@@ -1,0 +1,8 @@
+# Build context is this folder only; keep out of the image everything that is not runtime code.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Developer scripts stay outside the image — they are run with `python api/scripts/…` on the host.
+scripts/

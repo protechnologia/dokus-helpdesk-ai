@@ -546,6 +546,12 @@ Wspólne:
 - `pip install -e .` tylko po zmianie pyproject.toml, po zmianie kodu nigdy.
 - CLI to cienkie adaptery nad serwisami domenowymi (jak handlery HTTP) — zero logiki w komendzie.
 - **Komendy niszczące (`index rebuild`) pytają o potwierdzenie** albo wymagają `--yes`.
+- **Tekst pomocy zawsze przez `help=`, nigdy z docstringa.** Typer domyślnie wstawia docstring
+  do `--help`, a nasz format docstringów („Description:", „Example args:") jest dla programisty,
+  nie dla operatora — bez `help=` wycieka do interfejsu. Docstring zostaje, ale go nie widać.
+- **Jedna komenda w drzewie wymaga `@cli.callback()`** — Typer „zwija" aplikację z pojedynczą
+  komendą i wtedy `dokus` uruchamia ją wprost, zamiast wypisać drzewo. Callback (choćby pusty)
+  trzyma tryb subkomend, więc dodanie drugiej komendy nie zmienia zachowania pierwszej.
 
 ## Dokumentacja
 
@@ -591,6 +597,13 @@ Wspólne:
 - Unit testy **mockują klienta LLM i embedder**; realne API nigdy w domyślnym przebiegu.
 - **Retrieval testujemy na deterministycznej atrapie embeddera** (stały wektor per tekst) —
   test progów, dedupe i routingu nie ma prawa zależeć od modelu.
+- **Klientem HTTP dla `TestClient` jest `httpx2`, nie `httpx`** — Starlette ≥ 1.3 uznaje `httpx`
+  za przestarzały i przy każdym przebiegu sypie `StarletteDeprecationWarning`. Oba pakiety
+  zainstalowane obok siebie nie kolidują, ale ostrzeżenie znika dopiero po usunięciu `httpx`.
+- **Handlery wyjątków testujemy na nagiej aplikacji** (`register_exception_handlers` + trasy
+  prowokujące błąd), nie na prawdziwej — inaczej test zależy od tego, jakie endpointy
+  przypadkiem istnieją. Do tego `TestClient(app, raise_server_exceptions=False)`, bo domyślnie
+  wyjątek leci do testu, zamiast trafić do handlera.
 
 ## Świadomie pominięte (NIE dodawać bez pytania)
 
@@ -660,7 +673,7 @@ sekcji (reguła → sekcja tematyczna, odrzucona opcja → „Świadomie pomini�
     walidator „pusty/biały string → `None`" (pułapka z „Konfiguracja i deploy") + **test
     plumbingu configu**. Pierwszy realny test w repo, chodzi bez Dockera. Noga „compose
     `environment:`" tego testu dochodzi w 0e, razem z plikami compose.
-  - [ ] **0c. Usługa `api`** — `Dockerfile`, `.dockerignore`, `requirements.txt`, `main.py`
+  - [x] **0c. Usługa `api`** — `Dockerfile`, `.dockerignore`, `requirements.txt`, `main.py`
     z `/health`, middleware Request-ID, handlery wyjątków (osobny na `RequestValidationError`),
     szkielet CLI (`dokus --help`).
   - [ ] **0d. Warstwa LLM** — `LLMClient` (interfejs), `FakeLLMClient`, `get_llm_client()`
