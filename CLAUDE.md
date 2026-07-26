@@ -641,12 +641,47 @@ Roadmapa budowy — etapy, ich kolejność i status. Trzyma kierunek prac i poka
 gotowe, a co przed nami. Gdy skończymy etap albo zmienimy plan, **zaktualizuj tu status**
 (np. `[x]` / `[~]` w trakcie / `[ ]`), a nowe etapy dopisuj z jednozdaniowym celem.
 
-- [ ] **0. Fundament repo** — compose (api + embedder + qdrant), `.env.example`, `Settings`,
-  `FakeLLMClient`, pytest/ruff, test plumbingu configu.
+**Rytm pracy:** etap **przed wdrożeniem rozpisujemy tu na podkroki** — z kolejnością (co od czego
+zależy) i sprawdzalnym kryterium ukończenia; rozpisany jest **tylko etap aktualny**, przyszłe
+zostają jednolinijkowe. **Po zakończeniu zwijamy podkroki** do jednego punktu `[x]` scalonego
+z opisem etapu — ale nie gubiąc wiedzy: trwałe ustalenia przenieś przed zwinięciem do właściwej
+sekcji (reguła → sekcja tematyczna, odrzucona opcja → „Świadomie pominięte", pułapka →
+„Gotchas", skrót → „TODO").
+
+**Etapy:**
+
+- [~] **0. Fundament repo** — szkielet, na którym da się uruchomić testy i całą kompozycję;
+  zero logiki domenowej. Kolejność idzie od rzeczy weryfikowalnych bez Dockera — compose na
+  starcie nie ma czego uruchomić, więc daje tylko informację „kontener wstał".
+  - [x] **0a. Pakiet i narzędzia** — `pyproject.toml` (pakietowanie, entry-point `dokus`,
+    `--import-mode=importlib` w `addopts`, markery `integration`, `integration_qdrant`,
+    `integration_embedder`, `llm_live`), `requirements-dev.txt`, `.venv`.
+  - [ ] **0b. Konfiguracja** — `Settings` (`api/app/config.py`) + `.env.example` +
+    walidator „pusty/biały string → `None`" (pułapka z „Konfiguracja i deploy") + **test
+    plumbingu configu**. Pierwszy realny test w repo, chodzi bez Dockera.
+  - [ ] **0c. Usługa `api`** — `Dockerfile`, `.dockerignore`, `requirements.txt`, `main.py`
+    z `/health`, middleware Request-ID, handlery wyjątków (osobny na `RequestValidationError`),
+    szkielet CLI (`dokus --help`).
+  - [ ] **0d. Warstwa LLM** — `LLMClient` (interfejs), `FakeLLMClient`, `get_llm_client()`
+    z fail-fast + testy atrapy i fabryki. Realnego dostawcy nie podłączamy — pierwszy
+    użytkownik pojawia się w etapie 5, ale abstrakcja musi istnieć wcześniej, żeby nikt
+    w międzyczasie nie zaimportował SDK prosto do domeny.
+  - [ ] **0e. Compose** — baza: `api` + `qdrant` + `embedder`-zaślepka (`/health`
+    i deterministyczny wektor per tekst, bez wag modelu) + warstwa `prod`
+    (`volumes: !reset []`). Obrazy pinowane, ENV przez `environment:`.
+
+  **Kryterium ukończenia** (sprawdzalne komendą, nie opinią):
+  `pytest` przechodzi offline i nie rusza sieci · `ruff check .` czysto ·
+  `docker compose up -d` → `/health` 200 i Qdrant odpowiada ·
+  `docker compose config` pokazuje zinterpolowane ENV bez pustych stringów ·
+  `docker compose -f docker-compose.prod.yml config` bez bind-mountu kodu ·
+  `dokus --help` działa po `pip install -e .` ·
+  **test plumbingu configu pada** po celowym przekręceniu nazwy w `.env.example`
+  (kontrola negatywna — strażnik, którego nikt nie widział na czerwono, nie jest strażnikiem).
 - [ ] **1. Kontrakt zgłoszenia** — `ParsedTicket` (Pydantic) + prompt parsujący w `prompts/` +
   `dokus tickets validate`; na tej podstawie parsujemy ręcznie pierwszą partię w czacie.
-- [ ] **2. Embedder jako usługa** — PolDense za REST-em, `embed_query/passage/sts`,
-  `EmbeddingClient` po stronie `api`.
+- [ ] **2. Embedder jako usługa** — podmiana zaślepki z etapu 0 na realny PolDense (wagi, dobór
+  wariantu, warstwa GPU), `embed_query/passage/sts`, `EmbeddingClient` po stronie `api`.
 - [ ] **3. Ewaluacja embeddera** — golden set par + `recall@5` na dwóch osiach: model (PolDense
   vs mmlw-roberta-large vs BGE-M3) i tryb (`query→passage` vs `sts→sts`, zapytanie surowe vs
   sparsowane); wynik zapisany w repo. **Decyzja o modelu i trybie zapada tu, nie wcześniej** —

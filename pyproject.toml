@@ -1,0 +1,62 @@
+[build-system]
+requires      = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "dokus-helpdesk-ai"
+version         = "0.1.0"
+description     = "LLM support for a helpdesk application and its implementation engineers"
+requires-python = ">=3.12"
+
+# Runtime dependencies deliberately live in api/requirements.txt (they go into the image);
+# duplicating them here would give two sources of truth for the same fact.
+dependencies = []
+
+[project.scripts]
+# Single entry-point for the whole production CLI tree; subcommands are @cli.command().
+# Note: unusable until step 0c creates api/app/cli/cli.py.
+dokus = "app.cli.cli:cli"
+
+[tool.setuptools]
+# Code lives in api/app/ because the folder is also the compose service; "api" is the import root,
+# so `import app...` works identically on the host and inside the container.
+package-dir = { "" = "api" }
+
+[tool.setuptools.packages.find]
+where = ["api"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+# importlib mode is required: the same file name may exist in tests/unit/ and tests/integration/,
+# which makes the default prepend mode fail with "import file mismatch".
+addopts = "--import-mode=importlib"
+
+markers = [
+    "integration: umbrella for every test requiring a running service",
+    "integration_qdrant: requires a reachable Qdrant instance",
+    "integration_embedder: requires a reachable embedder service",
+    "llm_live: hits a real, billable LLM — outside the integration umbrella on purpose",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "F",  # pyflakes
+    "W",  # pycodestyle warnings
+    "I",  # import sorting (imports belong at the top of the module)
+    "B",  # bugbear — catches bare-except-adjacent and mutable-default traps
+    "UP", # pyupgrade — keeps syntax at the level of requires-python
+]
+
+# Vertical alignment of `=` is a deliberate project style (see CLAUDE.md → "Styl kodu").
+# These whitespace rules exist precisely to forbid it, so they stay off.
+ignore = [
+    "E221", # multiple spaces before operator   — `name    = value`
+    "E222", # multiple spaces after operator
+    "E251", # spaces around keyword equals      — `timeout  = 60` in a call
+    "E252", # missing whitespace around parameter equals
+]
