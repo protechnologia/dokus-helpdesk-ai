@@ -1,0 +1,20 @@
+# --- konfiguracja lokalna (kontraktem jest .env.example) ---
+.env
+
+# --- artefakty i dane wejściowe: zawierają dane klientów (PII) ---
+data/
+
+# --- Python ---
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# --- narzędzia i edytory ---
+.idea/
+.vscode/
+
+# --- frontend (dojdzie w etapie 8) ---
+node_modules/
