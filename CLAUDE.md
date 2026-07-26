@@ -656,9 +656,10 @@ sekcji (reguła → sekcja tematyczna, odrzucona opcja → „Świadomie pomini�
   - [x] **0a. Pakiet i narzędzia** — `pyproject.toml` (pakietowanie, entry-point `dokus`,
     `--import-mode=importlib` w `addopts`, markery `integration`, `integration_qdrant`,
     `integration_embedder`, `llm_live`), `requirements-dev.txt`, `.venv`.
-  - [ ] **0b. Konfiguracja** — `Settings` (`api/app/config.py`) + `.env.example` +
+  - [x] **0b. Konfiguracja** — `Settings` (`api/app/config.py`) + `.env.example` +
     walidator „pusty/biały string → `None`" (pułapka z „Konfiguracja i deploy") + **test
-    plumbingu configu**. Pierwszy realny test w repo, chodzi bez Dockera.
+    plumbingu configu**. Pierwszy realny test w repo, chodzi bez Dockera. Noga „compose
+    `environment:`" tego testu dochodzi w 0e, razem z plikami compose.
   - [ ] **0c. Usługa `api`** — `Dockerfile`, `.dockerignore`, `requirements.txt`, `main.py`
     z `/health`, middleware Request-ID, handlery wyjątków (osobny na `RequestValidationError`),
     szkielet CLI (`dokus --help`).

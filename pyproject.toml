@@ -60,3 +60,8 @@ ignore = [
     "E251", # spaces around keyword equals      — `timeout  = 60` in a call
     "E252", # missing whitespace around parameter equals
 ]
+
+[tool.ruff.lint.isort]
+# Without this, `app` is taken for a third-party library and lands in the same block as pytest;
+# declaring it keeps our own imports in a separate, last group.
+known-first-party = ["app"]

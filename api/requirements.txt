@@ -1,0 +1,4 @@
+# Runtime dependencies of the `api` service — these go INTO the image.
+# Test/lint tooling lives in requirements-dev.txt at the repo root and never enters the image.
+pydantic==2.10.5
+pydantic-settings==2.7.1
