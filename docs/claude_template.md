@@ -153,6 +153,27 @@
   )
   ```
 
+## Warstwa CLI
+
+Dwie kategorie, których nie mieszamy:
+1. Deweloperskie — `api/scripts/*.py`, uruchamiane `python api/scripts/nazwa.py`.
+2. Produkcyjne — `api/app/cli/cli.py`, jeden wpis w `[project.scripts]` na całe drzewo subkomend.
+
+Wspólne:
+- Framework: Typer.
+- Wpis w `[project.scripts]` = osobna komenda (`myapp-worker`); `@cli.command()` = subkomenda (`myapp meters import`).
+- `pip install -e .` tylko po zmianie pyproject.toml, po zmianie kodu nigdy.
+- CLI to cienkie adaptery nad serwisami domenowymi (jak handlery HTTP) — zero logiki w komendzie.
+
+### Gotchas
+
+- **Tekst pomocy przez `help=`** — inaczej Typer wstawi do `--help` docstring pisany dla programisty.
+- **`@cli.callback()` nawet przy jednej komendzie** — inaczej Typer zwija drzewo i odpala ją wprost.
+
+## Warstwa API
+
+- **`/health` mówi „ok" tylko o samym API** — o stanie zależności nie mówi nic.
+
 ## Warstwa LLM
 
 - **Jeden plik importuje SDK dostawcy** — reszta kodu tylko przez `LLMClient` (zasada 4).
@@ -333,18 +354,6 @@ Raises:                      # only when the method raises
 - Nie rozbijaj małych komponentów na kilkanaście plików (np. nawigacja jako dane w configu, nie JSX).
 - Wykresy: `@ant-design/charts`.
 
-## Skrypty konsolowe
-
-Dwie kategorie, których nie mieszamy:
-1. Deweloperskie — `api/scripts/*.py`, uruchamiane `python api/scripts/nazwa.py`.
-2. Produkcyjne — `api/app/cli/cli.py`, jeden wpis w `[project.scripts]` na całe drzewo subkomend.
-
-Wspólne:
-- Framework: Typer.
-- Wpis w `[project.scripts]` = osobna komenda (`myapp-worker`); `@cli.command()` = subkomenda (`myapp meters import`).
-- `pip install -e .` tylko po zmianie pyproject.toml, po zmianie kodu nigdy.
-- CLI to cienkie adaptery nad serwisami domenowymi (jak handlery HTTP) — zero logiki w komendzie.
-
 ## Dokumentacja
 
 - **CLAUDE.md** — „dlaczego": zasady, trwałe decyzje, pułapki, świadome pominięcia.
@@ -402,14 +411,6 @@ tworzysz świadomym skrótem), **dopisz go tu** zamiast zostawiać w milczeniu.
 
 _(pusta — uzupełniana w miarę pracy)_
 
-## Gotchas (pułapki wdrożone na własnej skórze)
-
-Pułapki **bez naturalnego domu** w innych sekcjach (środowisko, biblioteki, framework) —
-tematyczne zostają u siebie (config → „Konfiguracja i deploy", LLM → „Warstwa LLM"). Gdy
-stracisz czas na coś nieoczywistego z dokumentacji, **dopisz to tu**: objaw → przyczyna → obejście.
-
-_(pusta — uzupełniana w miarę odkryć)_
-
 ## Plan tworzenia aplikacji
 
 Roadmapa budowy — etapy, ich kolejność i status. Trzyma kierunek prac i pokazuje, co już
@@ -420,8 +421,8 @@ gotowe, a co przed nami. Gdy skończymy etap albo zmienimy plan, **zaktualizuj t
 zależy) i sprawdzalnym kryterium ukończenia; rozpisany jest **tylko etap aktualny**, przyszłe
 zostają jednolinijkowe. **Po zakończeniu zwijamy podkroki** do jednego punktu `[x]` scalonego
 z opisem etapu — ale nie gubiąc wiedzy: trwałe ustalenia przenieś przed zwinięciem do właściwej
-sekcji (reguła → sekcja tematyczna, odrzucona opcja → „Świadomie pominięte", pułapka →
-„Gotchas", skrót → „TODO").
+sekcji (reguła → sekcja tematyczna, odrzucona opcja → „Świadomie pominięte", pułapka → „Gotchas"
+właściwej warstwy, skrót → „TODO").
 
 **Etapy:**
 
