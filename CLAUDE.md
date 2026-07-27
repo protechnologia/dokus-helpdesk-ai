@@ -592,6 +592,9 @@ Wspólne:
 - **Markery:** `integration_qdrant`, `integration_embedder` + parasol `integration`; osobno
   `llm_live` (żywy, płatny LLM **poza** parasolem, żeby `-m integration` go nie łapał).
   Wszystkie rejestrowane w `pyproject.toml`.
+- **Testy async przez `pytest-asyncio` w trybie `asyncio_mode = "auto"`** — klienci transportowi
+  (LLM, embedder, Qdrant) są async, więc ich testy są korutynami; tryb `auto` uruchamia każdy
+  `async def test_*` bez dekoratora na każdym teście.
 - **`--import-mode=importlib`** w `addopts` — bez tego zbiorczy `pytest -m …` wywala „import file
   mismatch", gdy ten sam plik istnieje w `tests/unit/` i `tests/integration/`.
 - Unit testy **mockują klienta LLM i embedder**; realne API nigdy w domyślnym przebiegu.
@@ -676,9 +679,10 @@ sekcji (reguła → sekcja tematyczna, odrzucona opcja → „Świadomie pomini�
   - [x] **0c. Usługa `api`** — `Dockerfile`, `.dockerignore`, `requirements.txt`, `main.py`
     z `/health`, middleware Request-ID, handlery wyjątków (osobny na `RequestValidationError`),
     szkielet CLI (`dokus --help`).
-  - [ ] **0d. Warstwa LLM** — `LLMClient` (interfejs), `FakeLLMClient`, `get_llm_client()`
-    z fail-fast + testy atrapy i fabryki. Realnego dostawcy nie podłączamy — pierwszy
-    użytkownik pojawia się w etapie 5, ale abstrakcja musi istnieć wcześniej, żeby nikt
+  - [x] **0d. Warstwa LLM** — `LLMClient` (interfejs) + `LLMCompletion` (tekst + użycie do logu),
+    `FakeLLMClient` (odpowiedzi skryptowane, `calls` do asercji, wyczerpanie skryptu = `LLMError`),
+    `get_llm_client()` z fail-fast + testy atrapy i fabryki. Realnego dostawcy nie podłączamy —
+    pierwszy użytkownik pojawia się w etapie 5, ale abstrakcja istnieje wcześniej, żeby nikt
     w międzyczasie nie zaimportował SDK prosto do domeny.
   - [ ] **0e. Compose** — baza: `api` + `qdrant` + `embedder`-zaślepka (`/health`
     i deterministyczny wektor per tekst, bez wag modelu) + warstwa `prod`

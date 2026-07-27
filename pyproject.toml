@@ -32,6 +32,11 @@ testpaths = ["tests"]
 # which makes the default prepend mode fail with "import file mismatch".
 addopts = "--import-mode=importlib"
 
+# The transport clients (LLM, embedder, Qdrant) are async, so their tests are coroutines.
+# "auto" runs any `async def test_*` without decorating each one — no marker boilerplate.
+asyncio_mode                       = "auto"
+asyncio_default_fixture_loop_scope = "function"  # silences the pytest-asyncio unset-scope warning
+
 markers = [
     "integration: umbrella for every test requiring a running service",
     "integration_qdrant: requires a reachable Qdrant instance",
