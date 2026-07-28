@@ -102,6 +102,9 @@
   Korzeń należy do infrastruktury: compose, `.env*`, dokumentacja, config testów.
 - **Testy w korzeniu, nie w folderze usługi** — nie trafiają do obrazu, a integracyjne sięgają
   kilku usług. Ten sam plik może być w `unit/` i `integration/` (stąd `--import-mode=importlib`).
+- **Pakiety usług nazwane rozłącznie** (`api/app/`, `embedder/embedder_app/`) — dwa pakiety `app`
+  zasłaniają się w jednym procesie pytest. Niepakowana usługa dochodzi przez `pythonpath`
+  w `pyproject.toml`.
 - **Dwa pliki zależności:** `<usługa>/requirements.txt` = runtime, do obrazu;
   `requirements-dev.txt` w korzeniu = testy/lint, nigdy w obrazie.
 
@@ -342,6 +345,10 @@ Raises:                      # only when the method raises
 - **Przyczynę błędu logujemy w handlerach wyjątków, nie w middleware** — middleware widzi już
   gotową `Response`, a `detail` (jedyne „dlaczego") żyje tylko w wyjątku. Uwaga: `RequestValidationError`
   to **nie** `HTTPException` — potrzebuje osobnego handlera (najczęstsze 422).
+- **Awaria zależności → 503 z generycznym komunikatem** (tekst wyjątku SDK potrafi zacytować
+  prompt); szczegół zostaje w logu.
+- **Błąd konfiguracji NIGDY nie zamienia się w status HTTP** — `…ConfigError` dziedziczy po
+  błędzie warstwy, więc sam wpadnie w handler 503: handler musi go **wyrzucić z powrotem**.
 - **Treści promptów/odpowiedzi/danych użytkownika: DEBUG, nigdy INFO.**
 
 ## Frontend
@@ -394,6 +401,8 @@ Raises:                      # only when the method raises
   **poza** parasolem, żeby `-m integration` go nie łapał). Wszystkie rejestrowane w `pyproject.toml`.
 - **`--import-mode=importlib`** w `addopts` — bez tego zbiorczy `pytest -m …` wywala „import file
   mismatch", gdy ten sam plik istnieje w `tests/unit/` i `tests/integration/`.
+- **`-m 'not integration and not llm_live'` w `addopts`** — sama rejestracja markera niczego nie
+  odsiewa; bez tego gołe `pytest` odpala też integracyjne. `-m` z linii poleceń nadpisuje.
 - Unit testy **mockują klienta LLM**; realne API nigdy w domyślnym przebiegu.
 
 ## Świadomie pominięte (NIE dodawać bez pytania)

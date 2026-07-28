@@ -28,9 +28,18 @@ where = ["api"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+# `api` is importable through the editable install (package-dir above); the other services are not
+# packaged at all — they only ship inside their own image. Adding their folder here lets a unit
+# test import their pure logic (e.g. `embedder_app.vectors`) without installing them.
+pythonpath = ["embedder"]
+
 # importlib mode is required: the same file name may exist in tests/unit/ and tests/integration/,
 # which makes the default prepend mode fail with "import file mismatch".
-addopts = "--import-mode=importlib"
+#
+# The default run must be offline unit tests only: everything behind a marker needs a running
+# service (or a billable LLM) and is asked for explicitly. `-m` on the command line replaces this
+# value, so `pytest -m integration_embedder` still selects exactly what it names.
+addopts = "--import-mode=importlib -m 'not integration and not llm_live'"
 
 # The transport clients (LLM, embedder, Qdrant) are async, so their tests are coroutines.
 # "auto" runs any `async def test_*` without decorating each one — no marker boilerplate.
@@ -69,4 +78,4 @@ ignore = [
 [tool.ruff.lint.isort]
 # Without this, `app` is taken for a third-party library and lands in the same block as pytest;
 # declaring it keeps our own imports in a separate, last group.
-known-first-party = ["app"]
+known-first-party = ["app", "embedder_app"]

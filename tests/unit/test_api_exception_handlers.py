@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from app.errors import register_exception_handlers
+from app.llm import LLMConfigError, LLMError
 
 
 @pytest.fixture
@@ -16,7 +17,7 @@ def client() -> TestClient:
         (injected by pytest)
 
     Example result:
-        TestClient over an app exposing /boom and /needs-param
+        TestClient over an app exposing /boom, /needs-param, /llm-down and /llm-misconfigured
     """
     app = FastAPI()
     register_exception_handlers(app)
@@ -28,6 +29,14 @@ def client() -> TestClient:
     @app.get("/needs-param")
     async def needs_param(limit: int) -> dict[str, int]:
         return {"limit": limit}
+
+    @app.get("/llm-down")
+    async def llm_down() -> None:
+        raise LLMError("Read timed out; prompt was 'Drukarka nie drukuje'")
+
+    @app.get("/llm-misconfigured")
+    async def llm_misconfigured() -> None:
+        raise LLMConfigError("Unknown LLM_PROVIDER='openai'")
 
     # raise_server_exceptions=False: let the handlers answer instead of re-raising into the test.
     return TestClient(app, raise_server_exceptions=False)
@@ -56,6 +65,29 @@ def test_validation_error_hides_submitted_values(client: TestClient) -> None:
 
     assert response.status_code == 422
     assert "not-a-number" not in response.text
+
+
+def test_llm_error_becomes_service_unavailable(client: TestClient) -> None:
+    """LLMError during a request → 503, so the caller retries instead of blaming its own input."""
+    response = client.get("/llm-down")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Language model call failed"
+
+
+def test_llm_error_body_hides_the_provider_message(client: TestClient) -> None:
+    """Provider exception text → never in the body (it may quote the prompt, i.e. ticket text)."""
+    response = client.get("/llm-down")
+
+    assert "timed out" not in response.text
+    assert "Drukarka" not in response.text
+
+
+def test_config_error_is_not_dressed_up_as_a_transient_failure(client: TestClient) -> None:
+    """LLMConfigError (an LLMError subclass) → NOT 503; misconfiguration must stay loud."""
+    response = client.get("/llm-misconfigured")
+
+    assert response.status_code == 500
 
 
 def test_request_id_is_absent_without_middleware(client: TestClient) -> None:

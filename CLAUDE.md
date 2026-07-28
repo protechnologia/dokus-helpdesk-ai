@@ -272,7 +272,13 @@ dokus-helpdesk-ai/
 │       └── retrieval/            # klient Qdranta: indeksacja, wyszukiwanie
 ├── embedder/                     # kolejna usługa: model PL za REST-em
 │   ├── Dockerfile
-│   └── app/
+│   ├── requirements.txt
+│   └── embedder_app/             # pakiet nazwany rozłącznie z `app` z `api/` (patrz „Testy")
+│       ├── main.py               # montaż aplikacji
+│       ├── config.py             # Settings tej usługi (własne, kodu nie dzielimy)
+│       ├── models.py             # kontrakt HTTP: EmbedRequest/EmbedResponse, tryby prefiksów
+│       ├── encoding/             # Encoder + fabryka + FakeEncoder — tu wchodzi PolDense
+│       └── routers/              # /health, /embed
 ├── tests/
 │   ├── unit/
 │   └── integration/
@@ -294,6 +300,14 @@ dokus-helpdesk-ai/
   konstruktor, nigdy nie sięga po SDK.
 - **Klient per usługa.** Jedna implementacja → klient tworzony wprost. Klient
   wymienny → z fabryki po configu (np. LLM: chmura na dev, Bielik na prod).
+- **„Klient" znaczy przekroczenie granicy procesu.** `EmbeddingClient` w `api` mówi HTTP-em do
+  usługi `embedder`; to, co **wewnątrz** tej usługi liczy wektory, klientem nie jest i tak się
+  nie nazywa (`Encoder`, `FakeEncoder`) — inaczej ta sama nazwa znaczyłaby dwie różne rzeczy
+  w dwóch usługach. Wzorzec za to jest ten sam po obu stronach: interfejs + implementacja
+  offline (`Fake…`) + fabryka po ENV z fail-fast.
+- **Funkcja czy klasa — rozstrzyga stan, nie symetria.** Implementacja z cyklem życia (wagi
+  modelu, sesja HTTP) to obiekt budowany raz; obliczenie bezstanowe zostaje funkcją modułową
+  wołaną przez tę implementację (`deterministic_vector` wewnątrz `FakeEncoder`).
 - **Handlery cienkie** — żądanie → serwis → odpowiedź; zero logiki i LLM w handlerze.
 - **Osobne modele domenowe i API.** Encje/obiekty domeny nie wychodzą wprost przez HTTP —
   przepisujemy jawnie. Chroni kontrakt i blokuje wyciek pól wewnętrznych (ID, scoring).
@@ -540,6 +554,19 @@ Raises:                      # only when the method raises
 - **Przyczynę błędu logujemy w handlerach wyjątków, nie w middleware** — middleware widzi już
   gotową `Response`, a `detail` (jedyne „dlaczego") żyje tylko w wyjątku. Uwaga: `RequestValidationError`
   to **nie** `HTTPException` — potrzebuje osobnego handlera (najczęstsze 422).
+- **Awaria zależności ma własny handler i status „spróbuj później".** Wyjątek warstwy
+  transportowej (dziś `EncoderError` w embedderze) łapiemy osobno i zwracamy **503** we wspólnym
+  kształcie `ErrorResponse` — surowy 500 nie odróżnia „model chwilowo padł" od „zapytanie jest
+  błędne", a to decyduje, czy przebieg indeksacji ma ponowić, czy porzucić zgłoszenie.
+  **Treść wyjątku zostaje w logu, nie w odpowiedzi** — komunikat biblioteki modelu potrafi
+  zacytować wejście, czyli dane klienta.
+- **Błąd konfiguracji NIGDY nie zamienia się w status HTTP.** `LLMConfigError`/`EncoderConfigError`
+  dziedziczą po błędzie swojej warstwy, więc wpadłyby w handler 503 — handler **wyrzuca je z
+  powrotem**. Powód: 503 znaczy „spróbuj za chwilę", a przy złym `LLM_PROVIDER` czekanie nic nie
+  da; zielony kontener oddający uprzejme 503 na każde żądanie jest gorszy niż głośna śmierć.
+- **Każda usługa ma swoje handlery i swój Request-ID** — kodu nie dzielimy, więc to świadome
+  powielenie; id **przyjęte od wołającego wygrywa**, żeby jeden identyfikator spinał `api`
+  i embedder w jednym przebiegu indeksacji.
 - **Treści promptów/odpowiedzi/danych użytkownika: DEBUG, nigdy INFO.** Treść zgłoszenia
   i trafienia z RAG to dane klienta — na INFO wyłącznie identyfikatory i score.
 
@@ -580,8 +607,12 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 ## Testy
 
 - **Dzielić wg odpowiedzialności na osobne pliki** — jeden plik = jedna jednostka/aspekt
-  (`test_llm_fake.py` + `test_llm_factory.py` + `test_llm_openai.py` + `test_llm_openai_errors.py`),
-  nie jeden zbiorczy.
+  (`test_api_llm_fake.py` + `test_api_llm_factory.py` + `test_api_llm_openai.py` +
+  `test_api_llm_openai_errors.py`), nie jeden zbiorczy.
+- **Nazwa pliku zaczyna się od usługi, której test dotyczy** (`test_api_*`, `test_embedder_*`) —
+  przy kilku usługach sama nazwa mówi, co się psuje. **Bez prefiksu zostają testy
+  ponadusługowe** (`test_config_plumbing.py` sprawdza `.env.example` wobec `Settings` wszystkich
+  usług) — doklejenie im nazwy jednej usługi kłamałoby o zakresie.
 - **Każdy test ma docstring** — jedna linia „scenariusz → oczekiwanie", spójnie we wszystkich
   testach pliku (nie część z docstringiem, część bez).
 - **Bez obronnego boilerplate'u bez uzasadnienia.** Zadeklarowanych zależności (runtime i dev)
@@ -595,6 +626,33 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 - **Markery:** `integration_qdrant`, `integration_embedder` + parasol `integration`; osobno
   `llm_live` (żywy, płatny LLM **poza** parasolem, żeby `-m integration` go nie łapał).
   Wszystkie rejestrowane w `pyproject.toml`.
+- **Domyślny przebieg wyklucza markery jawnie** — `-m 'not integration and not llm_live'`
+  w `addopts`. Sama rejestracja markera niczego nie odsiewa: bez tego gołe `pytest` odpala też
+  integracyjne i jest zielone tylko wtedy, gdy akurat chodzi stack. `-m` z linii poleceń
+  **nadpisuje** tę wartość, więc `pytest -m integration_embedder` dalej wybiera dokładnie to,
+  o co prosi.
+- **Pakiety usług mają rozłączne nazwy** (`api/app/`, `embedder/embedder_app/`) — wszystkie
+  drzewa są importowalne w JEDNYM procesie pytest, a dwa pakiety najwyższego poziomu o tej samej
+  nazwie zasłaniałyby się nawzajem (`sys.modules` zapamiętuje pierwszy import, więc kolejność
+  decydowałaby, którą usługę faktycznie testujesz). W kontenerze nazwa nie ma znaczenia — ta
+  decyzja istnieje wyłącznie po to, żeby o testach jednostkowych nie rozstrzygała nazwa katalogu.
+- **Usługa nieopakowana jako pakiet dochodzi przez `pythonpath` w `pyproject.toml`** — tylko
+  `api` jest instalowane (`pip install -e .`), reszta jedzie wyłącznie w swoim obrazie.
+- **Podział testów usługi: kontrakt w procesie, wdrożenie po HTTP.** Linia podziału biegnie po
+  tym, CO test może udowodnić — nie po tym, której usługi dotyczy (obie mają być traktowane
+  tak samo):
+  - **jednostkowo, offline:** logika czysta (np. `deterministic_vector`) oraz kontrakt aplikacji
+    na `TestClient` — kody odpowiedzi, walidacja żądania, kształt payloadu;
+  - **integracyjnie, za markerem:** to, czego prawdziwość mieszka **poza naszym kodem** —
+    zachowanie realnej zależności (czy Qdrant naprawdę tak filtruje i sortuje, czy model
+    naprawdę daje inne wektory dla `[query]:` i `[sts]:`) oraz wdrożenie (obraz się zbudował,
+    `CMD` wskazuje właściwy moduł, port opublikowany, ENV doszło). Gdy pod spodem nie ma
+    zewnętrznej prawdy — jak przy backendzie `fake` — zostaje z tego **cienki smoke**
+    (`/health` + jedno realne wywołanie); powtarzanie w nim walidacji tylko wydłuża przebieg
+    wymagający stacku.
+- **Deterministyczna atrapa ma test „złotej wartości"** — zapisany wektor dla znanego tekstu.
+  Bez niego refaktor cicho zmienia odwzorowanie tekst→wektor i zaindeksowane wektory przestają
+  pasować do świeżo policzonych; wartość aktualizujemy **razem ze świadomą zmianą** algorytmu.
 - **Testy async przez `pytest-asyncio` w trybie `asyncio_mode = "auto"`** — klienci transportowi
   (LLM, embedder, Qdrant) są async, więc ich testy są korutynami; tryb `auto` uruchamia każdy
   `async def test_*` bez dekoratora na każdym teście.
@@ -679,9 +737,41 @@ właściwej warstwy, skrót → „TODO").
     `get_llm_client()` z fail-fast + testy atrapy i fabryki. Realnego dostawcy nie podłączamy —
     pierwszy użytkownik pojawia się w etapie 5, ale abstrakcja istnieje wcześniej, żeby nikt
     w międzyczasie nie zaimportował SDK prosto do domeny.
-  - [ ] **0e. Compose** — baza: `api` + `qdrant` + `embedder`-zaślepka (`/health`
-    i deterministyczny wektor per tekst, bez wag modelu) + warstwa `prod`
-    (`volumes: !reset []`). Obrazy pinowane, ENV przez `environment:`.
+  - [ ] **0e. Compose** — baza: `api` + `qdrant` + `embedder`-zaślepka + warstwa `prod`.
+    Obrazy pinowane (tag + digest), ENV przez `environment:`. Kolejność: zaślepka musi
+    istnieć, zanim compose ma co budować; test plumbingu na końcu, bo domyka pętlę
+    `.env.example` ↔ compose ↔ `Settings`.
+    - [x] **0e-1. Usługa `embedder` (backend `fake`)** — `embedder/` (Dockerfile, `.dockerignore`,
+      `requirements.txt` — **bez** `sentence-transformers`), `embedder_app/main.py` z `/health`
+      i `POST /embed`. Warstwa `encoding/` w kształcie lustrzanym wobec `app/llm/`: `Encoder`
+      (interfejs, async, `model_name`/`dimension`), `FakeEncoder` (`EMBEDDING_BACKEND=fake`),
+      `build_encoder()`/`get_encoder()` z fail-fast, `EncoderError`/`EncoderConfigError`.
+      Wektor **deterministyczny per tekst** (sha256 → seed → wektor znormalizowany, długość
+      z `EMBEDDING_VECTOR_SIZE`), bez wag modelu: progi, dedupe i routing nie mają prawa zależeć
+      od modelu (→ „Testy"). Kontrakt endpointu już w kształcie docelowym — przyjmuje `mode`
+      (`query`/`passage`/`sts`) i **ignoruje** go, bo mapowanie `mode` → prefiks jest cechą
+      modelu i mieszka w implementacji. Handlery wyjątków i Request-ID jak w `api`, plus własny
+      handler `EncoderError` → **503** (awaria backendu jest przejściowa — config padł już przy
+      starcie — więc indeksacja ma się wycofać i ponowić, a nie porzucić zgłoszenie).
+      Sprawdzian: dwa wywołania `/embed` na tym samym tekście = ten sam wektor (także po
+      restarcie procesu); zły `EMBEDDING_BACKEND` = śmierć przy starcie, nie błąd w żądaniu.
+    - [ ] **0e-2. Baza `docker-compose.yml` (dev)** — `api` (build `./api`, bind-mount
+      `./api/app`, `command` z `--reload`, `data/` zamontowane pod artefakty z etapu 1),
+      `embedder` (build `./embedder`), `qdrant` (wolumen nazwany na `/qdrant/storage`).
+      `healthcheck` tylko tam, gdzie usługa ma własny `/health` (`api`, `embedder`) — bez
+      `depends_on: service_healthy`, bo `/health` mówi wyłącznie o sobie.
+      **Wyrównanie testów do reguły „kontrakt w procesie, wdrożenie po HTTP"** (→ „Testy"),
+      możliwe dopiero tutaj, bo przed compose `api` nie ma czego odpytać po HTTP:
+      `api` dostaje integracyjny smoke `/health` (dziś jedyny sprawdzian kryterium
+      „`compose up` → 200" jest ręczny); testy kontraktowe embeddera (422 na brak/zły `mode`
+      i pusty batch, kolejność w batchu) schodzą do unitów na `TestClient`, a po HTTP zostaje
+      cienki smoke na usługę — `/health` + jedno `/embed`.
+    - [ ] **0e-3. Warstwa `docker-compose.prod.yml`** — `include:` bazy (jeden `-f` podnosi
+      łańcuch), zdjęcie bind-mountu przez `volumes: !reset []` i nadpisanie `command` bez
+      `--reload`. Sprawdzian: `config` tej warstwy nie pokazuje montowania kodu z hosta.
+    - [ ] **0e-4. Trzecia noga testu plumbingu configu** — parsuje pliki compose **jako dane**
+      (`pyyaml` do `requirements-dev.txt`, bez Dockera) i pilnuje zgodności kluczy
+      `environment:` ↔ `.env.example` ↔ pól `Settings` w obie strony.
 
   **Kryterium ukończenia** (sprawdzalne komendą, nie opinią):
   `pytest` przechodzi offline i nie rusza sieci · `ruff check .` czysto ·
@@ -693,8 +783,15 @@ właściwej warstwy, skrót → „TODO").
   (kontrola negatywna — strażnik, którego nikt nie widział na czerwono, nie jest strażnikiem).
 - [ ] **1. Kontrakt zgłoszenia** — `ParsedTicket` (Pydantic) + prompt parsujący w `prompts/` +
   `dokus tickets validate`; na tej podstawie parsujemy ręcznie pierwszą partię w czacie.
-- [ ] **2. Embedder jako usługa** — podmiana zaślepki z etapu 0 na realny PolDense (wagi, dobór
-  wariantu, warstwa GPU), `embed_query/passage/sts`, `EmbeddingClient` po stronie `api`.
+- [ ] **2. Embedder jako usługa** — realny PolDense obok backendu `fake` z etapu 0: nowa
+  implementacja `Encoder` (wagi, dobór wariantu, warstwa GPU, prefiksy trybów, `encode` przez
+  `run_in_threadpool`, bo `sentence-transformers` jest synchroniczne) + wpis w fabryce;
+  `embed_query/passage/sts` i `EmbeddingClient` po stronie `api`. Dochodzą dwie reguły:
+  **fabryka porównuje wymiar zgłoszony przez backend z `EMBEDDING_VECTOR_SIZE`** i wywala przy
+  starcie (dziś ten sprawdzian nie ma jak paść — `fake` bierze wymiar z configu), oraz
+  `EMBEDDING_MODEL` jako **parametr** jednej implementacji, nie osobny backend (PolDense, mmlw
+  i BGE-M3 ładują się tak samo). **Otwarte:** czy `fake` zostaje jako backend do dev/CI, czy
+  znika — decyzja po poznaniu rozmiaru wag i sprzętu.
 - [ ] **3. Ewaluacja embeddera** — golden set par + `recall@5` na dwóch osiach: model (PolDense
   vs mmlw-roberta-large vs BGE-M3) i tryb (`query→passage` vs `sts→sts`, zapytanie surowe vs
   sparsowane); wynik zapisany w repo. **Decyzja o modelu i trybie zapada tu, nie wcześniej** —

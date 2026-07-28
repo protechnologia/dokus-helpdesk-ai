@@ -1,0 +1,5 @@
+# Build context is this folder only; keep out of the image everything that is not runtime code.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/

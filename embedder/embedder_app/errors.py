@@ -4,18 +4,21 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.llm import LLMConfigError, LLMError
-from app.models import ErrorResponse
+from embedder_app.encoding import EncoderConfigError, EncoderError
+from embedder_app.models import ErrorResponse
 
 logger = logging.getLogger(__name__)
 
-# Header used both to accept an upstream correlation id and to return the one we used.
+# Header used both to accept an upstream correlation id and to return the one we used. The value
+# normally comes from `api`, which called us — one id has to span both services or the two log
+# streams cannot be stitched together.
 REQUEST_ID_HEADER = "X-Request-ID"
 
-# A model call that fails mid-request is reported as "temporarily unavailable", not "broken
-# request": configuration was validated when the client was built, so what remains is transient
-# (timeout, provider outage, refusal). 503 tells the caller to retry rather than to give up.
-DEPENDENCY_FAILURE_STATUS = 503
+# An encoding failure is reported as "temporarily unavailable", not "broken request": by the time
+# a request reaches us, configuration has already been validated at startup, so what remains is
+# transient (out of memory, backend hiccup). 503 tells an indexing run to back off and retry
+# rather than to discard the ticket.
+ENCODER_FAILURE_STATUS = 503
 
 
 def _request_id_of(request: Request) -> str | None:   # e.g. Request with state.request_id set
@@ -43,10 +46,10 @@ async def _handle_http_exception(request: Request, exc: Exception) -> JSONRespon
 
     Example args:
         request=Request(scope={...})
-        exc=HTTPException(status_code=404, detail="Ticket not found")
+        exc=HTTPException(status_code=404, detail="Not Found")
 
     Example result:
-        JSONResponse(status_code=404, content={"detail": "Ticket not found", "request_id": "8f14…"})
+        JSONResponse(status_code=404, content={"detail": "Not Found", "request_id": "8f14…"})
     """
     # Signature is typed as Exception because FastAPI's handler registry is untyped; narrow here.
     assert isinstance(exc, HTTPException)
@@ -68,13 +71,13 @@ async def _handle_http_exception(request: Request, exc: Exception) -> JSONRespon
 async def _handle_validation_error(request: Request, exc: Exception) -> JSONResponse:
     """
     Description:
-    Handles `RequestValidationError` — the most common 422. It is NOT an `HTTPException`, so
-    without its own handler it would bypass the one above and return FastAPI's raw error shape,
-    breaking the uniform contract.
+    Handles `RequestValidationError` — the most common 422 here, because every request that omits
+    `mode` or sends an empty batch lands in it. It is NOT an `HTTPException`, so without its own
+    handler it would bypass the one above and return FastAPI's raw error shape.
 
     Example args:
         request=Request(scope={...})
-        exc=RequestValidationError(errors=[{"loc": ["query", "limit"], "msg": "…"}])
+        exc=RequestValidationError(errors=[{"loc": ["body", "mode"], "msg": "Field required"}])
 
     Example result:
         JSONResponse(status_code=422, content={"detail": "…", "request_id": "8f14…"})
@@ -82,7 +85,7 @@ async def _handle_validation_error(request: Request, exc: Exception) -> JSONResp
     assert isinstance(exc, RequestValidationError)
 
     request_id = _request_id_of(request)
-    # Full error list at DEBUG only: it echoes submitted values, i.e. potentially user data.
+    # Full error list at DEBUG only: it echoes submitted values, i.e. ticket text.
     logger.warning(
         "validation_error path=%s error_count=%d request_id=%s",
         request.url.path,
@@ -96,44 +99,45 @@ async def _handle_validation_error(request: Request, exc: Exception) -> JSONResp
     return JSONResponse(status_code=422, content=body.model_dump())
 
 
-async def _handle_llm_error(request: Request, exc: Exception) -> JSONResponse:
+async def _handle_encoder_error(request: Request, exc: Exception) -> JSONResponse:
     """
     Description:
-    Handles a failure of the LLM layer. Its purpose is containment: whatever a provider SDK
-    raises has already been translated into `LLMError`, and here it stops becoming a bare 500.
-    The message is deliberately generic — a provider's exception text may quote the prompt,
-    which contains the customer's ticket.
+    Handles a failure of the encoding layer. Its purpose is containment: whatever a backend
+    library raises has already been translated into `EncoderError`, and here it stops becoming
+    a bare 500 with a stack-shaped body. The message is deliberately generic — a model library's
+    exception text may quote the input, which is customer data.
 
     Example args:
         request=Request(scope={...})
-        exc=LLMError("Read timed out after 60s")
+        exc=EncoderError("CUDA out of memory")
 
     Example result:
-        JSONResponse(status_code=503, content={"detail": "Language model call failed", …})
+        JSONResponse(status_code=503, content={"detail": "Encoding failed", "request_id": "8f14…"})
 
     Raises:
-        LLMConfigError: re-raised untouched — see below
+        EncoderConfigError: re-raised untouched — see below
     """
-    # A configuration error must NOT be dressed up as a transient failure: it means the process
-    # should never have started serving. Letting it escape kills the request loudly (500 + stack)
-    # instead of leaving a green container answering 503 to every caller forever.
-    if isinstance(exc, LLMConfigError):
+    # EncoderConfigError is a SUBCLASS of EncoderError, so it would land here silently. It must
+    # not: a configuration error means the process should never have started serving, and today
+    # it cannot occur mid-request only because `get_encoder()` runs at startup. If that ever
+    # changes, this re-raise keeps the failure loud instead of turning it into a polite 503.
+    if isinstance(exc, EncoderConfigError):
         raise exc
 
-    assert isinstance(exc, LLMError)
+    assert isinstance(exc, EncoderError)
 
     request_id = _request_id_of(request)
-    # Exception message at ERROR because it is ours (no user text), unlike the prompt.
+    # Exception message at ERROR because it is ours (no user text), unlike the request body.
     logger.error(
-        "llm_error path=%s error=%s request_id=%s",
+        "encoder_error path=%s error=%s request_id=%s",
         request.url.path,
         exc,
         request_id,
     )
 
-    body = ErrorResponse(detail="Language model call failed", request_id=request_id)
+    body = ErrorResponse(detail="Encoding failed", request_id=request_id)
 
-    return JSONResponse(status_code=DEPENDENCY_FAILURE_STATUS, content=body.model_dump())
+    return JSONResponse(status_code=ENCODER_FAILURE_STATUS, content=body.model_dump())
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -150,6 +154,4 @@ def register_exception_handlers(app: FastAPI) -> None:
     """
     app.add_exception_handler(HTTPException, _handle_http_exception)
     app.add_exception_handler(RequestValidationError, _handle_validation_error)
-    # Registered before the first caller exists (stage 5): the handler is what makes a model
-    # outage a documented 503 rather than whatever the endpoint author remembers to catch.
-    app.add_exception_handler(LLMError, _handle_llm_error)
+    app.add_exception_handler(EncoderError, _handle_encoder_error)

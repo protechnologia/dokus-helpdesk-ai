@@ -1,0 +1,9 @@
+# Runtime dependencies of the `embedder` service — these go INTO the image.
+#
+# Deliberately NO sentence-transformers / torch: this stage ships a stub that fabricates
+# deterministic vectors. The real PolDense model (and the weights, and the GPU layer) arrive in
+# stage 2 and change only this file and app/vectors.py — the HTTP contract stays put.
+pydantic==2.10.5
+pydantic-settings==2.7.1
+fastapi==0.140.0
+uvicorn[standard]==0.51.0
