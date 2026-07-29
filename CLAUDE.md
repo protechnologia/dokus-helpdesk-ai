@@ -4,10 +4,10 @@
 
 Wsparcie LLM dla aplikacji helpdesk i pracujących z nią wdrożeniowców.
 
-Na wejściu dostaniemy **historyczną bazę zgłoszeń** (format jeszcze nieznany — patrz „Dane
-wejściowe"). Z niej budujemy **bazę wektorową (RAG)**, a na jej podstawie aplikacja wspomaga
-wdrożeniowca — przede wszystkim **przygotowuje propozycję odpowiedzi** na nowe zgłoszenie,
-opartą o rozwiązania podobnych spraw z przeszłości.
+Na wejściu mamy **historyczną bazę zgłoszeń** — zrzut produkcyjnej bazy MariaDB helpdesku,
+zawężony do **modułu Dokus** (patrz „Dane wejściowe"). Z niej budujemy **bazę wektorową (RAG)**,
+a na jej podstawie aplikacja wspomaga wdrożeniowca — przede wszystkim **przygotowuje propozycję
+odpowiedzi** na nowe zgłoszenie, opartą o rozwiązania podobnych spraw z przeszłości.
 
 Kluczowa decyzja architektoniczna: **do RAG nie trafiają surowe zgłoszenia.** Każda konwersacja
 przechodzi najpierw przez LLM, który zwraca **ustrukturyzowany JSON** (problem, objawy, system,
@@ -63,6 +63,11 @@ LLM jest **zewnętrznym endpointem**, nie usługą w bazowym compose.
 - **Nie wrzucaj pola `solution` do embeddingu** — rozwiązanie żyje w payloadzie, nie w wektorze
 - **Nie indeksuj surowej treści maila** — indeksujemy wyłącznie sparsowane pola
 - **Nie kasuj i nie nadpisuj plików w `data/parsed/`** — to niepowtarzalny wynik przebiegu LLM
+- **Nie filtruj korpusu po `status = 'zamkniety'`** — Dokus kończy zgłoszenia na `rozwiazany`,
+  `zamkniety` ma 5 sztuk na 1825 (patrz „Dane wejściowe")
+- **Nie szukaj rozwiązań w tabeli `rozwiazanie`** — jest martwa; rozwiązanie to `komentarz`
+  z `typ IN ('rozwiazanie','konczacy_zgloszenie')`
+- **Nie wybieraj zakresu po `grupa_id` ani `projektid`** — tylko po `modulid = 116`
 
 ## Praca z agentem
 
@@ -73,19 +78,95 @@ LLM jest **zewnętrznym endpointem**, nie usługą w bazowym compose.
 - **Commity bez trailerów współautorstwa** (`Co-Authored-By` itp.).
 - Język komunikacji: polski.
 
-## Dane wejściowe (stan: nieznany)
+## Dane wejściowe (stan: znany — analiza 2026-07-29)
 
-Historycznej bazy zgłoszeń **jeszcze nie mamy** i nie znamy jej formatu (eksport z systemu
-ticketowego? skrzynka mailowa? CSV? baza?). Konsekwencje dla projektowania:
+Dostaliśmy **zrzut MySQL/MariaDB bazy `helpdesk`** (`mysql_helpdesk_20260724-141140.sql`, 37 MB,
+MariaDB 10.3, aplikacja na Doctrine/Symfony, 21 tabel). Nie jest to eksport plikowy ani skrzynka
+mailowa — **źródłem jest relacyjna baza produkcyjna**, więc adapter w `ingest/` czyta SQL,
+nie CSV.
+
+**`data/raw/` jest zdejmowane ze zrzutu skryptem `scripts/export_raw_tickets.py`** — wiernie,
+bez stripowania HTML-u i bez filtra jakości (filtr to decyzja etapu 4, zabetonowany w artefakcie
+przestałby być widoczny). Eksport jest odtwarzalny i nie woła LLM-a, więc **nie podlega zasadzie
+7** — w razie potrzeby wolno go powtórzyć albo zmienić jego kształt. Kolumny z hasłami nie są
+czytane przez żadne zapytanie tego skryptu.
 
 - **Import to cienka warstwa adapterów** — `api/app/ingest/`, jeden adapter na format źródłowy;
   reszta systemu widzi wyłącznie znormalizowany `RawTicket`.
 - **Nie zaszywamy założeń o źródle w domenie.** Nazwy pól, kodowanie, sposób sklejania wątku
   w konwersację żyją w adapterze.
-- Zanim dane przyjdą: pracujemy na **ręcznie przygotowanej próbce** w `samples/`.
 - **Dane zawierają PII** (nazwiska, adresy, telefony klientów). Traktujemy je jak wrażliwe:
   nigdy w logach na INFO, nigdy w commicie; `data/` w `.gitignore`, w repo tylko zanonimizowane
   przykłady.
+
+### Zakres korpusu: wyłącznie moduł Dokus
+
+**Interesuje nas jedna aplikacja — Dokus, czyli `zgloszenie.modulid = 116`.** Reszta bazy
+(30 923 zgłoszenia dla ~124 modułów: Karty Kontowe, Podatki, KiP, FK…) jest poza zakresem.
+
+**Zakres wybieramy po `modulid`, nigdy po grupie.** Grupa `Dokus` (`modul_zgloszenia.grupa_id`)
+to linia aplikacji webowych, nie produkt — zawiera też eObywatel (106 zgłoszeń), CHEM-SPED,
+Portal inwestora i GIS. Do tego `grupa_id` nie jest utrzymywany dla nowych modułów (część ma
+`NULL`), a `projektid` jest niespójny z `id` i miejscami śmieciowy (`8888`, `88886`) — **żadne
+z tych pól nie nadaje się na identyfikator.**
+
+Liczby (stan zrzutu 2026-07-24): **1825 zgłoszeń** (2021-02 → 2026-07), 1740 zamkniętych,
+**1496 użytecznych do RAG** (mają opis > 50 zn. i choć jeden komentarz > 50 zn.), z czego
+**1327 ma komentarz jawnie oznaczony jako rozwiązanie**. Śr. 2,2 komentarza na zgłoszenie,
+śr. długość opisu 598 zn. 138 zgłaszających z 34 instytucji. Przyrost ~500 użytecznych
+rekordów rocznie i rosnący.
+
+### Mapowanie tabel na `ParsedTicket`
+
+| nasze pole | źródło w bazie |
+|---|---|
+| `ticket_id`  | `zgloszenie.id` |
+| `date`       | `zgloszenie.created_at` |
+| `problem`    | `zgloszenie.czego_dotyczy` |
+| `symptoms`   | `zgloszenie.szczegolowy_opis` |
+| `solution`   | `komentarz.tresc` przy `typ IN ('rozwiazanie','konczacy_zgloszenie')` |
+| `category`   | `kategoria.nazwa` przez `zgloszenie.kategoriaid` (10 wartości w Dokusie) |
+| `resolved`   | `zgloszenie.status` — **uwaga niżej** |
+| `system`     | `modul_zgloszenia.nazwa` — **w tym zakresie stała, patrz niżej** |
+| `confirmed`  | `zgloszenie.powod_zakonczenia` — **nie** `ocena_rozwiazania` (patrz niżej) |
+| `cause`      | brak kolumny — do wyprowadzenia przez LLM z wątku |
+
+### Pułapki tej bazy (sprawdzone na danych, nie zgadywane)
+
+- **Statusem końcowym Dokusa jest `rozwiazany` (1735), nie `zamkniety` (5).** W całej bazie jest
+  odwrotnie (26 933 `zamkniety`). Filtr `resolved` napisany pod „resztę bazy" **odrzuciłby cały
+  korpus Dokusa** — to najłatwiejszy sposób na cichy pusty indeks.
+- **Tabela `rozwiazanie` jest martwa** — 1 wiersz w całej bazie, `zgloszenie.rozwiazanieid`
+  zerowe pokrycie. **Nie mylić jej z komentarzem `typ='rozwiazanie'`**, który jest realnym
+  źródłem rozwiązań. Tak samo martwe: `przyczyna` i `ocena_rozwiazania` (0 wypełnionych w całej
+  bazie).
+- **`confirmed` bierzemy z `powod_zakonczenia`, nie z `ocena_rozwiazania`.** Pole ocen jest puste,
+  ale powód zakończenia rozróżnia `akceptacja_propozycji_rozwiazania` (552 w Dokusie) od
+  `zignorowanie_propozycji_rozwiazania` (413) — to jest ten sygnał, tylko pod inną nazwą.
+  Pozostałe wartości (`komentarz_konczacy` 368, `NULL` 490) nie rozstrzygają — wtedy potwierdzenie
+  trzeba wyczytać z treści wątku albo zostawić jako nieznane. **Nie mylić „brak potwierdzenia"
+  z „klient zaprzeczył"** — zignorowanie propozycji to najczęściej cisza, nie sprzeciw.
+- **`cause` nie ma kolumny, ale często jest w wątku** — konsultant opisuje przyczynę w treści
+  rozwiązania („wyczerpanie połączeń do bazy przez konwersję LibreOffice", „certyfikat bez
+  uprawnienia AddDocumentToSign"). To zadanie dla LLM-a przy parsowaniu, nie brak danych.
+- **Część rozwiązań jest pusta merytorycznie** — „Już powinno działać", „Zamykam", „Proszę się
+  przelogować". Formalnie to komentarz `typ='rozwiazanie'`, ale nie niesie wiedzy nadającej się
+  do zaproponowania komuś innemu. **Filtr jakości musi to odsiewać**, inaczej RAG zwróci
+  trafienie bez treści — gorsze niż brak trafienia, bo wygląda na odpowiedź.
+- **Treści są w HTML** — tagi (`<p>`) i encje (`&#039;`, `&#34;`). Strip + unescape w adapterze,
+  przed jakimkolwiek parsowaniem i embedowaniem.
+- **Temat (`czego_dotyczy`) jest słabym sygnałem** — w całej bazie 24 749 unikalnych na 30 923,
+  samo „błąd" 446×. Dedup po treści opisu, nie po temacie.
+- **W całej bazie 89% zgłoszeń wyjechało do Mantisa** (`numer_mantis`), przez co komentarze
+  z synchronizacji REST gubią FK autora i lądują z `typ='zwyczajny'` mimo że są rozwiązaniami.
+  **Dokusa to nie dotyczy** (6 zgłoszeń z 1825 ma `numer_mantis`, 2 komentarze bez autora) —
+  ale gdyby zakres kiedyś się rozszerzył, `typ` i autor przestają być wiarygodne.
+- **Zrzut zawiera hasła** — `konsultant.haslo` i `uzytkownik.haslo` jako 32-znakowe hashe (MD5,
+  bez bcrypt/argon) oraz `skrzynka_email.password`. **Do niczego ich nie potrzebujemy — adapter
+  nie czyta tych kolumn**, nie trafiają nawet do kopii roboczej.
+- **Błędne klucze obce w schemacie źródłowym:** `instytucje_to_moduly.modulid`
+  i `instytucje_to_kategorie.kategoriaid` wskazują na `instytucja(id)` zamiast na
+  `modul_zgloszenia(id)` / `kategoria(id)`. Nie joinować po nich.
 
 ## Domena: kontrakt sparsowanego zgłoszenia
 
@@ -115,8 +196,16 @@ Zasady schematu (rozwinięcie „Jak projektować schemat odpowiedzi" niżej):
 - **Embedujemy wyłącznie `system` + `problem` + `symptoms`.** `solution` i metadane idą do
   payloadu Qdranta. Powód: szukamy po *podobieństwie problemu*, nie rozwiązania — wektor
   zanieczyszczony rozwiązaniem miesza oba sygnały.
+  - **Przy obecnym zakresie (`modulid = 116`) `system` jest stałą** — cały korpus to jeden
+    moduł, więc pole nie filtruje, nie różnicuje, a do każdego wektora dokłada ten sam token.
+    **Embedujemy `problem` + `symptoms`.** Regułę z `system` zostawiamy spisaną, bo wraca
+    natychmiast, gdy zakres obejmie więcej niż jedną aplikację.
 - **Filtr jakości przy indeksacji:** rekordy bez rozwiązania (`resolved = false`) nie trafiają
   do indeksu — nie ma z czego zaproponować odpowiedzi. `confirmed` podnosi wagę.
+  - **`confirmed` i `cause` nie mają źródła w bazie** (`ocena_rozwiazania` i `przyczyna` są
+    puste — patrz „Dane wejściowe"). Albo wypadają ze schematu, albo wyprowadza je LLM z wątku
+    z jawnym wyjściem `brak`. **Decyzja w etapie 1.** Do tego czasu nie opieramy na `confirmed`
+    żadnej wagi — nie ma czego ważyć.
 - **Deduplikacja** powtarzalnych problemów — ten sam problem w 200 ticketach zalałby top-5.
 
 ## RAG — architektura
@@ -222,6 +311,10 @@ wracać, i to ona kasuje jeden z dwóch named vectors.
 - Po zmianie zależności lub `Dockerfile` (albo kodu na prodzie): `docker compose up -d --build <usługa>`
 - Weryfikacja realnej konfiguracji: `docker compose config` (nie zawartość `.env`)
 
+**Przygotowanie danych (skrypty repo)**
+- Eksport zgłoszeń ze zrzutu do `data/raw/`: `python scripts/export_raw_tickets.py export --module-id 116`
+  (wymaga kontenera z zaimportowanym zrzutem; kontrola liczb wobec bazy na końcu przebiegu)
+
 **Pipeline danych (CLI `dokus`)**
 - Walidacja artefaktów: `dokus tickets validate data/parsed/`
 - Indeksacja do Qdranta: `dokus index build --collection <nazwa>`
@@ -250,6 +343,7 @@ dokus-helpdesk-ai/
 ├── pyproject.toml                # pytest/lint + pakietowanie (entry-point `dokus`)
 ├── requirements-dev.txt          # zależności testów/lintera (poza obrazem)
 ├── CLAUDE.md / README.md
+├── scripts/                      # narzędzia repo niezwiązane z usługą (patrz „Warstwa CLI")
 ├── data/                         # artefakty — NIE w repo (PII)
 │   ├── raw/                      # zgłoszenia źródłowe jak przyszły
 │   └── parsed/                   # sparsowane JSON-y (trwały artefakt, zasada 7)
@@ -351,9 +445,21 @@ dokus-helpdesk-ai/
 
 ## Warstwa CLI
 
-Dwie kategorie, których nie mieszamy:
-1. Deweloperskie — `api/scripts/*.py`, uruchamiane `python api/scripts/nazwa.py`.
-2. Produkcyjne — `api/app/cli/cli.py`, jeden wpis w `[project.scripts]` na całe drzewo subkomend.
+Trzy kategorie, których nie mieszamy:
+1. **Repo-level** — `scripts/*.py`, narzędzia niezwiązane z żadną usługą (przygotowanie danych,
+   jednorazowe migracje artefaktów). Uruchamiane `python scripts/nazwa.py`.
+2. **Deweloperskie usługi** — `<usługa>/scripts/*.py`, sięgają do kodu, configu albo endpointów
+   tej usługi. Uruchamiane `python api/scripts/nazwa.py`.
+3. **Produkcyjne** — `api/app/cli/cli.py`, jeden wpis w `[project.scripts]` na całe drzewo subkomend.
+
+**Kryterium podziału 1 vs 2: czy skrypt dotyka konkretnej usługi.** Eksport zrzutu bazy do
+`data/raw/` nie importuje `api.app` i nie odpytuje żadnego endpointu — jest repo-level. Sonda po
+`Settings` albo po `/embed` należy do usługi. Ta sama logika co przy nazwach testów: prefiks
+usługi dostaje to, co jej dotyczy, a rzeczy ponadusługowe zostają bez niego.
+
+**Skrypty z `scripts/` nie mają własnego `requirements.txt`** — nie trafiają do żadnego obrazu.
+Zależności biorą z `.venv`: `requirements-dev.txt` albo edytowalnej instalacji `api` (stamtąd
+Typer). Poza tym trzymamy je na bibliotece standardowej.
 
 Wspólne:
 - Framework: Typer.
@@ -689,6 +795,12 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Reranker (cross-encoder na top-10)** — dopiero gdy pomiar pokaże, że top-5 gubi trafienia.
 - **Synthetic queries jako dodatkowy named vector** — rozważane, nieprzyjęte.
 - **Automatyczna wysyłka odpowiedzi do klienta** — produktem jest propozycja dla wdrożeniowca.
+- **Zgłoszenia spoza modułu Dokus** — w bazie jest ich 29 tys. z ~124 modułów, ale zakres
+  projektu to jedna aplikacja; ich włączenie to nowa decyzja, nie rozszerzenie filtra
+  (wraca wtedy `system` do embeddingu i przestaje działać założenie o wiarygodnym `typ`
+  komentarza — patrz „Dane wejściowe").
+- **Załączniki zgłoszeń** — 16 634 plików w całej bazie, ale `zalacznik` trzyma tylko ścieżki,
+  samych plików w zrzucie nie ma; treść zgłoszenia i wątku wystarcza.
 
 ## TODO — przed wdrożeniem produkcyjnym
 
@@ -697,6 +809,18 @@ tworzysz świadomym skrótem), **dopisz go tu** zamiast zostawiać w milczeniu.
 
 - **PII w danych historycznych** — ustalić politykę: anonimizacja przy parsowaniu czy tylko
   kontrola dostępu. Decyzja wpływa na schemat i na to, co wolno trzymać w payloadzie Qdranta.
+  Kontekst z realnych danych: PII jest gęste (`osoba_kontakt`/`email_kontakt`/`telefon_kontakt`
+  wypełnione w ~92% zgłoszeń, do tego nazwiska w treści komentarzy), a przy **34 instytucjach**
+  Dokusa anonimizacja nazwy instytucji jest iluzoryczna — kontekst zgłoszenia i tak zdradza,
+  o kogo chodzi. Realny wybór jest więc między pełną anonimizacją treści a kontrolą dostępu,
+  nie między „ukryjemy nazwę" a resztą.
+- **Hasła w zrzucie źródłowym** — zgłosić klientowi, że `konsultant.haslo` i `uzytkownik.haslo`
+  to 32-znakowe hashe MD5 (bez bcrypt/argon), a `skrzynka_email.password` leży obok. Nas to nie
+  dotyczy (adapter tych kolumn nie czyta), ale zrzut u nas na dysku owszem — trzymać go krótko
+  i nie kopiować.
+- **Odświeżanie korpusu** — mamy jednorazowy zrzut z 2026-07-24. Bez ustalonego trybu
+  odświeżania (kolejny zrzut? dostęp read-only?) baza wiedzy zestarzeje się przy ~500 nowych
+  użytecznych zgłoszeniach rocznie.
 - **Uwierzytelnianie API** — brak; endpointy są dziś otwarte w sieci compose.
 - **Licencja PolDense (gemma)** — zweryfikować dopuszczalność użycia komercyjnego.
 - **Persystencja feedbacku** (czy wdrożeniowiec zaakceptował propozycję) — bez tego nie
@@ -783,6 +907,8 @@ właściwej warstwy, skrót → „TODO").
   (kontrola negatywna — strażnik, którego nikt nie widział na czerwono, nie jest strażnikiem).
 - [ ] **1. Kontrakt zgłoszenia** — `ParsedTicket` (Pydantic) + prompt parsujący w `prompts/` +
   `dokus tickets validate`; na tej podstawie parsujemy ręcznie pierwszą partię w czacie.
+  **Rozstrzygnąć tu:** los `cause` i `confirmed` (brak źródła w bazie — patrz „Dane wejściowe")
+  oraz czy `system` zostaje w schemacie mimo że w tym zakresie jest stałą.
 - [ ] **2. Embedder jako usługa** — realny PolDense obok backendu `fake` z etapu 0: nowa
   implementacja `Encoder` (wagi, dobór wariantu, warstwa GPU, prefiksy trybów, `encode` przez
   `run_in_threadpool`, bo `sentence-transformers` jest synchroniczne) + wpis w fabryce;
@@ -797,13 +923,16 @@ właściwej warstwy, skrót → „TODO").
   sparsowane); wynik zapisany w repo. **Decyzja o modelu i trybie zapada tu, nie wcześniej** —
   i to ona kasuje zbędny named vector.
 - [ ] **4. Indeksacja** — filtr `resolved` + dedup + named vectors + payload;
-  `dokus index build/rebuild` odtwarzalne z `data/parsed/`.
+  `dokus index build/rebuild` odtwarzalne z `data/parsed/`. Filtr jakości musi być mocniejszy
+  niż sam status: warunek „ma opis i ma treść rozwiązania" (w źródle odsiewa 1496 z 1825).
 - [ ] **5. Wyszukiwanie** — `POST /search`: parser zapytania (LLM → `ParsedTicket`) + top-K,
   próg, dedupe, zwrot trafień ze score i ID. **Tu parser wchodzi do runtime** — ten sam prompt
   i ten sam model Pydantic, którymi parsowaliśmy korpus.
 - [ ] **6. Generacja propozycji** — prompt + routing 3-ścieżkowy + placeholdery; `POST /suggest`.
-- [ ] **7. Masowy import w aplikacji** — adaptery pod realny format danych + pipeline
-  `RawTicket → LLM → ParsedTicket → data/parsed/`; parser z etapu 5 użyty ponownie, dochodzi
-  wsadowość (wznawianie, limity, raport z przebiegu).
+- [ ] **7. Masowy import w aplikacji** — adapter **SQL** (`ingest/`, źródłem jest zrzut bazy
+  `helpdesk`, nie plik eksportu) + pipeline `RawTicket → LLM → ParsedTicket → data/parsed/`;
+  parser z etapu 5 użyty ponownie, dochodzi wsadowość (wznawianie, limity, raport z przebiegu).
+  Adapter skleja wątek: `zgloszenie` + jego `komentarz`e w kolejności `id`, po strip HTML.
+  Skala przebiegu: ~1500 wywołań LLM — to jest ten „drogi, jednorazowy" koszt z zasady 7.
 - [ ] **8. Rozszerzenia** — hybrid search (sparse pod kody błędów), reranker, frontend, feedback
   wdrożeniowców.
