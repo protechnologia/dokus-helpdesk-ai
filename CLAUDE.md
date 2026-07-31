@@ -248,11 +248,14 @@ największy 14 vs 55). Objawy się zlewają, przyczyny nie.
 | `problem`    | `zgloszenie.czego_dotyczy` |
 | `symptoms`   | `zgloszenie.szczegolowy_opis` |
 | `solution`   | `komentarz.tresc` przy `typ IN ('rozwiazanie','konczacy_zgloszenie')` |
-| `category`   | `kategoria.nazwa` przez `zgloszenie.kategoriaid` (10 wartości w Dokusie) |
-| `resolved`   | **wyłącznie treść wątku** — żadna kolumna nie jest wiarygodna (patrz niżej) |
-| `system`     | **treść wątku przez LLM**, nie `modul_zgloszenia.nazwa` (patrz niżej) |
-| `confirmed`  | brak wiarygodnego źródła — **kandydat do usunięcia ze schematu** (patrz niżej) |
+| `resolution` | **wyłącznie treść wątku** — żadna kolumna nie jest wiarygodna (patrz niżej) |
+| `component`  | **treść wątku przez LLM**, nie `modul_zgloszenia.nazwa` (patrz niżej) |
 | `cause`      | brak kolumny — do wyprowadzenia przez LLM z wątku |
+| `error_codes`, `questions_summary` | brak kolumny — LLM z wątku |
+
+`kategoria.nazwa` **nie jest już mapowana na żadne pole** (`category` odrzucone — patrz
+„Świadomie pominięte"), ale adapter nadal ją czyta: wartość „Automat mailowy" wyznacza rekordy
+wymagające czyszczenia cytowanej historii przed parsowaniem.
 
 ### Pułapki tej bazy (sprawdzone na danych, nie zgadywane)
 
@@ -284,10 +287,11 @@ największy 14 vs 55). Objawy się zlewają, przyczyny nie.
   w załączeniu"** (załączników nie ma w zrzucie, a rekord wygląda na kompletny) · odesłanie
   „zgłoszenie NNNNN" bez własnego rozstrzygnięcia · **zapowiedź w czasie przyszłym w ostatnim
   komentarzu dostawcy nigdy nie jest rozwiązaniem**.
-- **`system` NIE jest wiarygodną stałą.** Mimo `modulid = 116` trafiają się zgłoszenia dotyczące
-  zupełnie innych systemów (Portal Mieszkańca, login.gov.pl, system innego dostawcy). Wniosek
-  o wyłączeniu `system` z embeddingu zostaje, ale **wartość musi wyprowadzić LLM z treści**, tak
-  jak `cause` — nie brać jej z `modul_zgloszenia.nazwa`.
+- **Zakres modułu NIE gwarantuje, że sprawa dotyczy naszej aplikacji.** Mimo `modulid = 116`
+  trafiają się zgłoszenia o Portalu Mieszkańca, login.gov.pl czy systemie innego dostawcy.
+  Stąd `component` **wyprowadza LLM z treści**, tak jak `cause` — nigdy z `modul_zgloszenia.nazwa`.
+  To zarazem argument za polem swobodnym: zamknięty słownik nie przewidzi, o czym napisze
+  użytkownik.
 - **Rozwiązanie bywa napisane przez KLIENTA, nie konsultanta.** Kusząca reguła „szukaj rozwiązania
   w komentarzach konsultanta" odrzuciłaby kilka z najbogatszych rekordów korpusu (klient
   zdiagnozował limit długości nazwy, administrator klienta wyjaśnił montowanie woluminów, klient
@@ -410,132 +414,106 @@ Odwrotna strona powyższych ryzyk — to działa zawsze i jest najtańszym zyski
 Serce projektu. **Ten schemat jest kontraktem** — trzyma go model Pydantic w
 `api/app/domain/ticket.py` i to on rozstrzyga, co jest poprawnym artefaktem.
 
-Pola (robocze; doprecyzować na pierwszej realnej partii danych):
+**Rdzeń: 10 pól** (ustalone 2026-07-31, po przeglądzie pod kątem uniwersalności produktu —
+schemat pierwotny miał 17 i był projektowany pod ten jeden korpus, nie pod produkt):
 
 | pole | rola | embedowane |
 |---|---|---|
 | `ticket_id`   | identyfikator źródłowy                          | nie |
 | `date`        | data zgłoszenia                                 | nie |
-| `system`      | system/moduł, którego dotyczy                   | **tak** |
+| `component`   | czego dotyczy: główna aplikacja / ePUAP / e-Doręczenia… | nie |
 | `problem`     | zwięzły opis problemu (1–2 zdania)              | **tak** |
 | `symptoms`    | objawy widziane przez użytkownika               | **tak** |
 | `error_codes` | kody błędów, sygnatury, identyfikatory urządzeń | nie (→ sparse, etap 11) |
-| `questions_summary` | synteza: czego konsultant nie wiedział i o co dopytywał | nie |
 | `cause`       | ustalona przyczyna                              | nie |
-| `solution`    | co konkretnie rozwiązało sprawę                 | **nie** |
-| `category`    | kategoria ze słownika                           | nie |
-| `resolved`    | czy sprawa zakończyła się rozwiązaniem          | nie |
-| `confirmed`   | ~~czy klient potwierdził skuteczność~~ — **do usunięcia, patrz niżej** | nie |
+| `solution`    | co rozwiązało sprawę, **wraz z zastrzeżeniami** | **nie** |
+| `resolution`  | klasa rozstrzygnięcia — **słownik konfigurowalny** | nie |
+| `questions_summary` | synteza: czego konsultant nie wiedział i o co dopytywał | nie |
+
+**Założenie fundujące: jedna instancja produktu obsługuje jeden helpdeskowany produkt.**
+Stąd nie ma pola `system` — nazwa własnej aplikacji jest stała dla instancji, więc byłaby
+powielana w każdym rekordzie (dowód: 661 sparsowanych plików ma tam 661× „Dokus"). Nazwa idzie
+z konfiguracji instancji tam, gdzie jest potrzebna — do promptu generacji. **Gdyby jedna
+instancja miała kiedyś obsłużyć dwa produkty, pole wraca do rekordu i oznacza to ponowny
+przebieg LLM po korpusie** (zasada 7).
 
 Zasady schematu (rozwinięcie „Jak projektować schemat odpowiedzi" niżej):
 
 - **Każde pole ma jawne wyjście** (`brak` / `nie dotyczy`) — pole obowiązkowe wymusza
   konfabulację.
-- **Embedujemy wyłącznie `system` + `problem` + `symptoms`.** `solution` i metadane idą do
-  payloadu Qdranta. Powód: szukamy po *podobieństwie problemu*, nie rozwiązania — wektor
-  zanieczyszczony rozwiązaniem miesza oba sygnały.
-  - **Przy obecnym zakresie (`modulid = 116`) `system` jest stałą** — cały korpus to jeden
-    moduł, więc pole nie filtruje, nie różnicuje, a do każdego wektora dokłada ten sam token.
-    **Embedujemy `problem` + `symptoms`.** Regułę z `system` zostawiamy spisaną, bo wraca
-    natychmiast, gdy zakres obejmie więcej niż jedną aplikację.
-- **Filtr jakości przy indeksacji:** rekordy bez rozwiązania (`resolved = false`) co do zasady
-  nie trafiają do indeksu — ale **filtr nie może być binarny na poziomie zgłoszenia** i musi
-  **raportować, co odrzuca** (patrz „Ryzyka jakości treści": część rekordów bez rozwiązania
-  niesie jedyną w korpusie wiedzę o danym problemie).
+- **Embedujemy wyłącznie `problem` + `symptoms`.** `solution` i metadane idą do payloadu
+  Qdranta. Powód: szukamy po *podobieństwie problemu*, nie rozwiązania — wektor zanieczyszczony
+  rozwiązaniem miesza oba sygnały.
+- **`component` jest polem SWOBODNYM, nie słownikiem** — słownik trafia do promptu jako
+  podpowiedź, ale nic go nie egzekwuje. Decyzja świadoma, z policzonym kosztem: rozkład wartości
+  ma długi cienki ogon (ePUAP i eNadawca to 125 ze 131 trafień w próbce, reszta po 1–2 rekordy),
+  więc zamknięty enum wymuszałby deploy przy każdej nowej integracji klienta. **Cena: przy ~1500
+  wywołaniach warianty zapisu tej samej usługi („ePUAP" / „epuap" / „platforma ePUAP") są niemal
+  pewne, więc pole NIE nadaje się na filtr Qdranta bez normalizacji.** Traktujemy je jako
+  opisowe. Tanie ubezpieczenie: raport rozkładu wartości po pierwszej setce rekordów — wychwytuje
+  rozjazd, zanim obejmie cały korpus.
+- **`resolution` jest słownikiem OPISOWYM — kod nie wyprowadza z niego żadnej klasy.** Wartość
+  idzie do payloadu i do promptu generacji, bo „odmowa" i „działa zgodnie z projektem" to inne
+  odpowiedzi niż „naprawione". **Nie steruje filtrem indeksacji** — patrz niżej.
+- **Informacja o wykonawcy mieszka w słowniku `resolution`** (np. `naprawione_przez_dostawcę`),
+  nie w osobnym polu. Rozróżnienie „zrób sam" / „poproś dostawcę" dotyczy 18% korpusu
+  („naprawiono skutki, nie przyczynę") i musi przetrwać, choć pole `audience` odpadło.
+- **Filtr jakości przy indeksacji patrzy na TREŚĆ (`solution`, `cause`), nie na `resolution`.**
+  Zmierzone na 661 rekordach: wśród „nierozwiązanych" tylko **8 na 161 ma puste `solution`** —
+  czyli 95% z nich niesie treść, a klasa rozstrzygnięcia niczego nie przewiduje. Filtr oparty
+  o `resolution` odtwarzałby dokładnie ten binarny odsiew, przed którym ostrzegają „Ryzyka
+  jakości treści" („im poważniejsza operacyjnie sprawa, tym większa szansa, że wątek urwie się
+  bez odpowiedzi"). Filtr ma być **wielosygnałowy, niebinarny i raportujący, co odrzuca**.
+  - Konsekwencja: **`resolution` nie jest polem krytycznym dla działania systemu.** Gdy klient
+    nie skonfiguruje słownika, produkt nadal działa — traci wzbogacenie odpowiedzi, nie indeks.
 
-### Co rozstrzygnęły dane — do wdrożenia w etapie 1
+### Reguły parsowania wyprowadzone z korpusu
 
-Pomiar na 661 sparsowanych rekordach zamyka pytania, które schemat zostawiał otwarte:
+Wejście do promptu z etapu 1. Czytaj **cały wątek**, nie komentarz wybrany po `typ` · zapisuj
+**rozstrzygnięcie końcowe, nie pierwszą hipotezę**, a trop odrzucony wspomnij jednym zdaniem ·
+**rozwiązanie może pochodzić od klienta** · odmowa i „to nie jest błąd" **to też rozwiązanie**
+(najcenniejszy wariant mówi, **czego NIE robić**) · zapisuj **oba kody błędu** — ten z ekranu
+(po nim użytkownik szuka) i ten z logów (on identyfikuje problem) — i **normalizuj** je,
+obcinając ścieżki instalacji i wartości kluczy · nie przenoś liczb specyficznych dla instalacji,
+**ale liczby narzucone przez operatorów zachowuj zawsze**.
 
-- **`confirmed` — usunąć ze schematu.** Nie ma wiarygodnego źródła, **nie jest predyktorem
-  użyteczności** (klient potwierdza *ustąpienie problemu*, nie skuteczność rozwiązania:
-  „potwierdzam, problem zniknął po wizycie" przy pustym `solution`) i **nie jest mierzalne na
-  tym korpusie** — udział spadł z 36% do 9% wyłącznie przez zaostrzenie reguły między turami.
-  Do tego potwierdzenia często padają poza systemem, więc `false` nie znaczy „klient nie
-  potwierdził".
-- **`cause` zostaje bezdyskusyjnie** — to ono niesie strukturę korpusu i jest kryterium
-  rekomendacji trybu (patrz „Powtarza się objaw, nie przyczyna").
-- **`resolved` jako boolean jest za ubogi** — w danych jest **co najmniej osiem rodzajów
-  rozstrzygnięcia**: naprawione · *działa zgodnie z projektem* (12 rekordów na 300 — najlepszy
-  materiał szkoleniowy) · obejście · odmowa · przekierowane · czynność administracyjna ·
-  bezprzedmiotowe · odpowiedzialność po stronie urzędu.
-- **`solution` rozdzielić** na *co zrobiono* / *co ustalono po drodze* / *zastrzeżenia* — to
-  ratuje rekordy formalnie nierozwiązane, a niosące realną wiedzę.
-- **Zastrzeżenia mają CZTERY wymiary** i są obowiązkowe, nie opcjonalne: skutek uboczny ·
-  **zasięg zmiany** („ustawienie globalne, dotyczy wszystkich" — w kontekście RODO to bywa
-  rozstrzygające) · **zakres czasowy** („działa od teraz, dla zaległych nie ma drogi") ·
-  **kompletność naprawy wstecznej**. Pominięcie zdania o zastrzeżeniu zamienia odpowiedź
-  w jej przeciwieństwo.
+**Zastrzeżenia mają CZTERY wymiary** i są obowiązkowe, nie opcjonalne: skutek uboczny · **zasięg
+zmiany** („ustawienie globalne, dotyczy wszystkich" — przy RODO bywa rozstrzygające) · **zakres
+czasowy** („działa od teraz, dla zaległych nie ma drogi") · **kompletność naprawy wstecznej**.
+Pominięcie zdania o zastrzeżeniu zamienia odpowiedź w jej przeciwieństwo. **Nie mają własnego
+pola — są częścią `solution`**, więc odpowiadają za nie oba prompty.
 
-**Nowe pola z dowodami w danych:**
+**Jedno zgłoszenie ≠ jeden rekord — problem realny, ale świadomie NIE rozwiązywany na tym
+etapie.** Wątki-projekty (kilkanaście postulatów w jednym zgłoszeniu) są najbogatszym
+i najgorzej indeksowalnym materiałem w korpusie: naturalną jednostką jest tam pojedyncze
+ustalenie, nie zgłoszenie. Pomiar na surowych danych (2026-07-31): **33 zgłoszenia, 1,8%**
+korpusu mają w opisie ≥3 punkty listy, mediana 5 postulatów (max 9), a ich opisy są **prawie
+6× dłuższe od medianowych** (1116 vs 192 zn.). To **dolna granica** — liczone są wyłącznie listy
+sformatowane punktami, postulaty rozdzielone akapitami przechodzą niezauważone.
 
-| pole | po co | dowód |
-|---|---|---|
-| `channel` | ePUAP / e-Doręczenia / eNadawca | bez tego odpowiedź bywa **odwrotnością prawdy** (ten sam status, przeciwne znaczenie) |
-| `audience` | użytkownik / administrator urzędu / dostawca | różnica między „zrób to sam" a „zgłoś informatykowi"; **to samo rozróżnienie dzieli warianty generacji** |
-| `related_tickets` | graf odesłań | ~5% korpusu odsyła do innego numeru; czasem to **jedyny ślad, że rozwiązanie istnieje** |
-| `version` | numer wersji poprawki | bez tego nie da się odpowiedzieć „to już naprawione, jesteś na nowszej wersji" — najtańsza możliwa odpowiedź |
-| `portable` | czy rozstrzygnięcie przenosi się na inny urząd | część rozwiązań powołuje się na ustalenia konkretnego wdrożenia |
+Bez reakcji taki rekord daje `problem` będący streszczeniem pięciu spraw i `solution` będące
+streszczeniem pięciu rozwiązań: wektor nie trafia w żadną z nich, a przy trafieniu podsuwa
+wdrożeniowcowi cztery odpowiedzi na pytania, których nie zadał.
 
-**Reguły parsowania wyprowadzone z korpusu** (do promptu etapu 1): czytaj **cały wątek**, nie
-komentarz wybrany po `typ` · zapisuj **rozstrzygnięcie końcowe, nie pierwszą hipotezę**, a trop
-odrzucony wspomnij jednym zdaniem · **rozwiązanie może pochodzić od klienta** · odmowa i „to nie
-jest błąd" **to też rozwiązanie** (najcenniejszy wariant mówi, **czego NIE robić**) · zapisuj
-**oba kody błędu** — ten z ekranu (po nim użytkownik szuka) i ten z logów (on identyfikuje
-problem) — i **normalizuj** je, obcinając ścieżki instalacji i wartości kluczy · nie przenoś
-liczb specyficznych dla instalacji, **ale liczby narzucone przez operatorów zachowuj zawsze**.
+**Decyzja: wykrywać i wykluczać z indeksu, raportując** (etap 4 i tak ma raportować, co
+odrzuca). Rozbicie na wiele rekordów rozważamy dopiero, gdy pomiar pokaże, że te rekordy
+realnie psują trafienia — patrz „Świadomie pominięte".
 
-**Jedno zgłoszenie ≠ jeden rekord.** Wątki-projekty (kilkanaście postulatów w jednym zgłoszeniu)
-są najbogatszym i najgorzej indeksowalnym materiałem w korpusie — naturalną jednostką jest tam
-pojedyncze ustalenie, nie zgłoszenie.
-- **Deduplikacja** powtarzalnych problemów — ten sam problem w 200 ticketach zalałby top-5.
-  Trzy reguły z danych:
-  - **dedup na parze `problem` + `solution`**, nie na samym `problem` — dwa różne zgłoszenia
-    o różnych kategoriach potrafią mieć **identyczny słowo w słowo** komentarz rozwiązujący;
-  - **blokowany przez różny kanał i różną przyczynę** — klastry pozorne mają bardzo wysokie
-    podobieństwo `problem`, a **scalić ich nie wolno** (trzy awarie u operatora, trzy różne
-    działania);
-  - **reprezentant = rekord najbogatszy**, nie najstarszy ani najnowszy — z wyjątkiem rekordów
-    **komplementarnych** (jeden mówi CO zrobić, drugi JAK sprawdzić, kto blokuje).
+### `questions_summary` — synteza bez konkretów jest bezwartościowa
 
-### `questions_summary` — materiał dla wariantu `questions`
+Synteza tego, **czego konsultant nie wiedział i o co dopytywał**. Jedyne miejsce w korpusie, gdzie
+widać **jak ten helpdesk diagnozuje** — tego nie da się wyprowadzić z `problem` i `symptoms`.
+Wypełnione w **16,7%** zgłoszeń (sonda na 1825, 2026-07-31), więc `brak` jest normą, a wariant
+`questions` nie może zakładać, że trafienia je mają.
 
-Pole zbiera to, **czego konsultant nie wiedział i o co dopytywał** w danej sprawie. Jest jedynym
-miejscem w korpusie, gdzie widać **jak ten helpdesk diagnozuje** — wiedzy „w tym produkcie warto
-sprawdzić profil skanowania w NAPS2 albo nietypową rozdzielczość ekranu" nie da się wyprowadzić
-z `problem` i `symptoms`. Zasila wariant `questions` (patrz „Generacja propozycji").
-
-Stan faktyczny w korpusie (sonda na 1825 zgłoszeniach, 2026-07-31):
-
-| miara | wartość |
-|---|---|
-| zgłoszenia z pytaniem konsultanta | **304 (16,7%)** |
-| pytań ogółem | 429 |
-| z tego dokładnie 1 pytanie na zgłoszenie | 224 z 304 (**74%**) |
-| pierwsze pytanie już w 1. komentarzu | 211 z 304 (69%) |
-
-Reguły:
-
-- **Synteza, nie lista cytatów** — decyzja świadoma. Powód: przy 2+ pytaniach zwięzły obraz
-  niewiadomych działa lepiej niż luźne zdania, a forma niepytająca osłabia pokusę dosłownego
-  przepisania pytań do propozycji.
-- **Synteza MUSI zachować konkrety** — nazwy narzędzi, ustawienia, wersje, miejsca w aplikacji.
-  „Pytano o konfigurację stanowiska" jest bezwartościowe; „pytano o rozdzielczość ekranu i profil
-  skanowania w NAPS2" niesie wiedzę operacyjną. **To jest warunek, pod którym całe pole ma sens**
-  — prompt parsujący musi to wymuszać wprost, a test-strażnik promptu tego pilnować.
-- **Pomijamy pytania proceduralne** — „czy problem nadal występuje?", „czy możemy zamknąć
-  zgłoszenie?" to domykanie sprawy, nie diagnostyka (~⅓ pytań w korpusie). Podsunięte
-  wdrożeniowcowi jako propozycja są gorsze niż brak propozycji — wyglądają na odpowiedź,
-  a są szumem. Ta sama pułapka co przy pustych rozwiązaniach („Już powinno działać").
-- **Jawne wyjście `brak`** — pole będzie puste w ~83% rekordów i to jest normalny stan, nie
-  usterka. Wariant `questions` nie może zakładać, że trafienia je mają.
-- **Nie embedowane** — to nie jest sygnał podobieństwa problemu, tylko materiał do payloadu,
-  dokładnie jak `solution`.
-- **Ryzyko przyjęte świadomie:** synteza jest **nieodwracalna** (zasada 7) — błąd streszczenia
-  utrwala się w artefakcie, a odtworzenie konkretów wymaga ponownego przebiegu LLM po korpusie.
-  Stąd nacisk na zachowanie konkretów w prompcie: to jedyny moment, w którym da się je uratować.
-- **Nie chroni przed dosłownym kopiowaniem sama z siebie** — przed przepisaniem cudzych pytań
-  do propozycji chroni **prompt wariantu** (patrz „Generacja propozycji"), nie kształt pola.
+- **MUSI zachować konkrety** — nazwy narzędzi, ustawienia, wersje, miejsca w aplikacji. „Pytano
+  o konfigurację stanowiska" jest bezwartościowe; „pytano o rozdzielczość ekranu i profil
+  skanowania w NAPS2" niesie wiedzę operacyjną. **To warunek, pod którym całe pole ma sens** —
+  prompt wymusza go wprost, test-strażnik pilnuje. Synteza jest **nieodwracalna** (zasada 7):
+  zgubionych konkretów nie odzyska się bez ponownego przebiegu po korpusie.
+- **Bez pytań proceduralnych** — „czy problem nadal występuje?", „czy możemy zamknąć?" to
+  domykanie sprawy, nie diagnostyka (~⅓ pytań w korpusie). Podsunięte jako propozycja są gorsze
+  niż jej brak: wyglądają na odpowiedź, a są szumem. Ta sama pułapka co „Już powinno działać".
 
 ## RAG — architektura
 
@@ -1029,6 +1007,17 @@ Wspólne:
   - **Prompt parsujący zgłoszenie NIE jest konfigurowalny** — jest kontraktem artefaktu
     (zasada 7). Jego zmiana unieważnia `data/parsed/`, więc należy do kodu i do gita, nie do
     ustawień klienta.
+  - **Wyjątek w wyjątku: słowniki wstawiane do promptu parsującego** (`resolution`, podpowiedź
+    dla `component`) **są danymi klienta** — inny helpdesk ma inne rodzaje rozstrzygnięć
+    („odpowiedzialność po stronie urzędu" nie znaczy nic poza sektorem publicznym). Żyją
+    w `api/app/rules/` jako plik danych, **nie w ENV** (potrzebna struktura, nie płaski string)
+    i nie w SQL do etapu 8 — dokładnie tą samą drogą co zasady „Popraw": wbudowany zestaw
+    domyślny za interfejsem magazynu reguł, a podmiana źródła na bazę nie rusza serwisu.
+  - **Słownik wstawiany do promptu parsującego MUSI być wersjonowany, a artefakt zapisuje
+    wersję, którą powstał.** Bez tego edycja przez GUI w etapie 8 po cichu unieważnia cały
+    korpus (zasada 7), a „dlaczego wczoraj było X, dziś Y" jest nie do odtworzenia. Z wersją
+    re-parsing jest **wybiórczy**, nie totalny. To ten sam wzorzec co wersjonowanie reguł
+    bramek — nie wprowadzamy nowego mechanizmu, tylko rozciągamy istniejący na artefakty.
 - **Prompt parsujący zgłoszenie mieszka w repo od pierwszego dnia** — nawet gdy pierwszą partię
   parsujemy ręcznie w czacie Claude. Ręczny przebieg ma używać **dokładnie tego** pliku; inaczej
   bootstrapowe JSON-y rozjadą się ze schematem, który potem wymusi aplikacja.
@@ -1407,6 +1396,40 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Twarda blokada bez furtki** (bramka, której człowiek nie przejdzie) — rozważona, odrzucona:
   fałszywy negatyw LLM-a zatrzymałby obsługę klienta, a model stałby się pojedynczym punktem
   awarii procesu (zasada 10).
+- **Siedem pól schematu odrzuconych przy przeglądzie pod kątem uniwersalności** (2026-07-31,
+  17 pól → 10). Wspólna przyczyna: były projektowane pod **ten jeden korpus**, a nie pod produkt.
+  - `system` — wchłonięte przez `component`; przy założeniu „jedna instancja = jeden produkt"
+    byłoby stałą powielaną w każdym rekordzie (661× „Dokus" w próbce).
+  - `component_other` — wchłonięte przez `component`, gdy pole stało się swobodne.
+  - `confirmed` — bez wiarygodnego źródła i bez mocy predykcyjnej (uzasadnienie wyżej).
+  - `audience` — informacja o wykonawcy zmieściła się w słowniku `resolution`.
+  - `related_tickets` — zbyt szczegółowe; **kosztem jest graf odesłań w etapie 4**.
+  - `version`, `portable` — wyprowadzone z jednego wdrożenia; mieszczą się w tekście `solution`.
+  - `category` — **86% rekordów w trzech wartościach, 74% w dwóch**, a granica „Błąd"/„Usterka"
+    nieostra nawet dla człowieka. Nie jest embedowane, jako filtr nie różnicuje (41% na jedną
+    wartość), a do generacji nie wnosi nic ponad `cause` i `solution`. Do tego pochodzi
+    z metadanych źródłowych, które w tej bazie **bywają sprzeczne z treścią** („już powinno
+    działać" w kategorii „Awaria krytyczna"). **Uwaga: kategoria „Automat mailowy" pozostaje
+    sygnałem dla ADAPTERA** (wymaga czyszczenia cytowanej historii przed parsowaniem) — adapter
+    czyta ją ze źródła, nie z artefaktu.
+- **Rozbicie wątku-projektu na wiele rekordów** (prompt zwraca listę `ParsedTicket`, `ticket_id`
+  z sufiksem `33644-1`, `33644-2`) — rozważone, **odłożone do etapu 11**, nie odrzucone na
+  zawsze. Powód: dotyka **kontraktu artefaktu** (parser zwraca listę zamiast obiektu, zmienia się
+  walidacja, klucz i dedup), więc wprowadzenie go po masowym parsowaniu oznacza ponowny przebieg
+  LLM po całym korpusie (zasada 7). Przy 1,8% korpusu robienie tego **zanim** wiadomo, czy te
+  rekordy realnie psują trafienia, byłoby projektowaniem na zapas. Do tego czasu: filtr etapu 4
+  je wyklucza i **liczy**, a ta liczba jest wejściem do decyzji.
+- **Rozdzielenie `solution` na trzy pola** (*co zrobiono* / *co ustalono* / *zastrzeżenia*) —
+  rozważone, odrzucone jako nadmierna struktura. Zastrzeżenia zostają **częścią tekstu
+  `solution`**, a o ich zachowanie dba prompt parsujący i prompt generacji. **Ryzyko przyjęte
+  świadomie:** model streszczający potrafi zgubić zdanie o zastrzeżeniu, a to zamienia odpowiedź
+  w jej przeciwieństwo — stąd zastrzeżenia są jawnym wymogiem obu promptów, nie dobrą praktyką.
+- **Klasa `useful`/`not_useful` wyprowadzana z `resolution`** — rozważona, odrzucona po pomiarze:
+  wśród 161 rekordów „nierozwiązanych" tylko **8 ma puste `solution`**, więc klasa niczego nie
+  przewiduje, a filtr na niej oparty odtwarzałby binarny odsiew, przed którym ostrzega sekcja
+  „Ryzyka jakości treści". Filtr indeksacji patrzy na treść. Uboczna korzyść: słownik
+  `resolution` jest w całości konfigurowalny, bez wymogu mapowania na cokolwiek — więc klient
+  nie może przypadkiem skonfigurować progu jakości.
 - **Lista dosłownych pytań konsultanta zamiast syntezy** (`asked_questions`) — rozważona,
   odrzucona: przy medianie **jednego** pytania na zgłoszenie (74% przypadków) lista to niemal
   to samo co synteza, a forma pytająca silniej ciągnie model do przepisania cudzych pytań wprost.
@@ -1441,9 +1464,10 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   starcie: „potoczne słownictwo" i „nie widać, co zrobiono" nie są wyrażalne słownikiem.
   Kandydat na tanie **pre-filtry przed** wywołaniem LLM-a, jeśli koszt zacznie boleć.
 - **Zgłoszenia spoza modułu Dokus** — w bazie jest ich 29 tys. z ~124 modułów, ale zakres
-  projektu to jedna aplikacja; ich włączenie to nowa decyzja, nie rozszerzenie filtra
-  (wraca wtedy `system` do embeddingu i przestaje działać założenie o wiarygodnym `typ`
-  komentarza — patrz „Dane wejściowe").
+  projektu to jedna aplikacja; ich włączenie to nowa decyzja, nie rozszerzenie filtra —
+  **łamie założenie „jedna instancja = jeden produkt"** (wraca pole `system` do schematu
+  i do embeddingu, czyli ponowny przebieg LLM po korpusie), a do tego przestaje działać
+  założenie o wiarygodnym `typ` komentarza (patrz „Dane wejściowe").
 - **Załączniki zgłoszeń** — 16 634 plików w całej bazie, ale `zalacznik` trzyma tylko ścieżki,
   samych plików w zrzucie nie ma; treść zgłoszenia i wątku wystarcza.
 
@@ -1528,15 +1552,45 @@ właściwej warstwy, skrót → „TODO").
   zatrzymanym stacku) · `ruff` czysto · `up` → trzy usługi odpowiadają · prod bez bind-mountu ·
   `dokus --help` · kontrola negatywna testu plumbingu na czerwono. Zasady, które z tego etapu
   zostały, żyją w sekcjach tematycznych — **roadmapa ich nie powtarza**.
-- [ ] **1. Kontrakt zgłoszenia** — `ParsedTicket` (Pydantic) + prompt parsujący w `prompts/` +
-  `dokus tickets validate`; na tej podstawie parsujemy ręcznie pierwszą partię w czacie.
-  **Większość otwartych pytań rozstrzygnęły już dane** — patrz „Co rozstrzygnęły dane"
-  w sekcji Domena (`confirmed` do usunięcia, `cause` zostaje, `resolved` za ubogi jako boolean,
-  `solution` do rozdzielenia, pięć nowych pól). Zadaniem etapu jest **wdrożyć te ustalenia**,
-  nie rozstrzygać je od nowa.
-  **Uwaga na 661 już sparsowanych zgłoszeń** w `data/parsed/` — dochodzi `questions_summary`,
-  więc albo re-parsujemy tę partię, albo świadomie żyjemy z korpusem, w którym część rekordów
-  pola nie ma. Decyzja przed dalszym parsowaniem, nie po (zasada 7 — każdy przebieg kosztuje).
+- [~] **1. Kontrakt zgłoszenia** — `ParsedTicket` (Pydantic) + prompt parsujący w `prompts/` +
+  `dokus tickets validate`. **Większość otwartych pytań rozstrzygnęły już dane** — patrz „Co
+  rozstrzygnęły dane" w sekcji Domena. Zadaniem etapu jest **wdrożyć te ustalenia**, nie
+  rozstrzygać je od nowa.
+
+  Kolejność wynika z jednej zależności: **model musi powstać przed decyzją o re-parsowaniu**,
+  bo dopiero on mierzy, ile realnie brakuje w istniejących plikach. Stan wyjściowy: 661 plików
+  ma 11 pól starego schematu, więc **żaden nie przejdzie walidacji nowym modelem** — to nie
+  jest drobna migracja i nie wolno jej odkryć w trakcie.
+
+  - [ ] **1a. `ParsedTicket` — model i typy.** `api/app/domain/ticket.py`: **10 pól rdzenia**
+    wg tabeli z „Domena" (kształt ustalony 2026-07-31 — nie projektować go od nowa).
+    `resolution` czyta słownik z `api/app/rules/` (plik danych, wersjonowany), `component` jest
+    polem swobodnym. **Każde pole ma jawne wyjście** (`brak` / `nie dotyczy`) — pole obowiązkowe
+    wymusza konfabulację. Sprawdzian: testy modelu, w tym **rekord z samymi wyjściami waliduje
+    się poprawnie** (to normalny stan, nie błąd) oraz **artefakt niesie wersję słownika**.
+  - [ ] **1b. Pomiar rozjazdu na 661 plikach.** Skrypt repo-level, który walidując nowym modelem
+    raportuje: ile plików przechodzi, których pól brakuje i w ilu rekordach, ile `solution` da
+    się rozdzielić mechanicznie, a ile wymaga LLM-a. **Bez tego decyzja z 1c jest zgadywaniem.**
+    Sprawdzian: raport w `data/docs/`, liczby zamiast wrażeń.
+  - [ ] **1c. Decyzja o 661 plikach — do podjęcia przez człowieka, nie przez agenta.**
+    Re-parsować całość · dopisać brakujące pola drugim, tańszym przebiegiem · czy żyć
+    z korpusem niejednorodnym. Wejście: raport z 1b i koszt przebiegu. **Decyzja przed dalszym
+    parsowaniem, nie po** (zasada 7). Zapisać razem z uzasadnieniem — to wraca w etapie 10.
+  - [ ] **1d. Prompt parsujący** — `api/app/prompts/parse_ticket.py`, w repo od pierwszego dnia
+    (zasada 7: to kontrakt artefaktu, nie konfiguracja klienta). Wchodzą **reguły parsowania
+    wyprowadzone z korpusu** z sekcji „Domena": czytaj cały wątek · rozstrzygnięcie końcowe,
+    nie pierwsza hipoteza · rozwiązanie bywa od klienta · odmowa to też rozwiązanie · oba kody
+    błędu, znormalizowane · liczby operatorów zachowuj, instalacyjne pomijaj · `questions_summary`
+    **z konkretami**, bez pytań proceduralnych. Sprawdzian: **test-strażnik** na niezmienniki
+    promptu, w tym wymóg konkretów w `questions_summary`.
+  - [ ] **1e. `dokus tickets validate`** — cienki adapter nad modelem: waliduje katalog, raportuje
+    per plik, kończy niezerowym kodem przy błędzie. Sprawdzian: przechodzi na artefakcie
+    poprawnym, pada na uszkodzonym (kontrola negatywna).
+
+  **Kryterium ukończenia:** `dokus tickets validate data/parsed/` daje wynik zgodny z decyzją
+  z 1c (komplet zielony albo jawnie zaraportowana i zaakceptowana niejednorodność) · prompt ma
+  test-strażnik · model odrzuca rekord z polem spoza schematu **albo** świadomie je ignoruje —
+  rozstrzygnięte i pokryte testem, nie pozostawione przypadkowi.
 - [ ] **2. Embedder jako usługa** — realny PolDense obok backendu `fake` z etapu 0: nowa
   implementacja `Encoder` (wagi, dobór wariantu, warstwa GPU, prefiksy trybów, `encode` przez
   `run_in_threadpool`, bo `sentence-transformers` jest synchroniczne) + wpis w fabryce;
@@ -1556,9 +1610,21 @@ właściwej warstwy, skrót → „TODO").
 - [ ] **4. Indeksacja** — filtr + dedup + named vectors + payload; `dokus index build/rebuild`
   odtwarzalne z `data/parsed/`. **Filtr wielosygnałowy, niebinarny i raportujący, co odrzuca**
   (patrz „Ryzyka jakości treści") — sam status nie wystarczy, a rekordy `resolved = false`
-  niosące realną wiedzę trzeba dać się uratować. Dedup wg trzech reguł z sekcji „Domena".
-  **Graf odesłań budowany PRZED indeksacją** — pusty rekord potrafi odzyskać pełną treść
-  z sąsiada za cenę jednego przejścia po numerach.
+  niosące realną wiedzę trzeba dać się uratować.
+  **Wątki-projekty (~1,8%) filtr wykrywa i wyklucza, z raportem** — sygnał wstępny: ≥3 punkty
+  listy w opisie albo opis wielokrotnie dłuższy od mediany (patrz „Domena"). Wykluczenie ma być
+  **policzalne**, bo to ono uzasadni albo obali rozbicie na wiele rekordów w etapie 11.
+  **Dedup wg trzech reguł z danych** (ten sam problem w 200 ticketach zalałby top-5):
+  na parze `problem` + `solution`, nie na samym `problem` (dwa różne zgłoszenia potrafią mieć
+  **identyczny słowo w słowo** komentarz rozwiązujący) · **blokowany przez różny `component`
+  i różną `cause`** — klastry pozorne mają bardzo wysokie podobieństwo `problem`, a scalić ich
+  nie wolno (trzy awarie u operatora, trzy różne działania) · **reprezentant = rekord
+  najbogatszy**, nie najstarszy ani najnowszy, z wyjątkiem rekordów **komplementarnych** (jeden
+  mówi CO zrobić, drugi JAK sprawdzić, kto blokuje).
+  **Graf odesłań wypadł razem z polem `related_tickets`** (przegląd schematu 2026-07-31).
+  Świadoma strata: ~5% korpusu odsyła do innego numeru zgłoszenia, a czasem to jedyny ślad, że
+  rozwiązanie w ogóle istnieje — te rekordy zostaną w indeksie puste albo wypadną przez filtr.
+  Odzyskanie tego wymaga pola w schemacie, czyli ponownego przebiegu LLM (zasada 7).
 - [ ] **4b. Rekordy syntetyczne** — kilkanaście ręcznie napisanych rekordów-drzew decyzyjnych
   dla klas wieloprzyczynowych, gdzie wiedza jest kompletna, ale rozsypana po 4–7 zgłoszeniach
   (patrz zasada 9, wyjątek). **Osobny etap przed generacją, nie przypis** — te kilkanaście
@@ -1606,3 +1672,5 @@ właściwej warstwy, skrót → „TODO").
   bramek i „Popraw" — noga 2 jest najbardziej „przyciskowa" z całego produktu), feedback
   wdrożeniowców, **domknięcie pętli: zgłoszenie, które przeszło bramkę zamknięcia, jako kandydat
   do `data/parsed/`** (produkt sam buduje sobie korpus — patrz „Cel").
+  Tu wraca **rozbicie wątków-projektów na wiele rekordów** — decyzja na podstawie liczby
+  wykluczeń z etapu 4, nie z góry (patrz „Świadomie pominięte").
