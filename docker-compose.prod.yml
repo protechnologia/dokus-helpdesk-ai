@@ -1,0 +1,26 @@
+# Production layer. Named after what it ADDS (running the code from the image), not after an
+# environment — the same rule that gives us docker-compose.gpu.yml later.
+#
+# `include` rather than multi -f / COMPOSE_FILE: one `-f docker-compose.prod.yml` raises the
+# whole chain, so there is a single command to remember and no way to forget the base.
+include:
+  - docker-compose.yml
+
+services:
+
+  api:
+    # !reset (Compose >= 2.24) is the ONLY way to drop an inherited list entry: lists MERGE,
+    # so re-declaring `volumes` here would add a second mount rather than replace the first.
+    # Emptying it is the whole point of this layer — prod runs the code baked into the image,
+    # which is exactly the artifact we built and tested.
+    #
+    # Note this also drops the ./data mount: on prod the artifact directory is supplied by the
+    # deployment (a real volume or a host path), not by the developer's checkout.
+    volumes: !reset []
+    # No --reload: the reloader watches the filesystem and restarts the worker on every write,
+    # which is a development convenience and a liability in production.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  embedder:
+    volumes: !reset []
+    command: ["uvicorn", "embedder_app.main:app", "--host", "0.0.0.0", "--port", "8000"]

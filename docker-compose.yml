@@ -1,0 +1,100 @@
+# Base composition = DEV. Layers named after what they ADD live next to this file
+# (docker-compose.prod.yml drops the code mount), and a single `-f` raises the whole chain
+# because layers pull this file in through `include:`.
+#
+# Every value reaching a container is passed EXPLICITLY through `environment:` rather than
+# `env_file:` — only then does `docker compose config` show the real result of interpolation,
+# which is the file we verify instead of `.env` (see CLAUDE.md -> "Konfiguracja i deploy").
+
+services:
+
+  # --- api: FastAPI + the `dokus` CLI; the only service that talks to every other one ---
+  api:
+    build: ./api
+    # Host port is published so the integration smoke can reach /health from outside the
+    # compose network. Both halves are variables and both live in the BASE on purpose: compose
+    # MERGES list entries instead of replacing them, so a layer trying to "fix" this line would
+    # yield two bindings rather than one corrected one.
+    #
+    # DOCKER_* means "resolved here, never passed to a container" — these two are the host half
+    # of the mapping only; the container keeps listening on 8000, and that is the port sibling
+    # services dial. The default is 8010, not the conventional 8000: this machine already runs an
+    # unrelated project on 8000, and a base composition that refuses to start out of the box is
+    # worse than an unconventional number.
+    ports:
+      - "${DOCKER_BIND_ADDR:-127.0.0.1}:${DOCKER_API_PORT:-8010}:8000"
+    volumes:
+      # Dev shadows the code baked into the image, so .py edits are live without a rebuild.
+      # The prod layer removes this entry and the image copy becomes visible again.
+      - ./api/app:/code/app
+      # Parsed tickets are the durable artifact (rule 7) and must survive `down -v`, so they
+      # stay a host directory rather than a named volume.
+      - ./data:/code/data
+    # The three LLM_* values below interpolate to an EMPTY STRING while the provider is `fake`,
+    # and that is deliberate: they are optional and only a real provider fills them. The empty
+    # string never reaches a client, because `_drop_blank_values` in Settings turns it back into
+    # the declared default — this is the exact trap that validator exists for, not an oversight.
+    environment:
+      LOG_LEVEL:                 ${LOG_LEVEL:-INFO}
+      LLM_PROVIDER:              ${LLM_PROVIDER:-fake}
+      LLM_BASE_URL:              ${LLM_BASE_URL:-}
+      LLM_API_KEY:               ${LLM_API_KEY:-}
+      LLM_MODEL:                 ${LLM_MODEL:-}
+      LLM_TEMPERATURE:           ${LLM_TEMPERATURE:-0}
+      LLM_TIMEOUT_SECONDS:       ${LLM_TIMEOUT_SECONDS:-60}
+      EMBEDDING_BASE_URL:        ${EMBEDDING_BASE_URL:-http://embedder:8000}
+      EMBEDDING_VECTOR_SIZE:     ${EMBEDDING_VECTOR_SIZE:-768}
+      EMBEDDING_TIMEOUT_SECONDS: ${EMBEDDING_TIMEOUT_SECONDS:-30}
+      QDRANT_URL:                ${QDRANT_URL:-http://qdrant:6333}
+      QDRANT_COLLECTION:         ${QDRANT_COLLECTION:-tickets}
+      QDRANT_TIMEOUT_SECONDS:    ${QDRANT_TIMEOUT_SECONDS:-30}
+    # --reload belongs to the dev layer, not to the image: the shipped CMD has no reloader.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    healthcheck:
+      # Python rather than curl: the slim base has no curl, and adding one for a probe would
+      # grow the image for nothing.
+      test:         ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"]
+      interval:     10s
+      timeout:      3s
+      retries:      3
+      start_period: 10s
+    restart: unless-stopped
+
+  # --- embedder: the PL model behind REST; today a deterministic stub (stage 0e-1) ---
+  embedder:
+    build: ./embedder
+    ports:
+      - "${DOCKER_BIND_ADDR:-127.0.0.1}:${DOCKER_EMBEDDER_PORT:-8001}:8000"
+    volumes:
+      - ./embedder/embedder_app:/code/embedder_app
+    # This service owns EMBEDDING_BACKEND; `api` never sees it, because how text becomes a
+    # vector is none of its business — it only knows the HTTP contract.
+    environment:
+      LOG_LEVEL:             ${LOG_LEVEL:-INFO}
+      EMBEDDING_BACKEND:     ${EMBEDDING_BACKEND:-fake}
+      EMBEDDING_VECTOR_SIZE: ${EMBEDDING_VECTOR_SIZE:-768}
+    command: ["uvicorn", "embedder_app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    healthcheck:
+      test:         ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"]
+      interval:     10s
+      timeout:      3s
+      retries:      3
+      start_period: 10s
+    restart: unless-stopped
+
+  # --- qdrant: the index, never the source of truth (rule 8) ---
+  qdrant:
+    # Tag pins the version, digest pins the exact image — same reasoning as in our Dockerfiles.
+    image: qdrant/qdrant:v1.12.5@sha256:05fecce7dce45d1254e0468bc037e8210e187fd56fa847688b012293d5f08aae
+    ports:
+      - "${DOCKER_BIND_ADDR:-127.0.0.1}:${DOCKER_QDRANT_PORT:-6333}:6333"
+    volumes:
+      # A named volume is convenience, not a backup: the collection is rebuilt from
+      # data/parsed/ with one command, so the backup target is that directory (rule 8).
+      - qdrant_storage:/qdrant/storage
+    # No healthcheck: the image carries no shell and no python, so a probe would need a helper
+    # binary we would have to add ourselves. Qdrant is not gated on by anything here anyway.
+    restart: unless-stopped
+
+volumes:
+  qdrant_storage:

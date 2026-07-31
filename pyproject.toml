@@ -39,7 +39,7 @@ pythonpath = ["embedder"]
 # The default run must be offline unit tests only: everything behind a marker needs a running
 # service (or a billable LLM) and is asked for explicitly. `-m` on the command line replaces this
 # value, so `pytest -m integration_embedder` still selects exactly what it names.
-addopts = "--import-mode=importlib -m 'not integration and not llm_live'"
+addopts = "--import-mode=importlib -m 'not integration and not functional and not llm_live'"
 
 # The transport clients (LLM, embedder, Qdrant) are async, so their tests are coroutines.
 # "auto" runs any `async def test_*` without decorating each one — no marker boilerplate.
@@ -48,8 +48,14 @@ asyncio_default_fixture_loop_scope = "function"  # silences the pytest-asyncio u
 
 markers = [
     "integration: umbrella for every test requiring a running service",
+    "integration_api: requires a reachable api service",
     "integration_qdrant: requires a reachable Qdrant instance",
     "integration_embedder: requires a reachable embedder service",
+    # Also needs the stack, but answers a different question: `integration` asks whether the
+    # services are wired together, `functional` whether the product behaves ("this ticket in,
+    # sensible hits out"). Separate umbrellas, so a slow product run is not the price of a
+    # 30-second wiring check. No test carries it yet — the first arrives with POST /search.
+    "functional: end-to-end product behaviour — outside the integration umbrella on purpose",
     "llm_live: hits a real, billable LLM — outside the integration umbrella on purpose",
 ]
 
