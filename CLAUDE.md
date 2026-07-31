@@ -104,6 +104,10 @@ a od etapu 8 baza reguł. LLM jest **zewnętrznym endpointem**, nie usługą w b
 - **Nie wstawiaj reguł klienta do promptu przez sklejanie instrukcji** — wyłącznie jako dane
   w oddzielonej sekcji (prompt injection)
 - **Nie rób z werdyktu twardego „nie"** — furtka dla człowieka jest częścią kontraktu (zasada 10)
+- **Nie myl wariantu generacji z routingiem po score** — guzik wybiera człowiek (co), score
+  tylko podpowiada (jak dobre trafienia); to dwie prostopadłe osie
+- **Nie zaszywaj listy wariantów w kodzie ani w UI** — warianty to dane, kod zna tylko kontrakt
+- **Nie rób osobnego endpointu na każdy guzik** — `variant` jest parametrem `/suggest`
 
 ## Praca z agentem
 
@@ -266,7 +270,8 @@ nowe zgłoszenie (surowy tekst)
       ├─ [LLM parser] → ParsedTicket (ten sam schemat i ten sam prompt co przy indeksacji)
       ├─ [embedder] system+problem+symptoms → wektor zapytania
       ├─ top-K z Qdranta → próg score → dedupe
-      └─ 1–3 rekordy (payload, nie surowe maile) → [LLM + szablon] → propozycja
+      ├─ 1–3 rekordy (payload, nie surowe maile) + podpowiedź wariantu po score
+      └─ [wybór wariantu przez człowieka] → [LLM + prompt wariantu] → propozycja + źródła
 ```
 
 **Nowe zgłoszenie parsujemy PRZED wyszukaniem.** Powody: surowy mail (powitanie, stopka,
@@ -326,17 +331,66 @@ wracać, i to ona kasuje jeden z dwóch named vectors.
 
 ### Generacja propozycji odpowiedzi
 
+**Dwie prostopadłe osie — nie mylić ich ze sobą.** Zbieżność „trzy warianty i trzy ścieżki
+routingu" jest przypadkowa i już raz myliła przy czytaniu tego dokumentu:
+
+| oś | kto decyduje | o czym rozstrzyga |
+|---|---|---|
+| **wariant generacji** | **człowiek** — klika guzik | **co** ma powstać (pytania / rozwiązanie / przekazanie) |
+| **routing po score**  | **system** — patrzy na trafienia | **jak dobre** są trafienia i co z tego wynika |
+
+Wspólne dla wszystkich wariantów:
+
 - **Trafienia dają treść merytoryczną, prompt zadaje styl.** Do promptu idą pola z payloadu
   (`problem`, `cause`, `solution` + metadane: score, data, `ticket_id`) — **nie** surowe maile.
 - **Top-5 → próg score → dedupe → 1–3 rekordy** do promptu. Więcej rozmywa odpowiedź.
-- **Routing 3-ścieżkowy** (decyzja po score i zgodności trafień):
-  1. **wysoki score + zgodne rozwiązania** → pełny szablon odpowiedzi,
-  2. **średni score / sprzeczne rozwiązania** → szablon **diagnostyczny** (pytania do klienta),
-  3. **niski score** → brak generacji z RAG + flaga **„nowy typ problemu"**.
 - **Placeholdery zamiast danych** (`{IMIĘ}`, `{NR_URZĄDZENIA}`), nawiasy kwadratowe na
   instrukcje dla człowieka (`[dla serwisanta: sprawdź wersję firmware]`).
 - Propozycja **zawsze** wraca z listą źródeł (ID ticketów + score) — wdrożeniowiec musi móc
-  zweryfikować, skąd to się wzięło.
+  zweryfikować, skąd to się wzięło. Wariant nieoparty na trafieniach wraca z **pustą listą
+  źródeł**, i to jest informacja, nie brak danych.
+
+#### Oś 1: warianty generacji (guziki)
+
+Wdrożeniowiec wybiera **rodzaj** odpowiedzi. Trzy warianty startowe:
+
+| wariant | co generuje | wymaga trafień |
+|---|---|---|
+| `questions` | pytania, które warto zadać w ramach zgłoszenia | nie |
+| `solution`  | rozwiązanie — gdy zgłoszenie nie wymaga działania serwisu | **tak** |
+| `handoff`   | informacja o przekazaniu zgłoszenia do dalszych prac po stronie serwisu | nie |
+
+- **Wariant deklaruje, czy potrzebuje trafień** (`requires_hits`). To pole rozstrzyga, **które
+  guziki działają przy pustym indeksie** — `questions` i `handoff` są użyteczne od pierwszego
+  dnia, `solution` bez trafień nie ma z czego powstać (zasada 9).
+- **Lista wariantów jest konfigurowalna** — nazwa, etykieta guzika, prompt i `requires_hits` to
+  **dane w magazynie reguł**, nie kod. Klient dodaje własny czwarty guzik bez naszego deployu.
+- **Kod nie zna listy wariantów, zna kontrakt.** Wszystkie zwracają ten sam kształt: tekst
+  propozycji + źródła + wariant, którym powstał. Dzięki temu dodanie guzika nie dotyka handlera
+  ani UI helpdesku.
+- **Odpowiedzialność za konfigurację wariantu leży po stronie klienta — decyzja świadoma.**
+  Zestawiając prompt „wygeneruj rozwiązanie" z `requires_hits = false`, klient dostanie
+  propozycję opartą o wiedzę modelu, nie o bazę. **Nie blokujemy tego w kodzie** (blokada
+  wymagałaby rozumienia, co prompt klienta faktycznie robi — czego nie umiemy zrobić
+  niezawodnie), ale też **nie udajemy, że problem nie istnieje**: puste źródła w odpowiedzi są
+  jawnym sygnałem „to nie stoi na bazie", a zasada 9 obowiązuje warianty wbudowane.
+
+#### Oś 2: routing po score — podpowiedź, nie decyzja
+
+System ocenia trafienia i **podpowiada, który wariant ma sens**; wyboru nie odbiera człowiekowi.
+
+1. **wysoki score + zgodne rozwiązania** → podpowiadany `solution`,
+2. **średni score / sprzeczne rozwiązania** → podpowiadany `questions` (dopytanie przed
+   zaproponowaniem czegokolwiek),
+3. **niski score** → podpowiadany `questions` lub `handoff` + flaga **„nowy typ problemu"**;
+   `solution` zostaje dostępny, ale wygenerowany z pustą listą źródeł.
+
+- **Podpowiedź wraca w odpowiedzi wyszukiwania**, żeby UI mógł podświetlić guzik, zanim
+  użytkownik cokolwiek kliknie. Nie jest ostrzeżeniem blokującym.
+- **Reguły mapowania score → podpowiadany wariant zostają w kodzie** — to logika biznesowa
+  (patrz „Konfiguracja i deploy"). Konfigurowalne są warianty, nie sposób ich oceniania.
+- **Przy niskim score wynik dalej powstaje, jeśli człowiek tego chce** — z flagą i pustymi
+  źródłami. Zasada 10 („werdykt nie jest wyrokiem") dotyczy też tej podpowiedzi.
 
 ## Bramki jakości i asysta pisania (noga 2)
 
@@ -435,6 +489,8 @@ merytorycznie").
 - Indeksacja do Qdranta: `dokus index build --collection <nazwa>`
 - Pełna odbudowa indeksu: `dokus index rebuild` (kasuje kolekcję, wstaje z `data/parsed/`)
 - Zapytanie z konsoli: `dokus search "treść zgłoszenia"`
+- Propozycja w wybranym wariancie: `dokus suggest "treść zgłoszenia" --variant solution`
+- Lista dostępnych wariantów: `dokus variants list`
 - Ewaluacja embeddera: `dokus eval recall --model <nazwa>`
 
 **Bramki jakości i asysta pisania**
@@ -479,13 +535,13 @@ dokus-helpdesk-ai/
 │       ├── main.py               # montaż aplikacji, middleware, handlery wyjątków
 │       ├── config.py             # Settings (pydantic-settings)
 │       ├── models.py             # modele API (odrębne od domenowych)
-│       ├── prompts/              # szablony promptów (parser, generator, bramki, „Popraw")
+│       ├── prompts/              # szkielety promptów (parser, warianty, bramki, „Popraw")
 │       ├── routers/              # jeden plik na zasób/endpoint, cienkie
-│       ├── domain/               # ParsedTicket, Verdict, reguły filtrowania i routingu
+│       ├── domain/               # ParsedTicket, Verdict, warianty, reguły filtrowania i routingu
 │       ├── ingest/               # adaptery formatów źródłowych → RawTicket
 │       ├── llm/                  # LLMClient + fabryka + FakeLLMClient
 │       ├── embedding/            # EmbeddingClient (HTTP do `embedder`) + prefiksy
-│       ├── rules/                # magazyn reguł bramek (odczyt + wersjonowanie)
+│       ├── rules/                # magazyn reguł i wariantów (odczyt + wersjonowanie)
 │       └── retrieval/            # klient Qdranta: indeksacja, wyszukiwanie
 ├── embedder/                     # kolejna usługa: model PL za REST-em
 │   ├── Dockerfile
@@ -607,6 +663,14 @@ Wspólne:
 - **Endpointy bramek są synchroniczne wobec akcji użytkownika** — człowiek czeka przed
   kliknięciem „Zamknij". Timeout LLM-a musi być **krótszy** niż cierpliwość UI helpdesku, a jego
   przekroczenie to 503 (helpdesk decyduje sam), nie zawieszony request.
+- **`POST /suggest` przyjmuje wariant jako parametr, nie ma endpointu na guzik.** Trzy przyciski
+  to trzy wartości `variant`, nie trzy trasy — inaczej dodanie czwartego wariantu (dane!)
+  wymagałoby zmiany kodu, czyli dokładnie tego, czego konfigurowalność ma unikać.
+- **Nieznany wariant to 422, nie cichy fallback na domyślny** — literówka w nazwie guzika po
+  stronie helpdesku ma być widoczna od razu, a nie objawić się wygenerowaniem czegoś innego,
+  niż użytkownik kliknął.
+- **Lista dostępnych wariantów jest do odpytania** (`GET /variants`) — UI helpdesku musi wiedzieć,
+  jakie guziki narysować, skoro listy nie ma w kodzie.
 
 ## Warstwa LLM
 
@@ -631,10 +695,14 @@ Wspólne:
 
 - **Prompt = logika, nie konfiguracja** — szablony w kodzie (`api/app/prompts/`, jeden plik na
   prompt), **nigdy w ENV**.
-  - **Jedyny wyjątek: reguły bramek i zasady „Popraw"** (patrz „Bramki jakości"). Wyjątek dotyczy
-    **treści reguł**, nie szablonu — szkielet promptu zostaje w repo pod testem-strażnikiem,
-    a z bazy wchodzą wyłącznie dane wstawiane w wyznaczone miejsce. Nie rozszerzamy tego wyjątku
-    na prompt parsujący ani generator odpowiedzi.
+  - **Wyjątek: treści konfigurowane przez klienta** — reguły bramek, zasady „Popraw" (patrz
+    „Bramki jakości") i **prompty wariantów generacji** (patrz „Generacja propozycji"). We
+    wszystkich trzech przypadkach wyjątek dotyczy **treści**, nie szkieletu: rama promptu
+    zostaje w repo pod testem-strażnikiem, a z magazynu reguł wchodzą dane wstawiane
+    w wyznaczone miejsce.
+  - **Prompt parsujący zgłoszenie NIE jest konfigurowalny** — jest kontraktem artefaktu
+    (zasada 7). Jego zmiana unieważnia `data/parsed/`, więc należy do kodu i do gita, nie do
+    ustawień klienta.
 - **Prompt parsujący zgłoszenie mieszka w repo od pierwszego dnia** — nawet gdy pierwszą partię
   parsujemy ręcznie w czacie Claude. Ręczny przebieg ma używać **dokładnie tego** pliku; inaczej
   bootstrapowe JSON-y rozjadą się ze schematem, który potem wymusi aplikacja.
@@ -651,6 +719,11 @@ Jakość wyjścia LLM **mierz, nie oceniaj na oko.** Zbuduj golden set wejść, 
 W tym projekcie mierzymy **dwie osie osobno**: jakość **retrievalu** (`recall@5` — czy właściwy
 ticket w ogóle wpadł do top-5) i jakość **generacji** (czy propozycja odpowiedzi jest użyteczna).
 Zła odpowiedź przy dobrym trafieniu to inny problem niż dobra odpowiedź z pustego indeksu.
+
+**Generację mierzymy osobno per wariant** — `questions`, `solution` i `handoff` mają różne
+kryteria sukcesu i wspólny licznik je zaciera. Dobre pytania diagnostyczne to co innego niż
+dobre rozwiązanie: pierwsze mają trafiać w niewiadome, drugie w sprawdzony krok. Wariant
+`handoff` jest w dużej mierze formułką i jego ocena mówi głównie o stylu, nie o merytoryce.
 
 **Jak mierzyć:**
 - **Powtórz każdą ewaluację ≥2 razy niezależnie** — `temperature=0` nie daje determinizmu
@@ -744,8 +817,12 @@ Raises:                      # only when the method raises
   kontrakt** — każda zmienna z compose i `Settings` musi tam być. Bez `.env.prod`/`.env.dev` —
   różnice środowisk przez warstwy compose i ENV na maszynie docelowej.
 - **Progi i parametry retrievalu (`RAG_TOP_K`, `RAG_SCORE_MIN`…) idą do ENV** — to strojenie,
-  nie logika. Ale **reguły routingu 3-ścieżkowego zostają w kodzie**: decyzja „pełny szablon czy
-  diagnostyczny" to logika biznesowa, nie konfiguracja.
+  nie logika. Ale **reguły routingu (score → podpowiadany wariant) zostają w kodzie**: ocena
+  jakości trafień to logika biznesowa, nie konfiguracja.
+- **Granica przy generacji przebiega między „co" a „jak dobre"**: lista wariantów i ich prompty
+  są **danymi** w magazynie reguł (klient dodaje guzik bez deployu), a sposób oceniania trafień
+  i mapowanie score → podpowiedź **zostają w kodzie**. Mylenie tych dwóch rzeczy kończy się albo
+  zabetonowanym guzikiem, albo konfigurowalnym progiem jakości — obu nie chcemy.
 - **ENV do kontenerów jawnie przez `environment:`**, nie `env_file:` — wtedy `docker compose
   config` pokazuje realny wynik interpolacji.
 - **Test plumbingu configu** — parsuje `.env.example` ↔ compose `environment` ↔ `Settings` jako
@@ -911,6 +988,10 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
   zakazu zmyślania. Reguły pochodzą od klienta, więc są **niezaufanym wejściem**.
 - **Marker `integration_rules`** dla testów sięgających bazy reguł (od etapu 8), pod tym samym
   parasolem `integration`.
+- **Testy generacji nie zakładają, że warianty są trzy** — lista jest danymi, więc test
+  parametryzujemy po tym, co zwraca magazyn, a nie po zaszytej trójce. Osobno testujemy
+  **nieznany wariant → 422** i **wariant `requires_hits` bez trafień** (pusta lista źródeł,
+  a nie wygenerowane rozwiązanie).
 - **Klientem HTTP dla `TestClient` jest `httpx2`, nie `httpx`** — Starlette ≥ 1.3 uznaje `httpx`
   za przestarzały i przy każdym przebiegu sypie `StarletteDeprecationWarning`. Oba pakiety
   zainstalowane obok siebie nie kolidują, ale ostrzeżenie znika dopiero po usunięciu `httpx`.
@@ -946,6 +1027,15 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Twarda blokada bez furtki** (bramka, której człowiek nie przejdzie) — rozważona, odrzucona:
   fałszywy negatyw LLM-a zatrzymałby obsługę klienta, a model stałby się pojedynczym punktem
   awarii procesu (zasada 10).
+- **Automatyczny wybór wariantu generacji za człowieka** — score **podpowiada** guzik, nigdy nie
+  klika go sam. Rozważone i odrzucone: system nie wie, czy zgłoszenie wymaga działania serwisu
+  (to wiedza wdrożeniowca, nie funkcja podobieństwa wektorów).
+- **Osobny endpoint na każdy wariant** (`/suggest/questions`, `/suggest/solution`…) — odrzucone:
+  lista wariantów jest konfigurowalna, więc nowy guzik nie może wymagać nowej trasy.
+- **Blokowanie konfiguracji wariantu, która obchodzi zasadę 9** (prompt „wygeneruj rozwiązanie"
+  z `requires_hits = false`) — świadomie nie blokujemy. Wymagałoby to rozumienia, co prompt
+  klienta faktycznie robi; zamiast tego puste źródła w odpowiedzi jawnie sygnalizują brak
+  podstawy w bazie, a odpowiedzialność za własny wariant bierze klient.
 - **Bramki oparte o RAG** (porównywanie zamknięcia z historycznymi rozwiązaniami) — odrzucone
   na tym etapie: uzależniłoby nogę 2 od gotowego indeksu i zabrało jej największą zaletę,
   czyli użyteczność przy pustej bazie.
@@ -990,6 +1080,12 @@ tworzysz świadomym skrótem), **dopisz go tu** zamiast zostawiać w milczeniu.
 - **Kto edytuje reguły i na jakich prawach** — endpoint edycji reguł zmienia zachowanie bramek
   dla wszystkich; przy dzisiejszym braku uwierzytelniania (punkt wyżej) to otwarta zmiana
   konfiguracji produkcyjnej. Reguły muszą wejść razem z kontrolą dostępu i audytem zmian.
+  **Dotyczy tak samo wariantów generacji** — edycja promptu wariantu zmienia treść, którą
+  wdrożeniowcy wysyłają klientom.
+- **Wariant konfigurowalny może obejść zasadę 9** — świadomie nie blokujemy tego w kodzie
+  (patrz „Świadomie pominięte"), ale przed wdrożeniem trzeba to **powiedzieć klientowi wprost**
+  przy przekazywaniu edycji wariantów: prompt „wygeneruj rozwiązanie" bez wymogu trafień daje
+  propozycję z wiedzy modelu, nie z bazy zgłoszeń.
 - **Punkt integracji po stronie helpdesku** — bramki mają sens tylko wtedy, gdy helpdesk
   faktycznie zawoła nas przed zamknięciem/wysyłką. Ustalić z właścicielem tamtej aplikacji,
   czy i gdzie da się wpiąć hook (to zależność zewnętrzna, nie nasza robota).
@@ -1097,8 +1193,13 @@ właściwej warstwy, skrót → „TODO").
 - [ ] **5. Wyszukiwanie** — `POST /search`: parser zapytania (LLM → `ParsedTicket`) + top-K,
   próg, dedupe, zwrot trafień ze score i ID. **Tu parser wchodzi do runtime** — ten sam prompt
   i ten sam model Pydantic, którymi parsowaliśmy korpus.
-- [ ] **6. Generacja propozycji** — prompt + routing 3-ścieżkowy + placeholdery; `POST /suggest`.
-  **Koniec nogi 1** (RAG). Od etapu 7 budujemy nogę 2 — patrz „Bramki jakości i asysta pisania".
+- [ ] **6. Generacja propozycji** — `POST /suggest` z parametrem `variant` + `GET /variants`
+  + placeholdery + routing po score jako **podpowiedź** wariantu. Trzy warianty startowe
+  (`questions`, `solution`, `handoff`) zdefiniowane **w kodzie, ale za interfejsem magazynu
+  reguł** — tak samo jak zasady „Popraw" w etapie 7; przeniesienie ich do bazy w etapie 8 ma nie
+  ruszać serwisu. Każdy wariant deklaruje `requires_hits`, co przesądza, które guziki działają
+  przy pustym indeksie. **Koniec nogi 1** (RAG). Od etapu 7 budujemy nogę 2 — patrz „Bramki
+  jakości i asysta pisania".
 - [ ] **7. Asysta pisania („Popraw")** — `POST /polish`: szkielet promptu w `prompts/`, zasady
   stylu jako dane, serwis wołający wyłącznie `LLMClient`. **Pierwszy z trzech, bo najprostszy
   i najmniej ryzykowny** — nie wydaje werdyktu, nikogo nie blokuje. Zasady stylu na tym etapie
@@ -1106,11 +1207,14 @@ właściwej warstwy, skrót → „TODO").
   granica „szkielet w kodzie / treść jako dane" powstaje tu, a podmiana źródła na bazę w etapie 8
   ma nie ruszać serwisu. **Kluczowy sprawdzian: brak nowych faktów** — porównanie wejścia
   z wyjściem pod kątem dodanych liczb, nazw i kroków (zasada 9).
-- [ ] **8. Magazyn reguł (SQL)** — relacyjna baza wchodzi do compose jako czwarta usługa; schemat
-  wąski: zestawy reguł, ich **wersje** i audyt wydanych werdyktów. Endpoint odczytu + edycji,
-  `dokus rules show`. **Rozstrzygnąć tu:** kontrola dostępu do edycji (patrz TODO — dziś API jest
-  otwarte, a edycja reguł to zmiana konfiguracji produkcyjnej) oraz zachowanie przy pustym
-  zestawie reguł.
+- [ ] **8. Magazyn reguł i wariantów (SQL)** — relacyjna baza wchodzi do compose jako czwarta
+  usługa; schemat wąski: zestawy reguł, **warianty generacji** (nazwa, etykieta, prompt,
+  `requires_hits`), ich **wersje** i audyt wydanych werdyktów. Endpoint odczytu + edycji,
+  `dokus rules show`, `dokus variants list`. Tu warianty z etapu 6 przestają być wbudowane
+  i klient może dodać własny guzik. **Rozstrzygnąć tu:** kontrola dostępu do edycji (patrz
+  TODO — dziś API jest otwarte, a edycja reguł to zmiana konfiguracji produkcyjnej), zachowanie
+  przy pustym zestawie reguł oraz **co się dzieje z wariantem skasowanym po tym, jak helpdesk
+  narysował już guzik** (wyścig między `GET /variants` a `POST /suggest`).
 - [ ] **9. Bramki jakości** — `POST /gate/close` i `POST /gate/reply` na wspólnym kontrakcie
   `Verdict` (werdykt + powody + braki + wskazówka + wersja reguł). Dochodzi **ewaluacja bramek**
   (`dokus eval gates`) na realnych zamknięciach z korpusu, mierzona osobno per reguła, z naciskiem
