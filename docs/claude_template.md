@@ -302,9 +302,10 @@ Raises:                      # only when the method raises
   i ENV na maszynie docelowej.
 - **ENV do kontenerów jawnie przez `environment:`**, nie `env_file:` — wtedy `docker compose
   config` pokazuje realny wynik interpolacji.
-- **Test plumbingu configu** — parsuje `.env.example` ↔ compose `environment` ↔ `Settings` jako
-  dane (bez Dockera) i pilnuje zgodności nazw w obie strony. Granica: sprawdza **przepływ nazw**,
-  nie zachowanie — zły typ czy jednostka przejdzie.
+- **Prefiks nazywa właściciela zmiennej** — `LLM_*`, `DB_*` dzielą po komponencie, a `DOCKER_*`
+  wydziela to, co **czyta sam compose i nigdy nie wchodzi do kontenera** (porty hosta, adres
+  nasłuchu); inaczej takie wpisy wyglądają w `.env.example` na martwe.
+- **Zgodności nazw pilnuje test, nie czujność przy review** — patrz „Testy" (plumbing configu).
 
 **Pliki i warstwy compose:**
 - **Wszystkie pliki compose w korzeniu** — tylko stamtąd Compose znajdzie `.env`, a ścieżki
@@ -399,6 +400,13 @@ Raises:                      # only when the method raises
   `pytest` = unity na atrapie, więc nic nie pada przez brak stacku.)
 - **Markery:** `integration_<usługa>` + parasol `integration`; osobno `llm_live` (żywy, płatny LLM
   **poza** parasolem, żeby `-m integration` go nie łapał). Wszystkie rejestrowane w `pyproject.toml`.
+- **Test plumbingu configu** — `.env.example` ↔ compose `environment:` ↔ `Settings` czytane jako
+  dane (bez Dockera, więc unit). Trzy źródła = **trzy krawędzie po dwa kierunki, wszystkie sześć
+  trzeba napisać**; ważniejszy jest kierunek „brak" (pole, którego usługa nie dostaje), bo wartość
+  domyślna sprawia, że usługa cicho wstaje na wartości z kodu. Krawędź compose ↔ `Settings` licz
+  **per usługa** — pośrednie „trafia do *jakiegoś* kontenera" przepuści odebranie zmiennej jednej
+  z dwóch. Compose-only (`DOCKER_*`) wyklucz **predykatem, nie listą** — za cenę dwóch strażników
+  odwrotnych (nie trafia do kontenera, nie deklaruje jej `Settings`). To test **nazw**, nie wartości.
 - **`--import-mode=importlib`** w `addopts` — bez tego zbiorczy `pytest -m …` wywala „import file
   mismatch", gdy ten sam plik istnieje w `tests/unit/` i `tests/integration/`.
 - **`-m 'not integration and not llm_live'` w `addopts`** — sama rejestracja markera niczego nie

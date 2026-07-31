@@ -1154,6 +1154,17 @@ Raises:                      # only when the method raises
 - **Test plumbingu configu** — parsuje `.env.example` ↔ compose `environment` ↔ `Settings` jako
   dane (bez Dockera) i pilnuje zgodności nazw w obie strony. Granica: sprawdza **przepływ nazw**,
   nie zachowanie — zły typ czy jednostka przejdzie.
+  - **Wszystkie trzy krawędzie są dwukierunkowe** i to nie jest symetria dla samej symetrii.
+    Krawędź compose ↔ `Settings` **per usługa** długo miała tylko kierunek „klucz, którego usługa
+    nie umie przeczytać"; brakujący kierunek — **pole, którego usługa nigdy nie dostaje** — jest
+    groźniejszy, bo **nie objawia się niczym**: każde pole `Settings` ma wartość domyślną, więc
+    usługa wstaje, raportuje `healthy` i cicho jedzie na wartości z kodu zamiast na
+    skonfigurowanej. Przy `QDRANT_URL` czy `EMBEDDING_BASE_URL` znaczy to rozmowę z niewłaściwym
+    adresem. Pokrycie pośrednie („wpis z `.env.example` trafia do *jakiegokolwiek* kontenera")
+    **nie wystarcza** — przy zmiennej czytanej przez dwie usługi (`LOG_LEVEL`,
+    `EMBEDDING_VECTOR_SIZE`) utrata jej przez jedną z nich przechodzi niezauważona.
+  - **Bez listy wyjątków — świadomie.** Zostawienie pola na wartości domyślnej ma być aktem
+    jawnym, a deklaruje się go **dopisaniem klucza do compose**, nie cichym pominięciem w teście.
 
 **Pliki i warstwy compose:**
 - **Wszystkie pliki compose w korzeniu** — tylko stamtąd Compose znajdzie `.env`, a ścieżki
@@ -1180,12 +1191,45 @@ Raises:                      # only when the method raises
 - **Pusty string zamiast braku** — `docker compose` dla niezdefiniowanego `${VAR:-}` wstawia
   **pusty string**. Bez walidatora „pusty/biały → `None`" w `Settings` dostajesz
   `Client(base_url="")` → błąd połączenia zamiast czytelnego błędu configu.
+  - **U nas puste są trzy wpisy i to stan docelowy, nie usterka:** `LLM_BASE_URL`, `LLM_API_KEY`
+    i `LLM_MODEL` przy `LLM_PROVIDER=fake`. `docker compose config` pokazuje przy nich `""`,
+    a walidator zamienia je na `None` (zweryfikowane w kontenerze). **Usunięcie ich z compose
+    łamie test „każde pole `Settings` jest podane usłudze"**, więc to nie jest sprzątanie —
+    to zmiana dwóch reguł naraz.
+  - **Nie „naprawiaj" tego wpisując `none` / `null` / `unused`** — sprawdzone na `Settings`:
+    to zwykłe łańcuchy i pole `str | None` przyjmuje je jako **poprawną wartość**
+    (`llm_base_url = 'none'`), więc klient pójdzie pod adres `none`. Wersja gorsza od pustego
+    stringa, bo walidator łapie wyłącznie ten drugi. Jedynym sposobem na „brak" jest brak.
 - **Powłoka przebija `.env`** — przy `${VAR:-default}` Compose stawia zmienną powłoki **wyżej**
   niż `.env`, cicho; jedno `set -a; . ./.env` zamraża stare wartości na resztę sesji. Stąd:
   **weryfikuj `docker compose config`, nie `.env`**.
 - **Listy się SKLEJAJĄ, nie nadpisują** (`ports`, `volumes`) — warstwa nie „poprawi" wpisu
   z bazy, dostaniesz dwa. Zdjęcie: `!reset []` (Compose ≥ 2.24) — tak prod kasuje mount i tak
-  zdejmujesz stary port. Zmiana adresu nasłuchu: ENV **w bazie** (`${BIND_ADDR:-0.0.0.0}`).
+  zdejmujesz stary port. Zmiana adresu nasłuchu: ENV **w bazie** (`${DOCKER_BIND_ADDR:-127.0.0.1}`).
+- **Prefiks `DOCKER_` = zmienna rozwiązywana przez `docker compose`, która NIE wchodzi do
+  kontenera.** To jest cała umowa i jedyne kryterium: `DOCKER_*` interpoluje się w pliku compose
+  i tam się kończy, więc **żaden `Settings` nie ma prawa jej deklarować**; wszystko bez tego
+  prefiksu trafia do kontenera i ktoś to czyta. Test plumbingu rozpoznaje je **predykatem po
+  prefiksie**, nie listą — nowa zmienna nie wymaga dopisywania w dwóch miejscach.
+  - **Koszt przyjęty świadomie:** predykat wyłącza z kontroli *każdą* przyszłą `DOCKER_*`, także
+    omyłkowo tak nazwaną, która powinna trafić do kontenera. Dziurę domykają dwa testy pilnujące
+    reguły **w drugą stronę**: żadna `DOCKER_*` nie jest podawana kontenerowi i żaden `Settings`
+    nie deklaruje pola z tym prefiksem.
+- **Port hosta jest zmienną, nie stałą** (`${DOCKER_API_PORT:-8010}`) — kolizja z innym projektem
+  na maszynie deweloperskiej jest normą, nie wyjątkiem, a poprawianie jej edycją YAML-a wraca przy
+  każdym `git pull`. **`api` domyślnie na 8010, nie 8000** — 8000 bywa zajęte przez inny lokalny
+  projekt, a baza, która nie wstaje po `up`, jest gorsza niż nietypowy numer.
+- **`DOCKER_*_PORT` rusza wyłącznie stronę hosta.** W mapowaniu `adres:port_hosta:port_kontenera`
+  o znaczeniu członu decyduje wyłącznie **pozycja**, a strony są nierównoważne: port kontenera jest
+  **stały** (8000 dla obu aplikacji, 6333 dla Qdranta) i to jego używają usługi, rozmawiając ze
+  sobą po nazwie (`EMBEDDING_BASE_URL`, `QDRANT_URL`). Zmiana `DOCKER_EMBEDDER_PORT` jest
+  **niewidoczna wewnątrz sieci compose** — pułapka realna, bo nazwa brzmi podobnie do
+  `EMBEDDING_BASE_URL`, a robi co innego. Uboczny skutek: `api` i `embedder` mają w kontenerze ten
+  sam port 8000 i **to nie jest konflikt** — kolidują dopiero porty hosta.
+- **Adres nasłuchu domyślnie `127.0.0.1`, nie `0.0.0.0`** — stack nie ma jeszcze
+  uwierzytelniania (patrz TODO), więc nie może odpowiadać z sieci bez świadomej decyzji.
+- **`healthcheck` przez `python -c`, nie `curl`** — obraz `python:*-slim` nie ma `curl`,
+  a dokładanie go wyłącznie pod sondę powiększa obraz bez powodu.
 
 **Obrazy:**
 - **Pinowane tagiem, bazowy digestem** (`python:3.12-slim@sha256:…`) — ruchomy tag daje przy
@@ -1267,11 +1311,21 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
   = fail, nie skip.** Integracyjne i `llm_live` są za markerem, uruchamiane świadomie; skoro
   o nie prosisz, brak warunków do uruchomienia to błąd, nie powód do pominięcia. (Domyślny
   `pytest` = unity na atrapie, więc nic nie pada przez brak stacku.)
-- **Markery:** `integration_qdrant`, `integration_embedder` + parasol `integration`; osobno
-  `llm_live` (żywy, płatny LLM **poza** parasolem, żeby `-m integration` go nie łapał).
-  Wszystkie rejestrowane w `pyproject.toml`.
-- **Domyślny przebieg wyklucza markery jawnie** — `-m 'not integration and not llm_live'`
-  w `addopts`. Sama rejestracja markera niczego nie odsiewa: bez tego gołe `pytest` odpala też
+- **Markery:** `integration_api`, `integration_qdrant`, `integration_embedder` + parasol
+  `integration`; osobno `functional` i `llm_live` (oba **poza** parasolem, żeby
+  `-m integration` ich nie łapał). Wszystkie rejestrowane w `pyproject.toml`.
+- **`functional` to osobna oś, nie odmiana `integration`.** Oba wymagają stacku, ale odpowiadają
+  na inne pytanie: `integration` — „czy usługi są ze sobą spięte", `functional` — „czy produkt
+  zachowuje się sensownie" (zgłoszenie na wejściu, trafienia na wyjściu). Rozdzielone, żeby
+  30-sekundowy sprawdzian okablowania nie kosztował przebiegu wołającego LLM i Qdranta.
+  **Dziś żaden test go nie nosi** — pierwszy powstanie razem z `POST /search` (etap 5).
+- **Test czytający compose musi tolerować tagi Compose'a** — `volumes: !reset []` jest poprawnym
+  Compose'em, ale nieznanym tagiem dla `yaml.safe_load`, więc gołe wczytanie pliku wywala się
+  dokładnie na linii, która stanowi o działaniu warstwy prod. Stąd własny loader z konstruktorem
+  `!reset`.
+- **Domyślny przebieg wyklucza markery jawnie** — `-m 'not integration and not functional and
+  not llm_live'` w `addopts`. **Każdy nowy marker trzeba tu dopisać** — parasol `integration`
+  nie obejmuje tych, które celowo stoją obok niego. Sama rejestracja markera niczego nie odsiewa: bez tego gołe `pytest` odpala też
   integracyjne i jest zielone tylko wtedy, gdy akurat chodzi stack. `-m` z linii poleceń
   **nadpisuje** tę wartość, więc `pytest -m integration_embedder` dalej wybiera dokładnie to,
   o co prosi.
@@ -1465,68 +1519,15 @@ właściwej warstwy, skrót → „TODO").
 
 **Etapy:**
 
-- [~] **0. Fundament repo** — szkielet, na którym da się uruchomić testy i całą kompozycję;
-  zero logiki domenowej. Kolejność idzie od rzeczy weryfikowalnych bez Dockera — compose na
-  starcie nie ma czego uruchomić, więc daje tylko informację „kontener wstał".
-  - [x] **0a. Pakiet i narzędzia** — `pyproject.toml` (pakietowanie, entry-point `dokus`,
-    `--import-mode=importlib` w `addopts`, markery `integration`, `integration_qdrant`,
-    `integration_embedder`, `llm_live`), `requirements-dev.txt`, `.venv`.
-  - [x] **0b. Konfiguracja** — `Settings` (`api/app/config.py`) + `.env.example` +
-    walidator „pusty/biały string → `None`" (pułapka z „Konfiguracja i deploy") + **test
-    plumbingu configu**. Pierwszy realny test w repo, chodzi bez Dockera. Noga „compose
-    `environment:`" tego testu dochodzi w 0e, razem z plikami compose.
-  - [x] **0c. Usługa `api`** — `Dockerfile`, `.dockerignore`, `requirements.txt`, `main.py`
-    z `/health`, middleware Request-ID, handlery wyjątków (osobny na `RequestValidationError`),
-    szkielet CLI (`dokus --help`).
-  - [x] **0d. Warstwa LLM** — `LLMClient` (interfejs) + `LLMCompletion` (tekst + użycie do logu),
-    `FakeLLMClient` (odpowiedzi skryptowane, `calls` do asercji, wyczerpanie skryptu = `LLMError`),
-    `get_llm_client()` z fail-fast + testy atrapy i fabryki. Realnego dostawcy nie podłączamy —
-    pierwszy użytkownik pojawia się w etapie 5, ale abstrakcja istnieje wcześniej, żeby nikt
-    w międzyczasie nie zaimportował SDK prosto do domeny.
-  - [ ] **0e. Compose** — baza: `api` + `qdrant` + `embedder`-zaślepka + warstwa `prod`.
-    Obrazy pinowane (tag + digest), ENV przez `environment:`. Kolejność: zaślepka musi
-    istnieć, zanim compose ma co budować; test plumbingu na końcu, bo domyka pętlę
-    `.env.example` ↔ compose ↔ `Settings`.
-    - [x] **0e-1. Usługa `embedder` (backend `fake`)** — `embedder/` (Dockerfile, `.dockerignore`,
-      `requirements.txt` — **bez** `sentence-transformers`), `embedder_app/main.py` z `/health`
-      i `POST /embed`. Warstwa `encoding/` w kształcie lustrzanym wobec `app/llm/`: `Encoder`
-      (interfejs, async, `model_name`/`dimension`), `FakeEncoder` (`EMBEDDING_BACKEND=fake`),
-      `build_encoder()`/`get_encoder()` z fail-fast, `EncoderError`/`EncoderConfigError`.
-      Wektor **deterministyczny per tekst** (sha256 → seed → wektor znormalizowany, długość
-      z `EMBEDDING_VECTOR_SIZE`), bez wag modelu: progi, dedupe i routing nie mają prawa zależeć
-      od modelu (→ „Testy"). Kontrakt endpointu już w kształcie docelowym — przyjmuje `mode`
-      (`query`/`passage`/`sts`) i **ignoruje** go, bo mapowanie `mode` → prefiks jest cechą
-      modelu i mieszka w implementacji. Handlery wyjątków i Request-ID jak w `api`, plus własny
-      handler `EncoderError` → **503** (awaria backendu jest przejściowa — config padł już przy
-      starcie — więc indeksacja ma się wycofać i ponowić, a nie porzucić zgłoszenie).
-      Sprawdzian: dwa wywołania `/embed` na tym samym tekście = ten sam wektor (także po
-      restarcie procesu); zły `EMBEDDING_BACKEND` = śmierć przy starcie, nie błąd w żądaniu.
-    - [ ] **0e-2. Baza `docker-compose.yml` (dev)** — `api` (build `./api`, bind-mount
-      `./api/app`, `command` z `--reload`, `data/` zamontowane pod artefakty z etapu 1),
-      `embedder` (build `./embedder`), `qdrant` (wolumen nazwany na `/qdrant/storage`).
-      `healthcheck` tylko tam, gdzie usługa ma własny `/health` (`api`, `embedder`) — bez
-      `depends_on: service_healthy`, bo `/health` mówi wyłącznie o sobie.
-      **Wyrównanie testów do reguły „kontrakt w procesie, wdrożenie po HTTP"** (→ „Testy"),
-      możliwe dopiero tutaj, bo przed compose `api` nie ma czego odpytać po HTTP:
-      `api` dostaje integracyjny smoke `/health` (dziś jedyny sprawdzian kryterium
-      „`compose up` → 200" jest ręczny); testy kontraktowe embeddera (422 na brak/zły `mode`
-      i pusty batch, kolejność w batchu) schodzą do unitów na `TestClient`, a po HTTP zostaje
-      cienki smoke na usługę — `/health` + jedno `/embed`.
-    - [ ] **0e-3. Warstwa `docker-compose.prod.yml`** — `include:` bazy (jeden `-f` podnosi
-      łańcuch), zdjęcie bind-mountu przez `volumes: !reset []` i nadpisanie `command` bez
-      `--reload`. Sprawdzian: `config` tej warstwy nie pokazuje montowania kodu z hosta.
-    - [ ] **0e-4. Trzecia noga testu plumbingu configu** — parsuje pliki compose **jako dane**
-      (`pyyaml` do `requirements-dev.txt`, bez Dockera) i pilnuje zgodności kluczy
-      `environment:` ↔ `.env.example` ↔ pól `Settings` w obie strony.
-
-  **Kryterium ukończenia** (sprawdzalne komendą, nie opinią):
-  `pytest` przechodzi offline i nie rusza sieci · `ruff check .` czysto ·
-  `docker compose up -d` → `/health` 200 i Qdrant odpowiada ·
-  `docker compose config` pokazuje zinterpolowane ENV bez pustych stringów ·
-  `docker compose -f docker-compose.prod.yml config` bez bind-mountu kodu ·
-  `dokus --help` działa po `pip install -e .` ·
-  **test plumbingu configu pada** po celowym przekręceniu nazwy w `.env.example`
-  (kontrola negatywna — strażnik, którego nikt nie widział na czerwono, nie jest strażnikiem).
+- [x] **0. Fundament repo** — pakiet i narzędzia (`pyproject.toml`, markery, `.venv`), `Settings`
+  + `.env.example` + test plumbingu configu, usługa `api` (`/health`, Request-ID, handlery
+  wyjątków, CLI `dokus`), warstwa LLM za `LLMClient` z `FakeLLMClient`, usługa `embedder`
+  (backend `fake`) oraz compose: baza dev + warstwa prod. Zero logiki domenowej — pierwszy
+  realny użytkownik warstwy LLM pojawia się w etapie 5.
+  **Kryterium ukończenia sprawdzone komendami 2026-07-31**: `pytest` offline (79 unitów, przy
+  zatrzymanym stacku) · `ruff` czysto · `up` → trzy usługi odpowiadają · prod bez bind-mountu ·
+  `dokus --help` · kontrola negatywna testu plumbingu na czerwono. Zasady, które z tego etapu
+  zostały, żyją w sekcjach tematycznych — **roadmapa ich nie powtarza**.
 - [ ] **1. Kontrakt zgłoszenia** — `ParsedTicket` (Pydantic) + prompt parsujący w `prompts/` +
   `dokus tickets validate`; na tej podstawie parsujemy ręcznie pierwszą partię w czacie.
   **Większość otwartych pytań rozstrzygnęły już dane** — patrz „Co rozstrzygnęły dane"
