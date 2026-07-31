@@ -108,6 +108,9 @@ a od etapu 8 baza reguł. LLM jest **zewnętrznym endpointem**, nie usługą w b
   tylko podpowiada (jak dobre trafienia); to dwie prostopadłe osie
 - **Nie zaszywaj listy wariantów w kodzie ani w UI** — warianty to dane, kod zna tylko kontrakt
 - **Nie rób osobnego endpointu na każdy guzik** — `variant` jest parametrem `/suggest`
+- **Nie streszczaj `questions_summary` do kategorii** („pytano o konfigurację") — konkrety
+  (nazwy, ustawienia, wersje) są całą wartością tego pola
+- **Nie wrzucaj do `questions_summary` pytań proceduralnych** („czy problem nadal występuje?")
 
 ## Praca z agentem
 
@@ -223,6 +226,7 @@ Pola (robocze; doprecyzować na pierwszej realnej partii danych):
 | `problem`     | zwięzły opis problemu (1–2 zdania)              | **tak** |
 | `symptoms`    | objawy widziane przez użytkownika               | **tak** |
 | `error_codes` | kody błędów, sygnatury, identyfikatory urządzeń | nie (→ sparse, etap 11) |
+| `questions_summary` | synteza: czego konsultant nie wiedział i o co dopytywał | nie |
 | `cause`       | ustalona przyczyna                              | nie |
 | `solution`    | co konkretnie rozwiązało sprawę                 | **nie** |
 | `category`    | kategoria ze słownika                           | nie |
@@ -247,6 +251,45 @@ Zasady schematu (rozwinięcie „Jak projektować schemat odpowiedzi" niżej):
     z jawnym wyjściem `brak`. **Decyzja w etapie 1.** Do tego czasu nie opieramy na `confirmed`
     żadnej wagi — nie ma czego ważyć.
 - **Deduplikacja** powtarzalnych problemów — ten sam problem w 200 ticketach zalałby top-5.
+
+### `questions_summary` — materiał dla wariantu `questions`
+
+Pole zbiera to, **czego konsultant nie wiedział i o co dopytywał** w danej sprawie. Jest jedynym
+miejscem w korpusie, gdzie widać **jak ten helpdesk diagnozuje** — wiedzy „w tym produkcie warto
+sprawdzić profil skanowania w NAPS2 albo nietypową rozdzielczość ekranu" nie da się wyprowadzić
+z `problem` i `symptoms`. Zasila wariant `questions` (patrz „Generacja propozycji").
+
+Stan faktyczny w korpusie (sonda na 1825 zgłoszeniach, 2026-07-31):
+
+| miara | wartość |
+|---|---|
+| zgłoszenia z pytaniem konsultanta | **304 (16,7%)** |
+| pytań ogółem | 429 |
+| z tego dokładnie 1 pytanie na zgłoszenie | 224 z 304 (**74%**) |
+| pierwsze pytanie już w 1. komentarzu | 211 z 304 (69%) |
+
+Reguły:
+
+- **Synteza, nie lista cytatów** — decyzja świadoma. Powód: przy 2+ pytaniach zwięzły obraz
+  niewiadomych działa lepiej niż luźne zdania, a forma niepytająca osłabia pokusę dosłownego
+  przepisania pytań do propozycji.
+- **Synteza MUSI zachować konkrety** — nazwy narzędzi, ustawienia, wersje, miejsca w aplikacji.
+  „Pytano o konfigurację stanowiska" jest bezwartościowe; „pytano o rozdzielczość ekranu i profil
+  skanowania w NAPS2" niesie wiedzę operacyjną. **To jest warunek, pod którym całe pole ma sens**
+  — prompt parsujący musi to wymuszać wprost, a test-strażnik promptu tego pilnować.
+- **Pomijamy pytania proceduralne** — „czy problem nadal występuje?", „czy możemy zamknąć
+  zgłoszenie?" to domykanie sprawy, nie diagnostyka (~⅓ pytań w korpusie). Podsunięte
+  wdrożeniowcowi jako propozycja są gorsze niż brak propozycji — wyglądają na odpowiedź,
+  a są szumem. Ta sama pułapka co przy pustych rozwiązaniach („Już powinno działać").
+- **Jawne wyjście `brak`** — pole będzie puste w ~83% rekordów i to jest normalny stan, nie
+  usterka. Wariant `questions` nie może zakładać, że trafienia je mają.
+- **Nie embedowane** — to nie jest sygnał podobieństwa problemu, tylko materiał do payloadu,
+  dokładnie jak `solution`.
+- **Ryzyko przyjęte świadomie:** synteza jest **nieodwracalna** (zasada 7) — błąd streszczenia
+  utrwala się w artefakcie, a odtworzenie konkretów wymaga ponownego przebiegu LLM po korpusie.
+  Stąd nacisk na zachowanie konkretów w prompcie: to jedyny moment, w którym da się je uratować.
+- **Nie chroni przed dosłownym kopiowaniem sama z siebie** — przed przepisaniem cudzych pytań
+  do propozycji chroni **prompt wariantu** (patrz „Generacja propozycji"), nie kształt pola.
 
 ## RAG — architektura
 
@@ -356,13 +399,23 @@ Wdrożeniowiec wybiera **rodzaj** odpowiedzi. Trzy warianty startowe:
 
 | wariant | co generuje | wymaga trafień |
 |---|---|---|
-| `questions` | pytania, które warto zadać w ramach zgłoszenia | nie |
+| `questions` | pytania, które warto zadać w ramach zgłoszenia | nie (trafienia wzbogacają) |
 | `solution`  | rozwiązanie — gdy zgłoszenie nie wymaga działania serwisu | **tak** |
 | `handoff`   | informacja o przekazaniu zgłoszenia do dalszych prac po stronie serwisu | nie |
 
 - **Wariant deklaruje, czy potrzebuje trafień** (`requires_hits`). To pole rozstrzyga, **które
   guziki działają przy pustym indeksie** — `questions` i `handoff` są użyteczne od pierwszego
   dnia, `solution` bez trafień nie ma z czego powstać (zasada 9).
+- **`questions` działa dwutorowo i to jest zamierzone:** bez trafień generuje pytania z ogólnej
+  wiedzy o zgłoszeniu, z trafieniami dokłada `questions_summary` z podobnych spraw — czyli to,
+  o co realnie dopytywał ten helpdesk. Dlatego `requires_hits = false`, ale trafienia istotnie
+  podnoszą jakość. **Puste `questions_summary` w trafieniach jest normą** (~83% korpusu), więc
+  prompt nie może na nim polegać.
+- **Prompt wariantu `questions` odpowiada za to, żeby nie przepisać cudzych pytań.** Materiał
+  historyczny to **wzorzec, nie treść do skopiowania** — instrukcja musi kazać: odrzuć pytania
+  niepasujące do bieżącego kontekstu, przeformułuj pod to zgłoszenie, **pomiń te, na które
+  odpowiedź już jest w treści**. Bez tego model podsunie „czy wykonano CTRL+F5 po aktualizacji?"
+  na zgłoszenie, w którym żadnej aktualizacji nie było.
 - **Lista wariantów jest konfigurowalna** — nazwa, etykieta guzika, prompt i `requires_hits` to
   **dane w magazynie reguł**, nie kod. Klient dodaje własny czwarty guzik bez naszego deployu.
 - **Kod nie zna listy wariantów, zna kontrakt.** Wszystkie zwracają ten sam kształt: tekst
@@ -1027,6 +1080,12 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Twarda blokada bez furtki** (bramka, której człowiek nie przejdzie) — rozważona, odrzucona:
   fałszywy negatyw LLM-a zatrzymałby obsługę klienta, a model stałby się pojedynczym punktem
   awarii procesu (zasada 10).
+- **Lista dosłownych pytań konsultanta zamiast syntezy** (`asked_questions`) — rozważona,
+  odrzucona: przy medianie **jednego** pytania na zgłoszenie (74% przypadków) lista to niemal
+  to samo co synteza, a forma pytająca silniej ciągnie model do przepisania cudzych pytań wprost.
+  Zysk z wierności artefaktu nie równoważył tego przy tak niskim pokryciu (16,7% zgłoszeń).
+  **Warunek, na którym stoi ta decyzja:** synteza zachowuje konkrety — jeśli w praktyce zacznie
+  je gubić, wracamy do rozmowy, bo wtedy pole traci wartość.
 - **Automatyczny wybór wariantu generacji za człowieka** — score **podpowiada** guzik, nigdy nie
   klika go sam. Rozważone i odrzucone: system nie wie, czy zgłoszenie wymaga działania serwisu
   (to wiedza wdrożeniowca, nie funkcja podobieństwa wektorów).
@@ -1174,6 +1233,9 @@ właściwej warstwy, skrót → „TODO").
   `dokus tickets validate`; na tej podstawie parsujemy ręcznie pierwszą partię w czacie.
   **Rozstrzygnąć tu:** los `cause` i `confirmed` (brak źródła w bazie — patrz „Dane wejściowe")
   oraz czy `system` zostaje w schemacie mimo że w tym zakresie jest stałą.
+  **Uwaga na 661 już sparsowanych zgłoszeń** w `data/parsed/` — dochodzi `questions_summary`,
+  więc albo re-parsujemy tę partię, albo świadomie żyjemy z korpusem, w którym część rekordów
+  pola nie ma. Decyzja przed dalszym parsowaniem, nie po (zasada 7 — każdy przebieg kosztuje).
 - [ ] **2. Embedder jako usługa** — realny PolDense obok backendu `fake` z etapu 0: nowa
   implementacja `Encoder` (wagi, dobór wariantu, warstwa GPU, prefiksy trybów, `encode` przez
   `run_in_threadpool`, bo `sentence-transformers` jest synchroniczne) + wpis w fabryce;
