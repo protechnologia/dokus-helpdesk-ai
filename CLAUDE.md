@@ -453,11 +453,20 @@ Zasady schematu (rozwinięcie „Jak projektować schemat odpowiedzi" niżej):
   opisowe. Tanie ubezpieczenie: raport rozkładu wartości po pierwszej setce rekordów — wychwytuje
   rozjazd, zanim obejmie cały korpus.
 - **`resolution` jest słownikiem OPISOWYM — kod nie wyprowadza z niego żadnej klasy.** Wartość
-  idzie do payloadu i do promptu generacji, bo „odmowa" i „działa zgodnie z projektem" to inne
-  odpowiedzi niż „naprawione". **Nie steruje filtrem indeksacji** — patrz niżej.
-- **Informacja o wykonawcy mieszka w słowniku `resolution`** (np. `naprawione_przez_dostawcę`),
-  nie w osobnym polu. Rozróżnienie „zrób sam" / „poproś dostawcę" dotyczy 18% korpusu
-  („naprawiono skutki, nie przyczynę") i musi przetrwać, choć pole `audience` odpadło.
+  idzie do payloadu i do promptu generacji, bo „bez zmian w systemie" prowadzi do innej odpowiedzi
+  niż „naprawione" — pierwsza mówi, co klient ma zrobić u siebie, druga że sprawa jest zamknięta
+  po naszej stronie. **Nie steruje filtrem indeksacji** — patrz niżej.
+  - **Oś słownika: czy zmieniliśmy coś w systemie.** Zestaw domyślny zszedł z dziesięciu wartości
+    do trzech (2026-07-31) — rodzaje odpowiedzialności, kanału i wykonawcy okazały się treścią
+    `solution`, nie metadanymi. **Cena scalenia:** „zachowanie jest poprawne" i „usterka trwa,
+    obejdź ją tak" wpadają w jedną klasę, a to przeciwne komunikaty dla klienta — rozróżnia je
+    wyłącznie tekst `solution`, więc prompt generacji musi je z niego wyczytać.
+- **Informacja o wykonawcy mieszka w tekście `solution`**, nie w polu ani w klasie
+  rozstrzygnięcia — rozwiązanie ma wprost mówić, kto wykonuje krok („poproś dostawcę o ręczne
+  wygenerowanie podglądów"). Rozróżnienie „zrób sam" / „poproś dostawcę" dotyczy 18% korpusu
+  („naprawiono skutki, nie przyczynę"), więc **prompt parsujący musi je wymuszać** — po odrzuceniu
+  pola `audience` i klasy `naprawione_przez_dostawcę` nie ma innego nośnika. **Cena przyjęta
+  świadomie: nie da się po tym filtrować ani tego policzyć** — jest treścią, nie metadanymi.
 - **Filtr jakości przy indeksacji patrzy na TREŚĆ (`solution`, `cause`), nie na `resolution`.**
   Zmierzone na 661 rekordach: wśród „nierozwiązanych" tylko **8 na 161 ma puste `solution`** —
   czyli 95% z nich niesie treść, a klasa rozstrzygnięcia niczego nie przewiduje. Filtr oparty
@@ -471,8 +480,9 @@ Zasady schematu (rozwinięcie „Jak projektować schemat odpowiedzi" niżej):
 
 Wejście do promptu z etapu 1. Czytaj **cały wątek**, nie komentarz wybrany po `typ` · zapisuj
 **rozstrzygnięcie końcowe, nie pierwszą hipotezę**, a trop odrzucony wspomnij jednym zdaniem ·
-**rozwiązanie może pochodzić od klienta** · odmowa i „to nie jest błąd" **to też rozwiązanie**
-(najcenniejszy wariant mówi, **czego NIE robić**) · zapisuj **oba kody błędu** — ten z ekranu
+**rozwiązanie może pochodzić od klienta** · **rozstrzygnięcie odmowne zapisuj w `solution`**
+(„nie zostanie zrealizowane, bo…") — nie ma dla niego osobnej klasy, a bywa najcenniejsze, bo
+mówi, **czego NIE robić** · zapisuj **oba kody błędu** — ten z ekranu
 (po nim użytkownik szuka) i ten z logów (on identyfikuje problem) — i **normalizuj** je,
 obcinając ścieżki instalacji i wartości kluczy · nie przenoś liczb specyficznych dla instalacji,
 **ale liczby narzucone przez operatorów zachowuj zawsze**.
@@ -1562,12 +1572,24 @@ właściwej warstwy, skrót → „TODO").
   ma 11 pól starego schematu, więc **żaden nie przejdzie walidacji nowym modelem** — to nie
   jest drobna migracja i nie wolno jej odkryć w trakcie.
 
-  - [ ] **1a. `ParsedTicket` — model i typy.** `api/app/domain/ticket.py`: **10 pól rdzenia**
-    wg tabeli z „Domena" (kształt ustalony 2026-07-31 — nie projektować go od nowa).
-    `resolution` czyta słownik z `api/app/rules/` (plik danych, wersjonowany), `component` jest
-    polem swobodnym. **Każde pole ma jawne wyjście** (`brak` / `nie dotyczy`) — pole obowiązkowe
-    wymusza konfabulację. Sprawdzian: testy modelu, w tym **rekord z samymi wyjściami waliduje
-    się poprawnie** (to normalny stan, nie błąd) oraz **artefakt niesie wersję słownika**.
+  - [x] **1a. `ParsedTicket` — model i typy.** `api/app/domain/ticket.py` (10 pól rdzenia +
+    `resolution_vocabulary_version`) oraz `api/app/rules/` — słownik rozstrzygnięć jako **plik
+    JSON za interfejsem magazynu reguł** (biblioteka standardowa; `pyyaml` jest zależnością
+    dev i nie wchodzi do obrazu). Rozstrzygnięte przy okazji:
+    - **`extra="forbid"` — nadmiarowy klucz to błąd, nie ciche odrzucenie.** Domyślne zachowanie
+      pydantica milcząco kasuje pola, które model dołożył, a te bywają cenne merytorycznie; przy
+      jednorazowym i drogim przebiegu (zasada 7) cicha strata jest gorsza niż głośny błąd, bo
+      błąd naprawia się **przed** masowym parsowaniem.
+    - **`resolution` sprawdzane wobec wersji zapisanej W REKORDZIE**, nie wobec dziś
+      skonfigurowanej — inaczej edycja słownika wstecznie unieważniałaby poprawne artefakty,
+      czyli dokładnie to, czemu wersjonowanie ma zapobiegać.
+    - **`embedding_text()` mieszka na modelu** — indeksacja (etap 4) i zapytanie (etap 5) muszą
+      sklejać tekst tak samo; dwa miejsca robiące to ręcznie rozjechałyby się bezgłośnie,
+      dając wektory nieporównywalne.
+    - **Pusty string odrzucany osobno od jawnego wyjścia** — `brak`/`nie dotyczy` to odpowiedź,
+      `""` to pominięte pole, które w korpusie wyglądałoby jak wypełnione.
+    Sprawdzone: 22 testy (model + słownik), oraz **wewnątrz obrazu** — plik słownika faktycznie
+    jedzie w `COPY app/`, a nie tylko w bind-moncie deweloperskim.
   - [ ] **1b. Pomiar rozjazdu na 661 plikach.** Skrypt repo-level, który walidując nowym modelem
     raportuje: ile plików przechodzi, których pól brakuje i w ilu rekordach, ile `solution` da
     się rozdzielić mechanicznie, a ile wymaga LLM-a. **Bez tego decyzja z 1c jest zgadywaniem.**
@@ -1579,7 +1601,7 @@ właściwej warstwy, skrót → „TODO").
   - [ ] **1d. Prompt parsujący** — `api/app/prompts/parse_ticket.py`, w repo od pierwszego dnia
     (zasada 7: to kontrakt artefaktu, nie konfiguracja klienta). Wchodzą **reguły parsowania
     wyprowadzone z korpusu** z sekcji „Domena": czytaj cały wątek · rozstrzygnięcie końcowe,
-    nie pierwsza hipoteza · rozwiązanie bywa od klienta · odmowa to też rozwiązanie · oba kody
+    nie pierwsza hipoteza · rozwiązanie bywa od klienta · odmowę zapisz w `solution` · oba kody
     błędu, znormalizowane · liczby operatorów zachowuj, instalacyjne pomijaj · `questions_summary`
     **z konkretami**, bez pytań proceduralnych. Sprawdzian: **test-strażnik** na niezmienniki
     promptu, w tym wymóg konkretów w `questions_summary`.
