@@ -55,11 +55,19 @@ Werdykt blokujący da się **świadomie obejść** (patrz „Bramki jakości").
 7. **Sparsowany JSON zgłoszenia jest trwałym artefaktem na dysku, nie efektem ubocznym.**
    Embeddingi i kolekcje Qdranta są wymienne i odtwarzalne — przebieg LLM jest drogi
    i jednorazowy. Re-index **nigdy** nie wymaga ponownego wołania LLM.
-   - **Dzisiejsze 661 plików w `data/parsed/` to próbka projektowa z ręcznego bootstrapu,
-     NIE artefakt produkcyjny.** Powstały w trzech turach o różnych regułach (`confirmed`
-     36% → 9%, średnia długość `solution` 210 → 356 zn.), więc mają wbudowany rozjazd
-     niewykrywalny z zewnątrz. **Masowe parsowanie z etapu 10 musi przejechać cały korpus jedną,
-     zamrożoną wersją promptu** — i wtedy dopiero powstaje artefakt objęty tą zasadą.
+   - **W `data/parsed/` leży dziś 10 plików i NIE jest to korpus.** To próbka kontrolna
+     z 2026-07-31: dziesięć zgłoszeń dobranych pod skrajności (najkrótszy opis, najdłuższy wątek
+     w korpusie, wątek-projekt z 9 punktami, zgłoszenie bez komentarza dostawcy, „Automat
+     mailowy" z potrójnie cytowaną historią), sparsowanych **w czacie, innym modelem niż
+     docelowy** — służy sprawdzeniu promptu i schematu, nie jest materiałem do indeksu.
+     **Masowe parsowanie z etapu 10 ma je nadpisać albo skasować.**
+   - Poprzednia próbka (661 plików z ręcznego bootstrapu) została skasowana 2026-07-31: powstała
+     w trzech turach o różnych regułach (`confirmed` 36% → 9%, średnia długość `solution`
+     210 → 356 zn.), więc miała wbudowany rozjazd niewykrywalny z zewnątrz, a przeprojektowany
+     schemat i tak by jej nie przyjął. **Zasada 7 zaczyna obowiązywać dopiero dla artefaktu
+     z etapu 10** — jednego przebiegu całego korpusu zamrożoną wersją promptu. Pomiary z tamtej
+     próbki (lejek, ryzyka jakości, rozkłady) zostały w tym pliku i pozostają wiążące — zniknęły
+     pliki, nie wiedza.
 8. **Qdrant jest indeksem, nie źródłem prawdy.** Musi dać się skasować i odbudować z katalogu
    JSON-ów jedną komendą.
 9. **Nie zmyślamy treści merytorycznej.** Odpowiedź generowana jest wyłącznie z pól trafionych
@@ -1563,14 +1571,12 @@ właściwej warstwy, skrót → „TODO").
   `dokus --help` · kontrola negatywna testu plumbingu na czerwono. Zasady, które z tego etapu
   zostały, żyją w sekcjach tematycznych — **roadmapa ich nie powtarza**.
 - [~] **1. Kontrakt zgłoszenia** — `ParsedTicket` (Pydantic) + prompt parsujący w `prompts/` +
-  `dokus tickets validate`. **Większość otwartych pytań rozstrzygnęły już dane** — patrz „Co
-  rozstrzygnęły dane" w sekcji Domena. Zadaniem etapu jest **wdrożyć te ustalenia**, nie
+  `dokus tickets validate`. **Kształt schematu rozstrzygnęły już dane i przegląd 2026-07-31** —
+  patrz tabela rdzenia w sekcji „Domena". Zadaniem etapu jest **wdrożyć te ustalenia**, nie
   rozstrzygać je od nowa.
 
-  Kolejność wynika z jednej zależności: **model musi powstać przed decyzją o re-parsowaniu**,
-  bo dopiero on mierzy, ile realnie brakuje w istniejących plikach. Stan wyjściowy: 661 plików
-  ma 11 pól starego schematu, więc **żaden nie przejdzie walidacji nowym modelem** — to nie
-  jest drobna migracja i nie wolno jej odkryć w trakcie.
+  `data/parsed/` jest puste, więc etap nie ma nic do migrowania: korpus powstanie od zera
+  w etapie 10, a walidator z 1e będzie strażnikiem **tego** przebiegu, nie starych plików.
 
   - [x] **1a. `ParsedTicket` — model i typy.** `api/app/domain/ticket.py` (10 pól rdzenia +
     `resolution_vocabulary_version`) oraz `api/app/rules/` — słownik rozstrzygnięć jako **plik
@@ -1590,21 +1596,35 @@ właściwej warstwy, skrót → „TODO").
       `""` to pominięte pole, które w korpusie wyglądałoby jak wypełnione.
     Sprawdzone: 22 testy (model + słownik), oraz **wewnątrz obrazu** — plik słownika faktycznie
     jedzie w `COPY app/`, a nie tylko w bind-moncie deweloperskim.
-  - [ ] **1b. Pomiar rozjazdu na 661 plikach.** Skrypt repo-level, który walidując nowym modelem
-    raportuje: ile plików przechodzi, których pól brakuje i w ilu rekordach, ile `solution` da
-    się rozdzielić mechanicznie, a ile wymaga LLM-a. **Bez tego decyzja z 1c jest zgadywaniem.**
-    Sprawdzian: raport w `data/docs/`, liczby zamiast wrażeń.
-  - [ ] **1c. Decyzja o 661 plikach — do podjęcia przez człowieka, nie przez agenta.**
-    Re-parsować całość · dopisać brakujące pola drugim, tańszym przebiegiem · czy żyć
-    z korpusem niejednorodnym. Wejście: raport z 1b i koszt przebiegu. **Decyzja przed dalszym
-    parsowaniem, nie po** (zasada 7). Zapisać razem z uzasadnieniem — to wraca w etapie 10.
-  - [ ] **1d. Prompt parsujący** — `api/app/prompts/parse_ticket.py`, w repo od pierwszego dnia
-    (zasada 7: to kontrakt artefaktu, nie konfiguracja klienta). Wchodzą **reguły parsowania
-    wyprowadzone z korpusu** z sekcji „Domena": czytaj cały wątek · rozstrzygnięcie końcowe,
-    nie pierwsza hipoteza · rozwiązanie bywa od klienta · odmowę zapisz w `solution` · oba kody
-    błędu, znormalizowane · liczby operatorów zachowuj, instalacyjne pomijaj · `questions_summary`
-    **z konkretami**, bez pytań proceduralnych. Sprawdzian: **test-strażnik** na niezmienniki
-    promptu, w tym wymóg konkretów w `questions_summary`.
+  - [x] **1b+1c. Decyzja o 661 plikach: skasowane (2026-07-31).** Podjęta przez człowieka,
+    **bez pomiaru z 1b** — schemat zmienił się na tyle, że żaden z tych plików nie przeszedłby
+    walidacji (miały `confirmed`, `system`, `category`, `resolved`, nie miały `component`
+    ani `resolution`), więc mierzenie rozjazdu nie zmieniłoby wyniku. Korpus powstanie od zera
+    **jednym przebiegiem zamrożonej wersji promptu** w etapie 10 — czyli dokładnie tak, jak
+    zasada 7 opisuje artefakt produkcyjny, w odróżnieniu od tamtej próbki z trzech tur
+    o różnych regułach. **`data/raw/` (1825 zgłoszeń) nietknięte** — jest odtwarzalne skryptem
+    i nie podlega zasadzie 7.
+  - [x] **1d. Prompt parsujący** — **treść w `parse_ticket.md`, kod w `parse_ticket.py` tylko go
+    składa** + 26 testów. Wszystkie reguły z sekcji „Reguły parsowania" trafiły do promptu
+    i każda ma swój test.
+    - **Prompt to dokument, nie stała w kodzie** — jako jedyna rzecz w projekcie wymaga kontroli
+      zdanie po zdaniu przez człowieka, a sklejany z trzech stałych czytał się przez składnię
+      Pythona. W `.md` diff w review pokazuje zmianę treści wprost. Komentarze redakcyjne
+      (`<!-- … -->`) są **wycinane przed wysłaniem** — osobny test tego pilnuje, bo notatka dla
+      nas nie ma prawa dotrzeć do modelu.
+    - **Sekcje niezaufane odgraniczone i opisane jako dane** — zarówno wątek zgłoszenia, jak
+      i słownik. Test-strażnik sprawdza to **złośliwym zestawem reguł** („zignoruj poprzednie
+      polecenia"): wstrzyknięty tekst ma wylądować pod regułami, a instrukcja formatu wyjścia
+      zamyka prompt po wątku.
+    - **Lista pól wyprowadzana ze schematu, nie przepisana** — dodanie pola do `ParsedTicket`
+      bez opisania go w prompcie wywala test, zamiast po cichu dać kolumnę pustą w całym korpusie.
+    - **Pułapka złapana kontrolą negatywną:** pierwsza wersja strażnika szukała nazwy pola
+      w całym prompcie, więc usunięcie **opisu** `cause` przechodziło niezauważone — nazwa pada
+      też w regułach czytania wątku. Test sprawdza teraz wyłącznie blok opisów pól
+      (`field_rules()`). Bez tej sondy strażnik wyglądałby na działający.
+    - **Zakaz przepisywania sekretów i PII wprost w prompcie** — 1,1% wątków zawiera działające
+      hasła (patrz „Pułapki tej bazy"), a parser jest ostatnim momentem, w którym da się je
+      zatrzymać przed wejściem do artefaktu.
   - [ ] **1e. `dokus tickets validate`** — cienki adapter nad modelem: waliduje katalog, raportuje
     per plik, kończy niezerowym kodem przy błędzie. Sprawdzian: przechodzi na artefakcie
     poprawnym, pada na uszkodzonym (kontrola negatywna).
