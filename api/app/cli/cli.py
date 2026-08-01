@@ -2,11 +2,17 @@ from importlib.metadata import version
 
 import typer
 
-# no_args_is_help: a bare `dokus` prints the subcommand tree instead of an unhelpful usage error.
+from app.cli.tickets import tickets
+
+# no_args_is_help: a bare `helpdesk` prints the subcommand tree instead of an unhelpful usage error.
 cli = typer.Typer(
     help            = "Operator tooling for dokus-helpdesk-ai (indexing, search, evaluation).",
     no_args_is_help = True,
 )
+
+# Groups of related operations arrive as sub-apps, so the tree stays `helpdesk <resource> <action>`
+# (`helpdesk tickets validate`) instead of flattening into ever longer single-word commands.
+cli.add_typer(tickets, name="tickets")
 
 
 @cli.callback()
@@ -14,7 +20,7 @@ def main() -> None:
     """
     Description:
     Root callback of the command tree. Its presence keeps Typer in subcommand mode — without it
-    an app holding a single command collapses, and `dokus` would run that command directly
+    an app holding a single command collapses, and `helpdesk` would run that command directly
     instead of listing the tree.
 
     Example args:

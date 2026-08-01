@@ -22,6 +22,19 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Consequence: a file missing from this COPY still "works" in dev and breaks in prod.
 COPY app/ ./app/
 
+# The `helpdesk` entry point, which on the host comes from `pip install -e .`. The image cannot get
+# it that way: pyproject.toml lives in the repo root, outside this build context, and declares
+# `package-dir = api` — so installing it here would mean either widening the context to the whole
+# repo or duplicating the packaging config. A three-line launcher is the smaller price.
+#
+# Needed because the batch import of stage 10 runs INSIDE the container, not on a developer's
+# host, and `docker compose run api helpdesk …` must simply work.
+# PYTHONPATH rather than a bare import: the launcher may be invoked from any working directory,
+# and /code lands on sys.path only when it happens to be the current one.
+RUN printf '#!/bin/sh\nexec env PYTHONPATH=/code python -c "from app.cli.cli import cli; cli()" "$@"\n' \
+      > /usr/local/bin/helpdesk \
+ && chmod +x /usr/local/bin/helpdesk
+
 EXPOSE 8000
 
 # No --reload here: live reload is a dev concern and belongs to the compose layer that mounts

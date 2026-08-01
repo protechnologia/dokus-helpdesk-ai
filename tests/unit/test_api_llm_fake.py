@@ -1,7 +1,7 @@
 import pytest
 
 from app.llm import FakeLLMClient, LLMError
-from app.llm.fake import DEFAULT_FAKE_RESPONSE, FAKE_MODEL_NAME
+from app.llm.client_fake import DEFAULT_FAKE_RESPONSE, FAKE_MODEL_NAME
 
 
 async def test_unscripted_call_returns_the_default_answer() -> None:

@@ -20,6 +20,18 @@ class LLMCompletion(BaseModel):
     completion_tokens: int   = Field(examples=[96])
     latency_ms:        float = Field(examples=[1240.5])
 
+    # Cache accounting. Providers that bill cached input separately report it here; the rest leave
+    # both at zero. Kept apart from `prompt_tokens` because the rates differ by an order of
+    # magnitude (a cache read costs ~0.1x a fresh token, a write ~1.25x) — folding them into one
+    # number would make the cost report wrong in whichever direction the caching went.
+    cache_write_tokens: int = Field(default=0, examples=[1830])
+    cache_read_tokens:  int = Field(default=0, examples=[1830])
+
+    # Priced by the client that made the call, because the price list is provider knowledge and has
+    # no business leaking into the domain (rule 4). Offline providers report 0.0 — a real zero, not
+    # a missing value, so a run against the fake sums to "this cost nothing" rather than to None.
+    cost_usd: float = Field(default=0.0, examples=[0.0123])
+
 
 class LLMClient(ABC):
     """
@@ -80,10 +92,14 @@ class LLMClient(ABC):
             None — one INFO record with usage, one DEBUG record with the texts
         """
         logger.info(
-            "llm_call model=%s prompt_tokens=%d completion_tokens=%d latency_ms=%.1f",
+            "llm_call model=%s prompt_tokens=%d completion_tokens=%d "
+            "cache_write_tokens=%d cache_read_tokens=%d latency_ms=%.1f cost_usd=%.6f",
             completion.model,
             completion.prompt_tokens,
             completion.completion_tokens,
+            completion.cache_write_tokens,
+            completion.cache_read_tokens,
             completion.latency_ms,
+            completion.cost_usd,
         )
         logger.debug("llm_call prompt=%r response=%r", prompt, completion.text)

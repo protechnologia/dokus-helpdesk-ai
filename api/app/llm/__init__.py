@@ -6,9 +6,9 @@ detail, while this surface is what the domain is allowed to know about a model.
 """
 
 from app.llm.base import LLMClient, LLMCompletion
+from app.llm.client_fake import FakeLLMClient
 from app.llm.errors import LLMConfigError, LLMError
 from app.llm.factory import get_llm_client
-from app.llm.fake import FakeLLMClient
 
 __all__ = [
     "FakeLLMClient",

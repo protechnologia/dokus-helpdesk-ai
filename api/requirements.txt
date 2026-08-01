@@ -5,3 +5,5 @@ pydantic-settings==2.7.1
 fastapi==0.140.0
 uvicorn[standard]==0.51.0
 typer==0.27.0
+# Claude API SDK. Imported by exactly one module (app/llm/client_claude.py) — CLAUDE.md rule 4.
+anthropic==0.120.2

@@ -55,12 +55,16 @@ Werdykt blokujący da się **świadomie obejść** (patrz „Bramki jakości").
 7. **Sparsowany JSON zgłoszenia jest trwałym artefaktem na dysku, nie efektem ubocznym.**
    Embeddingi i kolekcje Qdranta są wymienne i odtwarzalne — przebieg LLM jest drogi
    i jednorazowy. Re-index **nigdy** nie wymaga ponownego wołania LLM.
-   - **W `data/parsed/` leży dziś 10 plików i NIE jest to korpus.** To próbka kontrolna
-     z 2026-07-31: dziesięć zgłoszeń dobranych pod skrajności (najkrótszy opis, najdłuższy wątek
-     w korpusie, wątek-projekt z 9 punktami, zgłoszenie bez komentarza dostawcy, „Automat
-     mailowy" z potrójnie cytowaną historią), sparsowanych **w czacie, innym modelem niż
-     docelowy** — służy sprawdzeniu promptu i schematu, nie jest materiałem do indeksu.
-     **Masowe parsowanie z etapu 10 ma je nadpisać albo skasować.**
+   - **W `data/parsed/` leżą dziś TRZY podkatalogi po 10 plików i żaden NIE jest korpusem.**
+     To ta sama próbka kontrolna z 2026-07-31 — dziesięć zgłoszeń dobranych pod skrajności
+     (najkrótszy opis, najdłuższy wątek w korpusie, wątek-projekt z 9 punktami, zgłoszenie bez
+     komentarza dostawcy, „Automat mailowy" z potrójnie cytowaną historią) — sparsowana trzema
+     drogami dla porównania jakości (2026-08-01): `chat/` (ręcznie w czacie, innym modelem niż
+     docelowy), `haiku/` i `sonnet/` (przez `helpdesk tickets parse`). Służy sprawdzeniu promptu
+     i schematu, nie jest materiałem do indeksu. **Masowe parsowanie z etapu 10 pisze do
+     `data/parsed/` płasko — te trzy katalogi ma wtedy nadpisać albo skasować.**
+     Walidator chodzi po `*.json` bez schodzenia w podkatalogi, więc `helpdesk tickets validate
+     data/parsed/` widzi dziś zero plików, a każdy wariant sprawdza się osobno.
    - Poprzednia próbka (661 plików z ręcznego bootstrapu) została skasowana 2026-07-31: powstała
      w trzech turach o różnych regułach (`confirmed` 36% → 9%, średnia długość `solution`
      210 → 356 zn.), więc miała wbudowany rozjazd niewykrywalny z zewnątrz, a przeprojektowany
@@ -448,10 +452,22 @@ przebieg LLM po korpusie** (zasada 7).
 Zasady schematu (rozwinięcie „Jak projektować schemat odpowiedzi" niżej):
 
 - **Każde pole ma jawne wyjście** (`brak` / `nie dotyczy`) — pole obowiązkowe wymusza
-  konfabulację.
+  konfabulację. **Pusty string to co innego niż jawne wyjście** i jest odrzucany: `brak` to
+  odpowiedź, `""` to pole pominięte, które w korpusie wyglądałoby jak wypełnione.
+- **Klucz spoza schematu to BŁĄD, nie ciche odrzucenie** (`extra="forbid"`). Domyślne zachowanie
+  pydantica milcząco kasuje pola, które model dołożył, a te bywają cenne merytorycznie; przy
+  jednorazowym i drogim przebiegu (zasada 7) cicha strata jest gorsza niż głośny błąd — bo błąd
+  naprawia się **przed** masowym parsowaniem, a straty nie odzyska się wcale.
+- **`resolution` sprawdzane wobec wersji słownika zapisanej W REKORDZIE**, nie wobec dziś
+  skonfigurowanej. Inaczej edycja słownika unieważniałaby wstecznie poprawne artefakty — czyli
+  dokładnie to, czemu wersjonowanie ma zapobiegać. Komunikat błędu nazywa obie wersje, żeby
+  re-parsowany korpus nie wyglądał jak tysiąc niepowiązanych błędów.
 - **Embedujemy wyłącznie `problem` + `symptoms`.** `solution` i metadane idą do payloadu
   Qdranta. Powód: szukamy po *podobieństwie problemu*, nie rozwiązania — wektor zanieczyszczony
   rozwiązaniem miesza oba sygnały.
+  - **Tekst do embeddingu skleja model (`embedding_text()`), nie wywołania.** Indeksacja
+    (etap 4) i zapytanie (etap 5) muszą go budować identycznie; dwa miejsca robiące to ręcznie
+    rozjechałyby się **bezgłośnie**, dając wektory nieporównywalne.
 - **`component` jest polem SWOBODNYM, nie słownikiem** — słownik trafia do promptu jako
   podpowiedź, ale nic go nie egzekwuje. Decyzja świadoma, z policzonym kosztem: rozkład wartości
   ma długi cienki ogon (ePUAP i eNadawca to 125 ze 131 trafień w próbce, reszta po 1–2 rekordy),
@@ -806,21 +822,21 @@ merytorycznie").
 - Eksport zgłoszeń ze zrzutu do `data/raw/`: `python scripts/export_raw_tickets.py export --module-id 116`
   (wymaga kontenera z zaimportowanym zrzutem; kontrola liczb wobec bazy na końcu przebiegu)
 
-**Pipeline danych (CLI `dokus`)**
-- Walidacja artefaktów: `dokus tickets validate data/parsed/`
-- Indeksacja do Qdranta: `dokus index build --collection <nazwa>`
-- Pełna odbudowa indeksu: `dokus index rebuild` (kasuje kolekcję, wstaje z `data/parsed/`)
-- Zapytanie z konsoli: `dokus search "treść zgłoszenia"`
-- Propozycja w wybranym wariancie: `dokus suggest "treść zgłoszenia" --variant solution`
-- Lista dostępnych wariantów: `dokus variants list`
-- Ewaluacja embeddera: `dokus eval recall --model <nazwa>`
+**Pipeline danych (CLI `helpdesk`)**
+- Walidacja artefaktów: `helpdesk tickets validate data/parsed/`
+- Indeksacja do Qdranta: `helpdesk index build --collection <nazwa>`
+- Pełna odbudowa indeksu: `helpdesk index rebuild` (kasuje kolekcję, wstaje z `data/parsed/`)
+- Zapytanie z konsoli: `helpdesk search "treść zgłoszenia"`
+- Propozycja w wybranym wariancie: `helpdesk suggest "treść zgłoszenia" --variant solution`
+- Lista dostępnych wariantów: `helpdesk variants list`
+- Ewaluacja embeddera: `helpdesk eval recall --model <nazwa>`
 
 **Bramki jakości i asysta pisania**
-- Sprawdzenie zamknięcia z konsoli: `dokus gate close --file <plik>`
-- Sprawdzenie wiadomości: `dokus gate reply --file <plik>`
-- Poprawa tekstu: `dokus polish --file <plik>`
-- Podgląd aktywnego zestawu reguł: `dokus rules show --gate close`
-- Ewaluacja bramek (fałszywe alarmy/przepuszczenia): `dokus eval gates --gate close`
+- Sprawdzenie zamknięcia z konsoli: `helpdesk gate close --file <plik>`
+- Sprawdzenie wiadomości: `helpdesk gate reply --file <plik>`
+- Poprawa tekstu: `helpdesk polish --file <plik>`
+- Podgląd aktywnego zestawu reguł: `helpdesk rules show --gate close`
+- Ewaluacja bramek (fałszywe alarmy/przepuszczenia): `helpdesk eval gates --gate close`
 
 **Testy i jakość**
 - Lint: `ruff check .`
@@ -840,7 +856,7 @@ dokus-helpdesk-ai/
 ├── docker-compose.prod.yml       # warstwa: kod z obrazu (volumes: !reset [])
 ├── .env                          # wartości lokalne — NIE w repo
 ├── .env.example                  # kontrakt konfiguracji — W repo
-├── pyproject.toml                # pytest/lint + pakietowanie (entry-point `dokus`)
+├── pyproject.toml                # pytest/lint + pakietowanie (entry-point `helpdesk`)
 ├── requirements-dev.txt          # zależności testów/lintera (poza obrazem)
 ├── CLAUDE.md / README.md
 ├── scripts/                      # narzędzia repo niezwiązane z usługą (patrz „Warstwa CLI")
@@ -964,7 +980,14 @@ Typer). Poza tym trzymamy je na bibliotece standardowej.
 
 Wspólne:
 - Framework: Typer.
-- Wpis w `[project.scripts]` = osobna komenda (`dokus`); `@cli.command()` = subkomenda (`dokus index build`).
+- Wpis w `[project.scripts]` = osobna komenda (`helpdesk`); `@cli.command()` = subkomenda (`helpdesk index build`).
+- **Komenda nazywa się `helpdesk`, nie nazwą helpdeskowanego produktu** — przy założeniu „jedna
+  instancja = jeden produkt" wpisanie nazwy klienta w komendę własnego narzędzia kłamałoby przy
+  drugim wdrożeniu.
+- **W obrazie entry point tworzy launcher z `Dockerfile`, nie `pip install`** — `pyproject.toml`
+  leży w korzeniu repo, poza kontekstem budowania `./api`, i deklaruje `package-dir = api`.
+  Launcher ustawia `PYTHONPATH=/code`, bo katalog roboczy nie zawsze jest `/code`. Potrzebne,
+  bo **masowy import z etapu 10 uruchamia się w kontenerze**, nie na hoście dewelopera.
 - `pip install -e .` tylko po zmianie pyproject.toml, po zmianie kodu nigdy.
 - CLI to cienkie adaptery nad serwisami domenowymi (jak handlery HTTP) — zero logiki w komendzie.
 - **Komendy niszczące (`index rebuild`) pytają o potwierdzenie** albo wymagają `--yes`.
@@ -1015,8 +1038,13 @@ Wspólne:
 
 ### Prompty
 
-- **Prompt = logika, nie konfiguracja** — szablony w kodzie (`api/app/prompts/`, jeden plik na
+- **Prompt = logika, nie konfiguracja** — szablony w repo (`api/app/prompts/`, jeden plik na
   prompt), **nigdy w ENV**.
+  - **Treść promptu to dokument `.md`, moduł `.py` obok tylko go składa.** Prompt jest jedyną
+    rzeczą w projekcie, którą człowiek musi kontrolować zdanie po zdaniu — sklejany z kilku
+    stałych czyta się przez składnię Pythona, a jako dokument diff w review pokazuje zmianę
+    treści wprost. Komentarze redakcyjne (`<!-- … -->`) muszą być **wycinane przed wysłaniem**:
+    notatka dla nas nie ma prawa dotrzeć do modelu.
   - **Wyjątek: treści konfigurowane przez klienta** — reguły bramek, zasady „Popraw" (patrz
     „Bramki jakości") i **prompty wariantów generacji** (patrz „Generacja propozycji"). We
     wszystkich trzech przypadkach wyjątek dotyczy **treści**, nie szkieletu: rama promptu
@@ -1367,7 +1395,7 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 - **Retrieval testujemy na deterministycznej atrapie embeddera** (stały wektor per tekst) —
   test progów, dedupe i routingu nie ma prawa zależeć od modelu.
 - **Bramki i „Popraw" testujemy na `FakeLLMClient`** — sprawdzamy **kształt werdyktu i wstawienie
-  reguł do promptu**, nie trafność oceny. Trafność mieszka w ewaluacji (`dokus eval gates`),
+  reguł do promptu**, nie trafność oceny. Trafność mieszka w ewaluacji (`helpdesk eval gates`),
   bo zależy od modelu, a nie od naszego kodu — mylenie tych dwóch rzeczy daje test, który
   „przechodzi", zmieniając wynik przy każdej podmianie modelu.
 - **Test-strażnik promptu bramki dostaje złośliwy zestaw reguł** — reguła w stylu „zignoruj
@@ -1400,9 +1428,18 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   Qdrant (zasady 7 i 8 bez zmian). Nie przenosimy do SQL-a ani sparsowanych zgłoszeń, ani
   wektorów.
 - **Frontend (React SPA)** — na starcie API + CLI; UI to etap 11.
-- **Masowe parsowanie korpusu w aplikacji** — pierwszą partię parsujemy ręcznie w czacie Claude
-  wg promptu z repo; wsadowy import to etap 10. Nie dotyczy parsera pojedynczego zgłoszenia —
-  ten wchodzi już w etapie 5, bo zapytanie parsujemy przed wyszukaniem.
+- ~~**Masowe parsowanie korpusu w aplikacji**~~ — **decyzja odwrócona 2026-08-01.** Parsowanie
+  przez API weszło wcześniej, niż zakładał etap 10: `helpdesk tickets parse` woła skonfigurowany
+  `LLMClient`, wypełnia `ticket_id`/`date` ze źródła i zapisuje artefakt po KAŻDYM zgłoszeniu, więc
+  przerwany przebieg nie traci tego, za co zapłacił. Etapowi 10 zostaje adapter SQL, wznawianie po
+  identyfikatorach i raport zbiorczy — nie sama zdolność parsowania.
+  - **Ręczne parsowanie w czacie skończone**, a razem z nim `scripts/prepare_parse_batch.py`
+    (renderował porcje tekstu do wklejenia) i `data/batch/` — **skasowane 2026-08-01**, commit
+    `8d7114e`. **W skrypcie zostały dwie rzeczy, których CLI nie ma:** dobór warstwowy
+    proporcjonalny do kategorii (deterministyczny, bez losowania — wejście do golden setu z etapu 3)
+    oraz filtr progu 50 znaków **liczony po stripie HTML-a**, z pomiarem: na module 1496 zgłoszeń
+    przechodzi próg liczony na HTML-u, a 1477 na samym tekście — 19 przechodzi wyłącznie dzięki
+    tagom i encjom. Przy etapie 3 i 4 odzyskać z gita, nie pisać od nowa.
 - **Framework RAG (LangChain / LlamaIndex)** — piszemy wprost na kliencie Qdranta; warstwa
   pośrednia ukryłaby dokładnie te rzeczy, które tu kontrolujemy ręcznie (prefiksy, named vectors,
   progi, routing).
@@ -1563,76 +1600,16 @@ właściwej warstwy, skrót → „TODO").
 
 - [x] **0. Fundament repo** — pakiet i narzędzia (`pyproject.toml`, markery, `.venv`), `Settings`
   + `.env.example` + test plumbingu configu, usługa `api` (`/health`, Request-ID, handlery
-  wyjątków, CLI `dokus`), warstwa LLM za `LLMClient` z `FakeLLMClient`, usługa `embedder`
+  wyjątków, CLI `helpdesk`), warstwa LLM za `LLMClient` z `FakeLLMClient`, usługa `embedder`
   (backend `fake`) oraz compose: baza dev + warstwa prod. Zero logiki domenowej — pierwszy
   realny użytkownik warstwy LLM pojawia się w etapie 5.
-  **Kryterium ukończenia sprawdzone komendami 2026-07-31**: `pytest` offline (79 unitów, przy
-  zatrzymanym stacku) · `ruff` czysto · `up` → trzy usługi odpowiadają · prod bez bind-mountu ·
-  `dokus --help` · kontrola negatywna testu plumbingu na czerwono. Zasady, które z tego etapu
-  zostały, żyją w sekcjach tematycznych — **roadmapa ich nie powtarza**.
-- [~] **1. Kontrakt zgłoszenia** — `ParsedTicket` (Pydantic) + prompt parsujący w `prompts/` +
-  `dokus tickets validate`. **Kształt schematu rozstrzygnęły już dane i przegląd 2026-07-31** —
-  patrz tabela rdzenia w sekcji „Domena". Zadaniem etapu jest **wdrożyć te ustalenia**, nie
-  rozstrzygać je od nowa.
-
-  `data/parsed/` jest puste, więc etap nie ma nic do migrowania: korpus powstanie od zera
-  w etapie 10, a walidator z 1e będzie strażnikiem **tego** przebiegu, nie starych plików.
-
-  - [x] **1a. `ParsedTicket` — model i typy.** `api/app/domain/ticket.py` (10 pól rdzenia +
-    `resolution_vocabulary_version`) oraz `api/app/rules/` — słownik rozstrzygnięć jako **plik
-    JSON za interfejsem magazynu reguł** (biblioteka standardowa; `pyyaml` jest zależnością
-    dev i nie wchodzi do obrazu). Rozstrzygnięte przy okazji:
-    - **`extra="forbid"` — nadmiarowy klucz to błąd, nie ciche odrzucenie.** Domyślne zachowanie
-      pydantica milcząco kasuje pola, które model dołożył, a te bywają cenne merytorycznie; przy
-      jednorazowym i drogim przebiegu (zasada 7) cicha strata jest gorsza niż głośny błąd, bo
-      błąd naprawia się **przed** masowym parsowaniem.
-    - **`resolution` sprawdzane wobec wersji zapisanej W REKORDZIE**, nie wobec dziś
-      skonfigurowanej — inaczej edycja słownika wstecznie unieważniałaby poprawne artefakty,
-      czyli dokładnie to, czemu wersjonowanie ma zapobiegać.
-    - **`embedding_text()` mieszka na modelu** — indeksacja (etap 4) i zapytanie (etap 5) muszą
-      sklejać tekst tak samo; dwa miejsca robiące to ręcznie rozjechałyby się bezgłośnie,
-      dając wektory nieporównywalne.
-    - **Pusty string odrzucany osobno od jawnego wyjścia** — `brak`/`nie dotyczy` to odpowiedź,
-      `""` to pominięte pole, które w korpusie wyglądałoby jak wypełnione.
-    Sprawdzone: 22 testy (model + słownik), oraz **wewnątrz obrazu** — plik słownika faktycznie
-    jedzie w `COPY app/`, a nie tylko w bind-moncie deweloperskim.
-  - [x] **1b+1c. Decyzja o 661 plikach: skasowane (2026-07-31).** Podjęta przez człowieka,
-    **bez pomiaru z 1b** — schemat zmienił się na tyle, że żaden z tych plików nie przeszedłby
-    walidacji (miały `confirmed`, `system`, `category`, `resolved`, nie miały `component`
-    ani `resolution`), więc mierzenie rozjazdu nie zmieniłoby wyniku. Korpus powstanie od zera
-    **jednym przebiegiem zamrożonej wersji promptu** w etapie 10 — czyli dokładnie tak, jak
-    zasada 7 opisuje artefakt produkcyjny, w odróżnieniu od tamtej próbki z trzech tur
-    o różnych regułach. **`data/raw/` (1825 zgłoszeń) nietknięte** — jest odtwarzalne skryptem
-    i nie podlega zasadzie 7.
-  - [x] **1d. Prompt parsujący** — **treść w `parse_ticket.md`, kod w `parse_ticket.py` tylko go
-    składa** + 26 testów. Wszystkie reguły z sekcji „Reguły parsowania" trafiły do promptu
-    i każda ma swój test.
-    - **Prompt to dokument, nie stała w kodzie** — jako jedyna rzecz w projekcie wymaga kontroli
-      zdanie po zdaniu przez człowieka, a sklejany z trzech stałych czytał się przez składnię
-      Pythona. W `.md` diff w review pokazuje zmianę treści wprost. Komentarze redakcyjne
-      (`<!-- … -->`) są **wycinane przed wysłaniem** — osobny test tego pilnuje, bo notatka dla
-      nas nie ma prawa dotrzeć do modelu.
-    - **Sekcje niezaufane odgraniczone i opisane jako dane** — zarówno wątek zgłoszenia, jak
-      i słownik. Test-strażnik sprawdza to **złośliwym zestawem reguł** („zignoruj poprzednie
-      polecenia"): wstrzyknięty tekst ma wylądować pod regułami, a instrukcja formatu wyjścia
-      zamyka prompt po wątku.
-    - **Lista pól wyprowadzana ze schematu, nie przepisana** — dodanie pola do `ParsedTicket`
-      bez opisania go w prompcie wywala test, zamiast po cichu dać kolumnę pustą w całym korpusie.
-    - **Pułapka złapana kontrolą negatywną:** pierwsza wersja strażnika szukała nazwy pola
-      w całym prompcie, więc usunięcie **opisu** `cause` przechodziło niezauważone — nazwa pada
-      też w regułach czytania wątku. Test sprawdza teraz wyłącznie blok opisów pól
-      (`field_rules()`). Bez tej sondy strażnik wyglądałby na działający.
-    - **Zakaz przepisywania sekretów i PII wprost w prompcie** — 1,1% wątków zawiera działające
-      hasła (patrz „Pułapki tej bazy"), a parser jest ostatnim momentem, w którym da się je
-      zatrzymać przed wejściem do artefaktu.
-  - [ ] **1e. `dokus tickets validate`** — cienki adapter nad modelem: waliduje katalog, raportuje
-    per plik, kończy niezerowym kodem przy błędzie. Sprawdzian: przechodzi na artefakcie
-    poprawnym, pada na uszkodzonym (kontrola negatywna).
-
-  **Kryterium ukończenia:** `dokus tickets validate data/parsed/` daje wynik zgodny z decyzją
-  z 1c (komplet zielony albo jawnie zaraportowana i zaakceptowana niejednorodność) · prompt ma
-  test-strażnik · model odrzuca rekord z polem spoza schematu **albo** świadomie je ignoruje —
-  rozstrzygnięte i pokryte testem, nie pozostawione przypadkowi.
+- [x] **1. Kontrakt zgłoszenia** — `ParsedTicket` (10 pól rdzenia + wersja słownika)
+  w `api/app/domain/`, słownik rozstrzygnięć jako plik JSON za interfejsem magazynu reguł
+  (`api/app/rules/`), prompt parsujący jako **dokument markdown** pod testem-strażnikiem
+  (`api/app/prompts/parse_ticket.md`) oraz `helpdesk tickets validate` — logika w domenie,
+  CLI tylko drukuje i ustala kod wyjścia, żeby masowy import z etapu 10 użył tego samego
+  sprawdzenia. Kształt schematu rozstrzygnął przegląd 2026-07-31 — patrz tabela rdzenia
+  w sekcji „Domena".
 - [ ] **2. Embedder jako usługa** — realny PolDense obok backendu `fake` z etapu 0: nowa
   implementacja `Encoder` (wagi, dobór wariantu, warstwa GPU, prefiksy trybów, `encode` przez
   `run_in_threadpool`, bo `sentence-transformers` jest synchroniczne) + wpis w fabryce;
@@ -1649,7 +1626,7 @@ właściwej warstwy, skrót → „TODO").
   **Golden set warstwowany na dwa gatunki zapytań:** eksploatacyjne (referent) i
   **wdrożeniowo-migracyjne** — te drugie to osobny gatunek, gdzie `problem` brzmi jak błąd
   aplikacji, a `cause` prawie zawsze leży w mapowaniu danych. Korpus zawiera gotowe pary.
-- [ ] **4. Indeksacja** — filtr + dedup + named vectors + payload; `dokus index build/rebuild`
+- [ ] **4. Indeksacja** — filtr + dedup + named vectors + payload; `helpdesk index build/rebuild`
   odtwarzalne z `data/parsed/`. **Filtr wielosygnałowy, niebinarny i raportujący, co odrzuca**
   (patrz „Ryzyka jakości treści") — sam status nie wystarczy, a rekordy `resolved = false`
   niosące realną wiedzę trzeba dać się uratować.
@@ -1695,14 +1672,14 @@ właściwej warstwy, skrót → „TODO").
 - [ ] **8. Magazyn reguł i wariantów (SQL)** — relacyjna baza wchodzi do compose jako czwarta
   usługa; schemat wąski: zestawy reguł, **warianty generacji** (nazwa, etykieta, prompt,
   `requires_hits`), ich **wersje** i audyt wydanych werdyktów. Endpoint odczytu + edycji,
-  `dokus rules show`, `dokus variants list`. Tu warianty z etapu 6 przestają być wbudowane
+  `helpdesk rules show`, `helpdesk variants list`. Tu warianty z etapu 6 przestają być wbudowane
   i klient może dodać własny guzik. **Rozstrzygnąć tu:** kontrola dostępu do edycji (patrz
   TODO — dziś API jest otwarte, a edycja reguł to zmiana konfiguracji produkcyjnej), zachowanie
   przy pustym zestawie reguł oraz **co się dzieje z wariantem skasowanym po tym, jak helpdesk
   narysował już guzik** (wyścig między `GET /variants` a `POST /suggest`).
 - [ ] **9. Bramki jakości** — `POST /gate/close` i `POST /gate/reply` na wspólnym kontrakcie
   `Verdict` (werdykt + powody + braki + wskazówka + wersja reguł). Dochodzi **ewaluacja bramek**
-  (`dokus eval gates`) na realnych zamknięciach z korpusu, mierzona osobno per reguła, z naciskiem
+  (`helpdesk eval gates`) na realnych zamknięciach z korpusu, mierzona osobno per reguła, z naciskiem
   na **fałszywe alarmy**. **Uzgodnić z helpdeskiem** punkt wpięcia i zachowanie przy 503
   (patrz TODO) — bez tego endpointy istnieją, ale nikt ich nie woła.
 - [ ] **10. Masowy import w aplikacji** — adapter **SQL** (`ingest/`, źródłem jest zrzut bazy

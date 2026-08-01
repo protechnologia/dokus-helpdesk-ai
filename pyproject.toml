@@ -15,7 +15,7 @@ dependencies = []
 [project.scripts]
 # Single entry-point for the whole production CLI tree; subcommands are @cli.command().
 # Note: unusable until step 0c creates api/app/cli/cli.py.
-dokus = "app.cli.cli:cli"
+helpdesk = "app.cli.cli:cli"
 
 [tool.setuptools]
 # Code lives in api/app/ because the folder is also the compose service; "api" is the import root,
