@@ -196,6 +196,14 @@ Wspólne:
 - **Loguj każde wywołanie:** model, tokeny in/out, latencja, koszt (log strukturalny). Treści
   promptu/odpowiedzi **nigdy na INFO** (dane użytkownika) — tylko DEBUG.
 
+### Gotchas
+
+- **Ollama: okno kontekstu ustawia wyłącznie `OLLAMA_CONTEXT_LENGTH` na serwerze — `num_ctx`
+  w żądaniu (także przez `extra_body` w SDK OpenAI) jest IGNOROWANY, a nadmiar ucinany BEZ BŁĘDU.**
+  Artefakt z połowy wejścia wygląda na kompletny, więc klient musi odmówić za długiego wejścia
+  przed wysłaniem i sprawdzić po odpowiedzi, czy `prompt_tokens` nie wypełniło całego okna.
+  Nigdy nie przycinaj sam.
+
 ### Prompty
 
 - **Prompt = logika, nie konfiguracja** — szablony w kodzie (`api/app/prompts/`, jeden plik na
