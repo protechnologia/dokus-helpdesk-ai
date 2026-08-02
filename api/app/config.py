@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     llm_temperature:     float      = 0.0               # 0 for every extraction task
     llm_timeout_seconds: float      = 60.0              # seconds
 
+    # Context budget, in tokens. Hosted providers manage their own window and ignore both values;
+    # they exist for self-hosted runners (Ollama, vLLM), where the window is OUR decision and a
+    # wrong one is silent — anything past `llm_num_ctx` is dropped without an error.
+    # Both belong in ENV rather than in code because they depend on the model and the machine:
+    # the same client serves a 4.5B model on a laptop and Bielik 11B on a rented GPU.
+    llm_num_ctx:           int = 8192                   # must fit what the model declares
+    llm_max_output_tokens: int = 1500                   # carved OUT of llm_num_ctx, not added
+
     # --- embedder service (own compose service, reached over REST) ---
     embedding_base_url:        str   = "http://embedder:8000"
     embedding_vector_size:     int   = 768              # must match the Qdrant collection

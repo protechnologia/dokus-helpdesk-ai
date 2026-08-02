@@ -3,6 +3,7 @@ import pytest
 from app.config import Settings
 from app.llm import FakeLLMClient, LLMConfigError, LLMError, get_llm_client
 from app.llm.client_claude import ClaudeLLMClient
+from app.llm.client_ollama import OllamaLLMClient
 from app.llm.client_openai import OpenAILLMClient
 
 
@@ -162,3 +163,41 @@ def test_openai_accepts_a_compatible_endpoint() -> None:
     client = get_llm_client(_openai_settings(llm_base_url="https://example.invalid/v1"))
 
     assert "example.invalid" in str(client._client.base_url)
+
+
+def test_ollama_provider_builds_the_ollama_client() -> None:
+    """LLM_PROVIDER=ollama z modelem → OllamaLLMClient; klucz nie jest potrzebny."""
+    client = get_llm_client(_settings("ollama", llm_model="bielik-4.5b-v3.0-instruct:Q8_0"))
+
+    assert isinstance(client, OllamaLLMClient)
+
+
+def test_ollama_without_model_fails_at_build_time() -> None:
+    """Provider ollama bez LLM_MODEL → LLMConfigError; nie ma sensownej wartości domyślnej."""
+    with pytest.raises(LLMConfigError, match="LLM_MODEL"):
+        get_llm_client(_settings("ollama"))
+
+
+def test_ollama_does_not_require_an_api_key() -> None:
+    """Provider ollama bez LLM_API_KEY → klient powstaje; lokalny serwer klucza nie sprawdza."""
+    client = get_llm_client(
+        _settings("ollama", llm_model="bielik-4.5b-v3.0-instruct:Q8_0", llm_api_key=None)
+    )
+
+    assert isinstance(client, OllamaLLMClient)
+
+
+def test_ollama_uses_the_local_default_address() -> None:
+    """Puste LLM_BASE_URL → domyślny adres Ollamy; port jest ustalony przez narzędzie."""
+    client = get_llm_client(_settings("ollama", llm_model="bielik:Q8_0"))
+
+    assert "11434" in str(client._client.base_url)
+
+
+def test_ollama_accepts_a_custom_address() -> None:
+    """Ustawione LLM_BASE_URL → wygrywa nad domyślnym; Ollama bywa na innej maszynie."""
+    client = get_llm_client(
+        _settings("ollama", llm_model="bielik:Q8_0", llm_base_url="http://192.168.1.10:11434/v1")
+    )
+
+    assert "192.168.1.10" in str(client._client.base_url)

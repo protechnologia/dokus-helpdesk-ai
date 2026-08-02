@@ -2,17 +2,23 @@ from app.config import Settings
 from app.llm.base import LLMClient
 from app.llm.client_claude import ClaudeLLMClient
 from app.llm.client_fake import FakeLLMClient
+from app.llm.client_ollama import OllamaLLMClient
 from app.llm.client_openai import OpenAILLMClient
 from app.llm.errors import LLMConfigError
 
 PROVIDER_FAKE   = "fake"
 PROVIDER_CLAUDE = "claude"
 PROVIDER_OPENAI = "openai"
+PROVIDER_OLLAMA = "ollama"
 
-# Three entries, not two clients with a flag: the Messages API and the OpenAI API differ in the
-# SHAPE of the request, not merely in the endpoint (CLAUDE.md -> "Warstwa LLM"). Bielik on RunPod
-# will arrive through `openai` with a `base_url`, because its endpoint is OpenAI-compatible.
-SUPPORTED_PROVIDERS = (PROVIDER_FAKE, PROVIDER_CLAUDE, PROVIDER_OPENAI)
+# Separate entries, not one client with flags. `claude` differs in the SHAPE of the request
+# (CLAUDE.md -> "Warstwa LLM"); `ollama` shares the OpenAI protocol but differs in everything
+# around it — free, keyless, and slow enough that timeouts are measured in minutes.
+SUPPORTED_PROVIDERS = (PROVIDER_FAKE, PROVIDER_CLAUDE, PROVIDER_OPENAI, PROVIDER_OLLAMA)
+
+# Where Ollama listens when nothing says otherwise. A default rather than a required setting: the
+# port is fixed by the tool, so demanding it in `.env` would be ceremony without a decision.
+DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434/v1"
 
 
 def _require_key_and_model(
@@ -105,6 +111,36 @@ def _build_openai_client(
     )
 
 
+def _build_ollama_client(
+    settings: Settings,  # e.g. Settings(llm_provider="ollama", llm_model="bielik-4.5b:Q8_0")
+) -> OllamaLLMClient:
+    """
+    Description:
+    Builds the Ollama client. Only `LLM_MODEL` is required: a local server needs no API key, and its
+    address has a working default — so this refuses to start on the ONE value it cannot guess.
+
+    Example args:
+        settings=Settings(llm_provider="ollama", llm_model="bielik-4.5b-v3.0-instruct:Q8_0")
+
+    Example result:
+        OllamaLLMClient(model="bielik-4.5b-v3.0-instruct:Q8_0", timeout=1800.0)
+
+    Raises:
+        LLMConfigError: `LLM_MODEL` is missing — there is no sensible default for which model to run
+    """
+    if not settings.llm_model:
+        raise LLMConfigError(f"LLM_PROVIDER={PROVIDER_OLLAMA!r} wymaga ustawienia: LLM_MODEL")
+
+    return OllamaLLMClient(
+        model             = settings.llm_model,
+        base_url          = settings.llm_base_url or DEFAULT_OLLAMA_BASE_URL,
+        timeout           = settings.llm_timeout_seconds,
+        temperature       = settings.llm_temperature,
+        num_ctx           = settings.llm_num_ctx,
+        max_output_tokens = settings.llm_max_output_tokens,
+    )
+
+
 def get_llm_client(settings: Settings) -> LLMClient:   # e.g. Settings(llm_provider="fake")
     """
     Description:
@@ -133,6 +169,9 @@ def get_llm_client(settings: Settings) -> LLMClient:   # e.g. Settings(llm_provi
 
     if provider == PROVIDER_OPENAI:
         return _build_openai_client(settings)
+
+    if provider == PROVIDER_OLLAMA:
+        return _build_ollama_client(settings)
 
     supported = ", ".join(SUPPORTED_PROVIDERS)
 

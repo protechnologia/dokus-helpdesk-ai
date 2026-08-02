@@ -1,4 +1,5 @@
 import asyncio
+import time
 from pathlib import Path
 
 import typer
@@ -8,6 +9,7 @@ from app.domain.parsing import ParseResult, TicketParser
 from app.domain.validation import ValidationReport, validate_directory
 from app.ingest.raw_ticket import load_raw_ticket
 from app.llm import LLMError, get_llm_client
+from app.util.time import format_duration
 
 tickets = typer.Typer(
     help            = "Operacje na sparsowanych zgłoszeniach z data/parsed/.",
@@ -163,8 +165,13 @@ def _print_parse_summary(results: list[ParseResult], out_dir: Path) -> None:
     # ten-ticket run would look free.
     typer.echo(f"Koszt przebiegu: ${total_cost:.6f}")
 
+    total_seconds = sum(result.latency_ms for result in results) / 1000
+
+    typer.echo(f"Czas przebiegu: {format_duration(total_seconds)}")
+
     if parsed:
-        typer.echo(f"Średnio na zgłoszenie: ${total_cost / len(results):.6f}")
+        typer.echo(f"Średnio na zgłoszenie: ${total_cost / len(results):.6f}"
+                   f", {format_duration(total_seconds / len(results))}")
 
 
 async def _parse_all(
@@ -193,11 +200,17 @@ async def _parse_all(
             run cost up to that point, so the operator knows what was already spent
     """
     results: list[ParseResult] = []
+    started_at = time.perf_counter()
 
     for index, path in enumerate(paths, start=1):
         raw = load_raw_ticket(path)
 
-        typer.echo(f"[{index}/{len(paths)}] {raw.ticket_id} … ", nl=False)
+        # Thread size announced BEFORE the call, and the line is flushed without a newline. On a
+        # local model one ticket takes minutes, so a bare counter would read as a hung process —
+        # the character count is the only advance warning of which ones will be slow.
+        thread_chars = len(raw.as_thread())
+
+        typer.echo(f"[{index}/{len(paths)}] {raw.ticket_id} ({thread_chars:,} zn.) … ", nl=False)
 
         try:
             result = await parser.parse(raw)
@@ -224,7 +237,14 @@ async def _parse_all(
             encoding="utf-8",
         )
 
-        typer.echo(f"ok  (${result.cost_usd:.6f}, {result.latency_ms / 1000:.1f}s)")
+        # Elapsed total after every ticket, because on a slow provider the useful question is not
+        # "what did this one cost" but "how long until this finishes".
+        elapsed_total = time.perf_counter() - started_at
+
+        typer.echo(
+            f"ok  (${result.cost_usd:.6f}, {result.latency_ms / 1000:.1f}s"
+            f", razem {format_duration(elapsed_total)})"
+        )
 
     return results
 
