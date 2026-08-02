@@ -7,3 +7,6 @@ uvicorn[standard]==0.51.0
 typer==0.27.0
 # Claude API SDK. Imported by exactly one module (app/llm/client_claude.py) — CLAUDE.md rule 4.
 anthropic==0.120.2
+# OpenAI SDK. Imported by exactly one module (app/llm/client_openai.py) — CLAUDE.md rule 4. Also the
+# route for OpenAI-compatible endpoints (Bielik on RunPod, Ollama, vLLM) via LLM_BASE_URL.
+openai==2.52.0

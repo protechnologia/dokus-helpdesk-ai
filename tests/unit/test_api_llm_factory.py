@@ -3,6 +3,7 @@ import pytest
 from app.config import Settings
 from app.llm import FakeLLMClient, LLMConfigError, LLMError, get_llm_client
 from app.llm.client_claude import ClaudeLLMClient
+from app.llm.client_openai import OpenAILLMClient
 
 
 def _settings(provider: str, **overrides) -> Settings:   # e.g. "fake"
@@ -37,6 +38,24 @@ def _claude_settings(**overrides) -> Settings:
     values.update(overrides)
 
     return _settings("claude", **values)
+
+
+def _openai_settings(**overrides) -> Settings:
+    """
+    Description:
+    Builds a complete OpenAI configuration, with overrides applied on top. Each test then removes
+    exactly the one value it is about, instead of restating the whole set.
+
+    Example args:
+        overrides={"llm_model": None}
+
+    Example result:
+        Settings(llm_provider="openai", llm_api_key="sk-proj-test", llm_model=None, …)
+    """
+    values = {"llm_api_key": "sk-proj-test", "llm_model": "gpt-5.4-mini"}
+    values.update(overrides)
+
+    return _settings("openai", **values)
 
 
 def test_default_provider_builds_the_offline_fake() -> None:
@@ -103,3 +122,43 @@ def test_claude_with_unpriced_model_fails_at_build_time() -> None:
     """Model spoza cennika → LLMConfigError przy budowie, zanim przebieg cokolwiek kosztuje."""
     with pytest.raises(LLMConfigError, match="cennik"):
         get_llm_client(_claude_settings(llm_model="claude-nieistniejacy-9"))
+
+
+def test_openai_provider_builds_the_openai_client() -> None:
+    """LLM_PROVIDER=openai z kluczem i modelem → OpenAILLMClient gotowy do wywołania API."""
+    client = get_llm_client(_openai_settings())
+
+    assert isinstance(client, OpenAILLMClient)
+
+
+def test_openai_without_api_key_fails_at_build_time() -> None:
+    """Provider openai bez LLM_API_KEY → LLMConfigError nazywający brakujący klucz."""
+    with pytest.raises(LLMConfigError, match="LLM_API_KEY"):
+        get_llm_client(_openai_settings(llm_api_key=None))
+
+
+def test_openai_without_model_fails_at_build_time() -> None:
+    """Provider openai bez LLM_MODEL → LLMConfigError nazywający brakujący model."""
+    with pytest.raises(LLMConfigError, match="LLM_MODEL"):
+        get_llm_client(_openai_settings(llm_model=None))
+
+
+def test_openai_config_error_names_the_provider() -> None:
+    """Błąd konfiguracji openai → nazwa dostawcy w komunikacie, nie samo 'brakuje wartości'."""
+    # Komunikat jest wspólny dla obu dostawców, więc bez nazwy czytający nie wie, którą sekcję
+    # `.env` poprawić.
+    with pytest.raises(LLMConfigError, match="openai"):
+        get_llm_client(_openai_settings(llm_api_key=None))
+
+
+def test_openai_with_unpriced_model_fails_at_build_time() -> None:
+    """Model spoza cennika → LLMConfigError przy budowie, zanim przebieg cokolwiek kosztuje."""
+    with pytest.raises(LLMConfigError, match="cennik"):
+        get_llm_client(_openai_settings(llm_model="gpt-nieistniejacy-9"))
+
+
+def test_openai_accepts_a_compatible_endpoint() -> None:
+    """LLM_BASE_URL ustawione → klient celuje w podany endpoint; tą drogą wejdzie Bielik."""
+    client = get_llm_client(_openai_settings(llm_base_url="https://example.invalid/v1"))
+
+    assert "example.invalid" in str(client._client.base_url)

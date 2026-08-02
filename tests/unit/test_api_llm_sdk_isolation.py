@@ -1,25 +1,28 @@
 from pathlib import Path
 
-# The single module allowed to import the provider SDK (CLAUDE.md -> rule 4 and the "Don't" list).
-ALLOWED_MODULE = "client_claude.py"
+import pytest
 
-# Import spellings that pull the SDK in. Matched as substrings against source lines, which is
-# coarse on purpose: a guard that only understood one spelling would miss the other.
-SDK_IMPORTS = ("import anthropic", "from anthropic")
+# One row per provider SDK: which module may import it, and the import spellings that pull it in.
+# Spellings are matched as substrings against source lines, which is coarse on purpose — a guard
+# that only understood one spelling would miss the other (CLAUDE.md -> rule 4 and the "Don't" list).
+SDK_RULES = (
+    ("llm/client_claude.py", ("import anthropic", "from anthropic")),
+    ("llm/client_openai.py", ("import openai",    "from openai")),
+)
 
 APP_ROOT = Path(__file__).resolve().parents[2] / "api" / "app"
 
 
-def _modules_importing_sdk() -> list[str]:
+def _modules_importing(spellings: tuple[str, ...]) -> list[str]:
     """
     Description:
-    Lists the modules under `api/app/` whose source imports the Anthropic SDK, as paths relative
-    to that root. Reads the files as TEXT rather than importing them: an import-based check would
-    only see modules that happened to be loaded, and would miss exactly the accidental import this
-    guard exists to catch.
+    Lists the modules under `api/app/` whose source contains one of the given import spellings, as
+    paths relative to that root. Reads the files as TEXT rather than importing them: an import-based
+    check would only see modules that happened to be loaded, and would miss exactly the accidental
+    import this guard exists to catch.
 
     Example args:
-        (none)
+        spellings=("import anthropic", "from anthropic")
 
     Example result:
         ["llm/client_claude.py"]
@@ -32,24 +35,26 @@ def _modules_importing_sdk() -> list[str]:
         # Comment lines mentioning the SDK are prose, not a dependency.
         lines = [line.strip() for line in source.splitlines() if not line.strip().startswith("#")]
 
-        if any(spelling in line for line in lines for spelling in SDK_IMPORTS):
+        if any(spelling in line for line in lines for spelling in spellings):
             offenders.append(str(path.relative_to(APP_ROOT)))
 
     return offenders
 
 
-def test_only_the_claude_client_imports_the_sdk():
-    """SDK dostawcy importowany wyłącznie w kliencie — poza nim domena nie zna Anthropica."""
-    offenders = _modules_importing_sdk()
+@pytest.mark.parametrize(("allowed_module", "spellings"), SDK_RULES)
+def test_only_its_own_client_imports_the_sdk(allowed_module: str, spellings: tuple[str, ...]):
+    """SDK dostawcy importowany wyłącznie w jego kliencie — poza nim domena go nie zna."""
+    offenders = _modules_importing(spellings)
 
-    assert offenders == [f"llm/{ALLOWED_MODULE}"], (
-        f"SDK Anthropic zaimportowany poza {ALLOWED_MODULE}: {offenders}. "
+    assert offenders == [allowed_module], (
+        f"SDK zaimportowany poza {allowed_module}: {offenders}. "
         f"Domena rozmawia z modelem wyłącznie przez LLMClient (CLAUDE.md -> zasada 4)."
     )
 
 
-def test_the_guard_actually_finds_the_import():
+@pytest.mark.parametrize(("allowed_module", "spellings"), SDK_RULES)
+def test_the_guard_actually_finds_the_import(allowed_module: str, spellings: tuple[str, ...]):
     """Strażnik widzi import w dozwolonym pliku — inaczej przechodziłby też po jego usunięciu."""
     # Bez tego asercja wyżej byłaby spełniona również przez pustą listę wynikającą z zepsutego
     # wyszukiwania, a test-strażnik milczałby o realnym złamaniu reguły.
-    assert _modules_importing_sdk(), "strażnik nie znalazł żadnego importu SDK — sprawdź wzorce"
+    assert _modules_importing(spellings), f"strażnik nie znalazł importu dla {allowed_module}"

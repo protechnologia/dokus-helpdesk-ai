@@ -1,5 +1,9 @@
 # --- konfiguracja lokalna (kontraktem jest .env.example) ---
+# Wzorzec obejmuje warianty (.env.dev.claude, .env.openai), bo trzymamy obok siebie kilka
+# konfiguracji dostawców — każda z żywym kluczem. Wyjątek jest jeden i jawny: .env.example.
 .env
+.env.*
+!.env.example
 
 # --- artefakty i dane wejściowe: zawierają dane klientów (PII) ---
 data/
