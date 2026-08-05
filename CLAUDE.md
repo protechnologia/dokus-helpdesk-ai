@@ -1839,7 +1839,28 @@ właściwej warstwy, skrót → „TODO").
      - **Nie parsujemy przy tej okazji całego korpusu**, choć pod stoi i kosztowałoby ~6 h / $4:
        prompt nie jest zamrożony, a zasada 7 wymaga, żeby artefakt z etapu 10 powstał **jednym
        przebiegiem zamrożonej wersji**. Pełny przebieg dopiero po etapie 6.
-  3. **Golden set = syntetyczne zapytania, nie pary historyczne** (decyzja 2026-08-05). Do każdego
+  3. [x] **Golden set gotowy: 165 zapytań, 35 odrzuconych** (2026-08-05,
+     `data/golden/bielik-11b-golden200.json`). Wszystkie 200 artefaktów przejrzane, zero
+     duplikatów, kopie `expected_problem`/`expected_cause` zgodne z artefaktami.
+     - **Odsiew wyszedł 18%** wobec spodziewanych 25–26% z pomiaru na 661 rekordach. Różnica jest
+       wyjaśnialna: tamten pomiar oceniał **przydatność do zaproponowania komuś innemu**, a tu
+       kryterium jest węższe — *czy da się napisać sensowne zapytanie użytkownika*. Rekord
+       z ubogim `solution`, ale wyraźnym objawem, przechodzi tutaj i wypadnie dopiero przy filtrze
+       etapu 4. **Odsiew rósł wraz z przeglądem** (8% → 13% → 15% → 18%), więc pierwsze partie
+       oceniałem łagodniej — przy powtórce warto zacząć od kryterium ustalonego na końcu.
+     - **Powody odrzuceń, gotowe wejście do filtru etapu 4:** puste `cause` i `solution` naraz
+       (najliczniejsze) · rozstrzygnięcie pozorne („rozwiązane do zamknięcia", „powinno już
+       działać") bez podania, co zrobiono · zamknięcie jako duplikat innego zgłoszenia ·
+       **wątki-projekty** (`23853`, `30423`, `33315` — kilka niezależnych spraw w jednym
+       zgłoszeniu, `problem` jest streszczeniem wszystkich) · sprawy nietechniczne (reklamacja
+       terminu realizacji, prośba o zwiększenie dysku).
+     - **Rozkład: 137 eksploatacyjnych / 28 wdrożeniowo-migracyjnych**, 94 typowe / 71 trudnych.
+       Przewaga eksploatacyjnych jest własnością korpusu, nie doboru — helpdesk obsługuje głównie
+       referentów. **Przy 28 zapytaniach migracyjnych `recall@5` per gatunek ma dużą niepewność**
+       (jedno trafienie to 3,6 pp), więc różnice poniżej ~10 pp między modelami będą w tej
+       warstwie nieistotne.
+
+     Zasady, na których powstał (rozwinięcie decyzji z 2026-08-05). Do każdego
      rekordu, który coś wnosi, piszemy **hipotetyczny opis nowego zgłoszenia od klienta**; parą
      jest `zapytanie → rekord źródłowy`. Trzy powody, każdy rozstrzygający:
      - **Mierzy właściwą rzecz.** Produkt bierze nowe zgłoszenie i szuka podobnych w bazie. Pary
