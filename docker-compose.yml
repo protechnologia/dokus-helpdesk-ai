@@ -63,19 +63,28 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # --- embedder: the PL model behind REST; today a deterministic stub (stage 0e-1) ---
+  # --- embedder: the PL model behind REST ---
   embedder:
     build: ./embedder
     ports:
       - "${DOCKER_BIND_ADDR:-127.0.0.1}:${DOCKER_EMBEDDER_PORT:-8001}:8000"
     volumes:
       - ./embedder/embedder_app:/code/embedder_app
+      # Model weights, cached across restarts. A named volume rather than a path under ./data:
+      # data/ is the irreplaceable artifact that gets backed up (rule 7), while weights are a
+      # download away. Without this the container refetches ~600 MB on every recreate.
+      - hf_cache:/root/.cache/huggingface
     # This service owns EMBEDDING_BACKEND; `api` never sees it, because how text becomes a
     # vector is none of its business — it only knows the HTTP contract.
+    #
+    # The default is the REAL model, not the fake. A stack that cannot compute a real vector is
+    # useless for stages 3-4, and `integration_embedder` exists to test what lives outside our
+    # code — which with the fake would be nothing. `fake` stays available for a weightless start
+    # (EMBEDDING_BACKEND=fake) and remains the default for `pytest`, which never reads this file.
     environment:
       LOG_LEVEL:             ${LOG_LEVEL:-INFO}
-      EMBEDDING_BACKEND:     ${EMBEDDING_BACKEND:-fake}
-      EMBEDDING_MODEL:       ${EMBEDDING_MODEL:-}
+      EMBEDDING_BACKEND:     ${EMBEDDING_BACKEND:-sentence-transformers}
+      EMBEDDING_MODEL:       ${EMBEDDING_MODEL:-OPI-PIB/PolDense-150M}
       EMBEDDING_VECTOR_SIZE: ${EMBEDDING_VECTOR_SIZE:-768}
     command: ["uvicorn", "embedder_app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     healthcheck:
@@ -83,7 +92,10 @@ services:
       interval:     10s
       timeout:      3s
       retries:      3
-      start_period: 10s
+      # Generous because the FIRST start downloads the weights before uvicorn binds; later starts
+      # read them from hf_cache and come up in seconds. Too short a period here marks a container
+      # unhealthy for doing exactly what it is supposed to do on first run.
+      start_period: 300s
     restart: unless-stopped
 
   # --- qdrant: the index, never the source of truth (rule 8) ---
@@ -102,3 +114,5 @@ services:
 
 volumes:
   qdrant_storage:
+  # Downloaded model weights. Safe to delete — the next start refetches them.
+  hf_cache:
