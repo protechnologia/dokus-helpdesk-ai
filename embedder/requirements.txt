@@ -1,9 +1,13 @@
 # Runtime dependencies of the `embedder` service — these go INTO the image.
-#
-# Deliberately NO sentence-transformers / torch: this stage ships a stub that fabricates
-# deterministic vectors. The real PolDense model (and the weights, and the GPU layer) arrive in
-# stage 2 and change only this file and app/vectors.py — the HTTP contract stays put.
 pydantic==2.10.5
 pydantic-settings==2.7.1
 fastapi==0.140.0
 uvicorn[standard]==0.51.0
+
+# --- the real encoder (stage 2) ---
+# CPU-only torch, pulled from PyTorch's own index: the default PyPI wheel bundles the whole CUDA
+# runtime (~2.5 GB of image) and this service is deployed to a machine without a GPU
+# (CLAUDE.md -> "Świadomie pominięte": the GPU compose layer was dropped for that reason).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.9.1+cpu
+sentence-transformers==5.6.1

@@ -1428,6 +1428,21 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   Qdrant (zasady 7 i 8 bez zmian). Nie przenosimy do SQL-a ani sparsowanych zgłoszeń, ani
   wektorów.
 - **Frontend (React SPA)** — na starcie API + CLI; UI to etap 11.
+- **Warstwa `docker-compose.gpu.yml`** — **decyzja 2026-08-05: nie powstaje.** Przesłanka
+  („PolDense na RTX 4090 obok Bielika", jedna maszyna) odpadła: embedder chodzi na CPU, a LLM
+  jest **zewnętrznym endpointem** na osobnej maszynie, więc w bazowym compose nie ma czego z czym
+  dzielić. Pusty plik „na wszelki wypadek" łamie regułę „warstwa dokłada jeden wymiar", a aktywna
+  rezerwacja GPU **twardo wywala start** bez runtime'u GPU — czyli plik, którego nikt nie odpala
+  i który przy pierwszym użyciu za pół roku nie zadziała. Gdy pojawi się maszyna z kartą, warstwa
+  to jeden plik i **zero zmian w bazie** (baza pozostaje przenośna — to była cała motywacja
+  wydzielenia). Uboczna korzyść CPU-only: `pytest -m integration_embedder` z prawdziwym modelem
+  chodzi wszędzie, bez warunkowych pominięć.
+  - **Gdyby jednak kiedyś padło na jedną maszynę** — embedder na CPU, LLM na GPU (nie odwrotnie
+    i nie oba na GPU). Powód: obciążenia są rozłączne w czasie (indeksacja jest wsadowa,
+    generacja interaktywna), embedder na CPU jest wystarczająco szybki, a przede wszystkim
+    **znika konflikt o VRAM** — dwa procesy na jednej karcie dają najgorszy rodzaj awarii:
+    Ollama wpada w częściowy offload na CPU i **cicho zwalnia kilkukrotnie, bez błędu w logach
+    obu usług**. Cena to jeden parametr (wątki `torch`), nie zmiana architektury.
 - ~~**Masowe parsowanie korpusu w aplikacji**~~ — **decyzja odwrócona 2026-08-01.** Parsowanie
   przez API weszło wcześniej, niż zakładał etap 10: `helpdesk tickets parse` woła skonfigurowany
   `LLMClient`, wypełnia `ticket_id`/`date` ze źródła i zapisuje artefakt po KAŻDYM zgłoszeniu, więc
@@ -1563,6 +1578,11 @@ tworzysz świadomym skrótem), **dopisz go tu** zamiast zostawiać w milczeniu.
   wzorcami** (kontekst dla haseł słownikowych, entropia dla losowych). Patrz „Pułapki tej bazy":
   1,1% zgłoszeń, dwa z pięciu przypadków wkleił konsultant. **To liczba do zgłoszenia klientowi.**
 - **Backup `data/parsed/`** — jedyny niepowtarzalny artefakt (odtworzenie = ponowny koszt LLM).
+- **Liczba wątków `torch` w embedderze** — domyślnie biblioteka bierze **wszystkie rdzenie**, co
+  na maszynie dzielonej z `api` i Qdrantem potrafi zagłodzić resztę na czas przebiegu indeksacji.
+  Kandydat na `EMBEDDING_NUM_THREADS`, ale **najpierw pomiar** — nie dokładamy zmiennej, zanim
+  wiadomo, że przeszkadza. Dotyczy też układu z osobnymi maszynami, bo embedder i tak dzieli host
+  z `api`.
 - **Limity i koszty LLM** — brak budżetowania i rate-limitu na wywołania generacji. **Bramki
   zmieniają skalę problemu**: dotąd LLM wołaliśmy raz na zapytanie wdrożeniowca, teraz woła go
   **każde zamknięcie, każda wysyłka i każde kliknięcie „Popraw"** — czyli ruch proporcjonalny do
@@ -1610,15 +1630,64 @@ właściwej warstwy, skrót → „TODO").
   CLI tylko drukuje i ustala kod wyjścia, żeby masowy import z etapu 10 użył tego samego
   sprawdzenia. Kształt schematu rozstrzygnął przegląd 2026-07-31 — patrz tabela rdzenia
   w sekcji „Domena".
-- [ ] **2. Embedder jako usługa** — realny PolDense obok backendu `fake` z etapu 0: nowa
-  implementacja `Encoder` (wagi, dobór wariantu, warstwa GPU, prefiksy trybów, `encode` przez
-  `run_in_threadpool`, bo `sentence-transformers` jest synchroniczne) + wpis w fabryce;
-  `embed_query/passage/sts` i `EmbeddingClient` po stronie `api`. Dochodzą dwie reguły:
-  **fabryka porównuje wymiar zgłoszony przez backend z `EMBEDDING_VECTOR_SIZE`** i wywala przy
-  starcie (dziś ten sprawdzian nie ma jak paść — `fake` bierze wymiar z configu), oraz
-  `EMBEDDING_MODEL` jako **parametr** jednej implementacji, nie osobny backend (PolDense, mmlw
-  i BGE-M3 ładują się tak samo). **Otwarte:** czy `fake` zostaje jako backend do dev/CI, czy
-  znika — decyzja po poznaniu rozmiaru wag i sprzętu.
+- [ ] **2. Embedder jako usługa** — realny PolDense obok backendu `fake` z etapu 0:
+  implementacja `Encoder` na `sentence-transformers` + wpis w fabryce, `EmbeddingClient`
+  i `embed_query/passage/sts` po stronie `api`.
+
+  **Wariant roboczy: PolDense-150M, wymiar 768** (sprawdzone w `config.json` i `1_Pooling/`
+  na HF, 2026-08-05 — `hidden_size` 768, pooling CLS, `ModernBertModel`). Trafia w wartość, którą
+  `.env.example` i compose już mają, więc `EMBEDDING_VECTOR_SIZE` nie wymaga zmiany. **To wybór
+  roboczy, nie docelowy** — rozstrzyga go pomiar z etapu 3; zmiana wariantu ⇒ inny wymiar ⇒ nowa
+  kolekcja, ale kolekcji jeszcze nie ma, więc dziś kosztuje zero.
+  **Wariant 1B wypada świadomie** (nie przez przeoczenie): przy CPU-only latencja `POST /search`
+  byłaby rzędu sekundy, zanim LLM zacznie generować. Etap 3 ma go nie mierzyć.
+
+  Podkroki (1–2 splecione, bo fabryka potrzebuje `dimension` z implementacji; 5 zależy od 1–4):
+
+  1. [x] **`SentenceTransformerEncoder`** w `embedder/embedder_app/encoding/` — jedyne miejsce
+     z importem `sentence-transformers`. **Mapowanie trybu na prefiks żyje tutaj**, bo to
+     własność modelu, nie protokołu (`base.py` już to zapisuje). `encode()` przez
+     `run_in_threadpool`, bo biblioteka jest synchroniczna. Wagi ładowane **eager w konstruktorze**
+     — zły `EMBEDDING_MODEL` zabija usługę przy starcie, nie przy pierwszym żądaniu.
+     Zależności runtime: `torch==2.9.1+cpu` z indeksu PyTorcha (domyślny wheel z PyPI ciągnie cały
+     runtime CUDA, ~2,5 GB obrazu, a maszyna docelowa nie ma karty) + `sentence-transformers==5.6.1`.
+     - **Normalizacja wektorów jest NASZA, nie modelu.** `modules.json` PolDense ma wyłącznie
+       `Transformer` + `Pooling`, **bez `Normalize`** — surowe wyjście ma dowolne długości, a
+       `FakeEncoder` produkuje jednostkowe. Bez `normalize_embeddings=True` progi `RAG_SCORE_MIN`
+       znaczyłyby co innego w testach niż na produkcji. Flaga zostaje **bezwarunkowo**, także dla
+       modeli z etapu 3 mających `Normalize` w pipelinie (BGE-M3) — tam jest redundantna, nigdy
+       szkodliwa (dzielenie przez 1). Zdanie się na normalizację Qdranta nie wystarcza: ewaluacja
+       z etapu 3 liczy podobieństwa **poza bazą**, więc skala musi być gwarantowana wcześniej.
+     - **Prefiksy zweryfikowane empirycznie** (2026-08-05, ten sam tekst w trzech trybach):
+       `cos(query, passage) = 0,544`, `cos(passage, sts) = 0,814`. Gdyby prefiks był kosmetyką,
+       wyszłoby 1,0 — to jest miara skali błędu przy mieszaniu trybów w jednej przestrzeni.
+     - **`[sts]: ` potwierdzony u autorów**, mimo że NIE MA go w `config_sentence_transformers.json`
+       (są tam tylko `query` i `document`). To nie usterka karty modelu, tylko granica formatu:
+       pole `prompts` opisuje **asymetrię** (prefiks na jedną stronę porównania), a STS jest
+       z definicji symetryczny — obie strony dostają ten sam prefiks, więc nie ma czego rozróżniać.
+       Konsekwencja: **nie wolno czytać trybów z `prompts` modelu przez `prompt_name=`** — `sts` by
+       tam nie istniał i biblioteka rzuciłaby błędem. Nasza tabela `MODE_PREFIXES` jest źródłem prawdy.
+     - Rodowód wart zapamiętania przy etapie 3 i przy TODO o licencji: PolDense stoi na
+       **ettin-encoders (ModernBERT)**, a trenowany był destylacją z **BGE-Multilingual-Gemma2** —
+       stąd licencja gemma.
+  2. **Wpis w fabryce + kontrola wymiaru** — backend dochodzi do `SUPPORTED_BACKENDS`,
+     `build_encoder()` porównuje `encoder.dimension` z `settings.embedding_vector_size` i wywala
+     przy starcie. Dziś ten sprawdzian **nie ma jak paść** — `fake` bierze wymiar z configu, więc
+     zawsze się zgadza.
+  3. **`EMBEDDING_MODEL` jako parametr jednej implementacji**, nie osobny backend — PolDense,
+     mmlw, BGE-M3 i Nomic ładują się tak samo, więc etap 3 przelatuje po nich **zmianą ENV, bez
+     dotykania kodu**.
+  4. **Nowe zmienne do `.env.example` i compose** — test plumbingu jest dwukierunkowy per usługa,
+     więc pominięcie któregokolwiek miejsca wywali testy.
+  5. **`api/app/embedding/`** — `EmbeddingClient` (HTTP do `embeddera`) + `embed_query/passage/sts`.
+     Tego katalogu dziś nie ma w ogóle. Trzy metody zamiast jednej z parametrem, żeby nikt nie
+     sklejał prefiksu w kodzie domenowym.
+  6. **`FakeEncoder` zostaje** (rozstrzygnięcie wcześniej otwartego pytania) — domyślny `pytest`
+     ma być offline, a wagi w CI to setki MB pobierania. Zostaje też jego test „złotej wartości".
+  7. **Testy** — kontrakt HTTP jednostkowo na `TestClient`; integracyjnie (`integration_embedder`)
+     to, czego prawdziwość mieszka **poza naszym kodem**: czy model naprawdę daje różne wektory
+     dla `[query]:` i `[sts]:`.
+  8. **Warstwa GPU wypada** → „Świadomie pominięte"; **liczba wątków `torch`** → TODO.
 - [ ] **3. Ewaluacja embeddera** — golden set par + `recall@5` na dwóch osiach: model (PolDense
   vs mmlw-roberta-large vs BGE-M3) i tryb (`query→passage` vs `sts→sts`, zapytanie surowe vs
   sparsowane); wynik zapisany w repo. **Decyzja o modelu i trybie zapada tu, nie wcześniej** —
