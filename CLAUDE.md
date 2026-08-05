@@ -187,6 +187,12 @@ rekordów rocznie i rosnący.
 **Uwaga: 1496 to filtr długościowy, NIE liczba użytecznych rekordów.** Patrz „Ile z tego
 naprawdę wejdzie do indeksu" — realny lejek jest o ~35% węższy.
 
+**1496 liczono na surowym HTML-u i bez filtru statusu.** Przy liczeniu po stripie i z filtrem
+`status ∈ (rozwiazany, zamkniety)` zostaje **1408** (pomiar 2026-08-05 przez
+`scripts/select_parse_sample.py`). Rozkład odrzuceń: **85** przez status, **138** przez opis
+≤ 50 zn., **186** przez brak komentarza > 50 zn. Obie liczby są poprawne — mierzą co innego,
+więc przy etapie 4 nie należy szukać „zgubionych" 88 rekordów.
+
 ### Ile z tego naprawdę wejdzie do indeksu (pomiar na 661 sparsowanych, 2026-07-29)
 
 Liczby niżej pochodzą z **ręcznego sparsowania 661 zgłoszeń** (36% modułu, 44% korpusu po
@@ -1532,11 +1538,10 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   identyfikatorach i raport zbiorczy — nie sama zdolność parsowania.
   - **Ręczne parsowanie w czacie skończone**, a razem z nim `scripts/prepare_parse_batch.py`
     (renderował porcje tekstu do wklejenia) i `data/batch/` — **skasowane 2026-08-01**, commit
-    `8d7114e`. **W skrypcie zostały dwie rzeczy, których CLI nie ma:** dobór warstwowy
-    proporcjonalny do kategorii (deterministyczny, bez losowania — wejście do golden setu z etapu 3)
-    oraz filtr progu 50 znaków **liczony po stripie HTML-a**, z pomiarem: na module 1496 zgłoszeń
-    przechodzi próg liczony na HTML-u, a 1477 na samym tekście — 19 przechodzi wyłącznie dzięki
-    tagom i encjom. Przy etapie 3 i 4 odzyskać z gita, nie pisać od nowa.
+    `8d7114e`. **Odzyskane 2026-08-05 jako `scripts/select_parse_sample.py`**: renderowanie
+    i porcjowanie wypadły (robi to `helpdesk tickets parse`), został **dobór warstwowy
+    deterministyczny** i **filtr progu 50 znaków liczony po stripie HTML-a** — czyli to, czego
+    CLI nie ma. Dołożona kontrola okna kontekstu przed przebiegiem.
 - **Framework RAG (LangChain / LlamaIndex)** — piszemy wprost na kliencie Qdranta; warstwa
   pośrednia ukryłaby dokładnie te rzeczy, które tu kontrolujemy ręcznie (prefiksy, named vectors,
   progi, routing).
@@ -1751,13 +1756,19 @@ właściwej warstwy, skrót → „TODO").
 
   Podkroki (3.3 zależy od 3.2; 3.4 da się pisać równolegle):
 
-  1. **Odzyskać dobór próbki z gita** — `git show 8d7114e:scripts/prepare_parse_batch.py`.
-     **Odzyskać, nie pisać od nowa**: skrypt ma dwie rzeczy, których CLI nie ma — **dobór
-     warstwowy deterministyczny** (równomierny skok po posortowanych id, bez losowania, więc dwa
-     przebiegi dają tę samą próbkę) i **filtr progu 50 znaków liczony po stripie HTML-a**
-     (na module 1496 zgłoszeń przechodzi próg liczony na HTML-u, a 1477 na samym tekście — 19
-     przechodzi wyłącznie dzięki tagom i encjom). Renderowanie do tekstu jest już zbędne
-     (parsujemy przez API), więc skrypt zwęża się do wypisania identyfikatorów próbki.
+  1. [x] **Dobór próbki odzyskany z gita** jako `scripts/select_parse_sample.py` (2026-08-05).
+     Renderowanie i porcjowanie wypadły — robi to `helpdesk tickets parse`; został **dobór
+     warstwowy deterministyczny** i **filtr progu liczony po stripie HTML-a**. Dołożona kontrola
+     okna kontekstu, bo odmowa w trakcie przebiegu kosztuje czas GPU.
+     - **Wybrano 199, nie 200** — kwoty per kategoria zaokrąglają się w dół. Nie warto tego
+       „naprawiać": dokładność liczby jest bez znaczenia, a wymuszanie jej psułoby proporcje.
+     - **Determinizm sprawdzony** (dwa przebiegi = identyczna lista), **rozkład lat wyszedł sam**:
+       2022→7, 2023→22, 2024→37, 2025→71, 2026→62, czyli zgodnie z przyrostem korpusu. To ten
+       efekt, dla którego warstwowanie było warte odzyskania — losowanie dałoby go w oczekiwaniu,
+       ale przy 200 z 1408 rozrzut bywa odczuwalny, a korpus ma rekordy unieważniane przez
+       późniejsze i sezonowość.
+     - **Żadne z 199 nie przekracza okna 16384 tokenów.** Obawa z pomiaru Bielika („odpadło 1 na
+       10") była artefaktem próbki kontrolnej dobranej pod skrajności — w korpusie to 0,1%.
   2. **Sparsować 200 zgłoszeń** przez `helpdesk tickets parse` **Bielikiem 11B na RunPodzie**
      (decyzja 2026-08-05). Artefakty do **`data/golden/`, nie do `data/parsed/`**: etap 10 ma ten
      drugi katalog nadpisać, a golden set jest wielokrotnego użytku — przyda się przy każdej
