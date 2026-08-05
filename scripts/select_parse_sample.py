@@ -9,7 +9,7 @@ Do czego:
     nie importuje `api.app` i nie odpytuje żadnego endpointu.
 
 Flow:
-    1. `select` wczytuje `data/raw/`, odsiewa zgłoszenia już sparsowane (`--parsed-dir`)
+    1. `select` wczytuje `data/raw/`, odsiewa zgłoszenia już sparsowane (katalog zestawu)
        i te bez treści (`_passes_quality`).
     2. Grupuje pozostałe po kategorii i dobiera próbkę proporcjonalnie (`_pick_stratified`).
     3. Szacuje długość wątku każdego wybranego zgłoszenia i ostrzega o tych, które nie zmieszczą
@@ -42,7 +42,19 @@ import typer
 
 REPO_ROOT   = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT_RAW = REPO_ROOT / "data" / "raw"
-DEFAULT_PAR = REPO_ROOT / "data" / "golden"
+# Artefakty i zestawy ewaluacyjne stoją w DWÓCH miejscach, ale pod JEDNĄ nazwą (`--name`):
+# artefakt jest jednorazowy i drogi (przebieg LLM), a golden set edytowalny i poprawiany przy
+# przeglądzie, więc mieszanie ich w jednym drzewie kłóciłoby się z zasadą 7. Jedna nazwa dla
+# obu, bo dwie osobne opcje rozjechałyby się przy drugim zestawie — i wtedy nie wiadomo, która
+# lista identyfikatorów opisuje który katalog.
+PARSED_ROOT = REPO_ROOT / "data" / "parsed"
+GOLDEN_ROOT = REPO_ROOT / "data" / "golden"
+
+# Domyślna nazwa zestawu. Zawiera model parsujący, choć TEN skrypt go nie zna — parsowanie to
+# osobny krok, więc nazwa jest deklaracją intencji, nie zapisem faktu. Świadomie: tak działa już
+# dziewięć katalogów porównawczych obok, a nazwa katalogu jest tym, co widać przy `ls`.
+# Model faktycznie użyty zapisuje nagłówek golden setu.
+DEFAULT_NAME = "bielik-11b-golden200"
 
 MIN_CHARS = 50   # próg treści dla opisu i dla komentarza, liczony po stripie
 
@@ -54,9 +66,9 @@ CHARS_PER_TOKEN = 3.0
 cli = typer.Typer(help="Dobór próbki zgłoszeń do sparsowania.")
 
 HELP_COMMAND = "Wybiera próbkę zgłoszeń i wypisuje ich identyfikatory."
+HELP_NAME    = "Nazwa zestawu — katalog artefaktów i plik z identyfikatorami dostają ją oba."
 HELP_COUNT   = "Ile zgłoszeń dobrać."
 HELP_RAW     = "Katalog ze zgłoszeniami źródłowymi (JSON per zgłoszenie)."
-HELP_PARSED  = "Katalog ze sparsowanymi zgłoszeniami — te zostaną pominięte."
 HELP_CTX     = "Okno kontekstu modelu w tokenach; zgłoszenia ponad próg są zgłaszane osobno."
 
 
@@ -178,28 +190,32 @@ def main() -> None:
 
 @cli.command(help=HELP_COMMAND)
 def select(
-    count:      int          = typer.Option(200,         "--count",      help=HELP_COUNT),
-    raw_dir:    pathlib.Path = typer.Option(DEFAULT_RAW, "--raw-dir",    help=HELP_RAW),
-    parsed_dir: pathlib.Path = typer.Option(DEFAULT_PAR, "--parsed-dir", help=HELP_PARSED),
-    num_ctx:    int          = typer.Option(16384,       "--num-ctx",    help=HELP_CTX),
+    name:    str          = typer.Option(DEFAULT_NAME, "--name",    help=HELP_NAME),
+    count:   int          = typer.Option(200,          "--count",   help=HELP_COUNT),
+    raw_dir: pathlib.Path = typer.Option(DEFAULT_RAW,  "--raw-dir", help=HELP_RAW),
+    num_ctx: int          = typer.Option(16384,        "--num-ctx", help=HELP_CTX),
 ) -> None:
     """
     Description:
-    Selects the sample and prints the ids, plus everything needed to judge the run before paying
-    for it: how many tickets were available, how the sample spreads over categories, and which
-    tickets are too long for the model's context window.
+    Selects the sample and prints everything needed to judge the run before paying for it: how
+    many tickets were available, how the sample spreads over categories, and which tickets are
+    too long for the model's context window. The ids land in a file named after the set, so a
+    second set cannot silently overwrite the record of which sample was actually parsed.
 
     Example args:
+        name="bielik-11b-golden200"
         count=200
         raw_dir=Path("data/raw")
         num_ctx=16384
 
     Example result:
-        None (podsumowanie i lista identyfikatorów na stdout)
+        None (podsumowanie na stdout, identyfikatory w data/golden/<name>.txt)
 
     Raises:
         typer.Exit: when nothing is left to parse
     """
+    parsed_dir = PARSED_ROOT / name
+    ids_file   = GOLDEN_ROOT / f"{name}.txt"
     # --- wczytanie i odsiew ---
     # Artefakty nazywają się od identyfikatora (`33644.json`), więc nazwa pliku wystarcza za
     # wczytanie treści; katalog może jeszcze nie istnieć przy pierwszym przebiegu.
@@ -254,10 +270,18 @@ def select(
         typer.echo(f"Wszystkie mieszczą się w oknie {num_ctx} tokenów.")
 
     typer.echo("")
-    typer.echo("Identyfikatory: " + ",".join(str(i) for i in picked))
+
+    # Gotowa komenda zamiast surowej listy: przy 200 zgłoszeniach same `-t <id>` to ~1700 znaków
+    # w jednej linii, których nie da się zaznaczyć w terminalu. Zapis do pliku pozwala wkleić
+    # jedno podstawienie, a plik zostaje jako ślad, którą próbkę faktycznie puszczono.
+    GOLDEN_ROOT.mkdir(parents=True, exist_ok=True)
+    ids_file.write_text("\n".join(str(i) for i in picked) + "\n", encoding="utf-8")
+
+    typer.echo(f"Identyfikatory zapisane: {ids_file}")
     typer.echo("")
-    typer.echo("Do wklejenia:")
-    typer.echo(" ".join(f"-t {i}" for i in picked))
+    typer.echo("Uruchomienie parsowania:")
+    typer.echo(f"  helpdesk tickets parse {parsed_dir} \\")
+    typer.echo(f"    $(sed 's/^/-t /' {ids_file} | tr '\\n' ' ')")
 
 
 if __name__ == "__main__":

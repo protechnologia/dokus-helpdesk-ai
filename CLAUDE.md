@@ -1760,6 +1760,15 @@ właściwej warstwy, skrót → „TODO").
      Renderowanie i porcjowanie wypadły — robi to `helpdesk tickets parse`; został **dobór
      warstwowy deterministyczny** i **filtr progu liczony po stripie HTML-a**. Dołożona kontrola
      okna kontekstu, bo odmowa w trakcie przebiegu kosztuje czas GPU.
+     - **Jedno `--name` steruje obiema ścieżkami** — `data/parsed/<name>/` na artefakty
+       i `data/golden/<name>.txt` na listę identyfikatorów. Dwie osobne opcje rozjechałyby się
+       przy drugim zestawie i nie byłoby wiadomo, która lista opisuje który katalog. Skrypt
+       drukuje **gotową komendę parsowania**: przy 200 zgłoszeniach same `-t <id>` to ~1700 znaków
+       w jednej linii, nie do zaznaczenia w terminalu.
+     - **Nazwa zawiera model, choć skrypt go nie zna** — parsowanie to osobny krok, więc nazwa
+       jest **deklaracją intencji, nie zapisem faktu**. Świadomie: tak działa już dziewięć
+       katalogów porównawczych obok, a nazwa katalogu jest tym, co widać przy `ls`. Model
+       faktycznie użyty zapisuje **nagłówek golden setu**.
      - **Wybrano 199, nie 200** — kwoty per kategoria zaokrąglają się w dół. Nie warto tego
        „naprawiać": dokładność liczby jest bez znaczenia, a wymuszanie jej psułoby proporcje.
      - **Determinizm sprawdzony** (dwa przebiegi = identyczna lista), **rozkład lat wyszedł sam**:
@@ -1770,9 +1779,10 @@ właściwej warstwy, skrót → „TODO").
      - **Żadne z 199 nie przekracza okna 16384 tokenów.** Obawa z pomiaru Bielika („odpadło 1 na
        10") była artefaktem próbki kontrolnej dobranej pod skrajności — w korpusie to 0,1%.
   2. **Sparsować 200 zgłoszeń** przez `helpdesk tickets parse` **Bielikiem 11B na RunPodzie**
-     (decyzja 2026-08-05). Artefakty do **`data/golden/`, nie do `data/parsed/`**: etap 10 ma ten
-     drugi katalog nadpisać, a golden set jest wielokrotnego użytku — przyda się przy każdej
-     zmianie modelu embeddingowego.
+     (decyzja 2026-08-05). Artefakty do **`data/parsed/bielik-11b-golden200/`** — nazwa niesie
+     naraz czym sparsowano, do czego służy i ile tego jest, więc nie da się go pomylić
+     z katalogami porównawczymi obok, które masowy przebieg z etapu 10 ma skasować. **Ten ma
+     przetrwać**: jest wielokrotnego użytku przy każdej zmianie modelu embeddingowego.
      - **Dlaczego Bielik, skoro jest 5. z 8 w rankingu** (42,5 pkt): ranking mierzy przydatność do
        parsowania korpusu w ogóle, a tu rozstrzyga **kategoria self-hosted** — gdy dane nie mogą
        opuścić infrastruktury klienta, alternatywą nie jest `gpt-4.1-mini`, tylko rezygnacja
@@ -1802,6 +1812,50 @@ właściwej warstwy, skrót → „TODO").
        policzymy. Syntetyczne zapytanie jest wobec tej osi neutralne, a przy okazji daje materiał
        na oś „surowe vs sparsowane": tekst piszemy surowy i dopiero przepuszczamy przez parser.
 
+     **Plik: `data/golden/bielik-11b-golden200.json`** — ta sama nazwa co katalog artefaktów
+     i lista identyfikatorów (`--name` z podkroku 3.1), więc trzy rzeczy jednego zestawu widać
+     razem. Zestawy ewaluacyjne stoją **obok** artefaktów, nie w nich, bo mają inny cykl życia:
+     artefakt jest jednorazowy i drogi (przebieg LLM), golden set edytowalny i poprawiany przy
+     przeglądzie. Katalog `data/golden/` jest w liczbie mnogiej z założenia — etap 6 doda tu
+     własny zestaw do oceny **generacji** (ten się nie nada, patrz wyżej o krótkim `solution`
+     Bielika).
+
+     **Self-contained do czytania, referencyjny do liczenia.** Pozycja niesie `expected_problem`
+     i `expected_cause` **skopiowane z artefaktu**, żeby dało się przejrzeć plik i ocenić
+     zapytanie bez otwierania rekordu — ale skrypt ewaluacyjny **ich nie czyta**: wektory liczy
+     z artefaktu po `expected_ticket_id`. Powód: przy zmianie promptu i ponownym parsowaniu kopia
+     rozjechałaby się z artefaktem, a ewaluacja liczyłaby na nowych danych, opisując je starymi.
+     Stąd **kontrola spójności w skrypcie** — rozbieżność kopii z artefaktem ma być ostrzeżeniem,
+     nie cichym błędem.
+
+     ```json
+     {
+       "expected_ticket_id": 24506,
+       "expected_problem":   "Brak akceptującego na liście wyboru przy zatwierdzaniu pisma",
+       "expected_cause":     "Przedział ważności elementu struktury organizacyjnej",
+       "query_raw":          "Dzień dobry, od dzisiaj przy zatwierdzaniu pisma nie mam…",
+       "kind":               "eksploatacyjne",
+       "difficulty":         "typowe"
+     }
+     ```
+
+     **`query_raw` przechowujemy tylko surowy** — wersja sparsowana powstaje w trakcie ewaluacji,
+     bo zależy od promptu, a ten może się zmienić. Nagłówek pliku niesie metadane przebiegu: datę,
+     model parsujący, rozmiar korpusu, liczbę odrzuceń **z powodami** (patrz niżej).
+
+     **Dwa gatunki `kind` — różnica leży w tym, kto pyta i gdzie leży przyczyna, nie w objawie:**
+     - `eksploatacyjne` — pyta **referent**, system działa poprawnie, przyczyna w stanie bieżącym
+       (wygasły certyfikat, zacięta kolejka, brak sekwencji numeracji). Słownictwo: „nie widzę",
+       „wyskakuje komunikat", „nie mogę kliknąć".
+     - `wdrożeniowo-migracyjne` — pyta **wdrożeniowiec/administrator** przy uruchamianiu,
+       aktualizacji albo migracji; przyczyna prawie zawsze w **mapowaniu danych albo konfiguracji
+       wdrożenia**. Słownictwo: „po migracji", „sprawdziłem w bazie", „uprawnienia mają wszystko".
+       Zapytanie **samo wyklucza tropy**, czego referent nie robi.
+
+     Liczyć `recall@5` **osobno per gatunek**: jeśli model trafia 70% eksploatacyjnych i 40%
+     migracyjnych, to konkretna informacja produktowa — narzędzie pomaga referentom, a zawodzi
+     tam, gdzie wdrożeniowiec jest najbardziej bezradny. Wspólny licznik by to zatarł.
+
      Reguły pisania zapytań — bez nich pomiar traci sens:
      - **Wyłącznie to, co widzi zgłaszający.** Zapytanie nie zna przyczyny ani terminologii
        z rozwiązania („nie udało się skomunikować z serwerem" — tak; „certyfikat bez uprawnienia
@@ -1813,7 +1867,9 @@ właściwej warstwy, skrót → „TODO").
        doskonały. Spodziewany rozmiar: **~150–170 zapytań na 200 rekordach korpusu**.
      - **Liczba odrzuceń jest wynikiem, nie odpadem** — to niezależny sprawdzian odsiewu 25–26%
        zmierzonego na 661 rekordach. Rozjazd oznaczałby, że dobór warstwowy trafia w inną
-       populację. Same odrzucone rekordy z uzasadnieniem to gotowe wejście do **filtru etapu 4**.
+       populację. **Odrzucone zostają w pliku z powodem** (`"rejected": "brak treści — 'już
+       powinno działać'"`), a nie znikają zliczone: lista „te 40 rekordów nie niesie wiedzy, oto
+       dlaczego" jest gotowym wejściem do **filtru etapu 4** i warta kilkudziesięciu linii JSON-a.
      - **Kilkanaście zapytań celowo trudnych** — dla klas wieloprzyczynowych (jeden objaw, 5–6
        przyczyn). Tam rozrzut między modelami będzie największy; bez nich mierzymy łatwe przypadki.
      - **Warstwowanie powstaje przy pisaniu**, nie jako osobna ocena: piszemy w roli
