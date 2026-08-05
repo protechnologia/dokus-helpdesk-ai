@@ -1392,6 +1392,19 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 - **`--import-mode=importlib`** w `addopts` — bez tego zbiorczy `pytest -m …` wywala „import file
   mismatch", gdy ten sam plik istnieje w `tests/unit/` i `tests/integration/`.
 - Unit testy **mockują klienta LLM i embedder**; realne API nigdy w domyślnym przebiegu.
+- **Ile w pliku jest osi, tyle helperów — żadnego „helper i reszta ręcznie".** Oś to rodzaj
+  sytuacji, którą test zastaje; w `test_api_embedding_client.py` są trzy i każda ma swój helper:
+  `_responding()` (przedmiotem jest **odpowiedź** — kształt, licznik, status), `_capturing()`
+  (przedmiotem jest **żądanie** — co poszło na drut), `_raising()` (transport **nie odpowiada
+  wcale**). **Sygnał do wyłapania:** jeden test woła helper, a trzy następne sklejają to samo
+  ręcznie — to znaczy, że brakuje helpera, a nie że tamte są wyjątkowe. Nie łataj tego kopią
+  handlera; dopisz brakujący, a powtórzone testy zwiną się do jednej parametryzacji.
+- **Atrapa z produkcji przed stubem pisanym w teście.** Jest `Fake…` (`FakeLLMClient`,
+  `FakeEncoder`)? Użyj jej — nawet gdy własny stub wygląda na mniejszy. **Rozstrzyga to, co
+  sprawdzenie faktycznie czyta:** `_verify_dimension` czyta `model_name` i `dimension`,
+  `FakeEncoder` ma oba, więc klasa z pełnym interfejsem `Encoder` była czystą duplikacją. Stub
+  dopiero wtedy, gdy atrapa nie umie odtworzyć badanego stanu. Zysk podwójny: mniej kodu i test
+  pokazuje, **po co ta atrapa istnieje**.
 - **Retrieval testujemy na deterministycznej atrapie embeddera** (stały wektor per tekst) —
   test progów, dedupe i routingu nie ma prawa zależeć od modelu.
 - **Bramki i „Popraw" testujemy na `FakeLLMClient`** — sprawdzamy **kształt werdyktu i wstawienie
@@ -1689,15 +1702,26 @@ właściwej warstwy, skrót → „TODO").
      usunięcie wpisu z compose: padają **dwa** testy, w tym ten pilnujący krawędzi groźniejszej —
      „pole, którego usługa nigdy nie dostaje". Bez niego `embedder` wstałby `healthy` i cicho
      jechał na wartości domyślnej mimo poprawnego `.env`.
-  5. **`api/app/embedding/`** — `EmbeddingClient` (HTTP do `embeddera`) + `embed_query/passage/sts`.
-     Tego katalogu dziś nie ma w ogóle. Trzy metody zamiast jednej z parametrem, żeby nikt nie
-     sklejał prefiksu w kodzie domenowym.
-  6. **`FakeEncoder` zostaje** (rozstrzygnięcie wcześniej otwartego pytania) — domyślny `pytest`
-     ma być offline, a wagi w CI to setki MB pobierania. Zostaje też jego test „złotej wartości".
+  5. [x] **`api/app/embedding/`** — `EmbeddingClient` (HTTP do `embeddera`) +
+     `embed_query/passage/sts`, obok `EmbeddingError`/`EmbeddingConfigError` tym samym wzorcem
+     co warstwa LLM. **Trzy metody zamiast jednej z parametrem `mode`** i to jest sedno tego
+     podkroku: parametr da się przekazać ze zmiennej trzy poziomy wyżej i nikt nie zauważy, który
+     tryb leci na drut, a trzy nazwane metody wymuszają wybór **w miejscu wywołania**. Prefiksy
+     zostają w `embedderze` — znaczenie trybu to własność modelu, nie kontraktu HTTP.
+     - **Bez fabryki**, inaczej niż `app.llm`: jest jeden sposób dotarcia (HTTP), a to, który
+       model odpowiada, jest konfiguracją tamtej usługi. Zmienia się URL, a URL to argument.
+     - Klient sprawdza **licznik wektorów wobec liczby tekstów** — retrieval zipuje je z powrotem
+       na zgłoszenia, więc rozjazd dałby błędne przypisanie, czyli złe odpowiedzi zamiast błędu.
+     - `httpx` **zadeklarowany jawnie** w `api/requirements.txt`, mimo że wchodził tranzytywnie
+       z SDK dostawców: kod importujący go wprost nie może stać na tym, że inny pakiet nadal od
+       niego zależy.
+  6. [x] **`FakeEncoder` zostaje** (rozstrzygnięcie wcześniej otwartego pytania) — domyślny
+     `pytest` ma być offline, a wagi w CI to setki MB pobierania. Zostaje też jego test „złotej
+     wartości".
   7. **Testy** — kontrakt HTTP jednostkowo na `TestClient`; integracyjnie (`integration_embedder`)
      to, czego prawdziwość mieszka **poza naszym kodem**: czy model naprawdę daje różne wektory
      dla `[query]:` i `[sts]:`.
-  8. **Warstwa GPU wypada** → „Świadomie pominięte"; **liczba wątków `torch`** → TODO.
+  8. [x] **Warstwa GPU wypada** → „Świadomie pominięte"; **liczba wątków `torch`** → TODO.
 - [ ] **3. Ewaluacja embeddera** — golden set par + `recall@5` na dwóch osiach: model (PolDense
   vs mmlw-roberta-large vs BGE-M3) i tryb (`query→passage` vs `sts→sts`, zapytanie surowe vs
   sparsowane); wynik zapisany w repo. **Decyzja o modelu i trybie zapada tu, nie wcześniej** —

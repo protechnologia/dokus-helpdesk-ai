@@ -5,6 +5,10 @@ pydantic-settings==2.7.1
 fastapi==0.140.0
 uvicorn[standard]==0.51.0
 typer==0.27.0
+# HTTP client for the `embedder` service (app/embedding/). Declared explicitly even though the
+# provider SDKs already pull it in: a dependency this code imports directly must not rely on
+# another package continuing to depend on it.
+httpx==0.28.1
 # Claude API SDK. Imported by exactly one module (app/llm/client_claude.py) — CLAUDE.md rule 4.
 anthropic==0.120.2
 # OpenAI SDK. Imported by exactly one module (app/llm/client_openai.py) — CLAUDE.md rule 4. Also the
