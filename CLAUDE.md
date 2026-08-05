@@ -1940,16 +1940,30 @@ właściwej warstwy, skrót → „TODO").
        bywa kilka tej samej klasy. Model zwracający **inny, równie dobry** rekord wyżej dostaje
        gorszą ocenę, niż zasługuje. Zaniża to wyniki **wszystkim po równo**, więc ranking zostaje
        uczciwy — ale liczby bezwzględnej nie wolno czytać jako „skuteczności produktu".
-  4. **Skrypt `scripts/eval_embeddings.py`** — repo-level (nie importuje `api.app`, nie woła
-     endpointu). Liczy `recall@5` na **czterech kombinacjach** per model, bo osie są dwie
-     i krzyżują się: zapytanie **surowe/sparsowane** × tryb **`query→passage`/`sts→sts`**. Dopiero
-     taka tabela rozdziela, **ile daje sam parser, a ile wybór trybu** — dwie różne decyzje, które
-     łatwo pomylić. Modele podmienia **`EMBEDDING_MODEL`**; fabryka jest gotowa od etapu 2.
-     - **Który tryb wygra, jest naprawdę otwarte.** Za `sts→sts`: po sparsowaniu obie strony to
-       ten sam gatunek tekstu. Za `query→passage`: tryb retrieval jest trenowany na luźnym
-       dopasowaniu tematycznym (inne słowa, ta sama intencja), a klienci opisują ten sam problem
-       skrajnie różnie. Zmierzone `cos(passage, sts) = 0,814` mówi, że tryby są wyraźnie różne,
-       ale nie rozłączne — z góry nie da się wskazać zwycięzcy.
+  4. [x] **Skrypt `scripts/eval_embeddings.py`** gotowy, pierwszy pomiar wykonany (2026-08-05) —
+     **pełny raport: `docs/pomiar-embedderow.md`**. Repo-level, ale **importuje
+     `ParsedTicket.embedding_text()`**, żeby mierzony tekst był bajt w bajt tym, co zaindeksuje
+     etap 4; sklejanie pól w skrypcie dałoby wynik opisujący coś innego niż produkt.
+     - **Krzywa `recall@1..K` + MRR zamiast samego `recall@5`.** Przy 200-rekordowym korpusie
+       `recall@5` dobija do sufitu i nie różnicuje; dopiero kształt krzywej i MRR pokazują, czy
+       model stawia rekord na pierwszym miejscu, czy na piątym. Stąd `_ranks()` zwraca **pozycję**,
+       nie `bool` — z jednej liczby wynikają wszystkie metryki.
+     - **Prefiksy są tabelą DWUPOZIOMOWĄ** (`MODEL_PREFIXES`: model → rola → prefiks), inaczej niż
+       w embedderze, gdzie model jest jeden. Nomic ma własne `search_query: `/`search_document: `,
+       BGE-M3 żadnych — porównanie „PolDense z prefiksami vs Nomic bez" mierzyłoby nasz błąd.
+     - **Wynik: tryb rozstrzygnięty, wybór modelu NIE.** `query→passage` bije `sts→sts` w czterech
+       niezależnych pomiarach (PolDense −1,2 pp, kontrola −3,7 pp @1). Ale `recall@1` = 98,2%
+       u PolDense to **sufit** — pozostali kandydaci zmieszczą się w granicach jednego zapytania.
+     - **Grupa kontrolna zamiast zgadywania.** Do pomiaru dołożony `nomic-embed-text-v1.5`
+       (anglojęzyczny), z **progami interpretacji ustalonymi przed przebiegiem**. Wyszło 87,9% —
+       czyli sygnał w zapytaniach jest w dużej mierze leksykalny, ale pomiar różnicuje o 10,3 pp.
+       Uboczny zysk: u kontroli warstwa „trudne" wypada gorzej niż „typowe", czyli **etykiety
+       trudności coś znaczą** — u PolDense obie mają 100%, bo model ich nie odczuwa.
+     - **Zaostrzenie zapytań dało mało — i to też jest wynik.** Usunięcie sygnatur, numerów
+       ewidencyjnych i nazw plików z 18 zapytań kosztowało PolDense 0,6 pp, a kontrolę 3,0 pp
+       (pięciokrotnie więcej — bo to ona polegała na ciągach znaków, nie na języku). Parafrazowanie
+       nic nie da: **parafraza to ta sama treść, a embedder semantyczny istnieje po to, by ją
+       rozpoznawać**. Rząd trudności zmieni dopiero większy korpus.
   5. **Przebieg i decyzja** — wynik z datą, wariantem modelu i trybem **zapisany w repo**.
      Tu **kasuje się jeden z dwóch named vectors** i tu zapada wybór, którego etap 2 świadomie
      nie podjął. Zgodnie z „Ewaluacja jakości": **każdy pomiar ≥2 razy niezależnie** i **czytać
