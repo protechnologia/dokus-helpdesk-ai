@@ -1670,15 +1670,25 @@ właściwej warstwy, skrót → „TODO").
      - Rodowód wart zapamiętania przy etapie 3 i przy TODO o licencji: PolDense stoi na
        **ettin-encoders (ModernBERT)**, a trenowany był destylacją z **BGE-Multilingual-Gemma2** —
        stąd licencja gemma.
-  2. **Wpis w fabryce + kontrola wymiaru** — backend dochodzi do `SUPPORTED_BACKENDS`,
-     `build_encoder()` porównuje `encoder.dimension` z `settings.embedding_vector_size` i wywala
-     przy starcie. Dziś ten sprawdzian **nie ma jak paść** — `fake` bierze wymiar z configu, więc
-     zawsze się zgadza.
-  3. **`EMBEDDING_MODEL` jako parametr jednej implementacji**, nie osobny backend — PolDense,
+  2. [x] **Wpis w fabryce + kontrola wymiaru** — `build_encoder()` porównuje `encoder.dimension`
+     z `settings.embedding_vector_size` i wywala przy starcie. **Sprawdzian po raz pierwszy ma jak
+     paść i padł** (zweryfikowane na żywym modelu 2026-08-05: `EMBEDDING_VECTOR_SIZE=1024` wobec
+     PolDense-150M → `EncoderConfigError` cytujący obie liczby i nazwę modelu). Przy `fake` był
+     martwy — atrapa dostaje wymiar z tej samej zmiennej, więc porównanie zawsze wychodziło zgodne;
+     dopiero model **mierzy się sam**, czyniąc oba źródła niezależnymi.
+     - **Backend nazywa się `sentence-transformers`, od biblioteki — nie od modelu.** Nazwa
+       `poldense` zabetonowałaby w kodzie decyzję, którą ma rozstrzygnąć dopiero etap 3.
+     - Testy kontroli wymiaru stoją na `FakeEncoder`, nie na własnym stubie: sprawdzenie czyta
+       **dwie właściwości**, a ładowanie wag po to, by asertować na liczbie całkowitej, kazałoby
+       testowi jednostkowemu ściągać setki megabajtów.
+  3. [x] **`EMBEDDING_MODEL` jako parametr jednej implementacji**, nie osobny backend — PolDense,
      mmlw, BGE-M3 i Nomic ładują się tak samo, więc etap 3 przelatuje po nich **zmianą ENV, bez
-     dotykania kodu**.
-  4. **Nowe zmienne do `.env.example` i compose** — test plumbingu jest dwukierunkowy per usługa,
-     więc pominięcie któregokolwiek miejsca wywali testy.
+     dotykania kodu**. Nazwa z samych spacji jest traktowana jak brak, nie jak model tak nazwany.
+  4. [x] **Nowe zmienne do `.env.example` i compose** — **test plumbingu nie wymagał zmiany**, bo
+     czyta wszystkie trzy powierzchnie jako dane, bez wypisanej listy nazw. Zweryfikowane przez
+     usunięcie wpisu z compose: padają **dwa** testy, w tym ten pilnujący krawędzi groźniejszej —
+     „pole, którego usługa nigdy nie dostaje". Bez niego `embedder` wstałby `healthy` i cicho
+     jechał na wartości domyślnej mimo poprawnego `.env`.
   5. **`api/app/embedding/`** — `EmbeddingClient` (HTTP do `embeddera`) + `embed_query/passage/sts`.
      Tego katalogu dziś nie ma w ogóle. Trzy metody zamiast jednej z parametrem, żeby nikt nie
      sklejał prefiksu w kodzie domenowym.

@@ -75,6 +75,7 @@ services:
     environment:
       LOG_LEVEL:             ${LOG_LEVEL:-INFO}
       EMBEDDING_BACKEND:     ${EMBEDDING_BACKEND:-fake}
+      EMBEDDING_MODEL:       ${EMBEDDING_MODEL:-}
       EMBEDDING_VECTOR_SIZE: ${EMBEDDING_VECTOR_SIZE:-768}
     command: ["uvicorn", "embedder_app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     healthcheck:

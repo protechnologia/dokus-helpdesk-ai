@@ -26,9 +26,14 @@ class Settings(BaseSettings):
     log_level: str = "INFO"                             # e.g. "DEBUG"
 
     # --- vectors ---
-    # `fake` keeps the service offline and instant: no weights, no GPU, no download. The real
-    # backend arrives in stage 2; any other value fails fast with EncoderConfigError.
-    embedding_backend:     str = "fake"                 # e.g. "local"
+    # `fake` keeps the service offline and instant: no weights, no GPU, no download.
+    # `sentence-transformers` loads a real model; any other value fails fast with
+    # EncoderConfigError.
+    embedding_backend:     str = "fake"                 # e.g. "sentence-transformers"
+    # Which model the real backend loads — a PARAMETER of one backend, not a backend of its own:
+    # PolDense, mmlw and BGE-M3 all load the same way, so stage 3 compares them by changing this
+    # value alone. Empty by default because the shipped backend is the fake, which has no model.
+    embedding_model:       str = ""                     # e.g. "OPI-PIB/PolDense-150M"
     # The dimension is a contract with the Qdrant collection, not a local detail.
     embedding_vector_size: int = 768                    # e.g. 1024
 
