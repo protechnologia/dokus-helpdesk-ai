@@ -1640,6 +1640,13 @@ tworzysz świadomym skrótem), **dopisz go tu** zamiast zostawiać w milczeniu.
   Dokusa anonimizacja nazwy instytucji jest iluzoryczna — kontekst zgłoszenia i tak zdradza,
   o kogo chodzi. Realny wybór jest więc między pełną anonimizacją treści a kontrolą dostępu,
   nie między „ukryjemy nazwę" a resztą.
+  - **Zmierzone na artefaktach, nie na źródle (2026-08-05, 200 rekordów): nazwiska przechodzą
+    przez parser do pól EMBEDOWANYCH w 9,5% rekordów** (19 z 200, np. „Użytkownik Marta Gajda nie
+    widzi żadnych elementów w eSODzie"). Prompt ich nie usuwa — i nie ma powodu, żeby robił to
+    sam z siebie, bo nikt mu tego nie kazał. Ekstrapolacja na korpus: **~130 rekordów**.
+    To przesuwa problem z „PII jest w źródle" na **„PII wjedzie do bazy wektorowej i do payloadu"**,
+    czyli tam, skąd trudniej je usunąć niż z pliku. Rozstrzygnąć **przed etapem 4**, bo re-indeks
+    jest tani, ale ponowne parsowanie korpusu już nie (zasada 7).
 - **Hasła w zrzucie źródłowym** — zgłosić klientowi, że `konsultant.haslo` i `uzytkownik.haslo`
   to 32-znakowe hashe MD5 (bez bcrypt/argon), a `skrzynka_email.password` leży obok. Nas to nie
   dotyczy (adapter tych kolumn nie czyta), ale zrzut u nas na dysku owszem — trzymać go krótko
@@ -1778,11 +1785,43 @@ właściwej warstwy, skrót → „TODO").
        późniejsze i sezonowość.
      - **Żadne z 199 nie przekracza okna 16384 tokenów.** Obawa z pomiaru Bielika („odpadło 1 na
        10") była artefaktem próbki kontrolnej dobranej pod skrajności — w korpusie to 0,1%.
-  2. **Sparsować 200 zgłoszeń** przez `helpdesk tickets parse` **Bielikiem 11B na RunPodzie**
-     (decyzja 2026-08-05). Artefakty do **`data/parsed/bielik-11b-golden200/`** — nazwa niesie
-     naraz czym sparsowano, do czego służy i ile tego jest, więc nie da się go pomylić
-     z katalogami porównawczymi obok, które masowy przebieg z etapu 10 ma skasować. **Ten ma
-     przetrwać**: jest wielokrotnego użytku przy każdej zmianie modelu embeddingowego.
+  2. [x] **199 zgłoszeń sparsowanych Bielikiem 11B** (RTX A6000, 2026-08-05) do
+     **`data/parsed/bielik-11b-golden200/`**. Nazwa niesie naraz czym sparsowano, do czego służy
+     i ile tego jest, więc nie da się go pomylić z katalogami porównawczymi obok, które masowy
+     przebieg z etapu 10 ma skasować. **Ten ma przetrwać** — jest wielokrotnego użytku przy każdej
+     zmianie modelu embeddingowego.
+     - **Przebieg: 199/199, zero błędów, 21 min 42 s** (~6,5 s/zgłoszenie), 586k tokenów wejścia,
+       54k wyjścia, ~$0,29 czasu GPU. Walidacja `tickets validate`: **200 plików, 0 błędnych**
+       (200., nie 199., to zgłoszenie z sondy przed przebiegiem — poprawny artefakt spoza próbki).
+     - **Szybciej niż zakładano** (~6,5 s wobec 15 s z próbki kontrolnej): tamta była dobrana pod
+       skrajności, ta jest warstwowa, więc mediana długości wątku znacznie niższa. Do tego
+       `OLLAMA_KEEP_ALIVE=-1` trzyma model w VRAM — pierwsze wywołanie po załadowaniu trwało
+       8,1 s, kolejne ~5 s.
+     - **Okno kontekstu 16384 mimo karty 48 GB** — model zajął 15,3 GB, więc tym razem to **nie
+       była** wymuszona redukcja jak przy 4090, tylko wartość z `OLLAMA_CONTEXT_LENGTH` poda.
+       Ta sama liczba, inna przyczyna. Żadne zgłoszenie nie zostało ucięte.
+
+     **Zmierzona jakość artefaktów (200 rekordów) — dwa problemy, żaden nie dotyka etapu 3:**
+     - **`questions_summary` wypełnione w 98%, a w korpusie pole ma pokrycie 16,7%.** To nie
+       sukces, tylko **obchodzenie jawnego wyjścia ze schematu**: model pisze „Brak pytań
+       dotyczących…" zamiast `brak`. Tabela porównawcza sygnalizowała to na jednym rekordzie —
+       teraz widać, że to wzorzec obejmujący niemal cały zbiór. **Uderza w etap 6**: wariant
+       `questions` dokłada `questions_summary` z trafień, więc będzie podsuwał pytania, których
+       nikt nie zadał. Do domknięcia w prompcie **przed** masowym przebiegiem z etapu 10.
+     - **`component` rozsypany na warianty zapisu** — `usługa ePUAP` / `ePUAP` / `usługa
+       zewnętrzna (epuap)`, `usługa e-Doręczenia` / `usługa eDoręczeń`. CLAUDE.md przewidywał to
+       jako ryzyko przy ~1500 wywołaniach; teraz jest **zmierzone na 200**. Potwierdza, że pole
+       nie nadaje się na filtr Qdranta bez normalizacji (etap 4). Osobno: **186 z 200 to „główna
+       aplikacja"** — rozdzielczość, którą Bielik pokazał na próbce kontrolnej, na warstwowej
+       wypada znacznie słabiej.
+     - **Rozkład treści:** `solution` puste w **10%**, `cause` puste w **36%**, oba puste w 10%.
+       `solution` średnio **123 zn.** (mediana 125) wobec 154 zn. z tabeli porównawczej — czyli
+       jeszcze krócej, niż zapowiadał najkrótszy model w zestawie. Dla etapu 3 bez znaczenia
+       (`solution` nie wchodzi do embeddingu), ale **wzmacnia zapisane zastrzeżenie**: ten zbiór
+       nie nadaje się do oceny generacji.
+     - **Co dla golden setu istotne — i wypadło dobrze:** `problem` i `symptoms` wypełnione
+       w każdym rekordzie, walidacja czysta, nic nie ucięte. Puste `solution`/`cause` **nie są
+       wadą artefaktu**, tylko wejściem do decyzji, do których rekordów pisać zapytania.
      - **Dlaczego Bielik, skoro jest 5. z 8 w rankingu** (42,5 pkt): ranking mierzy przydatność do
        parsowania korpusu w ogóle, a tu rozstrzyga **kategoria self-hosted** — gdy dane nie mogą
        opuścić infrastruktury klienta, alternatywą nie jest `gpt-4.1-mini`, tylko rezygnacja
