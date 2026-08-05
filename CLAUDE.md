@@ -1742,6 +1742,91 @@ właściwej warstwy, skrót → „TODO").
   **Golden set warstwowany na dwa gatunki zapytań:** eksploatacyjne (referent) i
   **wdrożeniowo-migracyjne** — te drugie to osobny gatunek, gdzie `problem` brzmi jak błąd
   aplikacji, a `cause` prawie zawsze leży w mapowaniu danych. Korpus zawiera gotowe pary.
+
+  **Punkt wyjścia: nie ma ani korpusu, ani golden setu, ani kodu liczącego metrykę.**
+  W `data/parsed/` leży dziewięć katalogów po 10 plików — ta sama próbka kontrolna sparsowana
+  dziewięcioma modelami; `recall@5` na dziesięciu zgłoszeniach nie znaczy nic. **Etap 3 nie
+  potrzebuje za to `POST /search` (etap 5) ani Qdranta** — wystarczą wektory i podobieństwo
+  kosinusowe liczone skryptem.
+
+  Podkroki (3.3 zależy od 3.2; 3.4 da się pisać równolegle):
+
+  1. **Odzyskać dobór próbki z gita** — `git show 8d7114e:scripts/prepare_parse_batch.py`.
+     **Odzyskać, nie pisać od nowa**: skrypt ma dwie rzeczy, których CLI nie ma — **dobór
+     warstwowy deterministyczny** (równomierny skok po posortowanych id, bez losowania, więc dwa
+     przebiegi dają tę samą próbkę) i **filtr progu 50 znaków liczony po stripie HTML-a**
+     (na module 1496 zgłoszeń przechodzi próg liczony na HTML-u, a 1477 na samym tekście — 19
+     przechodzi wyłącznie dzięki tagom i encjom). Renderowanie do tekstu jest już zbędne
+     (parsujemy przez API), więc skrypt zwęża się do wypisania identyfikatorów próbki.
+  2. **Sparsować 200 zgłoszeń** przez `helpdesk tickets parse` **Bielikiem 11B na RunPodzie**
+     (decyzja 2026-08-05). Artefakty do **`data/golden/`, nie do `data/parsed/`**: etap 10 ma ten
+     drugi katalog nadpisać, a golden set jest wielokrotnego użytku — przyda się przy każdej
+     zmianie modelu embeddingowego.
+     - **Dlaczego Bielik, skoro jest 5. z 8 w rankingu** (42,5 pkt): ranking mierzy przydatność do
+       parsowania korpusu w ogóle, a tu rozstrzyga **kategoria self-hosted** — gdy dane nie mogą
+       opuścić infrastruktury klienta, alternatywą nie jest `gpt-4.1-mini`, tylko rezygnacja
+       z parsowania. To **ten sam model, który ma pójść w etapie 10**, więc golden set opisuje
+       artefakt, który realnie trafi do indeksu.
+     - **Najkrótsze `solution` w zestawie (154 zn. wobec 203–364) NIE psuje tego pomiaru**, bo
+       `solution` nie wchodzi do embeddingu. Działa to jednak w obie strony: **ten golden set nie
+       nadaje się do oceny jakości generacji** (etap 6), gdzie `solution` jest całą treścią.
+     - **Czas i koszt zmierzone, nie szacowane:** 9 zgłoszeń w 2 min 26 s (~15 s/zgłoszenie) →
+       200 zgłoszeń ≈ **50 min GPU, poniżej $1**. Próbka kontrolna była dobrana pod skrajności,
+       więc przy doborze warstwowym realny czas będzie krótszy. Doliczyć 10–15% zapasu na retry
+       po błędzie walidacji — Bielik w próbce obchodził jawne wyjścia ze schematu.
+     - **Sprawdzić okno kontekstu na dobranej próbce PRZED przebiegiem** (liczenie znaków, bez
+       LLM-a). Przy oknie 16384 z próbki kontrolnej odpadło 1 na 10, ale w korpusie to **0,1%**.
+     - **Nie parsujemy przy tej okazji całego korpusu**, choć pod stoi i kosztowałoby ~6 h / $4:
+       prompt nie jest zamrożony, a zasada 7 wymaga, żeby artefakt z etapu 10 powstał **jednym
+       przebiegiem zamrożonej wersji**. Pełny przebieg dopiero po etapie 6.
+  3. **Golden set = syntetyczne zapytania, nie pary historyczne** (decyzja 2026-08-05). Do każdego
+     rekordu, który coś wnosi, piszemy **hipotetyczny opis nowego zgłoszenia od klienta**; parą
+     jest `zapytanie → rekord źródłowy`. Trzy powody, każdy rozstrzygający:
+     - **Mierzy właściwą rzecz.** Produkt bierze nowe zgłoszenie i szuka podobnych w bazie. Pary
+       historyczne mierzyłyby `ticket ↔ ticket`, czyli coś, czego produkt nie robi.
+     - **Znika problem singletonów.** 47% użytecznych rekordów nie ma bliskiego sąsiada, więc
+       z par historycznych wyszłoby 40–60 pozycji; tu **każdy rekord dostaje zapytanie**.
+     - **Nie przekrzywia osi trybu.** Golden set z par historycznych ma obie strony sparsowane,
+       więc **faworyzowałby `sts→sts` z definicji** — pomiar byłby zepsuty, zanim cokolwiek
+       policzymy. Syntetyczne zapytanie jest wobec tej osi neutralne, a przy okazji daje materiał
+       na oś „surowe vs sparsowane": tekst piszemy surowy i dopiero przepuszczamy przez parser.
+
+     Reguły pisania zapytań — bez nich pomiar traci sens:
+     - **Wyłącznie to, co widzi zgłaszający.** Zapytanie nie zna przyczyny ani terminologii
+       z rozwiązania („nie udało się skomunikować z serwerem" — tak; „certyfikat bez uprawnienia
+       AddDocumentToSign" — nie). Inaczej zadanie staje się za łatwe dla **wszystkich** modeli
+       i pomiar przestaje je rozróżniać.
+     - **Filtrujemy pytania, nie odpowiedzi.** Zapytanie powstaje tylko do rekordu niosącego
+       wiedzę, ale **korpus przeszukiwany zostaje nieprzefiltrowany** — puste rekordy zostają jako
+       dystraktory. Usunięcie ich zawyżyłoby wynik wobec produkcji, gdzie filtr etapu 4 nie jest
+       doskonały. Spodziewany rozmiar: **~150–170 zapytań na 200 rekordach korpusu**.
+     - **Liczba odrzuceń jest wynikiem, nie odpadem** — to niezależny sprawdzian odsiewu 25–26%
+       zmierzonego na 661 rekordach. Rozjazd oznaczałby, że dobór warstwowy trafia w inną
+       populację. Same odrzucone rekordy z uzasadnieniem to gotowe wejście do **filtru etapu 4**.
+     - **Kilkanaście zapytań celowo trudnych** — dla klas wieloprzyczynowych (jeden objaw, 5–6
+       przyczyn). Tam rozrzut między modelami będzie największy; bez nich mierzymy łatwe przypadki.
+     - **Warstwowanie powstaje przy pisaniu**, nie jako osobna ocena: piszemy w roli
+       (eksploatacyjnej albo wdrożeniowo-migracyjnej), więc etykieta jest darmowa.
+     - **Rola człowieka: przegląd próbki 20–30 zapytań** z pytaniem „czy tak napisałby to
+       użytkownik?". Autor zapytań nie może być jedynym sędzią własnej pracy.
+     - **Znane ograniczenie:** golden set zna **jeden** poprawny rekord na zapytanie, a w korpusie
+       bywa kilka tej samej klasy. Model zwracający **inny, równie dobry** rekord wyżej dostaje
+       gorszą ocenę, niż zasługuje. Zaniża to wyniki **wszystkim po równo**, więc ranking zostaje
+       uczciwy — ale liczby bezwzględnej nie wolno czytać jako „skuteczności produktu".
+  4. **Skrypt `scripts/eval_embeddings.py`** — repo-level (nie importuje `api.app`, nie woła
+     endpointu). Liczy `recall@5` na **czterech kombinacjach** per model, bo osie są dwie
+     i krzyżują się: zapytanie **surowe/sparsowane** × tryb **`query→passage`/`sts→sts`**. Dopiero
+     taka tabela rozdziela, **ile daje sam parser, a ile wybór trybu** — dwie różne decyzje, które
+     łatwo pomylić. Modele podmienia **`EMBEDDING_MODEL`**; fabryka jest gotowa od etapu 2.
+     - **Który tryb wygra, jest naprawdę otwarte.** Za `sts→sts`: po sparsowaniu obie strony to
+       ten sam gatunek tekstu. Za `query→passage`: tryb retrieval jest trenowany na luźnym
+       dopasowaniu tematycznym (inne słowa, ta sama intencja), a klienci opisują ten sam problem
+       skrajnie różnie. Zmierzone `cos(passage, sts) = 0,814` mówi, że tryby są wyraźnie różne,
+       ale nie rozłączne — z góry nie da się wskazać zwycięzcy.
+  5. **Przebieg i decyzja** — wynik z datą, wariantem modelu i trybem **zapisany w repo**.
+     Tu **kasuje się jeden z dwóch named vectors** i tu zapada wybór, którego etap 2 świadomie
+     nie podjął. Zgodnie z „Ewaluacja jakości": **każdy pomiar ≥2 razy niezależnie** i **czytać
+     surowe wyniki, nie tylko licznik**.
 - [ ] **4. Indeksacja** — filtr + dedup + named vectors + payload; `helpdesk index build/rebuild`
   odtwarzalne z `data/parsed/`. **Filtr wielosygnałowy, niebinarny i raportujący, co odrzuca**
   (patrz „Ryzyka jakości treści") — sam status nie wystarczy, a rekordy `resolved = false`
