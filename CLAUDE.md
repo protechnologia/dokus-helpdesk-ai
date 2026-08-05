@@ -635,28 +635,47 @@ Konsekwencje:
 - **Dwa named vectors na rekord** (`problem` = passage, `sts` = sts). Wektor `sts` jest
   bezdyskusyjny — dedup i „podobne przypadki" to porównanie zgłoszenie↔zgłoszenie, symetryczne
   z definicji.
-- **Którym trybem szukać — pytanie otwarte, rozstrzygane pomiarem (etap 3), nie z góry.**
-  Skoro zapytanie parsujemy przed wyszukaniem, obie strony są tym samym rodzajem tekstu, więc
-  `sts→sts` jest naturalnym kandydatem; z drugiej strony tryb retrieval jest trenowany na luźnym
-  dopasowaniu tematycznym (inne słowa, ta sama intencja), a STS bliżej parafrazy — przy
-  zgłoszeniach opisywanych przez klientów skrajnie różnie to realna różnica.
-- **Drugi wektor to zabezpieczenie do czasu pomiaru, nie docelowa architektura.** Kosztuje jedno
-  dodatkowe wywołanie embeddera przy indeksacji i podwójną pamięć na wektory (przy 68M/150M
-  i skali helpdesku — pomijalne). **Gdy pomiar wskaże zwycięzcę, przegrany wektor znika.**
+- **Którym trybem szukać — zmierzone (patrz niżej): `query→passage`.** Rozstrzygnięcie jest
+  jednak **połowiczne**, bo dotyczy zapytań SUROWYCH. Argument za `sts→sts` brzmiał: skoro
+  zapytanie parsujemy przed wyszukaniem, obie strony są tym samym rodzajem tekstu — a tej osi
+  jeszcze nie zmierzono.
+- **Drugi wektor zostaje do czasu domknięcia osi parsera.** Kosztuje jedno dodatkowe wywołanie
+  embeddera przy indeksacji i podwójną pamięć na wektory (przy 150M i skali helpdesku —
+  pomijalne). **Skasujemy go dopiero, gdy pomiar obejmie zapytania sparsowane.**
 - Zmiana modelu embeddingowego albo trybu ⇒ **nowa kolekcja i pełny re-index** (tani — JSON-y
   leżą na dysku).
 
-### Wybór modelu embeddingowego i trybu — mierzyć, nie zgadywać
+### Wybór modelu i trybu — zmierzony 2026-08-05
 
-**Przed pełną indeksacją: mini-ewaluacja `recall@5`** na własnych parach testowych
-(zgłoszenie → oczekiwany historyczny ticket). Dwie osie, mierzone niezależnie:
+**Decyzja: `OPI-PIB/PolDense-150M`, tryb `query→passage`.** Pełny raport:
+`docs/pomiar-embedderow.md`; narzędzie: `scripts/eval_embeddings.py`.
 
-1. **Model:** PolDense vs `mmlw-roberta-large` vs `BGE-M3`.
-2. **Tryb:** `query→passage` vs `sts→sts`, każdy z zapytaniem **surowym** i **sparsowanym** —
-   bo dopiero to pokazuje, ile daje sam parser, a ile wybór trybu.
+Zmierzone na 165 syntetycznych zapytaniach wobec korpusu 200 rekordów (nieprzefiltrowanego —
+odrzucone zostają jako dystraktory), pomiar powtórzony dwukrotnie z identycznym wynikiem:
 
-Wynik z datą, wariantem modelu i trybem zapisujemy w repo — to decyzja, do której będziemy
-wracać, i to ona kasuje jeden z dwóch named vectors.
+| tryb | recall@1 | recall@5 | MRR |
+|---|---:|---:|---:|
+| `query→passage` | **98,2** | 100,0 | **0,988** |
+| `sts→sts` | 97,0 | 99,4 | 0,980 |
+
+- **Model wybrany BEZ rozstrzygającego pomiaru — świadomie.** `recall@1` = 98,2% przy 200
+  rekordach to **sufit**: pozostali kandydaci (PolDense-68M, mmlw, BGE-M3, Nomic v2-moe)
+  zmieściliby się w granicach jednego–dwóch zapytań, więc wybór „po liczbach" byłby wyborem po
+  szumie. Do porównania **wracamy po etapie 4**, gdy indeks obejmie ~1400 rekordów.
+- **Że to sufit, a nie jakość modelu, wiemy z GRUPY KONTROLNEJ.** Do pomiaru dołożono
+  `nomic-embed-text-v1.5` (anglojęzyczny), z progami interpretacji ustalonymi **przed** przebiegiem.
+  Wyszło 87,9% — czyli sygnał w zapytaniach jest w dużej mierze leksykalny, choć pomiar różnicuje
+  o 10,3 pp. **Bez kontroli 98,2% zapisalibyśmy jako sukces modelu.**
+- **Tryb rozstrzygnięty POŁOWICZNIE.** `query→passage` wygrywa w czterech pomiarach (u kontroli
+  różnica jest większa: 3,7 pp), ale **oś „zapytanie sparsowane" nie została zmierzona** — wymaga
+  przebiegu LLM po zapytaniach. Argument za `sts→sts` dotyczył właśnie zapytań sparsowanych, więc
+  **named vector `sts` NIE jest jeszcze skasowany**: etap 4 buduje oba.
+- **Zaostrzanie zapytań wyczerpane jako droga.** Usunięcie sygnatur i numerów z 18 zapytań
+  kosztowało PolDense 0,6 pp, kontrolę 3,0 pp. **Parafrazowanie nic nie da** — parafraza to ta sama
+  treść, a embedder semantyczny istnieje po to, by ją rozpoznawać. Rząd trudności zmieni wyłącznie
+  większy korpus.
+- **Wniosek produktowy:** przy tej skuteczności wąskim gardłem **nie jest model**, tylko jakość
+  i kompletność samych zgłoszeń — czyli filtr z etapu 4 i bramka zamknięcia z nogi 2.
 
 ### Generacja propozycji odpowiedzi
 
@@ -857,7 +876,8 @@ merytorycznie").
 - Zapytanie z konsoli: `helpdesk search "treść zgłoszenia"`
 - Propozycja w wybranym wariancie: `helpdesk suggest "treść zgłoszenia" --variant solution`
 - Lista dostępnych wariantów: `helpdesk variants list`
-- Ewaluacja embeddera: `helpdesk eval recall --model <nazwa>`
+- Ewaluacja embeddera: `python scripts/eval_embeddings.py recall --model <nazwa>`
+  (repo-level, nie CLI usługi — ładuje modele wprost, bez stawiania stacku)
 
 **Bramki jakości i asysta pisania**
 - Sprawdzenie zamknięcia z konsoli: `helpdesk gate close --file <plik>`
@@ -1143,6 +1163,40 @@ Jakość wyjścia LLM **mierz, nie oceniaj na oko.** Zbuduj golden set wejść, 
 W tym projekcie mierzymy **dwie osie osobno**: jakość **retrievalu** (`recall@5` — czy właściwy
 ticket w ogóle wpadł do top-5) i jakość **generacji** (czy propozycja odpowiedzi jest użyteczna).
 Zła odpowiedź przy dobrym trafieniu to inny problem niż dobra odpowiedź z pustego indeksu.
+
+#### Golden set retrievalu — reguły wyprowadzone z budowy (2026-08-05)
+
+Zestaw to **syntetyczne zapytania**, nie pary historycznych zgłoszeń: produkt bierze nowe
+zgłoszenie i szuka podobnych, więc para `ticket ↔ ticket` mierzyłaby coś, czego produkt nie robi.
+Uboczny zysk: znika problem singletonów (47% rekordów nie ma bliskiego sąsiada), bo **zapytanie
+dostaje każdy rekord**.
+
+- **Zapytanie zna WYŁĄCZNIE to, co widzi zgłaszający** — nigdy przyczyny ani terminologii
+  z rozwiązania. Inaczej zadanie staje się za łatwe dla **wszystkich** modeli i pomiar przestaje
+  je rozróżniać.
+- **Filtrujemy pytania, nie odpowiedzi.** Zapytanie powstaje tylko do rekordu niosącego wiedzę,
+  ale **korpus przeszukiwany zostaje nieprzefiltrowany** — puste rekordy zostają jako dystraktory,
+  bo w produkcji filtr etapu 4 też nie będzie doskonały.
+- **Liczba odrzuceń jest wynikiem, nie odpadem** — wyszło 18% (35 z 200) wobec 25–26% z pomiaru
+  na 661 rekordach; różnica jest wyjaśnialna (tamto kryterium było szersze: „przydatne do
+  zaproponowania komuś"). Odrzucone zostają w pliku **z powodem** — to gotowe wejście do filtru
+  etapu 4.
+- **Grupa kontrolna zamiast zgadywania.** Do pomiaru dokładamy model, o którym **z góry wiadomo**,
+  że powinien wypaść słabo (tu: anglojęzyczny `nomic-embed-text-v1.5`), i **ustalamy progi
+  interpretacji PRZED przebiegiem**. Bez niej nie odróżnisz „model jest dobry" od „zadanie jest
+  za łatwe" — a to jest różnica, na której stoi cała decyzja.
+- **Krzywa `recall@1..K` + MRR, nie samo `recall@5`.** Na małym korpusie `recall@5` dobija do
+  sufitu i nie różnicuje; kształt krzywej i MRR pokazują, czy model stawia rekord na pierwszym
+  miejscu, czy na piątym.
+- **Warstwuj zapytania** (u nas: eksploatacyjne / wdrożeniowo-migracyjne, typowe / trudne)
+  i licz metryki **osobno per warstwa**. Ale pamiętaj o liczebności: przy 28 zapytaniach jedno
+  trafienie waży 3,6 pp, więc różnice poniżej ~10 pp są w takiej warstwie nieistotne.
+- **Autor zapytań nie może być jedynym sędzią** — potrzebny przegląd próbki przez drugą osobę
+  („czy tak napisałby to użytkownik?").
+- **Znane ograniczenie:** zestaw zna **jeden** poprawny rekord na zapytanie, a w korpusie bywa
+  kilka tej samej klasy. Model zwracający **inny, równie dobry** rekord wyżej dostaje gorszą
+  ocenę, niż zasługuje — zaniża to wyniki **wszystkim po równo**, więc ranking zostaje uczciwy,
+  ale liczby bezwzględnej nie wolno czytać jako „skuteczności produktu".
 
 **Generację mierzymy osobno per wariant** — `questions`, `solution` i `handoff` mają różne
 kryteria sukcesu i wspólny licznik je zaciera. Dobre pytania diagnostyczne to co innego niż
@@ -1740,234 +1794,19 @@ właściwej warstwy, skrót → „TODO").
   wymiar ⇒ nowa kolekcja, a dziś kolekcji jeszcze nie ma, więc kosztuje zero.
   **Wariant 1B wypada świadomie:** przy CPU-only latencja `POST /search` byłaby rzędu sekundy,
   zanim LLM zacznie generować — etap 3 ma go nie mierzyć.
-- [ ] **3. Ewaluacja embeddera** — golden set par + `recall@5` na dwóch osiach: model (PolDense
-  **150M i 68M** vs mmlw-roberta-large vs BGE-M3 vs **nomic-embed-text-v2-moe**) i tryb
-  (`query→passage` vs `sts→sts`, zapytanie surowe vs sparsowane); wynik zapisany w repo.
-  **Decyzja o modelu i trybie zapada tu, nie wcześniej** — i to ona kasuje zbędny named vector.
-  Kod jest gotowy: modele podmienia się **zmianą `EMBEDDING_MODEL`**, bez dotykania fabryki.
-  - **Nomic w wariancie `v2-moe`, nie `v1.5`** — v1.5 jest anglojęzyczny i przegrałby z powodów
-    niezwiązanych z jakością; v2-moe jest jawnie wielojęzyczny. **Ma własne prefiksy**
-    (`search_query: ` / `search_document: `), więc `MODE_PREFIXES` wymaga wpisu per model —
-    porównanie „PolDense z prefiksami vs Nomic bez" mierzyłoby nasz błąd, nie modele.
-  - **1B nie startuje** (CPU-only, latencja runtime — patrz etap 2).
-  - **Wybór modelu jest też decyzją licencyjną**, nie tylko jakościową (patrz TODO o gemmie).
-  **Golden set warstwowany na dwa gatunki zapytań:** eksploatacyjne (referent) i
-  **wdrożeniowo-migracyjne** — te drugie to osobny gatunek, gdzie `problem` brzmi jak błąd
-  aplikacji, a `cause` prawie zawsze leży w mapowaniu danych. Korpus zawiera gotowe pary.
-
-  **Punkt wyjścia: nie ma ani korpusu, ani golden setu, ani kodu liczącego metrykę.**
-  W `data/parsed/` leży dziewięć katalogów po 10 plików — ta sama próbka kontrolna sparsowana
-  dziewięcioma modelami; `recall@5` na dziesięciu zgłoszeniach nie znaczy nic. **Etap 3 nie
-  potrzebuje za to `POST /search` (etap 5) ani Qdranta** — wystarczą wektory i podobieństwo
-  kosinusowe liczone skryptem.
-
-  Podkroki (3.3 zależy od 3.2; 3.4 da się pisać równolegle):
-
-  1. [x] **Dobór próbki odzyskany z gita** jako `scripts/select_parse_sample.py` (2026-08-05).
-     Renderowanie i porcjowanie wypadły — robi to `helpdesk tickets parse`; został **dobór
-     warstwowy deterministyczny** i **filtr progu liczony po stripie HTML-a**. Dołożona kontrola
-     okna kontekstu, bo odmowa w trakcie przebiegu kosztuje czas GPU.
-     - **Jedno `--name` steruje obiema ścieżkami** — `data/parsed/<name>/` na artefakty
-       i `data/golden/<name>.txt` na listę identyfikatorów. Dwie osobne opcje rozjechałyby się
-       przy drugim zestawie i nie byłoby wiadomo, która lista opisuje który katalog. Skrypt
-       drukuje **gotową komendę parsowania**: przy 200 zgłoszeniach same `-t <id>` to ~1700 znaków
-       w jednej linii, nie do zaznaczenia w terminalu.
-     - **Nazwa zawiera model, choć skrypt go nie zna** — parsowanie to osobny krok, więc nazwa
-       jest **deklaracją intencji, nie zapisem faktu**. Świadomie: tak działa już dziewięć
-       katalogów porównawczych obok, a nazwa katalogu jest tym, co widać przy `ls`. Model
-       faktycznie użyty zapisuje **nagłówek golden setu**.
-     - **Wybrano 199, nie 200** — kwoty per kategoria zaokrąglają się w dół. Nie warto tego
-       „naprawiać": dokładność liczby jest bez znaczenia, a wymuszanie jej psułoby proporcje.
-     - **Determinizm sprawdzony** (dwa przebiegi = identyczna lista), **rozkład lat wyszedł sam**:
-       2022→7, 2023→22, 2024→37, 2025→71, 2026→62, czyli zgodnie z przyrostem korpusu. To ten
-       efekt, dla którego warstwowanie było warte odzyskania — losowanie dałoby go w oczekiwaniu,
-       ale przy 200 z 1408 rozrzut bywa odczuwalny, a korpus ma rekordy unieważniane przez
-       późniejsze i sezonowość.
-     - **Żadne z 199 nie przekracza okna 16384 tokenów.** Obawa z pomiaru Bielika („odpadło 1 na
-       10") była artefaktem próbki kontrolnej dobranej pod skrajności — w korpusie to 0,1%.
-  2. [x] **199 zgłoszeń sparsowanych Bielikiem 11B** (RTX A6000, 2026-08-05) do
-     **`data/parsed/bielik-11b-golden200/`**. Nazwa niesie naraz czym sparsowano, do czego służy
-     i ile tego jest, więc nie da się go pomylić z katalogami porównawczymi obok, które masowy
-     przebieg z etapu 10 ma skasować. **Ten ma przetrwać** — jest wielokrotnego użytku przy każdej
-     zmianie modelu embeddingowego.
-     - **Przebieg: 199/199, zero błędów, 21 min 42 s** (~6,5 s/zgłoszenie), 586k tokenów wejścia,
-       54k wyjścia, ~$0,29 czasu GPU. Walidacja `tickets validate`: **200 plików, 0 błędnych**
-       (200., nie 199., to zgłoszenie z sondy przed przebiegiem — poprawny artefakt spoza próbki).
-     - **Szybciej niż zakładano** (~6,5 s wobec 15 s z próbki kontrolnej): tamta była dobrana pod
-       skrajności, ta jest warstwowa, więc mediana długości wątku znacznie niższa. Do tego
-       `OLLAMA_KEEP_ALIVE=-1` trzyma model w VRAM — pierwsze wywołanie po załadowaniu trwało
-       8,1 s, kolejne ~5 s.
-     - **Okno kontekstu 16384 mimo karty 48 GB** — model zajął 15,3 GB, więc tym razem to **nie
-       była** wymuszona redukcja jak przy 4090, tylko wartość z `OLLAMA_CONTEXT_LENGTH` poda.
-       Ta sama liczba, inna przyczyna. Żadne zgłoszenie nie zostało ucięte.
-
-     **Zmierzona jakość artefaktów (200 rekordów) — dwa problemy, żaden nie dotyka etapu 3:**
-     - **`questions_summary` wypełnione w 98%, a w korpusie pole ma pokrycie 16,7%.** To nie
-       sukces, tylko **obchodzenie jawnego wyjścia ze schematu**: model pisze „Brak pytań
-       dotyczących…" zamiast `brak`. Tabela porównawcza sygnalizowała to na jednym rekordzie —
-       teraz widać, że to wzorzec obejmujący niemal cały zbiór. **Uderza w etap 6**: wariant
-       `questions` dokłada `questions_summary` z trafień, więc będzie podsuwał pytania, których
-       nikt nie zadał. Do domknięcia w prompcie **przed** masowym przebiegiem z etapu 10.
-     - **`component` rozsypany na warianty zapisu** — `usługa ePUAP` / `ePUAP` / `usługa
-       zewnętrzna (epuap)`, `usługa e-Doręczenia` / `usługa eDoręczeń`. CLAUDE.md przewidywał to
-       jako ryzyko przy ~1500 wywołaniach; teraz jest **zmierzone na 200**. Potwierdza, że pole
-       nie nadaje się na filtr Qdranta bez normalizacji (etap 4). Osobno: **186 z 200 to „główna
-       aplikacja"** — rozdzielczość, którą Bielik pokazał na próbce kontrolnej, na warstwowej
-       wypada znacznie słabiej.
-     - **Rozkład treści:** `solution` puste w **10%**, `cause` puste w **36%**, oba puste w 10%.
-       `solution` średnio **123 zn.** (mediana 125) wobec 154 zn. z tabeli porównawczej — czyli
-       jeszcze krócej, niż zapowiadał najkrótszy model w zestawie. Dla etapu 3 bez znaczenia
-       (`solution` nie wchodzi do embeddingu), ale **wzmacnia zapisane zastrzeżenie**: ten zbiór
-       nie nadaje się do oceny generacji.
-     - **Co dla golden setu istotne — i wypadło dobrze:** `problem` i `symptoms` wypełnione
-       w każdym rekordzie, walidacja czysta, nic nie ucięte. Puste `solution`/`cause` **nie są
-       wadą artefaktu**, tylko wejściem do decyzji, do których rekordów pisać zapytania.
-     - **Dlaczego Bielik, skoro jest 5. z 8 w rankingu** (42,5 pkt): ranking mierzy przydatność do
-       parsowania korpusu w ogóle, a tu rozstrzyga **kategoria self-hosted** — gdy dane nie mogą
-       opuścić infrastruktury klienta, alternatywą nie jest `gpt-4.1-mini`, tylko rezygnacja
-       z parsowania. To **ten sam model, który ma pójść w etapie 10**, więc golden set opisuje
-       artefakt, który realnie trafi do indeksu.
-     - **Najkrótsze `solution` w zestawie (154 zn. wobec 203–364) NIE psuje tego pomiaru**, bo
-       `solution` nie wchodzi do embeddingu. Działa to jednak w obie strony: **ten golden set nie
-       nadaje się do oceny jakości generacji** (etap 6), gdzie `solution` jest całą treścią.
-     - **Czas i koszt zmierzone, nie szacowane:** 9 zgłoszeń w 2 min 26 s (~15 s/zgłoszenie) →
-       200 zgłoszeń ≈ **50 min GPU, poniżej $1**. Próbka kontrolna była dobrana pod skrajności,
-       więc przy doborze warstwowym realny czas będzie krótszy. Doliczyć 10–15% zapasu na retry
-       po błędzie walidacji — Bielik w próbce obchodził jawne wyjścia ze schematu.
-     - **Sprawdzić okno kontekstu na dobranej próbce PRZED przebiegiem** (liczenie znaków, bez
-       LLM-a). Przy oknie 16384 z próbki kontrolnej odpadło 1 na 10, ale w korpusie to **0,1%**.
-     - **Nie parsujemy przy tej okazji całego korpusu**, choć pod stoi i kosztowałoby ~6 h / $4:
-       prompt nie jest zamrożony, a zasada 7 wymaga, żeby artefakt z etapu 10 powstał **jednym
-       przebiegiem zamrożonej wersji**. Pełny przebieg dopiero po etapie 6.
-  3. [x] **Golden set gotowy: 165 zapytań, 35 odrzuconych** (2026-08-05,
-     `data/golden/bielik-11b-golden200.json`). Wszystkie 200 artefaktów przejrzane, zero
-     duplikatów, kopie `expected_problem`/`expected_cause` zgodne z artefaktami.
-     - **Odsiew wyszedł 18%** wobec spodziewanych 25–26% z pomiaru na 661 rekordach. Różnica jest
-       wyjaśnialna: tamten pomiar oceniał **przydatność do zaproponowania komuś innemu**, a tu
-       kryterium jest węższe — *czy da się napisać sensowne zapytanie użytkownika*. Rekord
-       z ubogim `solution`, ale wyraźnym objawem, przechodzi tutaj i wypadnie dopiero przy filtrze
-       etapu 4. **Odsiew rósł wraz z przeglądem** (8% → 13% → 15% → 18%), więc pierwsze partie
-       oceniałem łagodniej — przy powtórce warto zacząć od kryterium ustalonego na końcu.
-     - **Powody odrzuceń, gotowe wejście do filtru etapu 4:** puste `cause` i `solution` naraz
-       (najliczniejsze) · rozstrzygnięcie pozorne („rozwiązane do zamknięcia", „powinno już
-       działać") bez podania, co zrobiono · zamknięcie jako duplikat innego zgłoszenia ·
-       **wątki-projekty** (`23853`, `30423`, `33315` — kilka niezależnych spraw w jednym
-       zgłoszeniu, `problem` jest streszczeniem wszystkich) · sprawy nietechniczne (reklamacja
-       terminu realizacji, prośba o zwiększenie dysku).
-     - **Rozkład: 137 eksploatacyjnych / 28 wdrożeniowo-migracyjnych**, 94 typowe / 71 trudnych.
-       Przewaga eksploatacyjnych jest własnością korpusu, nie doboru — helpdesk obsługuje głównie
-       referentów. **Przy 28 zapytaniach migracyjnych `recall@5` per gatunek ma dużą niepewność**
-       (jedno trafienie to 3,6 pp), więc różnice poniżej ~10 pp między modelami będą w tej
-       warstwie nieistotne.
-
-     Zasady, na których powstał (rozwinięcie decyzji z 2026-08-05). Do każdego
-     rekordu, który coś wnosi, piszemy **hipotetyczny opis nowego zgłoszenia od klienta**; parą
-     jest `zapytanie → rekord źródłowy`. Trzy powody, każdy rozstrzygający:
-     - **Mierzy właściwą rzecz.** Produkt bierze nowe zgłoszenie i szuka podobnych w bazie. Pary
-       historyczne mierzyłyby `ticket ↔ ticket`, czyli coś, czego produkt nie robi.
-     - **Znika problem singletonów.** 47% użytecznych rekordów nie ma bliskiego sąsiada, więc
-       z par historycznych wyszłoby 40–60 pozycji; tu **każdy rekord dostaje zapytanie**.
-     - **Nie przekrzywia osi trybu.** Golden set z par historycznych ma obie strony sparsowane,
-       więc **faworyzowałby `sts→sts` z definicji** — pomiar byłby zepsuty, zanim cokolwiek
-       policzymy. Syntetyczne zapytanie jest wobec tej osi neutralne, a przy okazji daje materiał
-       na oś „surowe vs sparsowane": tekst piszemy surowy i dopiero przepuszczamy przez parser.
-
-     **Plik: `data/golden/bielik-11b-golden200.json`** — ta sama nazwa co katalog artefaktów
-     i lista identyfikatorów (`--name` z podkroku 3.1), więc trzy rzeczy jednego zestawu widać
-     razem. Zestawy ewaluacyjne stoją **obok** artefaktów, nie w nich, bo mają inny cykl życia:
-     artefakt jest jednorazowy i drogi (przebieg LLM), golden set edytowalny i poprawiany przy
-     przeglądzie. Katalog `data/golden/` jest w liczbie mnogiej z założenia — etap 6 doda tu
-     własny zestaw do oceny **generacji** (ten się nie nada, patrz wyżej o krótkim `solution`
-     Bielika).
-
-     **Self-contained do czytania, referencyjny do liczenia.** Pozycja niesie `expected_problem`
-     i `expected_cause` **skopiowane z artefaktu**, żeby dało się przejrzeć plik i ocenić
-     zapytanie bez otwierania rekordu — ale skrypt ewaluacyjny **ich nie czyta**: wektory liczy
-     z artefaktu po `expected_ticket_id`. Powód: przy zmianie promptu i ponownym parsowaniu kopia
-     rozjechałaby się z artefaktem, a ewaluacja liczyłaby na nowych danych, opisując je starymi.
-     Stąd **kontrola spójności w skrypcie** — rozbieżność kopii z artefaktem ma być ostrzeżeniem,
-     nie cichym błędem.
-
-     ```json
-     {
-       "expected_ticket_id": 24506,
-       "expected_problem":   "Brak akceptującego na liście wyboru przy zatwierdzaniu pisma",
-       "expected_cause":     "Przedział ważności elementu struktury organizacyjnej",
-       "query_raw":          "Dzień dobry, od dzisiaj przy zatwierdzaniu pisma nie mam…",
-       "kind":               "eksploatacyjne",
-       "difficulty":         "typowe"
-     }
-     ```
-
-     **`query_raw` przechowujemy tylko surowy** — wersja sparsowana powstaje w trakcie ewaluacji,
-     bo zależy od promptu, a ten może się zmienić. Nagłówek pliku niesie metadane przebiegu: datę,
-     model parsujący, rozmiar korpusu, liczbę odrzuceń **z powodami** (patrz niżej).
-
-     **Dwa gatunki `kind` — różnica leży w tym, kto pyta i gdzie leży przyczyna, nie w objawie:**
-     - `eksploatacyjne` — pyta **referent**, system działa poprawnie, przyczyna w stanie bieżącym
-       (wygasły certyfikat, zacięta kolejka, brak sekwencji numeracji). Słownictwo: „nie widzę",
-       „wyskakuje komunikat", „nie mogę kliknąć".
-     - `wdrożeniowo-migracyjne` — pyta **wdrożeniowiec/administrator** przy uruchamianiu,
-       aktualizacji albo migracji; przyczyna prawie zawsze w **mapowaniu danych albo konfiguracji
-       wdrożenia**. Słownictwo: „po migracji", „sprawdziłem w bazie", „uprawnienia mają wszystko".
-       Zapytanie **samo wyklucza tropy**, czego referent nie robi.
-
-     Liczyć `recall@5` **osobno per gatunek**: jeśli model trafia 70% eksploatacyjnych i 40%
-     migracyjnych, to konkretna informacja produktowa — narzędzie pomaga referentom, a zawodzi
-     tam, gdzie wdrożeniowiec jest najbardziej bezradny. Wspólny licznik by to zatarł.
-
-     Reguły pisania zapytań — bez nich pomiar traci sens:
-     - **Wyłącznie to, co widzi zgłaszający.** Zapytanie nie zna przyczyny ani terminologii
-       z rozwiązania („nie udało się skomunikować z serwerem" — tak; „certyfikat bez uprawnienia
-       AddDocumentToSign" — nie). Inaczej zadanie staje się za łatwe dla **wszystkich** modeli
-       i pomiar przestaje je rozróżniać.
-     - **Filtrujemy pytania, nie odpowiedzi.** Zapytanie powstaje tylko do rekordu niosącego
-       wiedzę, ale **korpus przeszukiwany zostaje nieprzefiltrowany** — puste rekordy zostają jako
-       dystraktory. Usunięcie ich zawyżyłoby wynik wobec produkcji, gdzie filtr etapu 4 nie jest
-       doskonały. Spodziewany rozmiar: **~150–170 zapytań na 200 rekordach korpusu**.
-     - **Liczba odrzuceń jest wynikiem, nie odpadem** — to niezależny sprawdzian odsiewu 25–26%
-       zmierzonego na 661 rekordach. Rozjazd oznaczałby, że dobór warstwowy trafia w inną
-       populację. **Odrzucone zostają w pliku z powodem** (`"rejected": "brak treści — 'już
-       powinno działać'"`), a nie znikają zliczone: lista „te 40 rekordów nie niesie wiedzy, oto
-       dlaczego" jest gotowym wejściem do **filtru etapu 4** i warta kilkudziesięciu linii JSON-a.
-     - **Kilkanaście zapytań celowo trudnych** — dla klas wieloprzyczynowych (jeden objaw, 5–6
-       przyczyn). Tam rozrzut między modelami będzie największy; bez nich mierzymy łatwe przypadki.
-     - **Warstwowanie powstaje przy pisaniu**, nie jako osobna ocena: piszemy w roli
-       (eksploatacyjnej albo wdrożeniowo-migracyjnej), więc etykieta jest darmowa.
-     - **Rola człowieka: przegląd próbki 20–30 zapytań** z pytaniem „czy tak napisałby to
-       użytkownik?". Autor zapytań nie może być jedynym sędzią własnej pracy.
-     - **Znane ograniczenie:** golden set zna **jeden** poprawny rekord na zapytanie, a w korpusie
-       bywa kilka tej samej klasy. Model zwracający **inny, równie dobry** rekord wyżej dostaje
-       gorszą ocenę, niż zasługuje. Zaniża to wyniki **wszystkim po równo**, więc ranking zostaje
-       uczciwy — ale liczby bezwzględnej nie wolno czytać jako „skuteczności produktu".
-  4. [x] **Skrypt `scripts/eval_embeddings.py`** gotowy, pierwszy pomiar wykonany (2026-08-05) —
-     **pełny raport: `docs/pomiar-embedderow.md`**. Repo-level, ale **importuje
-     `ParsedTicket.embedding_text()`**, żeby mierzony tekst był bajt w bajt tym, co zaindeksuje
-     etap 4; sklejanie pól w skrypcie dałoby wynik opisujący coś innego niż produkt.
-     - **Krzywa `recall@1..K` + MRR zamiast samego `recall@5`.** Przy 200-rekordowym korpusie
-       `recall@5` dobija do sufitu i nie różnicuje; dopiero kształt krzywej i MRR pokazują, czy
-       model stawia rekord na pierwszym miejscu, czy na piątym. Stąd `_ranks()` zwraca **pozycję**,
-       nie `bool` — z jednej liczby wynikają wszystkie metryki.
-     - **Prefiksy są tabelą DWUPOZIOMOWĄ** (`MODEL_PREFIXES`: model → rola → prefiks), inaczej niż
-       w embedderze, gdzie model jest jeden. Nomic ma własne `search_query: `/`search_document: `,
-       BGE-M3 żadnych — porównanie „PolDense z prefiksami vs Nomic bez" mierzyłoby nasz błąd.
-     - **Wynik: tryb rozstrzygnięty, wybór modelu NIE.** `query→passage` bije `sts→sts` w czterech
-       niezależnych pomiarach (PolDense −1,2 pp, kontrola −3,7 pp @1). Ale `recall@1` = 98,2%
-       u PolDense to **sufit** — pozostali kandydaci zmieszczą się w granicach jednego zapytania.
-     - **Grupa kontrolna zamiast zgadywania.** Do pomiaru dołożony `nomic-embed-text-v1.5`
-       (anglojęzyczny), z **progami interpretacji ustalonymi przed przebiegiem**. Wyszło 87,9% —
-       czyli sygnał w zapytaniach jest w dużej mierze leksykalny, ale pomiar różnicuje o 10,3 pp.
-       Uboczny zysk: u kontroli warstwa „trudne" wypada gorzej niż „typowe", czyli **etykiety
-       trudności coś znaczą** — u PolDense obie mają 100%, bo model ich nie odczuwa.
-     - **Zaostrzenie zapytań dało mało — i to też jest wynik.** Usunięcie sygnatur, numerów
-       ewidencyjnych i nazw plików z 18 zapytań kosztowało PolDense 0,6 pp, a kontrolę 3,0 pp
-       (pięciokrotnie więcej — bo to ona polegała na ciągach znaków, nie na języku). Parafrazowanie
-       nic nie da: **parafraza to ta sama treść, a embedder semantyczny istnieje po to, by ją
-       rozpoznawać**. Rząd trudności zmieni dopiero większy korpus.
-  5. **Przebieg i decyzja** — wynik z datą, wariantem modelu i trybem **zapisany w repo**.
-     Tu **kasuje się jeden z dwóch named vectors** i tu zapada wybór, którego etap 2 świadomie
-     nie podjął. Zgodnie z „Ewaluacja jakości": **każdy pomiar ≥2 razy niezależnie** i **czytać
-     surowe wyniki, nie tylko licznik**.
+- [x] **3. Ewaluacja embeddera** — golden set 165 syntetycznych zapytań
+  (`data/golden/bielik-11b-golden200.json`, 35 rekordów odrzuconych z powodem) + skrypt
+  `scripts/eval_embeddings.py` liczący krzywą `recall@1..K` i MRR. **Decyzja: PolDense-150M, tryb
+  `query→passage`** — pełny raport `docs/pomiar-embedderow.md`, reguły budowy zestawu w sekcji
+  „Ewaluacja jakości", wynik i jego zastrzeżenia w „Embeddingi i prefiksy PolDense".
+  **Dwie rzeczy do zapamiętania, bo wracają w etapie 4:**
+  **(1) model wybrany bez rozstrzygającego pomiaru** — `recall@1` = 98,2% przy korpusie 200
+  rekordów to sufit, więc do porównania kandydatów wracamy przy pełnym indeksie;
+  **(2) named vector `sts` NIE jest skasowany** — oś „zapytanie sparsowane" wymaga LLM-a i nie
+  została zmierzona, a to właśnie jej dotyczył argument za `sts→sts`.
+  Materiał wielokrotnego użytku: golden set przyda się przy każdej zmianie modelu, a korpus
+  `data/parsed/bielik-11b-golden200/` (200 zwalidowanych artefaktów) **ma przetrwać** czystkę
+  z etapu 10.
 - [ ] **4. Indeksacja** — filtr + dedup + named vectors + payload; `helpdesk index build/rebuild`
   odtwarzalne z `data/parsed/`. **Filtr wielosygnałowy, niebinarny i raportujący, co odrzuca**
   (patrz „Ryzyka jakości treści") — sam status nie wystarczy, a rekordy `resolved = false`
