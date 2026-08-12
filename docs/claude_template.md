@@ -79,14 +79,22 @@
 │   ├── requirements.txt          # zależności RUNTIME tej usługi (do obrazu)
 │   ├── scripts/                  # skrypty deweloperskie (python api/scripts/…)
 │   └── app/                      # kod aplikacji
-│       ├── cli/                  # CLI produkcyjne (Typer) — cienkie adaptery nad domeną
+│       ├── cli/                  # CLI produkcyjne (Typer) — cienkie adaptery nad serwisami
 │       ├── static/               # zbudowany frontend, serwowany przez FastAPI
 │       ├── main.py               # montaż aplikacji, middleware, handlery wyjątków
 │       ├── config.py             # Settings (pydantic-settings)
 │       ├── models.py             # modele API (odrębne od domenowych)
-│       ├── prompts/              # szablony promptów
 │       ├── routers/              # jeden plik na zasób/endpoint, cienkie
-│       └── <domena>/             # pakiet domenowy: service.py + jego transport obok
+│       │
+│       │                         # --- nasza strona: podział po RODZAJU obiektu ---
+│       ├── model/                # modele domenowe, JEDEN na plik
+│       ├── service/              # logika: <rola>_<przedmiot>.py, zero modeli
+│       ├── text/                 # treść czytana przez człowieka: prompty .md, słowniki .json
+│       ├── util/                 # funkcje bezstanowe bez wiedzy o dziedzinie
+│       │
+│       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
+│       ├── llm/                  # interfejs + implementacje + fabryka + modele transportu
+│       └── <usługa>/             # tak samo dla każdej zewnętrznej usługi
 ├── frontend/                     # React (SPA) + Vite; build → api/app/static/
 │   ├── src/
 │   └── package.json
@@ -98,6 +106,11 @@
 └── samples/                      # dane wejściowe do testów i ewaluacji
 ```
 
+- **Dwie osie podziału, granicą jest przekroczenie granicy procesu.** Co rozmawia z usługą
+  zewnętrzną, dostaje **własny pakiet** (`llm/`, `embedding/`): interfejs, implementacje, fabryka,
+  wyjątki i modele transportu razem, żeby podmiana dostawcy była zmianą jednego katalogu — dlatego
+  te modele **nie wychodzą** do `model/`. Reszta idzie osią techniczną (`model` / `service` /
+  `text` / `util`).
 - **Folder = usługa z compose**; wszystko do zbudowania obrazu leży w nim, nie w korzeniu.
   Korzeń należy do infrastruktury: compose, `.env*`, dokumentacja, config testów.
 - **Testy w korzeniu, nie w folderze usługi** — nie trafiają do obrazu, a integracyjne sięgają
@@ -118,6 +131,35 @@
 - **Handlery cienkie** — żądanie → serwis → odpowiedź; zero logiki i LLM w handlerze.
 - **Osobne modele domenowe i API.** Encje/obiekty domeny nie wychodzą wprost przez HTTP —
   przepisujemy jawnie. Chroni kontrakt i blokuje wyciek pól wewnętrznych (ID, scoring).
+
+- **Granica `model` / `service` działa w OBIE strony:** w `model/` wyłącznie modele, w `service/`
+  ani jednego modelu. Model wychodzi z serwisu nawet wtedy, gdy używa go jeden serwis i zmienia
+  się razem z nim. **Cena:** kilka importów więcej i rzeczy zmieniające się razem leżą osobno.
+  **Wyjątek:** metoda czytająca własne pola zostaje na modelu, gdy jej jedyność jest
+  zabezpieczeniem (np. sklejanie tekstu do embeddingu — dwa miejsca robiące to ręcznie
+  rozjechałyby się bezgłośnie).
+- **Nazwa pliku mówi, CO ROBI, nie czego dotyczy** — `validator_ticket_parsed.py`, nie
+  `artifacts.py`. W `service/` oś `<rola>_<przedmiot>`, w `model/` prefiks tematyczny grupujący
+  alfabetycznie (`ticket_raw`, `ticket_parsed`, `ticket_parse_result`).
+- **Sprawdź nazwę przeciw wariantowi, który dojdzie później.** Jeśli dołożenie brata wymusi
+  przemianowanie pierwszego, oś nazwy jest źle wybrana — zwykle znaczy to, że nazwa opisuje
+  WYNIK, a pliki różni ŹRÓDŁO (albo odwrotnie).
+- **Funkcja czy klasa — rozstrzyga stan, nie symetria.** Implementacja z cyklem życia (wagi
+  modelu, sesja HTTP) to obiekt budowany raz; obliczenie bezstanowe zostaje funkcją modułową.
+- **Katalog z samymi danymi potrzebuje `__init__.py`**, choć nikt go nie importuje:
+  `[tool.setuptools.packages.find]` wykrywa pakiety po tym pliku, a bez niego treść wypada
+  z dystrybucji i `FileNotFoundError` wychodzi dopiero w runtime. Napisz w tym pliku, po co jest —
+  pusty `__init__.py` w katalogu bez kodu wygląda jak pozostałość do sprzątnięcia.
+
+**Gdzie to położyć — cztery pytania, po kolei:**
+
+1. **Rozmawia z usługą zewnętrzną?** → pakiet tej usługi (`llm/`, `embedding/`), razem z jej
+   modelami transportu.
+2. **Da się to opisać i przetestować, ani razu nie nazywając dziedziny?** → `util/`
+   (strip HTML-a, formatowanie czasu, tłumaczenie błędu walidacji na tekst).
+3. **Model danych czy operacja na nich?** → `model/` albo `service/`.
+4. **Treść, którą człowiek czyta zdanie po zdaniu** (prompt, słownik pojęć)? → `text/`;
+   kod, który ją składa — nigdy tam.
   
 ## Styl kodu
 
@@ -206,8 +248,13 @@ Wspólne:
 
 ### Prompty
 
-- **Prompt = logika, nie konfiguracja** — szablony w kodzie (`api/app/prompts/`, jeden plik na
+- **Prompt = logika, nie konfiguracja** — szablony w kodzie (`api/app/text/`, jeden plik na
   prompt), **nigdy w ENV**.
+- **Treść promptu to dokument `.md`; kod, który go składa, mieszka w `service/`.** Prompt jest
+  jedyną rzeczą, którą człowiek musi kontrolować zdanie po zdaniu — sklejany z kilku stałych
+  czyta się przez składnię Pythona, a jako dokument pokazuje zmianę treści wprost w diffie.
+  Dotyczy to także promptu systemowego. Komentarze redakcyjne (`<!-- … -->`) **wycinaj przed
+  wysłaniem**: notatka dla nas nie ma prawa dotrzeć do modelu.
 - **Każdy prompt ma test-strażnik** — unit test na niezmienniki (wymagane pola są, zakazanych
   konstrukcji nie ma). Bez tego prompt dryfuje przy każdej edycji.
 - **Zmiana promptu = pokaż przed/po + oczekiwany wpływ.** Nie przepisujemy promptów po cichu

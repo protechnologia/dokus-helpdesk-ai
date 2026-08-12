@@ -1,54 +1,21 @@
 import json
 import re
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import ValidationError
 
-from app.domain.ticket import ParsedTicket
-from app.ingest.raw_ticket import RawTicket
 from app.llm.base import LLMClient
-from app.prompts.parse_ticket import SYSTEM_PROMPT, build_parse_prompt
-from app.rules.resolution import get_resolution_classes
+from app.model.ticket_parse_result import ParseResult
+from app.model.ticket_parsed import ParsedTicket
+from app.model.ticket_raw import RawTicket
+from app.service.loader_dict_resolution import get_resolution_classes
+from app.service.prompt_ticket_parse import build_parse_prompt, system_prompt
+from app.util.validation_text import describe_validation_error
 
 # Models wrap JSON in a markdown fence often enough that stripping it is part of reading the
 # answer, not error handling. Tolerated rather than retried: the content is right, the packaging
 # is not, and a retry would pay for the same answer twice.
 _JSON_FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.IGNORECASE)
 
-
-class ParseResult(BaseModel):
-    """
-    Description:
-    Outcome of parsing ONE ticket: the artifact when it worked, the reason when it did not, and
-    the accounting either way. Failure is a value here rather than an exception because a run over
-    a corpus must report what it could not parse and keep going — and because a call that failed
-    validation still cost money, so its usage belongs in the total.
-    """
-
-    ticket_id: str                 = Field(examples=["33644"])
-    ticket:    ParsedTicket | None = Field(default=None)
-    errors:    list[str]           = Field(default_factory=list, examples=[["cause: puste pole"]])
-
-    # Accounting travels with the result: a caller summing a run must not have to reach back into
-    # the client for what a given call cost.
-    prompt_tokens:     int   = Field(default=0, examples=[4820])
-    completion_tokens: int   = Field(default=0, examples=[640])
-    cost_usd:          float = Field(default=0.0, examples=[0.0080])
-    latency_ms:        float = Field(default=0.0, examples=[3120.4])
-    model:             str   = Field(default="", examples=["claude-haiku-4-5"])
-
-    @property
-    def ok(self) -> bool:
-        """
-        Description:
-        Tells whether this ticket produced a valid artifact.
-
-        Example args:
-            (none)
-
-        Example result:
-            True
-        """
-        return self.ticket is not None
 
 
 def _strip_json_fence(text: str) -> str:   # e.g. "```json\n{\"problem\": \"…\"}\n```"
@@ -126,7 +93,7 @@ class TicketParser:
                 decide about
         """
         prompt     = build_parse_prompt(thread=raw.as_thread(), vocabulary=self._vocabulary)
-        completion = await self._llm.complete(prompt=prompt, system=SYSTEM_PROMPT)
+        completion = await self._llm.complete(prompt=prompt, system=system_prompt())
 
         # Accounting is attached first and kept on every return path below: a call that produced an
         # unusable answer cost exactly as much as one that worked.
@@ -165,28 +132,7 @@ class TicketParser:
         try:
             result.ticket = ParsedTicket.model_validate(fields)
         except ValidationError as exc:
-            result.errors = _describe(exc)
+            result.errors = describe_validation_error(exc)
 
         return result
 
-
-def _describe(error: ValidationError) -> list[str]:   # e.g. ValidationError with 2 errors
-    """
-    Description:
-    Flattens a pydantic error into one readable line per problem, so a run over many tickets prints
-    what to fix rather than a raw pydantic dump.
-
-    Example args:
-        error=ValidationError(...)
-
-    Example result:
-        ["cause: pole nie może być puste — użyj 'brak' albo 'nie dotyczy'"]
-    """
-    lines: list[str] = []
-
-    for entry in error.errors():
-        # Model-level validators report an empty location; name them for what they are.
-        location = ".".join(str(part) for part in entry["loc"]) or "rekord"
-        lines.append(f"{location}: {entry['msg']}")
-
-    return lines

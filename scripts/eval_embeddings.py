@@ -6,7 +6,7 @@ Do czego:
     (CLAUDE.md -> „Wybór modelu embeddingowego i trybu — mierzyć, nie zgadywać").
 
     Skrypt jest repo-level: nie odpytuje usługi `embedder` i nie stawia stacku, bo ładuje modele
-    wprost. Importuje jednak `app.domain` — po to, żeby tekst do embeddingu budował TA SAMA
+    wprost. Importuje jednak `app.model` — po to, żeby tekst do embeddingu budował TA SAMA
     metoda co przyszła indeksacja (`ParsedTicket.embedding_text()`). Sklejenie go tutaj ręcznie
     dałoby wynik opisujący coś innego niż produkt.
 
@@ -45,7 +45,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 # `app` mieszka w api/ i nie jest na ścieżce przy uruchomieniu `python scripts/...`.
 sys.path.insert(0, str(REPO_ROOT / "api"))
 
-from app.domain.ticket import ParsedTicket  # noqa: E402  (import po ustawieniu sys.path)
+from app.model.ticket_parsed import ParsedTicket  # noqa: E402  (import po ustawieniu sys.path)
 
 DEFAULT_GOLDEN = REPO_ROOT / "data" / "golden" / "bielik-11b-golden200.json"
 

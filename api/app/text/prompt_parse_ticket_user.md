@@ -3,6 +3,10 @@ Treść promptu parsującego. To jest KONTRAKT ARTEFAKTU: każda zmiana tego pli
 wszystkich przyszłych plików w data/parsed/, więc plik żyje w gicie pod testem-strażnikiem i nigdy
 w konfiguracji klienta (CLAUDE.md → zasada 7, „Prompty").
 
+NASZ KOD, nie dane klienta — w odróżnieniu od dict_resolution.json leżącego w tym samym
+katalogu, który klient edytuje (w etapie 8 przez GUI). Katalog jest płaski, więc tej różnicy nie
+widać po ścieżce: zmiana tego pliku wymaga commita, review i przebiegu testu-strażnika.
+
 Plik jest tekstem dla modelu, nie kodem. Miejsca `{{...}}` wypełnia `parse_ticket.py`:
   {{vocabulary}} — słownik rozstrzygnięć z magazynu reguł
   {{thread}}     — wątek zgłoszenia

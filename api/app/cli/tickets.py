@@ -5,10 +5,12 @@ from pathlib import Path
 import typer
 
 from app.config import Settings
-from app.domain.parsing import ParseResult, TicketParser
-from app.domain.validation import ValidationReport, validate_directory
-from app.ingest.raw_ticket import load_raw_ticket
 from app.llm import LLMError, get_llm_client
+from app.model.ticket_parse_result import ParseResult
+from app.model.validation_parsed_report import ValidationReport
+from app.service.parser_ticket_parsed import TicketParser
+from app.service.parser_ticket_raw import load_raw_ticket
+from app.service.validator_ticket_parsed import validate_directory
 from app.util.time import format_duration
 
 tickets = typer.Typer(

@@ -4,7 +4,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from app.rules.resolution import DEFAULT_RULES_FILE, ResolutionVocabulary, get_resolution_classes
+from app.model.dict_resolution_vocabulary import ResolutionVocabulary
+from app.service.loader_dict_resolution import DEFAULT_DICT_FILE, get_resolution_classes
 
 
 def test_bundled_vocabulary_loads() -> None:
@@ -30,7 +31,7 @@ def test_class_names_are_unique() -> None:
 
 def test_names_preserve_declaration_order() -> None:
     """names() → same order as the file, because the prompt lists them in that order."""
-    raw = json.loads(DEFAULT_RULES_FILE.read_text(encoding="utf-8"))
+    raw = json.loads(DEFAULT_DICT_FILE.read_text(encoding="utf-8"))
 
     assert get_resolution_classes().names() == [entry["name"] for entry in raw["classes"]]
 

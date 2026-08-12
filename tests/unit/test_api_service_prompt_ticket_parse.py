@@ -1,14 +1,16 @@
 import pytest
 
-from app.domain.ticket import ParsedTicket
-from app.prompts.parse_ticket import (
-    SYSTEM_PROMPT,
+from app.model.dict_resolution_class import ResolutionClass
+from app.model.dict_resolution_vocabulary import ResolutionVocabulary
+from app.model.ticket_parsed import ParsedTicket
+from app.service.loader_dict_resolution import get_resolution_classes
+from app.service.prompt_ticket_parse import (
     THREAD_PLACEHOLDER,
     VOCABULARY_PLACEHOLDER,
     build_parse_prompt,
     field_rules,
+    system_prompt,
 )
-from app.rules.resolution import ResolutionClass, ResolutionVocabulary, get_resolution_classes
 
 THREAD = "ZGŁOSZENIE 33644\nTemat: Błąd wysyłki\n\n[klient] Nie udało się wysłać dokumentu."
 
@@ -168,5 +170,5 @@ def test_no_placeholder_survives_rendering(prompt: str, placeholder: str) -> Non
 
 def test_system_prompt_forbids_invention(prompt: str) -> None:
     """System prompt → states the no-invention rule and the JSON-only output contract."""
-    assert "nigdy zmyśloną" in SYSTEM_PROMPT
-    assert "wyłącznie obiekt JSON" in SYSTEM_PROMPT
+    assert "nigdy zmyśloną" in system_prompt()
+    assert "wyłącznie obiekt JSON" in system_prompt()

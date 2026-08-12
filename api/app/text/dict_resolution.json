@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "description": "DANE KLIENTA, nie nasz kod — w odróżnieniu od parse_ticket*.md leżących w tym samym katalogu. Zmiana tego pliku jest konfiguracją, nie zmianą kontraktu: podbij `version`, a artefakty sparsowane starszą wersją zostają ważne (zapisują ją w polu resolution_vocabulary_version). W etapie 8 źródłem staje się baza SQL i plik zostaje zestawem domyślnym. Rodzaje rozstrzygnięcia zgłoszenia: `name` trafia do pola `resolution` w ParsedTicket, `hint` wchodzi do promptu parsującego jako opis dla modelu. Zestaw domyślny wyprowadzony z korpusu Dokusa (2026-07-31) — inny helpdesk skonfiguruje własny.",
+  "classes": [
+    {
+      "name": "naprawione",
+      "hint": "usterka usunięta, przyczyna rozpoznana i wyeliminowana"
+    },
+    {
+      "name": "bez_zmian_w_systemie",
+      "hint": "w systemie nic nie zmieniono — klient dostał wskazówkę, co ma zrobić po swojej stronie: obejście problemu, wyjaśnienie, że zachowanie jest poprawne, albo działanie na jego instalacji, sprzęcie lub procedurach"
+    },
+    {
+      "name": "brak",
+      "hint": "z wątku nie wynika, czym sprawa się skończyła"
+    }
+  ]
+}

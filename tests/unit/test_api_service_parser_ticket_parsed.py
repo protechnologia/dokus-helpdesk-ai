@@ -3,10 +3,11 @@ from datetime import date as Date
 
 import pytest
 
-from app.domain.parsing import TicketParser
-from app.ingest.raw_ticket import RawComment, RawTicket
 from app.llm import FakeLLMClient, LLMError
-from app.rules.resolution import get_resolution_classes
+from app.model.ticket_raw import RawTicket
+from app.model.ticket_raw_comment import RawComment
+from app.service.loader_dict_resolution import get_resolution_classes
+from app.service.parser_ticket_parsed import TicketParser
 
 # The fields the prompt asks for. `ticket_id`, `date` and the vocabulary version are deliberately
 # absent: those come from the source, and a test that supplied them would not prove that.

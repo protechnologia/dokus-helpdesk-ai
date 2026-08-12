@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from app.domain.validation import validate_directory, validate_file
+from app.service.validator_ticket_parsed import validate_directory, validate_file
 
 VALID_TICKET = {
     "ticket_id":                     "33644",

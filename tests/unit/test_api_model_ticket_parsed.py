@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.domain.ticket import NO_VALUE, NOT_APPLICABLE, ParsedTicket
+from app.model.ticket_parsed import NO_VALUE, NOT_APPLICABLE, ParsedTicket
 
 # A record carrying real content, used as the starting point every test varies from.
 VALID_TICKET = {

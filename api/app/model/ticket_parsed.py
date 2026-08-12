@@ -2,7 +2,7 @@ from datetime import date as Date
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.rules.resolution import get_resolution_classes
+from app.service.loader_dict_resolution import get_resolution_classes
 
 # Every text field may say "there is nothing here" instead of being left out. A required field
 # forces the model to invent a value (CLAUDE.md -> "Jak projektować schemat odpowiedzi"), and an
@@ -158,3 +158,4 @@ class ParsedTicket(BaseModel):
             "Wysyłka przez ePUAP kończy się błędem komunikacji\\nPo kliknięciu Wyślij…"
         """
         return "\n".join(getattr(self, field) for field in EMBEDDED_FIELDS)
+

@@ -150,7 +150,7 @@ a od etapu 8 baza reguł. LLM jest **zewnętrznym endpointem**, nie usługą w b
 
 Dostaliśmy **zrzut MySQL/MariaDB bazy `helpdesk`** (`mysql_helpdesk_20260724-141140.sql`, 37 MB,
 MariaDB 10.3, aplikacja na Doctrine/Symfony, 21 tabel). Nie jest to eksport plikowy ani skrzynka
-mailowa — **źródłem jest relacyjna baza produkcyjna**, więc adapter w `ingest/` czyta SQL,
+mailowa — **źródłem jest relacyjna baza produkcyjna**, więc adapter w `service/` czyta SQL,
 nie CSV.
 
 **`data/raw/` jest zdejmowane ze zrzutu skryptem `scripts/export_raw_tickets.py`** — wiernie,
@@ -159,8 +159,11 @@ przestałby być widoczny). Eksport jest odtwarzalny i nie woła LLM-a, więc **
 7** — w razie potrzeby wolno go powtórzyć albo zmienić jego kształt. Kolumny z hasłami nie są
 czytane przez żadne zapytanie tego skryptu.
 
-- **Import to cienka warstwa adapterów** — `api/app/ingest/`, jeden adapter na format źródłowy;
-  reszta systemu widzi wyłącznie znormalizowany `RawTicket`.
+- **Import to cienka warstwa adapterów** — jeden czytnik na format źródłowy
+  (`service/parser_ticket_raw.py`, w etapie 10 obok wariantu SQL); reszta systemu widzi wyłącznie
+  znormalizowany `RawTicket`. **Model `RawTicket` mieszka w `model/`, czytnik w `service/`** —
+  jest wejściową połową kontraktu, którego wyjściem jest `ParsedTicket`, więc nie należy do
+  żadnego z czytników (patrz „Warstwy kodu").
 - **Nie zaszywamy założeń o źródle w domenie.** Nazwy pól, kodowanie, sposób sklejania wątku
   w konwersację żyją w adapterze.
 - **Dane zawierają PII** (nazwiska, adresy, telefony klientów). Traktujemy je jak wrażliwe:
@@ -280,21 +283,16 @@ wymagające czyszczenia cytowanej historii przed parsowaniem.
 - **Statusem końcowym Dokusa jest `rozwiazany` (1735), nie `zamkniety` (5).** W całej bazie jest
   odwrotnie (26 933 `zamkniety`). Filtr `resolved` napisany pod „resztę bazy" **odrzuciłby cały
   korpus Dokusa** — to najłatwiejszy sposób na cichy pusty indeks.
-- **Tabela `rozwiazanie` jest martwa** — 1 wiersz w całej bazie, `zgloszenie.rozwiazanieid`
-  zerowe pokrycie. **Nie mylić jej z komentarzem `typ='rozwiazanie'`**, który jest realnym
-  źródłem rozwiązań. Tak samo martwe: `przyczyna` i `ocena_rozwiazania` (0 wypełnionych w całej
-  bazie).
-- **ŻADNE metadane nie nadają się na wejście do `resolved`/`confirmed` — rozstrzyga wyłącznie
-  treść wątku.** To korekta wcześniejszego ustalenia, obalona na sparsowanej próbce:
-  - `powod_zakonczenia = akceptacja_propozycji_rozwiazania` trafia się na wątku, który kończy się
-    **pytaniem konsultanta**, i na wątku z **zerem komentarzy dostawcy**;
-  - **metadane potrafią przeczyć sobie nawzajem w jednym rekordzie** — jedyny komentarz ma
-    `typ='odrzucona_propozycja_rozwiazania'`, a `powod_zakonczenia` mówi o akceptacji;
-  - `typ` komentarza to **stan przepływu, nie znaczenie**: bywa `typ='rozwiazanie'` o treści
-    „Czy można zamknąć?", napisane przez klienta, a nawet **zaprzeczające rozwiązaniu**;
-    odwrotnie — `typ='odrzucona_propozycja_rozwiazania'` bywa poprawnym rozwiązaniem.
-
-  `powod_zakonczenia` zostaje **przesłanką pomocniczą**, nigdy samodzielnym źródłem.
+- **Tabela `rozwiazanie` jest martwa** — 1 wiersz w całej bazie, `zgloszenie.rozwiazanieid` zerowe
+  pokrycie; tak samo `przyczyna` i `ocena_rozwiazania`. **Nie mylić z komentarzem
+  `typ='rozwiazanie'`**, który jest realnym źródłem rozwiązań.
+- **ŻADNE metadane nie rozstrzygają, czy sprawa ma rozwiązanie — decyduje wyłącznie treść
+  wątku.** Zmierzone na sparsowanej próbce: `powod_zakonczenia = akceptacja_propozycji_rozwiazania`
+  trafia się na wątku kończącym się **pytaniem konsultanta** i na wątku z **zerem komentarzy
+  dostawcy**; metadane potrafią **przeczyć sobie w jednym rekordzie**; `typ` komentarza to stan
+  przepływu, nie znaczenie (bywa `rozwiazanie` o treści „Czy można zamknąć?", bywa
+  `odrzucona_propozycja_rozwiazania` będące poprawnym rozwiązaniem). `powod_zakonczenia` zostaje
+  **przesłanką pomocniczą**, nigdy samodzielnym źródłem.
 - **26% zgłoszeń ze statusem końcowym i kompletem danych nie niesie żadnej wiedzy.** Filtr
   długościowy ich nie łapie — rozstrzyga dopiero treść. Najtańsze sygnały do zautomatyzowania
   (kolejność wg trafności na próbce): **wątek bez ani jednego komentarza dostawcy** (1,4%,
@@ -305,46 +303,30 @@ wymagające czyszczenia cytowanej historii przed parsowaniem.
   w załączeniu"** (załączników nie ma w zrzucie, a rekord wygląda na kompletny) · odesłanie
   „zgłoszenie NNNNN" bez własnego rozstrzygnięcia · **zapowiedź w czasie przyszłym w ostatnim
   komentarzu dostawcy nigdy nie jest rozwiązaniem**.
-- **Zakres modułu NIE gwarantuje, że sprawa dotyczy naszej aplikacji.** Mimo `modulid = 116`
-  trafiają się zgłoszenia o Portalu Mieszkańca, login.gov.pl czy systemie innego dostawcy.
-  Stąd `component` **wyprowadza LLM z treści**, tak jak `cause` — nigdy z `modul_zgloszenia.nazwa`.
-  To zarazem argument za polem swobodnym: zamknięty słownik nie przewidzi, o czym napisze
-  użytkownik.
-- **Rozwiązanie bywa napisane przez KLIENTA, nie konsultanta.** Kusząca reguła „szukaj rozwiązania
-  w komentarzach konsultanta" odrzuciłaby kilka z najbogatszych rekordów korpusu (klient
-  zdiagnozował limit długości nazwy, administrator klienta wyjaśnił montowanie woluminów, klient
-  spisał ścieżkę klik po kliku po zdalnej pomocy). **Liczy się, że rozstrzygnięcie jest w wątku
-  — nie kto je napisał.**
-- **Najcenniejszy komentarz bywa PO tym z rozwiązaniem**, czasem nawet **po zamknięciu
-  zgłoszenia**. Parser musi czytać cały wątek do końca, nie urywać na komentarzu rozwiązującym.
-- **Wątek bywa zapisem dochodzenia — z fałszywym tropem włącznie.** Najostrzejszy przypadek:
-  fałszywy trop podsunął **sam komunikat błędu** („java heap space" sugerował brak pamięci;
-  zwiększanie limitu do 4 GB nie pomogło, rozwiązaniem była przeinstalacja środowiska).
-  **Odrzuconą hipotezę warto zapisać** — inaczej RAG podpowie sprawdzoną ślepą uliczkę,
-  uwiarygodnioną przez treść komunikatu.
-- **Autor komentarza bywa odwrócony w kategorii „Automat mailowy"** — komentarz oznaczony jako
-  klienta zawiera odpowiedź konsultanta ze stopką, bo cały mail wklejany jest w całości, a rola
-  opisuje nadawcę maila, nie autora cytowanej wypowiedzi. Ta kategoria wymaga **osobnego
-  czyszczenia przed parsowaniem** (obcięcie cytowanej historii, stopek, klauzul RODO) — jeden
-  rekord potrafi mieć ~100 linii, z czego 15 to treść.
-- **`cause` nie ma kolumny, ale często jest w wątku** — konsultant opisuje przyczynę w treści
-  rozwiązania („wyczerpanie połączeń do bazy przez konwersję LibreOffice", „certyfikat bez
-  uprawnienia AddDocumentToSign"). To zadanie dla LLM-a przy parsowaniu, nie brak danych.
+- **Zakres modułu NIE gwarantuje, że sprawa dotyczy naszej aplikacji** — mimo `modulid = 116`
+  trafiają się zgłoszenia o Portalu Mieszkańca czy login.gov.pl. Stąd `component` wyprowadza LLM
+  z treści, nigdy z `modul_zgloszenia.nazwa`, i jest polem swobodnym.
+- **Autor komentarza bywa odwrócony w kategorii „Automat mailowy"** — cały mail wklejany jest
+  w całości, więc rola opisuje nadawcę, nie autora cytowanej wypowiedzi. **Ta kategoria wymaga
+  osobnego czyszczenia przed parsowaniem** (cytowana historia, stopki, klauzule RODO): jeden
+  rekord potrafi mieć ~100 linii, z czego 15 to treść. **Nie jest zrobione — wchodzi w etapie 10.**
 - **Część rozwiązań jest pusta merytorycznie** — „Już powinno działać", „Zamykam", „Proszę się
-  przelogować". Formalnie to komentarz `typ='rozwiazanie'`, ale nie niesie wiedzy nadającej się
-  do zaproponowania komuś innemu. **Filtr jakości musi to odsiewać**, inaczej RAG zwróci
-  trafienie bez treści — gorsze niż brak trafienia, bo wygląda na odpowiedź.
-- **Treści są w HTML** — tagi (`<p>`) i encje (`&#039;`, `&#34;`). Strip + unescape w adapterze,
-  przed jakimkolwiek parsowaniem i embedowaniem.
+  przelogować". Formalnie komentarz `typ='rozwiazanie'`, ale nie niesie wiedzy do zaproponowania
+  komuś innemu. **Filtr jakości musi to odsiewać**: trafienie bez treści jest gorsze niż brak
+  trafienia, bo wygląda na odpowiedź.
 - **Temat (`czego_dotyczy`) jest słabym sygnałem** — w całej bazie 24 749 unikalnych na 30 923,
   samo „błąd" 446×. Dedup po treści opisu, nie po temacie.
-- **W całej bazie 89% zgłoszeń wyjechało do Mantisa** (`numer_mantis`), przez co komentarze
-  z synchronizacji REST gubią FK autora i lądują z `typ='zwyczajny'` mimo że są rozwiązaniami.
-  **Dokusa to nie dotyczy** (6 zgłoszeń z 1825 ma `numer_mantis`, 2 komentarze bez autora) —
-  ale gdyby zakres kiedyś się rozszerzył, `typ` i autor przestają być wiarygodne.
-- **Zrzut zawiera hasła** — `konsultant.haslo` i `uzytkownik.haslo` jako 32-znakowe hashe (MD5,
-  bez bcrypt/argon) oraz `skrzynka_email.password`. **Do niczego ich nie potrzebujemy — adapter
-  nie czyta tych kolumn**, nie trafiają nawet do kopii roboczej.
+- **Zapisane w prompcie parsującym, do odtworzenia gdyby ktoś go upraszczał:** rozwiązanie bywa
+  napisane **przez klienta** (reguła „tylko komentarze konsultanta" odrzuciłaby najbogatsze
+  rekordy) · najcenniejszy komentarz bywa **po** tym z rozwiązaniem, czasem po zamknięciu ·
+  wątek bywa zapisem dochodzenia i **fałszywy trop podsuwa sam komunikat błędu** („java heap
+  space" → rozwiązaniem była przeinstalacja, nie pamięć), więc odrzuconą hipotezę trzeba zapisać ·
+  `cause` nie ma kolumny, ale zwykle jest w treści rozwiązania.
+- **Rozstrzygnięte w kodzie, nie wracać:** treści są w HTML (strip + unescape w adapterze) ·
+  zrzut zawiera hasła w `konsultant.haslo`, `uzytkownik.haslo`, `skrzynka_email.password`
+  (adapter tych kolumn nie czyta — reszta w TODO) · 89% zgłoszeń **całej bazy** wyjechało do
+  Mantisa, przez co `typ` i autor komentarza tracą wiarygodność, ale **Dokusa to nie dotyczy**
+  (6 zgłoszeń z 1825) — wróci dopiero przy rozszerzeniu zakresu.
 - **DZIAŁAJĄCE sekrety w treści komentarzy — 1,1% zgłoszeń, i to nie tylko od klientów.**
   W próbce: login i hasło VPN, hasło administratora serwera, **hasło roota**, hasło do skrzynki
   pocztowej wraz z adresami serwerów i listą użytkowników. **Dwa z pięciu przypadków wkleił
@@ -367,21 +349,17 @@ wymagające czyszczenia cytowanej historii przed parsowaniem.
 Rzeczy, które przechodzą każdy sprawdzian formalny, a psują odpowiedź. Kolejność wg skali.
 
 - **„Naprawiono skutki, nie przyczynę" — 18% rekordów z rozwiązaniem.** Dostawca ręcznie
-  wygenerował brakujące podglądy, przywrócił statusy, podpiął wizualizację — a przyczyna
-  została nierozpoznana. Rekord wygląda na pełnowartościowy, a realna odpowiedź brzmi „poproś
-  dostawcę, żeby zrobił to ręcznie". **Etykieta, nie odrzucenie** — dla wdrożeniowca to
-  informacja, że sam tego nie zrobi. Stąd potrzeba rozróżnienia **„wykonalne przez wdrożeniowca"
-  od „wymaga interwencji dostawcy"**.
+  wygenerował podglądy, przywrócił statusy — a przyczyna została nierozpoznana. Rekord wygląda na
+  pełnowartościowy, a realna odpowiedź brzmi „poproś dostawcę, żeby zrobił to ręcznie".
+  **Etykieta, nie odrzucenie** — wdrożeniowiec musi wiedzieć, że sam tego nie zrobi.
 - **`solution` odpowiada na inne pytanie niż `problem` — 5–10%.** Uwaga metodologiczna:
   **leksykalnie tego nie wykryjesz** (mediana podobieństwa `problem` ↔ `solution` to 0,19, bo
   oba pola naturalnie używają innego słownictwa). Potrzebny model semantyczny.
-- **Skupiska sprzecznych odpowiedzi między rekordami.** Limit załącznika ePUAP ma w korpusie
-  **trzy różne wartości** (3 / 3 / 3,5 MB); tryb nadania — odwrotną rekomendację po pół roku;
-  wysyłka e-Doręczeniami bez uprawnienia do kancelarii — dwie różne odpowiedzi w odstępie
-  siedmiu tygodni, temat wracał przez osiem miesięcy bez rozstrzygnięcia. Stąd: **przy
-  rozbieżności podawać zakres i daty, nigdy jednej wartości**, i iść ścieżką diagnostyczną
-  **mimo wysokiego score**. Uboczny wniosek: najczęściej powracający temat korpusu bywa
-  najgorzej udokumentowany.
+- **Skupiska sprzecznych odpowiedzi między rekordami** — limit załącznika ePUAP ma trzy różne
+  wartości (3 / 3 / 3,5 MB), tryb nadania odwrotną rekomendację po pół roku, e-Doręczenia bez
+  uprawnienia do kancelarii dwie odpowiedzi w odstępie siedmiu tygodni. Stąd: **przy rozbieżności
+  podawaj zakres i daty, nigdy jednej wartości**, i idź ścieżką diagnostyczną **mimo wysokiego
+  score**. Uboczny wniosek: najczęściej powracający temat bywa najgorzej udokumentowany.
 - **Rekord unieważniony przez późniejszy.** **Odmowa jest najkrócej żyjącym rodzajem
   rozstrzygnięcia** — nowszy rekord obala starszą odmowę (trzy pary w jednej turze). Przy
   trafieniu odmowy starszej niż kilka miesięcy generacja musi to sygnalizować.
@@ -393,12 +371,12 @@ Rzeczy, które przechodzą każdy sprawdzian formalny, a psują odpowiedź. Kole
 - **Rozkład jakości jest dwubiegunowy, bez środka.** Rekordy są albo bardzo dobre (pełna ścieżka
   klik po kliku, przyczyna, zastrzeżenie), albo puste. Dobra wiadomość: **granica jest ostra,
   więc prosty filtr treściowy wystarczy.**
-- **Wiedza cenna w zgłoszeniu formalnie NIEROZWIĄZANYM.** Kopie zapasowe niewykonujące się przez
-  literówkę we wpisie harmonogramu — `cause` konkretna i przenośna („sprawdź wpis CRON"),
-  a rekord wypadnie z indeksu przy filtrze po `resolved`. Ogólniej: **im poważniejsza operacyjnie
-  sprawa, tym większa szansa, że wątek urwie się bez odpowiedzi** — filtr po `resolved` wytnie
-  dokładnie te tematy, przy których wdrożeniowiec najbardziej potrzebuje wskazówki. Stąd
-  **filtr nie może być binarny na poziomie zgłoszenia i musi raportować, co odrzuca**.
+- **Wiedza cenna bywa w zgłoszeniu formalnie NIEROZWIĄZANYM** — kopie zapasowe niedziałające
+  przez literówkę w harmonogramie mają `cause` przenośną („sprawdź wpis CRON"), a wypadną przy
+  filtrze po `resolved`. **Im poważniejsza operacyjnie sprawa, tym większa szansa, że wątek urwie
+  się bez odpowiedzi** — czyli filtr binarny wytnie dokładnie te tematy, przy których
+  wdrożeniowiec najbardziej potrzebuje wskazówki. Stąd **filtr niebinarny i raportujący, co
+  odrzuca**.
 - **Utrata danych: 5 rekordów w próbce, 0 rozwiązań.** Cały ten temat wypadnie z indeksu.
   Trzeba to powiedzieć wprost, zamiast udawać, że system pomoże.
 
@@ -430,7 +408,7 @@ Odwrotna strona powyższych ryzyk — to działa zawsze i jest najtańszym zyski
 ## Domena: kontrakt sparsowanego zgłoszenia
 
 Serce projektu. **Ten schemat jest kontraktem** — trzyma go model Pydantic w
-`api/app/domain/ticket.py` i to on rozstrzyga, co jest poprawnym artefaktem.
+`api/app/model/ticket_parsed.py` i to on rozstrzyga, co jest poprawnym artefaktem.
 
 **Rdzeń: 10 pól** (ustalone 2026-07-31, po przeglądzie pod kątem uniwersalności produktu —
 schemat pierwotny miał 17 i był projektowany pod ten jeden korpus, nie pod produkt):
@@ -917,18 +895,20 @@ dokus-helpdesk-ai/
 │   ├── requirements.txt          # zależności RUNTIME tej usługi (do obrazu)
 │   ├── scripts/                  # skrypty deweloperskie (python api/scripts/…)
 │   └── app/                      # kod aplikacji
-│       ├── cli/                  # CLI produkcyjne (Typer) — cienkie adaptery nad domeną
+│       ├── cli/                  # CLI produkcyjne (Typer) — cienkie adaptery nad serwisami
 │       ├── main.py               # montaż aplikacji, middleware, handlery wyjątków
 │       ├── config.py             # Settings (pydantic-settings)
 │       ├── models.py             # modele API (odrębne od domenowych)
-│       ├── prompts/              # szkielety promptów (parser, warianty, bramki, „Popraw")
 │       ├── routers/              # jeden plik na zasób/endpoint, cienkie
-│       ├── domain/               # ParsedTicket, Verdict, warianty, reguły filtrowania i routingu
-│       ├── ingest/               # adaptery formatów źródłowych → RawTicket
-│       ├── llm/                  # LLMClient + fabryka + FakeLLMClient
+│       │                         # --- nasza strona: podział po RODZAJU obiektu ---
+│       ├── model/                # ticket_*, validation_parsed_*, dict_resolution_*
+│       ├── service/              # parser_*, validator_*, prompt_*, loader_*
+│       ├── text/                 # prompt_*_{user,system}.md (nasze) + dict_*.json (klienta)
+│       ├── util/                 # html, validation_text, time
+│       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
+│       ├── llm/                  # LLMClient + fabryka + FakeLLMClient + cenniki
 │       ├── embedding/            # EmbeddingClient (HTTP do `embedder`) + prefiksy
-│       ├── rules/                # magazyn reguł i wariantów (odczyt + wersjonowanie)
-│       └── retrieval/            # klient Qdranta: indeksacja, wyszukiwanie
+│       └── retrieval/            # klient Qdranta: indeksacja, wyszukiwanie (etap 4)
 ├── embedder/                     # kolejna usługa: model PL za REST-em
 │   ├── Dockerfile
 │   ├── requirements.txt
@@ -954,6 +934,11 @@ dokus-helpdesk-ai/
 
 ## Warstwy kodu
 
+- **Dwie osie podziału, granicą jest przekroczenie granicy procesu.** Co rozmawia z usługą
+  zewnętrzną, dostaje **własny pakiet** (`llm/`, `embedding/`): interfejs, implementacje, fabryka,
+  wyjątki i modele transportu razem, żeby podmiana dostawcy była zmianą jednego katalogu — dlatego
+  te modele **nie wychodzą** do `model/`. Reszta idzie osią techniczną (`model` / `service` /
+  `text` / `util`).
 - **Transport vs domena.** Transport = rozmowa z usługą zewnętrzną (LLM, embedder, Qdrant); domena =
   logika, nieświadoma tego, co pod spodem. Domena dostaje klienta transportowego przez
   konstruktor, nigdy nie sięga po SDK.
@@ -964,13 +949,44 @@ dokus-helpdesk-ai/
   nie nazywa (`Encoder`, `FakeEncoder`) — inaczej ta sama nazwa znaczyłaby dwie różne rzeczy
   w dwóch usługach. Wzorzec za to jest ten sam po obu stronach: interfejs + implementacja
   offline (`Fake…`) + fabryka po ENV z fail-fast.
+- **Granica `model` / `service` działa w OBIE strony:** w `model/` wyłącznie modele, jeden na plik;
+  w `service/` ani jednego modelu Pydantic. Model wychodzi z serwisu nawet wtedy, gdy używa go
+  jeden serwis i zmienia się razem z nim. **Cena:** kilka importów więcej i rzeczy zmieniające się
+  razem leżą osobno. **Wyjątek:** metoda czytająca własne pola zostaje na modelu, gdy jej jedyność
+  jest zabezpieczeniem — `embedding_text()` jest tu jedynym przypadkiem, bo dwa miejsca sklejające
+  ten tekst rozjechałyby się **bezgłośnie** (indeksacja z etapu 4 wobec zapytania z etapu 5).
+- **Nazwa pliku mówi, CO ROBI, nie czego dotyczy** — `validator_ticket_parsed.py`, nie
+  `artifacts.py`. W `service/` oś `<rola>_<przedmiot>` (`parser_`, `validator_`, `prompt_`,
+  `loader_`), w `model/` prefiks tematyczny grupujący alfabetycznie (`ticket_*`,
+  `validation_parsed_*`, `dict_*`).
+  - **Znany koszt tej konwencji, do rozstrzygnięcia przy etapie 10:** wszystkie czytniki źródeł
+    produkują ten sam `RawTicket`, więc wariant SQL musi dołożyć źródło do nazwy
+    (`parser_ticket_raw_sql`) albo oba dostaną sufiks. Nazwa opisuje WYNIK, a te pliki różni
+    ŹRÓDŁO.
+- **`util/` to funkcje bezstanowe bez wiedzy o dziedzinie** — kryterium: czy da się je opisać
+  i przetestować, ani razu nie mówiąc „zgłoszenie". Stąd `strip_html()` i
+  `describe_validation_error()` są tam, a nie przy swoich wywołujących; drugi powód jest
+  praktyczny — czytnik SQL z etapu 10 potrzebuje tego samego strippera.
 - **Funkcja czy klasa — rozstrzyga stan, nie symetria.** Implementacja z cyklem życia (wagi
   modelu, sesja HTTP) to obiekt budowany raz; obliczenie bezstanowe zostaje funkcją modułową
   wołaną przez tę implementację (`deterministic_vector` wewnątrz `FakeEncoder`).
 - **Handlery cienkie** — żądanie → serwis → odpowiedź; zero logiki i LLM w handlerze.
 - **Osobne modele domenowe i API.** Encje/obiekty domeny nie wychodzą wprost przez HTTP —
   przepisujemy jawnie. Chroni kontrakt i blokuje wyciek pól wewnętrznych (ID, scoring).
-  
+- **Katalog z samymi danymi (`text/`) potrzebuje `__init__.py`**, choć nikt go nie importuje:
+  `[tool.setuptools.packages.find]` wykrywa pakiety po tym pliku, a bez niego treść wypada
+  z dystrybucji i `FileNotFoundError` wychodzi dopiero w runtime. Powód jest zapisany w samym
+  pliku — pusty `__init__.py` w katalogu bez kodu wygląda jak pozostałość do sprzątnięcia.
+
+**Gdzie to położyć — cztery pytania, po kolei:**
+
+1. **Rozmawia z usługą zewnętrzną?** → pakiet tej usługi (`llm/`, `embedding/`), razem z jej
+   modelami transportu.
+2. **Da się to opisać i przetestować, ani razu nie nazywając dziedziny?** → `util/`.
+3. **Model danych czy operacja na nich?** → `model/` albo `service/`.
+4. **Treść, którą człowiek czyta zdanie po zdaniu** (prompt, słownik pojęć)? → `text/`;
+   kod, który ją składa — nigdy tam.
+
 ## Styl kodu
 
 - Język kodu, identyfikatorów, docstringów i komentarzy: **angielski**.
@@ -1121,8 +1137,18 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
 
 ### Prompty
 
-- **Prompt = logika, nie konfiguracja** — szablony w repo (`api/app/prompts/`, jeden plik na
+- **Prompt = logika, nie konfiguracja** — szablony w repo (`api/app/text/`, jeden plik na
   prompt), **nigdy w ENV**.
+  - **Treść w `text/`, kod składający w `service/prompt_<przedmiot>.py`** — dotyczy TAKŻE promptu
+    systemowego (`prompt_parse_ticket_system.md`), bo to również treść czytana zdanie po zdaniu.
+    Moduł sięga po dokument jawną ścieżką, nie po własnej nazwie pliku.
+  - **`text/` jest PŁASKI i mieszają się w nim dwa reżimy zmiany — to świadoma decyzja z ceną.**
+    `prompt_*.md` to NASZ kod: zmiana wymaga commita, review i testu-strażnika, bo zmienia
+    znaczenie wszystkich przyszłych artefaktów (zasada 7). `dict_resolution.json` to DANE
+    KLIENTA: zmiana to podbicie `version`, a w etapie 8 edycja przez GUI. **Ścieżka tej różnicy
+    nie pokazuje**, więc niesie ją nagłówek każdego pliku (`<!-- -->` w markdownie, pole
+    `description` w JSON-ie) — i to jedyne miejsce, które ją pilnuje. Przy dokładaniu pliku do
+    `text/` napisz w nagłówku, do którego reżimu należy.
   - **Treść promptu to dokument `.md`, moduł `.py` obok tylko go składa.** Prompt jest jedyną
     rzeczą w projekcie, którą człowiek musi kontrolować zdanie po zdaniu — sklejany z kilku
     stałych czyta się przez składnię Pythona, a jako dokument diff w review pokazuje zmianę
@@ -1139,7 +1165,9 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   - **Wyjątek w wyjątku: słowniki wstawiane do promptu parsującego** (`resolution`, podpowiedź
     dla `component`) **są danymi klienta** — inny helpdesk ma inne rodzaje rozstrzygnięć
     („odpowiedzialność po stronie urzędu" nie znaczy nic poza sektorem publicznym). Żyją
-    w `api/app/rules/` jako plik danych, **nie w ENV** (potrzebna struktura, nie płaski string)
+    w `api/app/text/` jako plik danych czytany przez `service/loader_dict_resolution.py`,
+    **nie w ENV**
+    (potrzebna struktura, nie płaski string)
     i nie w SQL do etapu 8 — dokładnie tą samą drogą co zasady „Popraw": wbudowany zestaw
     domyślny za interfejsem magazynu reguł, a podmiana źródła na bazę nie rusza serwisu.
   - **Słownik wstawiany do promptu parsującego MUSI być wersjonowany, a artefakt zapisuje
@@ -1563,39 +1591,21 @@ Rejestr odrzuconych rozwiązań — narzędzi/podejść, które celowo pominęli
 taką decyzję w trakcie pracy, **dopisz ją tu** (co + jednozdaniowe dlaczego). Jeśli zadanie
 wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 
-- ~~**Relacyjna baza (MariaDB)**~~ — **decyzja odwrócona 2026-07-31.** SQL wchodzi w etapie 8
-  jako magazyn **reguł bramek** (edytowalnych przez klienta w runtime) — to była właśnie ta
-  „potrzeba", na którą czekaliśmy. Zakres jest wąski i tak ma zostać: **reguły + wersje +
-  audyt werdyktów**. Źródłem prawdy dla korpusu **dalej są JSON-y w `data/parsed/`**, a indeksem
-  Qdrant (zasady 7 i 8 bez zmian). Nie przenosimy do SQL-a ani sparsowanych zgłoszeń, ani
-  wektorów.
+- ~~**Relacyjna baza (MariaDB)**~~ — **odwrócone 2026-07-31**: SQL wchodzi w etapie 8, ale
+  wyłącznie jako magazyn **reguł, ich wersji i audytu werdyktów**. Źródłem prawdy dla korpusu
+  dalej są JSON-y w `data/parsed/`, indeksem Qdrant (zasady 7 i 8 bez zmian).
 - **Frontend (React SPA)** — na starcie API + CLI; UI to etap 11.
-- **Warstwa `docker-compose.gpu.yml`** — **decyzja 2026-08-05: nie powstaje.** Przesłanka
-  („PolDense na RTX 4090 obok Bielika", jedna maszyna) odpadła: embedder chodzi na CPU, a LLM
-  jest **zewnętrznym endpointem** na osobnej maszynie, więc w bazowym compose nie ma czego z czym
-  dzielić. Pusty plik „na wszelki wypadek" łamie regułę „warstwa dokłada jeden wymiar", a aktywna
-  rezerwacja GPU **twardo wywala start** bez runtime'u GPU — czyli plik, którego nikt nie odpala
-  i który przy pierwszym użyciu za pół roku nie zadziała. Gdy pojawi się maszyna z kartą, warstwa
-  to jeden plik i **zero zmian w bazie** (baza pozostaje przenośna — to była cała motywacja
-  wydzielenia). Uboczna korzyść CPU-only: `pytest -m integration_embedder` z prawdziwym modelem
-  chodzi wszędzie, bez warunkowych pominięć.
-  - **Gdyby jednak kiedyś padło na jedną maszynę** — embedder na CPU, LLM na GPU (nie odwrotnie
-    i nie oba na GPU). Powód: obciążenia są rozłączne w czasie (indeksacja jest wsadowa,
-    generacja interaktywna), embedder na CPU jest wystarczająco szybki, a przede wszystkim
-    **znika konflikt o VRAM** — dwa procesy na jednej karcie dają najgorszy rodzaj awarii:
-    Ollama wpada w częściowy offload na CPU i **cicho zwalnia kilkukrotnie, bez błędu w logach
-    obu usług**. Cena to jeden parametr (wątki `torch`), nie zmiana architektury.
-- ~~**Masowe parsowanie korpusu w aplikacji**~~ — **decyzja odwrócona 2026-08-01.** Parsowanie
-  przez API weszło wcześniej, niż zakładał etap 10: `helpdesk tickets parse` woła skonfigurowany
-  `LLMClient`, wypełnia `ticket_id`/`date` ze źródła i zapisuje artefakt po KAŻDYM zgłoszeniu, więc
-  przerwany przebieg nie traci tego, za co zapłacił. Etapowi 10 zostaje adapter SQL, wznawianie po
-  identyfikatorach i raport zbiorczy — nie sama zdolność parsowania.
-  - **Ręczne parsowanie w czacie skończone**, a razem z nim `scripts/prepare_parse_batch.py`
-    (renderował porcje tekstu do wklejenia) i `data/batch/` — **skasowane 2026-08-01**, commit
-    `8d7114e`. **Odzyskane 2026-08-05 jako `scripts/select_parse_sample.py`**: renderowanie
-    i porcjowanie wypadły (robi to `helpdesk tickets parse`), został **dobór warstwowy
-    deterministyczny** i **filtr progu 50 znaków liczony po stripie HTML-a** — czyli to, czego
-    CLI nie ma. Dołożona kontrola okna kontekstu przed przebiegiem.
+- **Warstwa `docker-compose.gpu.yml`** — nie powstaje (2026-08-05): embedder chodzi na CPU, a LLM
+  jest zewnętrznym endpointem, więc nie ma czego z czym dzielić. Gdy pojawi się maszyna z kartą,
+  warstwa to jeden plik i zero zmian w bazie.
+  - **Gdyby padło na jedną maszynę:** embedder na CPU, LLM na GPU — nie odwrotnie i nie oba na
+    GPU. Dwa procesy na jednej karcie dają najgorszą awarię: Ollama wpada w częściowy offload
+    i **cicho zwalnia kilkukrotnie, bez błędu w logach**.
+- ~~**Masowe parsowanie korpusu w aplikacji**~~ — **odwrócone 2026-08-01**: `helpdesk tickets
+  parse` już to robi, zapisując artefakt po KAŻDYM zgłoszeniu. Etapowi 10 zostaje adapter SQL,
+  wznawianie i raport zbiorczy — nie sama zdolność parsowania. Ręczne parsowanie w czacie
+  skończone; z narzędzi został `scripts/select_parse_sample.py` (dobór warstwowy deterministyczny
+  + próg 50 znaków liczony po stripie HTML-a).
 - **Framework RAG (LangChain / LlamaIndex)** — piszemy wprost na kliencie Qdranta; warstwa
   pośrednia ukryłaby dokładnie te rzeczy, które tu kontrolujemy ręcznie (prefiksy, named vectors,
   progi, routing).
@@ -1609,27 +1619,18 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   awarii procesu (zasada 10).
 - **Siedem pól schematu odrzuconych przy przeglądzie pod kątem uniwersalności** (2026-07-31,
   17 pól → 10). Wspólna przyczyna: były projektowane pod **ten jeden korpus**, a nie pod produkt.
-  - `system` — wchłonięte przez `component`; przy założeniu „jedna instancja = jeden produkt"
-    byłoby stałą powielaną w każdym rekordzie (661× „Dokus" w próbce).
-  - `component_other` — wchłonięte przez `component`, gdy pole stało się swobodne.
+  - `system` — stała przy założeniu „jedna instancja = jeden produkt" (661× „Dokus" w próbce).
+  - `component_other`, `audience`, `version`, `portable` — wchłonięte przez `component`,
+    `resolution` albo tekst `solution`.
   - `confirmed` — bez wiarygodnego źródła i bez mocy predykcyjnej (uzasadnienie wyżej).
-  - `audience` — informacja o wykonawcy zmieściła się w słowniku `resolution`.
   - `related_tickets` — zbyt szczegółowe; **kosztem jest graf odesłań w etapie 4**.
-  - `version`, `portable` — wyprowadzone z jednego wdrożenia; mieszczą się w tekście `solution`.
-  - `category` — **86% rekordów w trzech wartościach, 74% w dwóch**, a granica „Błąd"/„Usterka"
-    nieostra nawet dla człowieka. Nie jest embedowane, jako filtr nie różnicuje (41% na jedną
-    wartość), a do generacji nie wnosi nic ponad `cause` i `solution`. Do tego pochodzi
-    z metadanych źródłowych, które w tej bazie **bywają sprzeczne z treścią** („już powinno
-    działać" w kategorii „Awaria krytyczna"). **Uwaga: kategoria „Automat mailowy" pozostaje
-    sygnałem dla ADAPTERA** (wymaga czyszczenia cytowanej historii przed parsowaniem) — adapter
-    czyta ją ze źródła, nie z artefaktu.
-- **Rozbicie wątku-projektu na wiele rekordów** (prompt zwraca listę `ParsedTicket`, `ticket_id`
-  z sufiksem `33644-1`, `33644-2`) — rozważone, **odłożone do etapu 11**, nie odrzucone na
-  zawsze. Powód: dotyka **kontraktu artefaktu** (parser zwraca listę zamiast obiektu, zmienia się
-  walidacja, klucz i dedup), więc wprowadzenie go po masowym parsowaniu oznacza ponowny przebieg
-  LLM po całym korpusie (zasada 7). Przy 1,8% korpusu robienie tego **zanim** wiadomo, czy te
-  rekordy realnie psują trafienia, byłoby projektowaniem na zapas. Do tego czasu: filtr etapu 4
-  je wyklucza i **liczy**, a ta liczba jest wejściem do decyzji.
+  - `category` — 86% rekordów w trzech wartościach, granica „Błąd"/„Usterka" nieostra nawet dla
+    człowieka, a metadane bywają sprzeczne z treścią. **Ale kategoria „Automat mailowy" zostaje
+    sygnałem dla ADAPTERA** — czyta ją ze źródła, nie z artefaktu.
+- **Rozbicie wątku-projektu na wiele rekordów** (`ticket_id` z sufiksem `33644-1`) — **odłożone
+  do etapu 11**, nie odrzucone: dotyka kontraktu artefaktu, więc po masowym parsowaniu oznacza
+  ponowny przebieg LLM (zasada 7). Przy 1,8% korpusu decyduje pomiar — filtr etapu 4 je wyklucza
+  i **liczy**.
 - **Rozdzielenie `solution` na trzy pola** (*co zrobiono* / *co ustalono* / *zastrzeżenia*) —
   rozważone, odrzucone jako nadmierna struktura. Zastrzeżenia zostają **częścią tekstu
   `solution`**, a o ich zachowanie dba prompt parsujący i prompt generacji. **Ryzyko przyjęte
@@ -1641,27 +1642,20 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   „Ryzyka jakości treści". Filtr indeksacji patrzy na treść. Uboczna korzyść: słownik
   `resolution` jest w całości konfigurowalny, bez wymogu mapowania na cokolwiek — więc klient
   nie może przypadkiem skonfigurować progu jakości.
-- **Lista dosłownych pytań konsultanta zamiast syntezy** (`asked_questions`) — rozważona,
-  odrzucona: przy medianie **jednego** pytania na zgłoszenie (74% przypadków) lista to niemal
-  to samo co synteza, a forma pytająca silniej ciągnie model do przepisania cudzych pytań wprost.
-  Zysk z wierności artefaktu nie równoważył tego przy tak niskim pokryciu (16,7% zgłoszeń).
-  **Warunek, na którym stoi ta decyzja:** synteza zachowuje konkrety — jeśli w praktyce zacznie
-  je gubić, wracamy do rozmowy, bo wtedy pole traci wartość.
-- **Automatyczny wybór wariantu generacji za człowieka** — score **podpowiada** guzik, nigdy nie
-  klika go sam. Rozważone i odrzucone: system nie wie, czy zgłoszenie wymaga działania serwisu
-  (to wiedza wdrożeniowca, nie funkcja podobieństwa wektorów). Dochodzi argument z danych:
-  automat wymagałby osądu „czy trafienia są zgodne co do przyczyny" — **osądu LLM-a nad osądem
-  LLM-a**, którego dziś nie umiemy zmierzyć. Przy wyborze ręcznym pomyłka kosztuje jedno
-  kliknięcie, a nie błędną odpowiedź. **Wraca jako możliwość**, gdy dane z klikania dadzą
-  podstawę do zbudowania i oceny — bo każde kliknięcie jest etykietą treningową.
-- **Odesłanie zgłoszenia do innego działu / zespołu wewnętrznego** — odrzucone: w tym zakresie
-  **nie ma działu, do którego się odsyła** (jeden moduł, jeden zespół dostawcy), a grzeczna
-  formułka bez treści jest **udokumentowaną patologią korpusu** (dosłownie ten sam tekst ≥12×
-  w jednej turze, zawsze przy zerowej treści). Automatyzacja grzecznego spławienia zautomatyzuje
-  mechanizm, przez który wiedza z tego helpdesku znika — i zrobi to skuteczniej niż człowiek.
-  **Nie dotyczy eskalacji do operatora usługi zewnętrznej** (COI, ePUAP, Poczta Polska) — ta
-  w korpusie jest realna i ma zapisane ścieżki; warunek: tekst musi nieść **co sprawdzono
-  i czego brakuje**, nigdy samo „przekazuję dalej". Dotyczy to tak samo wariantu `handoff`.
+- **Lista dosłownych pytań konsultanta zamiast syntezy** (`asked_questions`) — przy medianie
+  **jednego** pytania na zgłoszenie lista to niemal to samo co synteza, a forma pytająca ciągnie
+  model do przepisania cudzych pytań wprost. **Warunek tej decyzji:** synteza zachowuje konkrety;
+  jeśli zacznie je gubić, wracamy do rozmowy.
+- **Automatyczny wybór wariantu generacji za człowieka** — score podpowiada guzik, nigdy nie
+  klika go sam: system nie wie, czy zgłoszenie wymaga działania serwisu, a automat wymagałby
+  **osądu LLM-a nad osądem LLM-a**, którego nie umiemy zmierzyć. **Wraca jako możliwość**, gdy
+  dane z klikania dadzą podstawę do oceny — każde kliknięcie jest etykietą treningową.
+- **Odesłanie zgłoszenia do innego działu wewnętrznego** — nie ma działu, do którego się odsyła
+  (jeden moduł, jeden zespół), a grzeczna formułka bez treści to **udokumentowana patologia
+  korpusu** (ten sam tekst ≥12× w jednej turze, zawsze przy zerowej treści) — automatyzowalibyśmy
+  mechanizm, przez który wiedza znika. **Nie dotyczy eskalacji do operatora zewnętrznego** (ePUAP,
+  Poczta Polska): tam warunkiem jest, by tekst niósł **co sprawdzono i czego brakuje**. Dotyczy
+  tak samo wariantu `handoff`.
 - **Osobny endpoint na każdy wariant** (`/suggest/questions`, `/suggest/solution`…) — odrzucone:
   lista wariantów jest konfigurowalna, więc nowy guzik nie może wymagać nowej trasy.
 - **Blokowanie konfiguracji wariantu, która obchodzi zasadę 9** (prompt „wygeneruj rozwiązanie"
@@ -1687,20 +1681,13 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 Luki „ostatniej mili", o których agent ma wiedzieć. Gdy natrafisz na taki brak (albo sam go
 tworzysz świadomym skrótem), **dopisz go tu** zamiast zostawiać w milczeniu.
 
-- **PII w danych historycznych** — ustalić politykę: anonimizacja przy parsowaniu czy tylko
-  kontrola dostępu. Decyzja wpływa na schemat i na to, co wolno trzymać w payloadzie Qdranta.
-  Kontekst z realnych danych: PII jest gęste (`osoba_kontakt`/`email_kontakt`/`telefon_kontakt`
-  wypełnione w ~92% zgłoszeń, do tego nazwiska w treści komentarzy), a przy **34 instytucjach**
-  Dokusa anonimizacja nazwy instytucji jest iluzoryczna — kontekst zgłoszenia i tak zdradza,
-  o kogo chodzi. Realny wybór jest więc między pełną anonimizacją treści a kontrolą dostępu,
-  nie między „ukryjemy nazwę" a resztą.
-  - **Zmierzone na artefaktach, nie na źródle (2026-08-05, 200 rekordów): nazwiska przechodzą
-    przez parser do pól EMBEDOWANYCH w 9,5% rekordów** (19 z 200, np. „Użytkownik Marta Gajda nie
-    widzi żadnych elementów w eSODzie"). Prompt ich nie usuwa — i nie ma powodu, żeby robił to
-    sam z siebie, bo nikt mu tego nie kazał. Ekstrapolacja na korpus: **~130 rekordów**.
-    To przesuwa problem z „PII jest w źródle" na **„PII wjedzie do bazy wektorowej i do payloadu"**,
-    czyli tam, skąd trudniej je usunąć niż z pliku. Rozstrzygnąć **przed etapem 4**, bo re-indeks
-    jest tani, ale ponowne parsowanie korpusu już nie (zasada 7).
+- **PII w danych historycznych — ROZSTRZYGNIĘTE 2026-08-12: kontrola dostępu, nie anonimizacja
+  artefaktów.** Przesądził lokalny LLM (PII nie opuszcza infrastruktury) i proporcja: **9,5%
+  rekordów z nazwiskiem w polu embedowanym wobec ~92% zgłoszeń z pełnym PII w źródle** — czyli
+  anonimizacja artefaktów nie chroni przed niczym, przed czym nie chroni dostęp do bazy.
+  Właściwą osią jest **uwierzytelnianie API** (punkt niżej). Zostaje koszt jakościowy, nie
+  prywatnościowy: nazwisko w wektorze nie niesie nic o klasie problemu — stąd **etap 4c**
+  (placeholder w prompcie, bez re-parsowania).
 - **Hasła w zrzucie źródłowym** — zgłosić klientowi, że `konsultant.haslo` i `uzytkownik.haslo`
   to 32-znakowe hashe MD5 (bez bcrypt/argon), a `skrzynka_email.password` leży obok. Nas to nie
   dotyczy (adapter tych kolumn nie czyta), ale zrzut u nas na dysku owszem — trzymać go krótko
@@ -1709,41 +1696,31 @@ tworzysz świadomym skrótem), **dopisz go tu** zamiast zostawiać w milczeniu.
   odświeżania (kolejny zrzut? dostęp read-only?) baza wiedzy zestarzeje się przy ~500 nowych
   użytecznych zgłoszeniach rocznie.
 - **Uwierzytelnianie API** — brak; endpointy są dziś otwarte w sieci compose.
-- **Licencja PolDense (gemma)** — zweryfikować dopuszczalność użycia komercyjnego. Skąd się wzięła:
-  PolDense stoi na **ettin-encoders (ModernBERT)**, ale trenowany był **destylacją
-  z BGE-Multilingual-Gemma2** — licencja idzie od modelu-nauczyciela, nie od architektury.
-  Ma to znaczenie dla etapu 3: rywale (mmlw, BGE-M3, Nomic) mają inne licencje, więc wybór modelu
-  jest **także decyzją licencyjną**, nie tylko jakościową.
-- **Persystencja feedbacku** (czy wdrożeniowiec zaakceptował propozycję) — bez tego nie
-  zmierzymy realnej użyteczności na produkcji. **Waga tego punktu wzrosła po pomiarze korpusu:**
-  zapis „który wariant wybrano, czy propozycja poszła do klienta, czy człowiek poszedł wbrew
-  rekomendacji" jest **jedynym sygnałem realnej użyteczności** na produkcji **i jednocześnie
-  jedyną drogą do automatycznego routingu** (patrz „Świadomie pominięte").
-- **Nie zmierzono NIC po stronie użytkownika.** Wszystkie pomiary dotyczą korpusu. Jeśli
-  wdrożeniowców jest kilku i pracują od lat, top-50 odpowiedzi znają na pamięć, a narzędzie
-  pomaga dopiero w ogonie — czyli tam, gdzie korpus jest najcieńszy (47% singletonów).
-  **Do rozstrzygnięcia przed etapem 6: ilu jest wdrożeniowców, jak długo pracują i ile czasu
-  tracą dziennie na szukanie w helpdesku.** Kontrargument już w danych: jest w korpusie
-  zgłoszenie zamknięte bez odpowiedzi merytorycznej, mimo że **ta sama firma opisała tę funkcję
-  dwukrotnie w poprzednim półroczu** — wiedza plemienna zawodzi nawet u doświadczonych.
+- **Licencja PolDense (gemma)** — zweryfikować użycie komercyjne. Licencja idzie od
+  modelu-nauczyciela (destylacja z BGE-Multilingual-Gemma2), nie od architektury. Rywale (mmlw,
+  BGE-M3, Nomic) mają inne licencje, więc wybór modelu jest **także decyzją licencyjną**.
+- **Persystencja feedbacku** (który wariant wybrano, czy propozycja poszła do klienta, czy
+  człowiek poszedł wbrew rekomendacji) — **jedyny sygnał realnej użyteczności na produkcji
+  i jedyna droga do automatycznego routingu** (patrz „Świadomie pominięte").
+- **Nie zmierzono NIC po stronie użytkownika** — wszystkie pomiary dotyczą korpusu. Doświadczeni
+  wdrożeniowcy znają top-50 odpowiedzi na pamięć, więc narzędzie pomaga dopiero w ogonie, gdzie
+  korpus jest najcieńszy (47% singletonów). **Przed etapem 6 ustalić: ilu ich jest i ile czasu
+  tracą na szukanie.** Kontrargument już w danych: jedno zgłoszenie zamknięto bez odpowiedzi, choć
+  **ta sama firma opisała tę funkcję dwukrotnie pół roku wcześniej**.
 - **Detekcja sekretów jako osobny krok** — niezależny od anonimizacji PII, z **dwoma rozłącznymi
   wzorcami** (kontekst dla haseł słownikowych, entropia dla losowych). Patrz „Pułapki tej bazy":
   1,1% zgłoszeń, dwa z pięciu przypadków wkleił konsultant. **To liczba do zgłoszenia klientowi.**
 - **Backup `data/parsed/`** — jedyny niepowtarzalny artefakt (odtworzenie = ponowny koszt LLM).
-- **Liczba wątków `torch` w embedderze** — domyślnie biblioteka bierze **wszystkie rdzenie**, co
-  na maszynie dzielonej z `api` i Qdrantem potrafi zagłodzić resztę na czas przebiegu indeksacji.
-  Kandydat na `EMBEDDING_NUM_THREADS`, ale **najpierw pomiar** — nie dokładamy zmiennej, zanim
-  wiadomo, że przeszkadza. Dotyczy też układu z osobnymi maszynami, bo embedder i tak dzieli host
-  z `api`.
+- **Liczba wątków `torch` w embedderze** — domyślnie bierze **wszystkie rdzenie**, co przy
+  indeksacji potrafi zagłodzić `api` i Qdranta. Kandydat na `EMBEDDING_NUM_THREADS`, ale
+  **najpierw pomiar**.
 - **Limity i koszty LLM** — brak budżetowania i rate-limitu na wywołania generacji. **Bramki
   zmieniają skalę problemu**: dotąd LLM wołaliśmy raz na zapytanie wdrożeniowca, teraz woła go
   **każde zamknięcie, każda wysyłka i każde kliknięcie „Popraw"** — czyli ruch proporcjonalny do
   całej pracy helpdesku, nie do jej ułamka. Do policzenia przed wdrożeniem nogi 2.
-- **Kto edytuje reguły i na jakich prawach** — endpoint edycji reguł zmienia zachowanie bramek
-  dla wszystkich; przy dzisiejszym braku uwierzytelniania (punkt wyżej) to otwarta zmiana
-  konfiguracji produkcyjnej. Reguły muszą wejść razem z kontrolą dostępu i audytem zmian.
-  **Dotyczy tak samo wariantów generacji** — edycja promptu wariantu zmienia treść, którą
-  wdrożeniowcy wysyłają klientom.
+- **Kto edytuje reguły i na jakich prawach** — edycja zmienia zachowanie bramek dla wszystkich,
+  a przy braku uwierzytelniania to otwarta zmiana konfiguracji produkcyjnej. Reguły muszą wejść
+  razem z kontrolą dostępu i audytem. **Dotyczy tak samo wariantów generacji.**
 - **Wariant konfigurowalny może obejść zasadę 9** — świadomie nie blokujemy tego w kodzie
   (patrz „Świadomie pominięte"), ale przed wdrożeniem trzeba to **powiedzieć klientowi wprost**
   przy przekazywaniu edycji wariantów: prompt „wygeneruj rozwiązanie" bez wymogu trafień daje
@@ -1751,9 +1728,9 @@ tworzysz świadomym skrótem), **dopisz go tu** zamiast zostawiać w milczeniu.
 - **Punkt integracji po stronie helpdesku** — bramki mają sens tylko wtedy, gdy helpdesk
   faktycznie zawoła nas przed zamknięciem/wysyłką. Ustalić z właścicielem tamtej aplikacji,
   czy i gdzie da się wpiąć hook (to zależność zewnętrzna, nie nasza robota).
-- **Zachowanie przy niedostępnym LLM-ie musi być uzgodnione z helpdeskiem** — my zwracamy 503,
-  ale to tamta strona decyduje, czy przepuścić (`fail-open`). Bez tej uzgodnionej decyzji
-  awaria modelu albo zablokuje obsługę klienta, albo cicho wyłączy kontrolę jakości.
+- **Zachowanie przy niedostępnym LLM-ie uzgodnić z helpdeskiem** — my zwracamy 503, ale to tamta
+  strona decyduje o `fail-open`. Bez tego awaria modelu albo zablokuje obsługę klienta, albo cicho
+  wyłączy kontrolę jakości.
 
 ## Plan tworzenia aplikacji
 
@@ -1776,9 +1753,10 @@ właściwej warstwy, skrót → „TODO").
   (backend `fake`) oraz compose: baza dev + warstwa prod. Zero logiki domenowej — pierwszy
   realny użytkownik warstwy LLM pojawia się w etapie 5.
 - [x] **1. Kontrakt zgłoszenia** — `ParsedTicket` (10 pól rdzenia + wersja słownika)
-  w `api/app/domain/`, słownik rozstrzygnięć jako plik JSON za interfejsem magazynu reguł
-  (`api/app/rules/`), prompt parsujący jako **dokument markdown** pod testem-strażnikiem
-  (`api/app/prompts/parse_ticket.md`) oraz `helpdesk tickets validate` — logika w domenie,
+  w `api/app/model/`, słownik rozstrzygnięć jako plik JSON w `api/app/text/` za interfejsem
+  magazynu reguł (`service/loader_dict_resolution.py`), prompt parsujący jako **dokument
+  markdown** pod testem-strażnikiem
+  (`api/app/text/prompt_parse_ticket_user.md`) oraz `helpdesk tickets validate` — logika w domenie,
   CLI tylko drukuje i ustala kod wyjścia, żeby masowy import z etapu 10 użył tego samego
   sprawdzenia. Kształt schematu rozstrzygnął przegląd 2026-07-31 — patrz tabela rdzenia
   w sekcji „Domena".
@@ -1825,10 +1803,76 @@ właściwej warstwy, skrót → „TODO").
   Świadoma strata: ~5% korpusu odsyła do innego numeru zgłoszenia, a czasem to jedyny ślad, że
   rozwiązanie w ogóle istnieje — te rekordy zostaną w indeksie puste albo wypadną przez filtr.
   Odzyskanie tego wymaga pola w schemacie, czyli ponownego przebiegu LLM (zasada 7).
-- [ ] **4b. Rekordy syntetyczne** — kilkanaście ręcznie napisanych rekordów-drzew decyzyjnych
-  dla klas wieloprzyczynowych, gdzie wiedza jest kompletna, ale rozsypana po 4–7 zgłoszeniach
-  (patrz zasada 9, wyjątek). **Osobny etap przed generacją, nie przypis** — te kilkanaście
-  rekordów będzie warte więcej niż 650 rekordów korpusowych.
+
+  **Materiał: `data/parsed/bielik-11b-golden200/` (200 artefaktów)** — ten sam zestaw, na którym
+  stoi golden set, więc filtr da się zmierzyć wobec 35 etykiet „odrzuć" i 165 „przepuść"
+  z `data/golden/bielik-11b-golden200.json`. Pozostałe katalogi w `data/parsed/` to próbki
+  porównawcze parserów i **nie wchodzą do indeksu**.
+
+  **Podkroki:**
+  - **4.1 Klient Qdranta** (`service/`, `model/`) — tworzenie kolekcji z **dwoma named vectors**
+    (`problem` = passage, `sts` = sts, oba 768), upsert z payloadem, kasowanie kolekcji. Sam
+    transport, zero logiki filtrującej. Infrastruktura jest gotowa: usługa w compose, `QDRANT_*`
+    w `Settings`, marker `integration_qdrant` zarejestrowany. *Kryterium:* test
+    `integration_qdrant` — kolekcja powstaje z właściwymi wymiarami, punkt wraca z payloadem.
+  - **4.2 Filtr jakości** — wielosygnałowy, niebinarny, **raportujący co odrzuca**. Sygnały wprost
+    z etykiet golden setu: puste `cause`+`solution`, `solution` bez treści działania („problem
+    rozwiązany poprzez interwencję"), zgłoszenie nietechniczne. *Kryterium:* mierzony na **pełnych
+    200** (przed budową kolekcji, inaczej ocenialibyśmy filtr na tym, co sam przepuścił), osobno
+    fałszywe alarmy i przepuszczenia. **Nie celujemy w 100%** — rekordy „nierozwiązane, ale
+    niosące wiedzę" mają przechodzić, a fałszywy alarm boli bardziej niż przepuszczenie.
+  - **4.3 Wątki-projekty** — wykryj, wyklucz, **policz**; ta liczba jest wejściem do decyzji
+    z etapu 11. *Kryterium:* raport podaje liczbę i `ticket_id`.
+  - **4.4 Dedup** — trzy reguły wyżej. *Kryterium:* test na spreparowanych parach, w tym
+    **identyczne `solution` przy różnym `component` → NIE scalać**.
+  - **4.5 `helpdesk index build` / `rebuild`** — cienkie CLI nad serwisem, `rebuild` z `--yes`.
+    Raport przebiegu: ile weszło, ile odrzucone i z jakiego powodu, ile zdeduplikowane, ile
+    wątków-projektów. *Kryterium:* dwa `rebuild` pod rząd dają identyczny stan kolekcji.
+  - **4.6 Pomiar na realnym indeksie** — `recall@1..K` przez Qdranta zamiast liczenia poza bazą.
+    *Kryterium:* wynik zgodny z 98,2% z etapu 3 albo wyjaśniona różnica. **To sprawdzian
+    OKABLOWANIA, nie jakości modelu** — golden set i korpus to ten sam zbiór rekordów, więc
+    liczby nie wolno czytać jako skuteczności produktu.
+
+  **Ograniczenia przy 200 rekordach, zapisane świadomie:** dedup i wątki-projekty powstają jako
+  **mechanika** sprawdzona na spreparowanych przypadkach — realne liczby (oczekiwane ~4 wątki
+  projektowe, 47% singletonów) przyjdą dopiero z pełnym korpusem po etapie 10. **Nie kasujemy
+  named vectora `sts`** (oś „zapytanie sparsowane" wciąż niezmierzona) i **nie porównujemy
+  embedderów** — przy tej skali nadal sufit.
+- [ ] **4b. Rekordy syntetyczne — drzewa decyzyjne dla klas wieloprzyczynowych.** Kilkanaście
+  rekordów, których **nie ma w korpusie i nie da się ich z niego wyprowadzić automatycznie**:
+  pisze je człowiek, czytając po 4–7 zgłoszeń naraz (zasada 9, jawny wyjątek; `source`
+  w payloadzie odróżnia je od korpusowych).
+  - **Problem, który rozwiązują, leży MIĘDZY rekordami, nie w nich.** „Nic nie przychodzi
+    z e-Doręczeń" to 6 zgłoszeń i **6 rozłącznych przyczyn**; każde z osobna jest poprawne
+    i przejdzie filtr etapu 4, ale przy wyszukiwaniu top-1 trafia z prawdopodobieństwem ⅙,
+    a pięć pozostałych podpowiedzi **wygląda równie wiarygodnie**. Żadne pojedyncze trafienie nie
+    wystarcza — brakującym rekordem jest ten, który mówi „ten objaw ma sześć znanych przyczyn,
+    rozróżnia je to i to, sprawdź w tej kolejności".
+  - **To nie to samo co wątki-projekty z 4.3** — tam **jedno** zgłoszenie niesie kilkanaście
+    postulatów i filtr je **usuwa**; tutaj **wiele** zgłoszeń opisuje jeden objaw i my
+    **dokładamy** rekord scalający. Przeciwne kierunki, wspólny wniosek: naturalną jednostką
+    wiedzy nie zawsze jest zgłoszenie.
+  - **Materiałem są zgłoszenia, nie indeks** — rekord wykluczony przez filtr nadal może być
+    źródłem przy pisaniu drzewa.
+  - **Osobny etap przed generacją, nie przypis** — te kilkanaście rekordów będzie warte więcej
+    niż 650 rekordów korpusowych, bo dotyczą dokładnie tych zapytań, przy których naiwne top-1
+    jest aktywnie szkodliwe (patrz „Powtarza się objaw, nie przyczyna").
+- [ ] **4c. Kuracja promptu parsującego: PII i sekrety** — reguła 6 jest dziś zakazem
+  negatywnym bez wskazania, **co wpisać zamiast**, a to wymusza wybór między zgubieniem sensu
+  zdania a przepisaniem nazwiska (zmierzone: 9,5% rekordów, ~130 w korpusie). Naprawa to
+  **placeholder** (`{UŻYTKOWNIK}`) — ten sam mechanizm, którym zasada 9 rozwiązuje brakujące
+  dane przy generacji — nie mocniejszy zakaz. Osobno **sekrety**: reguła 6 wrzuca je do jednego
+  worka z nazwiskami, a klasy są **rozłączne co do skutku** — nazwisko w wektorze lekko szkodzi
+  retrievalowi, hasło roota wyskakujące w propozycji odpowiedzi to incydent bezpieczeństwa
+  (1,1% zgłoszeń, **dwa z pięciu przypadków wkleił konsultant** — patrz „Pułapki tej bazy").
+  - **Nowa wersja promptu NIE uruchamia re-parsowania.** Wchodzi w życie przy pełnym przebiegu
+    w **etapie 10**, więc kosztuje zero; odpalona teraz unieważniłaby 209 artefaktów i golden
+    set zbudowany na tych samych rekordach (zasada 7).
+  - **Priorytet obniżony świadomie** — polityka PII rozstrzygnięta na korzyść kontroli dostępu
+    (patrz TODO), bo docelowy LLM jest lokalny. To, co zostaje, jest argumentem **jakościowym**:
+    nazwisko w polu embedowanym zanieczyszcza wektor.
+  - **Kryterium ukończenia:** test-strażnik na obecności placeholdera i na rozdzieleniu reguły
+    sekretów od reguły PII, wersja promptu podbita, artefakty z etapów 3–4 nietknięte.
 - [ ] **5. Wyszukiwanie** — `POST /search`: parser zapytania (LLM → `ParsedTicket`) + top-K,
   próg, dedupe, zwrot trafień ze score i ID. **Tu parser wchodzi do runtime** — ten sam prompt
   i ten sam model Pydantic, którymi parsowaliśmy korpus.
@@ -1843,10 +1887,11 @@ właściwej warstwy, skrót → „TODO").
   ruszać serwisu. Każdy wariant deklaruje `requires_hits`, co przesądza, które guziki działają
   przy pustym indeksie. **Koniec nogi 1** (RAG). Od etapu 7 budujemy nogę 2 — patrz „Bramki
   jakości i asysta pisania".
-- [ ] **7. Asysta pisania („Popraw")** — `POST /polish`: szkielet promptu w `prompts/`, zasady
+- [ ] **7. Asysta pisania („Popraw")** — `POST /polish`: szkielet promptu w `text/`, zasady
   stylu jako dane, serwis wołający wyłącznie `LLMClient`. **Pierwszy z trzech, bo najprostszy
   i najmniej ryzykowny** — nie wydaje werdyktu, nikogo nie blokuje. Zasady stylu na tym etapie
-  są **wbudowanym zestawem domyślnym za interfejsem magazynu reguł** (`rules/`), nie SQL-em:
+  są **wbudowanym zestawem domyślnym za interfejsem magazynu reguł** (`text/` + `loader_*`),
+  nie SQL-em:
   granica „szkielet w kodzie / treść jako dane" powstaje tu, a podmiana źródła na bazę w etapie 8
   ma nie ruszać serwisu. **Kluczowy sprawdzian: brak nowych faktów** — porównanie wejścia
   z wyjściem pod kątem dodanych liczb, nazw i kroków (zasada 9).
@@ -1863,7 +1908,7 @@ właściwej warstwy, skrót → „TODO").
   (`helpdesk eval gates`) na realnych zamknięciach z korpusu, mierzona osobno per reguła, z naciskiem
   na **fałszywe alarmy**. **Uzgodnić z helpdeskiem** punkt wpięcia i zachowanie przy 503
   (patrz TODO) — bez tego endpointy istnieją, ale nikt ich nie woła.
-- [ ] **10. Masowy import w aplikacji** — adapter **SQL** (`ingest/`, źródłem jest zrzut bazy
+- [ ] **10. Masowy import w aplikacji** — czytnik **SQL** (w `service/`, źródłem jest zrzut bazy
   `helpdesk`, nie plik eksportu) + pipeline `RawTicket → LLM → ParsedTicket → data/parsed/`;
   parser z etapu 5 użyty ponownie, dochodzi wsadowość (wznawianie, limity, raport z przebiegu).
   Adapter skleja wątek: `zgloszenie` + jego `komentarz`e w kolejności `id`, po strip HTML.

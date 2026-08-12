@@ -2,12 +2,15 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-from app.rules.resolution import ResolutionVocabulary
+from app.model.dict_resolution_vocabulary import ResolutionVocabulary
 
-# The prompt TEXT lives in parse_ticket.md, not here. It is the artifact contract and the one
+# The prompt TEXT lives in `app/text/*.md`, never here. It is the artifact contract and the one
 # thing in this project a human must review sentence by sentence — as a markdown document it reads
-# (and diffs) like prose, instead of like a string assembled from three constants.
-PROMPT_FILE = Path(__file__).with_suffix(".md")
+# (and diffs) like prose, instead of like a string assembled from constants. This module only
+# assembles it, which is why it sits in `service/` while the documents stay data.
+TEXT_DIR      = Path(__file__).parent.parent / "text"
+PROMPT_FILE   = TEXT_DIR / "prompt_parse_ticket_user.md"
+SYSTEM_FILE   = TEXT_DIR / "prompt_parse_ticket_system.md"
 
 # Editorial notes for us; they must never reach the model.
 _HTML_COMMENT = re.compile(r"<!--.*?-->\s*", re.DOTALL)
@@ -17,24 +20,16 @@ _HTML_COMMENT = re.compile(r"<!--.*?-->\s*", re.DOTALL)
 VOCABULARY_PLACEHOLDER = "{{vocabulary}}"
 THREAD_PLACEHOLDER     = "{{thread}}"
 
-SYSTEM_PROMPT = """\
-Jesteś parserem zgłoszeń helpdesku. Zamieniasz wątek zgłoszenia na ustrukturyzowany JSON.
-
-Twoim zadaniem jest WIERNY zapis tego, co jest w wątku — nie doradzanie, nie ocenianie i nie
-uzupełnianie wiedzą własną. Jeśli czegoś w wątku nie ma, wpisujesz jawne wyjście, nigdy zmyśloną
-wartość. Zwracasz wyłącznie obiekt JSON, bez komentarza przed nim ani po nim.\
-"""
-
 
 @lru_cache
-def prompt_template() -> str:
+def _read_document(path: Path) -> str:   # e.g. TEXT_DIR / "prompt_parse_ticket_user.md"
     """
     Description:
-    Reads the prompt document and strips our editorial comments. Cached, so the file is read once
-    per process rather than on every ticket of a 1500-ticket run.
+    Reads one prompt document and strips our editorial comments. Cached per path, so the file is
+    read once per process rather than on every ticket of a 1500-ticket run.
 
     Example args:
-        (none)
+        path=Path("/code/app/text/prompt_parse_ticket_user.md")
 
     Example result:
         "## Pola wynikowego JSON-a\\n\\n`component` — czego sprawa dotyczy…"
@@ -43,7 +38,37 @@ def prompt_template() -> str:
         FileNotFoundError: the prompt document is missing — a packaging error (it must be inside
             the image, not only in the developer's checkout)
     """
-    return _HTML_COMMENT.sub("", PROMPT_FILE.read_text(encoding="utf-8")).lstrip()
+    return _HTML_COMMENT.sub("", path.read_text(encoding="utf-8")).lstrip()
+
+
+def system_prompt() -> str:
+    """
+    Description:
+    Returns the system message that sets the model's role. A document rather than a constant in
+    code for the same reason the rules are: it is prompt TEXT, and prompt text is reviewed as
+    prose.
+
+    Example args:
+        (none)
+
+    Example result:
+        "Jesteś parserem zgłoszeń helpdesku. Zamieniasz wątek zgłoszenia na…"
+    """
+    return _read_document(SYSTEM_FILE).rstrip()
+
+
+def prompt_template() -> str:
+    """
+    Description:
+    Returns the parsing instructions with editorial comments removed, placeholders still in place.
+
+    Example args:
+        (none)
+
+    Example result:
+        "## Pola wynikowego JSON-a\\n\\n`component` — czego sprawa dotyczy…"
+    """
+    return _read_document(PROMPT_FILE)
 
 
 def field_rules() -> str:
@@ -93,8 +118,8 @@ def build_parse_prompt(
     Builds the full parsing prompt for one ticket thread.
 
     Flow:
-        1. The fixed rules come from `parse_ticket.md` — the artifact contract, covered by a
-           guard test.
+        1. The fixed rules come from `prompt_parse_ticket_user.md` — the artifact contract,
+           covered by a guard test.
         2. Both untrusted inputs are substituted into DELIMITED sections marked as data: the
            vocabulary (customer data) and the thread (user text). Neither may restate the output
            format or lift the no-invention rule, so they are inserted as data and never by

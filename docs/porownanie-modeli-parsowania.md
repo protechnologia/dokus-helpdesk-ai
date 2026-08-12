@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Data pomiaru | Anthropic 2026-08-01 · OpenAI i Bielik 2026-08-02 |
-| Prompt | `parse_ticket.md` (`c36eec0`) |
+| Prompt | `prompt_parse_ticket_user.md`, wtedy `parse_ticket.md` (`c36eec0`) |
 | Słownik rozstrzygnięć | `naprawione`, `bez_zmian_w_systemie`, `brak` |
 | Próbka | 10 zgłoszeń |
 
