@@ -467,19 +467,26 @@ Raises:                      # only when the method raises
 - **`-m 'not integration and not llm_live'` w `addopts`** — sama rejestracja markera niczego nie
   odsiewa; bez tego gołe `pytest` odpala też integracyjne. `-m` z linii poleceń nadpisuje.
 - Unit testy **mockują klienta LLM**; realne API nigdy w domyślnym przebiegu.
-- **Ile w pliku jest osi, tyle helperów — żadnego „helper i reszta ręcznie".** Oś to rodzaj
-  sytuacji, którą test zastaje. Przy kliencie HTTP są zwykle trzy i każda ma swój helper:
-  `_responding()` (przedmiotem jest **odpowiedź** — kształt, licznik, status), `_capturing()`
-  (przedmiotem jest **żądanie** — co poszło na drut), `_raising()` (transport **nie odpowiada
-  wcale**). **Sygnał do wyłapania:** jeden test woła helper, a trzy następne sklejają to samo
-  ręcznie — to znaczy, że brakuje helpera, a nie że tamte są wyjątkowe. Nie łataj tego kopią
-  handlera; dopisz brakujący, a powtórzone testy zwiną się do jednej parametryzacji.
+- **Ile w pliku jest osi, tyle helperów — żadnego „helper i reszta ręcznie".** Sygnał: jeden test
+  woła helper, a trzy następne sklejają to samo ręcznie — brakuje helpera, a nie tamte są
+  wyjątkowe. Dopisz brakujący, a powtórzone testy zwiną się do jednej parametryzacji.
 - **Atrapa z produkcji przed stubem pisanym w teście.** Jest `Fake…` (implementacja offline
   z fabryki)? Użyj jej — nawet gdy własny stub wygląda na mniejszy. **Rozstrzyga to, co
   sprawdzenie faktycznie czyta:** kontrola wymiaru czyta dwie właściwości, a `Fake…` obie ma,
   więc klasa z pełnym interfejsem byłaby czystą duplikacją. Stub dopiero wtedy, gdy atrapa nie
   umie odtworzyć badanego stanu. Zysk podwójny: mniej kodu i test pokazuje, **po co ta atrapa
   istnieje**.
+
+**Atrapy transportu bierz z `tests/helpers_transport.py`** — zawsze, gdy testujesz klienta HTTP.
+W pliku testu zostaje tylko budowa instancji klienta i atrapy jego własnych odpowiedzi.
+
+| helper | co robi |
+|---|---|
+| `with_transport()` | podmienia transport klienta |
+| `always()`         | jedna odpowiedź na wszystko |
+| `routed()`         | odpowiedź per `(metoda, ścieżka)` |
+| `capturing()`      | zapisuje wysłane żądania |
+| `raising()`        | transport nie odpowiada wcale |
 
 ## Świadomie pominięte (NIE dodawać bez pytania)
 

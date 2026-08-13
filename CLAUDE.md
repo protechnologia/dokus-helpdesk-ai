@@ -1565,12 +1565,9 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
   mismatch", gdy ten sam plik istnieje w `tests/unit/` i `tests/integration/`.
 - Unit testy **mockują klienta LLM i embedder**; realne API nigdy w domyślnym przebiegu.
 - **Ile w pliku jest osi, tyle helperów — żadnego „helper i reszta ręcznie".** Oś to rodzaj
-  sytuacji, którą test zastaje; w `test_api_embedding_client.py` są trzy i każda ma swój helper:
-  `_responding()` (przedmiotem jest **odpowiedź** — kształt, licznik, status), `_capturing()`
-  (przedmiotem jest **żądanie** — co poszło na drut), `_raising()` (transport **nie odpowiada
-  wcale**). **Sygnał do wyłapania:** jeden test woła helper, a trzy następne sklejają to samo
-  ręcznie — to znaczy, że brakuje helpera, a nie że tamte są wyjątkowe. Nie łataj tego kopią
-  handlera; dopisz brakujący, a powtórzone testy zwiną się do jednej parametryzacji.
+  sytuacji, którą test zastaje. **Sygnał do wyłapania:** jeden test woła helper, a trzy następne
+  sklejają to samo ręcznie — to znaczy, że brakuje helpera, a nie że tamte są wyjątkowe. Nie łataj
+  tego kopią handlera; dopisz brakujący, a powtórzone testy zwiną się do jednej parametryzacji.
 - **Atrapa z produkcji przed stubem pisanym w teście.** Jest `Fake…` (`FakeLLMClient`,
   `FakeEncoder`)? Użyj jej — nawet gdy własny stub wygląda na mniejszy. **Rozstrzyga to, co
   sprawdzenie faktycznie czyta:** `_verify_dimension` czyta `model_name` i `dimension`,
@@ -1599,6 +1596,18 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
   prowokujące błąd), nie na prawdziwej — inaczej test zależy od tego, jakie endpointy
   przypadkiem istnieją. Do tego `TestClient(app, raise_server_exceptions=False)`, bo domyślnie
   wyjątek leci do testu, zamiast trafić do handlera.
+
+**Atrapy transportu bierz z `tests/helpers_transport.py`** — zawsze, gdy testujesz klienta HTTP
+(`EmbeddingClient`, `QdrantClient`, magazyn reguł z etapu 8). W pliku testu zostaje tylko budowa
+instancji klienta i atrapy jego własnych odpowiedzi.
+
+| helper | co robi |
+|---|---|
+| `with_transport()` | podmienia transport klienta |
+| `always()`         | jedna odpowiedź na wszystko |
+| `routed()`         | odpowiedź per `(metoda, ścieżka)` |
+| `capturing()`      | zapisuje wysłane żądania |
+| `raising()`        | transport nie odpowiada wcale |
 
 ## Świadomie pominięte (NIE dodawać bez pytania)
 
