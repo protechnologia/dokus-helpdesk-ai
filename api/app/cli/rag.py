@@ -9,8 +9,17 @@ from app.model.rag_index_report import IndexBuildReport
 from app.retrieval import QdrantClient, RetrievalError
 from app.service.rag_indexer import TicketIndexer
 
-index = typer.Typer(
-    help            = "Budowa i odbudowa indeksu Qdranta z data/parsed/.",
+# --- helpdesk rag ---------------------------------------------------------------------------
+#
+# | komenda                 | co robi                                                     |
+# |-------------------------|-------------------------------------------------------------|
+# | `rag index <katalog>`   | dokłada artefakty do kolekcji, nadpisując punkty tych samych |
+# | `rag reindex <katalog>` | kasuje kolekcję i buduje ją od zera (pyta o potwierdzenie)   |
+#
+# Grupa zbiera to, co obsługuje nogę 1 (wykorzystanie bazy wiedzy) — dołączą tu wyszukiwanie
+# i generacja z etapów 5-6. Bramki i „Popraw" tu NIE trafią: z definicji działają bez indeksu.
+rag = typer.Typer(
+    help            = "RAG: baza wektorowa, wyszukiwanie i generacja propozycji.",
     no_args_is_help = True,
 )
 
@@ -154,8 +163,8 @@ def _execute(
         raise typer.Exit(code=1)
 
 
-@index.command("build", help="Zbuduj indeks z artefaktów, nie kasując istniejącej kolekcji.")
-def build(
+@rag.command("index", help="Zbuduj indeks z artefaktów, nie kasując istniejącej kolekcji.")
+def index(
     directory: Path = typer.Argument(Path("data/parsed"), help="Katalog z artefaktami."),
     verbose:   bool = typer.Option(False, "--verbose", "-v", help="Wypisz wszystkie odrzucone."),
 ) -> None:
@@ -175,8 +184,8 @@ def build(
     _execute(directory, drop_first=False, verbose=verbose)
 
 
-@index.command("rebuild", help="Skasuj kolekcję i zbuduj ją od zera.")
-def rebuild(
+@rag.command("reindex", help="Skasuj kolekcję i zbuduj ją od zera.")
+def reindex(
     directory: Path = typer.Argument(Path("data/parsed"), help="Katalog z artefaktami."),
     yes:       bool = typer.Option(False, "--yes", help="Nie pytaj o potwierdzenie."),
     verbose:   bool = typer.Option(False, "--verbose", "-v", help="Wypisz wszystkie odrzucone."),
@@ -187,7 +196,7 @@ def rebuild(
 
     Asks before destroying anything unless `--yes` is given. The index is rebuildable from
     `data/parsed/` by this very command (rule 8), so the risk is downtime rather than data loss —
-    but an accidental rebuild against an empty or wrong directory leaves nothing to search.
+    but an accidental run against an empty or wrong directory leaves nothing to search.
 
     Example args:
         directory=Path("data/parsed")

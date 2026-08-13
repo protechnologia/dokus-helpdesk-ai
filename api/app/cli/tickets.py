@@ -13,6 +13,15 @@ from app.service.parser_ticket_raw import load_raw_ticket
 from app.service.validator_ticket_parsed import validate_directory
 from app.util.time import format_duration
 
+# --- helpdesk tickets -------------------------------------------------------------------------
+#
+# | komenda                   | co robi                                                        |
+# |---------------------------|----------------------------------------------------------------|
+# | `tickets validate <kat.>` | sprawdza pliki JSON wobec kontraktu ParsedTicket; exit 1 = błędy |
+# | `tickets parse`           | parsuje zgłoszenia z data/raw/ przez LLM i zapisuje artefakty   |
+#
+# Grupa obejmuje wytwarzanie ARTEFAKTU (zasada 7) — to, co powstaje raz i drogo. Co się dzieje
+# z artefaktem dalej, należy do `helpdesk rag`.
 tickets = typer.Typer(
     help            = "Operacje na sparsowanych zgłoszeniach z data/parsed/.",
     no_args_is_help = True,

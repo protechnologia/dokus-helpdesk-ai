@@ -2,19 +2,32 @@ from importlib.metadata import version
 
 import typer
 
-from app.cli.index import index
+from app.cli.rag import rag
 from app.cli.tickets import tickets
 
-# no_args_is_help: a bare `helpdesk` prints the subcommand tree instead of an unhelpful usage error.
+# --- helpdesk: całe drzewo komend ------------------------------------------------------------
+#
+# | komenda                    | plik         | co robi                                        |
+# |----------------------------|--------------|------------------------------------------------|
+# | `version`                  | cli.py       | wersja pakietu; smoke test okablowania CLI      |
+# | `tickets validate <kat.>`  | tickets.py   | sprawdza artefakty wobec kontraktu ParsedTicket |
+# | `tickets parse`            | tickets.py   | parsuje zgłoszenia z data/raw/ przez LLM        |
+# | `rag index <kat.>`         | rag.py       | dokłada artefakty do kolekcji Qdranta           |
+# | `rag reindex <kat.>`       | rag.py       | kasuje kolekcję i buduje ją od zera             |
+#
+# Zaplanowane: `rag search` / `rag suggest` (etapy 5-6), `gate close` / `gate reply` / `polish`
+# (etapy 7-9). Bramki i „Popraw" stoją POZA grupą `rag` — z definicji działają bez indeksu.
+#
+# no_args_is_help: samo `helpdesk` drukuje drzewo, zamiast błędu użycia.
 cli = typer.Typer(
     help            = "Operator tooling for dokus-helpdesk-ai (indexing, search, evaluation).",
     no_args_is_help = True,
 )
 
-# Groups of related operations arrive as sub-apps, so the tree stays `helpdesk <resource> <action>`
-# (`helpdesk tickets validate`) instead of flattening into ever longer single-word commands.
+# Grupy powiązanych operacji wchodzą jako pod-aplikacje, więc drzewo zostaje
+# `helpdesk <obszar> <czynność>` zamiast płaskiej listy coraz dłuższych jednoczłonowych nazw.
 cli.add_typer(tickets, name="tickets")
-cli.add_typer(index, name="index")
+cli.add_typer(rag, name="rag")
 
 
 @cli.callback()

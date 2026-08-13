@@ -135,7 +135,7 @@ def stub_run(monkeypatch: pytest.MonkeyPatch) -> StubRun:
     """
     stub = StubRun()
 
-    monkeypatch.setattr("app.cli.index._run", stub)
+    monkeypatch.setattr("app.cli.rag._run", stub)
 
     return stub
 
@@ -144,7 +144,7 @@ def stub_run(monkeypatch: pytest.MonkeyPatch) -> StubRun:
 
 def test_build_reports_counts(tmp_path: Path, stub_run: StubRun) -> None:
     """Successful build → exit 0 and a line stating what was read, indexed and dropped."""
-    result = runner.invoke(cli, ["index", "build", str(_corpus(tmp_path))])
+    result = runner.invoke(cli, ["rag", "index", str(_corpus(tmp_path))])
 
     assert result.exit_code == 0
     assert "Wczytano" in result.stdout
@@ -154,7 +154,7 @@ def test_build_reports_counts(tmp_path: Path, stub_run: StubRun) -> None:
 def test_build_does_not_drop_the_collection(tmp_path: Path, stub_run: StubRun) -> None:
     """`build` → the run is asked NOT to delete first; that is the whole difference from
     `rebuild`."""
-    runner.invoke(cli, ["index", "build", str(_corpus(tmp_path))])
+    runner.invoke(cli, ["rag", "index", str(_corpus(tmp_path))])
 
     assert stub_run.calls[0]["drop_first"] is False
 
@@ -164,7 +164,7 @@ def test_build_lists_reasons_for_drops(tmp_path: Path, stub_run: StubRun) -> Non
     the index looks exactly like one that works, and this output is where the difference shows."""
     stub_run.report = _report(indexed=1, dropped_ids=("19596",))
 
-    result = runner.invoke(cli, ["index", "build", str(_corpus(tmp_path))])
+    result = runner.invoke(cli, ["rag", "index", str(_corpus(tmp_path))])
 
     assert "no_resolution" in result.stdout
     assert "19596" in result.stdout
@@ -175,7 +175,7 @@ def test_empty_index_is_a_failure(tmp_path: Path, stub_run: StubRun) -> None:
     scheduled rebuild destroy a working index unnoticed."""
     stub_run.report = _report(indexed=0)
 
-    result = runner.invoke(cli, ["index", "build", str(_corpus(tmp_path))])
+    result = runner.invoke(cli, ["rag", "index", str(_corpus(tmp_path))])
 
     assert result.exit_code == 1
 
@@ -184,7 +184,7 @@ def test_missing_directory_exits_two(tmp_path: Path, stub_run: StubRun) -> None:
     """Directory that does not exist → exit 2, apart from "the run produced nothing" (exit 1)."""
     stub_run.error = NotADirectoryError("nie jest katalogiem: /nie-ma")
 
-    result = runner.invoke(cli, ["index", "build", str(tmp_path / "nie-ma")])
+    result = runner.invoke(cli, ["rag", "index", str(tmp_path / "nie-ma")])
 
     assert result.exit_code == 2
 
@@ -194,7 +194,7 @@ def test_unreachable_service_exits_two(tmp_path: Path, stub_run: StubRun) -> Non
     corpus, which will not fix itself."""
     stub_run.error = RetrievalError("Could not reach Qdrant")
 
-    result = runner.invoke(cli, ["index", "build", str(_corpus(tmp_path))])
+    result = runner.invoke(cli, ["rag", "index", str(_corpus(tmp_path))])
 
     assert result.exit_code == 2
 
@@ -206,7 +206,7 @@ def test_warnings_are_printed(tmp_path: Path, stub_run: StubRun) -> None:
     report.warnings = ["filtr odrzucił 2.0% korpusu, oczekiwane ~19%"]
     stub_run.report = report
 
-    result = runner.invoke(cli, ["index", "build", str(_corpus(tmp_path))])
+    result = runner.invoke(cli, ["rag", "index", str(_corpus(tmp_path))])
 
     assert "UWAGA" in result.stdout
 
@@ -215,7 +215,7 @@ def test_warnings_are_printed(tmp_path: Path, stub_run: StubRun) -> None:
 
 def test_rebuild_asks_before_destroying(tmp_path: Path, stub_run: StubRun) -> None:
     """`rebuild` without --yes, answered "no" → exit 1 and nothing runs."""
-    result = runner.invoke(cli, ["index", "rebuild", str(_corpus(tmp_path))], input="n\n")
+    result = runner.invoke(cli, ["rag", "reindex", str(_corpus(tmp_path))], input="n\n")
 
     assert result.exit_code == 1
     assert stub_run.calls == []
@@ -224,14 +224,14 @@ def test_rebuild_asks_before_destroying(tmp_path: Path, stub_run: StubRun) -> No
 def test_rebuild_names_the_collection_in_the_prompt(tmp_path: Path, stub_run: StubRun) -> None:
     """Confirmation prompt names the collection → confirming a destructive action without saying
     WHAT it destroys is how the wrong index gets wiped."""
-    result = runner.invoke(cli, ["index", "rebuild", str(_corpus(tmp_path))], input="n\n")
+    result = runner.invoke(cli, ["rag", "reindex", str(_corpus(tmp_path))], input="n\n")
 
     assert "tickets" in result.stdout
 
 
 def test_rebuild_proceeds_when_confirmed(tmp_path: Path, stub_run: StubRun) -> None:
     """Confirmation accepted → the run is asked to delete first."""
-    result = runner.invoke(cli, ["index", "rebuild", str(_corpus(tmp_path))], input="y\n")
+    result = runner.invoke(cli, ["rag", "reindex", str(_corpus(tmp_path))], input="y\n")
 
     assert result.exit_code == 0
     assert stub_run.calls[0]["drop_first"] is True
@@ -239,7 +239,7 @@ def test_rebuild_proceeds_when_confirmed(tmp_path: Path, stub_run: StubRun) -> N
 
 def test_rebuild_with_yes_skips_the_prompt(tmp_path: Path, stub_run: StubRun) -> None:
     """`--yes` → no question asked, so the command is usable from a script."""
-    result = runner.invoke(cli, ["index", "rebuild", str(_corpus(tmp_path)), "--yes"])
+    result = runner.invoke(cli, ["rag", "reindex", str(_corpus(tmp_path)), "--yes"])
 
     assert result.exit_code == 0
     assert stub_run.calls[0]["drop_first"] is True

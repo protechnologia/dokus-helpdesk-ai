@@ -859,11 +859,11 @@ merytorycznie").
 
 **Pipeline danych (CLI `helpdesk`)**
 - Walidacja artefaktów: `helpdesk tickets validate data/parsed/`
-- Indeksacja do Qdranta: `helpdesk index build --collection <nazwa>`
-- Pełna odbudowa indeksu: `helpdesk index rebuild` (kasuje kolekcję, wstaje z `data/parsed/`)
-- Zapytanie z konsoli: `helpdesk search "treść zgłoszenia"`
-- Propozycja w wybranym wariancie: `helpdesk suggest "treść zgłoszenia" --variant solution`
-- Lista dostępnych wariantów: `helpdesk variants list`
+- Indeksacja do Qdranta: `helpdesk rag index <katalog>`
+- Pełna odbudowa indeksu: `helpdesk rag reindex` (kasuje kolekcję, wstaje z `data/parsed/`)
+- Zapytanie z konsoli: `helpdesk rag search "treść zgłoszenia"`
+- Propozycja w wybranym wariancie: `helpdesk rag suggest "treść zgłoszenia" --variant solution`
+- Lista dostępnych wariantów: `helpdesk rag variants`
 - Ewaluacja embeddera: `python scripts/eval_embeddings.py recall --model <nazwa>`
   (repo-level, nie CLI usługi — ładuje modele wprost, bez stawiania stacku)
 
@@ -1059,10 +1059,18 @@ Typer). Poza tym trzymamy je na bibliotece standardowej.
 
 Wspólne:
 - Framework: Typer.
-- Wpis w `[project.scripts]` = osobna komenda (`helpdesk`); `@cli.command()` = subkomenda (`helpdesk index build`).
+- Wpis w `[project.scripts]` = osobna komenda (`helpdesk`); `@cli.command()` = subkomenda
+  (`helpdesk rag index`).
 - **Komenda nazywa się `helpdesk`, nie nazwą helpdeskowanego produktu** — przy założeniu „jedna
   instancja = jeden produkt" wpisanie nazwy klienta w komendę własnego narzędzia kłamałoby przy
   drugim wdrożeniu.
+- **Drzewo ma dwa poziomy: `helpdesk <obszar> <czynność>`**, a plik w `cli/` nazywa się jak obszar
+  (`rag.py` → `helpdesk rag …`). Obszar zbiera to, co dzieli zależności: `rag` woła Qdranta
+  i embedder, `tickets` wytwarza artefakt LLM-em, a bramki i „Popraw" stoją **poza `rag`**, bo
+  z definicji działają bez indeksu. Nazwa pliku = nazwa obszaru jest jedyną rzeczą, która pozwala
+  trafić z komendy do kodu bez czytania `cli.py`.
+- **Na górze `cli.py` i każdego pliku obszaru stoi tabelka komend** — drzewo rozsypuje się po
+  kilku modułach, więc bez niej trzeba je odtwarzać z wywołań `add_typer`.
 - **W obrazie entry point tworzy launcher z `Dockerfile`, nie `pip install`** — `pyproject.toml`
   leży w korzeniu repo, poza kontekstem budowania `./api`, i deklaruje `package-dir = api`.
   Launcher ustawia `PYTHONPATH=/code`, bo katalog roboczy nie zawsze jest `/code`. Potrzebne,
@@ -1133,7 +1141,7 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
 - **`EMBEDDING_TIMEOUT_SECONDS` wymiaruje NAJWOLNIEJSZE wywołanie — batch indeksacji na zimnym
   modelu, nie zapytanie runtime.** Zmierzone 2026-08-13 na CPU (PolDense-150M, 200 artefaktów):
   batch 32 realnych rekordów to ~9 s przy ciepłym modelu, ale **pierwsze wywołanie po starcie
-  kontenera przekroczyło 30 s i wywaliło cały przebieg `helpdesk index build`** komunikatem
+  kontenera przekroczyło 30 s i wywaliło cały przebieg `helpdesk rag index`** komunikatem
   „Embedder timed out". Stąd domyślne **120 s**. Uwaga przy strojeniu: `/health` odpowiada, zanim
   model policzy pierwszy wektor, więc **healthcheck nie chroni przed tym timeoutem**.
 
@@ -1863,7 +1871,7 @@ właściwej warstwy, skrót → „TODO").
   Materiał wielokrotnego użytku: golden set przyda się przy każdej zmianie modelu, a korpus
   `data/parsed/bielik-11b-golden200/` (200 zwalidowanych artefaktów) **ma przetrwać** czystkę
   z etapu 10.
-- [ ] **4. Indeksacja** — filtr + named vectors + payload; `helpdesk index build/rebuild`
+- [ ] **4. Indeksacja** — filtr + named vectors + payload; `helpdesk rag index/reindex`
   odtwarzalne z `data/parsed/`. **Filtr wielosygnałowy, niebinarny i raportujący, co odrzuca**
   (patrz „Ryzyka jakości treści") — sam status nie wystarczy, a rekordy `resolved = false`
   niosące realną wiedzę trzeba dać się uratować.
@@ -1940,18 +1948,18 @@ właściwej warstwy, skrót → „TODO").
       Rozjazdy to rekordy do obejrzenia przez człowieka. Przy okazji poprawiono 3 etykiety
       (6773, 7468, 10718 → `rejected`): miały puste `cause` i `solution`, czyli dokładnie kryterium,
       po którym odrzucono 17 innych — niekonsekwencja przeglądu, nie decyzja. Stąd 38, nie 35.
-  - [x] **4.3 `helpdesk index build` / `rebuild`** — `service/rag_indexer.py` (`TicketIndexer`:
-    wczytanie → filtr → embedding obu wektorów → upsert) + `cli/index.py` jako cienki adapter,
+  - [x] **4.3 `helpdesk rag index` / `reindex`** — `service/rag_indexer.py` (`TicketIndexer`:
+    wczytanie → filtr → embedding obu wektorów → upsert) + `cli/rag.py` jako cienki adapter,
     raport w `model/rag_index_report.py`. *Kryterium spełnione:* przebieg na 200 artefaktach dał
-    **171 zaindeksowanych, 29 odrzuconych**, a dwa `rebuild` pod rząd — identyczne 171 punktów.
+    **171 zaindeksowanych, 29 odrzuconych**, a dwa `reindex` pod rząd — identyczne 171 punktów.
     **Utrwalone, do niepowtarzania:**
-    - **`build` na istniejącej kolekcji nadpisuje, nie duplikuje** — sprawdzone na żywym Qdrancie
+    - **`rag index` na istniejącej kolekcji nadpisuje, nie duplikuje** — sprawdzone na żywym Qdrancie
       (171 punktów po trzecim przebiegu). To działa dzięki UUID5 z `ticket_id` z 4.1.
     - **Pusty indeks to porażka (exit 1), nie sukces.** Zerowy kod przy zerze rekordów pozwoliłby
-      zaplanowanemu `rebuild` skasować działający indeks i nie zauważyć tego.
+      zaplanowanemu `reindex` skasować działający indeks i nie zauważyć tego.
     - **Kody wyjścia rozróżniają dwie rzeczy:** `2` = zła ścieżka albo niedostępna usługa (ponowna
       próba ma sens), `1` = przebieg wykonany, ale nic nie weszło (samo się nie naprawi).
-    - **`rebuild` nazywa kolekcję w pytaniu o potwierdzenie** — potwierdzanie operacji niszczącej
+    - **`reindex` nazywa kolekcję w pytaniu o potwierdzenie** — potwierdzanie operacji niszczącej
       bez wskazania celu to sposób na skasowanie niewłaściwego indeksu.
     - **Domyślny `EMBEDDING_TIMEOUT_SECONDS=30` był za mały i wywalał przebieg** — patrz „Warstwa
       embeddera"; podniesiony do 120 s w `.env.example`, compose i `Settings`.
@@ -2009,7 +2017,7 @@ właściwej warstwy, skrót → „TODO").
 - [ ] **8. Magazyn reguł i wariantów (SQL)** — relacyjna baza wchodzi do compose jako czwarta
   usługa; schemat wąski: zestawy reguł, **warianty generacji** (nazwa, etykieta, prompt,
   `requires_hits`), ich **wersje** i audyt wydanych werdyktów. Endpoint odczytu + edycji,
-  `helpdesk rules show`, `helpdesk variants list`. Tu warianty z etapu 6 przestają być wbudowane
+  `helpdesk rules show`, `helpdesk rag variants`. Tu warianty z etapu 6 przestają być wbudowane
   i klient może dodać własny guzik. **Rozstrzygnąć tu:** kontrola dostępu do edycji (patrz
   TODO — dziś API jest otwarte, a edycja reguł to zmiana konfiguracji produkcyjnej), zachowanie
   przy pustym zestawie reguł oraz **co się dzieje z wariantem skasowanym po tym, jak helpdesk
