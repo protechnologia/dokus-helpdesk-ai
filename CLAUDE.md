@@ -83,8 +83,8 @@ Werdykt blokujący da się **świadomie obejść** (patrz „Bramki jakości").
      wieloprzyczynowe („nic nie przychodzi z e-Doręczeń" — 6 zgłoszeń, 6 rozłącznych przyczyn)
      obsługuje **wariant `questions` z wielu trafień naraz**, a nie ręcznie pisany rekord
      scalający: trafienia niosą sześć różnych `cause`, więc materiał do pytań rozróżniających
-     jest w payloadzie wprost i model niczego nie zmyśla. Warunkiem jest **dedup, który tych
-     rekordów nie scali** (patrz etap 4.3).
+     jest w payloadzie wprost i model niczego nie zmyśla. Warunek: **te rekordy mają zostać
+     w indeksie osobno** — dlatego nie deduplikujemy (patrz „Świadomie pominięte").
 10. **Werdykt bramki nie jest wyrokiem.** Blokada zawsze ma **furtkę dla człowieka** i zawsze
     niesie **uzasadnienie oraz wskazówkę, czego brakuje** — samo „nie" zamienia narzędzie
     jakości w przeszkodę, którą wdrożeniowcy nauczą się obchodzić na ślepo.
@@ -209,7 +209,7 @@ filtrze długościowym), nie z szacunku. Materiał źródłowy: `data/docs/synte
 | − „naprawiono skutki, nie przyczynę" | −190 | **18%** rekordów z rozwiązaniem |
 | − rozjazd `problem` ↔ `solution` | −55 do −110 | 5% twardo, do 10% miękko |
 | **da się zaproponować innemu urzędowi** | **~690** | 46% korpusu |
-| po deduplikacji | **~600–650** | |
+| ~~po deduplikacji~~ | ~~600–650~~ | szacunek z 2026-07-29; **dedup wykreślony 2026-08-13**, więc do indeksu wchodzą wszystkie ~690 |
 
 **Wniosek: realny indeks to ~1000–1100 rekordów, z czego ~650 nadaje się do zaproponowania.**
 Odsiew 25–26% potwierdził się niezależnie w trzech turach parsowania (19% / 30% / 25%).
@@ -263,9 +263,9 @@ największy 14 vs 55). Objawy się zlewają, przyczyny nie.
    Punkt 4 działa tylko wtedy, gdy trafienia niosą kilka różnych `cause`; przy jednym trafieniu
    nie ma czego rozróżniać. Klaster wieloprzyczynowy jest przy tym **najłatwiejszy do trafienia
    w całym korpusie** (niemal identyczne `problem` + `symptoms`, czyli dokładnie to, co
-   embedujemy), więc jedynym realnym zagrożeniem jest **dedup, który go scali** — stąd twarda
-   reguła w 4.3. To ten sam wniosek, który unieważnił rekordy syntetyczne (patrz „Świadomie
-   pominięte"): wiedza „między rekordami" jest dostępna, o ile rekordy zostaną osobno.
+   embedujemy), więc jedynym realnym zagrożeniem byłby **dedup, który go scali** — dlatego go nie
+   ma (patrz „Świadomie pominięte"). To ten sam wniosek, który unieważnił rekordy syntetyczne:
+   wiedza „między rekordami" jest dostępna, o ile rekordy zostaną osobno.
 
 ### Mapowanie tabel na `ParsedTicket`
 
@@ -322,7 +322,8 @@ wymagające czyszczenia cytowanej historii przed parsowaniem.
   komuś innemu. **Filtr jakości musi to odsiewać**: trafienie bez treści jest gorsze niż brak
   trafienia, bo wygląda na odpowiedź.
 - **Temat (`czego_dotyczy`) jest słabym sygnałem** — w całej bazie 24 749 unikalnych na 30 923,
-  samo „błąd" 446×. Dedup po treści opisu, nie po temacie.
+  samo „błąd" 446×. Gdyby kiedykolwiek przyszło porównywać rekordy — po treści opisu, nie po
+  temacie.
 - **Zapisane w prompcie parsującym, do odtworzenia gdyby ktoś go upraszczał:** rozwiązanie bywa
   napisane **przez klienta** (reguła „tylko komentarze konsultanta" odrzuciłaby najbogatsze
   rekordy) · najcenniejszy komentarz bywa **po** tym z rozwiązaniem, czasem po zamknięciu ·
@@ -549,7 +550,7 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
                                                                     │
                               data/parsed/*.json ──────────────────┘
                                      │
-                                     ├─ filtr (resolved) + dedup
+                                     ├─ filtr jakości (raportuje, co odrzuca)
                                      ├─ [embedder] system+problem+symptoms → wektory
                                      └─ upsert do Qdranta (wektory + payload)
 ```
@@ -587,7 +588,7 @@ prefiksem daje **inny wektor** — trybów **nie wolno mieszać w jednej przestr
 |---|---|---|
 | query   | `[query]: ` | nowe zgłoszenie w runtime (pytanie do bazy) |
 | passage | *(brak)*    | podsumowanie problemu przy indeksacji (dokument-cel) |
-| sts     | `[sts]: `   | porównania zgłoszenie↔zgłoszenie: dedup, „podobne przypadki" |
+| sts     | `[sts]: `   | porównania zgłoszenie↔zgłoszenie: „podobne przypadki", zwijanie trafień |
 
 **Skala różnicy jest zmierzona, nie założona** (PolDense-150M, ten sam tekst w trzech trybach,
 2026-08-05): `cos(query, passage) = 0,544`, `cos(passage, sts) = 0,814`. Gdyby prefiks był
@@ -617,9 +618,11 @@ Konsekwencje:
   podobieństwa **poza bazą**.
 - **Nie wolno mieszać stron:** `[query]:` szuka wyłącznie po wektorach passage, `[sts]:`
   wyłącznie po wektorach sts.
-- **Dwa named vectors na rekord** (`problem` = passage, `sts` = sts). Wektor `sts` jest
-  bezdyskusyjny — dedup i „podobne przypadki" to porównanie zgłoszenie↔zgłoszenie, symetryczne
-  z definicji.
+- **Dwa named vectors na rekord** (`problem` = passage, `sts` = sts). Wektor `sts` służy
+  porównaniom zgłoszenie↔zgłoszenie — „podobne przypadki" i zwijanie zgodnych trafień w wynikach
+  (etap 5) — symetrycznym z definicji. **Po wykreśleniu dedupu przestał być bezdyskusyjny**
+  (patrz „Świadomie pominięte"): drugim uzasadnieniem pozostaje niezmierzona oś „zapytanie
+  sparsowane", więc rozstrzyga go ten sam pomiar co wybór trybu wyszukiwania.
 - **Którym trybem szukać — zmierzone (patrz niżej): `query→passage`.** Rozstrzygnięcie jest
   jednak **połowiczne**, bo dotyczy zapytań SUROWYCH. Argument za `sts→sts` brzmiał: skoro
   zapytanie parsujemy przed wyszukaniem, obie strony są tym samym rodzajem tekstu — a tej osi
@@ -1690,12 +1693,30 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   - **Cena, przyjęta świadomie:** trafienia niosą *jakie* są przyczyny, ale nie *od czego
     zacząć* — kolejność diagnostyczna siedzi w rozkładzie częstości, którego model nie widzi.
     Do zmierzenia po etapie 6 (patrz etap 11), nie do rozwiązywania z góry.
-  - **Warunek działania tej decyzji: dedup nie może tych rekordów scalić.** Reguła „różna
-    `cause` blokuje scalenie" (etap 4.3) przestaje być ostrożnością, a staje się **nośnikiem
-    obsługi klas wieloprzyczynowych** — stąd test wprost na tym przypadku.
+  - **Warunek działania tej decyzji: te rekordy muszą zostać w indeksie osobno** — co przesądziło
+    o wykreśleniu dedupu (punkt niżej).
   - Razem z etapem znika pole `source` w payloadzie (odróżniało rekordy syntetyczne od
     korpusowych). Dołożenie go później kosztuje **jeden przebieg indeksacji, nie przebieg
     LLM** — Qdrant odbudowuje się z `data/parsed/` jedną komendą (zasada 8).
+- **Deduplikacja rekordów przy indeksacji** (2026-08-13, była podkrokiem 4.3). Miała chronić
+  top-5 przed zalaniem powtórzeniami. **Odrzucona, bo kasowałaby sygnał, na którym stoi ocena
+  pewności:** i „pewność liczy się ze zgodności trafień co do `cause`", i routing „wysoki score
+  + zgodne rozwiązania" **liczą trafienia** — scalenie pięciu zgodnych rekordów w jeden zostawia
+  jedno trafienie zamiast pięciu, czyli usuwa dowód, że rozwiązanie jest sprawdzone. To ta sama
+  logika, która unieważniła rekordy syntetyczne, tylko po drugiej stronie: wielość rekordów **jest
+  informacją**, nie nadmiarem.
+  - **Pomiar to potwierdza:** na 200 artefaktach jest **8 par** o podobieństwie `problem` ≥ 0,40
+    i **ani jednej do scalenia**. Trzy rekordy „brak wizualizacji UPP" mają identyczny `problem`
+    i **rozłączne** rozwiązania; dwa „brak pliku BP.OP" (dwa dni różnicy, `problem` różny tylko
+    numerem pisma) mają **przeciwnego wykonawcę** — raz konsultant, raz użytkownik.
+  - **Puste `cause` nie jest zgodnością** — przy naiwnym porównaniu trzy rekordy UPP z `cause`
+    = „brak" po obu stronach wyglądają na idealnie zgodne. Brak informacji to nie dowód
+    podobieństwa (ta sama pułapka co przy filtrze z 4.2).
+  - **Co zostaje na etap 5:** zwijanie **wyników wyszukiwania**, nie rekordów — grupa zgodnych
+    trafień wraca jako jedno z **licznikiem**, a licznik jest wprost tym, czego potrzebuje routing.
+    Nic nie znika z indeksu, a błąd naprawia się parametrem zamiast re-indeksem.
+  - **Prawdziwe duplikaty** (to samo zgłoszenie wysłane dwa razy) to inna klasa — tania do
+    wykrycia po skrócie treści, do rozważenia przy pełnym korpusie.
 - **Automatyczny wybór wariantu generacji za człowieka** — score podpowiada guzik, nigdy nie
   klika go sam: system nie wie, czy zgłoszenie wymaga działania serwisu, a automat wymagałby
   **osądu LLM-a nad osądem LLM-a**, którego nie umiemy zmierzyć. **Wraca jako możliwość**, gdy
@@ -1836,20 +1857,14 @@ właściwej warstwy, skrót → „TODO").
   Materiał wielokrotnego użytku: golden set przyda się przy każdej zmianie modelu, a korpus
   `data/parsed/bielik-11b-golden200/` (200 zwalidowanych artefaktów) **ma przetrwać** czystkę
   z etapu 10.
-- [ ] **4. Indeksacja** — filtr + dedup + named vectors + payload; `helpdesk index build/rebuild`
+- [ ] **4. Indeksacja** — filtr + named vectors + payload; `helpdesk index build/rebuild`
   odtwarzalne z `data/parsed/`. **Filtr wielosygnałowy, niebinarny i raportujący, co odrzuca**
   (patrz „Ryzyka jakości treści") — sam status nie wystarczy, a rekordy `resolved = false`
   niosące realną wiedzę trzeba dać się uratować.
-  **Wątki-projekty (~1,8%) filtr wykrywa i wyklucza, z raportem** — sygnał wstępny: ≥3 punkty
-  listy w opisie albo opis wielokrotnie dłuższy od mediany (patrz „Domena"). Wykluczenie ma być
-  **policzalne**, bo to ono uzasadni albo obali rozbicie na wiele rekordów w etapie 11.
-  **Dedup wg trzech reguł z danych** (ten sam problem w 200 ticketach zalałby top-5):
-  na parze `problem` + `solution`, nie na samym `problem` (dwa różne zgłoszenia potrafią mieć
-  **identyczny słowo w słowo** komentarz rozwiązujący) · **blokowany przez różny `component`
-  i różną `cause`** — klastry pozorne mają bardzo wysokie podobieństwo `problem`, a scalić ich
-  nie wolno (trzy awarie u operatora, trzy różne działania) · **reprezentant = rekord
-  najbogatszy**, nie najstarszy ani najnowszy, z wyjątkiem rekordów **komplementarnych** (jeden
-  mówi CO zrobić, drugi JAK sprawdzić, kto blokuje).
+  **Wątki-projekty: sygnał do znalezienia na pełnym korpusie** — zapowiadana heurystyka
+  („≥3 punkty listy albo opis dłuższy od mediany") **została zmierzona i obalona** w 4.2: parser
+  streszcza opis, więc długość nie przeżywa parsowania, a numerowana lista w `solution` łapała
+  1–2 rekordy, zależnie od frazeologii jednego modelu. Wracają, gdy będzie na czym mierzyć.
   **Graf odesłań wypadł razem z polem `related_tickets`** (przegląd schematu 2026-07-31).
   Świadoma strata: ~5% korpusu odsyła do innego numeru zgłoszenia, a czasem to jedyny ślad, że
   rozwiązanie w ogóle istnieje — te rekordy zostaną w indeksie puste albo wypadną przez filtr.
@@ -1919,29 +1934,17 @@ właściwej warstwy, skrót → „TODO").
       Rozjazdy to rekordy do obejrzenia przez człowieka. Przy okazji poprawiono 3 etykiety
       (6773, 7468, 10718 → `rejected`): miały puste `cause` i `solution`, czyli dokładnie kryterium,
       po którym odrzucono 17 innych — niekonsekwencja przeglądu, nie decyzja. Stąd 38, nie 35.
-  - **4.3 Dedup** — trzy reguły wyżej. **Reguła „różna `cause` blokuje scalenie" jest tu
-    najważniejsza i nie jest ostrożnością**: po usunięciu rekordów syntetycznych to ona utrzymuje
-    obsługę klas wieloprzyczynowych — sześć zgłoszeń o jednym objawie ma wpaść do top-K **jako
-    sześć**, bo dopiero wtedy wariant `questions` ma z czego zbudować pytania rozróżniające
-    (patrz „Świadomie pominięte"). Scalone do jednego zabierają produktowi tę zdolność
-    **bezgłośnie** — indeks wygląda poprawnie, tylko podpowiedzi robią się jednostronne.
-    *Kryterium:* test na spreparowanych parach, w tym **identyczne `solution` przy różnym
-    `component` → NIE scalać** oraz **niemal identyczny `problem` przy różnej `cause` → NIE
-    scalać**. Dedup **raportuje, co scalił** — tak samo jak filtr raportuje, co odrzucił; bez
-    tego „nie wywaliliśmy za dużo" jest deklaracją, nie faktem.
-  - **4.4 `helpdesk index build` / `rebuild`** — cienkie CLI nad serwisem, `rebuild` z `--yes`.
-    Raport przebiegu: ile weszło, ile odrzucone i z jakiego powodu, ile zdeduplikowane, ile
-    wątków-projektów. *Kryterium:* dwa `rebuild` pod rząd dają identyczny stan kolekcji.
-  - **4.5 Pomiar na realnym indeksie** — `recall@1..K` przez Qdranta zamiast liczenia poza bazą.
+  - **4.3 `helpdesk index build` / `rebuild`** — cienkie CLI nad serwisem, `rebuild` z `--yes`.
+    Raport przebiegu: ile weszło, ile odrzucone i z jakiego powodu. *Kryterium:* dwa `rebuild`
+    pod rząd dają identyczny stan kolekcji.
+  - **4.4 Pomiar na realnym indeksie** — `recall@1..K` przez Qdranta zamiast liczenia poza bazą.
     *Kryterium:* wynik zgodny z 98,2% z etapu 3 albo wyjaśniona różnica. **To sprawdzian
     OKABLOWANIA, nie jakości modelu** — golden set i korpus to ten sam zbiór rekordów, więc
     liczby nie wolno czytać jako skuteczności produktu.
 
-  **Ograniczenia przy 200 rekordach, zapisane świadomie:** dedup i wątki-projekty powstają jako
-  **mechanika** sprawdzona na spreparowanych przypadkach — realne liczby (oczekiwane ~4 wątki
-  projektowe, 47% singletonów) przyjdą dopiero z pełnym korpusem po etapie 10. **Nie kasujemy
-  named vectora `sts`** (oś „zapytanie sparsowane" wciąż niezmierzona) i **nie porównujemy
-  embedderów** — przy tej skali nadal sufit.
+  **Ograniczenia przy 200 rekordach, zapisane świadomie:** **nie kasujemy named vectora `sts`**
+  (oś „zapytanie sparsowane" wciąż niezmierzona) i **nie porównujemy embedderów** — przy tej skali
+  nadal sufit.
 - [ ] **4b. Kuracja promptu parsującego: PII i sekrety** — reguła 6 jest dziś zakazem
   negatywnym bez wskazania, **co wpisać zamiast**, a to wymusza wybór między zgubieniem sensu
   zdania a przepisaniem nazwiska (zmierzone: 9,5% rekordów, ~130 w korpusie). Naprawa to
@@ -1959,8 +1962,13 @@ właściwej warstwy, skrót → „TODO").
   - **Kryterium ukończenia:** test-strażnik na obecności placeholdera i na rozdzieleniu reguły
     sekretów od reguły PII, wersja promptu podbita, artefakty z etapów 3–4 nietknięte.
 - [ ] **5. Wyszukiwanie** — `POST /search`: parser zapytania (LLM → `ParsedTicket`) + top-K,
-  próg, dedupe, zwrot trafień ze score i ID. **Tu parser wchodzi do runtime** — ten sam prompt
-  i ten sam model Pydantic, którymi parsowaliśmy korpus.
+  próg, zwijanie zgodnych trafień, zwrot trafień ze score i ID. **Tu parser wchodzi do runtime** —
+  ten sam prompt i ten sam model Pydantic, którymi parsowaliśmy korpus.
+  **Zwijanie zastępuje wykreślony dedup indeksacji** (patrz „Świadomie pominięte"): grupa trafień
+  zgodnych co do `component` + `cause` + `solution` wraca jako **jedno trafienie z licznikiem**,
+  a nie znika z bazy. Licznik jest wprost tym, czego potrzebuje routing („wysoki score + zgodne
+  rozwiązania") — czyli to, co dedup by skasował, tu staje się **danymi wejściowymi oceny
+  pewności**.
   **Parser musi strawić wątek w toku, nie pojedynczy opis** — stan konwersacji jest istotny
   (najcenniejszy komentarz bywa po tym z rozwiązaniem, dostawca potrafi odwołać własną pierwszą
   diagnozę). Uboczna korzyść: obie strony porównania stają się tym samym gatunkiem tekstu, co
