@@ -1,5 +1,15 @@
 """Measure recall@K of the BUILT index — through Qdrant and the embedder service, not in memory.
 
+OBIE KOMENDY WYMAGAJĄ ZBUDOWANEGO INDEKSU I CHODZĄCEGO STACKU:
+
+    docker compose up -d                          # embedder + qdrant
+    helpdesk rag index data/parsed/<zestaw>       # napełnij kolekcję
+    python scripts/eval_index.py recall           # recall@K jednego trybu
+    python scripts/eval_index.py modes            # porównanie query→passage z sts→sts
+
+Bez kolekcji obie kończą się kodem 2 i mówią, czego brakuje — zamiast drukować raport zer, bo
+0% wyglądałoby jak problem modelu, a byłoby brakiem danych.
+
 Do czego:
     Sprawdza OKABLOWANIE, nie jakość modelu. Etap 3 policzył recall@1 = 98,2% ładując model
     wprost i licząc podobieństwa w numpy; tutaj to samo zapytanie przechodzi przez usługę
@@ -17,15 +27,14 @@ Co ten pomiar potrafi złapać, a czego pomiar z etapu 3 nie potrafił:
     - **rekordy zgubione przez filtr albo upsert** — zapytanie do rekordu, którego w indeksie nie
       ma, wychodzi tu jako brak trafienia, a nie jako niższa ranga.
 
-Flow:
+Flow (`recall`; `modes` powtarza kroki 2-4 dla obu par tryb↔wektor):
     1. Wczytuje golden set i pyta Qdranta o rozmiar kolekcji.
     2. Embeduje zapytania przez usługę `embedder` w trybie `query` (partiami).
     3. Szuka każdego wektora w kolekcji po named vectorze `problem`, biorąc top-K.
     4. Liczy krzywą recall@1..K i MRR — tymi samymi wzorami co `eval_embeddings.py`.
 
-Uruchomienie (z hosta, przez porty publikowane przez compose):
-
-    python scripts/eval_index.py recall --collection tickets
+Adresy usług są argumentami (`--embedder`, `--qdrant`) i domyślnie wskazują **porty hosta**
+publikowane przez compose, nie nazwy z sieci compose: skrypt jest repo-level i chodzi obok stacku.
 """
 
 import json
@@ -110,10 +119,21 @@ def _embed_queries(
     vectors: list[list[float]] = []
 
     for start in range(0, len(texts), EMBED_BATCH_SIZE):
-        batch    = texts[start : start + EMBED_BATCH_SIZE]
-        response = client.post("/embed", json={"texts": batch, "mode": mode})
+        batch = texts[start : start + EMBED_BATCH_SIZE]
 
-        response.raise_for_status()
+        try:
+            response = client.post("/embed", json={"texts": batch, "mode": mode})
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            # Same reasoning as in `_collection_size`: a stack that is not up must produce a
+            # sentence, not a traceback from inside httpx.
+            typer.echo(
+                f"BŁĄD: nie ma kontaktu z embedderem ({client.base_url}): {exc}\n"
+                f"       Podnieś stack: `docker compose up -d`.",
+                err=True,
+            )
+            raise typer.Exit(code=2) from exc
+
         vectors.extend(response.json()["vectors"])
 
     return vectors
@@ -179,8 +199,12 @@ def _collection_size(
     """
     Description:
     Returns how many points the collection holds, refusing to go on when there is nothing to
-    measure. Both failures exit 2 rather than producing a report of zeros — a run against a missing
-    or empty index would otherwise print a perfectly formatted 0% and look like a model problem.
+    measure. Every failure exits 2 rather than producing a report of zeros — a run against a
+    missing or empty index would otherwise print a perfectly formatted 0% and look like a model
+    problem.
+
+    Also the place where an unreachable Qdrant is caught: this is the FIRST call the script makes,
+    so a stack that is not up stops here with a sentence instead of a traceback from inside httpx.
 
     Example args:
         client=httpx.Client(base_url="http://localhost:6333")
@@ -190,9 +214,17 @@ def _collection_size(
         171
 
     Raises:
-        typer.Exit: code 2 when the collection does not exist or is empty
+        typer.Exit: code 2 when Qdrant is unreachable, or the collection is missing or empty
     """
-    info = client.get(f"/collections/{collection}")
+    try:
+        info = client.get(f"/collections/{collection}")
+    except httpx.HTTPError as exc:
+        typer.echo(
+            f"BŁĄD: nie ma kontaktu z Qdrantem ({client.base_url}): {exc}\n"
+            f"       Podnieś stack: `docker compose up -d`.",
+            err=True,
+        )
+        raise typer.Exit(code=2) from exc
 
     if info.status_code == 404:
         typer.echo(
