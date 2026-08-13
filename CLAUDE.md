@@ -592,9 +592,19 @@ prefiksem daje **inny wektor** — trybów **nie wolno mieszać w jednej przestr
 
 **Skala różnicy jest zmierzona, nie założona** (PolDense-150M, ten sam tekst w trzech trybach,
 2026-08-05): `cos(query, passage) = 0,544`, `cos(passage, sts) = 0,814`. Gdyby prefiks był
-kosmetyką, wyszłoby 1,0 — te liczby są miarą błędu przy pomyleniu trybów. Pilnuje ich test
+kosmetyką, wyszłoby 1,0 — te liczby pokazują, że tryby dają **inne wektory**. Pilnuje ich test
 integracyjny (`integration_embedder`), bo to prawda mieszkająca **poza naszym kodem**: przy
 podmianie modelu w etapie 3 trzeba ją sprawdzić od nowa.
+
+**Ale to NIE jest miara szkody przy pomyleniu trybów** — i to jest korekta wcześniejszego zapisu.
+Zmierzone na zbudowanym indeksie (2026-08-13, 60 zapytań): poprawne `query→problem` daje
+`recall@1` 98,3%, pomylone `passage→problem` — **93,3%**, a `query→sts` — **96,7%**. Cosinus 0,544
+sugerował załamanie, wyszedł spadek o kilka punktów: **ranking jest odporniejszy niż odległość**,
+bo błąd przesuwa wszystkie wektory podobnie i kolejność w dużej mierze ocaleje.
+Konsekwencja praktyczna: **pomyłka prefiksu nie objawi się jako awaria, tylko jako „trochę gorsze
+wyniki"** — czyli coś, co łatwo złożyć na karb modelu albo korpusu. Dlatego trybów pilnuje test
+na progu podobieństwa, a nie pomiar recall, i dlatego `embed_query/passage/sts` są trzema
+nazwanymi metodami zamiast jednej z parametrem.
 
 Konsekwencje:
 
@@ -618,18 +628,37 @@ Konsekwencje:
   podobieństwa **poza bazą**.
 - **Nie wolno mieszać stron:** `[query]:` szuka wyłącznie po wektorach passage, `[sts]:`
   wyłącznie po wektorach sts.
-- **Dwa named vectors na rekord** (`problem` = passage, `sts` = sts). Wektor `sts` służy
-  porównaniom zgłoszenie↔zgłoszenie — „podobne przypadki" i zwijanie zgodnych trafień w wynikach
-  (etap 5) — symetrycznym z definicji. **Po wykreśleniu dedupu przestał być bezdyskusyjny**
-  (patrz „Świadomie pominięte"): drugim uzasadnieniem pozostaje niezmierzona oś „zapytanie
-  sparsowane", więc rozstrzyga go ten sam pomiar co wybór trybu wyszukiwania.
-- **Którym trybem szukać — zmierzone (patrz niżej): `query→passage`.** Rozstrzygnięcie jest
-  jednak **połowiczne**, bo dotyczy zapytań SUROWYCH. Argument za `sts→sts` brzmiał: skoro
-  zapytanie parsujemy przed wyszukaniem, obie strony są tym samym rodzajem tekstu — a tej osi
-  jeszcze nie zmierzono.
-- **Drugi wektor zostaje do czasu domknięcia osi parsera.** Kosztuje jedno dodatkowe wywołanie
-  embeddera przy indeksacji i podwójną pamięć na wektory (przy 150M i skali helpdesku —
-  pomijalne). **Skasujemy go dopiero, gdy pomiar obejmie zapytania sparsowane.**
+- **Którym trybem szukać — ROZSTRZYGNIĘTE OSTATECZNIE: `query→passage`, także dla zapytań
+  sparsowanych.** Zmierzone 2026-08-13 na zbudowanym indeksie
+  (`python scripts/eval_index.py modes`, 162 zapytania, 171 punktów):
+
+  | wejście | tryb | recall@1 | MRR |
+  |---|---|---:|---:|
+  | surowe | `query→passage` | **98,1** | **0,988** |
+  | surowe | `sts→sts` | 96,9 | 0,980 |
+  | **sparsowane** | `query→passage` | **98,1** | **0,990** |
+  | **sparsowane** | `sts→sts` | 96,3 | 0,976 |
+
+  **Argument za `sts→sts` upadł — i to w odwrotną stronę, niż zakładał.** Brzmiał: skoro zapytanie
+  parsujemy przed wyszukaniem, obie strony stają się tym samym gatunkiem tekstu, więc tryb
+  symetryczny powinien zacząć wygrywać. Po sparsowaniu przewaga `query→passage` **rośnie** (+1,2 pp
+  → +1,9 pp na @1, MRR +0,008 → +0,014). Prawdopodobna przyczyna: `sts` ocenia **równoważność**
+  dwóch zdań, a my szukamy dokumentu **odpowiadającego na pytanie** — ta asymetria zostaje nawet
+  przy podobnym wyglądzie obu tekstów, bo cel niesie `problem` + `symptoms`, a zapytanie sam opis
+  kłopotu.
+  - **Zastrzeżenie do liczb, nie do wniosku:** jako „zapytanie sparsowane" użyto `expected_problem`
+    z golden setu (kopia pola `problem` rekordu-celu), a nie wyniku parsera na cudzym zgłoszeniu.
+    To właściwy **gatunek** tekstu, ale bliższy celowi niż prawdziwy parse — zawyża **obie**
+    kolumny tak samo, więc różnica między trybami zostaje miarodajna, a wartości bezwzględne nie.
+    Przy 162 zapytaniach jedno trafienie waży 0,6 pp, czyli +1,9 pp to około trzy zapytania;
+    kierunek jest spójny w czterech pomiarach, ale to nie jest przepaść.
+- **Dwa named vectors na rekord** (`problem` = passage, `sts` = sts). **Wektor `sts` stracił oba
+  pierwotne uzasadnienia**: dedup wykreślony (patrz „Świadomie pominięte"), a wyszukiwanie
+  rozstrzygnięte na korzyść `query→passage`. Zostaje mu **jedno** zastosowanie — **zwijanie
+  zgodnych trafień w etapie 5**, gdzie porównuje się zgłoszenie ze zgłoszeniem, czyli symetrycznie
+  z definicji. Buduje się go dalej, bo kosztuje jedno wywołanie embeddera przy indeksacji, a jego
+  skasowanie i tak byłoby jednym `reindex` bez udziału LLM-a. **Decyzję o usunięciu podejmiemy po
+  etapie 5** — gdy będzie wiadomo, czy zwijanie faktycznie go używa.
 - Zmiana modelu embeddingowego albo trybu ⇒ **nowa kolekcja i pełny re-index** (tani — JSON-y
   leżą na dysku).
 
@@ -654,10 +683,11 @@ odrzucone zostają jako dystraktory), pomiar powtórzony dwukrotnie z identyczny
   `nomic-embed-text-v1.5` (anglojęzyczny), z progami interpretacji ustalonymi **przed** przebiegiem.
   Wyszło 87,9% — czyli sygnał w zapytaniach jest w dużej mierze leksykalny, choć pomiar różnicuje
   o 10,3 pp. **Bez kontroli 98,2% zapisalibyśmy jako sukces modelu.**
-- **Tryb rozstrzygnięty POŁOWICZNIE.** `query→passage` wygrywa w czterech pomiarach (u kontroli
-  różnica jest większa: 3,7 pp), ale **oś „zapytanie sparsowane" nie została zmierzona** — wymaga
-  przebiegu LLM po zapytaniach. Argument za `sts→sts` dotyczył właśnie zapytań sparsowanych, więc
-  **named vector `sts` NIE jest jeszcze skasowany**: etap 4 buduje oba.
+- **Tryb rozstrzygnięty POŁOWICZNIE — domknięte 2026-08-13.** Tu `query→passage` wygrał na
+  zapytaniach SUROWYCH (u kontroli różnica większa: 3,7 pp), a oś „zapytanie sparsowane" została
+  dołożona przy etapie 4: **`query→passage` wygrywa także tam, i to wyraźniej** (patrz „Embeddingi
+  i prefiksy PolDense"). Zastrzeżenie metodologiczne stąd zostaje aktualne: pomiar nie wymagał
+  przebiegu LLM, bo za zapytanie sparsowane posłużyło pole `expected_problem` z golden setu.
 - **Zaostrzanie zapytań wyczerpane jako droga.** Usunięcie sygnatur i numerów z 18 zapytań
   kosztowało PolDense 0,6 pp, kontrolę 3,0 pp. **Parafrazowanie nic nie da** — parafraza to ta sama
   treść, a embedder semantyczny istnieje po to, by ją rozpoznawać. Rząd trudności zmieni wyłącznie
@@ -866,6 +896,12 @@ merytorycznie").
 - Lista dostępnych wariantów: `helpdesk rag variants`
 - Ewaluacja embeddera: `python scripts/eval_embeddings.py recall --model <nazwa>`
   (repo-level, nie CLI usługi — ładuje modele wprost, bez stawiania stacku)
+- Ewaluacja zbudowanego indeksu: `python scripts/eval_index.py recall --collection tickets`
+  (**wymaga stacku** — mierzy przez usługę embeddera i Qdranta, czyli tę samą drogę co produkcja;
+  ten sam wzór recall/MRR co wyżej, żeby liczby dało się porównać)
+- Porównanie trybów wyszukiwania: `python scripts/eval_index.py modes --collection tickets`
+  (`query→passage` vs `sts→sts`, na zapytaniach surowych i sparsowanych — cztery pomiary w jednej
+  tabeli; wymaga stacku)
 
 **Bramki jakości i asysta pisania**
 - Sprawdzenie zamknięcia z konsoli: `helpdesk gate close --file <plik>`
@@ -1144,6 +1180,26 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   kontenera przekroczyło 30 s i wywaliło cały przebieg `helpdesk rag index`** komunikatem
   „Embedder timed out". Stąd domyślne **120 s**. Uwaga przy strojeniu: `/health` odpowiada, zanim
   model policzy pierwszy wektor, więc **healthcheck nie chroni przed tym timeoutem**.
+
+## Warstwa retrievalu (Qdrant)
+
+- **Piszemy wprost na REST Qdranta, bez `qdrant-client`** — użytych endpointów jest kilka, `httpx`
+  i tak jest zależnością, a warstwa pośrednia ukryłaby dokładnie to, co tu kontrolujemy ręcznie
+  (named vectory, metryka). Ta sama przesłanka, która wykluczyła LangChain/LlamaIndex.
+- **`point_id` = UUID5 z `ticket_id`, namespace ZAMROŻONY** (pod testem złotej wartości). Qdrant
+  przyjmuje tylko `uint` albo UUID, a nasze id to stringi; odwzorowanie musi być **funkcją** id,
+  inaczej `helpdesk rag reindex` duplikuje korpus zamiast go nadpisać. Zmiana namespace’u rozsypuje
+  wszystkie id naraz — nic poza tym testem by tego nie złapało.
+- **Kolekcja przy rozjeździe NIE jest naprawiana** — inny wymiar albo brak named vectora to
+  `RetrievalConfigError` z **obiema liczbami** w komunikacie. Bez tego rozjazd wychodzi jako
+  odrzucenie punktów w środku przebiegu, już po zapłaceniu za parsowanie LLM-em.
+- **Qdrant normalizuje wektory przy zapisie w kolekcji `Cosine`** — zapisane `[0.1]*4` wraca jako
+  `[0.5]*4` (zmierzone 2026-08-13). Nas to nie kosztuje nic (embedder oddaje wektory jednostkowe,
+  a cosinus ignoruje długość), ale **asercja na równość wektora padłaby przy poprawnie działającym
+  systemie** — porównujemy kierunek.
+- **Nazwa named vectora zawsze podawana jawnie przy wyszukiwaniu.** Kolekcja ma dwa, a szukanie po
+  niewłaściwym nie jest błędem — zwraca wiarygodnie wyglądające bzdury (zmierzone: `query→sts` daje
+  96,7% zamiast 98,3%, czyli spadek, nie awarię).
 
 ## Warstwa LLM
 
@@ -1680,8 +1736,10 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
     sygnałem dla ADAPTERA** — czyta ją ze źródła, nie z artefaktu.
 - **Rozbicie wątku-projektu na wiele rekordów** (`ticket_id` z sufiksem `33644-1`) — **odłożone
   do etapu 11**, nie odrzucone: dotyka kontraktu artefaktu, więc po masowym parsowaniu oznacza
-  ponowny przebieg LLM (zasada 7). Przy 1,8% korpusu decyduje pomiar — filtr etapu 4 je wyklucza
-  i **liczy**.
+  ponowny przebieg LLM (zasada 7). Przy 1,8% korpusu decyduje pomiar — ale **filtr z etapu 4 ich
+  NIE wykrywa**: zapowiadana heurystyka po długości opisu została zmierzona i obalona (parser
+  streszcza opis), więc liczby, która miała rozstrzygnąć, dziś nie mamy. Do zdobycia na pełnym
+  korpusie w etapie 10.
 - **Rozdzielenie `solution` na trzy pola** (*co zrobiono* / *co ustalono* / *zastrzeżenia*) —
   rozważone, odrzucone jako nadmierna struktura. Zastrzeżenia zostają **częścią tekstu
   `solution`**, a o ich zachowanie dba prompt parsujący i prompt generacji. **Ryzyko przyjęte
@@ -1866,111 +1924,36 @@ właściwej warstwy, skrót → „TODO").
   **Dwie rzeczy do zapamiętania, bo wracają w etapie 4:**
   **(1) model wybrany bez rozstrzygającego pomiaru** — `recall@1` = 98,2% przy korpusie 200
   rekordów to sufit, więc do porównania kandydatów wracamy przy pełnym indeksie;
-  **(2) named vector `sts` NIE jest skasowany** — oś „zapytanie sparsowane" wymaga LLM-a i nie
-  została zmierzona, a to właśnie jej dotyczył argument za `sts→sts`.
+  **(2) named vector `sts` zostaje, ale z innego powodu niż wtedy** — oś „zapytanie sparsowane"
+  domknięta przy etapie 4 (`query→passage` wygrywa i tam), więc `sts` służy już tylko zwijaniu
+  zgodnych trafień w etapie 5.
   Materiał wielokrotnego użytku: golden set przyda się przy każdej zmianie modelu, a korpus
   `data/parsed/bielik-11b-golden200/` (200 zwalidowanych artefaktów) **ma przetrwać** czystkę
   z etapu 10.
-- [ ] **4. Indeksacja** — filtr + named vectors + payload; `helpdesk rag index/reindex`
-  odtwarzalne z `data/parsed/`. **Filtr wielosygnałowy, niebinarny i raportujący, co odrzuca**
-  (patrz „Ryzyka jakości treści") — sam status nie wystarczy, a rekordy `resolved = false`
-  niosące realną wiedzę trzeba dać się uratować.
-  **Wątki-projekty: sygnał do znalezienia na pełnym korpusie** — zapowiadana heurystyka
-  („≥3 punkty listy albo opis dłuższy od mediany") **została zmierzona i obalona** w 4.2: parser
-  streszcza opis, więc długość nie przeżywa parsowania, a numerowana lista w `solution` łapała
-  1–2 rekordy, zależnie od frazeologii jednego modelu. Wracają, gdy będzie na czym mierzyć.
-  **Graf odesłań wypadł razem z polem `related_tickets`** (przegląd schematu 2026-07-31).
-  Świadoma strata: ~5% korpusu odsyła do innego numeru zgłoszenia, a czasem to jedyny ślad, że
-  rozwiązanie w ogóle istnieje — te rekordy zostaną w indeksie puste albo wypadną przez filtr.
-  Odzyskanie tego wymaga pola w schemacie, czyli ponownego przebiegu LLM (zasada 7).
-
+- [x] **4. Indeksacja** — filtr jakości + named vectors + payload; `helpdesk rag index/reindex`
+  odtwarzalne z `data/parsed/` bez wołania LLM-a. **Zamknięte 2026-08-13**: przebieg na 200
+  artefaktach daje **171 zaindeksowanych, 29 odrzuconych**, a pomiar przez Qdranta i usługę
+  embeddera — `recall@1 = 98,1%`, `MRR 0,988` (zgodnie z 98,2% z etapu 3; to sprawdzian
+  OKABLOWANIA, nie skuteczności produktu — golden set i korpus to ten sam zbiór rekordów).
+  Reguły warstwy: „Warstwa retrievalu (Qdrant)"; filtr i jego kruchość: „Ryzyka jakości treści"
+  oraz nagłówek `prompt_parse_ticket_user.md`; skala szkody przy pomyleniu prefiksów: „Embeddingi
+  i prefiksy PolDense".
+  **Cztery rzeczy do zapamiętania, bo wracają dalej:**
+  **(1) Puste `cause` NIE jest sygnałem braku wiedzy** — ma je 114 z 200 rekordów, z czego 105 jest
+  dobrych; filtr na tym polu wyciąłby połowę korpusu.
+  **(2) Wątki-projekty pozostają niewykryte** — zapowiadana heurystyka („≥3 punkty listy albo opis
+  dłuższy od mediany") **została zmierzona i obalona**: parser streszcza opis, więc długość nie
+  przeżywa parsowania. Wraca, gdy będzie na czym mierzyć (etap 10).
+  **(3) Nie kasujemy named vectora `sts`** — mimo że wyszukiwanie rozstrzygnięto na korzyść
+  `query→passage` (także dla zapytań sparsowanych): zostaje mu zwijanie trafień w etapie 5.
+  **(4) Nie porównujemy embedderów** — przy 200 rekordach metryka nadal jest przy suficie;
+  porównanie ma sens dopiero na pełnym korpusie.
+  **Graf odesłań wypadł razem z polem `related_tickets`** (przegląd schematu 2026-07-31). Świadoma
+  strata: ~5% korpusu odsyła do innego numeru zgłoszenia, a czasem to jedyny ślad, że rozwiązanie
+  w ogóle istnieje.
   **Materiał: `data/parsed/bielik-11b-golden200/` (200 artefaktów)** — ten sam zestaw, na którym
-  stoi golden set, więc filtr da się zmierzyć wobec 38 etykiet „odrzuć" i 162 „przepuść"
-  z `data/golden/bielik-11b-golden200.json`. Pozostałe katalogi w `data/parsed/` to próbki
-  porównawcze parserów i **nie wchodzą do indeksu**.
-
-  **Podkroki:**
-  - [x] **4.1 Klient Qdranta** — `api/app/retrieval/` (`QdrantClient` + `TicketPoint` + błędy):
-    tworzenie kolekcji z **dwoma named vectors** (`problem` = passage, `sts` = sts, oba 768),
-    upsert z payloadem, kasowanie, `count_points`. Sam transport, zero logiki filtrującej.
-    **Nie w `service/`/`model/`, jak zakładał wcześniejszy zapis planu** — to pakiet przekraczający
-    granicę procesu, więc idzie osią usługową obok `llm/` i `embedding/`, razem z modelem
-    transportu (patrz „Warstwy kodu" i drzewo katalogów). Napisany **wprost na REST Qdranta, bez
-    `qdrant-client`**: użytych endpointów jest kilka, `httpx` już był zależnością, a warstwa
-    pośrednia ukryłaby dokładnie to, co tu kontrolujemy ręcznie (named vectors, metryka) — ta sama
-    przesłanka, która wykluczyła LangChain/LlamaIndex.
-    **Utrwalone przy okazji, do niepowtarzania:**
-    - **`point_id` = UUID5 z `ticket_id`** (namespace **zamrożony**, pod testem złotej wartości).
-      Qdrant przyjmuje tylko `uint` albo UUID, a nasze id to stringi; odwzorowanie musi być
-      **funkcją** id, inaczej `index rebuild` duplikuje korpus zamiast go nadpisać. Zmiana
-      namespace’u rozsypuje wszystkie id — stąd test, którego nic innego by nie złapało.
-    - **Kolekcja przy rozjeździe NIE jest naprawiana** — inny wymiar albo brak named vectora to
-      `RetrievalConfigError` z **obiema liczbami** w komunikacie. Bez tego rozjazd wychodzi jako
-      odrzucenie punktów w środku przebiegu, już po zapłaceniu za parsowanie LLM-em.
-    - **Qdrant normalizuje wektory przy zapisie w kolekcji `Cosine`** — zapisane `[0.1]*4` wraca
-      jako `[0.5]*4` (zmierzone 2026-08-13, nie założone). Nas to nie kosztuje nic (embedder i tak
-      oddaje wektory jednostkowe, a cosinus z definicji ignoruje długość), ale **asercja na
-      równość wektora padłaby przy poprawnie działającym systemie** — porównujemy kierunek.
-    *Kryterium spełnione:* 28 testów jednostkowych + 5 `integration_qdrant` (kolekcja powstaje
-    z dwoma wektorami po 768, punkt wraca z payloadem, ponowny upsert nadpisuje, rozjazd wymiaru
-    odrzucony wobec **realnego** Qdranta).
-  - [x] **4.2 Filtr jakości** — `service/filter_ticket_quality.py` (orkiestrator) +
-    `filter_ticket_quality_rules.py` (reguły, jedna funkcja na regułę); modele werdyktu i raportu
-    w `model/filter_quality_*`. `evaluate_ticket()` ocenia **jeden** rekord i jest wejściem zarówno
-    dla wsadu, jak i dla runtime; `filter_tickets()` to ono po korpusie plus statystyka.
-    **Wynik: 29/38 zgodnych z etykietami, ZERO fałszywych alarmów** na pełnych 200 (2026-08-13).
-    **Utrwalone, do niepowtarzania:**
-    - **Jedna reguła zamiast sześciu: fraza ucieczkowa + liczba pozostałych słów.** Rekord bez
-      wiedzy to taki, którego `solution` niesie `brak`/`nie dotyczy` i **≤10 słów poza nią**.
-      Reguła czyta **kontrakt schematu** (`NO_VALUE`, `NOT_APPLICABLE`), nie styl modelu — dlatego
-      przeżywa podmianę modelu, w odróżnieniu od wzorców na frazeologii. Próg ma szeroki margines
-      (4–10 daje ten sam wynik), bo pustka jest krótka, a **odmowa musi się wytłumaczyć** i jest
-      długa („Brak możliwości wygenerowania ZPO…" to najcenniejsza klasa w korpusie).
-    - **`brak` dopasowujemy jako CAŁE SŁOWO.** Przedrostek `brak\w*` łapał „Dodano **brakujące**
-      ustawienie systemowe" — rekord opisujący wykonaną pracę (zmierzony fałszywy alarm).
-    - **Puste `cause` NIE jest sygnałem** — ma je 114 z 200 rekordów, z czego **105 jest dobrych**.
-      Sprawy bywają rozwiązane bez nazwania przyczyny; filtr na tym polu wyciąłby połowę korpusu.
-    - **Długości opisu NIE da się użyć do wykrycia wątków-projektów**, wbrew założeniu roadmapy:
-      jeden ma opis 1,0× mediany, a najdłuższy opis w korpusie należy do rekordu dobrego — parser
-      streszcza opis, więc sygnał z surowych zgłoszeń nie przeżywa parsowania. Trzy pozostałe
-      sygnały (zapowiedź w czasie przyszłym, odesłanie do duplikatu, lista postulatów) łapały po
-      1–2 rekordy, każdy zależny od frazeologii jednego modelu — **odłożone**, wracają, gdy pełny
-      korpus pokaże, że są tego warte. Tyle samo dotyczy osobnego licznika wątków-projektów.
-    - **Kruchość rozwiązana trzema zabezpieczeniami, nie filtrowaniem przez LLM.** Reguły czytają
-      tekst od modelu, więc psują się przez **zamilknięcie** — nic nie pasuje, wszystko przechodzi,
-      nic się nie czerwieni. Stąd: komentarz w prompcie parsującym (zmiana fraz ucieczkowych JEST
-      zmianą filtru), test-strażnik na korpusie referencyjnym (próg ≥25 odrzuceń) oraz
-      `drop_rate_warning()` sygnalizujące załamanie odsetka odrzuceń. **Filtrowanie przy parsowaniu
-      odrzucone**: łamie zasadę 7 (zmiana kryterium = ponowny przebieg LLM), znosi mierzalność
-      i każe modelowi oceniać własną pracę.
-    - **Etykiety golden setu nie są niezależnym źródłem prawdy** — powstały z modelu czytającego te
-      same artefakty, więc 29/38 mierzy **zgodność z wcześniejszym osądem**, nie poprawność.
-      Rozjazdy to rekordy do obejrzenia przez człowieka. Przy okazji poprawiono 3 etykiety
-      (6773, 7468, 10718 → `rejected`): miały puste `cause` i `solution`, czyli dokładnie kryterium,
-      po którym odrzucono 17 innych — niekonsekwencja przeglądu, nie decyzja. Stąd 38, nie 35.
-  - [x] **4.3 `helpdesk rag index` / `reindex`** — `service/rag_indexer.py` (`TicketIndexer`:
-    wczytanie → filtr → embedding obu wektorów → upsert) + `cli/rag.py` jako cienki adapter,
-    raport w `model/rag_index_report.py`. *Kryterium spełnione:* przebieg na 200 artefaktach dał
-    **171 zaindeksowanych, 29 odrzuconych**, a dwa `reindex` pod rząd — identyczne 171 punktów.
-    **Utrwalone, do niepowtarzania:**
-    - **`rag index` na istniejącej kolekcji nadpisuje, nie duplikuje** — sprawdzone na żywym Qdrancie
-      (171 punktów po trzecim przebiegu). To działa dzięki UUID5 z `ticket_id` z 4.1.
-    - **Pusty indeks to porażka (exit 1), nie sukces.** Zerowy kod przy zerze rekordów pozwoliłby
-      zaplanowanemu `reindex` skasować działający indeks i nie zauważyć tego.
-    - **Kody wyjścia rozróżniają dwie rzeczy:** `2` = zła ścieżka albo niedostępna usługa (ponowna
-      próba ma sens), `1` = przebieg wykonany, ale nic nie weszło (samo się nie naprawi).
-    - **`reindex` nazywa kolekcję w pytaniu o potwierdzenie** — potwierdzanie operacji niszczącej
-      bez wskazania celu to sposób na skasowanie niewłaściwego indeksu.
-    - **Domyślny `EMBEDDING_TIMEOUT_SECONDS=30` był za mały i wywalał przebieg** — patrz „Warstwa
-      embeddera"; podniesiony do 120 s w `.env.example`, compose i `Settings`.
-  - **4.4 Pomiar na realnym indeksie** — `recall@1..K` przez Qdranta zamiast liczenia poza bazą.
-    *Kryterium:* wynik zgodny z 98,2% z etapu 3 albo wyjaśniona różnica. **To sprawdzian
-    OKABLOWANIA, nie jakości modelu** — golden set i korpus to ten sam zbiór rekordów, więc
-    liczby nie wolno czytać jako skuteczności produktu.
-
-  **Ograniczenia przy 200 rekordach, zapisane świadomie:** **nie kasujemy named vectora `sts`**
-  (oś „zapytanie sparsowane" wciąż niezmierzona) i **nie porównujemy embedderów** — przy tej skali
-  nadal sufit.
+  stoi golden set, więc filtr jest mierzalny wobec 38 etykiet „odrzuć" i 162 „przepuść". Pozostałe
+  katalogi w `data/parsed/` to próbki porównawcze parserów i **nie wchodzą do indeksu**.
 - [ ] **4b. Kuracja promptu parsującego: PII i sekrety** — reguła 6 jest dziś zakazem
   negatywnym bez wskazania, **co wpisać zamiast**, a to wymusza wybór między zgubieniem sensu
   zdania a przepisaniem nazwiska (zmierzone: 9,5% rekordów, ~130 w korpusie). Naprawa to
@@ -1997,8 +1980,9 @@ właściwej warstwy, skrót → „TODO").
   pewności**.
   **Parser musi strawić wątek w toku, nie pojedynczy opis** — stan konwersacji jest istotny
   (najcenniejszy komentarz bywa po tym z rozwiązaniem, dostawca potrafi odwołać własną pierwszą
-  diagnozę). Uboczna korzyść: obie strony porównania stają się tym samym gatunkiem tekstu, co
-  **wzmacnia kandydaturę trybu `sts→sts`** w pomiarze z etapu 3.
+  diagnozę). Uboczna korzyść: obie strony porównania stają się tym samym gatunkiem tekstu — co
+  **zmierzono 2026-08-13 i co NIE pomogło `sts→sts`**: `query→passage` wygrywa tam nawet wyraźniej
+  niż na surowych (patrz „Embeddingi i prefiksy PolDense").
 - [ ] **6. Generacja propozycji** — `POST /suggest` z parametrem `variant` + `GET /variants`
   + placeholdery + routing po score jako **podpowiedź** wariantu. Trzy warianty startowe
   (`questions`, `solution`, `handoff`) zdefiniowane **w kodzie, ale za interfejsem magazynu
@@ -2036,8 +2020,8 @@ właściwej warstwy, skrót → „TODO").
   bramek i „Popraw" — noga 2 jest najbardziej „przyciskowa" z całego produktu), feedback
   wdrożeniowców, **domknięcie pętli: zgłoszenie, które przeszło bramkę zamknięcia, jako kandydat
   do `data/parsed/`** (produkt sam buduje sobie korpus — patrz „Cel").
-  Tu wraca **rozbicie wątków-projektów na wiele rekordów** — decyzja na podstawie liczby
-  wykluczeń z etapu 4, nie z góry (patrz „Świadomie pominięte").
+  Tu wraca **rozbicie wątków-projektów na wiele rekordów** — decyzja na podstawie liczby z pełnego
+  korpusu (etap 10), bo filtr z etapu 4 ich nie wykrywa (patrz „Świadomie pominięte").
   **Do sprawdzenia po etapie 6: czy `questions` odtwarza KOLEJNOŚĆ diagnostyczną.** Materiał na
   pytania rozróżniające trafienia niosą wprost (sześć różnych `cause` w top-K), ale informacja
   „od czego zacząć" nie jest w żadnym rekordzie — siedzi w **rozkładzie częstości między nimi**,
