@@ -51,7 +51,8 @@ class Settings(BaseSettings):
     # --- embedder service (own compose service, reached over REST) ---
     embedding_base_url:        str   = "http://embedder:8000"
     embedding_vector_size:     int   = 768              # must match the Qdrant collection
-    embedding_timeout_seconds: float = 30.0             # seconds
+    # Sized for the SLOWEST call — an indexing batch against a cold model, not a runtime query.
+    embedding_timeout_seconds: float = 120.0            # seconds
 
     # --- Qdrant ---
     qdrant_url:              str   = "http://qdrant:6333"

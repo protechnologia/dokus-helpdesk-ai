@@ -2,6 +2,7 @@ from importlib.metadata import version
 
 import typer
 
+from app.cli.index import index
 from app.cli.tickets import tickets
 
 # no_args_is_help: a bare `helpdesk` prints the subcommand tree instead of an unhelpful usage error.
@@ -13,6 +14,7 @@ cli = typer.Typer(
 # Groups of related operations arrive as sub-apps, so the tree stays `helpdesk <resource> <action>`
 # (`helpdesk tickets validate`) instead of flattening into ever longer single-word commands.
 cli.add_typer(tickets, name="tickets")
+cli.add_typer(index, name="index")
 
 
 @cli.callback()

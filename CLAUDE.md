@@ -1130,6 +1130,12 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   w nazwanym wolumenie `hf_cache`, **nie w `data/`** — `data/` to niepowtarzalny artefakt objęty
   backupem (zasada 7), a wagi są o jedno pobranie stąd. Pierwszy start ~40 s, kolejne sekundy,
   stąd `start_period: 300s` w healthchecku.
+- **`EMBEDDING_TIMEOUT_SECONDS` wymiaruje NAJWOLNIEJSZE wywołanie — batch indeksacji na zimnym
+  modelu, nie zapytanie runtime.** Zmierzone 2026-08-13 na CPU (PolDense-150M, 200 artefaktów):
+  batch 32 realnych rekordów to ~9 s przy ciepłym modelu, ale **pierwsze wywołanie po starcie
+  kontenera przekroczyło 30 s i wywaliło cały przebieg `helpdesk index build`** komunikatem
+  „Embedder timed out". Stąd domyślne **120 s**. Uwaga przy strojeniu: `/health` odpowiada, zanim
+  model policzy pierwszy wektor, więc **healthcheck nie chroni przed tym timeoutem**.
 
 ## Warstwa LLM
 
@@ -1934,9 +1940,21 @@ właściwej warstwy, skrót → „TODO").
       Rozjazdy to rekordy do obejrzenia przez człowieka. Przy okazji poprawiono 3 etykiety
       (6773, 7468, 10718 → `rejected`): miały puste `cause` i `solution`, czyli dokładnie kryterium,
       po którym odrzucono 17 innych — niekonsekwencja przeglądu, nie decyzja. Stąd 38, nie 35.
-  - **4.3 `helpdesk index build` / `rebuild`** — cienkie CLI nad serwisem, `rebuild` z `--yes`.
-    Raport przebiegu: ile weszło, ile odrzucone i z jakiego powodu. *Kryterium:* dwa `rebuild`
-    pod rząd dają identyczny stan kolekcji.
+  - [x] **4.3 `helpdesk index build` / `rebuild`** — `service/rag_indexer.py` (`TicketIndexer`:
+    wczytanie → filtr → embedding obu wektorów → upsert) + `cli/index.py` jako cienki adapter,
+    raport w `model/rag_index_report.py`. *Kryterium spełnione:* przebieg na 200 artefaktach dał
+    **171 zaindeksowanych, 29 odrzuconych**, a dwa `rebuild` pod rząd — identyczne 171 punktów.
+    **Utrwalone, do niepowtarzania:**
+    - **`build` na istniejącej kolekcji nadpisuje, nie duplikuje** — sprawdzone na żywym Qdrancie
+      (171 punktów po trzecim przebiegu). To działa dzięki UUID5 z `ticket_id` z 4.1.
+    - **Pusty indeks to porażka (exit 1), nie sukces.** Zerowy kod przy zerze rekordów pozwoliłby
+      zaplanowanemu `rebuild` skasować działający indeks i nie zauważyć tego.
+    - **Kody wyjścia rozróżniają dwie rzeczy:** `2` = zła ścieżka albo niedostępna usługa (ponowna
+      próba ma sens), `1` = przebieg wykonany, ale nic nie weszło (samo się nie naprawi).
+    - **`rebuild` nazywa kolekcję w pytaniu o potwierdzenie** — potwierdzanie operacji niszczącej
+      bez wskazania celu to sposób na skasowanie niewłaściwego indeksu.
+    - **Domyślny `EMBEDDING_TIMEOUT_SECONDS=30` był za mały i wywalał przebieg** — patrz „Warstwa
+      embeddera"; podniesiony do 120 s w `.env.example`, compose i `Settings`.
   - **4.4 Pomiar na realnym indeksie** — `recall@1..K` przez Qdranta zamiast liczenia poza bazą.
     *Kryterium:* wynik zgodny z 98,2% z etapu 3 albo wyjaśniona różnica. **To sprawdzian
     OKABLOWANIA, nie jakości modelu** — golden set i korpus to ten sam zbiór rekordów, więc
