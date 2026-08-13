@@ -79,12 +79,12 @@ Werdykt blokujący da się **świadomie obejść** (patrz „Bramki jakości").
    wartość. Brak trafień = brak propozycji z RAG, a nie propozycja „z głowy".
    **Dotyczy też „Popraw":** poprawiamy formę, nie treść — model nie ma prawa dodać faktu,
    którego nie było w bazgrołach (patrz „Asysta pisania").
-   - **Jawny wyjątek: rekordy syntetyczne.** W kilku obszarach wiedza jest kompletna, ale
-     **rozsypana po 4–7 zgłoszeniach** i żadne pojedyncze trafienie nie wystarcza (klasy
-     wieloprzyczynowe — patrz „Powtarza się objaw"). Drzewo decyzyjne da się z nich złożyć
-     **ręcznie**: pisze i zatwierdza je **człowiek**, a w payloadzie mają `source` odróżniający
-     je od rekordów korpusowych. Bez tego wyjątku zasada 9 wyklucza najcenniejszą część indeksu.
-     **To nie jest furtka dla modelu** — model nadal nie zmyśla niczego.
+   - **Bez wyjątków — indeks zawiera wyłącznie rekordy wyprowadzone ze zgłoszeń.** Klasy
+     wieloprzyczynowe („nic nie przychodzi z e-Doręczeń" — 6 zgłoszeń, 6 rozłącznych przyczyn)
+     obsługuje **wariant `questions` z wielu trafień naraz**, a nie ręcznie pisany rekord
+     scalający: trafienia niosą sześć różnych `cause`, więc materiał do pytań rozróżniających
+     jest w payloadzie wprost i model niczego nie zmyśla. Warunkiem jest **dedup, który tych
+     rekordów nie scali** (patrz etap 4.4).
 10. **Werdykt bramki nie jest wyrokiem.** Blokada zawsze ma **furtkę dla człowieka** i zawsze
     niesie **uzasadnienie oraz wskazówkę, czego brakuje** — samo „nie" zamienia narzędzie
     jakości w przeszkodę, którą wdrożeniowcy nauczą się obchodzić na ślepo.
@@ -249,7 +249,7 @@ rekordów o pięciu różnych objawach („brak akceptującego na liście", „n
 w liczbach — klastrowanie po `cause` daje **więcej klastrów i ostrzej rozdzielonych** (51 vs 41,
 największy 14 vs 55). Objawy się zlewają, przyczyny nie.
 
-**Cztery konsekwencje projektowe:**
+**Pięć konsekwencji projektowych:**
 
 1. **Ścieżka diagnostyczna (pytania) jest rdzeniem produktu, nie awarią.** Trafienie „ta sama
    klasa problemu" jest regułą, trafienie „to samo rozwiązanie" — wyjątkiem.
@@ -259,6 +259,13 @@ największy 14 vs 55). Objawy się zlewają, przyczyny nie.
    Wysoki score współistnieje w tym korpusie z sześcioma rozłącznymi przyczynami.
 4. **Pytania diagnostyczne da się wyprowadzić z korpusu, nie wymyślić** — korpus sam zapisał,
    co rozróżnia konkurujące przyczyny. Wielość przyczyn przestaje być wadą, a staje się treścią.
+5. **Konkurujące przyczyny muszą dotrzeć do promptu RAZEM — to wymóg na indeks, nie na prompt.**
+   Punkt 4 działa tylko wtedy, gdy trafienia niosą kilka różnych `cause`; przy jednym trafieniu
+   nie ma czego rozróżniać. Klaster wieloprzyczynowy jest przy tym **najłatwiejszy do trafienia
+   w całym korpusie** (niemal identyczne `problem` + `symptoms`, czyli dokładnie to, co
+   embedujemy), więc jedynym realnym zagrożeniem jest **dedup, który go scali** — stąd twarda
+   reguła w 4.4. To ten sam wniosek, który unieważnił rekordy syntetyczne (patrz „Świadomie
+   pominięte"): wiedza „między rekordami" jest dostępna, o ile rekordy zostaną osobno.
 
 ### Mapowanie tabel na `ParsedTicket`
 
@@ -1408,6 +1415,14 @@ Raises:                      # only when the method raises
   sam port 8000 i **to nie jest konflikt** — kolidują dopiero porty hosta.
 - **Adres nasłuchu domyślnie `127.0.0.1`, nie `0.0.0.0`** — stack nie ma jeszcze
   uwierzytelniania (patrz TODO), więc nie może odpowiadać z sieci bez świadomej decyzji.
+- **Montowanie kodu z hosta NIE obejmuje zależności** — dev podmienia `./api/app`, ale
+  `requirements.txt` jest zainstalowany **w obrazie**. Dopisanie biblioteki i samo `up` daje
+  kontener, który wstaje i **umiera na `ModuleNotFoundError` przy imporcie**, a `docker compose ps`
+  pokazuje `unhealthy` bez wskazania przyczyny. Zdarzyło się 2026-08-13: `anthropic` dołożony do
+  `requirements.txt` już po zbudowaniu obrazu — testy `integration_api` padały na `Connection reset
+  by peer`, **co wygląda na problem sieciowy, a jest brakującą paczką**. Stąd: po zmianie
+  zależności zawsze `up -d --build <usługa>`, a przy niejasnym `unhealthy` pierwszym krokiem jest
+  `docker compose logs <usługa>`, nie diagnozowanie sieci.
 - **`healthcheck` przez `python -c`, nie `curl`** — obraz `python:*-slim` nie ma `curl`,
   a dokładanie go wyłącznie pod sondę powiększa obraz bez powodu.
 
@@ -1646,6 +1661,22 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   **jednego** pytania na zgłoszenie lista to niemal to samo co synteza, a forma pytająca ciągnie
   model do przepisania cudzych pytań wprost. **Warunek tej decyzji:** synteza zachowuje konkrety;
   jeśli zacznie je gubić, wracamy do rozmowy.
+- **Rekordy syntetyczne — ręcznie pisane drzewa decyzyjne dla klas wieloprzyczynowych**
+  (2026-08-13, były osobnym etapem 4b). Miały scalać wiedzę rozsypaną po 4–7 zgłoszeniach
+  („nic nie przychodzi z e-Doręczeń" — 6 zgłoszeń, 6 rozłącznych przyczyn). **Odrzucone, bo
+  robi to już wariant `questions`**: te rekordy mają niemal identyczne `problem` + `symptoms`,
+  czyli dokładnie to, co embedujemy, więc **wpadają do top-K razem** — a wtedy w prompcie leży
+  sześć różnych `cause` i model generuje pytania rozróżniające **z trafień, nie z głowy**.
+  Rekord scalający dokładałby ręczną pracę do czegoś, co wychodzi z mechaniki produktu.
+  - **Cena, przyjęta świadomie:** trafienia niosą *jakie* są przyczyny, ale nie *od czego
+    zacząć* — kolejność diagnostyczna siedzi w rozkładzie częstości, którego model nie widzi.
+    Do zmierzenia po etapie 6 (patrz etap 11), nie do rozwiązywania z góry.
+  - **Warunek działania tej decyzji: dedup nie może tych rekordów scalić.** Reguła „różna
+    `cause` blokuje scalenie" (etap 4.4) przestaje być ostrożnością, a staje się **nośnikiem
+    obsługi klas wieloprzyczynowych** — stąd test wprost na tym przypadku.
+  - Razem z etapem znika pole `source` w payloadzie (odróżniało rekordy syntetyczne od
+    korpusowych). Dołożenie go później kosztuje **jeden przebieg indeksacji, nie przebieg
+    LLM** — Qdrant odbudowuje się z `data/parsed/` jedną komendą (zasada 8).
 - **Automatyczny wybór wariantu generacji za człowieka** — score podpowiada guzik, nigdy nie
   klika go sam: system nie wie, czy zgłoszenie wymaga działania serwisu, a automat wymagałby
   **osądu LLM-a nad osądem LLM-a**, którego nie umiemy zmierzyć. **Wraca jako możliwość**, gdy
@@ -1686,7 +1717,7 @@ tworzysz świadomym skrótem), **dopisz go tu** zamiast zostawiać w milczeniu.
   rekordów z nazwiskiem w polu embedowanym wobec ~92% zgłoszeń z pełnym PII w źródle** — czyli
   anonimizacja artefaktów nie chroni przed niczym, przed czym nie chroni dostęp do bazy.
   Właściwą osią jest **uwierzytelnianie API** (punkt niżej). Zostaje koszt jakościowy, nie
-  prywatnościowy: nazwisko w wektorze nie niesie nic o klasie problemu — stąd **etap 4c**
+  prywatnościowy: nazwisko w wektorze nie niesie nic o klasie problemu — stąd **etap 4b**
   (placeholder w prompcie, bez re-parsowania).
 - **Hasła w zrzucie źródłowym** — zgłosić klientowi, że `konsultant.haslo` i `uzytkownik.haslo`
   to 32-znakowe hashe MD5 (bez bcrypt/argon), a `skrzynka_email.password` leży obok. Nas to nie
@@ -1810,11 +1841,30 @@ właściwej warstwy, skrót → „TODO").
   porównawcze parserów i **nie wchodzą do indeksu**.
 
   **Podkroki:**
-  - **4.1 Klient Qdranta** (`service/`, `model/`) — tworzenie kolekcji z **dwoma named vectors**
-    (`problem` = passage, `sts` = sts, oba 768), upsert z payloadem, kasowanie kolekcji. Sam
-    transport, zero logiki filtrującej. Infrastruktura jest gotowa: usługa w compose, `QDRANT_*`
-    w `Settings`, marker `integration_qdrant` zarejestrowany. *Kryterium:* test
-    `integration_qdrant` — kolekcja powstaje z właściwymi wymiarami, punkt wraca z payloadem.
+  - [x] **4.1 Klient Qdranta** — `api/app/retrieval/` (`QdrantClient` + `TicketPoint` + błędy):
+    tworzenie kolekcji z **dwoma named vectors** (`problem` = passage, `sts` = sts, oba 768),
+    upsert z payloadem, kasowanie, `count_points`. Sam transport, zero logiki filtrującej.
+    **Nie w `service/`/`model/`, jak zakładał wcześniejszy zapis planu** — to pakiet przekraczający
+    granicę procesu, więc idzie osią usługową obok `llm/` i `embedding/`, razem z modelem
+    transportu (patrz „Warstwy kodu" i drzewo katalogów). Napisany **wprost na REST Qdranta, bez
+    `qdrant-client`**: użytych endpointów jest kilka, `httpx` już był zależnością, a warstwa
+    pośrednia ukryłaby dokładnie to, co tu kontrolujemy ręcznie (named vectors, metryka) — ta sama
+    przesłanka, która wykluczyła LangChain/LlamaIndex.
+    **Utrwalone przy okazji, do niepowtarzania:**
+    - **`point_id` = UUID5 z `ticket_id`** (namespace **zamrożony**, pod testem złotej wartości).
+      Qdrant przyjmuje tylko `uint` albo UUID, a nasze id to stringi; odwzorowanie musi być
+      **funkcją** id, inaczej `index rebuild` duplikuje korpus zamiast go nadpisać. Zmiana
+      namespace’u rozsypuje wszystkie id — stąd test, którego nic innego by nie złapało.
+    - **Kolekcja przy rozjeździe NIE jest naprawiana** — inny wymiar albo brak named vectora to
+      `RetrievalConfigError` z **obiema liczbami** w komunikacie. Bez tego rozjazd wychodzi jako
+      odrzucenie punktów w środku przebiegu, już po zapłaceniu za parsowanie LLM-em.
+    - **Qdrant normalizuje wektory przy zapisie w kolekcji `Cosine`** — zapisane `[0.1]*4` wraca
+      jako `[0.5]*4` (zmierzone 2026-08-13, nie założone). Nas to nie kosztuje nic (embedder i tak
+      oddaje wektory jednostkowe, a cosinus z definicji ignoruje długość), ale **asercja na
+      równość wektora padłaby przy poprawnie działającym systemie** — porównujemy kierunek.
+    *Kryterium spełnione:* 28 testów jednostkowych + 5 `integration_qdrant` (kolekcja powstaje
+    z dwoma wektorami po 768, punkt wraca z payloadem, ponowny upsert nadpisuje, rozjazd wymiaru
+    odrzucony wobec **realnego** Qdranta).
   - **4.2 Filtr jakości** — wielosygnałowy, niebinarny, **raportujący co odrzuca**. Sygnały wprost
     z etykiet golden setu: puste `cause`+`solution`, `solution` bez treści działania („problem
     rozwiązany poprzez interwencję"), zgłoszenie nietechniczne. *Kryterium:* mierzony na **pełnych
@@ -1823,8 +1873,16 @@ właściwej warstwy, skrót → „TODO").
     niosące wiedzę" mają przechodzić, a fałszywy alarm boli bardziej niż przepuszczenie.
   - **4.3 Wątki-projekty** — wykryj, wyklucz, **policz**; ta liczba jest wejściem do decyzji
     z etapu 11. *Kryterium:* raport podaje liczbę i `ticket_id`.
-  - **4.4 Dedup** — trzy reguły wyżej. *Kryterium:* test na spreparowanych parach, w tym
-    **identyczne `solution` przy różnym `component` → NIE scalać**.
+  - **4.4 Dedup** — trzy reguły wyżej. **Reguła „różna `cause` blokuje scalenie" jest tu
+    najważniejsza i nie jest ostrożnością**: po usunięciu rekordów syntetycznych to ona utrzymuje
+    obsługę klas wieloprzyczynowych — sześć zgłoszeń o jednym objawie ma wpaść do top-K **jako
+    sześć**, bo dopiero wtedy wariant `questions` ma z czego zbudować pytania rozróżniające
+    (patrz „Świadomie pominięte"). Scalone do jednego zabierają produktowi tę zdolność
+    **bezgłośnie** — indeks wygląda poprawnie, tylko podpowiedzi robią się jednostronne.
+    *Kryterium:* test na spreparowanych parach, w tym **identyczne `solution` przy różnym
+    `component` → NIE scalać** oraz **niemal identyczny `problem` przy różnej `cause` → NIE
+    scalać**. Dedup **raportuje, co scalił** — tak samo jak filtr raportuje, co odrzucił; bez
+    tego „nie wywaliliśmy za dużo" jest deklaracją, nie faktem.
   - **4.5 `helpdesk index build` / `rebuild`** — cienkie CLI nad serwisem, `rebuild` z `--yes`.
     Raport przebiegu: ile weszło, ile odrzucone i z jakiego powodu, ile zdeduplikowane, ile
     wątków-projektów. *Kryterium:* dwa `rebuild` pod rząd dają identyczny stan kolekcji.
@@ -1838,26 +1896,7 @@ właściwej warstwy, skrót → „TODO").
   projektowe, 47% singletonów) przyjdą dopiero z pełnym korpusem po etapie 10. **Nie kasujemy
   named vectora `sts`** (oś „zapytanie sparsowane" wciąż niezmierzona) i **nie porównujemy
   embedderów** — przy tej skali nadal sufit.
-- [ ] **4b. Rekordy syntetyczne — drzewa decyzyjne dla klas wieloprzyczynowych.** Kilkanaście
-  rekordów, których **nie ma w korpusie i nie da się ich z niego wyprowadzić automatycznie**:
-  pisze je człowiek, czytając po 4–7 zgłoszeń naraz (zasada 9, jawny wyjątek; `source`
-  w payloadzie odróżnia je od korpusowych).
-  - **Problem, który rozwiązują, leży MIĘDZY rekordami, nie w nich.** „Nic nie przychodzi
-    z e-Doręczeń" to 6 zgłoszeń i **6 rozłącznych przyczyn**; każde z osobna jest poprawne
-    i przejdzie filtr etapu 4, ale przy wyszukiwaniu top-1 trafia z prawdopodobieństwem ⅙,
-    a pięć pozostałych podpowiedzi **wygląda równie wiarygodnie**. Żadne pojedyncze trafienie nie
-    wystarcza — brakującym rekordem jest ten, który mówi „ten objaw ma sześć znanych przyczyn,
-    rozróżnia je to i to, sprawdź w tej kolejności".
-  - **To nie to samo co wątki-projekty z 4.3** — tam **jedno** zgłoszenie niesie kilkanaście
-    postulatów i filtr je **usuwa**; tutaj **wiele** zgłoszeń opisuje jeden objaw i my
-    **dokładamy** rekord scalający. Przeciwne kierunki, wspólny wniosek: naturalną jednostką
-    wiedzy nie zawsze jest zgłoszenie.
-  - **Materiałem są zgłoszenia, nie indeks** — rekord wykluczony przez filtr nadal może być
-    źródłem przy pisaniu drzewa.
-  - **Osobny etap przed generacją, nie przypis** — te kilkanaście rekordów będzie warte więcej
-    niż 650 rekordów korpusowych, bo dotyczą dokładnie tych zapytań, przy których naiwne top-1
-    jest aktywnie szkodliwe (patrz „Powtarza się objaw, nie przyczyna").
-- [ ] **4c. Kuracja promptu parsującego: PII i sekrety** — reguła 6 jest dziś zakazem
+- [ ] **4b. Kuracja promptu parsującego: PII i sekrety** — reguła 6 jest dziś zakazem
   negatywnym bez wskazania, **co wpisać zamiast**, a to wymusza wybór między zgubieniem sensu
   zdania a przepisaniem nazwiska (zmierzone: 9,5% rekordów, ~130 w korpusie). Naprawa to
   **placeholder** (`{UŻYTKOWNIK}`) — ten sam mechanizm, którym zasada 9 rozwiązuje brakujące
@@ -1919,3 +1958,10 @@ właściwej warstwy, skrót → „TODO").
   do `data/parsed/`** (produkt sam buduje sobie korpus — patrz „Cel").
   Tu wraca **rozbicie wątków-projektów na wiele rekordów** — decyzja na podstawie liczby
   wykluczeń z etapu 4, nie z góry (patrz „Świadomie pominięte").
+  **Do sprawdzenia po etapie 6: czy `questions` odtwarza KOLEJNOŚĆ diagnostyczną.** Materiał na
+  pytania rozróżniające trafienia niosą wprost (sześć różnych `cause` w top-K), ale informacja
+  „od czego zacząć" nie jest w żadnym rekordzie — siedzi w **rozkładzie częstości między nimi**,
+  a tego model nie widzi, patrząc na pięć wyciągniętych sztuk (korpusowy przykład: uprawnienia,
+  od których zaczyna każdy użytkownik, są tu najrzadszą przyczyną). Jeśli pomiar pokaże, że
+  kolejność ginie, wraca temat rekordu porządkującego dla najczęstszych klas wieloprzyczynowych —
+  **jako pomiar, nie z góry** (patrz „Świadomie pominięte").

@@ -1,0 +1,394 @@
+import json
+
+import httpx
+import pytest
+
+from app.retrieval import (
+    VECTOR_PROBLEM,
+    VECTOR_STS,
+    QdrantClient,
+    RetrievalConfigError,
+    RetrievalError,
+    TicketPoint,
+)
+
+BASE_URL   = "http://qdrant:6333"
+COLLECTION = "tickets"
+SIZE       = 768
+
+# The two paths every test routes on, spelled once: they appear in most `_responding` maps, and
+# rebuilding them inline made the keys longer than the line limit.
+PATH_COLLECTION = f"/collections/{COLLECTION}"
+PATH_POINTS     = f"{PATH_COLLECTION}/points"
+
+# One point, built by hand rather than through ParsedTicket: this file tests the CLIENT, and going
+# through the domain model would make a schema change fail here for a reason that has nothing to
+# do with transport.
+POINT = TicketPoint(
+    point_id       = "df3b51f3-9eac-56f3-9f28-6253f23dd731",
+    vector_problem = [0.1, -0.2],
+    vector_sts     = [0.3, -0.4],
+    payload        = {"ticket_id": "33644"},
+)
+
+
+def _client(handler: httpx.MockTransport) -> QdrantClient:
+    """
+    Description:
+    Builds a client whose transport is a handler instead of a socket, so the contract is tested
+    without a running Qdrant. The private attribute is replaced deliberately: `httpx` offers no
+    public seam for this, and a constructor argument only tests would use would put test
+    scaffolding into production code.
+
+    Example args:
+        handler=httpx.MockTransport(lambda request: httpx.Response(200, json={"result": {}}))
+
+    Example result:
+        QdrantClient answering from the handler
+    """
+    client         = QdrantClient(base_url=BASE_URL, collection=COLLECTION)
+    client._client = httpx.AsyncClient(transport=handler, base_url=BASE_URL)
+
+    return client
+
+
+def _responding(routes: dict[tuple[str, str], httpx.Response]) -> httpx.MockTransport:
+    """
+    Description:
+    Builds a transport answering per (method, path), because every call here is a conversation:
+    `ensure_collection` reads before it writes, `delete_collection` reads before it deletes. For
+    tests where the ANSWER is the subject — what the client concludes from what Qdrant said.
+
+    An unrouted request answers 200 with an empty result rather than failing, so a test declares
+    only the calls it cares about.
+
+    Example args:
+        routes={("GET", "/collections/tickets"): httpx.Response(404)}
+
+    Example result:
+        httpx.MockTransport answering 404 for that read and 200 for everything else
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        key = (request.method, request.url.path)
+
+        return routes.get(key, httpx.Response(200, json={"result": {}, "status": "ok"}))
+
+    return httpx.MockTransport(handler)
+
+
+def _capturing(seen: list, routes: dict | None = None) -> httpx.MockTransport:
+    """
+    Description:
+    Builds a transport recording every request into `seen` and answering as `_responding` would.
+    The counterpart of `_responding()`: for tests where the REQUEST is the subject — what actually
+    went on the wire.
+
+    Example args:
+        seen=[]
+        routes={("GET", "/collections/tickets"): httpx.Response(404)}
+
+    Example result:
+        httpx.MockTransport filling `seen` with {"method": …, "path": …, "body": {…}}
+    """
+    answers = routes or {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(
+            {
+                "method": request.method,
+                "path":   request.url.path,
+                "params": dict(request.url.params),
+                "body":   json.loads(request.content) if request.content else None,
+            }
+        )
+
+        key = (request.method, request.url.path)
+
+        return answers.get(key, httpx.Response(200, json={"result": {}, "status": "ok"}))
+
+    return httpx.MockTransport(handler)
+
+
+def _raising(error: Exception) -> httpx.MockTransport:
+    """
+    Description:
+    Builds a transport that fails the way a broken connection does, rather than answering.
+
+    Example args:
+        error=httpx.ConnectError("connection refused")
+
+    Example result:
+        httpx.MockTransport raising that error on every request
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise error
+
+    return httpx.MockTransport(handler)
+
+
+def _collection_of(size: int, names: tuple[str, ...]) -> httpx.Response:
+    """
+    Description:
+    Builds the description Qdrant returns for an existing collection, with the given named vectors
+    at the given size. Lets the schema-check tests state their case in one line.
+
+    Example args:
+        size=768
+        names=("problem", "sts")
+
+    Example result:
+        httpx.Response(200, json={"result": {"config": {"params": {"vectors": {…}}}}})
+    """
+    vectors = {name: {"size": size, "distance": "Cosine"} for name in names}
+
+    return httpx.Response(200, json={"result": {"config": {"params": {"vectors": vectors}}}})
+
+
+# --- construction -------------------------------------------------------------------------
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_empty_base_url_is_refused_at_build_time(blank: str) -> None:
+    """QDRANT_URL="" (what compose substitutes for an unset var) → error at construction, not a
+    connection error mid-run."""
+    with pytest.raises(RetrievalConfigError, match="QDRANT_URL"):
+        QdrantClient(base_url=blank, collection=COLLECTION)
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_empty_collection_is_refused_at_build_time(blank: str) -> None:
+    """QDRANT_COLLECTION="" → error at construction; an unnamed collection would write to a path
+    that silently means something else."""
+    with pytest.raises(RetrievalConfigError, match="QDRANT_COLLECTION"):
+        QdrantClient(base_url=BASE_URL, collection=blank)
+
+
+# --- ensure_collection --------------------------------------------------------------------
+
+async def test_missing_collection_is_created_with_both_named_vectors() -> None:
+    """No collection yet → created with `problem` and `sts`, both at the configured size. Building
+    only one vector now would make adding the other a full re-index later."""
+    seen: list = []
+    client     = _client(
+        _capturing(seen, {("GET", PATH_COLLECTION): httpx.Response(404)})
+    )
+
+    created = await client.ensure_collection(vector_size=SIZE)
+
+    assert created is True
+
+    write = next(call for call in seen if call["method"] == "PUT")
+
+    assert write["body"]["vectors"][VECTOR_PROBLEM]["size"] == SIZE
+    assert write["body"]["vectors"][VECTOR_STS]["size"]     == SIZE
+
+
+async def test_created_vectors_use_cosine() -> None:
+    """Collection creation → Cosine distance, the metric stage 3 measured on normalised vectors;
+    another metric would make RAG_SCORE_MIN mean something the measurement never covered."""
+    seen: list = []
+    client     = _client(
+        _capturing(seen, {("GET", PATH_COLLECTION): httpx.Response(404)})
+    )
+
+    await client.ensure_collection(vector_size=SIZE)
+
+    write = next(call for call in seen if call["method"] == "PUT")
+
+    assert write["body"]["vectors"][VECTOR_PROBLEM]["distance"] == "Cosine"
+    assert write["body"]["vectors"][VECTOR_STS]["distance"]     == "Cosine"
+
+
+async def test_matching_collection_is_left_alone() -> None:
+    """Collection already correct → reported as not created, and nothing is written."""
+    seen: list = []
+    client     = _client(
+        _capturing(
+            seen,
+            {("GET", PATH_COLLECTION): _collection_of(SIZE, (VECTOR_PROBLEM, VECTOR_STS))},
+        )
+    )
+
+    created = await client.ensure_collection(vector_size=SIZE)
+
+    assert created is False
+    assert [call["method"] for call in seen] == ["GET"]
+
+
+async def test_wrong_vector_size_is_refused_with_both_numbers() -> None:
+    """Existing collection built for another model → config error naming BOTH sizes. Adapting
+    silently would produce an index nobody can compare against, and the failure would otherwise
+    surface as rejected points an hour into a run that already paid for LLM parsing."""
+    client = _client(
+        _responding(
+            {("GET", PATH_COLLECTION): _collection_of(1024, (VECTOR_PROBLEM, VECTOR_STS))}
+        )
+    )
+
+    with pytest.raises(RetrievalConfigError, match="1024") as excinfo:
+        await client.ensure_collection(vector_size=SIZE)
+
+    # Both numbers, because one of them alone does not say which side to fix.
+    assert "768" in str(excinfo.value)
+
+
+async def test_missing_named_vector_is_refused() -> None:
+    """Collection carrying only `problem` → config error naming the missing vector, not a silent
+    write into a collection that cannot hold dedup vectors."""
+    client = _client(
+        _responding(
+            {("GET", PATH_COLLECTION): _collection_of(SIZE, (VECTOR_PROBLEM,))}
+        )
+    )
+
+    with pytest.raises(RetrievalConfigError, match=VECTOR_STS):
+        await client.ensure_collection(vector_size=SIZE)
+
+
+async def test_unrecognised_description_fails_with_our_message() -> None:
+    """Collection description of an unexpected shape → our config error, never a KeyError from
+    three levels inside the payload."""
+    client = _client(
+        _responding({("GET", PATH_COLLECTION): httpx.Response(200, json={"result": {}})})
+    )
+
+    with pytest.raises(RetrievalConfigError, match=COLLECTION):
+        await client.ensure_collection(vector_size=SIZE)
+
+
+# --- upsert -------------------------------------------------------------------------------
+
+async def test_upsert_sends_the_wire_shape_and_waits() -> None:
+    """Points in → named vectors on the wire, and `wait=true` so a reported write is a done write
+    (an indexing run reports what it wrote and a later step reads it back)."""
+    seen: list = []
+    client     = _client(_capturing(seen))
+
+    written = await client.upsert_points([POINT])
+
+    assert written == 1
+
+    call = seen[0]
+
+    assert call["params"]["wait"]                              == "true"
+    assert call["body"]["points"][0]["id"]                     == POINT.point_id
+    assert call["body"]["points"][0]["vector"][VECTOR_PROBLEM] == POINT.vector_problem
+
+
+async def test_upsert_of_nothing_writes_nothing() -> None:
+    """Empty list → zero written and no request. A filter rejecting everything is a legitimate
+    outcome, and the caller must be able to tell it from a crash."""
+    seen: list = []
+    client     = _client(_capturing(seen))
+
+    assert await client.upsert_points([]) == 0
+    assert seen                           == []
+
+
+async def test_upsert_splits_into_batches() -> None:
+    """More points than one batch → several requests, together carrying every point exactly once.
+    One giant request would lose a whole run's work to a single failure."""
+    seen: list = []
+    client     = _client(_capturing(seen))
+    points     = [POINT.model_copy(update={"point_id": f"id-{index}"}) for index in range(150)]
+
+    written = await client.upsert_points(points)
+
+    assert written    == 150
+    assert len(seen)  > 1
+
+    sent = [point["id"] for call in seen for point in call["body"]["points"]]
+
+    assert sent == [f"id-{index}" for index in range(150)]
+
+
+# --- delete and count ---------------------------------------------------------------------
+
+async def test_delete_reports_whether_anything_was_removed() -> None:
+    """Existing collection → deleted and reported True; `index rebuild` prints which happened."""
+    client = _client(
+        _responding(
+            {("GET", PATH_COLLECTION): _collection_of(SIZE, (VECTOR_PROBLEM, VECTOR_STS))}
+        )
+    )
+
+    assert await client.delete_collection() is True
+
+
+async def test_delete_of_a_missing_collection_is_not_an_error() -> None:
+    """No collection → False and no DELETE. An absent collection is a normal starting state for a
+    rebuild, not a failure."""
+    seen: list = []
+    client     = _client(
+        _capturing(seen, {("GET", PATH_COLLECTION): httpx.Response(404)})
+    )
+
+    assert await client.delete_collection() is False
+    assert [call["method"] for call in seen] == ["GET"]
+
+
+async def test_count_asks_for_an_exact_number() -> None:
+    """count_points() → exact:true on the wire; an approximate count would make the "two rebuilds
+    give the same state" assertion flaky."""
+    seen: list = []
+    client     = _client(
+        _capturing(
+            seen,
+            {
+                ("POST", f"{PATH_POINTS}/count"): httpx.Response(
+                    200, json={"result": {"count": 200}}
+                )
+            },
+        )
+    )
+
+    assert await client.count_points() == 200
+    assert seen[0]["body"]["exact"] is True
+
+
+# --- transport failures -------------------------------------------------------------------
+
+async def test_unreachable_qdrant_becomes_a_retrieval_error() -> None:
+    """Connection refused → RetrievalError, never an httpx type: the transport must not leak into
+    the domain (rule 4)."""
+    client = _client(_raising(httpx.ConnectError("connection refused")))
+
+    with pytest.raises(RetrievalError):
+        await client.ensure_collection(vector_size=SIZE)
+
+
+async def test_timeout_becomes_a_retrieval_error() -> None:
+    """Qdrant does not answer in time → RetrievalError naming the collection."""
+    client = _client(_raising(httpx.TimeoutException("timed out")))
+
+    with pytest.raises(RetrievalError, match=COLLECTION):
+        await client.ensure_collection(vector_size=SIZE)
+
+
+async def test_rejected_upsert_carries_qdrants_explanation() -> None:
+    """Qdrant rejects a write (wrong vector size, unknown vector name) → the error carries its
+    reason. That text is ours, not the customer's, and it is the only thing that says WHY."""
+    client = _client(
+        _responding(
+            {
+                ("PUT", PATH_POINTS): httpx.Response(
+                    400, text="Wrong input: Vector dimension error"
+                )
+            }
+        )
+    )
+
+    with pytest.raises(RetrievalError, match="Vector dimension error"):
+        await client.upsert_points([POINT])
+
+
+async def test_non_json_body_becomes_a_retrieval_error() -> None:
+    """A 200 whose body is not JSON (a proxy error page, typically) → RetrievalError rather than a
+    decoding crash far from the cause."""
+    client = _client(
+        _responding({("GET", PATH_COLLECTION): httpx.Response(200, text="<html>")})
+    )
+
+    with pytest.raises(RetrievalError):
+        await client.ensure_collection(vector_size=SIZE)
