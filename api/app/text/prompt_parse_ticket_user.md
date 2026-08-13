@@ -13,6 +13,16 @@ Plik jest tekstem dla modelu, nie kodem. Miejsca `{{...}}` wypełnia `parse_tick
 
 Każda reguła niżej wynika z konkretnego błędu znalezionego w prawdziwych zgłoszeniach; przy
 edycji warto zajrzeć do „Reguły parsowania wyprowadzone z korpusu" w CLAUDE.md.
+
+UWAGA: FRAZY UCIECZKOWE („brak", „nie dotyczy") SĄ KONTRAKTEM FILTRU JAKOŚCI.
+Filtr indeksacji (service/filter_ticket_quality_rules.py) rozpoznaje rekord bez wiedzy po tym, że
+`solution` niesie frazę ucieczkową i niewiele poza nią — nie po stylu wypowiedzi modelu. To jest
+jedyny powód, dla którego filtr przeżywa podmianę modelu.
+
+Zmiana tych fraz albo instrukcji, KIEDY je stosować, jest więc zmianą filtru, choćby nie tknęła
+jego kodu. Po takiej edycji uruchom test na korpusie referencyjnym
+(tests/unit/test_api_service_filter_ticket_quality_corpus.py) — pilnuje, ile rekordów filtr
+odrzuca, i zapala się, gdy prompt i filtr się rozjadą.
 -->
 
 ## Pola wynikowego JSON-a

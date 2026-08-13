@@ -84,7 +84,7 @@ Werdykt blokujący da się **świadomie obejść** (patrz „Bramki jakości").
      obsługuje **wariant `questions` z wielu trafień naraz**, a nie ręcznie pisany rekord
      scalający: trafienia niosą sześć różnych `cause`, więc materiał do pytań rozróżniających
      jest w payloadzie wprost i model niczego nie zmyśla. Warunkiem jest **dedup, który tych
-     rekordów nie scali** (patrz etap 4.4).
+     rekordów nie scali** (patrz etap 4.3).
 10. **Werdykt bramki nie jest wyrokiem.** Blokada zawsze ma **furtkę dla człowieka** i zawsze
     niesie **uzasadnienie oraz wskazówkę, czego brakuje** — samo „nie" zamienia narzędzie
     jakości w przeszkodę, którą wdrożeniowcy nauczą się obchodzić na ślepo.
@@ -264,7 +264,7 @@ największy 14 vs 55). Objawy się zlewają, przyczyny nie.
    nie ma czego rozróżniać. Klaster wieloprzyczynowy jest przy tym **najłatwiejszy do trafienia
    w całym korpusie** (niemal identyczne `problem` + `symptoms`, czyli dokładnie to, co
    embedujemy), więc jedynym realnym zagrożeniem jest **dedup, który go scali** — stąd twarda
-   reguła w 4.4. To ten sam wniosek, który unieważnił rekordy syntetyczne (patrz „Świadomie
+   reguła w 4.3. To ten sam wniosek, który unieważnił rekordy syntetyczne (patrz „Świadomie
    pominięte"): wiedza „między rekordami" jest dostępna, o ile rekordy zostaną osobno.
 
 ### Mapowanie tabel na `ParsedTicket`
@@ -964,8 +964,13 @@ dokus-helpdesk-ai/
   ten tekst rozjechałyby się **bezgłośnie** (indeksacja z etapu 4 wobec zapytania z etapu 5).
 - **Nazwa pliku mówi, CO ROBI, nie czego dotyczy** — `validator_ticket_parsed.py`, nie
   `artifacts.py`. W `service/` oś `<rola>_<przedmiot>` (`parser_`, `validator_`, `prompt_`,
-  `loader_`), w `model/` prefiks tematyczny grupujący alfabetycznie (`ticket_*`,
-  `validation_parsed_*`, `dict_*`).
+  `loader_`, `filter_`), w `model/` prefiks tematyczny grupujący alfabetycznie (`ticket_*`,
+  `validation_parsed_*`, `dict_*`, `filter_*`).
+  - **Gdy reguł jest wiele i przybywa ich szybciej niż logiki wokół nich, idą do osobnego pliku**
+    (`filter_ticket_quality.py` + `filter_ticket_quality_rules.py`): dwa różne rytmy zmian, a plik
+    reguł czyta się jak listę, nie jak kod. Każda reguła to funkcja modułowa — bezstanowa, więc
+    klasa dałaby tylko miejsce na `self` — a krotka `RULES` na końcu jest tym, po czym iteruje
+    orkiestrator i po czym parametryzują się testy. Dołożenie reguły to dopisanie funkcji.
   - **Znany koszt tej konwencji, do rozstrzygnięcia przy etapie 10:** wszystkie czytniki źródeł
     produkują ten sam `RawTicket`, więc wariant SQL musi dołożyć źródło do nazwy
     (`parser_ticket_raw_sql`) albo oba dostaną sufiks. Nazwa opisuje WYNIK, a te pliki różni
@@ -1212,10 +1217,15 @@ dostaje każdy rekord**.
 - **Filtrujemy pytania, nie odpowiedzi.** Zapytanie powstaje tylko do rekordu niosącego wiedzę,
   ale **korpus przeszukiwany zostaje nieprzefiltrowany** — puste rekordy zostają jako dystraktory,
   bo w produkcji filtr etapu 4 też nie będzie doskonały.
-- **Liczba odrzuceń jest wynikiem, nie odpadem** — wyszło 18% (35 z 200) wobec 25–26% z pomiaru
+- **Liczba odrzuceń jest wynikiem, nie odpadem** — wyszło 19% (38 z 200) wobec 25–26% z pomiaru
   na 661 rekordach; różnica jest wyjaśnialna (tamto kryterium było szersze: „przydatne do
   zaproponowania komuś"). Odrzucone zostają w pliku **z powodem** — to gotowe wejście do filtru
   etapu 4.
+  - **Pierwotnie było 35; trzy dołożono 2026-08-13 przy budowie filtru** (6773, 7468, 10718 —
+    puste `cause` i `solution`, czyli kryterium, po którym odrzucono 17 innych). **Wniosek na
+    przyszłe przeglądy: ręczna klasyfikacja 200 rekordów po kolei jest niekonsekwentna i wychodzi
+    to dopiero, gdy kod zacznie ją odtwarzać** — kryterium warto sprawdzić skryptem NA KOŃCU
+    przeglądu, zanim zestaw zacznie służyć za odniesienie.
 - **Grupa kontrolna zamiast zgadywania.** Do pomiaru dokładamy model, o którym **z góry wiadomo**,
   że powinien wypaść słabo (tu: anglojęzyczny `nomic-embed-text-v1.5`), i **ustalamy progi
   interpretacji PRZED przebiegiem**. Bez niej nie odróżnisz „model jest dobry" od „zadanie jest
@@ -1681,7 +1691,7 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
     zacząć* — kolejność diagnostyczna siedzi w rozkładzie częstości, którego model nie widzi.
     Do zmierzenia po etapie 6 (patrz etap 11), nie do rozwiązywania z góry.
   - **Warunek działania tej decyzji: dedup nie może tych rekordów scalić.** Reguła „różna
-    `cause` blokuje scalenie" (etap 4.4) przestaje być ostrożnością, a staje się **nośnikiem
+    `cause` blokuje scalenie" (etap 4.3) przestaje być ostrożnością, a staje się **nośnikiem
     obsługi klas wieloprzyczynowych** — stąd test wprost na tym przypadku.
   - Razem z etapem znika pole `source` w payloadzie (odróżniało rekordy syntetyczne od
     korpusowych). Dołożenie go później kosztuje **jeden przebieg indeksacji, nie przebieg
@@ -1812,8 +1822,9 @@ właściwej warstwy, skrót → „TODO").
   wymiar ⇒ nowa kolekcja, a dziś kolekcji jeszcze nie ma, więc kosztuje zero.
   **Wariant 1B wypada świadomie:** przy CPU-only latencja `POST /search` byłaby rzędu sekundy,
   zanim LLM zacznie generować — etap 3 ma go nie mierzyć.
-- [x] **3. Ewaluacja embeddera** — golden set 165 syntetycznych zapytań
-  (`data/golden/bielik-11b-golden200.json`, 35 rekordów odrzuconych z powodem) + skrypt
+- [x] **3. Ewaluacja embeddera** — golden set syntetycznych zapytań
+  (`data/golden/bielik-11b-golden200.json`; pomiar liczony na **165** zapytaniach i 35 odrzuceniach,
+  dziś w pliku 162 + 38 — patrz poprawka etykiet w 4.2) + skrypt
   `scripts/eval_embeddings.py` liczący krzywą `recall@1..K` i MRR. **Decyzja: PolDense-150M, tryb
   `query→passage`** — pełny raport `docs/pomiar-embedderow.md`, reguły budowy zestawu w sekcji
   „Ewaluacja jakości", wynik i jego zastrzeżenia w „Embeddingi i prefiksy PolDense".
@@ -1845,7 +1856,7 @@ właściwej warstwy, skrót → „TODO").
   Odzyskanie tego wymaga pola w schemacie, czyli ponownego przebiegu LLM (zasada 7).
 
   **Materiał: `data/parsed/bielik-11b-golden200/` (200 artefaktów)** — ten sam zestaw, na którym
-  stoi golden set, więc filtr da się zmierzyć wobec 35 etykiet „odrzuć" i 165 „przepuść"
+  stoi golden set, więc filtr da się zmierzyć wobec 38 etykiet „odrzuć" i 162 „przepuść"
   z `data/golden/bielik-11b-golden200.json`. Pozostałe katalogi w `data/parsed/` to próbki
   porównawcze parserów i **nie wchodzą do indeksu**.
 
@@ -1874,15 +1885,41 @@ właściwej warstwy, skrót → „TODO").
     *Kryterium spełnione:* 28 testów jednostkowych + 5 `integration_qdrant` (kolekcja powstaje
     z dwoma wektorami po 768, punkt wraca z payloadem, ponowny upsert nadpisuje, rozjazd wymiaru
     odrzucony wobec **realnego** Qdranta).
-  - **4.2 Filtr jakości** — wielosygnałowy, niebinarny, **raportujący co odrzuca**. Sygnały wprost
-    z etykiet golden setu: puste `cause`+`solution`, `solution` bez treści działania („problem
-    rozwiązany poprzez interwencję"), zgłoszenie nietechniczne. *Kryterium:* mierzony na **pełnych
-    200** (przed budową kolekcji, inaczej ocenialibyśmy filtr na tym, co sam przepuścił), osobno
-    fałszywe alarmy i przepuszczenia. **Nie celujemy w 100%** — rekordy „nierozwiązane, ale
-    niosące wiedzę" mają przechodzić, a fałszywy alarm boli bardziej niż przepuszczenie.
-  - **4.3 Wątki-projekty** — wykryj, wyklucz, **policz**; ta liczba jest wejściem do decyzji
-    z etapu 11. *Kryterium:* raport podaje liczbę i `ticket_id`.
-  - **4.4 Dedup** — trzy reguły wyżej. **Reguła „różna `cause` blokuje scalenie" jest tu
+  - [x] **4.2 Filtr jakości** — `service/filter_ticket_quality.py` (orkiestrator) +
+    `filter_ticket_quality_rules.py` (reguły, jedna funkcja na regułę); modele werdyktu i raportu
+    w `model/filter_quality_*`. `evaluate_ticket()` ocenia **jeden** rekord i jest wejściem zarówno
+    dla wsadu, jak i dla runtime; `filter_tickets()` to ono po korpusie plus statystyka.
+    **Wynik: 29/38 zgodnych z etykietami, ZERO fałszywych alarmów** na pełnych 200 (2026-08-13).
+    **Utrwalone, do niepowtarzania:**
+    - **Jedna reguła zamiast sześciu: fraza ucieczkowa + liczba pozostałych słów.** Rekord bez
+      wiedzy to taki, którego `solution` niesie `brak`/`nie dotyczy` i **≤10 słów poza nią**.
+      Reguła czyta **kontrakt schematu** (`NO_VALUE`, `NOT_APPLICABLE`), nie styl modelu — dlatego
+      przeżywa podmianę modelu, w odróżnieniu od wzorców na frazeologii. Próg ma szeroki margines
+      (4–10 daje ten sam wynik), bo pustka jest krótka, a **odmowa musi się wytłumaczyć** i jest
+      długa („Brak możliwości wygenerowania ZPO…" to najcenniejsza klasa w korpusie).
+    - **`brak` dopasowujemy jako CAŁE SŁOWO.** Przedrostek `brak\w*` łapał „Dodano **brakujące**
+      ustawienie systemowe" — rekord opisujący wykonaną pracę (zmierzony fałszywy alarm).
+    - **Puste `cause` NIE jest sygnałem** — ma je 114 z 200 rekordów, z czego **105 jest dobrych**.
+      Sprawy bywają rozwiązane bez nazwania przyczyny; filtr na tym polu wyciąłby połowę korpusu.
+    - **Długości opisu NIE da się użyć do wykrycia wątków-projektów**, wbrew założeniu roadmapy:
+      jeden ma opis 1,0× mediany, a najdłuższy opis w korpusie należy do rekordu dobrego — parser
+      streszcza opis, więc sygnał z surowych zgłoszeń nie przeżywa parsowania. Trzy pozostałe
+      sygnały (zapowiedź w czasie przyszłym, odesłanie do duplikatu, lista postulatów) łapały po
+      1–2 rekordy, każdy zależny od frazeologii jednego modelu — **odłożone**, wracają, gdy pełny
+      korpus pokaże, że są tego warte. Tyle samo dotyczy osobnego licznika wątków-projektów.
+    - **Kruchość rozwiązana trzema zabezpieczeniami, nie filtrowaniem przez LLM.** Reguły czytają
+      tekst od modelu, więc psują się przez **zamilknięcie** — nic nie pasuje, wszystko przechodzi,
+      nic się nie czerwieni. Stąd: komentarz w prompcie parsującym (zmiana fraz ucieczkowych JEST
+      zmianą filtru), test-strażnik na korpusie referencyjnym (próg ≥25 odrzuceń) oraz
+      `drop_rate_warning()` sygnalizujące załamanie odsetka odrzuceń. **Filtrowanie przy parsowaniu
+      odrzucone**: łamie zasadę 7 (zmiana kryterium = ponowny przebieg LLM), znosi mierzalność
+      i każe modelowi oceniać własną pracę.
+    - **Etykiety golden setu nie są niezależnym źródłem prawdy** — powstały z modelu czytającego te
+      same artefakty, więc 29/38 mierzy **zgodność z wcześniejszym osądem**, nie poprawność.
+      Rozjazdy to rekordy do obejrzenia przez człowieka. Przy okazji poprawiono 3 etykiety
+      (6773, 7468, 10718 → `rejected`): miały puste `cause` i `solution`, czyli dokładnie kryterium,
+      po którym odrzucono 17 innych — niekonsekwencja przeglądu, nie decyzja. Stąd 38, nie 35.
+  - **4.3 Dedup** — trzy reguły wyżej. **Reguła „różna `cause` blokuje scalenie" jest tu
     najważniejsza i nie jest ostrożnością**: po usunięciu rekordów syntetycznych to ona utrzymuje
     obsługę klas wieloprzyczynowych — sześć zgłoszeń o jednym objawie ma wpaść do top-K **jako
     sześć**, bo dopiero wtedy wariant `questions` ma z czego zbudować pytania rozróżniające
@@ -1892,10 +1929,10 @@ właściwej warstwy, skrót → „TODO").
     `component` → NIE scalać** oraz **niemal identyczny `problem` przy różnej `cause` → NIE
     scalać**. Dedup **raportuje, co scalił** — tak samo jak filtr raportuje, co odrzucił; bez
     tego „nie wywaliliśmy za dużo" jest deklaracją, nie faktem.
-  - **4.5 `helpdesk index build` / `rebuild`** — cienkie CLI nad serwisem, `rebuild` z `--yes`.
+  - **4.4 `helpdesk index build` / `rebuild`** — cienkie CLI nad serwisem, `rebuild` z `--yes`.
     Raport przebiegu: ile weszło, ile odrzucone i z jakiego powodu, ile zdeduplikowane, ile
     wątków-projektów. *Kryterium:* dwa `rebuild` pod rząd dają identyczny stan kolekcji.
-  - **4.6 Pomiar na realnym indeksie** — `recall@1..K` przez Qdranta zamiast liczenia poza bazą.
+  - **4.5 Pomiar na realnym indeksie** — `recall@1..K` przez Qdranta zamiast liczenia poza bazą.
     *Kryterium:* wynik zgodny z 98,2% z etapu 3 albo wyjaśniona różnica. **To sprawdzian
     OKABLOWANIA, nie jakości modelu** — golden set i korpus to ten sam zbiór rekordów, więc
     liczby nie wolno czytać jako skuteczności produktu.
