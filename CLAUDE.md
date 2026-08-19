@@ -1829,8 +1829,8 @@ tworzysz świadomym skrótem), **dopisz go tu** zamiast zostawiać w milczeniu.
   rekordów z nazwiskiem w polu embedowanym wobec ~92% zgłoszeń z pełnym PII w źródle** — czyli
   anonimizacja artefaktów nie chroni przed niczym, przed czym nie chroni dostęp do bazy.
   Właściwą osią jest **uwierzytelnianie API** (punkt niżej). Zostaje koszt jakościowy, nie
-  prywatnościowy: nazwisko w wektorze nie niesie nic o klasie problemu — stąd **etap 4b**
-  (placeholder w prompcie, bez re-parsowania).
+  prywatnościowy: nazwisko w wektorze nie niesie nic o klasie problemu — stąd placeholder
+  w prompcie jako **pierwszy podkrok etapu 10**, bez re-parsowania.
 - **Hasła w zrzucie źródłowym** — zgłosić klientowi, że `konsultant.haslo` i `uzytkownik.haslo`
   to 32-znakowe hashe MD5 (bez bcrypt/argon), a `skrzynka_email.password` leży obok. Nas to nie
   dotyczy (adapter tych kolumn nie czyta), ale zrzut u nas na dysku owszem — trzymać go krótko
@@ -1954,22 +1954,6 @@ właściwej warstwy, skrót → „TODO").
   **Materiał: `data/parsed/bielik-11b-golden200/` (200 artefaktów)** — ten sam zestaw, na którym
   stoi golden set, więc filtr jest mierzalny wobec 38 etykiet „odrzuć" i 162 „przepuść". Pozostałe
   katalogi w `data/parsed/` to próbki porównawcze parserów i **nie wchodzą do indeksu**.
-- [ ] **4b. Kuracja promptu parsującego: PII i sekrety** — reguła 6 jest dziś zakazem
-  negatywnym bez wskazania, **co wpisać zamiast**, a to wymusza wybór między zgubieniem sensu
-  zdania a przepisaniem nazwiska (zmierzone: 9,5% rekordów, ~130 w korpusie). Naprawa to
-  **placeholder** (`{UŻYTKOWNIK}`) — ten sam mechanizm, którym zasada 9 rozwiązuje brakujące
-  dane przy generacji — nie mocniejszy zakaz. Osobno **sekrety**: reguła 6 wrzuca je do jednego
-  worka z nazwiskami, a klasy są **rozłączne co do skutku** — nazwisko w wektorze lekko szkodzi
-  retrievalowi, hasło roota wyskakujące w propozycji odpowiedzi to incydent bezpieczeństwa
-  (1,1% zgłoszeń, **dwa z pięciu przypadków wkleił konsultant** — patrz „Pułapki tej bazy").
-  - **Nowa wersja promptu NIE uruchamia re-parsowania.** Wchodzi w życie przy pełnym przebiegu
-    w **etapie 10**, więc kosztuje zero; odpalona teraz unieważniłaby 209 artefaktów i golden
-    set zbudowany na tych samych rekordach (zasada 7).
-  - **Priorytet obniżony świadomie** — polityka PII rozstrzygnięta na korzyść kontroli dostępu
-    (patrz TODO), bo docelowy LLM jest lokalny. To, co zostaje, jest argumentem **jakościowym**:
-    nazwisko w polu embedowanym zanieczyszcza wektor.
-  - **Kryterium ukończenia:** test-strażnik na obecności placeholdera i na rozdzieleniu reguły
-    sekretów od reguły PII, wersja promptu podbita, artefakty z etapów 3–4 nietknięte.
 - [ ] **5. Wyszukiwanie** — `POST /search`: parser zapytania (LLM → `ParsedTicket`) + top-K,
   próg, zwijanie zgodnych trafień, zwrot trafień ze score i ID. **Tu parser wchodzi do runtime** —
   ten sam prompt i ten sam model Pydantic, którymi parsowaliśmy korpus.
@@ -1983,6 +1967,76 @@ właściwej warstwy, skrót → „TODO").
   diagnozę). Uboczna korzyść: obie strony porównania stają się tym samym gatunkiem tekstu — co
   **zmierzono 2026-08-13 i co NIE pomogło `sts→sts`**: `query→passage` wygrywa tam nawet wyraźniej
   niż na surowych (patrz „Embeddingi i prefiksy PolDense").
+  - [x] **5.1. Wyszukiwanie w kliencie Qdranta** — `search()` po `/points/query` z **wymaganą
+    nazwą named vectora, bez wartości domyślnej** (kolekcja ma dwa, a szukanie po niewłaściwym
+    nie jest błędem — zwraca wiarygodnie wyglądające bzdury) + `TicketHit` obok `TicketPoint`
+    jako strona odczytu. Payload trzymany **w całości**, nie rozpakowany na pola: prompt
+    generacji czyta klucze, których ten model nie nazywa, więc druga lista pól byłaby drugim
+    miejscem, gdzie można któreś zgubić.
+    **Zmierzone przy okazji, wobec działającego Qdranta:** ten sam wektor pytany o `problem` daje
+    score 1,0, a o `sts` — dokładnie −1,0, i **nic się nie wywala**. To ta „awaria, która nie
+    wygląda na awarię" pokazana liczbą; stąd wymagany argument zamiast domyślnego.
+    **Pusty wynik i zła nazwa wektora to rozłączne przypadki** i testy pilnują ich osobno: puste
+    trafienia są legalną odpowiedzią („nowy typ problemu"), a literówka w nazwie przestrzeni musi
+    być głośna — `[]` wyglądałoby jak „nic podobnego w korpusie" i schowałoby błąd okablowania.
+  - [ ] **5.2. Progi i parametry do ENV** — `config.py` nie ma dziś **ani jednego** `RAG_*`.
+    Dochodzą `RAG_TOP_K`, `RAG_SCORE_MIN` i parametr zwijania z 5.4 — do `Settings`, do
+    `.env.example` i do compose (obie krawędzie, patrz „Konfiguracja i deploy”: pole, którego
+    usługa nigdy nie dostaje, nie objawia się niczym).
+    **Kryterium:** `test_config_plumbing` przechodzi bez dopisywania wyjątków.
+  - [ ] **5.3. Serwis wyszukiwania** — `service/rag_searcher.py`: surowy tekst → `TicketParser`
+    → `embedding_text()` → `embed_query()` → `search()` → próg. **Parser jest gotowy i
+    deklaruje ten etap w docstringu**, ale przyjmuje `RawTicket`; do rozstrzygnięcia, czy
+    zapytanie z runtime buduje `RawTicket` z pustymi komentarzami, czy dostaje własną drogę
+    wejścia — wątek w toku ma komentarze, więc `as_thread()` jest tu potrzebny w całości.
+    **Tekst do embeddingu skleja `embedding_text()`**, nigdy serwis (dwa miejsca rozjechałyby
+    się bezgłośnie wobec indeksacji).
+    **Kryterium:** unit na deterministycznej atrapie embeddera i `FakeLLMClient` — próg odcina,
+    kolejność zachowana, pusty wynik jest wynikiem, nie błędem.
+  - [ ] **5.4. Zwijanie zgodnych trafień** — **jedyny podkrok z nierozstrzygniętą decyzją**:
+    czy zgodność liczy się z payloadu (`component` + `cause` + `solution`), czy z podobieństwa
+    wektorowego. To przesądza, **czy `sts` zostaje w indeksie** (etap 4 zostawił go wyłącznie
+    dla tego zastosowania). Rozstrzygnąć **pomiarem, przed pisaniem**, na 171 zaindeksowanych
+    rekordach.
+    - **Trzej kandydaci, mierzeni na tym samym zbiorze par:** podobieństwo `sts`, podobieństwo
+      `problem` (passage — już w indeksie, więc kandydat darmowy) i zgodność payloadu.
+      Odniesienie: ręcznie oznaczone pary „do zwinięcia / nie do zwinięcia"; punkt startowy to
+      8 par o podobieństwie `problem` ≥ 0,40 z pomiaru etapu 4.
+    - **Metryka rozdzielona, nie zbiorcza: fałszywe scalenia osobno od przeoczeń.** Fałszywe
+      scalenie jest groźniejsze — kasuje sygnał, na którym stoi ocena pewności w etapie 6
+      (licznik ma znaczyć „to rozwiązanie potwierdzone pięć razy"), podczas gdy przeoczenie
+      zostawia dwa trafienia zamiast jednego, czyli nadmiar, nie stratę.
+    - **To pierwsze zadanie w projekcie, w którym `sts` ma wiarygodną przesłankę** — zwijanie
+      porównuje rekord z rekordem, więc jest symetryczne z definicji i obie strony mają tę samą
+      objętość. Wyszukiwanie było zadaniem innego rodzaju i zostało rozstrzygnięte czterema
+      pomiarami na korzyść `query→passage` (patrz „Embeddingi i prefiksy PolDense") — **tamten
+      wynik nie przesądza tego**, i odwrotnie.
+    - **Możliwy wynik: wektory przegrywają z payloadem — bo mierzą co innego.** Wektor niesie
+      `problem` + `symptoms`, czyli **objaw**, a zwijanie ma scalać rekordy o tym samym
+      **rozstrzygnięciu**. Korpusowy kontrprzykład: trzy rekordy „brak wizualizacji UPP" mają
+      identyczny `problem` i rozłączne rozwiązania — każda miara wektorowa scali je wysoko
+      i będzie to błąd. Odwrotnie: sześć zgłoszeń „nic nie przychodzi z e-Doręczeń" ma niemal
+      równoważne opisy i **musi zostać rozdzielone**, bo to z nich powstają pytania
+      rozróżniające.
+    Twarde ograniczenie z pomiaru 4: **puste `cause` NIE jest zgodnością** — ma je 114 z 200
+    rekordów, więc naiwne porównanie skleja rekordy o rozłącznych rozwiązaniach.
+    Grupa wraca jako **jedno trafienie z licznikiem**; licznik jest wejściem oceny pewności
+    w etapie 6, nie kosmetyką.
+    **Kryterium:** raport z pomiaru trzech kandydatów (fałszywe scalenia / przeoczenia osobno)
+    + decyzja o losie wektora `sts` zapisana z liczbą, nie z przeczuciem; unit na rekordach
+    z pustym `cause` dowodzący, że NIE zostały zwinięte.
+  - [ ] **5.5. `POST /search` + `helpdesk rag search`** — cienki handler i cienkie CLI nad tym
+    samym serwisem, osobny model API (nie wypuszczamy modelu domenowego przez HTTP). Komenda
+    CLI jest już zapowiedziana w „Commands”, ale nie istnieje.
+    **Kryterium:** unit kontraktu na `TestClient` (kody, kształt payloadu) + `helpdesk rag
+    search "…"` drukuje trafienia ze score.
+  - [ ] **5.6. Pierwszy test `functional`** — marker istnieje od etapu 0 i **dziś nie nosi go
+    żaden test**; roadmapa wiąże jego powstanie właśnie z `/search`. Odpowiada na inne pytanie
+    niż `integration`: nie „czy usługi są spięte", tylko „czy produkt zachowuje się sensownie" —
+    zgłoszenie na wejściu, sensowne trafienia na wyjściu.
+    **Kryterium:** `pytest -m functional` przechodzi przy postawionym stacku, a domyślny
+    `pytest` go nie łapie (marker jest **poza** parasolem `integration`, więc `addopts` musi go
+    wykluczać jawnie).
 - [ ] **6. Generacja propozycji** — `POST /suggest` z parametrem `variant` + `GET /variants`
   + placeholdery + routing po score jako **podpowiedź** wariantu. Trzy warianty startowe
   (`questions`, `solution`, `handoff`) zdefiniowane **w kodzie, ale za interfejsem magazynu
@@ -2011,15 +2065,58 @@ właściwej warstwy, skrót → „TODO").
   (`helpdesk eval gates`) na realnych zamknięciach z korpusu, mierzona osobno per reguła, z naciskiem
   na **fałszywe alarmy**. **Uzgodnić z helpdeskiem** punkt wpięcia i zachowanie przy 503
   (patrz TODO) — bez tego endpointy istnieją, ale nikt ich nie woła.
+- [ ] **9a. Domknięcie pętli: zamknięte zgłoszenie wraca do korpusu** — endpoint przyjmujący
+  zgłoszenie, **które przeszło bramkę zamknięcia**, parsujący je tym samym promptem co korpus
+  i dokładający do `data/parsed/`. Tu noga 2 zaczyna karmić nogę 1 (patrz „Cel"): zgłoszenie,
+  którego nie wolno zamknąć bez opisu problemu i rozwiązania, jest z definicji dobrym materiałem
+  do indeksu. **Zaraz po 9, bo bramka jest jedynym warunkiem wstępnym** — nie potrzebuje niczego
+  z etapów 10 ani 11.
+  - **Wejściem jest zgłoszenie zamknięte z pozytywnym werdyktem bramki, nie dowolny surowy
+    tekst.** Bez tego warunku do indeksu trafiałyby sprawy świeże i nierozwiązane — bez `cause`
+    i bez `solution`, czyli dokładnie to, co odsiewa filtr z etapu 4 („trafienie bez treści jest
+    gorsze niż brak trafienia, bo wygląda na odpowiedź").
+  - **Nie mylić z parsowaniem zapytania z etapu 5.** Tam parsowanie jest efemeryczne — wynik
+    służy zbudowaniu wektora zapytania i ginie. Ścieżka runtime pozostaje **tylko do odczytu**
+    względem indeksu; ten etap jest jedynym wyjątkiem i dlatego ma własne wejście, a nie dopisek
+    do `/search`.
+  - **Do rozstrzygnięcia przed pisaniem:** czy „kandydat" znaczy zapis automatyczny, czy kolejkę
+    do akceptacji człowieka · czy artefakt ląduje w `data/parsed/` obok korpusu z etapu 10, mimo
+    że powstał inną wersją promptu i słownika (zasada 7 — wersja jest w rekordzie, więc da się je
+    rozróżnić) · kto uruchamia indeksację, bo Qdrant ma zostać odbudowywalny jedną komendą
+    (zasada 8), a nie dopisywany po jednym punkcie.
+  - **Kryterium ukończenia:** zgłoszenie z negatywnym werdyktem bramki **nie** tworzy artefaktu;
+    zgłoszenie z pozytywnym tworzy artefakt przechodzący `helpdesk tickets validate`; `reindex`
+    z `data/parsed/` nadal odtwarza całość jedną komendą.
 - [ ] **10. Masowy import w aplikacji** — czytnik **SQL** (w `service/`, źródłem jest zrzut bazy
   `helpdesk`, nie plik eksportu) + pipeline `RawTicket → LLM → ParsedTicket → data/parsed/`;
   parser z etapu 5 użyty ponownie, dochodzi wsadowość (wznawianie, limity, raport z przebiegu).
   Adapter skleja wątek: `zgloszenie` + jego `komentarz`e w kolejności `id`, po strip HTML.
   Skala przebiegu: ~1500 wywołań LLM — to jest ten „drogi, jednorazowy" koszt z zasady 7.
+  - **Pierwszym podkrokiem jest kuracja promptu parsującego (PII i sekrety), przed czytnikiem
+    SQL i przed przebiegiem** — to jedyna twarda zależność wewnątrz etapu. Odwrotna kolejność
+    znaczy ~1500 wywołań do wyrzucenia albo prompt poprawiany po przebiegu, czyli dokładnie to,
+    czemu zapobiega zasada 7. (Był osobnym etapem 4b, zwinięty tu 2026-08-19: jego jedynym
+    skutkiem było przygotowanie tego przebiegu, a własny numer sugerował robotę do wykonania
+    przed etapem 5.)
+    - **PII → placeholder, nie mocniejszy zakaz.** Reguła 6 promptu jest dziś zakazem
+      negatywnym bez wskazania, **co wpisać zamiast**, więc wymusza wybór między zgubieniem
+      sensu zdania a przepisaniem nazwiska (zmierzone: 9,5% rekordów, ~130 w korpusie). Naprawa
+      to `{UŻYTKOWNIK}` — ten sam mechanizm, którym zasada 9 rozwiązuje brakujące dane przy
+      generacji. Argument jest **jakościowy, nie prywatnościowy**: politykę PII rozstrzygnięto
+      na korzyść kontroli dostępu (patrz TODO), bo docelowy LLM jest lokalny — zostaje to, że
+      nazwisko w polu embedowanym zanieczyszcza wektor.
+    - **Sekrety to osobna reguła.** Reguła 6 wrzuca je dziś do jednego worka z nazwiskami,
+      a klasy są **rozłączne co do skutku**: nazwisko w wektorze lekko szkodzi retrievalowi,
+      hasło roota wyskakujące w propozycji odpowiedzi to incydent bezpieczeństwa (1,1%
+      zgłoszeń, **dwa z pięciu przypadków wkleił konsultant** — patrz „Pułapki tej bazy").
+    - **Kryterium ukończenia podkroku:** test-strażnik na obecności placeholdera i na
+      rozdzieleniu reguły sekretów od reguły PII, wersja promptu podbita, artefakty z etapów
+      3–4 nietknięte (nowa wersja promptu **nie** uruchamia re-parsowania — odpalona wcześniej
+      unieważniłaby 209 artefaktów i golden set zbudowany na tych samych rekordach).
 - [ ] **11. Rozszerzenia** — hybrid search (sparse pod kody błędów), reranker, frontend (UI dla
   bramek i „Popraw" — noga 2 jest najbardziej „przyciskowa" z całego produktu), feedback
-  wdrożeniowców, **domknięcie pętli: zgłoszenie, które przeszło bramkę zamknięcia, jako kandydat
-  do `data/parsed/`** (produkt sam buduje sobie korpus — patrz „Cel").
+  wdrożeniowców. **Domknięcie pętli wyszło stąd do etapu 9a** — zależy wyłącznie od bramki
+  zamknięcia, więc czekanie na rozszerzenia niczego by nie dało.
   Tu wraca **rozbicie wątków-projektów na wiele rekordów** — decyzja na podstawie liczby z pełnego
   korpusu (etap 10), bo filtr z etapu 4 ich nie wykrywa (patrz „Świadomie pominięte").
   **Do sprawdzenia po etapie 6: czy `questions` odtwarza KOLEJNOŚĆ diagnostyczną.** Materiał na
