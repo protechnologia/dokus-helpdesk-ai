@@ -1,13 +1,19 @@
 import asyncio
+from datetime import date
 from pathlib import Path
 
 import typer
 
 from app.config import Settings
 from app.embedding import EmbeddingClient, EmbeddingError
+from app.factory import build_searcher
+from app.llm import LLMError
 from app.model.rag_index_report import IndexBuildReport
+from app.model.rag_search_result import SearchResult
+from app.model.ticket_raw import RawTicket
 from app.retrieval import QdrantClient, RetrievalError
 from app.service.rag_indexer import TicketIndexer
+from app.service.rag_searcher import SearchParseError
 
 # --- helpdesk rag ---------------------------------------------------------------------------
 #
@@ -15,6 +21,7 @@ from app.service.rag_indexer import TicketIndexer
 # |-------------------------|-------------------------------------------------------------|
 # | `rag index <katalog>`   | dokłada artefakty do kolekcji, nadpisując punkty tych samych |
 # | `rag reindex <katalog>` | kasuje kolekcję i buduje ją od zera (pyta o potwierdzenie)   |
+# | `rag search "treść"`    | szuka podobnych zgłoszeń (parsuje zapytanie LLM-em)          |
 #
 # Grupa zbiera to, co obsługuje nogę 1 (wykorzystanie bazy wiedzy) — dołączą tu wyszukiwanie
 # i generacja z etapów 5-6. Bramki i „Popraw" tu NIE trafią: z definicji działają bez indeksu.
@@ -161,6 +168,135 @@ def _execute(
     if report.indexed == 0:
         typer.echo("\nBŁĄD: nie zaindeksowano żadnego rekordu.", err=True)
         raise typer.Exit(code=1)
+
+
+def _print_hits(result: SearchResult) -> None:
+    """
+    Description:
+    Prints what the search found: how the query was read, then the hits with their scores.
+
+    The parsed query is printed FIRST and unconditionally. A surprising hit list is explained by
+    an unexpected reading of the ticket far more often than by the search itself, and on a
+    terminal that reading is otherwise invisible.
+
+    Example args:
+        result=SearchResult(query=ParsedTicket(…), hits=[TicketHit(score=0.87, …)])
+
+    Example result:
+        None — writes the hits to stdout
+    """
+    query = result.query
+
+    typer.echo("")
+    typer.echo("Zapytanie zrozumiane jako:")
+    typer.echo(f"  problem:   {query.problem}")
+    typer.echo(f"  objawy:    {query.symptoms}")
+    typer.echo(f"  komponent: {query.component}")
+
+    # An empty result is an ANSWER, not a failure: "new kind of problem" is correct for a large
+    # part of this corpus, so it is stated plainly rather than left as silence.
+    if result.is_empty:
+        typer.echo("\nBrak trafień — nowy typ problemu.")
+
+        # Without this the operator cannot tell an empty index from a threshold that cut it.
+        if result.dropped_below_threshold:
+            typer.echo(
+                f"({result.dropped_below_threshold} trafień odrzucono progiem RAG_SCORE_MIN)"
+            )
+
+        return
+
+    typer.echo(f"\nZnaleziono {len(result.hits)}:")
+
+    for hit in result.hits:
+        payload = hit.payload
+
+        typer.echo(f"\n  [{hit.score:.3f}] zgłoszenie {hit.ticket_id} ({payload.get('date', '')})")
+        typer.echo(f"      problem:     {payload.get('problem', '')}")
+        typer.echo(f"      przyczyna:   {payload.get('cause', '')}")
+        typer.echo(f"      rozwiązanie: {payload.get('solution', '')}")
+
+    if result.dropped_below_threshold:
+        typer.echo(f"\nOdrzucono progiem: {result.dropped_below_threshold}")
+
+
+async def _run_search(
+    text: str,  # e.g. "Nie mogę wysłać pisma przez ePUAP"
+) -> SearchResult:
+    """
+    Description:
+    Runs one search and releases the connections afterwards.
+
+    The service comes from `build_searcher()`, the same construction the HTTP handler uses — a
+    second assembly here would drift apart the moment a setting is added, and a CLI searching with
+    different parameters than the API is a divergence nothing would report. Built rather than
+    taken from `get_searcher()`, because that one is cached for the life of the process: closing a
+    cached instance would leave the next caller with dead connection pools.
+
+    Example args:
+        text="Nie mogę wysłać pisma przez ePUAP"
+
+    Example result:
+        SearchResult(query=ParsedTicket(…), hits=[TicketHit(score=0.87, …)])
+
+    Raises:
+        SearchParseError: the model's answer did not validate as a ticket
+        LLMError: the provider itself failed
+        EmbeddingError: the embedder is unreachable or answered with an error
+        RetrievalError: Qdrant is unreachable or answered with an error
+    """
+    searcher = build_searcher(Settings())
+
+    # Console query: no ticket id or thread to speak of, so the id says where it came from and the
+    # date is today. Both travel into the artifact untouched by the model (identity comes from the
+    # source), so a recognisable placeholder beats a fabricated number.
+    raw = RawTicket(
+        ticket_id = "cli",
+        date      = date.today(),
+        category  = "",
+        subject   = "",
+        body      = text,
+    )
+
+    try:
+        return await searcher.search(raw)
+    finally:
+        await searcher.aclose()
+
+
+@rag.command("search", help="Znajdź zgłoszenia podobne do podanej treści.")
+def search(
+    text: str = typer.Argument(..., help="Treść nowego zgłoszenia."),
+) -> None:
+    """
+    Description:
+    Searches the index for tickets resembling the given text, parsing it with the same prompt the
+    corpus was parsed with.
+
+    Costs one LLM call per run — the query is parsed before it is embedded, because a raw mail
+    carries greetings and signatures that pollute the query vector.
+
+    Example args:
+        text="Nie mogę wysłać pisma przez ePUAP, błąd komunikacji"
+
+    Example result:
+        prints the parsed query and the hits; exits 0 even when nothing was found
+
+    Raises:
+        typer.Exit: code 2 for an unreachable dependency or an unparseable query
+    """
+    try:
+        result = asyncio.run(_run_search(text))
+    except SearchParseError as exc:
+        # Exit 2, like an unreachable service: both mean "this run could not answer", as opposed
+        # to "the corpus has nothing" — which is a legitimate result and exits 0.
+        typer.echo(f"BŁĄD: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    except (LLMError, EmbeddingError, RetrievalError) as exc:
+        typer.echo(f"BŁĄD: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    _print_hits(result)
 
 
 @rag.command("index", help="Zbuduj indeks z artefaktów, nie kasując istniejącej kolekcji.")

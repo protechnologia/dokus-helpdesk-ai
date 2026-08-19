@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request, Response
 
 from app.config import Settings
 from app.errors import REQUEST_ID_HEADER, register_exception_handlers
-from app.routers import health
+from app.routers import health, search
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ def create_app() -> FastAPI:
         (none)
 
     Example result:
-        FastAPI instance serving GET /health
+        FastAPI instance serving GET /health and POST /search
     """
     settings = Settings()
 
@@ -92,6 +92,7 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(app)
     app.include_router(health.router)
+    app.include_router(search.router)
 
     return app
 

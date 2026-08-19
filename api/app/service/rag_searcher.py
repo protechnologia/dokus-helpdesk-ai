@@ -132,6 +132,25 @@ class RagSearcher:
             dropped_below_threshold = dropped,
         )
 
+    async def aclose(self) -> None:
+        """
+        Description:
+        Releases the connection pools of the clients this searcher was given.
+
+        Delegates rather than exposing the clients, so a caller that has to clean up never needs
+        to know WHAT this service is built from — adding a third dependency stays a change to this
+        file alone. A server never calls this (pools live as long as the process); a CLI command
+        does, because it ends, and open pools leave sockets behind.
+
+        Example args:
+            (none)
+
+        Example result:
+            None
+        """
+        await self._embedder.aclose()
+        await self._qdrant.aclose()
+
     async def _vector_for(
         self,
         text: str,  # e.g. "Wysyłka przez ePUAP kończy się błędem\nPo kliknięciu Wyślij…"

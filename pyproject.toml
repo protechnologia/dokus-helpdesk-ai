@@ -82,10 +82,12 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Typer przekazuje metadane opcji przez wartość domyślną argumentu (`= typer.Option(...)`).
-# To idiom frameworka, nie pułapka mutowalnego argumentu domyślnego, przed którą ostrzega B008.
-"scripts/*.py"     = ["B008"]
-"api/app/cli/*.py" = ["B008"]
+# Typer przekazuje metadane opcji przez wartość domyślną argumentu (`= typer.Option(...)`),
+# FastAPI tak samo wstrzykuje zależności (`= Depends(...)`). To idiom obu frameworków, nie pułapka
+# mutowalnego argumentu domyślnego, przed którą ostrzega B008.
+"scripts/*.py"         = ["B008"]
+"api/app/cli/*.py"     = ["B008"]
+"api/app/routers/*.py" = ["B008"]
 
 [tool.ruff.lint.isort]
 # Without this, `app` is taken for a third-party library and lands in the same block as pytest;
