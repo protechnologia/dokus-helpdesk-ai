@@ -916,8 +916,14 @@ merytorycznie").
 **Testy i jakość**
 - Lint: `ruff check .`
 - Jednostkowe (LLM = atrapa): `pytest`
-- Integracyjne: `pytest -m integration_<usługa>` (albo parasol `pytest -m integration`)
+- Wszystko naraz: `pytest -m ""` — **jedno polecenie na cały przebieg**
+- Integracyjne: `pytest tests/integration/ -m integration` (albo `-m integration_<usługa>`)
+- Funkcjonalne: `pytest tests/functional/ -m functional` — **wymaga żywego LLM-a**
 - Na żywym LLM: `pytest -m llm_live` — **kosztuje / bije po sieci, pytaj przed**
+- **Podając marker, podaj też folder** — marker odsiewa dopiero PO imporcie, więc bez ścieżki
+  pytest wczytuje wszystkie pliki testowe, żeby uruchomić kilkanaście (kolekcja podzbioru spada
+  wtedy trzykrotnie). Foldery i markery można łączyć:
+  `pytest tests/integration/ tests/functional/ -m "integration_qdrant or functional"`
 
 **CLI / pakiet**
 - `pip install -e .` — tylko po zmianie `pyproject.toml`, po zmianie kodu nigdy
@@ -1049,6 +1055,9 @@ dokus-helpdesk-ai/
 - **Importy zawsze na górze modułu.** Lazy import tylko przy realnym problemie (cykl albo
   faktycznie opcjonalna zależność) — nie „na wszelki wypadek". Konsekwencja przyjęta świadomie:
   import modułu pociąga jego zależności; przy zależnościach twardych to OK.
+  - **Jedyny dziś wyjątek: SDK dostawców LLM w `llm/factory.py`** — importowane wewnątrz builderów,
+    bo problem został **zmierzony, nie przeczuty** (patrz „Warstwa LLM"). Wzorzec do naśladowania
+    przy kolejnych wyjątkach: liczba przed decyzją, powód w komentarzu przy imporcie.
 - Type hints obowiązkowe w sygnaturach; zamiast nieotypowanego `dict` — model Pydantic
   lub `TypedDict`.
 - **Nazwy opisują intencję** — `fetch_invoice_summary`, nie `get_data`.
@@ -1210,6 +1219,18 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   Zmiana API komercyjne → model on-prem = zmiana konfiguracji/klienta, nie logiki.
 - **Fabryka `get_llm_client()` po `LLM_PROVIDER`, fail-fast** — brak klucza/modelu/base_url →
   `LLMConfigError` przy budowie klienta, nie błąd połączenia w środku żądania.
+- **SDK dostawców importowane LENIWIE, wewnątrz builderów** — świadomy wyjątek od „importy na
+  górze". Powód zmierzony: `anthropic` ładuje się ~5,5 s, `openai` ~3,3 s, bo oba budują modele
+  Pydantic **całego swojego API** (typy beta, tool runner, streaming, Vertex) już przy imporcie.
+  Fabryka importowała wszystkie cztery klienty, żeby wybrać jednego, więc **każdy importer płacił
+  ~9 s za biblioteki, których nie zawoła**.
+  - **Zysk zmierzony na kolekcji: `tests/functional/` 3,0 s → 0,77 s** (naprzemiennie, trzy rundy,
+    rozkłady rozłączne). Dotyczy przebiegów **częściowych** — funkcjonalnych, integracyjnych
+    i komend CLI niesięgających do dostawcy chmurowego.
+  - **Dla `tests/unit/` i dla całego repo zysku NIE MA** — pięć plików testuje klienty wprost, bo
+    to ich przedmiot. Nie „naprawiać" tego, przenosząc tam import: test klienta ma go importować.
+  - **Cena:** buildery zwracają `LLMClient` zamiast konkretnej klasy (i tak wołający używa
+    interfejsu), a wyjątek trzeba tłumaczyć w komentarzu przy każdym takim imporcie.
 - **Domyślnie `FakeLLMClient`** (offline) — `up` i `pytest` nic nie wysyłają i nic nie kosztują;
   realny dostawca włączany jawnie w ENV.
 - **Endpoint zgodny z API OpenAI** (Ollama, vLLM, proxy) → model lokalny tym samym klientem,
@@ -1610,6 +1631,13 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
   integracyjne i jest zielone tylko wtedy, gdy akurat chodzi stack. `-m` z linii poleceń
   **nadpisuje** tę wartość, więc `pytest -m integration_embedder` dalej wybiera dokładnie to,
   o co prosi.
+- **Testy uruchamiaj JEDNYM poleceniem** — całość (`pytest -m ""`) albo podzbiór wskazany folderami
+  i markerami (`pytest tests/integration/ tests/functional/ -m "integration or functional"`).
+  Oszczędza kilkukrotne ładowanie ciężkich SDK i kolekcję testów; zmierzone: ~110 s wobec ~128 s
+  przy trzech osobnych poleceniach, a kolekcja podzbioru spada trzykrotnie po dodaniu folderu.
+  - **Przy debugowaniu czasu testów mierz sekwencyjnie i naprzemiennie A/B/A/B** — dwa przebiegi
+    naraz mierzą obciążenie maszyny, nie kod. `--durations` pokaże, czy czas siedzi w testach,
+    `--collect-only` — czy w imporcie.
 - **Pakiety usług mają rozłączne nazwy** (`api/app/`, `embedder/embedder_app/`) — wszystkie
   drzewa są importowalne w JEDNYM procesie pytest, a dwa pakiety najwyższego poziomu o tej samej
   nazwie zasłaniałyby się nawzajem (`sys.modules` zapamiętuje pierwszy import, więc kolejność

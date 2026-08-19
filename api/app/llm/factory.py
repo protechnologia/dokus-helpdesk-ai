@@ -1,10 +1,24 @@
 from app.config import Settings
 from app.llm.base import LLMClient
-from app.llm.client_claude import ClaudeLLMClient
 from app.llm.client_fake import FakeLLMClient
-from app.llm.client_ollama import OllamaLLMClient
-from app.llm.client_openai import OpenAILLMClient
 from app.llm.errors import LLMConfigError
+
+# The vendor clients are imported INSIDE their builders, not here — the deliberate exception to
+# "imports at the top" (CLAUDE.md -> "Styl kodu"), taken against a MEASURED problem.
+#
+# Why: `anthropic` takes ~5.5 s to import and `openai` ~3.3 s, because both build the Pydantic
+# models of their entire API surface (every beta type, tool runner, streaming and Vertex layer) at
+# import time. Importing all four clients in order to pick one made every importer of this module
+# pay ~9 s for SDKs it would never call.
+#
+# What it actually buys, measured on collection alone: `tests/functional/` went 3.0 s -> 0.77 s
+# (four times faster). It buys NOTHING for `tests/unit/` or a whole-repo run, where the client
+# test files import the SDKs directly — that is their subject. So the win is on partial runs: a
+# functional or integration pass, and `helpdesk` CLI commands that never touch a hosted provider.
+#
+# `FakeLLMClient` stays at the top: our own code, nothing heavy behind it, and the default provider.
+# Cost accepted: the concrete client types cannot appear in the builders' signatures, so they
+# return the `LLMClient` interface — which is what callers use anyway.
 
 PROVIDER_FAKE   = "fake"
 PROVIDER_CLAUDE = "claude"
@@ -56,7 +70,7 @@ def _require_key_and_model(
 
 def _build_claude_client(
     settings: Settings,  # e.g. Settings(llm_provider="claude", llm_model="claude-haiku-4-5")
-) -> ClaudeLLMClient:
+) -> LLMClient:
     """
     Description:
     Builds the Claude client, checking first that the configuration it needs is present.
@@ -71,6 +85,8 @@ def _build_claude_client(
     Raises:
         LLMConfigError: `LLM_API_KEY` or `LLM_MODEL` is missing, or the model has no known price
     """
+    from app.llm.client_claude import ClaudeLLMClient
+
     _require_key_and_model(settings, PROVIDER_CLAUDE)
 
     return ClaudeLLMClient(
@@ -83,7 +99,7 @@ def _build_claude_client(
 
 def _build_openai_client(
     settings: Settings,  # e.g. Settings(llm_provider="openai", llm_model="gpt-5.4-mini")
-) -> OpenAILLMClient:
+) -> LLMClient:
     """
     Description:
     Builds the OpenAI client. `LLM_BASE_URL` stays optional on purpose: empty means the official
@@ -100,6 +116,8 @@ def _build_openai_client(
     Raises:
         LLMConfigError: `LLM_API_KEY` or `LLM_MODEL` is missing, or the model has no known price
     """
+    from app.llm.client_openai import OpenAILLMClient
+
     _require_key_and_model(settings, PROVIDER_OPENAI)
 
     return OpenAILLMClient(
@@ -113,7 +131,7 @@ def _build_openai_client(
 
 def _build_ollama_client(
     settings: Settings,  # e.g. Settings(llm_provider="ollama", llm_model="bielik-4.5b:Q8_0")
-) -> OllamaLLMClient:
+) -> LLMClient:
     """
     Description:
     Builds the Ollama client. Only `LLM_MODEL` is required: a local server needs no API key, and its
@@ -128,6 +146,8 @@ def _build_ollama_client(
     Raises:
         LLMConfigError: `LLM_MODEL` is missing — there is no sensible default for which model to run
     """
+    from app.llm.client_ollama import OllamaLLMClient
+
     if not settings.llm_model:
         raise LLMConfigError(f"LLM_PROVIDER={PROVIDER_OLLAMA!r} wymaga ustawienia: LLM_MODEL")
 

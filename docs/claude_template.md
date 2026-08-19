@@ -166,9 +166,10 @@
 - Język kodu, identyfikatorów, docstringów i komentarzy: **angielski**.
 - **Brak autoformattera — świadomie.** `ruff format`/`black` zjadłyby pionowe wyrównanie `=`
   (niżej). Używamy `ruff check` (linter), nie formattera.
-- **Importy zawsze na górze modułu.** Lazy import tylko przy realnym problemie (cykl albo
-  faktycznie opcjonalna zależność) — nie „na wszelki wypadek". Konsekwencja przyjęta świadomie:
-  import modułu pociąga jego zależności; przy zależnościach twardych to OK.
+- **Importy zawsze na górze modułu.** Lazy import tylko przy realnym problemie (cykl, faktycznie
+  opcjonalna zależność albo **zmierzony** koszt ładowania) — nie „na wszelki wypadek". Konsekwencja
+  przyjęta świadomie: import modułu pociąga jego zależności; przy zależnościach twardych to OK.
+  Robiąc wyjątek, podaj w komentarzu liczbę, która go uzasadnia (patrz „Warstwa LLM").
 - Type hints obowiązkowe w sygnaturach; zamiast nieotypowanego `dict` — model Pydantic
   lub `TypedDict`.
 - **Nazwy opisują intencję** — `fetch_invoice_summary`, nie `get_data`.
@@ -225,6 +226,12 @@ Wspólne:
   Zmiana API komercyjne → model on-prem = zmiana konfiguracji/klienta, nie logiki.
 - **Fabryka `get_llm_client()` po `LLM_PROVIDER`, fail-fast** — brak klucza/modelu/base_url →
   `LLMConfigError` przy budowie klienta, nie błąd połączenia w środku żądania.
+- **SDK dostawców importuj LENIWIE, wewnątrz builderów** — świadomy wyjątek od „importy na górze".
+  SDK modeli budują przy imporcie modele Pydantic całego swojego API (u nas: `anthropic` ~5,5 s,
+  `openai` ~3,3 s), a fabryka importuje wszystkie klienty, żeby wybrać jednego — więc bez tego
+  każdy proces płaci za biblioteki, których nie zawoła. Zysk dotyczy przebiegów **częściowych**
+  (testy nietykające dostawcy, komendy CLI); tam, gdzie testy klientów importują SDK wprost, nie ma
+  go wcale. Cena: buildery zwracają interfejs `LLMClient`, nie konkretną klasę.
 - **Domyślnie `FakeLLMClient`** (offline) — `up` i `pytest` nic nie wysyłają i nic nie kosztują;
   realny dostawca włączany jawnie w ENV.
 - **Endpoint zgodny z API OpenAI** (Ollama, vLLM, proxy) → model lokalny tym samym klientem,
@@ -476,6 +483,12 @@ Raises:                      # only when the method raises
   więc klasa z pełnym interfejsem byłaby czystą duplikacją. Stub dopiero wtedy, gdy atrapa nie
   umie odtworzyć badanego stanu. Zysk podwójny: mniej kodu i test pokazuje, **po co ta atrapa
   istnieje**.
+- **Testy uruchamiaj JEDNYM poleceniem** — całość (`pytest -m ""`) albo podzbiór wskazany folderami
+  i markerami (`pytest tests/integration/ tests/functional/ -m "integration or functional"`).
+  Oszczędza kilkukrotne ładowanie ciężkich SDK i kolekcję testów.
+  - **Przy debugowaniu czasu testów mierz sekwencyjnie i naprzemiennie A/B/A/B** — dwa przebiegi
+    naraz mierzą obciążenie maszyny, nie kod. `--durations` pokaże, czy czas siedzi w testach,
+    `--collect-only` — czy w imporcie.
 
 **Atrapy transportu bierz z `tests/helpers_transport.py`** — zawsze, gdy testujesz klienta HTTP.
 W pliku testu zostaje tylko budowa instancji klienta i atrapy jego własnych odpowiedzi.
