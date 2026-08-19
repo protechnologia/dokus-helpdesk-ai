@@ -11,13 +11,13 @@ class TicketHit(BaseModel):
 
     Do czego:
     The read-side counterpart of `TicketPoint`. Everything downstream — the threshold, the
-    collapsing of agreeing hits, the generation prompt — works on these rather than on Qdrant's
-    JSON, so no caller ever learns the wire shape.
+    generation prompt, the agreement check behind stage 6's routing — works on these rather than
+    on Qdrant's JSON, so no caller ever learns the wire shape.
 
     Flow:
         1. `from_qdrant()` reads one entry of a query response.
         2. The client returns a list of them, already ordered by score.
-        3. The search service filters by threshold; stage 5 collapses agreeing ones.
+        3. The search service filters by threshold and returns what survives.
 
     The payload is kept whole rather than unpacked into fields. It is written by `TicketPoint` and
     read by the generation prompt, and a second place spelling out those keys would be a second

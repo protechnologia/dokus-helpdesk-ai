@@ -588,7 +588,7 @@ prefiksem daje **inny wektor** — trybów **nie wolno mieszać w jednej przestr
 |---|---|---|
 | query   | `[query]: ` | nowe zgłoszenie w runtime (pytanie do bazy) |
 | passage | *(brak)*    | podsumowanie problemu przy indeksacji (dokument-cel) |
-| sts     | `[sts]: `   | porównania zgłoszenie↔zgłoszenie: „podobne przypadki", zwijanie trafień |
+| sts     | `[sts]: `   | porównania zgłoszenie↔zgłoszenie: „podobne przypadki", zwijanie trafień — **u nas dziś nikt tego nie woła**, patrz niżej |
 
 **Skala różnicy jest zmierzona, nie założona** (PolDense-150M, ten sam tekst w trzech trybach,
 2026-08-05): `cos(query, passage) = 0,544`, `cos(passage, sts) = 0,814`. Gdyby prefiks był
@@ -652,13 +652,14 @@ Konsekwencje:
     kolumny tak samo, więc różnica między trybami zostaje miarodajna, a wartości bezwzględne nie.
     Przy 162 zapytaniach jedno trafienie waży 0,6 pp, czyli +1,9 pp to około trzy zapytania;
     kierunek jest spójny w czterech pomiarach, ale to nie jest przepaść.
-- **Dwa named vectors na rekord** (`problem` = passage, `sts` = sts). **Wektor `sts` stracił oba
-  pierwotne uzasadnienia**: dedup wykreślony (patrz „Świadomie pominięte"), a wyszukiwanie
-  rozstrzygnięte na korzyść `query→passage`. Zostaje mu **jedno** zastosowanie — **zwijanie
-  zgodnych trafień w etapie 5**, gdzie porównuje się zgłoszenie ze zgłoszeniem, czyli symetrycznie
-  z definicji. Buduje się go dalej, bo kosztuje jedno wywołanie embeddera przy indeksacji, a jego
-  skasowanie i tak byłoby jednym `reindex` bez udziału LLM-a. **Decyzję o usunięciu podejmiemy po
-  etapie 5** — gdy będzie wiadomo, czy zwijanie faktycznie go używa.
+- **Dwa named vectors na rekord** (`problem` = passage, `sts` = sts). **Wektor `sts` stracił
+  WSZYSTKIE trzy uzasadnienia i mimo to zostaje — świadomie, nie przez przeoczenie.** Kolejno:
+  dedup wykreślony, wyszukiwanie rozstrzygnięte na korzyść `query→passage`, a zwijanie trafień
+  wykreślone 2026-08-19 (wszystkie trzy w „Świadomie pominięte"). **Nie kasować go jako
+  „niewykorzystany".** Buduje się go dalej, bo kosztuje jedno wywołanie embeddera na rekord przy
+  indeksacji, a usunięcie i późniejszy powrót kosztowałyby **pełny re-index**. Wraca do gry razem
+  ze zwijaniem albo z „podobnymi przypadkami" — oba porównują zgłoszenie ze zgłoszeniem, czyli
+  symetrycznie z definicji.
 - Zmiana modelu embeddingowego albo trybu ⇒ **nowa kolekcja i pełny re-index** (tani — JSON-y
   leżą na dysku).
 
@@ -892,6 +893,8 @@ merytorycznie").
 - Indeksacja do Qdranta: `helpdesk rag index <katalog>`
 - Pełna odbudowa indeksu: `helpdesk rag reindex` (kasuje kolekcję, wstaje z `data/parsed/`)
 - Zapytanie z konsoli: `helpdesk rag search "treść zgłoszenia"`
+  (**woła LLM raz na przebieg** — zapytanie jest parsowane przed embedowaniem; brak trafień to
+  wynik i kod wyjścia 0, a kod 2 znaczy „nie dało się odpowiedzieć")
 - Propozycja w wybranym wariancie: `helpdesk rag suggest "treść zgłoszenia" --variant solution`
 - Lista dostępnych wariantów: `helpdesk rag variants`
 - Ewaluacja embeddera: `python scripts/eval_embeddings.py recall --model <nazwa>`
@@ -1784,11 +1787,29 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   - **Puste `cause` nie jest zgodnością** — przy naiwnym porównaniu trzy rekordy UPP z `cause`
     = „brak" po obu stronach wyglądają na idealnie zgodne. Brak informacji to nie dowód
     podobieństwa (ta sama pułapka co przy filtrze z 4.2).
-  - **Co zostaje na etap 5:** zwijanie **wyników wyszukiwania**, nie rekordów — grupa zgodnych
-    trafień wraca jako jedno z **licznikiem**, a licznik jest wprost tym, czego potrzebuje routing.
-    Nic nie znika z indeksu, a błąd naprawia się parametrem zamiast re-indeksem.
+  - ~~**Co zostaje na etap 5:** zwijanie wyników wyszukiwania~~ — **też wykreślone 2026-08-19,
+    patrz punkt niżej.**
   - **Prawdziwe duplikaty** (to samo zgłoszenie wysłane dwa razy) to inna klasa — tania do
     wykrycia po skrócie treści, do rozważenia przy pełnym korpusie.
+- **Zwijanie zgodnych trafień w wynikach wyszukiwania** (2026-08-19, był podkrokiem 5.4). Miało
+  zastąpić wykreślony dedup: grupa zgodnych trafień wraca jako jedno **z licznikiem**, a licznik
+  karmi ocenę pewności. **Odrzucone, bo przy `RAG_TOP_K` = 5 licznik jest artefaktem OKNA, nie
+  pomiarem korpusu** — „3 zgodne z 5" i „3 zgodne z 5, choć w bazie jest ich 12" to różne rzeczy,
+  a widać wyłącznie pierwszą. Liczba, która wygląda na dowód („to rozwiązanie zadziałało pięć
+  razy"), a jest funkcją rozmiaru okna, jest gorsza niż jej brak.
+  - **Bez licznika zostaje sama krótsza lista** — czyli kosmetyka, a nie sygnał. Za tę cenę nie
+    warto dokładać kroku, który potrafi scalić rekordy o rozłącznych rozwiązaniach (trzy rekordy
+    „brak wizualizacji UPP" mają identyczny `problem` i różne rozstrzygnięcia).
+  - **Ocena zgodności przechodzi do etapu 6**, gdzie i tak trzeba porównać `cause` między
+    trafieniami przy routingu („wysoki score + zgodne rozwiązania"). Tam robi się to na
+    trafieniach idących do promptu, bez udawania, że mierzy się korpus.
+  - **Wraca, gdy będzie potrzebne — i wtedy z rozdzieleniem „ile pobrać" od „ile pokazać"**
+    (szukać np. 20, pokazywać 3), bo dopiero to czyni licznik uczciwym. Koszt powrotu: parametr
+    i jeden krok w serwisie, **bez re-indeksu**.
+  - **Konsekwencja: named vector `sts` traci ostatnie zastosowanie i ZOSTAJE mimo to.** To
+    świadoma decyzja, nie przeoczenie — nie kasować go jako „niewykorzystany". Budowanie kosztuje
+    jedno wywołanie embeddera na rekord przy indeksacji, a jego usunięcie i powrót kosztowałyby
+    **pełny re-index**; wraca do gry razem ze zwijaniem albo z „podobnymi przypadkami".
 - **Automatyczny wybór wariantu generacji za człowieka** — score podpowiada guzik, nigdy nie
   klika go sam: system nie wie, czy zgłoszenie wymaga działania serwisu, a automat wymagałby
   **osądu LLM-a nad osądem LLM-a**, którego nie umiemy zmierzyć. **Wraca jako możliwość**, gdy
@@ -1924,9 +1945,9 @@ właściwej warstwy, skrót → „TODO").
   **Dwie rzeczy do zapamiętania, bo wracają w etapie 4:**
   **(1) model wybrany bez rozstrzygającego pomiaru** — `recall@1` = 98,2% przy korpusie 200
   rekordów to sufit, więc do porównania kandydatów wracamy przy pełnym indeksie;
-  **(2) named vector `sts` zostaje, ale z innego powodu niż wtedy** — oś „zapytanie sparsowane"
-  domknięta przy etapie 4 (`query→passage` wygrywa i tam), więc `sts` służy już tylko zwijaniu
-  zgodnych trafień w etapie 5.
+  **(2) named vector `sts` zostaje, choć nie ma dziś ŻADNEGO zastosowania** — oś „zapytanie
+  sparsowane" domknięta przy etapie 4 (`query→passage` wygrywa i tam), a zwijanie trafień
+  wykreślone przy 5.4; zostaje, bo powrót po skasowaniu kosztowałby pełny re-index.
   Materiał wielokrotnego użytku: golden set przyda się przy każdej zmianie modelu, a korpus
   `data/parsed/bielik-11b-golden200/` (200 zwalidowanych artefaktów) **ma przetrwać** czystkę
   z etapu 10.
@@ -1945,7 +1966,8 @@ właściwej warstwy, skrót → „TODO").
   dłuższy od mediany") **została zmierzona i obalona**: parser streszcza opis, więc długość nie
   przeżywa parsowania. Wraca, gdy będzie na czym mierzyć (etap 10).
   **(3) Nie kasujemy named vectora `sts`** — mimo że wyszukiwanie rozstrzygnięto na korzyść
-  `query→passage` (także dla zapytań sparsowanych): zostaje mu zwijanie trafień w etapie 5.
+  `query→passage` (także dla zapytań sparsowanych). **Zwijanie, które było wtedy jego ostatnim
+  zastosowaniem, też wypadło (5.4)** — a `sts` mimo to zostaje, bo powrót kosztowałby re-index.
   **(4) Nie porównujemy embedderów** — przy 200 rekordach metryka nadal jest przy suficie;
   porównanie ma sens dopiero na pełnym korpusie.
   **Graf odesłań wypadł razem z polem `related_tickets`** (przegląd schematu 2026-07-31). Świadoma
@@ -1955,13 +1977,11 @@ właściwej warstwy, skrót → „TODO").
   stoi golden set, więc filtr jest mierzalny wobec 38 etykiet „odrzuć" i 162 „przepuść". Pozostałe
   katalogi w `data/parsed/` to próbki porównawcze parserów i **nie wchodzą do indeksu**.
 - [ ] **5. Wyszukiwanie** — `POST /search`: parser zapytania (LLM → `ParsedTicket`) + top-K,
-  próg, zwijanie zgodnych trafień, zwrot trafień ze score i ID. **Tu parser wchodzi do runtime** —
+  próg, zwrot trafień ze score i ID. **Tu parser wchodzi do runtime** —
   ten sam prompt i ten sam model Pydantic, którymi parsowaliśmy korpus.
-  **Zwijanie zastępuje wykreślony dedup indeksacji** (patrz „Świadomie pominięte"): grupa trafień
-  zgodnych co do `component` + `cause` + `solution` wraca jako **jedno trafienie z licznikiem**,
-  a nie znika z bazy. Licznik jest wprost tym, czego potrzebuje routing („wysoki score + zgodne
-  rozwiązania") — czyli to, co dedup by skasował, tu staje się **danymi wejściowymi oceny
-  pewności**.
+  **Zwijanie zgodnych trafień wypadło z zakresu (5.4)** — przy oknie 5 rekordów licznik zgodności
+  mierzyłby okno, nie korpus, a bez licznika zostaje sama krótsza lista. Ocena zgodności trafień
+  przechodzi do etapu 6, gdzie routing i tak musi porównać `cause` (patrz „Świadomie pominięte").
   **Parser musi strawić wątek w toku, nie pojedynczy opis** — stan konwersacji jest istotny
   (najcenniejszy komentarz bywa po tym z rozwiązaniem, dostawca potrafi odwołać własną pierwszą
   diagnozę). Uboczna korzyść: obie strony porównania stają się tym samym gatunkiem tekstu — co
@@ -1986,9 +2006,8 @@ właściwej warstwy, skrót → „TODO").
     ukryłby po cichu przypadek, którego ten korpus jest pełen: prawie identyczne `problem`
     o rozłącznych przyczynach muszą trafić do promptu **razem**, bo inaczej `questions` nie ma
     czego rozróżniać. Podnosimy, gdy etap 5 da liczby.
-    **Parametr zwijania NIE wchodzi tutaj** — jego kształt rozstrzyga pomiar z 5.4 (próg
-    podobieństwa wektorowego to co innego niż porównanie payloadu), a zmienna dodana przed
-    decyzją zabetonowałaby jedną z odpowiedzi.
+    **Parametru zwijania nie ma i nie będzie** — samo zwijanie wypadło z zakresu przy 5.4.
+    Gdyby wróciło, potrzebuje **dwóch** zmiennych („ile pobrać" i „ile pokazać"), nie jednej.
   - [x] **5.3. Serwis wyszukiwania** — `service/rag_searcher.py`: `RawTicket` → `TicketParser`
     → `embedding_text()` → `embed_query()` → `search(VECTOR_PROBLEM)` → próg. Wynik to
     `SearchResult` niosący trafienia **oraz sparsowane zapytanie** — model przepisał wątek na
@@ -2002,43 +2021,30 @@ właściwej warstwy, skrót → „TODO").
     inaczej ostry próg wygląda dokładnie tak samo jak pusty indeks.
     **Nieudany parse to `SearchParseError`, nie błąd transportu** — dotyczy wejścia (handler
     odpowie 422), a nie stacku (503), i zatrzymuje przebieg **przed** embedderem i Qdrantem.
-  - [ ] **5.4. Zwijanie zgodnych trafień** — **jedyny podkrok z nierozstrzygniętą decyzją**:
-    czy zgodność liczy się z payloadu (`component` + `cause` + `solution`), czy z podobieństwa
-    wektorowego. To przesądza, **czy `sts` zostaje w indeksie** (etap 4 zostawił go wyłącznie
-    dla tego zastosowania). Rozstrzygnąć **pomiarem, przed pisaniem**, na 171 zaindeksowanych
-    rekordach.
-    - **Trzej kandydaci, mierzeni na tym samym zbiorze par:** podobieństwo `sts`, podobieństwo
-      `problem` (passage — już w indeksie, więc kandydat darmowy) i zgodność payloadu.
-      Odniesienie: ręcznie oznaczone pary „do zwinięcia / nie do zwinięcia"; punkt startowy to
-      8 par o podobieństwie `problem` ≥ 0,40 z pomiaru etapu 4.
-    - **Metryka rozdzielona, nie zbiorcza: fałszywe scalenia osobno od przeoczeń.** Fałszywe
-      scalenie jest groźniejsze — kasuje sygnał, na którym stoi ocena pewności w etapie 6
-      (licznik ma znaczyć „to rozwiązanie potwierdzone pięć razy"), podczas gdy przeoczenie
-      zostawia dwa trafienia zamiast jednego, czyli nadmiar, nie stratę.
-    - **To pierwsze zadanie w projekcie, w którym `sts` ma wiarygodną przesłankę** — zwijanie
-      porównuje rekord z rekordem, więc jest symetryczne z definicji i obie strony mają tę samą
-      objętość. Wyszukiwanie było zadaniem innego rodzaju i zostało rozstrzygnięte czterema
-      pomiarami na korzyść `query→passage` (patrz „Embeddingi i prefiksy PolDense") — **tamten
-      wynik nie przesądza tego**, i odwrotnie.
-    - **Możliwy wynik: wektory przegrywają z payloadem — bo mierzą co innego.** Wektor niesie
-      `problem` + `symptoms`, czyli **objaw**, a zwijanie ma scalać rekordy o tym samym
-      **rozstrzygnięciu**. Korpusowy kontrprzykład: trzy rekordy „brak wizualizacji UPP" mają
-      identyczny `problem` i rozłączne rozwiązania — każda miara wektorowa scali je wysoko
-      i będzie to błąd. Odwrotnie: sześć zgłoszeń „nic nie przychodzi z e-Doręczeń" ma niemal
-      równoważne opisy i **musi zostać rozdzielone**, bo to z nich powstają pytania
-      rozróżniające.
-    Twarde ograniczenie z pomiaru 4: **puste `cause` NIE jest zgodnością** — ma je 114 z 200
-    rekordów, więc naiwne porównanie skleja rekordy o rozłącznych rozwiązaniach.
-    Grupa wraca jako **jedno trafienie z licznikiem**; licznik jest wejściem oceny pewności
-    w etapie 6, nie kosmetyką.
-    **Kryterium:** raport z pomiaru trzech kandydatów (fałszywe scalenia / przeoczenia osobno)
-    + decyzja o losie wektora `sts` zapisana z liczbą, nie z przeczuciem; unit na rekordach
-    z pustym `cause` dowodzący, że NIE zostały zwinięte.
-  - [ ] **5.5. `POST /search` + `helpdesk rag search`** — cienki handler i cienkie CLI nad tym
-    samym serwisem, osobny model API (nie wypuszczamy modelu domenowego przez HTTP). Komenda
-    CLI jest już zapowiedziana w „Commands”, ale nie istnieje.
-    **Kryterium:** unit kontraktu na `TestClient` (kody, kształt payloadu) + `helpdesk rag
-    search "…"` drukuje trafienia ze score.
+  - [x] ~~**5.4. Zwijanie zgodnych trafień**~~ — **wykreślone 2026-08-19, przed napisaniem
+    linijki kodu.** Powód w jednym zdaniu: przy `RAG_TOP_K` = 5 licznik zgodnych trafień jest
+    artefaktem **okna**, nie pomiarem korpusu, a bez licznika zwijanie daje samą krótszą listę.
+    Pełne uzasadnienie, warunki powrotu i **decyzja o pozostawieniu named vectora `sts`** —
+    w „Świadomie pominięte".
+  - [x] **5.5. `POST /search` + `helpdesk rag search`** — cienki handler i cienkie CLI nad tym
+    samym serwisem, osobne modele API (`SearchRequest` / `SearchQuery` / `SearchHit`), bo modelu
+    domenowego nie wypuszczamy przez HTTP.
+    **Wymagane są tylko `ticket_id` i `body`** — reszta opisuje zgłoszenie, ale nie steruje
+    wyszukiwaniem, więc jej żądanie podnosiłoby koszt wpięcia bez zysku dla odpowiedzi. Brak daty
+    znaczy „dziś": zgłoszenie w toku jest z definicji świeże, a data i tak nie wchodzi do wektora.
+    **Odpowiedź niesie CAŁY odczyt zapytania, nie tylko `problem` + `symptoms`** — źle odczytany
+    `component` albo zgubiony kod błędu są niewidoczne w polach embedowanych i wyszłyby dopiero
+    jako dziwna propozycja w etapie 6.
+    **`app/factory.py`: `build_searcher()` buduje, `get_searcher()` trzyma jeden na proces.**
+    Rozdzielone, bo CLI musi zamknąć pule połączeń (komenda się kończy), a serwer nie — zamknięcie
+    instancji z cache'u zostawiłoby następnego wołającego z martwymi pulami. Klienci są **wewnątrz**
+    serwisu, a sprzątanie idzie przez `searcher.aclose()`: wołający nie musi wiedzieć, z czego
+    serwis jest zbudowany.
+    **Brak trafień to 200 z pustą listą, nigdy 404** — „nowy typ problemu" jest poprawną
+    odpowiedzią dla 47% korpusu, a 404 mówiłoby, że błędne było żądanie.
+    **Kryterium spełnione:** 11 unitów kontraktu na `TestClient`, 7 unitów CLI, 1 test wdrożeniowy
+    (`integration_api`) dowodzący, że trasa jest zamontowana w obrazie — bez dotykania zależności,
+    bo sprawdza żądanie odrzucane przez nasz model.
   - [ ] **5.6. Pierwszy test `functional`** — marker istnieje od etapu 0 i **dziś nie nosi go
     żaden test**; roadmapa wiąże jego powstanie właśnie z `/search`. Odpowiada na inne pytanie
     niż `integration`: nie „czy usługi są spięte", tylko „czy produkt zachowuje się sensownie" —

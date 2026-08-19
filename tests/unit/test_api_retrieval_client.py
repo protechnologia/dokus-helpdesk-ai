@@ -317,7 +317,7 @@ async def test_search_asks_for_payloads() -> None:
 
 async def test_search_returns_hits_in_the_order_qdrant_gave_them() -> None:
     """A query answer → TicketHits carrying score, point id and payload, order preserved: the
-    threshold and the collapsing downstream both read best-first."""
+    threshold downstream reads best-first."""
     client = _client(
         routed(
             {

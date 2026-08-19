@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     # answer quality rather than a setting (CLAUDE.md -> "Konfiguracja i deploy").
     #
     # Top 5 because more dilutes the answer: the generation prompt is built from 1-3 records, and
-    # this is the pool the threshold and the collapsing narrow down to them.
+    # this is the pool the threshold narrows down to them.
     rag_top_k:     int   = 5                            # e.g. 10
     # Deliberately permissive at 0.0 — nothing is cut until it is measured. A threshold guessed in
     # advance would silently hide the case this corpus is full of: near-identical `problem` texts
