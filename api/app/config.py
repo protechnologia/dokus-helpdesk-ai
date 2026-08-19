@@ -59,6 +59,21 @@ class Settings(BaseSettings):
     qdrant_collection:       str   = "tickets"
     qdrant_timeout_seconds:  float = 30.0               # seconds
 
+    # --- retrieval: tuning, NOT business logic ---
+    # These two are knobs a deployment turns; the rules that read them are not. Scoring the hits
+    # and mapping a score onto a suggested variant stay in code, because that is a judgement about
+    # answer quality rather than a setting (CLAUDE.md -> "Konfiguracja i deploy").
+    #
+    # Top 5 because more dilutes the answer: the generation prompt is built from 1-3 records, and
+    # this is the pool the threshold and the collapsing narrow down to them.
+    rag_top_k:     int   = 5                            # e.g. 10
+    # Deliberately permissive at 0.0 — nothing is cut until it is measured. A threshold guessed in
+    # advance would silently hide the case this corpus is full of: near-identical `problem` texts
+    # with disjoint causes, which must ALL reach the prompt for `questions` to tell them apart
+    # (CLAUDE.md -> "Powtarza się objaw, nie przyczyna", consequence 5). Raise it once stage 5 has
+    # numbers, not before.
+    rag_score_min: float = 0.0                          # cosine similarity, range -1.0 .. 1.0
+
     @model_validator(mode="before")
     @classmethod
     def _drop_blank_values(cls, values: Any) -> Any:    # e.g. {"llm_model": "  "}

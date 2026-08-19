@@ -1979,11 +1979,16 @@ właściwej warstwy, skrót → „TODO").
     **Pusty wynik i zła nazwa wektora to rozłączne przypadki** i testy pilnują ich osobno: puste
     trafienia są legalną odpowiedzią („nowy typ problemu"), a literówka w nazwie przestrzeni musi
     być głośna — `[]` wyglądałoby jak „nic podobnego w korpusie" i schowałoby błąd okablowania.
-  - [ ] **5.2. Progi i parametry do ENV** — `config.py` nie ma dziś **ani jednego** `RAG_*`.
-    Dochodzą `RAG_TOP_K`, `RAG_SCORE_MIN` i parametr zwijania z 5.4 — do `Settings`, do
-    `.env.example` i do compose (obie krawędzie, patrz „Konfiguracja i deploy”: pole, którego
-    usługa nigdy nie dostaje, nie objawia się niczym).
-    **Kryterium:** `test_config_plumbing` przechodzi bez dopisywania wyjątków.
+  - [x] **5.2. Progi i parametry do ENV** — `RAG_TOP_K` i `RAG_SCORE_MIN` przeprowadzone przez
+    wszystkie trzy krawędzie (`Settings`, `.env.example`, compose); `test_config_plumbing`
+    przechodzi bez dopisywania wyjątków.
+    **`RAG_SCORE_MIN` domyślnie 0.0, czyli nic nie odcina — świadomie.** Próg zgadnięty z góry
+    ukryłby po cichu przypadek, którego ten korpus jest pełen: prawie identyczne `problem`
+    o rozłącznych przyczynach muszą trafić do promptu **razem**, bo inaczej `questions` nie ma
+    czego rozróżniać. Podnosimy, gdy etap 5 da liczby.
+    **Parametr zwijania NIE wchodzi tutaj** — jego kształt rozstrzyga pomiar z 5.4 (próg
+    podobieństwa wektorowego to co innego niż porównanie payloadu), a zmienna dodana przed
+    decyzją zabetonowałaby jedną z odpowiedzi.
   - [ ] **5.3. Serwis wyszukiwania** — `service/rag_searcher.py`: surowy tekst → `TicketParser`
     → `embedding_text()` → `embed_query()` → `search()` → próg. **Parser jest gotowy i
     deklaruje ten etap w docstringu**, ale przyjmuje `RawTicket`; do rozstrzygnięcia, czy
@@ -2037,6 +2042,25 @@ właściwej warstwy, skrót → „TODO").
     **Kryterium:** `pytest -m functional` przechodzi przy postawionym stacku, a domyślny
     `pytest` go nie łapie (marker jest **poza** parasolem `integration`, więc `addopts` musi go
     wykluczać jawnie).
+  - [ ] **5.7. Wartość `RAG_SCORE_MIN` — z pomiaru, nie z głowy.** Dziś stoi na `0.0`, czyli nic
+    nie odcina; to stan celowy do czasu, aż będzie z czego liczyć (patrz 5.2). Tu liczymy
+    **dwa pomiary i dopiero z nich bierze się liczba**:
+    - **(A) górna granica — golden set przez `search()`.** Dla 162 zapytań zbieramy score
+      rekordu poprawnego i score najlepszego niepoprawnego. Materiał leży gotowy, koszt bliski
+      zeru. **Sam nie wystarcza:** golden set i korpus to ten sam zbiór rekordów, więc każde
+      zapytanie MA tam swój cel — pomiar mówi „gdzie kończą się trafienia poprawne", a nie
+      „gdzie kończy się sensowna odpowiedź".
+    - **(B) dolna granica — zapytania-dystraktory.** Kilkanaście opisów, dla których poprawną
+      odpowiedzią jest **„nic nie pasuje"**: tematy spoza Dokusa oraz takie, które wypadły
+      z indeksu (utrata danych — 5 rekordów w próbce, 0 rozwiązań). Bez nich nie widać drugiej
+      strony rozkładu, a to ona rozstrzyga o progu: **47% korpusu to singletony**, więc „nowy
+      typ problemu" jest częstą prawidłową odpowiedzią, nie przypadkiem brzegowym.
+    - **Decyzja po obu.** Jeśli rozkłady A i B się rozdzielają — próg między nimi. Jeśli się
+      nakładają, **to też jest wynik**: znaczy, że sam score nie odróżnia „mam odpowiedź" od
+      „nie mam", i wtedy `0.0` zostaje, a rozstrzyganie przechodzi na zgodność `cause` w etapie
+      6 (co jest zresztą zapisanym kryterium pewności — patrz „Powtarza się objaw").
+    **Kryterium:** wartość wpisana do `.env.example` **z liczbą w komentarzu**, albo świadomie
+    zostawione `0.0` z zapisanym powodem; w obu przypadkach raport z obu pomiarów.
 - [ ] **6. Generacja propozycji** — `POST /suggest` z parametrem `variant` + `GET /variants`
   + placeholdery + routing po score jako **podpowiedź** wariantu. Trzy warianty startowe
   (`questions`, `solution`, `handoff`) zdefiniowane **w kodzie, ale za interfejsem magazynu
