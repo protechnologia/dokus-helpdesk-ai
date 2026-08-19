@@ -1989,15 +1989,19 @@ właściwej warstwy, skrót → „TODO").
     **Parametr zwijania NIE wchodzi tutaj** — jego kształt rozstrzyga pomiar z 5.4 (próg
     podobieństwa wektorowego to co innego niż porównanie payloadu), a zmienna dodana przed
     decyzją zabetonowałaby jedną z odpowiedzi.
-  - [ ] **5.3. Serwis wyszukiwania** — `service/rag_searcher.py`: surowy tekst → `TicketParser`
-    → `embedding_text()` → `embed_query()` → `search()` → próg. **Parser jest gotowy i
-    deklaruje ten etap w docstringu**, ale przyjmuje `RawTicket`; do rozstrzygnięcia, czy
-    zapytanie z runtime buduje `RawTicket` z pustymi komentarzami, czy dostaje własną drogę
-    wejścia — wątek w toku ma komentarze, więc `as_thread()` jest tu potrzebny w całości.
-    **Tekst do embeddingu skleja `embedding_text()`**, nigdy serwis (dwa miejsca rozjechałyby
-    się bezgłośnie wobec indeksacji).
-    **Kryterium:** unit na deterministycznej atrapie embeddera i `FakeLLMClient` — próg odcina,
-    kolejność zachowana, pusty wynik jest wynikiem, nie błędem.
+  - [x] **5.3. Serwis wyszukiwania** — `service/rag_searcher.py`: `RawTicket` → `TicketParser`
+    → `embedding_text()` → `embed_query()` → `search(VECTOR_PROBLEM)` → próg. Wynik to
+    `SearchResult` niosący trafienia **oraz sparsowane zapytanie** — model przepisał wątek na
+    `problem` + `symptoms`, a nieoczekiwane odczytanie zgłoszenia jest pierwszą rzeczą
+    tłumaczącą dziwną listę trafień.
+    **Wejściem jest `RawTicket`, bez drugiej drogi do parsera** — rozstrzygnięte: zgłoszenie
+    w toku ma już `id` i datę, a `as_thread()` renderuje wątek z komentarzami bez zmian. Druga
+    droga wejścia byłaby pierwszym miejscem, w którym kształt tekstu zapytania mógłby rozjechać
+    się z kształtem tekstu korpusu — bezgłośnie.
+    **Odcięte poniżej progu jest LICZONE, nie milcząco gubione** (`dropped_below_threshold`):
+    inaczej ostry próg wygląda dokładnie tak samo jak pusty indeks.
+    **Nieudany parse to `SearchParseError`, nie błąd transportu** — dotyczy wejścia (handler
+    odpowie 422), a nie stacku (503), i zatrzymuje przebieg **przed** embedderem i Qdrantem.
   - [ ] **5.4. Zwijanie zgodnych trafień** — **jedyny podkrok z nierozstrzygniętą decyzją**:
     czy zgodność liczy się z payloadu (`component` + `cause` + `solution`), czy z podobieństwa
     wektorowego. To przesądza, **czy `sts` zostaje w indeksie** (etap 4 zostawił go wyłącznie
