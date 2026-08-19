@@ -3,6 +3,7 @@ import logging
 import httpx
 
 from app.retrieval.errors import RetrievalConfigError, RetrievalError
+from app.retrieval.model_hit import TicketHit
 from app.retrieval.model_point import VECTOR_PROBLEM, VECTOR_STS, TicketPoint
 
 logger = logging.getLogger(__name__)
@@ -196,6 +197,68 @@ class QdrantClient:
         logger.info("upsert collection=%s points=%d", self._collection, written)
 
         return written
+
+    async def search(
+        self,
+        vector:      list[float],  # e.g. [0.0123, -0.0456] — from embed_query()
+        vector_name: str,          # e.g. VECTOR_PROBLEM — which space to search, always explicit
+        limit:       int,          # e.g. 5 — RAG_TOP_K
+    ) -> list[TicketHit]:
+        """
+        Description:
+        Finds the `limit` nearest points in ONE named vector space, best score first.
+
+        `vector_name` is a required argument with no default on purpose. The collection carries two
+        named vectors, and searching the wrong one is not an error — it returns plausible-looking
+        nonsense (measured: `query→sts` scores 96.7% where `query→passage` scores 98.3%, i.e. a
+        drop, not a failure). A default would let the wrong space be reached by forgetting rather
+        than by deciding (CLAUDE.md -> "Warstwa retrievalu").
+
+        Example args:
+            vector=[0.0123, -0.0456]
+            vector_name=VECTOR_PROBLEM
+            limit=5
+
+        Example result:
+            [TicketHit(point_id="3f2a1c9e-…", score=0.87, payload={"ticket_id": "33644", …})]
+
+        Raises:
+            RetrievalError: Qdrant is unreachable, the collection or named vector does not exist,
+                            or the answer was not the shape the contract promises
+        """
+        payload = await self._request(
+            "POST",
+            f"/collections/{self._collection}/points/query",
+            json={
+                "query": vector,
+                "using": vector_name,
+                "limit": limit,
+                # Without this Qdrant returns ids and scores only, and every caller here needs the
+                # record itself — the generation prompt is built from payload fields.
+                "with_payload": True,
+            },
+        )
+
+        # Qdrant nests query results one level deeper than the older search endpoint. Read
+        # defensively so a shape we do not recognise becomes OUR message rather than a KeyError.
+        entries = payload.get("result", {}).get("points")
+
+        if entries is None:
+            raise RetrievalError(
+                f"Qdrant returned an unrecognised query result for '{self._collection}'"
+            )
+
+        # Counts and the vector space only: payloads carry ticket content, i.e. customer data,
+        # which belongs to DEBUG at most (CLAUDE.md -> "Logi i obserwowalność").
+        logger.info(
+            "search collection=%s using=%s limit=%d hits=%d",
+            self._collection,
+            vector_name,
+            limit,
+            len(entries),
+        )
+
+        return [TicketHit.from_qdrant(entry) for entry in entries]
 
     async def delete_collection(self) -> bool:
         """

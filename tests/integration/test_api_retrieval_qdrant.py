@@ -9,6 +9,7 @@ from app.retrieval import (
     VECTOR_STS,
     QdrantClient,
     RetrievalConfigError,
+    RetrievalError,
     TicketPoint,
     point_id_for,
 )
@@ -182,6 +183,71 @@ async def test_wrong_vector_size_is_refused_against_a_real_collection(client: Qd
 
     with pytest.raises(RetrievalConfigError):
         await client.ensure_collection(vector_size=SIZE + 1)
+
+
+async def test_search_ranks_the_nearest_point_first(client: QdrantClient) -> None:
+    """Query vector → hits ordered by real similarity, carrying payload and score. Sorting is
+    Qdrant's job, not ours, so this is the half no in-process test can prove."""
+    await client.ensure_collection(vector_size=SIZE)
+
+    # Two points pointing in different directions, so "nearest" is decided by the data rather than
+    # by insertion order — which is what makes the ranking assertion mean anything.
+    near = _ticket_point("33644", fill=0.1)
+    far  = TicketPoint(
+        point_id       = point_id_for("10718"),
+        vector_problem = [0.1, 0.1, -0.1, -0.1],
+        vector_sts     = [0.2] * SIZE,
+        payload        = {"ticket_id": "10718"},
+    )
+
+    await client.upsert_points([near, far])
+
+    hits = await client.search(
+        vector      = near.vector_problem,
+        vector_name = VECTOR_PROBLEM,
+        limit       = 5,
+    )
+
+    assert [hit.ticket_id for hit in hits] == ["33644", "10718"]
+    # The payload has to survive the round trip: an answer is generated from these fields, so a hit
+    # without them matches but says nothing.
+    assert hits[0].payload["solution"] == near.payload["solution"]
+    assert hits[0].score > hits[1].score
+
+
+async def test_search_reads_the_named_space_it_was_asked_for(client: QdrantClient) -> None:
+    """Same vector queried against `problem` and against `sts` → different scores. This is the
+    mistake that never announces itself: both spaces answer, and the wrong one returns
+    plausible-looking hits (measured: 96.7% vs 98.3% recall@1, a drop rather than a failure)."""
+    await client.ensure_collection(vector_size=SIZE)
+
+    # `sts` deliberately points the opposite way to `problem` (see `_ticket_point`), so querying
+    # the wrong space is visible as a sign flip rather than as a subtle difference.
+    point = _ticket_point("33644")
+
+    await client.upsert_points([point])
+
+    on_problem = await client.search(
+        vector=point.vector_problem, vector_name=VECTOR_PROBLEM, limit=1
+    )
+    on_sts     = await client.search(
+        vector=point.vector_problem, vector_name=VECTOR_STS, limit=1
+    )
+
+    assert on_problem[0].score == pytest.approx(1.0)
+    # Same query, same point, other space — and the score is as far from 1.0 as it gets. Nothing
+    # errors, which is precisely why the vector name is a required argument.
+    assert on_sts[0].score == pytest.approx(-1.0)
+
+
+async def test_search_of_an_unknown_named_vector_is_an_error(client: QdrantClient) -> None:
+    """Misspelled vector name → RetrievalError from a REAL Qdrant, never an empty list. An empty
+    list would read as "nothing similar in the corpus" and hide the wiring mistake for good."""
+    await client.ensure_collection(vector_size=SIZE)
+    await client.upsert_points([_ticket_point("33644")])
+
+    with pytest.raises(RetrievalError):
+        await client.search(vector=[0.1] * SIZE, vector_name="problme", limit=5)
 
 
 async def test_deleting_removes_the_collection(client: QdrantClient) -> None:

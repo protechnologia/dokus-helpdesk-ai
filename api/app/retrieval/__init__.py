@@ -10,13 +10,15 @@ No factory here, like `app.embedding` and unlike `app.llm`: there is one way to 
 database becomes a real option, a factory belongs in this package — and nothing outside it should
 have to change.
 
-`TicketPoint` lives here rather than in `model/` on purpose: it describes what crosses the wire to
-one particular service, so swapping that service touches this directory alone (CLAUDE.md ->
-"Warstwy kodu": what talks to an external service gets its own package, transport models included).
+`TicketPoint` and `TicketHit` — the write side and the read side — live here rather than in
+`model/` on purpose: they describe what crosses the wire to one particular service, so swapping
+that service touches this directory alone (CLAUDE.md -> "Warstwy kodu": what talks to an external
+service gets its own package, transport models included).
 """
 
 from app.retrieval.client import QdrantClient
 from app.retrieval.errors import RetrievalConfigError, RetrievalError
+from app.retrieval.model_hit import TicketHit
 from app.retrieval.model_point import (
     VECTOR_PROBLEM,
     VECTOR_STS,
@@ -30,6 +32,7 @@ __all__ = [
     "QdrantClient",
     "RetrievalConfigError",
     "RetrievalError",
+    "TicketHit",
     "TicketPoint",
     "point_id_for",
 ]

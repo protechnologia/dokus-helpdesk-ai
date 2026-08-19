@@ -266,6 +266,112 @@ async def test_count_asks_for_an_exact_number() -> None:
     assert seen[0]["body"]["exact"] is True
 
 
+# --- search -------------------------------------------------------------------------------
+
+def _hits(*entries: dict) -> httpx.Response:
+    """
+    Description:
+    Builds the answer Qdrant returns from a query, wrapping entries in the nesting the query
+    endpoint uses. Spelled once because every search test needs it and the nesting is the part
+    easiest to get subtly wrong.
+
+    Example args:
+        entries=({"id": "3f2a…", "score": 0.87, "payload": {"ticket_id": "33644"}},)
+
+    Example result:
+        httpx.Response(200, json={"result": {"points": [{…}]}})
+    """
+    return httpx.Response(200, json={"result": {"points": list(entries)}})
+
+
+async def test_search_asks_the_named_space_it_was_given() -> None:
+    """search(vector_name=VECTOR_PROBLEM) → "using": "problem" on the wire. The collection holds
+    two spaces and querying the wrong one returns plausible nonsense rather than an error, so the
+    name must travel exactly as passed."""
+    seen: list = []
+    client     = _client(
+        capturing(seen, {("POST", f"{PATH_POINTS}/query"): _hits()})
+    )
+
+    await client.search(vector=[0.1, -0.2], vector_name=VECTOR_PROBLEM, limit=5)
+
+    assert seen[0]["body"]["using"] == VECTOR_PROBLEM
+    assert seen[0]["body"]["query"] == [0.1, -0.2]
+    assert seen[0]["body"]["limit"] == 5
+
+
+async def test_search_asks_for_payloads() -> None:
+    """search() → with_payload:true, because every caller builds on payload fields; ids and scores
+    alone would make the generation prompt impossible to fill."""
+    seen: list = []
+    client     = _client(
+        capturing(seen, {("POST", f"{PATH_POINTS}/query"): _hits()})
+    )
+
+    await client.search(vector=[0.1], vector_name=VECTOR_STS, limit=1)
+
+    assert seen[0]["body"]["with_payload"] is True
+    # The other space, passed through just as faithfully — this is the mistake that stays silent.
+    assert seen[0]["body"]["using"] == VECTOR_STS
+
+
+async def test_search_returns_hits_in_the_order_qdrant_gave_them() -> None:
+    """A query answer → TicketHits carrying score, point id and payload, order preserved: the
+    threshold and the collapsing downstream both read best-first."""
+    client = _client(
+        routed(
+            {
+                ("POST", f"{PATH_POINTS}/query"): _hits(
+                    {"id": "a", "score": 0.91, "payload": {"ticket_id": "33644"}},
+                    {"id": "b", "score": 0.42, "payload": {"ticket_id": "10718"}},
+                )
+            }
+        )
+    )
+
+    hits = await client.search(vector=[0.1], vector_name=VECTOR_PROBLEM, limit=5)
+
+    assert [hit.ticket_id for hit in hits] == ["33644", "10718"]
+    assert [hit.score for hit in hits]     == [0.91, 0.42]
+    assert hits[0].point_id                == "a"
+
+
+async def test_search_finding_nothing_is_an_answer() -> None:
+    """An empty result → an empty list, not an error. A query matching nothing is the documented
+    "new kind of problem" case, which the product reports rather than treats as a failure."""
+    client = _client(routed({("POST", f"{PATH_POINTS}/query"): _hits()}))
+
+    assert await client.search(vector=[0.1], vector_name=VECTOR_PROBLEM, limit=5) == []
+
+
+async def test_search_of_an_unknown_named_vector_fails_loudly() -> None:
+    """Qdrant rejects an unknown vector name → RetrievalError carrying its explanation, never an
+    empty list: a silent [] here reads as "nothing similar found" and hides a wiring mistake."""
+    client = _client(
+        routed(
+            {
+                ("POST", f"{PATH_POINTS}/query"): httpx.Response(
+                    400, text="Wrong input: Vector name error: vector 'problme' does not exist"
+                )
+            }
+        )
+    )
+
+    with pytest.raises(RetrievalError, match="does not exist"):
+        await client.search(vector=[0.1], vector_name="problme", limit=5)
+
+
+async def test_search_with_an_unrecognised_body_fails_with_our_message() -> None:
+    """A 200 whose shape we do not recognise → RetrievalError naming the collection, rather than a
+    KeyError surfacing later inside the search service."""
+    client = _client(
+        routed({("POST", f"{PATH_POINTS}/query"): httpx.Response(200, json={"result": {}})})
+    )
+
+    with pytest.raises(RetrievalError, match=COLLECTION):
+        await client.search(vector=[0.1], vector_name=VECTOR_PROBLEM, limit=5)
+
+
 # --- transport failures -------------------------------------------------------------------
 
 async def test_unreachable_qdrant_becomes_a_retrieval_error() -> None:
