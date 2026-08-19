@@ -1683,6 +1683,13 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
   przypadkiem istnieją. Do tego `TestClient(app, raise_server_exceptions=False)`, bo domyślnie
   wyjątek leci do testu, zamiast trafić do handlera.
 
+**Adresy usług dla testów z hosta bierz z `tests/conftest.py`** (`embedder_url()`, `qdrant_url()`,
+`api_url()`, fixture `host_settings`) — nigdy nie wpisuj ich w pliku testu. Konfiguracja wskazuje
+nazwy z sieci compose (`http://embedder:8000`), nierozwiązywalne z hosta, więc każdy test spoza
+kontenera potrzebuje podmiany; powielona w plikach zostawiała porty rozjeżdżające się po zmianie
+w jednym miejscu. Conftest stoi w **korzeniu `tests/`**, bo `functional/` potrzebuje tego samego
+co `integration/` — te dwie osie różni koszt i to, co dowodzą, nie sposób dotarcia do usługi.
+
 **Atrapy transportu bierz z `tests/helpers_transport.py`** — zawsze, gdy testujesz klienta HTTP
 (`EmbeddingClient`, `QdrantClient`, magazyn reguł z etapu 8). W pliku testu zostaje tylko budowa
 instancji klienta i atrapy jego własnych odpowiedzi.
@@ -2045,13 +2052,31 @@ właściwej warstwy, skrót → „TODO").
     **Kryterium spełnione:** 11 unitów kontraktu na `TestClient`, 7 unitów CLI, 1 test wdrożeniowy
     (`integration_api`) dowodzący, że trasa jest zamontowana w obrazie — bez dotykania zależności,
     bo sprawdza żądanie odrzucane przez nasz model.
-  - [ ] **5.6. Pierwszy test `functional`** — marker istnieje od etapu 0 i **dziś nie nosi go
-    żaden test**; roadmapa wiąże jego powstanie właśnie z `/search`. Odpowiada na inne pytanie
-    niż `integration`: nie „czy usługi są spięte", tylko „czy produkt zachowuje się sensownie" —
-    zgłoszenie na wejściu, sensowne trafienia na wyjściu.
-    **Kryterium:** `pytest -m functional` przechodzi przy postawionym stacku, a domyślny
-    `pytest` go nie łapie (marker jest **poza** parasolem `integration`, więc `addopts` musi go
-    wykluczać jawnie).
+  - [x] **5.6. Dwa testy całej ścieżki — integracyjny i funkcjonalny.** Rozdzielone, bo
+    odpowiadają na różne pytania i mają różny koszt; robione razem, bo drugi potrzebuje żywego
+    modelu, a ten sam przebieg GPU obsłuży 5.7.
+    - **(a) `integration_api`, LLM na atrapie — „czy usługi są spięte".** Zamyka lukę widoczną
+      w dzisiejszym zestawie: **żaden test nie dotyka embeddera i Qdranta naraz**, więc rozjazd
+      między wektorem zapytania a wektorami w indeksie przeszedłby niezauważony (obie strony
+      dalej zwracają poprawne wektory, a Qdrant trafienia ze score). Deterministyczny i darmowy,
+      więc chodzi w każdym przebiegu z markerem.
+      **Uwaga na granicę:** przy atrapie parsera wejściem nie jest zgłoszenie, tylko podłożony
+      `ParsedTicket` — dlatego to **nie** jest test funkcjonalny, mimo że przechodzi przez cały
+      stos. Sprawdza okablowanie, nie zachowanie produktu.
+    - **(b) `functional`, żywy LLM — „czy produkt zachowuje się sensownie".** Prawdziwa treść
+      zgłoszenia na wejściu, prawdziwy parse, sprawdzenie że wraca właściwy rekord. Marker
+      istnieje od etapu 0 i **dziś nie nosi go żaden test**.
+    **Wynik (2026-08-19):** 3 integracyjne + 4 funkcjonalne, wszystkie zielone na żywym Bieliku
+    11B (125 s na cztery zapytania). Zapytania funkcjonalne pisane **słowami użytkownika**, a nad
+    każdym leży zacytowany rekord-cel — inaczej nie widać, czy zapytanie nie zbliżyło się do
+    treści rekordu, co czyni test zielonym przy malejącej wartości.
+    **Asercja na RANKING, nigdy na wysokość score.** Pierwotny próg (>0,8) padł na 0,751 dla pary
+    **identycznych** tekstów: strona zapytania dostaje `[query]: `, strona indeksu nic, więc nawet
+    ten sam tekst nie daje 1,0. Bezwzględna liczba byłaby wartością do przestrajania przy każdej
+    zmianie modelu i niczego by nie dowodziła — ranking jest tą własnością, która przeżywa.
+    **Adresy usług wyniesione do `tests/conftest.py`** (`embedder_url()`, `qdrant_url()`,
+    `api_url()`, fixture `host_settings`) — te same cztery wartości powielały się już w trzech
+    plikach. W korzeniu `tests/`, bo `functional/` potrzebuje ich tak samo jak `integration/`.
   - [ ] **5.7. Wartość `RAG_SCORE_MIN` — z pomiaru, nie z głowy.** Dziś stoi na `0.0`, czyli nic
     nie odcina; to stan celowy do czasu, aż będzie z czego liczyć (patrz 5.2). Tu liczymy
     **dwa pomiary i dopiero z nich bierze się liczba**:
