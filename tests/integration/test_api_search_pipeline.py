@@ -1,6 +1,6 @@
 import json
 import os
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 from datetime import date
 
 import pytest
@@ -71,7 +71,7 @@ def _scripted_parse(
 
 
 @pytest.fixture
-async def qdrant() -> Iterator[QdrantClient]:
+async def qdrant() -> AsyncIterator[QdrantClient]:
     """
     Description:
     Yields a Qdrant client bound to the running service and the real collection.
@@ -128,7 +128,7 @@ async def indexed_record(qdrant: QdrantClient) -> dict:
 
 
 @pytest.fixture
-async def searcher_for(indexed_record: dict) -> Iterator[RagSearcher]:
+async def searcher_for(indexed_record: dict) -> AsyncIterator[RagSearcher]:
     """
     Description:
     Yields a searcher wired to the REAL embedder and Qdrant, with the model scripted to return the

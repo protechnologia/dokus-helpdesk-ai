@@ -1,6 +1,5 @@
 import math
-import os
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 
 import pytest
 
@@ -13,6 +12,7 @@ from app.retrieval import (
     TicketPoint,
     point_id_for,
 )
+from tests.conftest import qdrant_url
 
 pytestmark = [pytest.mark.integration, pytest.mark.integration_qdrant]
 
@@ -24,12 +24,6 @@ pytestmark = [pytest.mark.integration, pytest.mark.integration_qdrant]
 #
 # The stack assumption from CLAUDE.md -> "Testy" applies: an unreachable Qdrant fails these tests,
 # it never skips them. Asking for this marker means the service is supposed to be up.
-
-# Integration tests run on the HOST, so they reach Qdrant through its published port — never
-# through the compose-internal QDRANT_URL (`http://qdrant:6333`), which resolves only inside the
-# compose network. Hence a test-only variable with a host default.
-QDRANT_URL_ENV     = "QDRANT_TEST_URL"
-QDRANT_URL_DEFAULT = "http://localhost:6333"
 
 # Its own collection, never the configured one: these tests create and DELETE what they touch, and
 # doing that to `tickets` would wipe a real index during a routine test run.
@@ -97,7 +91,7 @@ def _cosine(
 
 
 @pytest.fixture
-async def client() -> Iterator[QdrantClient]:
+async def client() -> AsyncIterator[QdrantClient]:
     """
     Description:
     Yields a client bound to the running Qdrant, on a throwaway collection dropped before and
@@ -110,8 +104,7 @@ async def client() -> Iterator[QdrantClient]:
     Example result:
         QdrantClient(collection="tickets_integration_test")
     """
-    base_url = os.environ.get(QDRANT_URL_ENV, QDRANT_URL_DEFAULT)
-    client   = QdrantClient(base_url=base_url, collection=TEST_COLLECTION, timeout=10.0)
+    client = QdrantClient(base_url=qdrant_url(), collection=TEST_COLLECTION, timeout=10.0)
 
     await client.delete_collection()
 
