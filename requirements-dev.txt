@@ -10,3 +10,7 @@ httpx2==2.9.1
 # The config plumbing test reads the compose files as DATA (no Docker, no shelling out), so it
 # needs a YAML parser. Test-only: no service imports it.
 pyyaml==6.0.2
+# Charts for measurement reports (scripts/plot_threshold.py -> docs/*.png). Used by repo-level
+# scripts only, never by a service or a test — a report figure has to be reproducible, so the
+# dependency is declared rather than installed ad hoc.
+matplotlib==3.11.1

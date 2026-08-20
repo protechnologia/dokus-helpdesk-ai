@@ -67,12 +67,14 @@ class Settings(BaseSettings):
     # Top 5 because more dilutes the answer: the generation prompt is built from 1-3 records, and
     # this is the pool the threshold narrows down to them.
     rag_top_k:     int   = 5                            # e.g. 10
-    # Deliberately permissive at 0.0 — nothing is cut until it is measured. A threshold guessed in
-    # advance would silently hide the case this corpus is full of: near-identical `problem` texts
-    # with disjoint causes, which must ALL reach the prompt for `questions` to tell them apart
-    # (CLAUDE.md -> "Powtarza się objaw, nie przyczyna", consequence 5). Raise it once stage 5 has
-    # numbers, not before.
-    rag_score_min: float = 0.0                          # cosine similarity, range -1.0 .. 1.0
+    # Measured 2026-08-20 on 171 records (docs/pomiar-progu-score.md): 0.48 keeps 157 of 162 correct
+    # hits and fully silences 14 of 16 distractors. The trade leans towards cutting rubbish on
+    # purpose — with 47% of the corpus being singletons, "found nothing" is a normal answer, while a
+    # contentless hit looks like an answer and is worse than none.
+    # KNOWN COST: four correct hits drop out and THREE of them sat at rank 1, because short texts on
+    # both sides score low however well they match — so this threshold systematically penalises the
+    # shortest records. Do NOT raise without re-measuring: 0.50 takes four more.
+    rag_score_min: float = 0.48                         # cosine similarity, range -1.0 .. 1.0
 
     @model_validator(mode="before")
     @classmethod

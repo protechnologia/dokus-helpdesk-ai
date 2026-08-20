@@ -905,6 +905,11 @@ merytorycznie").
 - Porównanie trybów wyszukiwania: `python scripts/eval_index.py modes --collection tickets`
   (`query→passage` vs `sts→sts`, na zapytaniach surowych i sparsowanych — cztery pomiary w jednej
   tabeli; wymaga stacku)
+- Pomiar progu odcięcia: `python scripts/eval_threshold.py table` (rozkłady + tabela koszt/zysk
+  per kandydat na próg), `... detail --threshold 0.48` (co ten próg robi z każdym dystraktorem
+  i które trafienia poprawne kosztuje) oraz `... plot` (wykres obu rozkładów z linią progu do
+  `docs/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz `data/golden/distractors.json`;
+  sam golden set mierzy tylko połowę rozkładu
 
 **Bramki jakości i asysta pisania**
 - Sprawdzenie zamknięcia z konsoli: `helpdesk gate close --file <plik>`
@@ -1151,6 +1156,21 @@ Wspólne:
   niż użytkownik kliknął.
 - **Lista dostępnych wariantów jest do odpytania** (`GET /variants`) — UI helpdesku musi wiedzieć,
   jakie guziki narysować, skoro listy nie ma w kodzie.
+- **Brak trafień to 200 z pustą listą, nigdy 404** — „nowy typ problemu" jest poprawną odpowiedzią
+  dla 47% korpusu, a 404 mówiłoby, że błędne było żądanie.
+- **`POST /search` wymaga tylko `ticket_id` i `body`** — reszta opisuje zgłoszenie, ale nie steruje
+  wyszukiwaniem, więc jej żądanie podnosiłoby koszt wpięcia bez zysku dla odpowiedzi. Brak daty
+  znaczy „dziś": zgłoszenie w toku jest z definicji świeże, a data i tak nie wchodzi do wektora.
+- **Odpowiedź niesie CAŁY odczyt zapytania, nie tylko pola embedowane** — źle odczytany `component`
+  albo zgubiony kod błędu są niewidoczne w `problem` + `symptoms` i wyszłyby dopiero jako dziwna
+  propozycja przy generacji.
+- **Nieudany parse zapytania to 422, nie 503** — dotyczy wejścia, a nie stacku (`SearchParseError`),
+  i zatrzymuje przebieg **przed** embedderem i Qdrantem.
+- **`factory.py`: `build_searcher()` buduje, `get_searcher()` trzyma jeden na proces.** Rozdzielone,
+  bo CLI musi zamknąć pule połączeń (komenda się kończy), a serwer nie — zamknięcie instancji
+  z cache'u zostawiłoby następnego wołającego z martwymi pulami. Klienci transportowi są **wewnątrz**
+  serwisu, a sprzątanie idzie przez `searcher.aclose()`: wołający nie musi wiedzieć, z czego serwis
+  jest zbudowany.
 
 ## Warstwa embeddera
 
@@ -1212,6 +1232,12 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
 - **Nazwa named vectora zawsze podawana jawnie przy wyszukiwaniu.** Kolekcja ma dwa, a szukanie po
   niewłaściwym nie jest błędem — zwraca wiarygodnie wyglądające bzdury (zmierzone: `query→sts` daje
   96,7% zamiast 98,3%, czyli spadek, nie awarię).
+- **Odcięte progiem trafienia są LICZONE, nie milcząco gubione** (`dropped_below_threshold`
+  w `SearchResult`) — inaczej ostry próg wygląda dokładnie tak samo jak pusty indeks, a to dwie
+  różne awarie. Przy `RAG_SCORE_MIN` = 0.48 odcinanie jest regułą, nie wyjątkiem.
+- **Wynik wyszukiwania niesie także sparsowane zapytanie** — model przepisał wątek na `problem`
+  + `symptoms`, a nieoczekiwane odczytanie zgłoszenia jest pierwszą rzeczą tłumaczącą dziwną listę
+  trafień.
 
 ## Warstwa LLM
 
@@ -1690,6 +1716,13 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
   pokazuje, **po co ta atrapa istnieje**.
 - **Retrieval testujemy na deterministycznej atrapie embeddera** (stały wektor per tekst) —
   test progów, dedupe i routingu nie ma prawa zależeć od modelu.
+- **Asercja na RANKING, nigdy na wysokość score.** Próg (>0,8) padł na **0,751 dla pary
+  identycznych tekstów**: strona zapytania dostaje `[query]: `, strona indeksu nic, więc nawet ten
+  sam tekst nie daje 1,0. Liczba bezwzględna byłaby wartością do przestrajania przy każdej zmianie
+  modelu i niczego by nie dowodziła — kolejność jest tą własnością, która przeżywa.
+- **Zapytania w testach funkcjonalnych pisane SŁOWAMI UŻYTKOWNIKA**, a nad każdym zacytowany
+  rekord-cel — inaczej nie widać, czy zapytanie nie zbliżyło się do treści rekordu, co czyni test
+  zielonym przy malejącej wartości.
 - **Bramki i „Popraw" testujemy na `FakeLLMClient`** — sprawdzamy **kształt werdyktu i wstawienie
   reguł do promptu**, nie trafność oceny. Trafność mieszka w ewaluacji (`helpdesk eval gates`),
   bo zależy od modelu, a nie od naszego kodu — mylenie tych dwóch rzeczy daje test, który
@@ -1913,6 +1946,16 @@ tworzysz świadomym skrótem), **dopisz go tu** zamiast zostawiać w milczeniu.
 - **Liczba wątków `torch` w embedderze** — domyślnie bierze **wszystkie rdzenie**, co przy
   indeksacji potrafi zagłodzić `api` i Qdranta. Kandydat na `EMBEDDING_NUM_THREADS`, ale
   **najpierw pomiar**.
+- **`RAG_SCORE_MIN` = 0.48 zmierzono na zapytaniach SUROWYCH, a `POST /search` szuka
+  SPARSOWANYMI.** Sonda z 2026-08-20 (40 zapytań golden setu + 16 dystraktorów przez prawdziwy
+  parser): parsowanie podnosi score **obu** serii, ale śmieci mocniej niż trafień poprawnych
+  (mediana +0,039 wobec +0,024), więc przy 0.48 przechodzi **29 z 80** trafień dystraktorów zamiast
+  2 z 80. Trafienia poprawne nie ucierpiały (40/40 w obu wariantach), więc **produkt działa** — ale
+  przepuszcza więcej śmieci, niż zakłada raport. Przyczyna jest mechaniczna: parser sprowadza każde
+  zgłoszenie do tego samego kształtu `problem` + `symptoms`, co upodabnia do korpusu **także**
+  zapytania bez odpowiednika. **Do przeliczenia razem z pomiarem po etapie 10** — wtedy obie serie
+  puścić przez parser (~180 wywołań LLM), a nie na `query_raw`. Odpowiednik dzisiejszego wyboru
+  w świecie sparsowanym to okolice **0.52**, ale próbka 40 zapytań nie wystarcza, by to zabetonować.
 - **Limity i koszty LLM** — brak budżetowania i rate-limitu na wywołania generacji. **Bramki
   zmieniają skalę problemu**: dotąd LLM wołaliśmy raz na zapytanie wdrożeniowca, teraz woła go
   **każde zamknięcie, każda wysyłka i każde kliknięcie „Popraw"** — czyli ruch proporcjonalny do
@@ -1982,7 +2025,7 @@ właściwej warstwy, skrót → „TODO").
   rekordów to sufit, więc do porównania kandydatów wracamy przy pełnym indeksie;
   **(2) named vector `sts` zostaje, choć nie ma dziś ŻADNEGO zastosowania** — oś „zapytanie
   sparsowane" domknięta przy etapie 4 (`query→passage` wygrywa i tam), a zwijanie trafień
-  wykreślone przy 5.4; zostaje, bo powrót po skasowaniu kosztowałby pełny re-index.
+  wykreślone w etapie 5; zostaje, bo powrót po skasowaniu kosztowałby pełny re-index.
   Materiał wielokrotnego użytku: golden set przyda się przy każdej zmianie modelu, a korpus
   `data/parsed/bielik-11b-golden200/` (200 zwalidowanych artefaktów) **ma przetrwać** czystkę
   z etapu 10.
@@ -2011,119 +2054,28 @@ właściwej warstwy, skrót → „TODO").
   **Materiał: `data/parsed/bielik-11b-golden200/` (200 artefaktów)** — ten sam zestaw, na którym
   stoi golden set, więc filtr jest mierzalny wobec 38 etykiet „odrzuć" i 162 „przepuść". Pozostałe
   katalogi w `data/parsed/` to próbki porównawcze parserów i **nie wchodzą do indeksu**.
-- [ ] **5. Wyszukiwanie** — `POST /search`: parser zapytania (LLM → `ParsedTicket`) + top-K,
-  próg, zwrot trafień ze score i ID. **Tu parser wchodzi do runtime** —
-  ten sam prompt i ten sam model Pydantic, którymi parsowaliśmy korpus.
-  **Zwijanie zgodnych trafień wypadło z zakresu (5.4)** — przy oknie 5 rekordów licznik zgodności
-  mierzyłby okno, nie korpus, a bez licznika zostaje sama krótsza lista. Ocena zgodności trafień
-  przechodzi do etapu 6, gdzie routing i tak musi porównać `cause` (patrz „Świadomie pominięte").
-  **Parser musi strawić wątek w toku, nie pojedynczy opis** — stan konwersacji jest istotny
-  (najcenniejszy komentarz bywa po tym z rozwiązaniem, dostawca potrafi odwołać własną pierwszą
-  diagnozę). Uboczna korzyść: obie strony porównania stają się tym samym gatunkiem tekstu — co
-  **zmierzono 2026-08-13 i co NIE pomogło `sts→sts`**: `query→passage` wygrywa tam nawet wyraźniej
-  niż na surowych (patrz „Embeddingi i prefiksy PolDense").
-  - [x] **5.1. Wyszukiwanie w kliencie Qdranta** — `search()` po `/points/query` z **wymaganą
-    nazwą named vectora, bez wartości domyślnej** (kolekcja ma dwa, a szukanie po niewłaściwym
-    nie jest błędem — zwraca wiarygodnie wyglądające bzdury) + `TicketHit` obok `TicketPoint`
-    jako strona odczytu. Payload trzymany **w całości**, nie rozpakowany na pola: prompt
-    generacji czyta klucze, których ten model nie nazywa, więc druga lista pól byłaby drugim
-    miejscem, gdzie można któreś zgubić.
-    **Zmierzone przy okazji, wobec działającego Qdranta:** ten sam wektor pytany o `problem` daje
-    score 1,0, a o `sts` — dokładnie −1,0, i **nic się nie wywala**. To ta „awaria, która nie
-    wygląda na awarię" pokazana liczbą; stąd wymagany argument zamiast domyślnego.
-    **Pusty wynik i zła nazwa wektora to rozłączne przypadki** i testy pilnują ich osobno: puste
-    trafienia są legalną odpowiedzią („nowy typ problemu"), a literówka w nazwie przestrzeni musi
-    być głośna — `[]` wyglądałoby jak „nic podobnego w korpusie" i schowałoby błąd okablowania.
-  - [x] **5.2. Progi i parametry do ENV** — `RAG_TOP_K` i `RAG_SCORE_MIN` przeprowadzone przez
-    wszystkie trzy krawędzie (`Settings`, `.env.example`, compose); `test_config_plumbing`
-    przechodzi bez dopisywania wyjątków.
-    **`RAG_SCORE_MIN` domyślnie 0.0, czyli nic nie odcina — świadomie.** Próg zgadnięty z góry
-    ukryłby po cichu przypadek, którego ten korpus jest pełen: prawie identyczne `problem`
-    o rozłącznych przyczynach muszą trafić do promptu **razem**, bo inaczej `questions` nie ma
-    czego rozróżniać. Podnosimy, gdy etap 5 da liczby.
-    **Parametru zwijania nie ma i nie będzie** — samo zwijanie wypadło z zakresu przy 5.4.
-    Gdyby wróciło, potrzebuje **dwóch** zmiennych („ile pobrać" i „ile pokazać"), nie jednej.
-  - [x] **5.3. Serwis wyszukiwania** — `service/rag_searcher.py`: `RawTicket` → `TicketParser`
-    → `embedding_text()` → `embed_query()` → `search(VECTOR_PROBLEM)` → próg. Wynik to
-    `SearchResult` niosący trafienia **oraz sparsowane zapytanie** — model przepisał wątek na
-    `problem` + `symptoms`, a nieoczekiwane odczytanie zgłoszenia jest pierwszą rzeczą
-    tłumaczącą dziwną listę trafień.
-    **Wejściem jest `RawTicket`, bez drugiej drogi do parsera** — rozstrzygnięte: zgłoszenie
-    w toku ma już `id` i datę, a `as_thread()` renderuje wątek z komentarzami bez zmian. Druga
-    droga wejścia byłaby pierwszym miejscem, w którym kształt tekstu zapytania mógłby rozjechać
-    się z kształtem tekstu korpusu — bezgłośnie.
-    **Odcięte poniżej progu jest LICZONE, nie milcząco gubione** (`dropped_below_threshold`):
-    inaczej ostry próg wygląda dokładnie tak samo jak pusty indeks.
-    **Nieudany parse to `SearchParseError`, nie błąd transportu** — dotyczy wejścia (handler
-    odpowie 422), a nie stacku (503), i zatrzymuje przebieg **przed** embedderem i Qdrantem.
-  - [x] ~~**5.4. Zwijanie zgodnych trafień**~~ — **wykreślone 2026-08-19, przed napisaniem
-    linijki kodu.** Powód w jednym zdaniu: przy `RAG_TOP_K` = 5 licznik zgodnych trafień jest
-    artefaktem **okna**, nie pomiarem korpusu, a bez licznika zwijanie daje samą krótszą listę.
-    Pełne uzasadnienie, warunki powrotu i **decyzja o pozostawieniu named vectora `sts`** —
-    w „Świadomie pominięte".
-  - [x] **5.5. `POST /search` + `helpdesk rag search`** — cienki handler i cienkie CLI nad tym
-    samym serwisem, osobne modele API (`SearchRequest` / `SearchQuery` / `SearchHit`), bo modelu
-    domenowego nie wypuszczamy przez HTTP.
-    **Wymagane są tylko `ticket_id` i `body`** — reszta opisuje zgłoszenie, ale nie steruje
-    wyszukiwaniem, więc jej żądanie podnosiłoby koszt wpięcia bez zysku dla odpowiedzi. Brak daty
-    znaczy „dziś": zgłoszenie w toku jest z definicji świeże, a data i tak nie wchodzi do wektora.
-    **Odpowiedź niesie CAŁY odczyt zapytania, nie tylko `problem` + `symptoms`** — źle odczytany
-    `component` albo zgubiony kod błędu są niewidoczne w polach embedowanych i wyszłyby dopiero
-    jako dziwna propozycja w etapie 6.
-    **`app/factory.py`: `build_searcher()` buduje, `get_searcher()` trzyma jeden na proces.**
-    Rozdzielone, bo CLI musi zamknąć pule połączeń (komenda się kończy), a serwer nie — zamknięcie
-    instancji z cache'u zostawiłoby następnego wołającego z martwymi pulami. Klienci są **wewnątrz**
-    serwisu, a sprzątanie idzie przez `searcher.aclose()`: wołający nie musi wiedzieć, z czego
-    serwis jest zbudowany.
-    **Brak trafień to 200 z pustą listą, nigdy 404** — „nowy typ problemu" jest poprawną
-    odpowiedzią dla 47% korpusu, a 404 mówiłoby, że błędne było żądanie.
-    **Kryterium spełnione:** 11 unitów kontraktu na `TestClient`, 7 unitów CLI, 1 test wdrożeniowy
-    (`integration_api`) dowodzący, że trasa jest zamontowana w obrazie — bez dotykania zależności,
-    bo sprawdza żądanie odrzucane przez nasz model.
-  - [x] **5.6. Dwa testy całej ścieżki — integracyjny i funkcjonalny.** Rozdzielone, bo
-    odpowiadają na różne pytania i mają różny koszt; robione razem, bo drugi potrzebuje żywego
-    modelu, a ten sam przebieg GPU obsłuży 5.7.
-    - **(a) `integration_api`, LLM na atrapie — „czy usługi są spięte".** Zamyka lukę widoczną
-      w dzisiejszym zestawie: **żaden test nie dotyka embeddera i Qdranta naraz**, więc rozjazd
-      między wektorem zapytania a wektorami w indeksie przeszedłby niezauważony (obie strony
-      dalej zwracają poprawne wektory, a Qdrant trafienia ze score). Deterministyczny i darmowy,
-      więc chodzi w każdym przebiegu z markerem.
-      **Uwaga na granicę:** przy atrapie parsera wejściem nie jest zgłoszenie, tylko podłożony
-      `ParsedTicket` — dlatego to **nie** jest test funkcjonalny, mimo że przechodzi przez cały
-      stos. Sprawdza okablowanie, nie zachowanie produktu.
-    - **(b) `functional`, żywy LLM — „czy produkt zachowuje się sensownie".** Prawdziwa treść
-      zgłoszenia na wejściu, prawdziwy parse, sprawdzenie że wraca właściwy rekord. Marker
-      istnieje od etapu 0 i **dziś nie nosi go żaden test**.
-    **Wynik (2026-08-19):** 3 integracyjne + 4 funkcjonalne, wszystkie zielone na żywym Bieliku
-    11B (125 s na cztery zapytania). Zapytania funkcjonalne pisane **słowami użytkownika**, a nad
-    każdym leży zacytowany rekord-cel — inaczej nie widać, czy zapytanie nie zbliżyło się do
-    treści rekordu, co czyni test zielonym przy malejącej wartości.
-    **Asercja na RANKING, nigdy na wysokość score.** Pierwotny próg (>0,8) padł na 0,751 dla pary
-    **identycznych** tekstów: strona zapytania dostaje `[query]: `, strona indeksu nic, więc nawet
-    ten sam tekst nie daje 1,0. Bezwzględna liczba byłaby wartością do przestrajania przy każdej
-    zmianie modelu i niczego by nie dowodziła — ranking jest tą własnością, która przeżywa.
-    **Adresy usług wyniesione do `tests/conftest.py`** (`embedder_url()`, `qdrant_url()`,
-    `api_url()`, fixture `host_settings`) — te same cztery wartości powielały się już w trzech
-    plikach. W korzeniu `tests/`, bo `functional/` potrzebuje ich tak samo jak `integration/`.
-  - [ ] **5.7. Wartość `RAG_SCORE_MIN` — z pomiaru, nie z głowy.** Dziś stoi na `0.0`, czyli nic
-    nie odcina; to stan celowy do czasu, aż będzie z czego liczyć (patrz 5.2). Tu liczymy
-    **dwa pomiary i dopiero z nich bierze się liczba**:
-    - **(A) górna granica — golden set przez `search()`.** Dla 162 zapytań zbieramy score
-      rekordu poprawnego i score najlepszego niepoprawnego. Materiał leży gotowy, koszt bliski
-      zeru. **Sam nie wystarcza:** golden set i korpus to ten sam zbiór rekordów, więc każde
-      zapytanie MA tam swój cel — pomiar mówi „gdzie kończą się trafienia poprawne", a nie
-      „gdzie kończy się sensowna odpowiedź".
-    - **(B) dolna granica — zapytania-dystraktory.** Kilkanaście opisów, dla których poprawną
-      odpowiedzią jest **„nic nie pasuje"**: tematy spoza Dokusa oraz takie, które wypadły
-      z indeksu (utrata danych — 5 rekordów w próbce, 0 rozwiązań). Bez nich nie widać drugiej
-      strony rozkładu, a to ona rozstrzyga o progu: **47% korpusu to singletony**, więc „nowy
-      typ problemu" jest częstą prawidłową odpowiedzią, nie przypadkiem brzegowym.
-    - **Decyzja po obu.** Jeśli rozkłady A i B się rozdzielają — próg między nimi. Jeśli się
-      nakładają, **to też jest wynik**: znaczy, że sam score nie odróżnia „mam odpowiedź" od
-      „nie mam", i wtedy `0.0` zostaje, a rozstrzyganie przechodzi na zgodność `cause` w etapie
-      6 (co jest zresztą zapisanym kryterium pewności — patrz „Powtarza się objaw").
-    **Kryterium:** wartość wpisana do `.env.example` **z liczbą w komentarzu**, albo świadomie
-    zostawione `0.0` z zapisanym powodem; w obu przypadkach raport z obu pomiarów.
+- [x] **5. Wyszukiwanie** — `POST /search` i `helpdesk rag search`: parser zapytania
+  (LLM → `ParsedTicket`) → `embed_query()` → top-K → próg → trafienia ze score i ID.
+  **Zamknięte 2026-08-20.** Reguły warstw: „Warstwa API" i „Warstwa retrievalu (Qdrant)";
+  próg i jego cena: `docs/pomiar-progu-score.md` (narzędzie: `scripts/eval_threshold.py`).
+  **Tu parser wszedł do runtime** — ten sam prompt i model Pydantic co przy korpusie, karmiony
+  **wątkiem w toku, nie pojedynczym opisem** (najcenniejszy komentarz bywa po tym z rozwiązaniem).
+  **Trzy rzeczy do zapamiętania, bo wracają dalej:**
+  **(1) `RAG_SCORE_MIN` = 0.48 z pomiaru na 171 rekordach, świadomie po stronie odsiewania
+  śmieci** — trafienie bez treści wygląda na odpowiedź, a przy 47% singletonów „nic nie znalazłem"
+  jest normalną odpowiedzią. **Wartość zmierzona na zapytaniach SUROWYCH, a produkcja szuka
+  SPARSOWANYMI** — sonda z 2026-08-20 (40 zapytań) pokazała, że parsowanie podnosi score śmieci
+  mocniej niż trafień poprawnych (mediana +0,039 wobec +0,024), więc przy tym progu przechodzi
+  ich 29/80 zamiast 2/80. **Do przeliczenia przy etapie 10** — patrz TODO.
+  **(2) Progu NIE stroi się liczbą „ile procent zachowanych"** — krótkie teksty mają niski score
+  mimo idealnego dopasowania (0,455 przy niemal tym samym zdaniu), więc z pięciu traconych zapytań
+  cztery stały na pierwszym miejscu. Zawsze `eval_threshold.py detail` przed zmianą wartości.
+  **(3) Pomiar progu wymaga DWÓCH zbiorów** — golden set mówi tylko, jak nisko schodzą trafienia
+  poprawne; „jak wysoko wchodzą śmieci" widać wyłącznie na zapytaniach bez celu w indeksie
+  (`data/golden/distractors.json`). Z nakładania się krańców rozkładów nie wolno wnioskować, że
+  progu nie da się ustawić — rozstrzyga gęstość, nie zasięg.
+  **Zwijanie zgodnych trafień wypadło z zakresu** (patrz „Świadomie pominięte"); ocena zgodności
+  `cause` przechodzi do etapu 6. Marker `functional` dostał tu pierwszego nosiciela.
 - [ ] **6. Generacja propozycji** — `POST /suggest` z parametrem `variant` + `GET /variants`
   + placeholdery + routing po score jako **podpowiedź** wariantu. Trzy warianty startowe
   (`questions`, `solution`, `handoff`) zdefiniowane **w kodzie, ale za interfejsem magazynu

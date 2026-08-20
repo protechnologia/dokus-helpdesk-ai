@@ -330,9 +330,9 @@ async def test_a_hit_exactly_on_the_threshold_is_kept() -> None:
     assert result.dropped_below_threshold         == 0
 
 
-async def test_the_default_threshold_cuts_nothing() -> None:
-    """With RAG_SCORE_MIN at its 0.0 default every hit survives — deliberate until stage 5.7
-    measures a value: near-identical problems with disjoint causes must all reach the prompt."""
+async def test_a_zero_threshold_cuts_nothing() -> None:
+    """At score_min 0.0 every hit survives: a deployment may disable the cut entirely, and the
+    service must then pass even near-zero hits through rather than applying a floor of its own."""
     searcher, _, _, _ = _searcher([_hit("33644", 0.9), _hit("10718", 0.02)])
 
     result = await searcher.search(RAW)

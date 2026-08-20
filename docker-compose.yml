@@ -55,7 +55,7 @@ services:
       # service never receives is the failure that announces itself with nothing — the container
       # starts, reports healthy and quietly runs on the code default.
       RAG_TOP_K:                 ${RAG_TOP_K:-5}
-      RAG_SCORE_MIN:             ${RAG_SCORE_MIN:-0.0}
+      RAG_SCORE_MIN:             ${RAG_SCORE_MIN:-0.48}
     # --reload belongs to the dev layer, not to the image: the shipped CMD has no reloader.
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     healthcheck:
