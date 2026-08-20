@@ -61,7 +61,7 @@ DEFAULT_DISTRACTORS = REPO_ROOT / "data" / "golden" / "distractors.json"
 DEFAULT_EMBEDDER = "http://localhost:8001"
 DEFAULT_QDRANT   = "http://localhost:6333"
 
-DEFAULT_PLOT_OUT = REPO_ROOT / "docs" / "pomiar-progu-score.png"
+DEFAULT_PLOT_OUT = REPO_ROOT / "data" / "docs" / "pomiar-progu-score.png"
 
 EMBED_BATCH_SIZE = 32
 
@@ -546,7 +546,7 @@ def plot(
     otherwise, and that difference decided this measurement.
 
     Example args:
-        out=Path("docs/pomiar-progu-score.png")
+        out=Path("data/docs/pomiar-progu-score.png")
         threshold=0.48
 
     Example result:

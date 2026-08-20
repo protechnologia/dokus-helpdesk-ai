@@ -666,7 +666,7 @@ Konsekwencje:
 ### Wybór modelu i trybu — zmierzony 2026-08-05
 
 **Decyzja: `OPI-PIB/PolDense-150M`, tryb `query→passage`.** Pełny raport:
-`docs/pomiar-embedderow.md`; narzędzie: `scripts/eval_embeddings.py`.
+`data/docs/pomiar-embedderow.md`; narzędzie: `scripts/eval_embeddings.py`.
 
 Zmierzone na 165 syntetycznych zapytaniach wobec korpusu 200 rekordów (nieprzefiltrowanego —
 odrzucone zostają jako dystraktory), pomiar powtórzony dwukrotnie z identycznym wynikiem:
@@ -908,8 +908,8 @@ merytorycznie").
 - Pomiar progu odcięcia: `python scripts/eval_threshold.py table` (rozkłady + tabela koszt/zysk
   per kandydat na próg), `... detail --threshold 0.48` (co ten próg robi z każdym dystraktorem
   i które trafienia poprawne kosztuje) oraz `... plot` (wykres obu rozkładów z linią progu do
-  `docs/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz `data/golden/distractors.json`;
-  sam golden set mierzy tylko połowę rozkładu
+  `data/docs/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz
+  `data/golden/distractors.json`; sam golden set mierzy tylko połowę rozkładu
 
 **Bramki jakości i asysta pisania**
 - Sprawdzenie zamknięcia z konsoli: `helpdesk gate close --file <plik>`
@@ -948,7 +948,9 @@ dokus-helpdesk-ai/
 ├── scripts/                      # narzędzia repo niezwiązane z usługą (patrz „Warstwa CLI")
 ├── data/                         # artefakty — NIE w repo (PII)
 │   ├── raw/                      # zgłoszenia źródłowe jak przyszły
-│   └── parsed/                   # sparsowane JSON-y (trwały artefakt, zasada 7)
+│   ├── parsed/                   # sparsowane JSON-y (trwały artefakt, zasada 7)
+│   ├── golden/                   # zestawy do ewaluacji: golden set, dystraktory
+│   └── docs/                     # raporty z pomiarów i dokumenty projektu (patrz niżej)
 ├── api/                          # folder = usługa z compose, nazwany tak samo
 │   ├── Dockerfile
 │   ├── .dockerignore
@@ -1602,6 +1604,12 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 ## Dokumentacja
 
 - **CLAUDE.md** — „dlaczego": zasady, trwałe decyzje, pułapki, świadome pominięcia.
+- **`data/docs/` — raporty z pomiarów i dokumenty projektu, POZA repo.** Katalog jest w `data/`,
+  więc obejmuje go `.gitignore` (2026-08-20). Powód: **raport cytujący korpus niesie PII**, choćby
+  autor tego nie zamierzał — wystarczy wkleić zrzut z konsoli operującej na zgłoszeniach, żeby
+  trafiły tam nazwiska użytkowników. Zdarzyło się przy pomiarze progu: trzy nazwiska w wyjściu
+  `eval_threshold.py detail`, wyłapane dopiero przy commicie. Wnioski trwałe przenoś **do
+  CLAUDE.md** (bez cytatów), a plik z pomiarem zostaw w `data/docs/`.
 - **README** — „jak": uruchomienie i kontrakt dla użytkownika. Proponowany podział na sekcje:
   1. **Stack** — technologie i ich role.
   2. **Flow działania** — ogólny algorytm (wejście → etapy → wyjście).
@@ -2018,7 +2026,7 @@ właściwej warstwy, skrót → „TODO").
   (`data/golden/bielik-11b-golden200.json`; pomiar liczony na **165** zapytaniach i 35 odrzuceniach,
   dziś w pliku 162 + 38 — patrz poprawka etykiet w 4.2) + skrypt
   `scripts/eval_embeddings.py` liczący krzywą `recall@1..K` i MRR. **Decyzja: PolDense-150M, tryb
-  `query→passage`** — pełny raport `docs/pomiar-embedderow.md`, reguły budowy zestawu w sekcji
+  `query→passage`** — pełny raport `data/docs/pomiar-embedderow.md`, reguły budowy zestawu w sekcji
   „Ewaluacja jakości", wynik i jego zastrzeżenia w „Embeddingi i prefiksy PolDense".
   **Dwie rzeczy do zapamiętania, bo wracają w etapie 4:**
   **(1) model wybrany bez rozstrzygającego pomiaru** — `recall@1` = 98,2% przy korpusie 200
@@ -2057,7 +2065,7 @@ właściwej warstwy, skrót → „TODO").
 - [x] **5. Wyszukiwanie** — `POST /search` i `helpdesk rag search`: parser zapytania
   (LLM → `ParsedTicket`) → `embed_query()` → top-K → próg → trafienia ze score i ID.
   **Zamknięte 2026-08-20.** Reguły warstw: „Warstwa API" i „Warstwa retrievalu (Qdrant)";
-  próg i jego cena: `docs/pomiar-progu-score.md` (narzędzie: `scripts/eval_threshold.py`).
+  próg i jego cena: `data/docs/pomiar-progu-score.md` (narzędzie: `scripts/eval_threshold.py`).
   **Tu parser wszedł do runtime** — ten sam prompt i model Pydantic co przy korpusie, karmiony
   **wątkiem w toku, nie pojedynczym opisem** (najcenniejszy komentarz bywa po tym z rozwiązaniem).
   **Trzy rzeczy do zapamiętania, bo wracają dalej:**
