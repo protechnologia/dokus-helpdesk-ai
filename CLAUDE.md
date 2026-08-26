@@ -2158,12 +2158,27 @@ właściwej warstwy, skrót → „TODO").
     dokumentu promptu wyszło do `util/markdown.py`: reguła „komentarz redakcyjny nie ma prawa
     dotrzeć do modelu" obowiązuje teraz dwie rodziny promptów, a druga kopia regexa byłaby drugim
     miejscem, w którym da się o niej zapomnieć.
-  - [ ] **6.3. Prompt: jakie pytania zadać klientowi** (`prompt_suggest_questions_{system,user}.md`).
+  - [x] **6.3. Prompt: jakie pytania zadać klientowi** (`prompt_suggest_questions_{system,user}.md`).
     Najtrudniejszy z trzech i rdzeń produktu — powtarza się objaw, nie przyczyna.
     **Dwie pułapki:** cudze pytania to wzorzec, nie treść do skopiowania (przeformułuj, pomiń te
     z odpowiedzią już w treści); `questions_summary` jest puste w ~83% korpusu, więc prompt nie
     może na nim stać.
     **Kryterium:** test-strażnik; wynik nie cytuje cudzych pytań dosłownie.
+    **Ustalony tu wzorzec dla 6.4 i 6.5 — CAŁA INSTRUKCJA W TURZE SYSTEMOWEJ, w turze użytkownika
+    same dane.** Kryterium podziału: co zmienia się między wywołaniami. Instrukcja jest stała, więc
+    stanowi cache'owalny prefiks i konkuruje z wklejoną treścią z pozycji, którą modele ważą wyżej;
+    ubocznie granica wstrzyknięcia robi się ostra, bo w turze użytkownika nie ma instrukcji, z
+    którymi wklejone polecenie mogłoby się zlać. Jedyny wyjątek to **zdanie zamykające**,
+    powtarzające kontrakt wyjścia PO danych — recency jest tam, gdzie format się trzyma.
+    **Świadomy rozjazd z promptem parsującym**, który trzyma reguły odwrotnie: tamten kształt
+    powstał wcześniej, przy prompcie systemowym ograniczonym do roli, i nie jest wzorcem. Nie
+    ruszamy go, bo jest kontraktem artefaktu (zasada 7).
+    **Siła strażnika ma odpowiadać kosztowi cichego dryfu.** Przy prompcie parsującym freeze fraz
+    jest uzasadniony (dryf = ~1500 wywołań LLM do powtórzenia); tu zmiana nie unieważnia
+    `data/parsed/`, więc strażnik pilnuje **wyłącznie rzeczy niewidocznych w diffie** —
+    placeholderów, braku instrukcji w turze użytkownika, wyciętych komentarzy i nieistniejącego
+    pola `score`. Fraz nie zamraża: freeze brzmienia kupowałby sztywność zamiast bezpieczeństwa,
+    a o jakość treści rozstrzyga pomiar z 6.10.
   - [ ] **6.4. Prompt: gotowa odpowiedź z rozwiązań** (`prompt_suggest_solution_{system,user}.md`). Jedyny
     wariant wymagający trafień — bez nich nie ma z czego powstać (zasada 9).
     Obowiązują „Twarde reguły promptu generacji": data bezwarunkowo, przy rozbieżnych liczbach
