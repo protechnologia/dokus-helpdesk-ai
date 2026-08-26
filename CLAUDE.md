@@ -711,6 +711,24 @@ Wspólne dla wszystkich wariantów:
 - **Trafienia dają treść merytoryczną, prompt zadaje styl.** Do promptu idą pola z payloadu
   (`problem`, `cause`, `solution` + metadane: score, data, `ticket_id`) — **nie** surowe maile.
 - **Top-5 → próg score → dedupe → 1–3 rekordy** do promptu. Więcej rozmywa odpowiedź.
+- **Które trafienia wchodzą do promptu, wybiera CZŁOWIEK — `/suggest` dostaje identyfikatory,
+  nie payloady** (decyzja 2026-08-26). To jedyna uczciwa odpowiedź na „powtarza się objaw, nie
+  przyczyna": przy sześciu rozłącznych przyczynach jednego objawu operator wie rzeczy, których
+  system nie wie (ten urząd nie ma eNadawcy, tamto trafienie dotyczy wersji sprzed migracji),
+  a dziś jedyne, co może zrobić z bezużytecznym trafieniem, to odrzucić całą propozycję.
+  Odznaczenie jest tańsze niż odrzucenie i jest **lepszą etykietą treningową niż kliknięcie
+  guzika** (patrz TODO: persystencja feedbacku) — „wyglądało podobnie, a było nie na temat" to
+  sygnał, którego score nie niesie.
+  - **Identyfikatory, nigdy payloady — i to nie dla wygody, tylko dla zasady 9.** Gdyby helpdesk
+    odsyłał całe trafienia, treść, z której generujemy, przeszłaby przez klienta i mogłaby zostać
+    po drodze zmieniona; „odpowiedź powstaje wyłącznie z pól trafionych rekordów" przestałaby być
+    prawdą, choć wszystko wyglądałoby normalnie. Przy identyfikatorach treść pochodzi z naszego
+    indeksu i nie ma jak inaczej — `point_id_for()` jest deterministyczne, więc to zwykły
+    `retrieve`, bez wyszukiwania wektorowego.
+  - **Ubocznie znika ponowne wyszukiwanie przy każdym guziku:** `/search` raz, potem trzy
+    kliknięcia to trzy generacje — **cztery wywołania LLM zamiast sześciu**.
+  - **Sam UI (checkboxy) nie jest naszą robotą** — należy do helpdesku i do etapu 11. My robimy
+    kontrakt, który je dopuszcza. Ta sama linia co „nasze API opiniuje, helpdesk egzekwuje".
 - **Placeholdery zamiast danych** (`{IMIĘ}`, `{NR_URZĄDZENIA}`), nawiasy kwadratowe na
   instrukcje dla człowieka (`[dla serwisanta: sprawdź wersję firmware]`).
 - Propozycja **zawsze** wraca z listą źródeł (ID ticketów + score) — wdrożeniowiec musi móc
@@ -1147,6 +1165,15 @@ Wspólne:
 - **Nieznany wariant to 422, nie cichy fallback na domyślny** — literówka w nazwie guzika po
   stronie helpdesku ma być widoczna od razu, a nie objawić się wygenerowaniem czegoś innego,
   niż użytkownik kliknął.
+- **`POST /suggest` bierze identyfikatory wybranych trafień i sparsowane zgłoszenie od wołającego**
+  — nie szuka sam (uzasadnienie: „Generacja propozycji odpowiedzi"). Sparsowane zgłoszenie wraca
+  od helpdesku, bo `/search` już mu je oddał, a treść zgłoszenia jest i tak wejściem operatora,
+  więc nie ma tu czego chronić przed nim samym.
+- **Identyfikatorom na tym etapie UFAMY** (decyzja 2026-08-26): nie sprawdzamy, czy pochodzą
+  z wyszukiwania, które przeszło `RAG_SCORE_MIN`. Obejście progu przez wołającego jest możliwe
+  i **świadomie przyjęte** — patrz TODO. Osobną sprawą jest identyfikator, którego **nie ma
+  w indeksie**: to 422, nie ciche pominięcie, bo inaczej propozycja powstałaby z czterech
+  rekordów zamiast pięciu i nikt by się o tym nie dowiedział.
 - **Lista dostępnych wariantów jest do odpytania** (`GET /variants`) — UI helpdesku musi wiedzieć,
   jakie guziki narysować, skoro listy nie ma w kodzie.
 - **Brak trafień to 200 z pustą listą, nigdy 404** — „nowy typ problemu" jest poprawną odpowiedzią
@@ -1943,9 +1970,17 @@ tworzysz świadomym skrótem), **dopisz go tu** zamiast zostawiać w milczeniu.
 - **Licencja PolDense (gemma)** — zweryfikować użycie komercyjne. Licencja idzie od
   modelu-nauczyciela (destylacja z BGE-Multilingual-Gemma2), nie od architektury. Rywale (mmlw,
   BGE-M3, Nomic) mają inne licencje, więc wybór modelu jest **także decyzją licencyjną**.
-- **Persystencja feedbacku** (który wariant wybrano, czy propozycja poszła do klienta, czy
-  człowiek poszedł wbrew rekomendacji) — **jedyny sygnał realnej użyteczności na produkcji
-  i jedyna droga do automatycznego routingu** (patrz „Świadomie pominięte").
+- **Persystencja feedbacku** (który wariant wybrano, **które trafienia operator odznaczył**, czy
+  propozycja poszła do klienta) — **jedyny sygnał realnej użyteczności na produkcji i jedyna
+  droga do automatycznego routingu** (patrz „Świadomie pominięte"). Odznaczenie trafienia jest
+  przy tym sygnałem mocniejszym niż wybór guzika: mówi „wyglądało podobnie, a było nie na temat",
+  czyli dokładnie to, czego score nie niesie.
+- **`/suggest` nie sprawdza, czy podane identyfikatory przeszły `RAG_SCORE_MIN`** — ufamy im
+  (decyzja 2026-08-26, żeby nie budować weryfikacji, zanim wiadomo, czy jest potrzebna). Skutek:
+  wołający może obejść próg, podając identyfikator rekordu, którego wyszukiwanie by nie zwróciło.
+  Nie jest to dziura bezpieczeństwa (to nasz własny korpus), ale **`RAG_SCORE_MIN` przestaje być
+  gwarancją i staje się domyślną podpowiedzią**. Do rozstrzygnięcia razem z uwierzytelnianiem API:
+  albo `/search` wydaje podpisaną listę, albo `/suggest` sam sprawdza score przy odczycie.
 - **Nie zmierzono NIC po stronie użytkownika** — wszystkie pomiary dotyczą korpusu. Doświadczeni
   wdrożeniowcy znają top-50 odpowiedzi na pamięć, więc narzędzie pomaga dopiero w ogonie, gdzie
   korpus jest najcieńszy (47% singletonów). **Przed etapem 6 ustalić: ilu ich jest i ile czasu
@@ -2141,15 +2176,21 @@ właściwej warstwy, skrót → „TODO").
     formułka bez treści to udokumentowana patologia tego korpusu.
     **Kryterium:** test-strażnik pilnuje obu elementów.
   - [ ] **6.6. Serwis składający propozycję** (`service/generator_suggestion.py`). Bierze
-    wariant z 6.2 i trafienia, woła `LLMClient`. Do promptu idą pola payloadu, **nigdy surowe
-    maile**; brakujące dane to placeholdery (`{IMIĘ}`), wynik zawsze z listą źródeł.
+    wariant z 6.2, sparsowane zgłoszenie i **identyfikatory wybranych trafień**, odczytuje ich
+    payloady z Qdranta (`retrieve` po `point_id_for()`, bez wyszukiwania) i woła `LLMClient`.
+    Do promptu idą pola payloadu, **nigdy surowe maile**; brakujące dane to placeholdery
+    (`{IMIĘ}`), wynik zawsze z listą źródeł.
     **Kryterium:** każdy wariant zwraca ten sam kształt (tekst + źródła + nazwa), więc czwarty
     guzik nie dotyka serwisu.
   - [ ] **6.7. Endpoint generacji** (`POST /suggest`). Cienki handler, osobne modele API.
     **Wariant jest parametrem, nie trasą**; nieznany wariant to **422, nie cichy fallback** —
     literówka po stronie helpdesku ma być widoczna od razu.
-    **Kryterium:** unity kontraktu na `TestClient`, w tym 422 i pusta lista źródeł przy
-    `requires_hits` bez trafień.
+    **Wejściem są identyfikatory trafień i sparsowane zgłoszenie, nie treść do wyszukania** —
+    endpoint nie szuka sam (uzasadnienie: „Generacja propozycji odpowiedzi"). Identyfikatorom
+    ufamy; sprawdzamy wyłącznie, czy istnieją w indeksie — brak to **422**, obejście progu
+    `RAG_SCORE_MIN` zostaje świadomie w TODO.
+    **Kryterium:** unity kontraktu na `TestClient`, w tym 422 przy nieznanym wariancie, 422 przy
+    identyfikatorze spoza indeksu i pusta lista źródeł przy `requires_hits` bez wybranych trafień.
   - [ ] **6.8. Endpoint listy guzików** (`GET /variants`). UI musi wiedzieć, co narysować, skoro
     listy nie ma w kodzie. Zwraca nazwę, etykietę i `requires_hits` — **nie prompty**.
     **Kryterium:** test wdrożeniowy `integration_api` na obie trasy.
