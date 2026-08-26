@@ -5,8 +5,8 @@ class GenerationVariant(BaseModel):
     """
     Description:
     One kind of proposal the operator can ask for — one button in the helpdesk UI. `name` is what
-    `POST /suggest` accepts as its `variant` parameter, `label` is what the button says, and
-    `prompt` is the instruction the generation service hands the model.
+    `POST /suggest` accepts as its `variant` parameter, `label` is what the button says, and the
+    two prompts are what the generation service hands the model.
 
     Do czego:
     The unit of configurability in stage 6. Code never names a variant: it asks the store for the
@@ -18,10 +18,16 @@ class GenerationVariant(BaseModel):
     without hits would have to invent its content, which rule 9 forbids. A variant that requires
     hits and gets none returns an empty source list rather than a generated answer.
 
-    `prompt` is TEXT here, not a filename, even though the bundled default set stores it as a
-    markdown document beside this code. Resolving the file belongs to the loader that owns that
-    file format; keeping text in the contract is what lets stage 8 serve the same variant out of a
-    SQL column without the service or this model changing (CLAUDE.md -> stage 8).
+    Split into a system and a user prompt, the same convention the parsing prompt follows: the
+    role the model plays is a different kind of sentence from the instructions it carries out, and
+    the provider API keeps them apart anyway. WHICH of the two a customer may edit — one, both, or
+    only a delimited block inside one — is deliberately left open until stage 8, when it will be
+    visible what they actually want to change.
+
+    Both are TEXT here, not filenames, even though the bundled default set stores them as markdown
+    documents beside this code. Resolving those files belongs to the loader that owns the file
+    format; keeping text in the contract is what lets stage 8 serve the same variant out of SQL
+    columns without the service or this model changing.
     """
 
     # A key we do not recognise means the store drifted from this contract — surface it at load
@@ -31,4 +37,5 @@ class GenerationVariant(BaseModel):
     name:          str  = Field(examples=["questions"])
     label:         str  = Field(examples=["Jakie pytania zadać"])
     requires_hits: bool = Field(examples=[False])
-    prompt:        str  = Field(examples=["Jesteś asystentem wdrożeniowca helpdesku…"])
+    system_prompt: str  = Field(examples=["Jesteś asystentem wdrożeniowca helpdesku…"])
+    user_prompt:   str  = Field(examples=["Zaproponuj pytania, które warto zadać…"])

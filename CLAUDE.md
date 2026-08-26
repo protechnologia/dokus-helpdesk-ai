@@ -2104,11 +2104,16 @@ właściwej warstwy, skrót → „TODO").
     Dane, nie kod, bo w etapie 8 plik zastąpi baza i ma się zmienić **tylko źródło**.
     **Kryterium:** plik z nagłówkiem mówiącym, że to dane klienta (`text/` miesza dwa reżimy
     zmiany — patrz „Prompty").
-    **Odstępstwo od planu: JSON niesie `prompt_file`, nie treść promptu.** Wielozdaniowy prompt
-    jako string JSON-a z `\n` to dokładnie ta nieczytelność, przed którą ostrzega „Prompty",
-    a podkroki 6.3–6.5 i tak nazywają osobne dokumenty `.md`. Kontraktem domeny zostaje
-    `prompt: str` (rozwija go loader), więc kolumna SQL z etapu 8 poda to samo i serwis się nie
-    zmieni.
+    **Odstępstwo od planu: JSON niesie odwołania do dokumentów, nie treść promptów.** Wielozdaniowy
+    prompt jako string JSON-a z `\n` to dokładnie ta nieczytelność, przed którą ostrzega „Prompty".
+    Wariant wskazuje **dwa pliki `.md` — systemowy i użytkownika** (ta sama konwencja co przy
+    prompcie parsującym), a loader rozwija je w `system_prompt` i `user_prompt`; kolumny SQL
+    z etapu 8 podadzą to samo i serwis się nie zmieni.
+    **Świadomie NIEROZSTRZYGNIĘTE: która część promptu jest konfigurowalna.** „Rama w repo, treść
+    z magazynu" brzmi rozsądnie, ale nie da się tego dziś uczciwie przeciąć — kandydaci to
+    „systemowy nasz, użytkownika klienta", „wszystko klienta" i „tylko wydzielony blok". Decyzja
+    należy do **etapu 8**, gdy będzie widać, co klient realnie edytuje; do tego czasu oba pliki są
+    nasze i pod testem-strażnikiem.
   - [x] **6.2. Czytnik tego pliku** — `service/loader_variants.py`, tą samą drogą co
     `loader_dict_resolution.py`. **Kod nigdzie nie wymienia wariantów z nazwy.**
     **Kryterium:** dopisanie czwartego wariantu do JSON-a i restart wystarczą, żeby się pojawił;
@@ -2118,19 +2123,19 @@ właściwej warstwy, skrót → „TODO").
     dokumentu promptu wyszło do `util/markdown.py`: reguła „komentarz redakcyjny nie ma prawa
     dotrzeć do modelu" obowiązuje teraz dwie rodziny promptów, a druga kopia regexa byłaby drugim
     miejscem, w którym da się o niej zapomnieć.
-  - [ ] **6.3. Prompt: jakie pytania zadać klientowi** (`prompt_suggest_questions.md`).
+  - [ ] **6.3. Prompt: jakie pytania zadać klientowi** (`prompt_suggest_questions_{system,user}.md`).
     Najtrudniejszy z trzech i rdzeń produktu — powtarza się objaw, nie przyczyna.
     **Dwie pułapki:** cudze pytania to wzorzec, nie treść do skopiowania (przeformułuj, pomiń te
     z odpowiedzią już w treści); `questions_summary` jest puste w ~83% korpusu, więc prompt nie
     może na nim stać.
     **Kryterium:** test-strażnik; wynik nie cytuje cudzych pytań dosłownie.
-  - [ ] **6.4. Prompt: gotowa odpowiedź z rozwiązań** (`prompt_suggest_solution.md`). Jedyny
+  - [ ] **6.4. Prompt: gotowa odpowiedź z rozwiązań** (`prompt_suggest_solution_{system,user}.md`). Jedyny
     wariant wymagający trafień — bez nich nie ma z czego powstać (zasada 9).
     Obowiązują „Twarde reguły promptu generacji": data bezwarunkowo, przy rozbieżnych liczbach
     zakres i daty, kanał, zastrzeżenia w komplecie, miejsce na „czego NIE robić".
     **Kryterium:** test-strażnik na tych regułach; zastrzeżenie z rekordu jest w wyniku, nie
     zgubione w streszczeniu.
-  - [ ] **6.5. Prompt: informacja o przekazaniu sprawy** (`prompt_suggest_handoff.md`).
+  - [ ] **6.5. Prompt: informacja o przekazaniu sprawy** (`prompt_suggest_handoff_{system,user}.md`).
     Najprostszy, w dużej mierze formułka.
     **Warunek, bez którego szkodzi:** musi nieść **co sprawdzono i czego brakuje** — grzeczna
     formułka bez treści to udokumentowana patologia tego korpusu.
