@@ -752,33 +752,24 @@ Wdrożeniowiec wybiera **rodzaj** odpowiedzi. Trzy warianty startowe:
   niezawodnie), ale też **nie udajemy, że problem nie istnieje**: puste źródła w odpowiedzi są
   jawnym sygnałem „to nie stoi na bazie", a zasada 9 obowiązuje warianty wbudowane.
 
-#### Oś 2: routing po score — podpowiedź, nie decyzja
+#### Wariant wybiera człowiek — system nie podpowiada
 
-System ocenia trafienia i **podpowiada, który wariant ma sens**; wyboru nie odbiera człowiekowi.
+**Podpowiadanie guzika po score wypadło z zakresu (2026-08-20)**, patrz „Świadomie pominięte".
+Powód w jednym zdaniu: **wysoki score nie znaczy „mam rozwiązanie"** — sześć zgłoszeń o niemal
+identycznym `problem` i sześciu rozłącznych przyczynach wpada do top-5 razem, z wysokimi score,
+więc podpowiedź `solution` byłaby wtedy błędna, a właściwą reakcją jest dopytanie. Rozróżnić te
+dwie sytuacje umiałaby dopiero ocena zgodności `cause`, której nie budujemy.
 
-1. **wysoki score + zgodne rozwiązania** → podpowiadany `solution`,
-2. **średni score / sprzeczne rozwiązania** → podpowiadany `questions` (dopytanie przed
-   zaproponowaniem czegokolwiek),
-3. **niski score** → podpowiadany `questions` lub `handoff` + flaga **„nowy typ problemu"**;
-   `solution` zostaje dostępny, ale wygenerowany z pustą listą źródeł.
+Konsekwencje dla produktu:
 
-- **Podpowiedź wraca w odpowiedzi wyszukiwania**, żeby UI mógł podświetlić guzik, zanim
-  użytkownik cokolwiek kliknie. Nie jest ostrzeżeniem blokującym.
-- **Reguły mapowania score → podpowiadany wariant zostają w kodzie** — to logika biznesowa
-  (patrz „Konfiguracja i deploy"). Konfigurowalne są warianty, nie sposób ich oceniania.
-- **Przy niskim score wynik dalej powstaje, jeśli człowiek tego chce** — z flagą i pustymi
-  źródłami. Zasada 10 („werdykt nie jest wyrokiem") dotyczy też tej podpowiedzi.
-- **Kryterium rekomendacji to zgodność trafień co do `cause`, NIE wysokość score** — patrz
-  „Powtarza się objaw, nie przyczyna". Wysoki score współistnieje w tym korpusie z sześcioma
-  rozłącznymi przyczynami jednego objawu, a w skrajnym przypadku z **odwrotnym znaczeniem** tego
-  samego statusu w dwóch kanałach.
-- **`questions` będzie wariantem najczęściej rekomendowanym — i tak ma być.** To rdzeń produktu
-  przy tym korpusie, nie tryb awaryjny.
-- **System ostrzega, gdy człowiek wybiera wariant sprzeczny z rekomendacją** („trafienia
-  wskazują 4 różne przyczyny tego objawu — na pewno rozwiązanie, a nie dopytanie?").
-  **Ostrzeżenie, nie blokada** (zasada 10). Powód: obserwacja „uprawnienia są najrzadszą
-  przyczyną" ma wartość właśnie dlatego, że **przeczy instynktowi operatora** — oddanie wyboru
-  w całości instynktowi wyrzuca tę wiedzę.
+- **UI rysuje trzy równorzędne przyciski.** Wdrożeniowiec wybiera rodzaj odpowiedzi sam.
+- **„Nic nie znaleziono" niesie już sama pusta lista trafień** z `/search` (plus
+  `dropped_below_threshold`, gdy odciął je próg) — osobna flaga „nowy typ problemu" nie jest
+  do tego potrzebna.
+- **`questions` pozostaje wariantem najsensowniejszym przy tym korpusie**, ale to wiedza dla
+  wdrożeniowca i dla dokumentacji, nie reguła w kodzie.
+- **Wraca jako możliwość, gdy dane z klikania dadzą podstawę do oceny** — każde kliknięcie jest
+  etykietą treningową (patrz TODO: persystencja feedbacku).
 
 #### Twarde reguły promptu generacji (wyprowadzone z korpusu)
 
@@ -1876,9 +1867,9 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   - **Bez licznika zostaje sama krótsza lista** — czyli kosmetyka, a nie sygnał. Za tę cenę nie
     warto dokładać kroku, który potrafi scalić rekordy o rozłącznych rozwiązaniach (trzy rekordy
     „brak wizualizacji UPP" mają identyczny `problem` i różne rozstrzygnięcia).
-  - **Ocena zgodności przechodzi do etapu 6**, gdzie i tak trzeba porównać `cause` między
-    trafieniami przy routingu („wysoki score + zgodne rozwiązania"). Tam robi się to na
-    trafieniach idących do promptu, bez udawania, że mierzy się korpus.
+  - ~~**Ocena zgodności przechodzi do etapu 6**~~ — **też wykreślona (2026-08-20)**, patrz punkt
+    niżej: jedynym jej odbiorcą było podświetlenie guzika, a koszt to porównywanie swobodnych
+    opisów przyczyn.
   - **Wraca, gdy będzie potrzebne — i wtedy z rozdzieleniem „ile pobrać" od „ile pokazać"**
     (szukać np. 20, pokazywać 3), bo dopiero to czyni licznik uczciwym. Koszt powrotu: parametr
     i jeden krok w serwisie, **bez re-indeksu**.
@@ -1886,6 +1877,19 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
     świadoma decyzja, nie przeoczenie — nie kasować go jako „niewykorzystany". Budowanie kosztuje
     jedno wywołanie embeddera na rekord przy indeksacji, a jego usunięcie i powrót kosztowałyby
     **pełny re-index**; wraca do gry razem ze zwijaniem albo z „podobnymi przypadkami".
+- **Ocena zgodności trafień co do `cause`** (2026-08-20, była podkrokiem 6.2; wcześniej przeszła
+  tu z wykreślonego zwijania). Miała mówić, czy znalezione sprawy wskazują tę samą przyczynę, czy
+  rozłączne, i na tej podstawie podpowiadać guzik. **Odrzucona, bo jej jedynym odbiorcą było
+  podświetlenie przycisku** — sygnał nie wchodził do promptu, nie zmieniał treści propozycji
+  i niczego nie blokował, a wymagał porównywania **swobodnych polskich opisów przyczyn**, czyli
+  embeddera albo osądu LLM-a nad osądem LLM-a. Nieproporcjonalne do zysku.
+  - **Materiał i tak dociera do człowieka:** trafienia z `cause` wracają w odpowiedzi `/search`,
+    więc przy pięciu rekordach operator widzi rozbieżność sam.
+  - **Zły sygnał byłby gorszy niż żaden** — przy 114 pustych `cause` na 200 rekordów naiwne
+    porównanie uznałoby trzy puste pola za „wszystkie zgodne", zamieniając brak wiedzy w pewność.
+  - **Cena, przyjęta świadomie:** podpowiedź wariantu stoi na samym score, choć „Oś 2" wskazuje
+    zgodność `cause` jako właściwe kryterium. Stąd tym bardziej **pozostaje podpowiedzią, nie
+    decyzją**. Wraca, gdy dane z klikania pokażą, że warto (etap 11).
 - **Automatyczny wybór wariantu generacji za człowieka** — score podpowiada guzik, nigdy nie
   klika go sam: system nie wie, czy zgłoszenie wymaga działania serwisu, a automat wymagałby
   **osądu LLM-a nad osądem LLM-a**, którego nie umiemy zmierzyć. **Wraca jako możliwość**, gdy
@@ -2084,13 +2088,65 @@ właściwej warstwy, skrót → „TODO").
   progu nie da się ustawić — rozstrzyga gęstość, nie zasięg.
   **Zwijanie zgodnych trafień wypadło z zakresu** (patrz „Świadomie pominięte"); ocena zgodności
   `cause` przechodzi do etapu 6. Marker `functional` dostał tu pierwszego nosiciela.
-- [ ] **6. Generacja propozycji** — `POST /suggest` z parametrem `variant` + `GET /variants`
-  + placeholdery + routing po score jako **podpowiedź** wariantu. Trzy warianty startowe
-  (`questions`, `solution`, `handoff`) zdefiniowane **w kodzie, ale za interfejsem magazynu
-  reguł** — tak samo jak zasady „Popraw" w etapie 7; przeniesienie ich do bazy w etapie 8 ma nie
-  ruszać serwisu. Każdy wariant deklaruje `requires_hits`, co przesądza, które guziki działają
-  przy pustym indeksie. **Koniec nogi 1** (RAG). Od etapu 7 budujemy nogę 2 — patrz „Bramki
-  jakości i asysta pisania".
+- [ ] **6. Generacja propozycji** — `POST /suggest` z parametrem `variant`, `GET /variants`
+  i placeholdery. Trzy warianty startowe (`questions`, `solution`, `handoff`) opisane **danymi
+  w `text/`, nie w kodzie** — tak samo jak zasady „Popraw" w etapie 7; przeniesienie ich do bazy
+  w etapie 8 ma nie ruszać serwisu. Każdy wariant deklaruje `requires_hits`, co przesądza, które
+  guziki działają przy pustym indeksie.
+  **Wariant wybiera wyłącznie człowiek** — podpowiadanie guzika po score wypadło z zakresu
+  (patrz „Świadomie pominięte"): przy tym korpusie wysoki score współistnieje z rozłącznymi
+  przyczynami jednego objawu, więc podpowiedź częściej myliłaby, niż pomagała. UI rysuje trzy
+  równorzędne przyciski, a informację „nic nie znaleziono" niesie już pusta lista trafień
+  z `/search`.
+  **Koniec nogi 1** (RAG). Od etapu 7 budujemy nogę 2 — patrz „Bramki jakości i asysta pisania".
+  - [ ] **6.1. Opis trzech guzików w pliku** — `text/variants.json`: nazwa, etykieta, prompt
+    i `requires_hits` dla każdego wariantu, plus `version` (jak przy słowniku rozstrzygnięć).
+    Dane, nie kod, bo w etapie 8 plik zastąpi baza i ma się zmienić **tylko źródło**.
+    **Kryterium:** plik z nagłówkiem mówiącym, że to dane klienta (`text/` miesza dwa reżimy
+    zmiany — patrz „Prompty").
+  - [ ] **6.2. Czytnik tego pliku** — `service/loader_variants.py`, tą samą drogą co
+    `loader_dict_resolution.py`. **Kod nigdzie nie wymienia wariantów z nazwy.**
+    **Kryterium:** dopisanie czwartego wariantu do JSON-a i restart wystarczą, żeby się pojawił;
+    testy parametryzują się po loaderze, nie po zaszytej trójce.
+  - [ ] **6.3. Prompt: jakie pytania zadać klientowi** (`prompt_suggest_questions.md`).
+    Najtrudniejszy z trzech i rdzeń produktu — powtarza się objaw, nie przyczyna.
+    **Dwie pułapki:** cudze pytania to wzorzec, nie treść do skopiowania (przeformułuj, pomiń te
+    z odpowiedzią już w treści); `questions_summary` jest puste w ~83% korpusu, więc prompt nie
+    może na nim stać.
+    **Kryterium:** test-strażnik; wynik nie cytuje cudzych pytań dosłownie.
+  - [ ] **6.4. Prompt: gotowa odpowiedź z rozwiązań** (`prompt_suggest_solution.md`). Jedyny
+    wariant wymagający trafień — bez nich nie ma z czego powstać (zasada 9).
+    Obowiązują „Twarde reguły promptu generacji": data bezwarunkowo, przy rozbieżnych liczbach
+    zakres i daty, kanał, zastrzeżenia w komplecie, miejsce na „czego NIE robić".
+    **Kryterium:** test-strażnik na tych regułach; zastrzeżenie z rekordu jest w wyniku, nie
+    zgubione w streszczeniu.
+  - [ ] **6.5. Prompt: informacja o przekazaniu sprawy** (`prompt_suggest_handoff.md`).
+    Najprostszy, w dużej mierze formułka.
+    **Warunek, bez którego szkodzi:** musi nieść **co sprawdzono i czego brakuje** — grzeczna
+    formułka bez treści to udokumentowana patologia tego korpusu.
+    **Kryterium:** test-strażnik pilnuje obu elementów.
+  - [ ] **6.6. Serwis składający propozycję** (`service/generator_suggestion.py`). Bierze
+    wariant z 6.2 i trafienia, woła `LLMClient`. Do promptu idą pola payloadu, **nigdy surowe
+    maile**; brakujące dane to placeholdery (`{IMIĘ}`), wynik zawsze z listą źródeł.
+    **Kryterium:** każdy wariant zwraca ten sam kształt (tekst + źródła + nazwa), więc czwarty
+    guzik nie dotyka serwisu.
+  - [ ] **6.7. Endpoint generacji** (`POST /suggest`). Cienki handler, osobne modele API.
+    **Wariant jest parametrem, nie trasą**; nieznany wariant to **422, nie cichy fallback** —
+    literówka po stronie helpdesku ma być widoczna od razu.
+    **Kryterium:** unity kontraktu na `TestClient`, w tym 422 i pusta lista źródeł przy
+    `requires_hits` bez trafień.
+  - [ ] **6.8. Endpoint listy guzików** (`GET /variants`). UI musi wiedzieć, co narysować, skoro
+    listy nie ma w kodzie. Zwraca nazwę, etykietę i `requires_hits` — **nie prompty**.
+    **Kryterium:** test wdrożeniowy `integration_api` na obie trasy.
+  - [ ] **6.9. Obsługa z konsoli** (`helpdesk rag suggest` i `... variants`). Cienkie CLI nad
+    tym samym serwisem co handlery, zero logiki w komendzie.
+    **Kryterium:** unity CLI; obie komendy w tabelce na górze `cli/rag.py`.
+  - [ ] **6.10. Sprawdzenie, czy propozycje są dobre** — osobno per wariant, bo mają różne
+    kryteria sukcesu i wspólny licznik je zaciera. Rubryka: fakty / kompletność / halucynacje /
+    użyteczność, **każdy przebieg ≥2 razy** (`temperature=0` nie daje determinizmu), z czytaniem
+    surowych odpowiedzi.
+    **Do rozstrzygnięcia:** golden set odpowiedzi (drogi, daje regresję) czy przegląd ręczny.
+    **Kryterium:** raport z datą i wersją promptu w `data/docs/`, wnioski trwałe do CLAUDE.md.
 - [ ] **7. Asysta pisania („Popraw")** — `POST /polish`: szkielet promptu w `text/`, zasady
   stylu jako dane, serwis wołający wyłącznie `LLMClient`. **Pierwszy z trzech, bo najprostszy
   i najmniej ryzykowny** — nie wydaje werdyktu, nikogo nie blokuje. Zasady stylu na tym etapie
