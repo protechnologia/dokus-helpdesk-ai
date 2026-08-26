@@ -529,8 +529,16 @@ realnie psują trafienia — patrz „Świadomie pominięte".
 
 Synteza tego, **czego konsultant nie wiedział i o co dopytywał**. Jedyne miejsce w korpusie, gdzie
 widać **jak ten helpdesk diagnozuje** — tego nie da się wyprowadzić z `problem` i `symptoms`.
-Wypełnione w **16,7%** zgłoszeń (sonda na 1825, 2026-07-31), więc `brak` jest normą, a wariant
-`questions` nie może zakładać, że trafienia je mają.
+**Dwa pomiary mierzą co innego i nie wolno ich mylić** (rozjazd wyszedł 2026-08-26): sonda na 1825
+**surowych** zgłoszeniach dała **16,7%** — tyle wątków zawiera pytania konsultanta. Ale w gotowych
+**artefaktach** pole niesie treść w **84%** (168 z 200 w `bielik-11b-golden200`; 4 to dosłowne
+`brak`, a **28 to sentinele w przebraniu** — „Brak pytań ze strony prowadzącego sprawę." 15×
+i dziewięć innych sformułowań). Model streszcza chętniej, niż sonda liczyła.
+**Wiążący dla wariantu `questions` jest ten drugi**, bo to on widzi artefakty — pole jest normą,
+nie wyjątkiem. Zastrzeżenie: golden200 to próbka **warstwowa dobrana pod jakość**, więc 84% jest
+górnym oszacowaniem; do przeliczenia na pełnym korpusie w etapie 10.
+**Konsekwencja: `brak` NIE jest normą, ale sentinel w przebraniu jest częsty** — prompt musi
+odsiewać wpisy stwierdzające, że pytań nie było, a nie zakładać puste pole.
 
 - **MUSI zachować konkrety** — nazwy narzędzi, ustawienia, wersje, miejsca w aplikacji. „Pytano
   o konfigurację stanowiska" jest bezwartościowe; „pytano o rozdzielczość ekranu i profil
@@ -751,8 +759,10 @@ Wdrożeniowiec wybiera **rodzaj** odpowiedzi. Trzy warianty startowe:
 - **`questions` działa dwutorowo i to jest zamierzone:** bez trafień generuje pytania z ogólnej
   wiedzy o zgłoszeniu, z trafieniami dokłada `questions_summary` z podobnych spraw — czyli to,
   o co realnie dopytywał ten helpdesk. Dlatego `requires_hits = false`, ale trafienia istotnie
-  podnoszą jakość. **Puste `questions_summary` w trafieniach jest normą** (~83% korpusu), więc
-  prompt nie może na nim polegać.
+  podnoszą jakość. **`questions_summary` w trafieniach jest zwykle WYPEŁNIONE** (84% artefaktów —
+  patrz sekcja o tym polu; wcześniejsze „~83% pustych" mieszało pomiar na surowych zgłoszeniach
+  z artefaktami). Ryzykiem nie jest więc puste pole, tylko **sentinel w przebraniu** („Brak pytań
+  ze strony prowadzącego sprawę.") — 28 na 200 rekordów, wygląda jak treść i wpada do promptu.
 - **Prompt wariantu `questions` odpowiada za to, żeby nie przepisać cudzych pytań.** Materiał
   historyczny to **wzorzec, nie treść do skopiowania** — instrukcja musi kazać: odrzuć pytania
   niepasujące do bieżącego kontekstu, przeformułuj pod to zgłoszenie, **pomiń te, na które
@@ -799,6 +809,12 @@ Konsekwencje dla produktu:
 - **Nakładka ostrzeżeń działa przy KAŻDYM wariancie**, nie konkuruje z nim. Najcenniejsza
   operacyjnie treść korpusu to nie rozwiązania, tylko ostrzeżenia — zwłaszcza gdy działanie
   jest **nieodwracalne**.
+  - **ALE DZIŚ NIE DZIAŁA — zmierzone 2026-08-26.** Na zgłoszeniu o masowej wysyłce ePUAP
+    („statusy w toku, UPP nie przyszły"), czyli **sztandarowym przykładzie operacji nieodwracalnej
+    w tym korpusie**, linia `[UWAGA: …]` nie padła **ani razu w żadnym z 11 wariantów promptu**,
+    choć prompt jej wprost wymaga. Model pytał o ponowienie wysyłki bez słowa ostrzeżenia.
+    **Nie ma na to metryki i nie było przedmiotem tamtego pomiaru** — do sprawdzenia osobno,
+    zanim wariant `solution` (6.4) oprze się na tej samej regule.
 - **Obowiązkowe miejsce na „czego NIE robić"** — „czy trzeba coś powtórzyć?" jest pierwszym
   pytaniem klienta po każdej takiej diagnozie.
 - **Zastrzeżenia przenoszone w komplecie** (cztery wymiary — patrz „Domena"). Rekord potrafi
@@ -1912,7 +1928,7 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   embeddera albo osądu LLM-a nad osądem LLM-a. Nieproporcjonalne do zysku.
   - **Materiał i tak dociera do człowieka:** trafienia z `cause` wracają w odpowiedzi `/search`,
     więc przy pięciu rekordach operator widzi rozbieżność sam.
-  - **Zły sygnał byłby gorszy niż żaden** — przy 114 pustych `cause` na 200 rekordów naiwne
+  - **Zły sygnał byłby gorszy niż żaden** — przy 103 pustych `cause` na 200 rekordów naiwne
     porównanie uznałoby trzy puste pola za „wszystkie zgodne", zamieniając brak wiedzy w pewność.
   - **Cena, przyjęta świadomie:** podpowiedź wariantu stoi na samym score, choć „Oś 2" wskazuje
     zgodność `cause` jako właściwe kryterium. Stąd tym bardziej **pozostaje podpowiedzią, nie
@@ -2085,8 +2101,13 @@ właściwej warstwy, skrót → „TODO").
   oraz nagłówek `prompt_parse_ticket_user.md`; skala szkody przy pomyleniu prefiksów: „Embeddingi
   i prefiksy PolDense".
   **Cztery rzeczy do zapamiętania, bo wracają dalej:**
-  **(1) Puste `cause` NIE jest sygnałem braku wiedzy** — ma je 114 z 200 rekordów, z czego 105 jest
-  dobrych; filtr na tym polu wyciąłby połowę korpusu.
+  **(1) Puste `cause` NIE jest sygnałem braku wiedzy** — **73% takich rekordów przechodzi filtr
+  jakości** (75 ze 103), więc odsiew po tym polu wyciąłby ponad jedną trzecią korpusu.
+  **Liczyć trzeba PO SENSIE, nie po prefiksie** (przeliczone 2026-08-26; wcześniejsze „114 z 200,
+  z czego 105 dobrych" nie odtwarza się przy żadnej definicji): dosłowne `brak` ma **71** rekordów,
+  sentinele po sensie (`brak`, „Brak ustalonej przyczyny…", „Brak szczegółów…") — **103**, a samo
+  `startswith("brak")` daje **143**, bo łapie 72 REALNE przyczyny w rodzaju „Brak uprawnienia do
+  kancelarii". Ten ostatni sposób liczenia jest pułapką i to on pewnie stoi za starą liczbą.
   **(2) Wątki-projekty pozostają niewykryte** — zapowiadana heurystyka („≥3 punkty listy albo opis
   dłuższy od mediany") **została zmierzona i obalona**: parser streszcza opis, więc długość nie
   przeżywa parsowania. Wraca, gdy będzie na czym mierzyć (etap 10).
@@ -2161,8 +2182,8 @@ właściwej warstwy, skrót → „TODO").
   - [x] **6.3. Prompt: jakie pytania zadać klientowi** (`prompt_suggest_questions_{system,user}.md`).
     Najtrudniejszy z trzech i rdzeń produktu — powtarza się objaw, nie przyczyna.
     **Dwie pułapki:** cudze pytania to wzorzec, nie treść do skopiowania (przeformułuj, pomiń te
-    z odpowiedzią już w treści); `questions_summary` jest puste w ~83% korpusu, więc prompt nie
-    może na nim stać.
+    z odpowiedzią już w treści); `questions_summary` jest w artefaktach zwykle WYPEŁNIONE (84%),
+    więc groźny jest nie brak pola, tylko **sentinel w przebraniu** — patrz sekcja o tym polu.
     **Kryterium:** test-strażnik; wynik nie cytuje cudzych pytań dosłownie.
     **Ustalony tu wzorzec dla 6.4 i 6.5 — CAŁA INSTRUKCJA W TURZE SYSTEMOWEJ, w turze użytkownika
     same dane.** Kryterium podziału: co zmienia się między wywołaniami. Instrukcja jest stała, więc
@@ -2179,6 +2200,34 @@ właściwej warstwy, skrót → „TODO").
     placeholderów, braku instrukcji w turze użytkownika, wyciętych komentarzy i nieistniejącego
     pola `score`. Fraz nie zamraża: freeze brzmienia kupowałby sztywność zamiast bezpieczeństwa,
     a o jakość treści rozstrzyga pomiar z 6.10.
+    **Wersja z pomiaru na żywym Bieliku (2026-08-26, 11 wariantów × 8 zgłoszeń, ~110 wywołań;
+    raport `data/docs/pomiar-wariantow-promptu-questions-2026-08-26.md`):**
+    **(1) Przykład niesie FORMĘ, nie treść** — bez niego pokrycie przyczyn stoi w miejscu, ale
+    trzymanie liczby pytań spada z 87% na 37%, a sentinel dopisuje się 7 razy zamiast 2. Jest
+    jedyną kotwicą formatu w tym prompcie i **nie wolno go usuwać jako „zbędnego".**
+    **(2) Przykład jest SCHEMATYCZNY i to jest wynik pomiaru, nie niedbałość.** Gotowe pytania
+    model przepisuje dosłownie razem z notatkami (3–4 przypadki na 8), a przykład z innej
+    dziedziny jest najgorszy ze wszystkich (14/26 i 13/26 — ściąga uwagę z danych).
+    **(3) Schemat DZIAŁA WYŁĄCZNIE Z BLOKIEM PRZYCZYN z 6.6** — osobno wypada najgorzej
+    (wcześniejsza sonda: 0 z 3 przyczyn), bo daje kształt bez treści. Wprowadzać razem albo wcale.
+    **(4) Notatka `[dla wdrożeniowca: …]` jest NOŚNA, choć wygląda na ozdobę** — jej zdjęcie daje
+    9,4 pytania na zapytanie i spadek pokrycia z 20 na 15. Zmusza model, żeby zajrzał w przyczyny,
+    zanim napisze pytanie. Wygląda na dekorację, **nie jest**.
+    **(5) Zdanie o `Brak pytań rozróżniających.` USUNIĘTE** — model traktował je jak formułkę
+    zamykającą i doklejał po pytaniach w 7 przebiegach na 8. Sytuacja, dla której istniało, i tak
+    nie zachodzi: prompt gdzie indziej każe nigdy nie odmawiać.
+    **(6) Zakaz przepisywania cudzych pytań jest DARMOWY** — 0–1 przypadków we wszystkich
+    jedenastu wariantach. Reguła zostaje, ale nic się tam nie psuje.
+    **ZNANA DZIURA, do naprawy z pomiarem:** prompt każe zebrać `cause` ze wszystkich trafień
+    i na tym poprzestaje, więc model **transponuje przyczyny na pytania, nie sprawdzając, czy
+    tłumaczą objaw z tego zgłoszenia** — przy awarii całego urzędu pyta o wygasłe konto jednego
+    użytkownika. Brakuje reguły zgodności przyczyny z objawem. **Nie dopisano jej przy tej zmianie
+    świadomie:** jest niezmierzona, a „nie przepisujemy promptów po cichu przy okazji innej
+    zmiany".
+    **Uwaga na metrykę, gdyby ktoś wracał do tych liczb:** „pokrycie przyczyn" nagradza mechaniczne
+    przepisanie przyczyny na pytanie, więc **komplet punktów bywa wynikiem bezwartościowym**
+    (zgłoszenie 8170: 3/3 przy pięciu pytaniach nie na temat). Liczby rozstrzygają o formie
+    i patologiach, o sensie pytań — nie.
   - [ ] **6.4. Prompt: gotowa odpowiedź z rozwiązań** (`prompt_suggest_solution_{system,user}.md`). Jedyny
     wariant wymagający trafień — bez nich nie ma z czego powstać (zasada 9).
     Obowiązują „Twarde reguły promptu generacji": data bezwarunkowo, przy rozbieżnych liczbach
@@ -2197,6 +2246,18 @@ właściwej warstwy, skrót → „TODO").
     (`{IMIĘ}`), wynik zawsze z listą źródeł.
     **Kryterium:** każdy wariant zwraca ten sam kształt (tekst + źródła + nazwa), więc czwarty
     guzik nie dotyka serwisu.
+    **WYMÓG Z POMIARU (2026-08-26): serializacja wypisuje rozłączne wartości `cause` w OSOBNYM
+    BLOKU przed rekordami**, zamiast zostawiać je wśród sześciu innych pól każdego trafienia. Przy
+    11B pole utopione w rekordzie nie dociera, wypisane osobno — dociera (pokrycie przyczyn
+    1/3 → 2/3 w sondzie, a w przemiacie to jedyny zabieg podnoszący rdzeń: 18/26 → 20/26).
+    **To NIE jest zmiana promptu, tylko serializacji** — i jest **warunkiem działania przykładu
+    schematycznego z 6.3**, który sam, bez tego bloku, wypada najgorzej ze wszystkich wariantów.
+    Sentinele traktować jak brak: `cause` = „brak"/„Brak ustalonej przyczyny…" wypisywać jako
+    „(nie ustalono)", nigdy jako zgodność — patrz etap 4, punkt (1).
+    **Otwarte:** czy do promptu podawać także treść SUROWĄ obok sparsowanej. Parser gubi konkret
+    („dwa pliki zip ze zdjęciami" → „w formacie zip", przy przyczynie `limit pamięci php`), ale
+    pomiar na 8 zapytaniach dał efekt niespójny między wariantami. Dołożenie surowej nic nie
+    kosztuje (helpdesk ma ją pod ręką), więc **tańszą stroną błędu jest podać obie**.
   - [ ] **6.7. Endpoint generacji** (`POST /suggest`). Cienki handler, osobne modele API.
     **Wariant jest parametrem, nie trasą**; nieznany wariant to **422, nie cichy fallback** —
     literówka po stronie helpdesku ma być widoczna od razu.
