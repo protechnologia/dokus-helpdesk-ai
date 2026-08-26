@@ -12,12 +12,6 @@ from app.util.markdown import read_document
 TEXT_DIR              = Path(__file__).parent.parent / "text"
 DEFAULT_VARIANTS_FILE = TEXT_DIR / "variants.json"
 
-# What the FILE format calls the prompt. The domain model carries `prompt` (text), because that is
-# what a SQL column will hold in stage 8; the file points at a markdown document instead, so the
-# prompt stays something a human reviews sentence by sentence rather than a JSON string full of
-# escaped newlines (CLAUDE.md -> "Prompty").
-PROMPT_FILE_KEY = "prompt_file"
-
 
 @lru_cache
 def get_generation_variants(path: Path = DEFAULT_VARIANTS_FILE) -> GenerationVariantSet:
@@ -65,6 +59,11 @@ def _with_prompt_text(
     Description:
     Turns one file-format entry into one domain-shaped entry: `prompt_file` out, `prompt` in.
 
+    Why the two differ: the domain model carries the prompt as TEXT, because that is what a SQL
+    column will hold in stage 8. The file points at a markdown document instead, so the prompt
+    stays something a human reviews sentence by sentence rather than a JSON string full of escaped
+    newlines (CLAUDE.md -> "Prompty").
+
     Raises rather than letting validation complain about a missing `prompt`: the file says
     `prompt_file` and the model says `prompt`, so pydantic's "prompt Field required" would point at
     a key the author never wrote.
@@ -82,11 +81,11 @@ def _with_prompt_text(
         ValueError: the entry has no `prompt_file`
         FileNotFoundError: the document it points at is missing
     """
-    prompt_file = entry.get(PROMPT_FILE_KEY)
+    prompt_file = entry.get("prompt_file")
     if prompt_file is None:
-        raise ValueError(f"wariant {entry.get('name', '?')!r} bez pola {PROMPT_FILE_KEY!r}")
+        raise ValueError(f"wariant {entry.get('name', '?')!r} bez pola 'prompt_file'")
 
-    resolved           = {key: value for key, value in entry.items() if key != PROMPT_FILE_KEY}
+    resolved           = {key: value for key, value in entry.items() if key != "prompt_file"}
     resolved["prompt"] = read_document(text_dir / prompt_file)
 
     return resolved
