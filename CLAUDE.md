@@ -2099,15 +2099,25 @@ właściwej warstwy, skrót → „TODO").
   równorzędne przyciski, a informację „nic nie znaleziono" niesie już pusta lista trafień
   z `/search`.
   **Koniec nogi 1** (RAG). Od etapu 7 budujemy nogę 2 — patrz „Bramki jakości i asysta pisania".
-  - [ ] **6.1. Opis trzech guzików w pliku** — `text/variants.json`: nazwa, etykieta, prompt
+  - [x] **6.1. Opis trzech guzików w pliku** — `text/variants.json`: nazwa, etykieta, prompt
     i `requires_hits` dla każdego wariantu, plus `version` (jak przy słowniku rozstrzygnięć).
     Dane, nie kod, bo w etapie 8 plik zastąpi baza i ma się zmienić **tylko źródło**.
     **Kryterium:** plik z nagłówkiem mówiącym, że to dane klienta (`text/` miesza dwa reżimy
     zmiany — patrz „Prompty").
-  - [ ] **6.2. Czytnik tego pliku** — `service/loader_variants.py`, tą samą drogą co
+    **Odstępstwo od planu: JSON niesie `prompt_file`, nie treść promptu.** Wielozdaniowy prompt
+    jako string JSON-a z `\n` to dokładnie ta nieczytelność, przed którą ostrzega „Prompty",
+    a podkroki 6.3–6.5 i tak nazywają osobne dokumenty `.md`. Kontraktem domeny zostaje
+    `prompt: str` (rozwija go loader), więc kolumna SQL z etapu 8 poda to samo i serwis się nie
+    zmieni.
+  - [x] **6.2. Czytnik tego pliku** — `service/loader_variants.py`, tą samą drogą co
     `loader_dict_resolution.py`. **Kod nigdzie nie wymienia wariantów z nazwy.**
     **Kryterium:** dopisanie czwartego wariantu do JSON-a i restart wystarczą, żeby się pojawił;
     testy parametryzują się po loaderze, nie po zaszytej trójce.
+    Powtórzona nazwa wariantu to **błąd walidacji, nie ciche przesłonięcie** — drugi wpis byłby
+    nieosiągalny, a helpdesk narysowałby guzik generujący cudzy prompt. Przy okazji czytanie
+    dokumentu promptu wyszło do `util/markdown.py`: reguła „komentarz redakcyjny nie ma prawa
+    dotrzeć do modelu" obowiązuje teraz dwie rodziny promptów, a druga kopia regexa byłaby drugim
+    miejscem, w którym da się o niej zapomnieć.
   - [ ] **6.3. Prompt: jakie pytania zadać klientowi** (`prompt_suggest_questions.md`).
     Najtrudniejszy z trzech i rdzeń produktu — powtarza się objaw, nie przyczyna.
     **Dwie pułapki:** cudze pytania to wzorzec, nie treść do skopiowania (przeformułuj, pomiń te
