@@ -2228,12 +2228,47 @@ właściwej warstwy, skrót → „TODO").
     przepisanie przyczyny na pytanie, więc **komplet punktów bywa wynikiem bezwartościowym**
     (zgłoszenie 8170: 3/3 przy pięciu pytaniach nie na temat). Liczby rozstrzygają o formie
     i patologiach, o sensie pytań — nie.
-  - [ ] **6.4. Prompt: gotowa odpowiedź z rozwiązań** (`prompt_suggest_solution_{system,user}.md`). Jedyny
-    wariant wymagający trafień — bez nich nie ma z czego powstać (zasada 9).
-    Obowiązują „Twarde reguły promptu generacji": data bezwarunkowo, przy rozbieżnych liczbach
-    zakres i daty, kanał, zastrzeżenia w komplecie, miejsce na „czego NIE robić".
-    **Kryterium:** test-strażnik na tych regułach; zastrzeżenie z rekordu jest w wyniku, nie
-    zgubione w streszczeniu.
+  - [x] **6.4. Prompt: gotowa odpowiedź z rozwiązań** (`prompt_suggest_solution_{system,user}.md`). Jedyny
+    wariant wymagający trafień — bez nich nie ma z czego powstać (zasada 9). Wzorzec podziału tur
+    i siła strażnika jak w 6.3.
+    **Wersja w repo pochodzi ze strojenia na żywych modelach** (2026-08-28): 7 prób jedną zmianą
+    na raz na jednym zgłoszeniu, 7 weryfikacyjnych na pozostałych, po dwa przebiegi Bielika przed
+    i po. Raport: `data/docs/pomiar-promptu-solution-2026-08-28.md`; materiał:
+    `data/docs/pomiar-solution-2026-08-28/`. Wersja dla klienta: `generowanie-odpowiedzi-2026-08-28.md`.
+    **Sześć rzeczy do zapamiętania, bo wracają przy 6.5 i przy każdej edycji promptu:**
+    **(1) FORMA PRZENOSI SIĘ MIĘDZY MODELAMI, TREŚĆ NIE — i to w obie strony.** Wzór odpowiedzi
+    dał na Bieliku 8/8 zgłoszeń z czterema sekcjami i uwagami 2+2 (przed: 0/8), ale **nazywanie
+    luki w bazie spadło z 6/8 na 2/8**. Regres powstał przy okazji poprawy formy: swobodną notatkę
+    `[dla wdrożeniowca: …]` zastąpiła sekcja z placeholderem, którą 11B wypełnia **poleceniami**
+    („należy zaktualizować konfigurację") zamiast informacją o granicy wiedzy. **U mocnego modelu
+    ta sama zmiana nie kosztowała nic (8/8 przed i po)** — gdyby pomiar skończył się na nim,
+    wniosek brzmiałby „darmowa" i byłby fałszywy.
+    **(2) Reguła wyrażona POŚREDNIO albo przez ROZRÓŻNIENIE jest na 11B martwa.** Dwa dowody:
+    „NIE ZMYŚLASZ" (mówi tylko, czego nie robić → Bielik składa obietnice: „zmiana w najbliższej
+    aktualizacji", „operacja do 24 godzin roboczych" — 4 zgłoszenia z 8, wobec 3/8 przed
+    strojeniem, więc ilościowo bez zmian, ale **natura gorsza: zobowiązania wobec klienta**)
+    i reguła 8 o przenośności wartości (wymaga klasyfikacji „zmienna między urzędami" vs
+    „narzucona z zewnątrz" → Bielik przepisał 8MB, 200MB i wersję 0.17 jako polecenie dla klienta,
+    mocny model odciął wszystkie trzy). **Naprawa to reguła POZYTYWNA albo zakaz wyliczający klasy
+    wprost** — do dopisania i zmierzenia NA BIELIKU.
+    **(3) Wzór odpowiedzi jest jedyną kotwicą formy** — reguła słowna o zwięzłości nie dała ani
+    jednego numerowanego kroku, wzór dał je natychmiast. To ten sam wynik co przy `questions`.
+    **(4) Limit liczby kroków i uwag jest decyzją o TREŚCI, nie o formie** — model sam wybiera, co
+    poświęci, żeby się zmieścić: raz powtórzenie, raz zastrzeżenie, raz informację o luce.
+    **(5) Reguła rozbijająca bez limitu puchnie** — „jeden punkt to jedna rzecz" rozbiła procedurę
+    klik po kliku (jedną w bazie) na cztery kroki u mocnego modelu; z limitem wychodziły trzy kroki,
+    bez limitu po dołożeniu drugiego łącznika — siedem. Wprowadzać wyłącznie razem z limitem.
+    **(6) Brakuje reguły zgodności trafienia z objawem** — ta sama dziura co w 6.3, tu groźniejsza:
+    mocny model kazał klientowi wygasić duplikat kontrahenta (operacja o trwałym skutku) przy
+    zgłoszeniu o przeniesieniu zasobów.
+    **Ostrzeżenie o kroku nieodwracalnym nadal nie pada — czwarty pomiar z rzędu, oba modele, obie
+    wersje promptu, zero trafień.** Żyje wyłącznie jako trzeci człon placeholdera uwag, czyli
+    w miejscu, którego model nie musi wypełnić. Potrzebna osobna reguła; do zrobienia razem z (2).
+    **Metodyka do powtórzenia przy 6.5:** odpowiedzi modelu odniesienia zbierać w **świeżym czacie
+    webowym** (w sesji roboczej model zna intencję reguł i mierzyłby prompt razem z autorem),
+    a weryfikację na pozostałych zgłoszeniach robić **wcześniej niż na końcu** — trzy wady
+    (metainformacja o bazie w sekcji przyczyn, rozdrabnianie kroków, kroki nie na temat) były
+    niewidoczne na zgłoszeniu, na którym strojono.
   - [ ] **6.5. Prompt: informacja o przekazaniu sprawy** (`prompt_suggest_handoff_{system,user}.md`).
     Najprostszy, w dużej mierze formułka.
     **Warunek, bez którego szkodzi:** musi nieść **co sprawdzono i czego brakuje** — grzeczna
