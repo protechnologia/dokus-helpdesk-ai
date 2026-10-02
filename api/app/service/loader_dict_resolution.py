@@ -3,11 +3,11 @@ from pathlib import Path
 
 from app.model.dict_resolution_vocabulary import ResolutionVocabulary
 
-# The bundled default set. Stage 8 replaces this SOURCE with the SQL rules store, and this
-# function is the seam that makes the swap invisible: every caller asks for the vocabulary here,
-# so none of them learns where it came from (CLAUDE.md -> "Bramki jakości": the same route the
-# `Popraw` style rules and the generation variants take). There is no `rules/` package any more —
-# the seam is this function, and stage 8 adds `loader_*` siblings next to it rather than a folder.
+# Wbudowany zestaw domyślny. Magazyn reguł w SQL (p. 29) podmienia to ŹRÓDŁO, a ta funkcja jest
+# szwem, który czyni podmianę niewidoczną: każdy wołający pyta o słownik tutaj, więc żaden nie
+# dowie się, skąd przyszedł (CLAUDE.md -> „Bramki jakości": tą samą drogą idą reguły bramek
+# i zasady stylu „Popraw"). Pakietu `rules/` już nie ma — szwem jest ta funkcja, a kolejne źródła
+# stają obok niej jako siostrzane `loader_*` (jak `loader_dict_rules.py`), nie jako katalog.
 DEFAULT_DICT_FILE = Path(__file__).parent.parent / "text" / "dict_resolution.json"
 
 
@@ -15,8 +15,8 @@ DEFAULT_DICT_FILE = Path(__file__).parent.parent / "text" / "dict_resolution.jso
 def get_resolution_classes(path: Path = DEFAULT_DICT_FILE) -> ResolutionVocabulary:
     """
     Description:
-    Loads the outcome vocabulary. Cached per path rather than read at import time, so importing
-    the module touches no disk and a test can point at its own file.
+    Wczytuje słownik rozstrzygnięć. Pamiętany per ścieżka, a nie czytany przy imporcie, więc
+    import modułu nie dotyka dysku, a test może wskazać własny plik.
 
     Example args:
         path=Path("/code/app/text/dict_resolution.json")
@@ -25,6 +25,6 @@ def get_resolution_classes(path: Path = DEFAULT_DICT_FILE) -> ResolutionVocabula
         ResolutionVocabulary(version=1, classes=[ResolutionClass(name="naprawione", …), …])
 
     Raises:
-        FileNotFoundError: the vocabulary file is missing — a deployment error, not a runtime one
+        FileNotFoundError: brak pliku słownika — błąd wdrożenia, nie wykonania
     """
     return ResolutionVocabulary.model_validate_json(path.read_text(encoding="utf-8"))

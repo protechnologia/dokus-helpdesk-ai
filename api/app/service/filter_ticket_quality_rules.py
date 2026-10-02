@@ -1,77 +1,77 @@
 """
 Description:
-The rules of the quality filter — one function per rule, each returning the fragment that made it
-fire, or None.
+Reguły filtra jakości — jedna funkcja na regułę, każda zwraca fragment, który ją wyzwolił, albo
+None.
 
-Why they live apart from `filter_ticket_quality.py`: rules keep arriving (every measurement over a
-larger corpus suggests another), while the orchestrator around them practically never changes. Two
-files, two rates of change.
+Dlaczego osobno od `filter_ticket_quality.py`: reguł wciąż przybywa (każdy pomiar na większym
+korpusie podsuwa kolejną), a orkiestrator wokół nich praktycznie się nie zmienia. Dwa pliki, dwa
+rytmy zmian.
 
-Why plain functions rather than methods: each is a stateless read of one record, so a class would
-add nothing but a place to put `self` (CLAUDE.md -> "Warstwy kodu": function or class is decided by
-state). `RULES` at the bottom is what the orchestrator iterates, so it never names a rule itself and
-adding one means appending to a tuple.
+Dlaczego zwykłe funkcje, a nie metody: każda to bezstanowy odczyt jednego rekordu, więc klasa
+dałaby tylko miejsce na `self` (CLAUDE.md -> „Warstwy kodu": o funkcji czy klasie rozstrzyga
+stan). `RULES` na dole to to, po czym iteruje orkiestrator, więc sam nie nazywa żadnej reguły,
+a dołożenie reguły to dopisanie do krotki.
 
-**Every rule reads `solution`, and never `cause` — that is measured, not assumed.** An empty `cause`
-looks like the obvious signal and is not: 114 of the 200 measured records declare no cause and 105
-of them are perfectly good (2026-08-13). Tickets do get solved without anyone naming the cause, so a
-filter built on that field would gut the corpus.
+**Każda reguła czyta `solution`, nigdy `cause` — to zmierzone, nie założone.** Puste `cause`
+wygląda na oczywisty sygnał, a nim nie jest: 114 z 200 zmierzonych rekordów nie deklaruje
+przyczyny, a 105 z nich jest w pełni dobrych (2026-08-13). Zgłoszenia bywają rozwiązane bez
+nazwania przyczyny, więc filtr oparty na tym polu wypatroszyłby korpus.
 
-**The labels these rules were measured against are not independent ground truth** — they were
-produced by a model reading the same artifacts. The numbers below therefore measure AGREEMENT with
-an earlier review, not correctness; disagreements are records worth a human look, not proof the
-rules are wrong.
+**Etykiety, wobec których mierzono te reguły, nie są niezależną prawdą** — wytworzył je model
+czytający te same artefakty. Liczby niżej mierzą więc ZGODNOŚĆ z wcześniejszym przeglądem, nie
+poprawność; rozbieżności to rekordy warte ludzkiego oka, nie dowód, że reguły są złe.
 """
 
 import re
 
-# The schema's explicit ways of saying "there is nothing here" (NO_VALUE, NOT_APPLICABLE in
-# `model/ticket_parsed.py`), plus the two phrasings the parsing prompt produces around them.
+# Jawne sposoby schematu na „nic tu nie ma" (NO_VALUE, NOT_APPLICABLE w `model/ticket_parsed.py`)
+# plus dwa sformułowania, które prompt parsujący wytwarza obok nich.
 #
-# THIS IS THE POINT OF THE WHOLE RULE: it reads the CONTRACT, not the model's prose. Every field may
-# say "brak" instead of being left out, the parsing prompt lives in the repo under a guard test, and
-# it is deliberately not configurable (rule 7). A different model gets the same prompt with the same
-# escape phrases — so unlike a rule tuned to one model's turn of phrase, this one survives swapping
-# the model. Editing these phrases in the prompt IS an edit to this filter; the prompt file says so,
-# and the guard test on the reference corpus fails loudly if the two drift apart.
+# NA TYM STOI CAŁA REGUŁA: czyta KONTRAKT, nie prozę modelu. Każde pole może powiedzieć „brak"
+# zamiast zostać pominięte, prompt parsujący leży w repo pod testem-strażnikiem i celowo nie jest
+# konfigurowalny (zasada 7). Inny model dostaje ten sam prompt z tymi samymi frazami ucieczkowymi,
+# więc w przeciwieństwie do reguły strojonej pod manierę jednego modelu ta przeżywa jego podmianę.
+# Edycja tych fraz w prompcie JEST edycją tego filtra; plik promptu mówi to wprost, a test-strażnik
+# na korpusie odniesienia głośno pada, gdy oba się rozjadą.
 #
-# `brak` is matched as a WHOLE WORD, never as a prefix. "Dodano brakujące ustawienie systemowe"
-# describes work that was done, and `brak\w*` turned it into a rejection (measured: one false
-# positive, gone after this change).
+# `brak` dopasowujemy jako CAŁE SŁOWO, nigdy jako prefiks. „Dodano brakujące ustawienie systemowe"
+# opisuje wykonaną pracę, a `brak\w*` robiło z tego odrzucenie (zmierzone: jeden fałszywy alarm,
+# zniknął po tej zmianie).
 ESCAPE_PHRASE = re.compile(r"\b(brak|nie dotyczy|nie ustalono|nie podano)\b", re.I)
 
-# How many words may remain beside the escape phrase before the field counts as content.
+# Ile słów może zostać obok frazy ucieczkowej, zanim pole liczy się jako treść.
 #
-# Measured on the 200-record reference corpus (2026-08-13): at this threshold the rule drops 29 of
-# 38 labelled records with ZERO false positives, and every value from 4 to 10 gives the same clean
-# split — a wide margin, not a number tuned to the data. The reasoning is plain: an empty record
-# says "brak rozstrzygnięcia w wątku" and stops, while a REFUSAL — the most valuable class in this
-# corpus, telling the reader what NOT to attempt — has to explain itself and therefore runs long
-# ("Brak możliwości wygenerowania ZPO w tej sytuacji. Klient musi zaakceptować…").
+# Zmierzone na korpusie odniesienia z 200 rekordów (2026-08-13): przy tym progu reguła odrzuca 29
+# z 38 oznaczonych rekordów przy ZERZE fałszywych alarmów, a każda wartość od 4 do 10 daje ten sam
+# czysty podział — szeroki margines, nie liczba dopasowana do danych. Rozumowanie jest proste:
+# pusty rekord mówi „brak rozstrzygnięcia w wątku" i na tym kończy, a ODMOWA — najcenniejsza klasa
+# w tym korpusie, bo mówi czytelnikowi, czego NIE próbować — musi się wytłumaczyć, więc wychodzi
+# długa („Brak możliwości wygenerowania ZPO w tej sytuacji. Klient musi zaakceptować…").
 #
-# Expect to revisit this number on the full corpus; it belongs to this corpus and this parser, which
-# is why it is a named constant rather than a literal buried in a comparison.
+# Tę liczbę trzeba będzie przejrzeć na pełnym korpusie; należy do tego korpusu i tego parsera,
+# dlatego jest nazwaną stałą, a nie literałem zakopanym w porównaniu.
 MAX_HOLLOW_EXTRA_WORDS = 10
 
-# How much of the field goes into the report. Enough to recognise the sentence, short enough that a
-# 200-record run stays readable.
+# Ile pola trafia do raportu. Dość, by rozpoznać zdanie, i dość mało, by przebieg na 200 rekordach
+# dało się czytać.
 EVIDENCE_LENGTH = 80
 
 
 def no_resolution(
-    solution: str,  # e.g. "Brak rozstrzygnięcia w wątku."
+    solution: str,  # np. "Brak rozstrzygnięcia w wątku."
 ) -> str | None:
     """
     Description:
-    Fires when `solution` admits there is no resolution and adds little else — the record closes
-    without saying what was wrong or what was done, so there is nothing to propose to anyone else.
+    Odpala, gdy `solution` przyznaje, że rozstrzygnięcia nie ma, i niewiele poza tym dodaje —
+    rekord kończy się bez powiedzenia, co było nie tak ani co zrobiono, więc nie ma czego
+    zaproponować nikomu innemu.
 
-    Two steps, and the second is what makes it safe: find an escape phrase anywhere in the field,
-    then count what remains once the escape wording is removed. Little left means the field is
-    hollow; plenty left means the "brak" opens a real statement (a refusal, an explanation of
-    unchanged behaviour) and the record stays.
+    Dwa kroki, a bezpieczną czyni ją drugi: znajdź frazę ucieczkową gdziekolwiek w polu, potem
+    policz, co zostaje po usunięciu słów ucieczki. Zostało mało — pole jest puste; zostało dużo —
+    „brak" otwiera realne stwierdzenie (odmowę, wyjaśnienie niezmienionego zachowania) i rekord
+    zostaje.
 
-    Measured: 29 of 38 labelled rejections, no false positives (2026-08-13).
+    Zmierzone: 29 z 38 oznaczonych odrzuceń, bez fałszywych alarmów (2026-08-13).
 
     Example args:
         solution="Brak rozstrzygnięcia w wątku."
@@ -83,16 +83,16 @@ def no_resolution(
         solution="Brak możliwości wygenerowania ZPO w tej sytuacji. Klient musi zaakceptować…"
 
     Example result:
-        None — a refusal is content, not emptiness
+        None — odmowa to treść, nie pustka
     """
-    # --- does the record admit to nothing at all? ---
+    # --- czy rekord przyznaje, że nic nie ma? ---
     if not ESCAPE_PHRASE.search(solution):
         return None
 
-    # --- how much is left once the admission is taken out? ---
-    # The same pattern both finds the admission and removes it: a separate "hollow words" list was
-    # measured against this and earned nothing at the chosen threshold (identical 29/38, zero false
-    # positives), so it was one more thing to keep in sync for no gain.
+    # --- ile zostaje po wyjęciu przyznania? ---
+    # Ten sam wzorzec i znajduje przyznanie, i je usuwa: osobną listę „pustych słów" zmierzono
+    # wobec niego i przy wybranym progu nic nie dała (identyczne 29/38, zero fałszywych alarmów),
+    # więc była tylko kolejną rzeczą do synchronizowania, bez zysku.
     remainder = ESCAPE_PHRASE.sub(" ", solution)
 
     if len(re.findall(r"\w+", remainder)) > MAX_HOLLOW_EXTRA_WORDS:
@@ -101,14 +101,14 @@ def no_resolution(
     return solution.strip()[:EVIDENCE_LENGTH]
 
 
-# Every rule, in the order the report lists them. The orchestrator iterates this tuple and knows no
-# rule by name, so adding one means appending here — and the tests parametrise over it rather than
-# over a hardcoded count.
+# Wszystkie reguły, w kolejności, w jakiej wypisuje je raport. Orkiestrator iteruje po tej krotce
+# i nie zna żadnej reguły z nazwy, więc dołożenie reguły to dopisanie tutaj — a testy
+# parametryzują się po niej, a nie po zaszytej liczbie.
 #
-# One rule today, deliberately. Patterns for the remaining nine rejections (a promise in the future
-# tense, a pointer to a duplicate ticket, a ticket carrying several unrelated matters) each caught
-# one or two records while depending on one model's exact wording — the fragile half of the trade,
-# for a fraction of the yield. They come back if a larger corpus shows they are worth it.
+# Dziś jedna reguła, celowo. Wzorce dla pozostałych dziewięciu odrzuceń (obietnica w czasie
+# przyszłym, odesłanie do zgłoszenia-duplikatu, zgłoszenie niosące kilka niepowiązanych spraw)
+# łapały po jeden–dwa rekordy, zależąc od dokładnego sformułowania jednego modelu — krucha strona
+# wymiany, za ułamek uzysku. Wrócą, jeśli większy korpus pokaże, że są tego warte.
 RULES = (
     no_resolution,
 )

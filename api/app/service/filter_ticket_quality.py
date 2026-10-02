@@ -3,39 +3,40 @@ from app.model.filter_quality_verdict import QualityVerdict, RuleHit
 from app.model.ticket_parsed import ParsedTicket
 from app.service.filter_ticket_quality_rules import RULES
 
-# Share of the corpus the filter is expected to drop. Measured twice on different samples: 19% of
-# the 200-record reference set, 25-26% over 661 records reviewed earlier. Anything far below that
-# means the rules stopped matching what the parser writes, not that the corpus got better.
+# Udział korpusu, który filtr powinien odrzucić. Zmierzony dwa razy na różnych próbkach: 19%
+# zestawu odniesienia z 200 rekordów, 25–26% na 661 rekordach przejrzanych wcześniej. Wynik daleko
+# poniżej znaczy, że reguły rozminęły się z tym, co pisze parser, a nie, że korpus się poprawił.
 EXPECTED_DROP_RATE = 0.19
 
-# How far the drop rate may fall before the run says so. Wide on purpose — the point is catching a
-# filter that went SILENT (a changed prompt, a swapped model), not policing normal variation.
+# O ile odsetek odrzuceń może spaść, zanim przebieg to zgłosi. Szeroko celowo — chodzi o złapanie
+# filtra, który ZAMILKŁ (zmieniony prompt, podmieniony model), a nie o pilnowanie zwykłych wahań.
 DROP_RATE_TOLERANCE = 0.5
 
-# Below this many records a drop rate says nothing: with a handful of tickets a single decision
-# swings it by tens of percent. Without this floor the check would fire on every healthy small
-# batch — including a single-ticket runtime call, where 0% dropped is the CORRECT outcome.
+# Poniżej tylu rekordów odsetek odrzuceń nic nie mówi: przy garstce zgłoszeń jedna decyzja przesuwa
+# go o dziesiątki punktów procentowych. Bez tego progu sprawdzian odpalałby przy każdej zdrowej
+# małej paczce — także przy wywołaniu runtime na jednym zgłoszeniu, gdzie 0% odrzuconych to wynik
+# POPRAWNY.
 MIN_RECORDS_FOR_DROP_RATE = 50
 
 
 def evaluate_ticket(
-    ticket: ParsedTicket,  # e.g. ParsedTicket(ticket_id="19596", …)
+    ticket: ParsedTicket,  # np. ParsedTicket(ticket_id="19596", …)
 ) -> QualityVerdict:
     """
     Description:
-    Judges ONE record and returns the verdict with the evidence collected. This is the entry point
-    for both callers: the batch indexing run of stage 4 and a runtime check on a single closed
-    ticket. `filter_tickets()` below is this function over a corpus plus the statistics a batch run
-    needs — nothing more.
+    Ocenia JEDEN rekord i zwraca werdykt z zebranymi dowodami. To punkt wejścia dla obu
+    wołających: wsadowego przebiegu indeksacji z etapu 4 i sprawdzenia w runtime pojedynczego
+    zamkniętego zgłoszenia. `filter_tickets()` niżej to ta sama funkcja na korpusie plus
+    statystyki potrzebne przebiegowi wsadowemu — nic więcej.
 
-    All rules run, none short-circuits: a record may be hollow for more than one reason, and the
-    report groups drops per rule, so stopping at the first hit would understate whichever rule
-    happens to sit later in the tuple.
+    Działają wszystkie reguły, żadna nie przerywa przebiegu: rekord bywa pusty z więcej niż
+    jednego powodu, a raport grupuje odrzucenia per reguła, więc zatrzymanie na pierwszym
+    trafieniu zaniżałoby wynik tej reguły, która akurat stoi dalej w krotce.
 
-    Not to be confused with the CLOSING GATE of stage 9. Both look at the same axis — is there a
-    problem and a resolution — but they answer different questions ("is this worth keeping in the
-    index" against "may this be closed"), return different shapes, and the gate calls an LLM. This
-    is a candidate for a cheap pre-filter in front of that gate, never a replacement for it.
+    Nie mylić z BRAMKĄ ZAMKNIĘCIA (graf `gate_close`). Obie patrzą na tę samą oś — czy jest
+    problem i rozstrzygnięcie — ale odpowiadają na inne pytania („czy warto to trzymać w indeksie"
+    wobec „czy wolno to zamknąć"), zwracają inne kształty, a bramka woła LLM. To kandydat na tani
+    pre-filtr przed tą bramką, nigdy jej zamiennik.
 
     Example args:
         ticket=ParsedTicket(ticket_id="19596", solution="Brak rozstrzygnięcia w wątku.", …)
@@ -55,15 +56,15 @@ def evaluate_ticket(
 
 
 def filter_tickets(
-    tickets: list[ParsedTicket],  # e.g. [ParsedTicket(ticket_id="33644", …)]
+    tickets: list[ParsedTicket],  # np. [ParsedTicket(ticket_id="33644", …)]
 ) -> QualityReport:
     """
     Description:
-    Judges a whole corpus and returns the report the indexing run prints.
+    Ocenia cały korpus i zwraca raport, który drukuje przebieg indeksacji.
 
-    Takes records rather than a directory: reading and validating artifacts belongs to
-    `validator_ticket_parsed`, and a filter that also walked the filesystem could not be measured
-    against a hand-built list of edge cases.
+    Przyjmuje rekordy, a nie katalog: czytanie i walidacja artefaktów należą do
+    `validator_ticket_parsed`, a filtra, który sam chodziłby po dysku, nie dałoby się zmierzyć na
+    ręcznie zbudowanej liście przypadków brzegowych.
 
     Example args:
         tickets=[ParsedTicket(ticket_id="33644", …), ParsedTicket(ticket_id="19596", …)]
@@ -75,30 +76,30 @@ def filter_tickets(
 
 
 def drop_rate_warning(
-    report: QualityReport,  # e.g. QualityReport(verdicts=[…])
+    report: QualityReport,  # np. QualityReport(verdicts=[…])
 ) -> str | None:
     """
     Description:
-    Returns a warning when the filter dropped far less of the corpus than every measurement leads
-    us to expect, or None when the rate is plausible or the batch is too small to judge.
+    Zwraca ostrzeżenie, gdy filtr odrzucił znacznie mniej korpusu, niż każą oczekiwać wszystkie
+    pomiary, albo None, gdy odsetek jest wiarygodny lub paczka jest za mała, by go ocenić.
 
-    Why this exists: the rules read text a language model wrote, so the way they fail is by going
-    QUIET — a changed parsing prompt or a swapped model, and suddenly nothing matches, every record
-    passes, and the index fills with hollow entries while nothing turns red. A count of what was
-    dropped is the one signal that cannot fail the way the rules do, because it depends on no
-    wording at all.
+    Po co to jest: reguły czytają tekst napisany przez model językowy, więc psują się przez
+    ZAMILKNIĘCIE — zmieniony prompt parsujący albo podmieniony model i nagle nic nie pasuje, każdy
+    rekord przechodzi, a indeks zapełnia się pustymi wpisami, choć nic nie świeci na czerwono.
+    Liczba odrzuconych to jedyny sygnał, który nie może zawieść tak jak reguły, bo nie zależy od
+    żadnego sformułowania.
 
-    Deliberately a warning, not an exception: a genuinely better corpus would trip it too, and
-    aborting an indexing run over a statistic would be wrong.
+    Celowo ostrzeżenie, nie wyjątek: naprawdę lepszy korpus też by je wyzwolił, a przerwanie
+    przebiegu indeksacji z powodu statystyki byłoby błędem.
 
     Example args:
-        report=QualityReport(verdicts=[…])  # 200 records, 4 dropped
+        report=QualityReport(verdicts=[…])  # 200 rekordów, 4 odrzucone
 
     Example result:
         "filtr odrzucił 2.0% korpusu, oczekiwane ~19% — sprawdź, czy reguły nadal pasują do
          artefaktów (zmiana promptu parsującego albo modelu?)"
     """
-    # Too few records for a share to mean anything — including the single-ticket runtime call.
+    # Za mało rekordów, by odsetek coś znaczył — także przy wywołaniu runtime na jednym zgłoszeniu.
     if len(report.verdicts) < MIN_RECORDS_FOR_DROP_RATE:
         return None
 

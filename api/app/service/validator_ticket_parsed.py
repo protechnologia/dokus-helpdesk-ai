@@ -8,13 +8,14 @@ from app.model.validation_parsed_report import ValidationReport
 from app.util.validation_text import describe_validation_error
 
 
-def validate_file(path: Path) -> FileVerdict:         # e.g. Path("data/parsed/33644.json")
+def validate_file(path: Path) -> FileVerdict:         # np. Path("data/parsed/33644.json")
     """
     Description:
-    Validates one artifact file against `ParsedTicket`.
+    Waliduje jeden plik artefaktu wobec `ParsedTicket`.
 
-    Every defect is reported rather than raised: a single unreadable file must not abort a run
-    over the whole corpus, because the reason for running it is to see every problem at once.
+    Każdą wadę raportujemy, zamiast rzucać wyjątek: jeden nieczytelny plik nie może przerwać
+    przebiegu po całym korpusie, bo ten przebieg robi się właśnie po to, żeby zobaczyć wszystkie
+    problemy naraz.
 
     Example args:
         path=Path("data/parsed/33644.json")
@@ -24,25 +25,25 @@ def validate_file(path: Path) -> FileVerdict:         # e.g. Path("data/parsed/3
     """
     try:
         ParsedTicket.model_validate_json(path.read_text(encoding="utf-8"))
-    # Malformed JSON arrives here too: `model_validate_json` reports it as a ValidationError of
-    # type `json_invalid`, so catching json.JSONDecodeError separately would be dead code.
+    # Wadliwy JSON też trafia tutaj: `model_validate_json` zgłasza go jako ValidationError typu
+    # `json_invalid`, więc osobne łapanie json.JSONDecodeError byłoby martwym kodem.
     except ValidationError as exc:
         return FileVerdict(path=path, errors=describe_validation_error(exc))
-    # Raised by read_text(), before pydantic ever sees the content.
+    # Rzucany przez read_text(), zanim pydantic w ogóle zobaczy treść.
     except UnicodeDecodeError as exc:
         return FileVerdict(path=path, errors=[f"plik nie jest tekstem UTF-8: {exc}"])
 
     return FileVerdict(path=path, errors=[])
 
 
-def validate_directory(directory: Path) -> ValidationReport:   # e.g. Path("data/parsed")
+def validate_directory(directory: Path) -> ValidationReport:   # np. Path("data/parsed")
     """
     Description:
-    Validates every `*.json` file in a directory, in sorted order so two runs over the same corpus
-    produce comparable reports.
+    Waliduje każdy plik `*.json` w katalogu, w kolejności posortowanej, żeby dwa przebiegi po tym
+    samym korpusie dawały porównywalne raporty.
 
-    An empty directory yields an empty, passing report — `data/parsed/` is legitimately empty
-    until the batch run of stage 10, and that is not an error.
+    Pusty katalog daje pusty, zaliczony raport — `data/parsed/` jest legalnie pusty aż do
+    masowego importu (p. 31), i to nie jest błąd.
 
     Example args:
         directory=Path("data/parsed")
@@ -51,7 +52,7 @@ def validate_directory(directory: Path) -> ValidationReport:   # e.g. Path("data
         ValidationReport(verdicts=[FileVerdict(path=…, errors=[]), …])
 
     Raises:
-        NotADirectoryError: the path does not exist or is not a directory
+        NotADirectoryError: ścieżka nie istnieje albo nie jest katalogiem
     """
     if not directory.is_dir():
         raise NotADirectoryError(f"nie jest katalogiem: {directory}")

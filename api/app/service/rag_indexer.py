@@ -10,45 +10,46 @@ from app.service.filter_ticket_quality import drop_rate_warning, filter_tickets
 
 logger = logging.getLogger(__name__)
 
-# How many tickets are embedded per call to the embedder. The whole corpus in one request would
-# hold the run hostage to a single timeout, while one ticket per request wastes most of the time on
-# HTTP round-trips — the model batches internally and is far faster fed in bulk.
+# Ile zgłoszeń idzie do embeddera w jednym wywołaniu. Cały korpus w jednym żądaniu uzależniłby
+# przebieg od jednego timeoutu, a jedno zgłoszenie na żądanie traci większość czasu na podróże
+# HTTP — model sam składa paczki wewnątrz i karmiony hurtem jest dużo szybszy.
 EMBED_BATCH_SIZE = 32
 
 
 class TicketIndexer:
     """
     Description:
-    Builds the Qdrant index from parsed artifacts: read, filter, embed, upsert.
+    Buduje indeks Qdranta ze sparsowanych artefaktów: odczyt, filtr, embedding, upsert.
 
     Do czego:
-    The index is a derivative, never the source of truth (rule 8) — everything here must be
-    reproducible from `data/parsed/` with one command and WITHOUT calling an LLM (rule 7). That is
-    why this service reads artifacts from disk and talks only to the embedder and Qdrant.
+    Indeks jest pochodną, nigdy źródłem prawdy (zasada 8) — wszystko tutaj musi dać się odtworzyć
+    z `data/parsed/` jedną komendą i BEZ wołania LLM-a (zasada 7). Dlatego ten serwis czyta
+    artefakty z dysku i rozmawia wyłącznie z embedderem i Qdrantem.
 
     Flow:
-        1. `build()` reads every `*.json` in the directory into `ParsedTicket`.
-        2. The quality filter splits them into kept and dropped, with a reason per drop.
-        3. Kept tickets are embedded in batches — TWICE, once per named vector: `problem` in
-           passage mode (what a runtime query is matched against) and `sts` in symmetric mode.
-        4. Points are upserted; the report carries counts, reasons and any warnings.
+        1. `build()` wczytuje każdy `*.json` z katalogu do `ParsedTicket`.
+        2. Filtr jakości dzieli je na zachowane i odrzucone, z powodem przy każdym odrzuceniu.
+        3. Zachowane zgłoszenia są embedowane paczkami — DWA RAZY, raz na named vector: `problem`
+           w trybie passage (z nim porównywane jest zapytanie w runtime) i `sts` w trybie
+           symetrycznym.
+        4. Punkty idą upsertem; raport niesie liczby, powody i ewentualne ostrzeżenia.
 
-    Both vectors are built on purpose. Stage 3 measured `query→passage` as the better search mode,
-    but only for RAW queries — the argument for `sts→sts` was about PARSED ones, an axis that has
-    not been measured (CLAUDE.md -> "Embeddingi"). Dropping `sts` now would make re-adding it a
-    full re-index.
+    Oba wektory budujemy celowo. Pomiar rozstrzygnął wyszukiwanie na korzyść `query→passage`,
+    i na zapytaniach surowych (etap 3), i na sparsowanych (etap 4), więc wektora `sts` dziś nikt
+    nie czyta. Zostaje mimo to: wraca razem ze zwijaniem trafień albo „podobnymi przypadkami",
+    a usunięcie go teraz zamieniłoby ten powrót w pełny re-index (CLAUDE.md -> „Embeddingi").
     """
 
     def __init__(
         self,
-        embedder:    EmbeddingClient,  # e.g. EmbeddingClient(base_url="http://embedder:8000")
-        qdrant:      QdrantClient,     # e.g. QdrantClient(base_url="http://qdrant:6333", …)
-        vector_size: int,              # e.g. 768 — must match EMBEDDING_VECTOR_SIZE
+        embedder:    EmbeddingClient,  # np. EmbeddingClient(base_url="http://embedder:8000")
+        qdrant:      QdrantClient,     # np. QdrantClient(base_url="http://qdrant:6333", …)
+        vector_size: int,              # np. 768 — musi zgadzać się z EMBEDDING_VECTOR_SIZE
     ):
         """
         Description:
-        Wires the indexer to the two services it needs. Both clients are injected rather than
-        built here: the domain never reaches for an SDK or a URL of its own (rule 4).
+        Spina indekser z dwiema usługami, których potrzebuje. Oba klienty są wstrzykiwane, a nie
+        budowane tutaj: domena nigdy nie sięga po własne SDK ani URL (zasada 4).
 
         Example args:
             embedder=EmbeddingClient(base_url="http://embedder:8000")
@@ -56,7 +57,7 @@ class TicketIndexer:
             vector_size=768
 
         Example result:
-            TicketIndexer ready to build the collection `tickets`
+            TicketIndexer gotowy do zbudowania kolekcji `tickets`
         """
         self._embedder    = embedder
         self._qdrant      = qdrant
@@ -64,12 +65,12 @@ class TicketIndexer:
 
     async def build(
         self,
-        directory: Path,  # e.g. Path("data/parsed")
+        directory: Path,  # np. Path("data/parsed")
     ) -> IndexBuildReport:
         """
         Description:
-        Indexes a directory of artifacts into the collection and returns what it did. Reads as a
-        list of steps; the details sit in the private helpers below.
+        Indeksuje katalog artefaktów do kolekcji i zwraca, co zrobił. Czyta się jak lista kroków;
+        szczegóły siedzą w prywatnych helperach niżej.
 
         Example args:
             directory=Path("data/parsed")
@@ -78,9 +79,9 @@ class TicketIndexer:
             IndexBuildReport(read=200, indexed=171, filtered=QualityReport(…), warnings=[])
 
         Raises:
-            NotADirectoryError: the path does not exist or is not a directory
-            RetrievalError: Qdrant is unreachable or rejected the write
-            EmbeddingError: the embedder is unreachable or answered with an error
+            NotADirectoryError: ścieżka nie istnieje albo nie jest katalogiem
+            RetrievalError: Qdrant jest nieosiągalny albo odrzucił zapis
+            EmbeddingError: embedder jest nieosiągalny albo odpowiedział błędem
         """
         tickets = self._read(directory)
         report  = filter_tickets(tickets)
@@ -89,8 +90,8 @@ class TicketIndexer:
         await self._qdrant.ensure_collection(vector_size=self._vector_size)
         indexed = await self._upsert(kept)
 
-        # Counts only: payloads carry ticket content, i.e. customer data, which belongs to DEBUG at
-        # most (CLAUDE.md -> "Logi i obserwowalność").
+        # Same liczby: payloady niosą treść zgłoszeń, czyli dane klienta, którym miejsce najwyżej
+        # na DEBUG (CLAUDE.md -> „Logi i obserwowalność").
         logger.info(
             "index build collection=%s read=%d indexed=%d dropped=%d",
             self._qdrant.collection,
@@ -110,16 +111,16 @@ class TicketIndexer:
 
     async def rebuild(
         self,
-        directory: Path,  # e.g. Path("data/parsed")
+        directory: Path,  # np. Path("data/parsed")
     ) -> IndexBuildReport:
         """
         Description:
-        Drops the collection and builds it again from scratch. Safe by design rather than by care:
-        the index is rebuildable from `data/parsed/` with this very command (rule 8), so what is
-        destroyed is a derivative.
+        Kasuje kolekcję i buduje ją od zera. Bezpieczne z konstrukcji, a nie dzięki ostrożności:
+        indeks da się odbudować z `data/parsed/` tą samą komendą (zasada 8), więc niszczona jest
+        pochodna.
 
-        Its own method rather than a flag on `build()`, because the two differ in what they RISK
-        rather than in how they work — and the CLI has to guard one of them behind a confirmation.
+        Osobna metoda zamiast flagi w `build()`, bo obie różnią się tym, czym RYZYKUJĄ, a nie tym,
+        jak działają — a CLI jedną z nich musi osłonić potwierdzeniem.
 
         Example args:
             directory=Path("data/parsed")
@@ -128,8 +129,8 @@ class TicketIndexer:
             IndexBuildReport(read=200, indexed=171, …)
 
         Raises:
-            NotADirectoryError: the path does not exist or is not a directory
-            RetrievalError: Qdrant is unreachable or rejected the write
+            NotADirectoryError: ścieżka nie istnieje albo nie jest katalogiem
+            RetrievalError: Qdrant jest nieosiągalny albo odrzucił zapis
         """
         await self._qdrant.delete_collection()
 
@@ -137,16 +138,16 @@ class TicketIndexer:
 
     def _read(
         self,
-        directory: Path,  # e.g. Path("data/parsed")
+        directory: Path,  # np. Path("data/parsed")
     ) -> list[ParsedTicket]:
         """
         Description:
-        Reads every artifact in the directory, in sorted order so two runs over the same corpus
-        produce comparable reports.
+        Czyta każdy artefakt z katalogu, w kolejności posortowanej, żeby dwa przebiegi po tym
+        samym korpusie dawały porównywalne raporty.
 
-        A malformed artifact aborts the run rather than being skipped: `helpdesk tickets validate`
-        exists to find those first, and quietly indexing 199 of 200 records would leave a gap
-        nobody can see afterwards.
+        Wadliwy artefakt przerywa przebieg, zamiast zostać pominięty: `helpdesk tickets validate`
+        istnieje po to, żeby takie wyłapać wcześniej, a ciche zaindeksowanie 199 z 200 rekordów
+        zostawiłoby lukę, której potem nikt nie zobaczy.
 
         Example args:
             directory=Path("data/parsed")
@@ -155,8 +156,8 @@ class TicketIndexer:
             [ParsedTicket(ticket_id="10012", …), …]
 
         Raises:
-            NotADirectoryError: the path does not exist or is not a directory
-            ValidationError: an artifact does not satisfy the contract
+            NotADirectoryError: ścieżka nie istnieje albo nie jest katalogiem
+            ValidationError: artefakt nie spełnia kontraktu
         """
         if not directory.is_dir():
             raise NotADirectoryError(f"nie jest katalogiem: {directory}")
@@ -168,15 +169,15 @@ class TicketIndexer:
 
     def _kept_tickets(
         self,
-        tickets: list[ParsedTicket],  # e.g. [ParsedTicket(ticket_id="10012", …)]
-        report:  QualityReport,       # e.g. QualityReport(verdicts=[…])
+        tickets: list[ParsedTicket],  # np. [ParsedTicket(ticket_id="10012", …)]
+        report:  QualityReport,       # np. QualityReport(verdicts=[…])
     ) -> list[ParsedTicket]:
         """
         Description:
-        Selects the tickets the filter kept, preserving the order they were read in.
+        Wybiera zgłoszenia zachowane przez filtr, w kolejności, w jakiej zostały wczytane.
 
-        The report carries ticket ids rather than the records themselves — deliberately, so the
-        filter stays testable without artifacts — which is why the two are matched back up here.
+        Raport niesie id zgłoszeń zamiast samych rekordów — celowo, żeby filtr dało się testować
+        bez artefaktów — dlatego tutaj trzeba je z powrotem dopasować.
 
         Example args:
             tickets=[ParsedTicket(ticket_id="10012", …), ParsedTicket(ticket_id="19596", …)]
@@ -191,17 +192,17 @@ class TicketIndexer:
 
     async def _upsert(
         self,
-        tickets: list[ParsedTicket],  # e.g. [ParsedTicket(ticket_id="10012", …)]
+        tickets: list[ParsedTicket],  # np. [ParsedTicket(ticket_id="10012", …)]
     ) -> int:
         """
         Description:
-        Embeds the tickets in batches and writes them as points. Returns how many were written.
+        Embeduje zgłoszenia paczkami i zapisuje je jako punkty. Zwraca, ile zapisano.
 
-        Each batch is embedded TWICE — once per named vector — because the two live in different
-        vector spaces and mixing them destroys retrieval silently (CLAUDE.md -> "Embeddingi").
-        Both calls take the same texts in the same order, so the results zip back onto the tickets
-        they came from; `strict=True` turns any length mismatch into an error rather than a
-        silently truncated batch.
+        Każda paczka jest embedowana DWA RAZY — raz na named vector — bo oba żyją w różnych
+        przestrzeniach wektorowych, a ich pomieszanie psuje wyszukiwanie po cichu (CLAUDE.md ->
+        „Embeddingi"). Oba wywołania dostają te same teksty w tej samej kolejności, więc wyniki
+        zipują się z powrotem na zgłoszenia, z których powstały; `strict=True` zamienia każdy
+        rozjazd długości w błąd zamiast w po cichu obciętą paczkę.
 
         Example args:
             tickets=[ParsedTicket(ticket_id="10012", …)]
@@ -210,15 +211,16 @@ class TicketIndexer:
             1
 
         Raises:
-            EmbeddingError: the embedder is unreachable or returned a different count
-            RetrievalError: Qdrant is unreachable or rejected the write
+            EmbeddingError: embedder jest nieosiągalny albo zwrócił inną liczbę wektorów
+            RetrievalError: Qdrant jest nieosiągalny albo odrzucił zapis
         """
         written = 0
 
         for start in range(0, len(tickets), EMBED_BATCH_SIZE):
             batch = tickets[start : start + EMBED_BATCH_SIZE]
-            # `embedding_text()` lives on the model so indexing and the runtime query cannot build
-            # it differently — two call sites assembling it by hand would drift apart in silence.
+            # `embedding_text()` mieszka na modelu, żeby indeksacja i zapytanie w runtime (narzędzie
+            # `find_tickets`) nie mogły zbudować go inaczej — dwa miejsca sklejające go ręcznie
+            # rozjechałyby się bezgłośnie.
             texts = [ticket.embedding_text() for ticket in batch]
 
             problem_vectors = await self._embedder.embed_passage(texts)
