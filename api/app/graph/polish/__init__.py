@@ -13,6 +13,7 @@ Status: na atrapach węzłów (`fake.py`); prompt to szkielet, treść i pomiar 
 
 from app.graph.polish.fake import build_fake_graph, example_state
 from app.graph.polish.graph import (
+    STATE,
     TOOL_NAMES,
     build_graph,
     model_tools,
@@ -25,6 +26,7 @@ from app.graph.polish.state import PolishState
 
 __all__ = [
     "RESPOND_TOOL_NAME",
+    "STATE",
     "TOOL_NAMES",
     "PolishState",
     "PolishedText",

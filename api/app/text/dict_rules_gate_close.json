@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "description": "DANE KLIENTA, nie nasz kod — tak jak dict_resolution.json. Zmiana tego pliku jest konfiguracją: podbij `version`, a odpowiedź bramki poda, którą wersją wydano werdykt. Reguły wchodzą do oddzielonej sekcji danych w prompcie grafu `gate_close` — nie mogą przestawić formatu wyjścia ani znieść zakazu zmyślania. Pusta lista to błąd: graf bez reguł nie rusza. Od p. 29 źródłem staje się magazyn reguł, a plik zostaje zestawem domyślnym. Zestaw startowy wyprowadzony z CLAUDE.md; treść stroi się z pomiarem w p. 21.",
+  "rules": [
+    "Z treści zgłoszenia wynika, co było problemem.",
+    "Z treści zgłoszenia wynika, co zostało zrobione, żeby problem rozwiązać."
+  ]
+}

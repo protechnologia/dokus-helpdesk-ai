@@ -19,11 +19,17 @@ USER_FILE   = GRAPH_DIR / "prompt_user.md"
 
 TICKET_PLACEHOLDER = "{{ticket}}"
 
+# Klasa stanu grafu — po nią sięga kod ogólny (trasa `/suggest`, test kontraktu).
+STATE = SuggestSolutionState
+
 # Narzędzia wiedzy dozwolone w tym grafie; opis każdego dla modelu leży obok jako `<nazwa>.md`.
 TOOL_NAMES: tuple[str, ...] = ("find_tickets", "find_docs")
 
 # Wariant wymaga trafień: bez źródeł węzeł `respond` nie odda propozycji (zasada 9).
 REQUIRES_HITS = True
+
+# Etykieta guzika, który helpdesk rysuje z `GET /variants`.
+LABEL = "Gotowa odpowiedź"
 
 
 def system_prompt() -> str:

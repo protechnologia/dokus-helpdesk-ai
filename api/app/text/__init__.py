@@ -1,18 +1,20 @@
-# Intentionally empty, and intentionally NOT deleted. Nothing imports `app.text` — this folder
-# holds only .md and .json documents — but `[tool.setuptools.packages.find]` discovers packages BY
-# the presence of this file. Without it the folder is not a package, so the documents drop out of
-# the installed distribution and the loaders raise FileNotFoundError mid-run.
+# Celowo pusty i celowo NIE skasowany. Nikt nie importuje `app.text` — katalog trzyma wyłącznie
+# dokumenty .md i .json — ale `[tool.setuptools.packages.find]` rozpoznaje pakiety PO tym pliku.
+# Bez niego katalog nie jest pakietem, dokumenty wypadają z instalowanej dystrybucji, a loadery
+# rzucają FileNotFoundError w środku przebiegu.
 #
-# Verified, not assumed: `find_packages(where="api")` lists `app.text` only while this file
-# exists. Today both environments happen to forgive its absence — an editable install points at
-# the working tree, and the image runs `COPY app/ ./app/` — which is exactly why removing it would
-# break somewhere else (a wheel, a plain `pip install .`) rather than here.
+# Sprawdzone, nie założone: `find_packages(where="api")` wymienia `app.text` tylko, gdy ten plik
+# istnieje. Dziś oba środowiska wybaczają jego brak — instalacja edytowalna wskazuje drzewo robocze,
+# a obraz robi `COPY app/ ./app/` — i właśnie dlatego jego usunięcie zepsułoby coś gdzie indziej
+# (wheel, zwykłe `pip install .`), a nie tutaj.
 #
-# WHAT LIVES HERE — two regimes that look alike and are not (see CLAUDE.md -> "Prompty"):
-#   * OURS, git-only, guard-tested: prompt_parse_ticket_user.md and
-#     prompt_parse_ticket_system.md. Editing them changes the meaning of every FUTURE artifact
-#     in data/parsed/ (rule 7), so they are never exposed to the customer nor edited at runtime.
-#   * CUSTOMER DATA, versioned by a field inside the file: dict_resolution.json. Stage 8 moves
-#     it to the SQL rules store, where it becomes editable through a GUI.
-# The folder is flat, so the distinction is NOT visible in the path — each file states its own
-# regime in its header, and that header is the only thing keeping them apart.
+# CO TU LEŻY — dwa reżimy, które wyglądają podobnie, a nie są (CLAUDE.md -> „Prompty"):
+#   * NASZE, tylko przez gita, pod testem-strażnikiem: prompt_parse_ticket_user.md
+#     i prompt_parse_ticket_system.md. Ich edycja zmienia znaczenie każdego PRZYSZŁEGO artefaktu
+#     w data/parsed/ (zasada 7), więc nie są wystawiane klientowi ani edytowane w runtime.
+#     Prompty grafów leżą w katalogach grafów (app/graph/<graf>/), nie tutaj.
+#   * DANE KLIENTA, wersjonowane polem w pliku: dict_resolution.json i domyślne zestawy reguł
+#     dict_rules_<graf>.json (gate_close, gate_reply, polish). Przejmie je magazyn reguł (p. 29),
+#     gdzie staną się edytowalne przez GUI.
+# Katalog jest płaski, więc różnicy NIE widać w ścieżce — każdy plik mówi o swoim reżimie
+# w nagłówku i tylko ten nagłówek je rozróżnia.

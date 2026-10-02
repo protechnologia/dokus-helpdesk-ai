@@ -6,22 +6,24 @@ from fastapi import FastAPI, Request, Response
 
 from app.config import Settings
 from app.errors import REQUEST_ID_HEADER, register_exception_handlers
-from app.routers import health, search
+from app.routers import gate, health, parse_ticket, polish, search, suggest
 
 logger = logging.getLogger(__name__)
 
 
-def _configure_logging(level: str) -> None:                 # e.g. "DEBUG"
+def _configure_logging(
+    level: str,  # np. "DEBUG"
+) -> None:
     """
     Description:
-    Sets up root logging once, at assembly time. `force=True` replaces handlers installed by
-    uvicorn, so our records are not emitted twice with two different formats.
+    Ustawia logowanie raz, przy montażu. `force=True` podmienia handlery zainstalowane przez
+    uvicorna, żeby nasze wpisy nie wychodziły dwa razy w dwóch formatach.
 
     Example args:
         level="INFO"
 
     Example result:
-        None — logging is configured process-wide
+        None — logowanie skonfigurowane dla całego procesu
     """
     logging.basicConfig(
         level   = level.upper(),
@@ -33,15 +35,16 @@ def _configure_logging(level: str) -> None:                 # e.g. "DEBUG"
 def create_app() -> FastAPI:
     """
     Description:
-    Assembles the application: configuration, logging, middleware, exception handlers, routers.
-    A factory rather than a module-level singleton, so tests build an isolated instance instead
-    of inheriting the state of an app created at import time.
+    Składa aplikację: konfiguracja, logowanie, middleware, handlery wyjątków, routery. Fabryka,
+    a nie singleton modułu, żeby testy budowały własną instancję zamiast dziedziczyć stan
+    aplikacji utworzonej przy imporcie.
 
     Example args:
-        (none)
+        (brak)
 
     Example result:
-        FastAPI instance serving GET /health and POST /search
+        FastAPI z /health, /search, /gate/close, /gate/reply, /parse-ticket, /suggest, /variants
+        i /polish
     """
     settings = Settings()
 
@@ -52,23 +55,23 @@ def create_app() -> FastAPI:
         version = "0.1.0",
     )
 
-    # --- correlation id: accepted from upstream when present, generated otherwise ---
+    # --- identyfikator korelacji: przyjęty od wołającego, jeśli jest, inaczej nadany ---
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next) -> Response:
         """
         Description:
-        Attaches a correlation id to the request and echoes it back in the response header, so
-        every log line of one request can be stitched together. This is log correlation, NOT
-        monitoring — it measures nothing and decides nothing.
+        Dokleja do żądania identyfikator korelacji i odsyła go w nagłówku odpowiedzi, żeby dało
+        się zszyć wszystkie wpisy logu jednego żądania. To korelacja logów, NIE monitoring — nic
+        nie mierzy i o niczym nie decyduje.
 
         Example args:
             request=Request(scope={...})
-            call_next=<downstream ASGI callable>
+            call_next=<wywołanie ASGI dalej w łańcuchu>
 
         Example result:
-            Response with the X-Request-ID header set
+            Response z ustawionym nagłówkiem X-Request-ID
         """
-        # An id from the caller wins: it lets one id span several services.
+        # Identyfikator od wołającego wygrywa: dzięki temu jeden id spina kilka usług.
         request_id = request.headers.get(REQUEST_ID_HEADER) or uuid4().hex
         request.state.request_id = request_id
 
@@ -78,7 +81,7 @@ def create_app() -> FastAPI:
 
         response.headers[REQUEST_ID_HEADER] = request_id
 
-        # Identifiers and timings only — never request bodies (they carry customer data).
+        # Tylko identyfikatory i czasy — nigdy treść żądania (niesie dane klienta).
         logger.info(
             "request method=%s path=%s status=%d duration_ms=%.1f request_id=%s",
             request.method,
@@ -91,8 +94,9 @@ def create_app() -> FastAPI:
         return response
 
     register_exception_handlers(app)
-    app.include_router(health.router)
-    app.include_router(search.router)
+
+    for module in (health, search, gate, parse_ticket, suggest, polish):
+        app.include_router(module.router)
 
     return app
 

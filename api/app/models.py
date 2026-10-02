@@ -1,17 +1,21 @@
 from datetime import date as Date
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+# Modele API — kontrakt HTTP, odrębny od modeli domenowych (CLAUDE.md -> „Warstwy kodu"): kontrakt
+# na drucie nie może się ruszać przy każdej zmianie domeny, a domena nie może wypuszczać na zewnątrz
+# pól wewnętrznych. Każde pole wychodzące jest tu wypisane jawnie.
 
-class SearchComment(BaseModel):
+
+class TicketComment(BaseModel):
     """
     Description:
-    One comment of the thread being searched with, as the caller sends it.
+    Jeden komentarz wątku zgłoszenia, tak jak przysyła go helpdesk.
 
-    Only `body` is required. `role` and `created_at` are labelled in the prompt but deliberately
-    not acted upon — this database has documented cases of both being wrong (the author is
-    inverted in the "Automat mailowy" category), so the model is told to weigh content over
-    labels. Sending them helps; missing them costs little.
+    Wymagane jest tylko `body`. `role` i `created_at` są oznaczane w prompcie, ale model ma ważyć
+    treść ponad etykiety — ta baza ma udokumentowane przypadki obu błędnych (autor odwrócony
+    w kategorii „Automat mailowy"). Przysłane pomagają, brakujące kosztują niewiele.
     """
 
     body:       str = Field(examples=["Proszę sprawdzić uprawnienia certyfikatu."])
@@ -19,111 +23,190 @@ class SearchComment(BaseModel):
     created_at: str = Field(default="", examples=["2026-06-23 12:01:21"])
 
 
-class SearchRequest(BaseModel):
+class TicketRequest(BaseModel):
     """
     Description:
-    Payload of `POST /search`: one incoming ticket, in the shape the helpdesk already holds it.
+    Zgłoszenie w kształcie, w jakim helpdesk już je trzyma — wejście `/search`, `/gate/close`,
+    `/parse-ticket` i `/suggest`.
 
-    Do czego:
-    An API model kept separate from the domain `RawTicket` on purpose — the wire contract must not
-    move every time the domain model does, and the domain must not leak internal fields outward
-    (CLAUDE.md -> "Warstwy kodu").
-
-    Which fields are required, and why only these two: `ticket_id` is the thread that ties a
-    proposal back to the ticket in logs and in later feedback, and `body` IS the query. The rest
-    describe the ticket without steering the search, so demanding them would raise the cost of
-    integration without improving an answer. A ticket in progress already has an id and a date —
-    both are assigned when it is opened.
+    Wymagane tylko `ticket_id` i `body`: id wiąże odpowiedź ze zgłoszeniem w logach i w przyszłym
+    feedbacku, a `body` JEST treścią. Reszta opisuje zgłoszenie, nie sterując odpowiedzią, więc
+    jej żądanie podnosiłoby koszt wpięcia bez zysku.
     """
 
-    ticket_id: str  = Field(examples=["41002"])
-    body:      str  = Field(examples=["Nie mogę wysłać pisma przez ePUAP, błąd komunikacji."])
-    # Defaults to today: a ticket being searched with is by definition current, and the date does
-    # not reach the vector — it matters for records IN the index (staleness, seasonality), not for
-    # the question asked of it.
-    date:      Date | None = Field(default=None, examples=["2026-08-19"])
-    subject:   str  = Field(default="", examples=["Błąd wysyłki"])
-    # Optional because its only meaningful value is "Automat mailowy", which marks threads whose
-    # quoted mail history needs cleaning. Another helpdesk may not have this field at all.
-    category:  str  = Field(default="", examples=["Automat mailowy", "Błąd"])
-    comments:  list[SearchComment] = Field(default_factory=list)
+    ticket_id: str                 = Field(examples=["41002"])
+    body:      str                 = Field(examples=["Nie mogę wysłać pisma przez ePUAP."])
+    # Brak daty znaczy „dziś": zgłoszenie w toku jest z definicji świeże.
+    date:      Date | None         = Field(default=None, examples=["2026-08-19"])
+    subject:   str                 = Field(default="", examples=["Błąd wysyłki"])
+    # Jedyna znacząca wartość to „Automat mailowy" — wątki z cytowaną historią do czyszczenia.
+    category:  str                 = Field(default="", examples=["Automat mailowy", "Błąd"])
+    comments:  list[TicketComment] = Field(default_factory=list)
 
 
-class SearchQuery(BaseModel):
+class SourceItem(BaseModel):
     """
     Description:
-    What the parser made of the incoming thread — the whole reading, not just the embedded part.
-
-    Do czego:
-    Debugging surface. A surprising hit list is explained by an unexpected reading of the ticket
-    far more often than by the search itself, and only `problem` + `symptoms` reach the vector —
-    so showing just those two would hide a misread `component` or a dropped error code until it
-    resurfaced as a strange proposal in stage 6.
-
-    A model of its own rather than `ParsedTicket` passed through: the domain model must not go out
-    over HTTP (CLAUDE.md -> "Warstwy kodu"), and the two contracts have to be free to move apart.
-
-    Carries the customer's text (names may appear in `problem` or `symptoms`), which is acceptable
-    here because the caller is the helpdesk that owns the original ticket — but it is a reason to
-    keep this endpoint behind authentication once there is any (CLAUDE.md -> TODO).
+    Jedno źródło odpowiedzi: które narzędzie co znalazło, z jakim podobieństwem i kiedy materiał
+    powstał. Powstaje z `cite()` narzędzi, nigdy z deklaracji modelu (zasada 9).
     """
 
-    component:         str       = Field(default="", examples=["ePUAP"])
-    problem:           str       = Field(default="", examples=["Wysyłka kończy się błędem"])
-    symptoms:          str       = Field(default="", examples=["Komunikat o braku sieci"])
-    error_codes:       list[str] = Field(default_factory=list, examples=[["ERR-4210"]])
-    cause:             str       = Field(default="", examples=["brak"])
-    solution:          str       = Field(default="", examples=["brak"])
-    resolution:        str       = Field(default="", examples=["naprawione"])
-    questions_summary: str       = Field(default="", examples=["brak"])
+    source:  str         = Field(examples=["find_tickets"])
+    item_id: str         = Field(examples=["33644"])
+    title:   str         = Field(examples=["Wysyłka przez ePUAP kończy się błędem"])
+    score:   float       = Field(examples=[0.87])
+    # Zawsze, gdy jest: od niej zależą dezaktualizacja, sprzeczności i sezonowość.
+    date:    Date | None = Field(default=None, examples=["2026-03-14"])
 
 
-class SearchHit(BaseModel):
+class AgentQuery(BaseModel):
     """
     Description:
-    One historical ticket found for the query: how well it matched, and the fields an answer is
-    built from.
-
-    Fields are listed explicitly rather than passing the Qdrant payload through. The payload is a
-    storage detail, and forwarding it whole would publish whatever we happen to store — the exact
-    leak the API/domain split exists to prevent.
+    Jedno zapytanie, które agent wysłał do narzędzia wiedzy. To jest dziś „odczyt zgłoszenia":
+    dziwną listę trafień najczęściej tłumaczy to, o co agent zapytał, a nie samo wyszukiwanie.
     """
 
-    ticket_id:         str   = Field(examples=["33644"])
-    score:             float = Field(examples=[0.87])
-    # Unconditional, because staleness, contradictions between records and seasonality all depend
-    # on it (CLAUDE.md -> "Twarde reguły promptu generacji").
-    date:              str   = Field(default="", examples=["2026-03-14"])
-    component:         str   = Field(default="", examples=["ePUAP"])
-    problem:           str   = Field(default="", examples=["Wysyłka kończy się błędem"])
-    symptoms:          str   = Field(default="", examples=["Komunikat o braku sieci"])
-    cause:             str   = Field(default="", examples=["Certyfikat bez uprawnienia"])
-    solution:          str   = Field(default="", examples=["Wygenerowano nowy certyfikat."])
-    resolution:        str   = Field(default="", examples=["naprawione"])
-    questions_summary: str   = Field(default="", examples=["pytano o wersję przeglądarki"])
+    tool:      str            = Field(examples=["find_tickets"])
+    arguments: dict[str, Any] = Field(examples=[{"problem": "Brak przesyłek"}])
 
 
 class SearchResponse(BaseModel):
     """
     Description:
-    Payload of `POST /search`: the hits, what the model understood the ticket to be, and how many
-    records the threshold removed.
-
-    `dropped_below_threshold` answers the one question a caller has about a short list — "was
-    there nothing, or did the threshold cut it?" — which no count of hits can answer on its own.
+    Odpowiedź `POST /search`: znalezione źródła i zapytania agenta. Brak źródeł to 200 z pustą
+    listą — „nowy typ problemu" jest poprawną odpowiedzią dla 47% korpusu.
     """
 
-    hits:                    list[SearchHit] = Field(default_factory=list)
-    query:                   SearchQuery     = Field(default_factory=SearchQuery)
-    dropped_below_threshold: int             = Field(default=0, examples=[3])
+    sources: list[SourceItem] = Field(default_factory=list)
+    queries: list[AgentQuery] = Field(default_factory=list)
+
+
+class TicketCard(BaseModel):
+    """
+    Description:
+    Odpowiedź `POST /parse-ticket`: karta zgłoszenia, czyli sparsowane pola w kształcie korpusu.
+    Własny model, a nie `ParsedTicket` przepuszczony wprost — model domenowy nie wychodzi przez
+    HTTP.
+
+    Niesie tekst klienta (nazwiska bywają w `problem`), co jest dopuszczalne, bo wołającym jest
+    helpdesk, do którego zgłoszenie należy — i jest powodem, by endpoint stał za uwierzytelnianiem
+    (p. 36).
+    """
+
+    ticket_id:         str       = Field(examples=["41002"])
+    date:              Date      = Field(examples=["2026-08-19"])
+    component:         str       = Field(examples=["ePUAP"])
+    problem:           str       = Field(examples=["Wysyłka kończy się błędem"])
+    symptoms:          str       = Field(examples=["Komunikat o braku sieci"])
+    error_codes:       list[str] = Field(default_factory=list, examples=[["ERR-4210"]])
+    cause:             str       = Field(examples=["brak"])
+    solution:          str       = Field(examples=["brak"])
+    resolution:        str       = Field(examples=["naprawione"])
+    questions_summary: str       = Field(examples=["brak"])
+
+
+class VerdictResponse(BaseModel):
+    """
+    Description:
+    Odpowiedź obu bramek (`/gate/close`, `/gate/reply`) — jeden kształt, więc wołający pisze jedną
+    obsługę. Werdykt jest danymi, nie prozą: `missing` helpdesk pokazuje jako listę we własnym UI.
+
+    `overridable` jest zawsze `true`: furtka dla człowieka jest częścią kontraktu, nie obejściem
+    (zasada 10), a blokadę egzekwuje helpdesk, nie my (zasada 11). `rules_version` mówi, którą
+    wersją zestawu reguł wydano werdykt.
+    """
+
+    verdict:       Literal["pass", "block"] = Field(examples=["block"])
+    reasons:       list[str]                = Field(default_factory=list, examples=[["Brak."]])
+    missing:       list[str]                = Field(default_factory=list, examples=[["przyczyna"]])
+    hint:          str                      = Field(default="", examples=["Dopisz, co zmieniono."])
+    overridable:   bool                     = Field(default=True, examples=[True])
+    rules_version: int                      = Field(examples=[1])
+
+
+class GateReplyRequest(BaseModel):
+    """
+    Description:
+    Wejście `POST /gate/reply`: wiadomość do klienta, którą wdrożeniowiec chce wysłać, i zgłoszenie,
+    którego dotyczy (do logów).
+    """
+
+    ticket_id: str = Field(examples=["41002"])
+    message:   str = Field(min_length=1, examples=["Dzień dobry, proszę podać hasło do skrzynki."])
+
+
+class SuggestRequest(TicketRequest):
+    """
+    Description:
+    Wejście `POST /suggest`: zgłoszenie i wariant odpowiedzi, czyli guzik, który kliknął człowiek.
+    Wariant jest parametrem, nie trasą — nowy guzik to nowy katalog grafu bez zmiany routera.
+    Nieznany wariant to 422, nigdy cichy fallback na domyślny.
+    """
+
+    variant: str = Field(examples=["questions", "solution", "handoff"])
+
+
+class SuggestResponse(BaseModel):
+    """
+    Description:
+    Odpowiedź `POST /suggest` — ten sam kształt dla każdego wariantu: tekst propozycji, źródła
+    i wariant, którym powstała. Wariant bez narzędzi wiedzy wraca z pustą listą źródeł, i to jest
+    informacja, nie brak danych.
+    """
+
+    variant: str              = Field(examples=["questions"])
+    text:    str              = Field(examples=["1. Od kiedy nie przychodzą przesyłki? …"])
+    sources: list[SourceItem] = Field(default_factory=list)
+
+
+class VariantInfo(BaseModel):
+    """
+    Description:
+    Jeden wariant odpowiedzi do narysowania jako guzik: nazwa do `/suggest`, etykieta dla
+    człowieka i czy działa przy pustym indeksie.
+    """
+
+    name:          str  = Field(examples=["questions"])
+    label:         str  = Field(examples=["Jakie pytania zadać"])
+    requires_hits: bool = Field(examples=[False])
+
+
+class VariantsResponse(BaseModel):
+    """
+    Description:
+    Odpowiedź `GET /variants`: warianty z rejestru grafów — UI helpdesku rysuje guziki z tej listy,
+    a nie z własnej, zaszytej.
+    """
+
+    variants: list[VariantInfo] = Field(default_factory=list)
+
+
+class PolishRequest(BaseModel):
+    """
+    Description:
+    Wejście `POST /polish`: notatki wdrożeniowca do przepisania i zgłoszenie, którego dotyczą
+    (do logów).
+    """
+
+    ticket_id: str = Field(examples=["41002"])
+    text:      str = Field(min_length=1, examples=["przesylki juz ida, kolejka stala"])
+
+
+class PolishResponse(BaseModel):
+    """
+    Description:
+    Odpowiedź `POST /polish`: ten sam sens w poprawnej formie — zawsze do akceptacji człowieka,
+    nigdy w miejsce oryginału automatycznie.
+    """
+
+    text: str = Field(examples=["Dzień dobry, przesyłki z e-Doręczeń już docierają…"])
 
 
 class HealthResponse(BaseModel):
     """
     Description:
-    Payload of `GET /health`. Deliberately says nothing about configuration — a liveness probe
-    is reachable to anyone who can reach the service, so it must not leak provider names,
-    endpoints or model identifiers.
+    Odpowiedź `GET /health`. Celowo nic o konfiguracji — sonda żywotności jest osiągalna dla
+    każdego, kto dosięgnie usługi, więc nie może zdradzać dostawców, adresów ani modeli.
     """
 
     status: str = Field(examples=["ok"])
@@ -132,10 +215,10 @@ class HealthResponse(BaseModel):
 class ErrorResponse(BaseModel):
     """
     Description:
-    Uniform error payload for every handled failure, so clients parse one shape instead of
-    three. `request_id` lets a caller quote a single value that stitches together all log
-    entries of the failed request.
+    Jeden kształt błędu dla każdej obsłużonej awarii, więc klient parsuje jeden kształt, nie trzy.
+    `request_id` pozwala wołającemu podać jedną wartość, która zszywa wszystkie wpisy logu
+    nieudanego żądania.
     """
 
-    detail:     str         = Field(examples=["Ticket not found"])
-    request_id: str | None  = Field(default=None, examples=["6f1c…"])
+    detail:     str        = Field(examples=["Ticket not found"])
+    request_id: str | None = Field(default=None, examples=["6f1c…"])

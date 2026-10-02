@@ -14,6 +14,7 @@ i TODO").
 
 from app.graph.parse_ticket.fake import build_fake_graph, default_ticket, example_state
 from app.graph.parse_ticket.graph import (
+    STATE,
     TOOL_NAMES,
     build_graph,
     model_tools,
@@ -23,6 +24,7 @@ from app.graph.parse_ticket.graph import (
 from app.graph.parse_ticket.state import ParseTicketState
 
 __all__ = [
+    "STATE",
     "TOOL_NAMES",
     "ParseTicketState",
     "build_fake_graph",

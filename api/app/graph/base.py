@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Annotated, Literal
 
+from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.anonymization import AnonymizedText
@@ -130,3 +131,26 @@ def tool_definitions(
     ]
 
     return definitions
+
+
+async def run_graph(
+    graph: CompiledStateGraph,  # np. gate_close.build_fake_graph()
+    state: BaseModel,           # np. GateCloseState(input_text="…", rules=["…"])
+) -> BaseModel:
+    """
+    Description:
+    Przepuszcza stan wejściowy przez graf i oddaje stan końcowy jako model tej samej klasy.
+    LangGraph zwraca słownik pól, a trasy czytają `output`, `sources` i `messages` z modelu.
+
+    Example args:
+        graph=gate_close.build_fake_graph()
+        state=GateCloseState(input_text="Nie przychodzą przesyłki…", rules=["…"])
+
+    Example result:
+        GateCloseState(…, output=Verdict(verdict="pass", …), log=[LogEntry(…), …])
+    """
+    result = await graph.ainvoke(state)
+
+    final = type(state)(**result)
+
+    return final

@@ -14,6 +14,7 @@ Status: na atrapach węzłów (`fake.py`); prompt to szkielet, treść i pomiar 
 
 from app.graph.gate_reply.fake import build_fake_graph, example_state
 from app.graph.gate_reply.graph import (
+    STATE,
     TOOL_NAMES,
     build_graph,
     model_tools,
@@ -25,6 +26,7 @@ from app.graph.gate_reply.state import GateReplyState
 
 __all__ = [
     "RESPOND_TOOL_NAME",
+    "STATE",
     "TOOL_NAMES",
     "GateReplyState",
     "build_fake_graph",

@@ -31,7 +31,13 @@ wywołaniem `respond_<graf>`, poza `parse_ticket` (JSON w tekście — p. 24):
 
 import langsmith
 
-from app.graph.base import GraphState, merge_sources, route_after_agent, tool_definitions
+from app.graph.base import (
+    GraphState,
+    merge_sources,
+    route_after_agent,
+    run_graph,
+    tool_definitions,
+)
 
 # LangSmith zablokowany jawnie: przy LANGSMITH_TRACING=true LangGraph wysyła do chmury stan
 # każdego węzła, także `input_text` sprzed anonimizacji. Przełącznik globalny wygrywa z ENV.
@@ -41,5 +47,6 @@ __all__ = [
     "GraphState",
     "merge_sources",
     "route_after_agent",
+    "run_graph",
     "tool_definitions",
 ]

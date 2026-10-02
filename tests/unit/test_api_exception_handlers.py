@@ -2,6 +2,7 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
+from app.anonymization import AnonymizationConfigError, AnonymizationError
 from app.errors import register_exception_handlers
 from app.llm import LLMConfigError, LLMError
 
@@ -10,14 +11,15 @@ from app.llm import LLMConfigError, LLMError
 def client() -> TestClient:
     """
     Description:
-    Builds a bare app with only the handlers under test plus two provoking routes. Using the real
-    application would tie these assertions to whatever endpoints exist at the time.
+    Buduje nagą aplikację z samymi handlerami i trasami, które prowokują błąd. Prawdziwa aplikacja
+    uzależniłaby te asercje od tego, jakie endpointy akurat istnieją.
 
     Example args:
-        (injected by pytest)
+        (wstrzykiwane przez pytest)
 
     Example result:
-        TestClient over an app exposing /boom, /needs-param, /llm-down and /llm-misconfigured
+        TestClient nad aplikacją z /boom, /needs-param, /llm-down, /llm-misconfigured,
+        /anonymization-down i /anonymization-misconfigured
     """
     app = FastAPI()
     register_exception_handlers(app)
@@ -38,12 +40,20 @@ def client() -> TestClient:
     async def llm_misconfigured() -> None:
         raise LLMConfigError("Unknown LLM_PROVIDER='openai'")
 
-    # raise_server_exceptions=False: let the handlers answer instead of re-raising into the test.
+    @app.get("/anonymization-down")
+    async def anonymization_down() -> None:
+        raise AnonymizationError("nie rozpoznano: 'Jan Kowalski, ul. Polna 3'")
+
+    @app.get("/anonymization-misconfigured")
+    async def anonymization_misconfigured() -> None:
+        raise AnonymizationConfigError("atrapa anonimizatora przy LLM_PROVIDER=ollama")
+
+    # raise_server_exceptions=False: odpowiadają handlery, zamiast wyjątku wpadającego do testu.
     return TestClient(app, raise_server_exceptions=False)
 
 
 def test_http_exception_uses_uniform_shape(client: TestClient) -> None:
-    """Raised HTTPException → declared status and the ErrorResponse shape."""
+    """HTTPException → zadeklarowany status i kształt ErrorResponse."""
     response = client.get("/boom")
 
     assert response.status_code == 404
@@ -52,7 +62,7 @@ def test_http_exception_uses_uniform_shape(client: TestClient) -> None:
 
 
 def test_validation_error_returns_422_in_same_shape(client: TestClient) -> None:
-    """Missing query param → 422 in ErrorResponse shape, not FastAPI's raw error list."""
+    """Brak parametru → 422 w kształcie ErrorResponse, nie surowa lista błędów FastAPI."""
     response = client.get("/needs-param")
 
     assert response.status_code == 422
@@ -60,38 +70,60 @@ def test_validation_error_returns_422_in_same_shape(client: TestClient) -> None:
 
 
 def test_validation_error_hides_submitted_values(client: TestClient) -> None:
-    """Bad query value → response body must not echo the submitted value (it may be user data)."""
+    """Zła wartość parametru → treść odpowiedzi jej nie cytuje (może to być dana klienta)."""
     response = client.get("/needs-param", params={"limit": "not-a-number"})
 
     assert response.status_code == 422
     assert "not-a-number" not in response.text
 
 
-def test_llm_error_becomes_service_unavailable(client: TestClient) -> None:
-    """LLMError during a request → 503, so the caller retries instead of blaming its own input."""
-    response = client.get("/llm-down")
+@pytest.mark.parametrize(
+    "path, detail",
+    [
+        ("/llm-down",           "Language model call failed"),
+        ("/anonymization-down", "Anonymization failed"),
+    ],
+    ids=["llm", "anonymization"],
+)
+def test_a_dependency_failure_becomes_service_unavailable(
+    client: TestClient,
+    path:   str,
+    detail: str,
+) -> None:
+    """Awaria modelu albo anonimizatora w trakcie żądania → 503: wołający ponawia albo decyduje
+    sam, zamiast winić własne wejście."""
+    response = client.get(path)
 
-    assert response.status_code == 503
-    assert response.json()["detail"] == "Language model call failed"
+    assert response.status_code     == 503
+    assert response.json()["detail"] == detail
 
 
-def test_llm_error_body_hides_the_provider_message(client: TestClient) -> None:
-    """Provider exception text → never in the body (it may quote the prompt, i.e. ticket text)."""
-    response = client.get("/llm-down")
+@pytest.mark.parametrize("path", ["/llm-down", "/anonymization-down"], ids=["llm", "anonymization"])
+def test_a_dependency_failure_hides_its_message(client: TestClient, path: str) -> None:
+    """Treść wyjątku zależności → nigdy w odpowiedzi: może cytować prompt albo dane klienta."""
+    response = client.get(path)
 
-    assert "timed out" not in response.text
     assert "Drukarka" not in response.text
+    assert "Kowalski" not in response.text
 
 
-def test_config_error_is_not_dressed_up_as_a_transient_failure(client: TestClient) -> None:
-    """LLMConfigError (an LLMError subclass) → NOT 503; misconfiguration must stay loud."""
-    response = client.get("/llm-misconfigured")
+@pytest.mark.parametrize(
+    "path",
+    ["/llm-misconfigured", "/anonymization-misconfigured"],
+    ids=["llm", "anonymization"],
+)
+def test_config_error_is_not_dressed_up_as_a_transient_failure(
+    client: TestClient,
+    path:   str,
+) -> None:
+    """Błąd konfiguracji (podklasa błędu zależności) → NIE 503; zła konfiguracja ma być głośna."""
+    response = client.get(path)
 
     assert response.status_code == 500
 
 
 def test_request_id_is_absent_without_middleware(client: TestClient) -> None:
-    """Handlers running outside the middleware → request_id is None, not a crash."""
+    """Handler poza middleware → request_id to None, nie wywrotka."""
     response = client.get("/boom")
 
     assert response.json()["request_id"] is None

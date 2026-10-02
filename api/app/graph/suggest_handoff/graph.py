@@ -18,11 +18,17 @@ USER_FILE   = GRAPH_DIR / "prompt_user.md"
 
 TICKET_PLACEHOLDER = "{{ticket}}"
 
+# Klasa stanu grafu — po nią sięga kod ogólny (trasa `/suggest`, test kontraktu).
+STATE = SuggestHandoffState
+
 # Narzędzia wiedzy dozwolone w tym grafie — przekazanie opiera się na wątku, nie na bazie.
 TOOL_NAMES: tuple[str, ...] = ()
 
 # Wariant działa przy pustym indeksie: nie potrzebuje trafień, żeby powstać.
 REQUIRES_HITS = False
+
+# Etykieta guzika, który helpdesk rysuje z `GET /variants`.
+LABEL = "Przekazanie sprawy"
 
 
 def system_prompt() -> str:

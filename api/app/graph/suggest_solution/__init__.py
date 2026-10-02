@@ -15,7 +15,9 @@ Status: na atrapach węzłów (`fake.py`); prompt przeniesiony z dawnego
 
 from app.graph.suggest_solution.fake import build_fake_graph, example_state
 from app.graph.suggest_solution.graph import (
+    LABEL,
     REQUIRES_HITS,
+    STATE,
     TOOL_NAMES,
     build_graph,
     model_tools,
@@ -26,8 +28,10 @@ from app.graph.suggest_solution.respond_tool import RESPOND_TOOL_NAME, respond_t
 from app.graph.suggest_solution.state import SuggestSolutionState
 
 __all__ = [
+    "LABEL",
     "REQUIRES_HITS",
     "RESPOND_TOOL_NAME",
+    "STATE",
     "TOOL_NAMES",
     "SuggestSolutionState",
     "build_fake_graph",

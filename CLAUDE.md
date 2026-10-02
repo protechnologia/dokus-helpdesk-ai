@@ -21,10 +21,11 @@ prowadzi do nowej. **Rozbieżność kod ↔ dokument jest teraz normą, nie bł�
 filtr jakości, indeksacja i Qdrant, embedder PolDense, `LLMClient` z fabryką oraz cała wiedza
 o korpusie („Dane wejściowe", „Domena"). Nowe grafy z nich korzystają, a nie je zastępują.
 
-**Do wycofania dopiero, gdy następca działa:** bezpośrednie wołanie wyszukiwania z routera
-`/search` (staje się narzędziem `find_tickets`). `variants.json`, `loader_variants.py`, modele
-`variant_generation*` i prompty `text/prompt_suggest_*` skasowane 2026-10-02 — nikt ich nie wołał,
-a prompty żyją w `graph/suggest_*`.
+**Wycofane 2026-10-02:** `variants.json`, `loader_variants.py`, modele `variant_generation*`
+i prompty `text/prompt_suggest_*` (nikt ich nie wołał, prompty żyją w `graph/suggest_*`),
+a `/search` przeszedł na graf `search` od razu, choć ten stoi na atrapach do p. 7 i 9–11 —
+świadomie, mimo „najpierw następca". `RagSearcher` zostaje dla `helpdesk rag search` i jako baza
+`find_tickets`.
 
 **Ta sekcja znika, gdy skończą się bloki 0, A, B, D i E planu** — wtedy kod dogoni dokument.
 
@@ -952,7 +953,9 @@ rozmyć:
 - **W repo (kod, wersjonowane, test-strażnik):** szkielet promptu — rola modelu, format wyjścia,
   zakaz zmyślania, sposób wstawienia reguł. To jest logika i tak zostaje.
 - **W bazie (edytowalne w runtime):** **treść reguł** — lista wymagań/zakazów i zasad stylu.
-  To są dane klienta o jego procesie, nie nasza logika.
+  To są dane klienta o jego procesie, nie nasza logika. Do p. 29 źródłem są zestawy domyślne
+  `text/dict_rules_<graf>.json` (wersjonowane polem) czytane przez `get_rule_set()` — to jest
+  szew, który p. 29 podmienia na SQL.
 
 Konsekwencje, których nie pomijamy:
 - **Wchodzi relacyjna baza** (dotąd w „Świadomie pominięte"). To jest ten moment i ta decyzja —
@@ -1292,17 +1295,25 @@ Wspólne:
 - **`POST /search` wymaga tylko `ticket_id` i `body`** — reszta opisuje zgłoszenie, ale nie steruje
   wyszukiwaniem, więc jej żądanie podnosiłoby koszt wpięcia bez zysku dla odpowiedzi. Brak daty
   znaczy „dziś": zgłoszenie w toku jest z definicji świeże, a data i tak nie wchodzi do wektora.
-- **Odpowiedź niesie CAŁY odczyt zapytania, nie tylko pola embedowane** — źle odczytany `component`
-  albo zgubiony kod błędu są niewidoczne w `problem` + `symptoms` i wyszłyby dopiero jako dziwna
-  propozycja przy generacji. **W grafie `search` (p. 5) zasada zostaje, zmienia się nośnik:**
-  odczytem są zapytania, które wysłał agent, a pełną kartę zgłoszenia daje graf `parse_ticket`.
-- **Nieudany parse zapytania to 422, nie 503** — dotyczy wejścia, a nie stacku (`SearchParseError`),
-  i zatrzymuje przebieg **przed** embedderem i Qdrantem.
-- **`factory.py`: `build_searcher()` buduje, `get_searcher()` trzyma jeden na proces.** Rozdzielone,
-  bo CLI musi zamknąć pule połączeń (komenda się kończy), a serwer nie — zamknięcie instancji
-  z cache'u zostawiłoby następnego wołającego z martwymi pulami. Klienci transportowi są **wewnątrz**
-  serwisu, a sprzątanie idzie przez `searcher.aclose()`: wołający nie musi wiedzieć, z czego serwis
-  jest zbudowany.
+- **Odpowiedź `/search` niesie odczyt zgłoszenia — dziś to zapytania agenta** (`queries`: narzędzie
+  i argumenty, bez wywołania `respond_search`), obok źródeł z `cite()`. Źle odczytany `component`
+  albo zgubiony kod błędu są niewidoczne w samej liście trafień; pełną kartę zgłoszenia daje
+  `/parse-ticket`.
+- **Wspólne żądanie `TicketRequest` dla `/search`, `/gate/close`, `/parse-ticket` i `/suggest`**;
+  trasa robi z niego `RawTicket.as_thread()`, czyli ten sam tekst wątku, który widzi parser
+  korpusu. `/gate/reply` i `/polish` biorą samą wiadomość albo notatki.
+- **Odpowiedź bramki: `overridable` zawsze `true` i `rules_version`** — furtka jest kontraktem
+  (zasada 10), a wersja zestawu reguł pozwala odtworzyć, dlaczego wczoraj przeszło. Reguły bierze
+  trasa z `get_rule_set()`, nigdy z żądania.
+- **`GET /variants` i `/suggest` czytają rejestr `graph/registry.py`** — każdy pakiet
+  `graph/suggest_<wariant>` to guzik (`LABEL`, `REQUIRES_HITS`, `STATE`), więc nowy wariant to nowy
+  katalog bez zmiany routera. Wariant bez narzędzi wiedzy nie ma `sources` w stanie i wraca
+  z pustą listą.
+- **Trasy biorą graf z `factory.get_graph_builder()` (zależność FastAPI), budowany na każde
+  żądanie** — atrapa jest jednorazowa. Do p. 9 `build_function_graph()` zawsze oddaje atrapę,
+  także przy prawdziwym `LLM_PROVIDER`: nic nie wychodzi z procesu, a odmowa położyłaby trasy na
+  stacku dev. Test podmienia zależność przez `dependency_overrides`, wstawiając graf z atrap,
+  do których ma dostęp. `build_searcher()` zostaje dla CLI.
 
 ## Warstwa embeddera
 
@@ -1505,10 +1516,11 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   — do zmierzenia w p. 25–28; `parse_ticket` — do rozstrzygnięcia w p. 24.
 - **Atrapa grafu (`build_fake_graph()`) jest jednorazowa** — `FakeAgent` ma zaplanowane tury, więc
   trasa i CLI budują ją na każde wywołanie. `ainvoke` zwraca słownik, nie model stanu.
-- **Każdy graf wystawia to samo API** — `TOOL_NAMES`, `system_prompt()`, `user_prompt(state)`,
-  `model_tools(tools)`, `build_graph(…)`, `build_fake_graph()`, `example_state()` (oraz
-  `respond_tool()`, a w `suggest_*` `REQUIRES_HITS`). `test_api_graph_contract.py` sam znajduje
-  grafy w `app/graph/` i sprawdza je wszystkie, więc nowy graf jest objęty bez dopisywania.
+- **Każdy graf wystawia to samo API** — `STATE`, `TOOL_NAMES`, `system_prompt()`,
+  `user_prompt(state)`, `model_tools(tools)`, `build_graph(…)`, `build_fake_graph()`,
+  `example_state()` (oraz `respond_tool()`, a w `suggest_*` `LABEL` i `REQUIRES_HITS`).
+  `test_api_graph_contract.py` sam znajduje grafy w `app/graph/` i sprawdza je wszystkie, więc nowy
+  graf jest objęty bez dopisywania.
 - **Dwa kształty przebiegu.** Bez narzędzi wiedzy: anonymize → agent → respond. Z nimi: pętla
   agent ⇄ run_tools, a o kierunku po turze modelu decyduje wspólne `route_after_agent()` z
   `graph/base.py` — tylko po tym, CO model wywołał (limit iteracji dochodzi w p. 9).
@@ -1861,12 +1873,14 @@ Raises:                      # only when the method raises
   gotową `Response`, a `detail` (jedyne „dlaczego") żyje tylko w wyjątku. Uwaga: `RequestValidationError`
   to **nie** `HTTPException` — potrzebuje osobnego handlera (najczęstsze 422).
 - **Awaria zależności ma własny handler i status „spróbuj później".** Wyjątek warstwy
-  transportowej (dziś `EncoderError` w embedderze) łapiemy osobno i zwracamy **503** we wspólnym
+  transportowej (`EncoderError` w embedderze, `LLMError` i `AnonymizationError` w `api`) łapiemy
+  osobno i zwracamy **503** we wspólnym
   kształcie `ErrorResponse` — surowy 500 nie odróżnia „model chwilowo padł" od „zapytanie jest
   błędne", a to decyduje, czy przebieg indeksacji ma ponowić, czy porzucić zgłoszenie.
   **Treść wyjątku zostaje w logu, nie w odpowiedzi** — komunikat biblioteki modelu potrafi
   zacytować wejście, czyli dane klienta.
-- **Błąd konfiguracji NIGDY nie zamienia się w status HTTP.** `LLMConfigError`/`EncoderConfigError`
+- **Błąd konfiguracji NIGDY nie zamienia się w status HTTP.** `LLMConfigError`/`EncoderConfigError`/
+  `AnonymizationConfigError`
   dziedziczą po błędzie swojej warstwy, więc wpadłyby w handler 503 — handler **wyrzuca je z
   powrotem**. Powód: 503 znaczy „spróbuj za chwilę", a przy złym `LLM_PROVIDER` czekanie nic nie
   da; zielony kontener oddający uprzejme 503 na każde żądanie jest gorszy niż głośna śmierć.
@@ -2284,11 +2298,9 @@ generacji.
   `suggest_questions`, `suggest_solution`, `suggest_handoff`, `polish` (ten ostatni do
   potwierdzenia w p. 28); LangGraph jako zależność, LangSmith zablokowany, `GraphState` z logiem,
   odpowiedź narzędziem `respond_<graf>`; reguły — „Warstwa grafów".
-- [ ] **6. Trasy i CLI na atrapach grafów** — `/gate/close`, `/gate/reply`, `/search`,
-  `/parse-ticket`, `/suggest` z `variant` mapowanym na graf (422 przy nieznanym), `/polish`,
-  `GET /variants` z rejestru grafów. *Dlaczego:* wariant zostaje parametrem, nie trasą, więc nowy
-  guzik to nowy katalog bez zmian w routerze; po tym punkcie cały produkt da się wywołać od wejścia
-  do odpowiedzi bez modelu i Qdranta.
+- [x] **6. Trasy na atrapach grafów** — `/gate/close`, `/gate/reply`, `/search` (przełączony
+  z `RagSearchera`), `/parse-ticket`, `/suggest` + `GET /variants` z rejestru, `/polish`; reguły
+  z `text/dict_rules_*`; reguły — „Warstwa API". CLI dla grafów odłożone do p. 46.
 
 ### A. Narzędzia — po jednym punkcie na narzędzie
 
@@ -2320,8 +2332,10 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
   omijałyby granicę anonimizacji, a zmiana dostawcy zmieniałaby zachowanie pętli.
 - [ ] **10. `run_tools`** — wywołania wyłącznie z listy dozwolonych, argumenty walidowane
   `query_model` (błąd wraca do modelu jako wiadomość `tool`, żeby mógł poprawić wywołanie), tekst
-  z `render_for_model()` do `messages`, źródła z `cite()` do `sources`. *Dlaczego:* lista źródeł
-  powstaje z wywołań narzędzi, nigdy z deklaracji modelu (zasada 9).
+  z `render_for_model()` do `messages`, źródła z `cite()` do `sources`; licznik
+  `dropped_below_threshold` ma wrócić do odpowiedzi `/search` (zgubiony przy przejściu na graf —
+  „nic nie było" i „próg wyciął" to różne odpowiedzi). *Dlaczego:* lista źródeł powstaje
+  z wywołań narzędzi, nigdy z deklaracji modelu (zasada 9).
 - [ ] **11. `respond`** — walidacja argumentów `respond_<graf>` do typu wyniku grafu; błąd wraca
   do modelu jako wiadomość `tool` (jak w p. 10), z jednym retry; `requires_hits`: graf wymagający
   źródeł bez źródeł nie oddaje propozycji. *Dlaczego:*
@@ -2333,6 +2347,11 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
   spoza listy, złośliwy zestaw reguł nie przestawia formatu. *Dlaczego:* przy katalogu na graf da
   się zapomnieć anonimizacji albo reduktora, a jeden test łapie to dla każdego przyszłego grafu;
   stoi po p. 9–11, bo limit i lista dozwolonych to zachowanie właściwych węzłów.
+- [ ] **46. CLI dla grafów** (dopisany 2026-10-02, numer spoza kolejności) — `helpdesk gate
+  close|reply`, `helpdesk suggest <wariant>`, „Popraw" i karta zgłoszenia na tej samej fabryce
+  grafów co trasy; `helpdesk rag search` przechodzi na graf. Do decyzji przy okazji: `cli/` jako
+  pakiet obszaru z plikiem na komendę (`rag.py` miesza wyszukiwanie z indeksacją). *Dlaczego:*
+  odłożone z p. 6 — na atrapach komenda zwracałaby stałe odpowiedzi.
 
 ### C. Decyzje
 

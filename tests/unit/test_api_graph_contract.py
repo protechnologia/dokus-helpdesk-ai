@@ -75,7 +75,7 @@ def output_type(
     Example result:
         Verdict
     """
-    annotation = type(graph.example_state()).model_fields["output"].annotation
+    annotation = graph.STATE.model_fields["output"].annotation
     found      = [arg for arg in get_args(annotation) if arg is not type(None)]
 
     return found[0]
@@ -120,6 +120,7 @@ def test_every_graph_exposes_the_same_api(graph: ModuleType) -> None:
     """Pakiet grafu → ta sama para promptów, definicje narzędzi, przebieg, atrapa i stan
     przykładowy: trasy, CLI i węzeł `agent` sięgają po nie tak samo w każdym grafie."""
     for attribute in (
+        "STATE",             # klasa stanu grafu
         "TOOL_NAMES",        # narzędzia wiedzy dozwolone w grafie
         "system_prompt",     # prompt systemowy
         "user_prompt",       # tura użytkownika ze stanu
@@ -253,9 +254,17 @@ def test_sources_exist_exactly_where_knowledge_tools_do(graph: ModuleType) -> No
     assert hints["sources"].__metadata__ == (merge_sources,)
 
 
+@pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
+def test_the_example_state_is_the_graph_state(graph: ModuleType) -> None:
+    """Stan przykładowy z atrapy → instancja `STATE`, czyli klasy, z której trasy budują stan."""
+    assert isinstance(graph.example_state(), graph.STATE)
+
+
 def test_only_the_solution_variant_requires_hits() -> None:
-    """Warianty `suggest_*` → każdy deklaruje `REQUIRES_HITS`; trafień wymaga tylko `solution`
-    (zasada 9), pytania i przekazanie działają przy pustym indeksie."""
+    """Warianty `suggest_*` → każdy deklaruje etykietę guzika i `REQUIRES_HITS`; trafień wymaga
+    tylko `solution` (zasada 9), pytania i przekazanie działają przy pustym indeksie."""
+    assert all(graph.LABEL for graph in GRAPHS if name_of(graph).startswith("suggest_"))
+
     declared = {
         name_of(graph): graph.REQUIRES_HITS
         for graph in GRAPHS

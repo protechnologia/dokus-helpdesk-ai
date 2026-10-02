@@ -227,11 +227,9 @@ async def _run_search(
     Description:
     Runs one search and releases the connections afterwards.
 
-    The service comes from `build_searcher()`, the same construction the HTTP handler uses — a
-    second assembly here would drift apart the moment a setting is added, and a CLI searching with
-    different parameters than the API is a divergence nothing would report. Built rather than
-    taken from `get_searcher()`, because that one is cached for the life of the process: closing a
-    cached instance would leave the next caller with dead connection pools.
+    The service comes from `build_searcher()` in `factory.py` — one assembly path, so the CLI cannot
+    quietly search with different parameters than configured. Built per run and closed afterwards;
+    `POST /search` no longer uses it (it goes through the `search` graph since plan item 6).
 
     Example args:
         text="Nie mogę wysłać pisma przez ePUAP"

@@ -19,6 +19,9 @@ USER_FILE   = GRAPH_DIR / "prompt_user.md"
 RULES_PLACEHOLDER   = "{{rules}}"
 MESSAGE_PLACEHOLDER = "{{message}}"
 
+# Klasa stanu grafu — po nią sięga kod ogólny (trasa `/suggest`, test kontraktu).
+STATE = GateReplyState
+
 # Narzędzia wiedzy dozwolone w tym grafie — bramka ocenia treść, którą dostała, i nie szuka.
 TOOL_NAMES: tuple[str, ...] = ()
 

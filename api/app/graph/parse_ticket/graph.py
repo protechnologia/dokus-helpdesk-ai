@@ -14,6 +14,9 @@ from app.tools import KnowledgeSource
 
 GRAPH_DIR = Path(__file__).parent
 
+# Klasa stanu grafu — po nią sięga kod ogólny (trasa `/suggest`, test kontraktu).
+STATE = ParseTicketState
+
 # Narzędzia wiedzy dozwolone w tym grafie — karta powstaje z samego wątku.
 TOOL_NAMES: tuple[str, ...] = ()
 
