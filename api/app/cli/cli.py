@@ -7,26 +7,28 @@ from app.cli.tickets import tickets
 
 # --- helpdesk: całe drzewo komend ------------------------------------------------------------
 #
-# | komenda                    | plik         | co robi                                        |
-# |----------------------------|--------------|------------------------------------------------|
-# | `version`                  | cli.py       | wersja pakietu; smoke test okablowania CLI      |
-# | `tickets validate <kat.>`  | tickets.py   | sprawdza artefakty wobec kontraktu ParsedTicket |
-# | `tickets parse`            | tickets.py   | parsuje zgłoszenia z data/raw/ przez LLM        |
-# | `rag index <kat.>`         | rag.py       | dokłada artefakty do kolekcji Qdranta           |
-# | `rag reindex <kat.>`       | rag.py       | kasuje kolekcję i buduje ją od zera             |
-# | `rag search "<treść>"`     | rag.py       | szuka zgłoszeń podobnych do podanej treści      |
+# Obszar to pakiet w `cli/`, czynność to plik w nim: `helpdesk rag search` → `cli/rag/search.py`.
 #
-# Zaplanowane (p. 6): komendy na grafach — `gate close` / `gate reply` / `polish` stoją POZA grupą
-# `rag`, bo z definicji działają bez indeksu.
+# | komenda                   | plik                  | co robi                        |
+# |---------------------------|-----------------------|--------------------------------|
+# | `version`                 | `cli.py`              | wersja pakietu; smoke test CLI |
+# | `tickets validate <kat.>` | `tickets/validate.py` | artefakty wobec ParsedTicket   |
+# | `tickets parse`           | `tickets/parse.py`    | parsowanie data/raw/ przez LLM |
+# | `rag index <kat.>`        | `rag/index.py`        | artefakty do kolekcji Qdranta  |
+# | `rag reindex <kat.>`      | `rag/reindex.py`      | kolekcja od zera               |
+# | `rag search "<treść>"`    | `rag/search.py`       | podobne zgłoszenia             |
+#
+# Zaplanowane (p. 46): komendy na grafach — `gate close` / `gate reply` / „Popraw" stoją POZA
+# obszarem `rag`, bo z definicji działają bez indeksu.
 #
 # no_args_is_help: samo `helpdesk` drukuje drzewo, zamiast błędu użycia.
 cli = typer.Typer(
-    help            = "Operator tooling for dokus-helpdesk-ai (indexing, search, evaluation).",
+    help            = "Narzędzia operatora: indeksacja, wyszukiwanie, ewaluacja.",
     no_args_is_help = True,
 )
 
-# Grupy powiązanych operacji wchodzą jako pod-aplikacje, więc drzewo zostaje
-# `helpdesk <obszar> <czynność>` zamiast płaskiej listy coraz dłuższych jednoczłonowych nazw.
+# Obszary wchodzą jako pod-aplikacje, więc drzewo zostaje `helpdesk <obszar> <czynność>` zamiast
+# płaskiej listy coraz dłuższych jednoczłonowych nazw.
 cli.add_typer(tickets, name="tickets")
 cli.add_typer(rag, name="rag")
 
@@ -35,29 +37,28 @@ cli.add_typer(rag, name="rag")
 def main() -> None:
     """
     Description:
-    Root callback of the command tree. Its presence keeps Typer in subcommand mode — without it
-    an app holding a single command collapses, and `helpdesk` would run that command directly
-    instead of listing the tree.
+    Callback korzenia drzewa komend. Jego obecność trzyma Typer w trybie podkomend — bez niego
+    aplikacja z jedną komendą się zwija i `helpdesk` uruchomiłby ją wprost, zamiast pokazać drzewo.
 
     Example args:
-        (none)
+        (brak)
 
     Example result:
-        None — Typer continues to dispatch to a subcommand
+        None — Typer przechodzi dalej do podkomendy
     """
 
 
-@cli.command("version", help="Print the installed package version.")
+@cli.command("version", help="Wypisz zainstalowaną wersję pakietu.")
 def show_version() -> None:
     """
     Description:
-    Prints the installed package version. Doubles as the smoke test of the whole CLI wiring:
-    entry point, package installation and Typer dispatch.
+    Wypisuje zainstalowaną wersję pakietu. Przy okazji smoke test całego okablowania CLI: entry
+    point, instalacja pakietu i rozsyłanie Typera.
 
     Example args:
-        (none)
+        (brak)
 
     Example result:
-        prints "dokus-helpdesk-ai 0.1.0"
+        wypisuje „dokus-helpdesk-ai 0.1.0"
     """
     typer.echo(f"dokus-helpdesk-ai {version('dokus-helpdesk-ai')}")

@@ -1064,7 +1064,7 @@ dokus-helpdesk-ai/
 │   ├── requirements.txt          # zależności RUNTIME tej usługi (do obrazu)
 │   ├── scripts/                  # skrypty deweloperskie (python api/scripts/…)
 │   └── app/                      # kod aplikacji
-│       ├── cli/                  # CLI produkcyjne (Typer) — cienkie adaptery nad serwisami
+│       ├── cli/                  # CLI (Typer): pakiet na obszar, plik na komendę — cienkie adaptery
 │       ├── main.py               # montaż aplikacji, middleware, handlery wyjątków
 │       ├── config.py             # Settings (pydantic-settings)
 │       ├── models.py             # modele API (odrębne od domenowych)
@@ -1251,13 +1251,19 @@ Wspólne:
 - **Komenda nazywa się `helpdesk`, nie nazwą helpdeskowanego produktu** — przy założeniu „jedna
   instancja = jeden produkt" wpisanie nazwy klienta w komendę własnego narzędzia kłamałoby przy
   drugim wdrożeniu.
-- **Drzewo ma dwa poziomy: `helpdesk <obszar> <czynność>`**, a plik w `cli/` nazywa się jak obszar
-  (`rag.py` → `helpdesk rag …`). Obszar zbiera to, co dzieli zależności: `rag` woła Qdranta
-  i embedder, `tickets` wytwarza artefakt LLM-em, a bramki i „Popraw" stoją **poza `rag`**, bo
-  z definicji działają bez indeksu. Nazwa pliku = nazwa obszaru jest jedyną rzeczą, która pozwala
-  trafić z komendy do kodu bez czytania `cli.py`.
-- **Na górze `cli.py` i każdego pliku obszaru stoi tabelka komend** — drzewo rozsypuje się po
-  kilku modułach, więc bez niej trzeba je odtwarzać z wywołań `add_typer`.
+- **Drzewo ma dwa poziomy: `helpdesk <obszar> <czynność>`; obszar to pakiet w `cli/`, czynność to
+  plik w nim** (`helpdesk rag search` → `cli/rag/search.py`, od 2026-10-02). Obszar zbiera to, co
+  dzieli zależności: `rag` woła Qdranta i embedder, `tickets` wytwarza artefakt LLM-em, a bramki
+  i „Popraw" stoją **poza `rag`**, bo z definicji działają bez indeksu. Ścieżka = komenda to
+  jedyna rzecz, która pozwala trafić z komendy do kodu bez czytania `cli.py`. Kod wspólny kilku
+  komend obszaru — w jego `common.py`.
+- **Moduł komendy wystawia `HELP` i funkcję nazwaną od intencji (`search_tickets`), a rejestruje
+  ją `__init__.py` obszaru** (`rag.command("search", help=search.HELP)(search.search_tickets)`).
+  Moduły nie dekorują obiektu Typer z pakietu, więc nie ma cyklu importów; funkcja nazywa się
+  inaczej niż moduł, bo inaczej przesłoniłaby go w przestrzeni pakietu, a testy podmieniają
+  funkcje po ścieżce modułu (`app.cli.rag.search._run_search`).
+- **Na górze `cli.py` i każdego `__init__.py` obszaru stoi tabelka komend** — drzewo rozsypuje się
+  po kilku modułach, więc bez niej trzeba je odtwarzać z wywołań `add_typer`.
 - **W obrazie entry point tworzy launcher z `Dockerfile`, nie `pip install`** — `pyproject.toml`
   leży w korzeniu repo, poza kontekstem budowania `./api`, i deklaruje `package-dir = api`.
   Launcher ustawia `PYTHONPATH=/code`, bo katalog roboczy nie zawsze jest `/code`. Potrzebne,
@@ -2349,9 +2355,8 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
   stoi po p. 9–11, bo limit i lista dozwolonych to zachowanie właściwych węzłów.
 - [ ] **46. CLI dla grafów** (dopisany 2026-10-02, numer spoza kolejności) — `helpdesk gate
   close|reply`, `helpdesk suggest <wariant>`, „Popraw" i karta zgłoszenia na tej samej fabryce
-  grafów co trasy; `helpdesk rag search` przechodzi na graf. Do decyzji przy okazji: `cli/` jako
-  pakiet obszaru z plikiem na komendę (`rag.py` miesza wyszukiwanie z indeksacją). *Dlaczego:*
-  odłożone z p. 6 — na atrapach komenda zwracałaby stałe odpowiedzi.
+  grafów co trasy; `helpdesk rag search` przechodzi na graf. *Dlaczego:* odłożone z p. 6 — na
+  atrapach komenda zwracałaby stałe odpowiedzi.
 
 ### C. Decyzje
 

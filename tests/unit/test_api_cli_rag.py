@@ -135,7 +135,7 @@ def stub_run(monkeypatch: pytest.MonkeyPatch) -> StubRun:
     """
     stub = StubRun()
 
-    monkeypatch.setattr("app.cli.rag._run", stub)
+    monkeypatch.setattr("app.cli.rag.common._run", stub)
 
     return stub
 

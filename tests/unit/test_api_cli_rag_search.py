@@ -131,7 +131,7 @@ def stub_search(monkeypatch: pytest.MonkeyPatch) -> StubSearch:
     """
     stub = StubSearch()
 
-    monkeypatch.setattr("app.cli.rag._run_search", stub)
+    monkeypatch.setattr("app.cli.rag.search._run_search", stub)
 
     return stub
 
