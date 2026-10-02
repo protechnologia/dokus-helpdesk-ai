@@ -1404,6 +1404,16 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   wektory, i nie woła parsera — sparsowanie zgłoszenia pod wyszukiwanie to zadanie agenta.
 - **Kontrakty nie importują LangGrapha ani LangChaina** — `StructuredTool` powstaje adapterem
   w grafie. Wymiana orkiestratora ma nie dotykać narzędzi.
+- **Atrapa narzędzia zwraca przy każdym wyszukaniu ten sam wynik, ze stałymi id, i zapisuje
+  zapytania w publicznym `queries`** — test grafu sprawdza, o co pytał agent, a nie jak szukało
+  narzędzie. Konstruktor przyjmuje własne elementy i `dropped_below_threshold`, więc scenariusz
+  „próg wszystko wyciął" to jedna linia. Wbudowany zestaw `FakeFindTickets` to **jeden objaw
+  i trzy różne przyczyny** — najczęstszy kształt trafień w korpusie, na którym agent ma dopytywać,
+  a nie zgadywać. Dane atrap są zmyślone, nigdy kopiowane z korpusu (PII).
+- **Test kontraktu sam znajduje narzędzia** (`test_api_tools_contract.py`: pakiety w `app/tools/`
+  → podklasy `KnowledgeSource`) i sprawdza to, czego `ABC` nie wymusza: `name`, `query_model`
+  z `extra="forbid"` oraz jedną nazwę na pakiet. Nowe narzędzie jest objęte testem bez dopisywania
+  go do żadnej listy.
 - **Każde źródło wiedzy jest tylko do odczytu** — wstrzyknięcie przez treść zgłoszenia może co
   najwyżej skierować agenta do nietrafionego materiału, nie zmienić indeksu.
 
@@ -2153,9 +2163,9 @@ narzędzia.
 - [x] **1. Struktura `api/app/tools/` z listą narzędzi** — kontrakty (`base.py`), wspólny
   `SourceRef` (`models.py`), katalogi `find_tickets/` i `find_docs/` z własnymi `models.py`,
   tabela narzędzi w `tools/__init__.py`; reguły — „Warstwa narzędzi agenta".
-- [ ] **2. Atrapy wszystkich narzędzi** — deterministyczne, zwracają wyniki ze stabilnymi id.
-  *Dlaczego:* grafy mają ruszyć bez Qdranta, embeddera i LLM-a, a reguła „atrapa z produkcji
-  przed stubem" już obowiązuje.
+- [x] **2. Atrapy wszystkich narzędzi** — `FakeFindTickets` i `FakeFindDocs` (`fake.py` w katalogu
+  narzędzia) oraz test kontraktu, który sam znajduje narzędzia w `app/tools/`; reguły —
+  „Warstwa narzędzi agenta".
 - [ ] **3. Struktura `api/app/nodes/` z listą węzłów** — katalog na węzeł (`node.py` + `fake.py`);
   wspólny kontrakt w `nodes/base.py`: stan grafu (wejście, `AnonymizedText`, wiadomości, wywołania
   narzędzi, źródła jako `list[SourceRef]`, licznik iteracji, wynik). Węzeł używany przez jeden graf
@@ -2221,9 +2231,11 @@ narzędzia.
 - [ ] **9. Właściwe implementacje wszystkich narzędzi** — `find_tickets` bez parsera: tekst do
   embeddingu z `problem` + `symptoms` składa funkcja wspólna z `ParsedTicket.embedding_text()`
   (wydzielona z modelu), dalej `embed_query()` i Qdrant z etapu 4–5; `find_docs` na kolekcji (bez
-  skonfigurowanej kolekcji narzędzie nie trafia do rejestru). *Dlaczego:* tekst do embeddingu
-  w dwóch miejscach rozjechałby się bezgłośnie, a klienci embeddera i Qdranta są gotowi, więc
-  grafy dostają prawdziwe wyszukiwanie od razu; dopracowanie przychodzi w bloku D.
+  skonfigurowanej kolekcji narzędzie nie trafia do rejestru). `cite()` i `render_for_model()`
+  atrapy i prawdziwego narzędzia mają być jednym kodem (dziś żyją tylko w `fake.py`) — różnić je
+  ma wyłącznie `search()`. *Dlaczego:* tekst do embeddingu w dwóch miejscach rozjechałby się
+  bezgłośnie, a klienci embeddera i Qdranta są gotowi, więc grafy dostają prawdziwe wyszukiwanie
+  od razu; dopracowanie przychodzi w bloku D.
 
 ### A. Decyzje
 

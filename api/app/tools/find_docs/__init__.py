@@ -10,14 +10,16 @@ jak jeden urząd kiedyś się na niej potknął. Każdy fragment niesie wersję 
 instrukcja do starszego wydania wprowadza w błąd dokładnie tak jak odmowa obalona później nowszym
 zgłoszeniem (CLAUDE.md -> „Ryzyka jakości treści").
 
-Status: tylko modele, i to tymczasowe. Czy dokumentacja w ogóle istnieje i w jakiej formie, to
-otwarta decyzja (CLAUDE.md -> „Plan i TODO", p. 12); `fake.py` powstaje w p. 2, `tool.py` w p. 9,
-wczytanie kolekcji w p. 20.
+Status: modele (tymczasowe) i atrapa (`FakeFindDocs`). Czy dokumentacja w ogóle istnieje
+i w jakiej formie, to otwarta decyzja (CLAUDE.md -> „Plan i TODO", p. 12); `tool.py` powstaje
+w p. 9, wczytanie kolekcji w p. 20.
 """
 
+from app.tools.find_docs.fake import FakeFindDocs
 from app.tools.find_docs.models import FindDocsQuery, FindDocsResult, FoundDoc
 
 __all__ = [
+    "FakeFindDocs",
     "FindDocsQuery",
     "FindDocsResult",
     "FoundDoc",

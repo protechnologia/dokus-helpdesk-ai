@@ -15,12 +15,14 @@ w jednym bloku PRZED rekordami, a przyczyny-sentinele („brak", „Brak ustalon
 „(nie ustalono)" i nigdy liczone jako zgodność. Przyczyna utopiona wśród sześciu innych pól do
 modelu nie dociera, a trzy puste przyczyny to nie trzy zgodne.
 
-Status: tylko modele. `fake.py` powstaje w p. 2, `tool.py` w p. 9.
+Status: modele i atrapa (`FakeFindTickets`); `tool.py` powstaje w p. 9.
 """
 
+from app.tools.find_tickets.fake import FakeFindTickets
 from app.tools.find_tickets.models import FindTicketsQuery, FindTicketsResult, FoundTicket
 
 __all__ = [
+    "FakeFindTickets",
     "FindTicketsQuery",
     "FindTicketsResult",
     "FoundTicket",
