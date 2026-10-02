@@ -22,7 +22,7 @@ katalog. Opis, który czyta MODEL, leży obok adaptera w każdym grafie, nie tut
 promptu, czytana zdanie po zdaniu, i może się różnić między grafami używającymi tego samego
 narzędzia.
 
-Narzędzia (CLAUDE.md -> „Plan i TODO", blok 0; dziś modele i atrapy, właściwe w p. 9):
+Narzędzia (CLAUDE.md -> „Plan i TODO", blok 0; dziś modele i atrapy, właściwe w p. 7–8):
 
 | narzędzie      | rodzaj                    | zapytanie agenta              | na czym stoi        |
 |----------------|---------------------------|-------------------------------|---------------------|

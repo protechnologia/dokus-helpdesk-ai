@@ -8,8 +8,8 @@ class AnonymizedText(BaseModel):
     zewnętrznego. Osobny typ, a nie zwykły `str`, żeby granica była widoczna w sygnaturach: kod
     przyjmujący `AnonymizedText` nie przyjmie surowego tekstu przez pomyłkę.
 
-    Tworzy go wyłącznie anonimizator — atrapa w p. 4, usługa w p. 16 (CLAUDE.md -> „Plan i TODO").
-    Python tego nie wymusi; pilnuje tego test grafów (p. 8). Mapowanie pseudonimów na dane
+    Tworzy go wyłącznie anonimizator — atrapa w p. 4, usługa w p. 19 (CLAUDE.md -> „Plan i TODO").
+    Python tego nie wymusi; pilnuje tego test grafów (p. 12). Mapowanie pseudonimów na dane
     dochodzi razem z prawdziwym anonimizatorem.
     """
 

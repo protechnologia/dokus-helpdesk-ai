@@ -11,8 +11,8 @@ instrukcja do starszego wydania wprowadza w błąd dokładnie tak jak odmowa oba
 zgłoszeniem (CLAUDE.md -> „Ryzyka jakości treści").
 
 Status: modele (tymczasowe) i atrapa (`FakeFindDocs`). Czy dokumentacja w ogóle istnieje
-i w jakiej formie, to otwarta decyzja (CLAUDE.md -> „Plan i TODO", p. 12); `tool.py` powstaje
-w p. 9, wczytanie kolekcji w p. 20.
+i w jakiej formie, to otwarta decyzja (CLAUDE.md -> „Plan i TODO", p. 15); `tool.py` i wczytanie
+kolekcji powstają w p. 8.
 """
 
 from app.tools.find_docs.fake import FakeFindDocs

@@ -11,7 +11,7 @@ class Node(ABC):
 
     Do czego:
     Wspólny kontrakt węzłów — właściwych i atrap — żeby każdy graf składał je tak samo
-    (`graph.add_node(node.name, node.run)`) i żeby test grafów (p. 8) rozpoznawał je po nazwie,
+    (`graph.add_node(node.name, node.run)`) i żeby test grafów (p. 12) rozpoznawał je po nazwie,
     np. czy pierwszym węzłem jest `anonymize`.
 
     Stan to model z `state.py` konkretnego grafu — wspólnej klasy stanu nie ma. Węzeł czyta pola,

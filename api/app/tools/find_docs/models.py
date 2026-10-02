@@ -22,9 +22,9 @@ class FoundDoc(BaseModel):
     Jeden fragment dokumentacji produktu zwrócony przez `find_docs`.
 
     Kształt TYMCZASOWY: czy dokumentacja istnieje i w jakiej formie, jest wciąż otwarte
-    (CLAUDE.md -> „Plan i TODO", p. 12), więc są tu tylko pola, których plan już wymaga — który
+    (CLAUDE.md -> „Plan i TODO", p. 15), więc są tu tylko pola, których plan już wymaga — który
     fragment (to cytuje odpowiedź), który dokument, które wydanie opisuje, treść — do przejrzenia
-    przy wczytaniu kolekcji (p. 20). Wydanie jest wymagane, nie opcjonalne: instrukcja do starszej
+    przy wczytaniu kolekcji (p. 8). Wydanie jest wymagane, nie opcjonalne: instrukcja do starszej
     wersji wprowadza w błąd dokładnie tak jak odmowa obalona później nowszym zgłoszeniem.
     """
 

@@ -8,7 +8,7 @@ stanu, a wspólny reduktor `merge_sources` leży w `app/graph/base.py`. W katalo
 implementacja (`node.py`) i atrapa (`fake.py`). Węzeł używany przez jeden graf mieszka
 w katalogu tego grafu, nie tutaj.
 
-Węzły (CLAUDE.md -> „Plan i TODO", blok 0; `anonymize` właściwy, reszta atrapy — właściwe p. 7):
+Węzły (CLAUDE.md -> „Plan i TODO", blok 0; `anonymize` właściwy, reszta atrapy — właściwe p. 9–11):
 
 | węzeł       | co robi                                                                  |
 |-------------|--------------------------------------------------------------------------|

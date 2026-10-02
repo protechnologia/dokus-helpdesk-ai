@@ -12,7 +12,7 @@ def merge_sources(
     ono znaleźć raz, z pierwszego trafienia.
 
     Wspólny dla wszystkich grafów, choć każdy ma własny `state.py`: graf ze źródłami deklaruje
-    pole jako `Annotated[list[SourceRef], merge_sources]`, a test grafów (p. 8) pilnuje, że żaden
+    pole jako `Annotated[list[SourceRef], merge_sources]`, a test grafów (p. 12) pilnuje, że żaden
     o tym nie zapomniał. Wiadomości łączy `operator.add`.
 
     Example args:

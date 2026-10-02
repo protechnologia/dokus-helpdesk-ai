@@ -64,7 +64,7 @@ class FakeFindTickets(KnowledgeSource):
     """
     Description:
     Atrapa `find_tickets`: zamiast Qdranta i embeddera zwraca ustalony zestaw zgłoszeń, zawsze
-    ten sam, ze stałymi id. Na niej chodzą grafy, zanim powstanie prawdziwe narzędzie (p. 9),
+    ten sam, ze stałymi id. Na niej chodzą grafy, zanim powstanie prawdziwe narzędzie (p. 7),
     i testy, którym wystarczy wiedzieć, CO agent dostał, a nie jak zostało znalezione.
 
     Flow:
@@ -126,7 +126,7 @@ class FakeFindTickets(KnowledgeSource):
         """
         Description:
         Prosty tekst dla modelu: liczba trafień i po jednym bloku na zgłoszenie. Docelowy format
-        (osobny blok przyczyn przed rekordami) powstaje w prawdziwym narzędziu (p. 18).
+        (osobny blok przyczyn przed rekordami) powstaje w prawdziwym narzędziu (p. 7).
 
         Example args:
             result=FindTicketsResult(items=[FoundTicket(…)], dropped_below_threshold=0)

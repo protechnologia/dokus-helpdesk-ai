@@ -29,7 +29,7 @@ class ChatMessage(BaseModel):
     Do czego:
     Własny typ zamiast wiadomości LangChaina: pętla rozmawia z modelem przez `LLMClient`
     (zasada 4), a format wiadomości u konkretnego dostawcy tłumaczy jego klient (CLAUDE.md ->
-    „Plan i TODO", p. 14). LangGraph nie wymaga typów LangChaina, więc stan grafu nie musi ich
+    „Plan i TODO", p. 17). LangGraph nie wymaga typów LangChaina, więc stan grafu nie musi ich
     znać. Prompt systemowy nie jest wiadomością — dokłada go węzeł `agent` przy każdej turze.
     """
 

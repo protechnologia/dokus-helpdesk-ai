@@ -28,7 +28,7 @@ class KnowledgeSource(ABC):
            grafu te dwie rzeczy stają się treścią i artefaktem narzędzia.
 
     Bez odczytu po id: dziś nic nie potrzebuje znalezionego elementu ponownie po zakończeniu
-    pętli. Odczyt wraca razem z krokiem human-in-the-loop (CLAUDE.md -> „Plan i TODO", p. 40).
+    pętli. Odczyt wraca razem z krokiem human-in-the-loop (CLAUDE.md -> „Plan i TODO", p. 44).
 
     Każda implementacja musi być tylko do odczytu: prompt wstrzyknięty przez treść zgłoszenia może
     co najwyżej skierować agenta do nietrafionego materiału, nigdy zmienić zawartości indeksu.
