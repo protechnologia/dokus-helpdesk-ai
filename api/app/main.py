@@ -6,7 +6,12 @@ from fastapi import FastAPI, Request, Response
 
 from app.config import Settings
 from app.errors import REQUEST_ID_HEADER, register_exception_handlers
-from app.routers import gate, health, parse_ticket, polish, search, suggest
+from app.routers.gate.router import router as gate_router
+from app.routers.health.router import router as health_router
+from app.routers.parse_ticket.router import router as parse_ticket_router
+from app.routers.polish.router import router as polish_router
+from app.routers.search.router import router as search_router
+from app.routers.suggest.router import router as suggest_router
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +100,15 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(app)
 
-    for module in (health, search, gate, parse_ticket, suggest, polish):
-        app.include_router(module.router)
+    for router in (
+        health_router,        # /health
+        search_router,        # /search
+        gate_router,          # /gate/close, /gate/reply
+        parse_ticket_router,  # /parse-ticket
+        suggest_router,       # /suggest, /variants
+        polish_router,        # /polish
+    ):
+        app.include_router(router)
 
     return app
 

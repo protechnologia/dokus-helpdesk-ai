@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.anonymization import AnonymizationConfigError, AnonymizationError
 from app.llm import LLMConfigError, LLMError
-from app.models import ErrorResponse
+from app.routers.models import ErrorResponse
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ from datetime import date as Date
 
 from app.model.ticket_raw import RawTicket
 from app.model.ticket_raw_comment import RawComment
-from app.models import SourceItem, TicketRequest
+from app.routers.models import SourceItem, TicketRequest
 from app.tools import SourceRef
 
 # Mapowanie modeli API na domenowe i z powrotem, wspólne dla tras. Pisane ręcznie, nie kopiowaniem

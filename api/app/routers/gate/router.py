@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends
 from app.factory import GraphBuilder, get_graph_builder
 from app.graph import gate_close, gate_reply, run_graph
 from app.model.gate_verdict import Verdict
-from app.models import GateReplyRequest, TicketRequest, VerdictResponse
+from app.routers.gate.models import GateReplyRequest, VerdictResponse
 from app.routers.mapping import to_raw_ticket
+from app.routers.models import TicketRequest
 from app.service.loader_dict_rules import get_rule_set
 
 logger = logging.getLogger(__name__)

@@ -5,8 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.factory import GraphBuilder, get_graph_builder
 from app.graph import run_graph
 from app.graph.registry import variant_graphs
-from app.models import SuggestRequest, SuggestResponse, VariantInfo, VariantsResponse
 from app.routers.mapping import to_raw_ticket, to_source_items
+from app.routers.suggest.models import (
+    SuggestRequest,
+    SuggestResponse,
+    VariantInfo,
+    VariantsResponse,
+)
 
 logger = logging.getLogger(__name__)
 

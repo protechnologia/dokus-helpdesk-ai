@@ -85,9 +85,9 @@ ignore = [
 # Typer przekazuje metadane opcji przez wartość domyślną argumentu (`= typer.Option(...)`),
 # FastAPI tak samo wstrzykuje zależności (`= Depends(...)`). To idiom obu frameworków, nie pułapka
 # mutowalnego argumentu domyślnego, przed którą ostrzega B008.
-"scripts/*.py"         = ["B008"]
-"api/app/cli/**/*.py"  = ["B008"]
-"api/app/routers/*.py" = ["B008"]
+"scripts/*.py"            = ["B008"]
+"api/app/cli/**/*.py"     = ["B008"]
+"api/app/routers/**/*.py" = ["B008"]
 # Stan grafu (`GraphState` w base.py i state.py grafów) ma komentarz inline przy każdym polu,
 # a wyrównany typ `messages` sam zajmuje 89 znaków.
 "api/app/graph/base.py"    = ["E501"]

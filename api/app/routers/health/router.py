@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.models import HealthResponse
+from app.routers.health.models import HealthResponse
 
 router = APIRouter(tags=["health"])
 
@@ -9,12 +9,12 @@ router = APIRouter(tags=["health"])
 async def read_health() -> HealthResponse:
     """
     Description:
-    Liveness probe. Answers from the process itself — it must not touch Qdrant, the embedder or
-    the LLM, otherwise a slow dependency would make a healthy container look dead and compose
-    would restart it for no reason.
+    Sonda żywotności. Odpowiada z samego procesu — nie może dotykać Qdranta, embeddera ani LLM-a,
+    bo wolna zależność sprawiłaby, że zdrowy kontener wygląda na martwy, a compose restartowałby
+    go bez powodu.
 
     Example args:
-        (none)
+        (brak)
 
     Example result:
         HealthResponse(status="ok")

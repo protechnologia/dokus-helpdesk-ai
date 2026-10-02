@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends
 
 from app.factory import GraphBuilder, get_graph_builder
 from app.graph import parse_ticket, run_graph
-from app.models import TicketCard, TicketRequest
 from app.routers.mapping import to_raw_ticket
+from app.routers.models import TicketRequest
+from app.routers.parse_ticket.models import TicketCard
 from app.service.loader_dict_resolution import get_resolution_classes
 
 logger = logging.getLogger(__name__)

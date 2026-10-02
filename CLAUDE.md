@@ -1067,8 +1067,8 @@ dokus-helpdesk-ai/
 │       ├── cli/                  # CLI (Typer): pakiet na obszar, plik na komendę — cienkie adaptery
 │       ├── main.py               # montaż aplikacji, middleware, handlery wyjątków
 │       ├── config.py             # Settings (pydantic-settings)
-│       ├── models.py             # modele API (odrębne od domenowych)
-│       ├── routers/              # jeden plik na zasób/endpoint, cienkie
+│       ├── routers/              # trasy: katalog na zasób (router.py + models.py z modelami API);
+│       │                         #   wspólne modele API i mapowanie na górze pakietu
 │       │                         # --- nasza strona: podział po RODZAJU obiektu ---
 │       ├── model/                # ticket_*, validation_parsed_*, dict_resolution_*
 │       ├── service/              # parser_*, validator_*, prompt_*, loader_*
@@ -1151,7 +1151,11 @@ dokus-helpdesk-ai/
   wołaną przez tę implementację (`deterministic_vector` wewnątrz `FakeEncoder`).
 - **Handlery cienkie** — żądanie → serwis → odpowiedź; zero logiki i LLM w handlerze.
 - **Osobne modele domenowe i API.** Encje/obiekty domeny nie wychodzą wprost przez HTTP —
-  przepisujemy jawnie. Chroni kontrakt i blokuje wyciek pól wewnętrznych (ID, scoring).
+  przepisujemy jawnie. Chroni kontrakt i blokuje wyciek pól wewnętrznych (ID, scoring). Modele API
+  żyją przy trasach jak modele narzędzi przy narzędziach: `routers/<zasób>/models.py` dla jednej
+  trasy, `routers/models.py` dla wspólnych (zgłoszenie, źródło, błąd); mapowanie w
+  `routers/mapping.py`. Obiektu `router` pakiet zasobu nie wystawia — przesłoniłby moduł
+  `router.py`, więc `main.py` importuje go pełną ścieżką.
 - **Katalog z samymi danymi (`text/`) potrzebuje `__init__.py`**, choć nikt go nie importuje:
   `[tool.setuptools.packages.find]` wykrywa pakiety po tym pliku, a bez niego treść wypada
   z dystrybucji i `FileNotFoundError` wychodzi dopiero w runtime. Powód jest zapisany w samym
