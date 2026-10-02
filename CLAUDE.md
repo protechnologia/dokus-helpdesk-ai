@@ -1071,8 +1071,11 @@ dokus-helpdesk-ai/
 │       ├── llm/                  # LLMClient + fabryka + FakeLLMClient + cenniki
 │       ├── embedding/            # EmbeddingClient (HTTP do `embedder`) + prefiksy
 │       ├── retrieval/            # klient Qdranta: indeksacja, wyszukiwanie (etap 4)
+│       ├── anonymization/        # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 16)
 │       │                         # --- agent: katalog na jednostkę, właściwa + fake.py ---
-│       └── tools/                # narzędzia agenta: kontrakty w base.py, katalog na narzędzie
+│       ├── tools/                # narzędzia agenta: kontrakty w base.py, katalog na narzędzie
+│       ├── nodes/                # węzły grafów: kontrakt Node, katalog na węzeł
+│       └── graph/                # grafy funkcji: base.py (merge_sources), katalog na graf ze state.py
 ├── embedder/                     # kolejna usługa: model PL za REST-em
 │   ├── Dockerfile
 │   ├── requirements.txt
@@ -1394,7 +1397,7 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   id to błąd, nigdy krótsza lista — propozycja z czterech rekordów zamiast pięciu wygląda dokładnie
   jak poprawna.
 - **Ten sam wynik daje dwie rzeczy: tekst dla modelu (`render_for_model`) i listę źródeł
-  (`cite`)** — w adapterze grafu odpowiednio treść i artefakt narzędzia. Tylko źródło wie, które
+  (`cite`)** — w węźle `run_tools` odpowiednio wiadomość `tool` i wpisy w `sources`. Tylko źródło wie, które
   pola się liczą (np. osobny blok przyczyn w `find_tickets`); lista źródeł powstaje z `cite()`,
   nigdy z deklaracji modelu.
 - **Zapytanie niesie wyłącznie to, czego szukać** — schemat to `query_model` narzędzia. Ile pobrać
@@ -1402,8 +1405,9 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   to błąd walidacji (`extra="forbid"` w każdym modelu zapytania). **Kształt zapytania dobiera się
   do indeksu:** `find_tickets` przyjmuje `problem` + `symptoms`, czyli pola, z których zbudowano
   wektory, i nie woła parsera — sparsowanie zgłoszenia pod wyszukiwanie to zadanie agenta.
-- **Kontrakty nie importują LangGrapha ani LangChaina** — `StructuredTool` powstaje adapterem
-  w grafie. Wymiana orkiestratora ma nie dotykać narzędzi.
+- **Kontrakty nie importują LangGrapha ani LangChaina** — definicję narzędzia dla modelu buduje
+  graf z `name`, opisu `.md` i `query_model.model_json_schema()`. Wymiana orkiestratora ma nie
+  dotykać narzędzi.
 - **Atrapa narzędzia zwraca przy każdym wyszukaniu ten sam wynik, ze stałymi id, i zapisuje
   zapytania w publicznym `queries`** — test grafu sprawdza, o co pytał agent, a nie jak szukało
   narzędzie. Konstruktor przyjmuje własne elementy i `dropped_below_threshold`, więc scenariusz
@@ -1416,6 +1420,31 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   go do żadnej listy.
 - **Każde źródło wiedzy jest tylko do odczytu** — wstrzyknięcie przez treść zgłoszenia może co
   najwyżej skierować agenta do nietrafionego materiału, nie zmienić indeksu.
+
+## Warstwa węzłów (`nodes/`)
+
+- **Kontrakt węzła (`Node` w `nodes/base.py`) to `name` i `run(state)`**; atrapa i węzeł właściwy
+  mają ten sam kontrakt.
+- **Każdy graf ma własny `state.py` z pełnym modelem stanu — wspólnej klasy stanu nie ma
+  (2026-10-02).** Graf wie, jakich węzłów używa, więc deklaruje dokładnie te pola, które one
+  czytają (`input_text`, `anonymized`, `messages`, `iterations`; `sources` tylko grafy z narzędziami
+  wiedzy), plus `output` z typem swojego wyniku (`Verdict`, `ParsedTicket`…). Dzięki temu żadne
+  pole nie ma typu bazowego, więc odpada pułapka serializacji Pydantica (`model_dump()` zrzuca
+  z pola typowanego klasą bazową wyłącznie pola bazowe). Węzeł przyjmuje stan jako `BaseModel`
+  i czyta pola, których potrzebuje.
+- **Węzeł zwraca wyłącznie zmieniane pola, a listy tylko nowymi elementami.** Listy łączą reduktory
+  z adnotacji pola (LangGraph czyta je stamtąd): `messages` — `operator.add`, `sources` —
+  `merge_sources` z `graph/base.py` (po kluczu `source:item_id`, pierwsze trafienie wygrywa).
+  **Cena osobnych stanów:** graf może zadeklarować pole bez reduktora i wtedy po cichu je nadpisuje
+  zamiast doklejać — pilnuje tego test grafów (p. 8).
+- **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `llm/messages.py`), żadnych typów
+  LangChaina (2026-10-02).** Pętla rozmawia z modelem przez `LLMClient`, a format wiadomości
+  u dostawcy tłumaczy jego klient (p. 14). Skoro i model, i narzędzia idą przez nasze kontrakty,
+  LangGraph jest **wyłącznie maszyną stanów** — `StructuredTool` z wcześniejszego planu okazał się
+  zbędny. Prompt systemowy nie jest wiadomością; dokłada go węzeł `agent` przy każdej turze.
+- **`AnonymizedText` mieszka w `anonymization/`** — pakiecie na usługę anonimizatora, jak
+  `embedding/`. Osobny typ zamiast `str`, żeby granica była widoczna w sygnaturach: kod przyjmujący
+  `AnonymizedText` nie przyjmie surowego tekstu przez pomyłkę.
 
 ## Warstwa LLM
 
@@ -1977,10 +2006,10 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Framework RAG (LangChain / LlamaIndex)** — piszemy wprost na kliencie Qdranta; warstwa
   pośrednia ukryłaby dokładnie te rzeczy, które tu kontrolujemy ręcznie (prefiksy, named vectors,
   progi). **LangGraph tego nie odwraca (2026-10-02):** wchodzi wyłącznie jako silnik przebiegu
-  grafów. Narzędzia definiujemy jako nasz kontrakt Pydantic (nie `@tool`), a `StructuredTool`
-  powstaje z niego adapterem w jednym miejscu; model wołamy przez `LLMClient`, nie przez modele
-  czatowe LangChaina; **LangSmith zablokowany jawnie** — jego tracing wysyła pełne prompty do
-  chmury, czyli dane sprzed anonimizacji.
+  grafów — maszyna stanów, nic więcej. Narzędzia to nasz kontrakt Pydantic (nie `@tool`,
+  nie `StructuredTool`), wiadomości to nasze `ChatMessage`, model wołamy przez `LLMClient`, nie
+  przez modele czatowe LangChaina — z LangChaina nie używamy niczego; **LangSmith zablokowany
+  jawnie** — jego tracing wysyła pełne prompty do chmury, czyli dane sprzed anonimizacji.
 - **Hybrid search (dense + BM25/sparse)** — świadomie na później (p. 41), mimo że kody błędów
   i nazwy urządzeń go potrzebują; najpierw czysty dense z pomiarem.
 - **Reranker (cross-encoder na top-10)** — dopiero gdy pomiar pokaże, że top-5 gubi trafienia.
@@ -2166,32 +2195,21 @@ narzędzia.
 - [x] **2. Atrapy wszystkich narzędzi** — `FakeFindTickets` i `FakeFindDocs` (`fake.py` w katalogu
   narzędzia) oraz test kontraktu, który sam znajduje narzędzia w `app/tools/`; reguły —
   „Warstwa narzędzi agenta".
-- [ ] **3. Struktura `api/app/nodes/` z listą węzłów** — katalog na węzeł (`node.py` + `fake.py`);
-  wspólny kontrakt w `nodes/base.py`: stan grafu (wejście, `AnonymizedText`, wiadomości, wywołania
-  narzędzi, źródła jako `list[SourceRef]`, licznik iteracji, wynik). Węzeł używany przez jeden graf
-  mieszka w katalogu tego grafu:
-
-  ```
-  api/app/nodes/
-  ├── base.py              # kontrakt: stan grafu
-  ├── anonymize/           # wejście → AnonymizedText, fail-closed
-  ├── agent/               # tura modelu z narzędziami + decyzja: dalej pętla czy odpowiedź
-  ├── run_tools/           # wywołania z listy dozwolonych, wyniki przez granicę anonimizacji, źródła
-  └── respond/             # walidacja do modelu wyjścia, jeden retry, requires_hits
-  ```
-
-  *Dlaczego:* w LangGraph węzły rozmawiają wyłącznie przez stan, więc model stanu jest dla nich
-  tym, czym `tools/base.py` dla narzędzi — kontraktem, który musi istnieć przed pierwszą atrapą.
+- [x] **3. Struktura `api/app/nodes/` z listą węzłów** — kontrakt `Node` (`base.py`), katalogi
+  `anonymize/`, `agent/`, `run_tools/`, `respond/`; reduktor `merge_sources` w `graph/base.py`
+  (stan ma każdy graf własny, w `state.py`); do tego `ChatMessage`/`ToolCall` (`llm/messages.py`)
+  i `AnonymizedText` (`anonymization/`); reguły — „Warstwa węzłów".
 - [ ] **4. Atrapy wszystkich węzłów** — zwracają ustalony fragment stanu (np. `agent`: od razu
   odpowiedź albo jedno wywołanie atrapy narzędzia). **Wyjątek: `anonymize/` nie dostaje atrapy
   węzła** — od razu jest właściwy, na atrapie zależności (`FakeAnonymizer` → `AnonymizedText`
   w pakiecie usługi, jak `embedding/`; dopuszczalny tylko przy `LLM_PROVIDER=fake`). *Dlaczego:*
   grafy da się złożyć i uruchomić, zanim powstanie logika pętli; atrapa węzła anonimizacji byłaby
   drugą drogą obok anonimizacji, której test z punktu 8 nie odróżniłby od prawdziwego węzła.
-- [ ] **5. Wszystkie grafy na atrapach** — każdy katalog to `graph.py` (przebieg, adaptery
-  narzędzi, funkcja budująca graf z wstrzykiwanymi zależnościami), `fake.py` (atrapa całego
-  grafu dla testów tras i CLI), prompt startowy (`prompt_system.md` + `prompt_user.md`, wzorzec
-  z „Prompty"), opisy narzędzi dla modelu jako `.md` i `__init__.py`:
+- [ ] **5. Wszystkie grafy na atrapach** — każdy katalog to `graph.py` (przebieg, definicje
+  narzędzi dla modelu, funkcja budująca graf z wstrzykiwanymi zależnościami), `state.py` (pełny
+  model stanu grafu z `output` w typie jego wyniku), `fake.py` (atrapa całego grafu dla testów
+  tras i CLI), prompt startowy (`prompt_system.md` + `prompt_user.md`, wzorzec z „Prompty"),
+  opisy narzędzi dla modelu jako `.md` i `__init__.py`:
 
   ```
   api/app/graph/
@@ -2224,10 +2242,11 @@ narzędzia.
   jednym, a przebieg grafu się przy tym nie zmienia.
 - [ ] **8. Test przechodzący po wszystkich grafach** — pierwszy węzeł to anonimizacja, prompt bez
   komentarzy redakcyjnych, narzędzia tylko z listy dozwolonych, limit iteracji działa, złośliwy
-  zestaw reguł nie przestawia formatu; `parse_ticket` jako dopuszczony wyjątek od własnego
-  promptu. *Dlaczego:* przy katalogu na graf da się zapomnieć anonimizacji, a jeden test łapie to
-  dla każdego przyszłego grafu; stoi po punkcie 7, bo limit i lista dozwolonych to zachowanie
-  właściwych węzłów.
+  zestaw reguł nie przestawia formatu, pola-listy w `state.py` mają właściwe reduktory
+  (`messages` — `operator.add`, `sources` — `merge_sources`); `parse_ticket` jako dopuszczony
+  wyjątek od własnego promptu. *Dlaczego:* przy katalogu na graf da się zapomnieć anonimizacji
+  albo reduktora, a jeden test łapie to dla każdego przyszłego grafu; stoi po punkcie 7, bo limit
+  i lista dozwolonych to zachowanie właściwych węzłów.
 - [ ] **9. Właściwe implementacje wszystkich narzędzi** — `find_tickets` bez parsera: tekst do
   embeddingu z `problem` + `symptoms` składa funkcja wspólna z `ParsedTicket.embedding_text()`
   (wydzielona z modelu), dalej `embed_query()` i Qdrant z etapu 4–5; `find_docs` na kolekcji (bez
