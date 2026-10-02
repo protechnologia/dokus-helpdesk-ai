@@ -14,3 +14,8 @@ anthropic==0.120.2
 # OpenAI SDK. Imported by exactly one module (app/llm/client_openai.py) — CLAUDE.md rule 4. Also the
 # route for OpenAI-compatible endpoints (Bielik on RunPod, Ollama, vLLM) via LLM_BASE_URL.
 openai==2.52.0
+# Silnik przebiegu grafów (app/graph/) — wyłącznie maszyna stanów; z LangChaina nie używamy niczego.
+langgraph==1.2.12
+# Przychodzi z LangGraphem, ale importujemy go wprost (app/graph/__init__.py wyłącza nim tracing),
+# więc deklarujemy jawnie — jak httpx wyżej.
+langsmith==0.14.3

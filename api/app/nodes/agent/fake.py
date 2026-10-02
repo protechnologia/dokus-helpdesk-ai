@@ -27,10 +27,12 @@ def tool_call_turn(
     Example result:
         ChatMessage(role="assistant", tool_calls=[ToolCall(name="find_tickets", …)])
     """
-    return ChatMessage(
+    turn = ChatMessage(
         role       = "assistant",
         tool_calls = [ToolCall(call_id=call_id, name=name, arguments=arguments)],
     )
+
+    return turn
 
 
 class FakeAgent(Node):
@@ -83,7 +85,8 @@ class FakeAgent(Node):
             state=SuggestSolutionState(input_text="…", iterations=0)
 
         Example result:
-            {"messages": [ChatMessage(role="assistant", …)], "iterations": 1}
+            {"messages": [ChatMessage(role="assistant", …)], "iterations": 1,
+             "log": [LogEntry(node="agent", message="tura 1: odpowiedź")]}
 
         Raises:
             LLMError: zaplanowane tury się skończyły
@@ -96,4 +99,14 @@ class FakeAgent(Node):
         turn = self._turns[self._next]
         self._next += 1
 
-        return {"messages": [turn], "iterations": state.iterations + 1}
+        iteration = state.iterations + 1
+        tools     = ", ".join(call.name for call in turn.tool_calls)
+        action    = f"narzędzia: {tools}" if tools else "odpowiedź"
+
+        update = {
+            "messages":   [turn],
+            "iterations": iteration,
+            "log":        [self.log_entry(f"tura {iteration}: {action}")],
+        }
+
+        return update

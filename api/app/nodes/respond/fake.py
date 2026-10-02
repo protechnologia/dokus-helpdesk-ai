@@ -49,8 +49,14 @@ class FakeRespond(Node):
             state=GateCloseState(input_text="…", messages=[…])
 
         Example result:
-            {"output": Verdict(verdict="pass", …)}
+            {"output": Verdict(verdict="pass", …),
+             "log": [LogEntry(node="respond", message="output: Verdict")]}
         """
         self.calls.append(state)
 
-        return {"output": self._output}
+        update = {
+            "output": self._output,
+            "log":    [self.log_entry(f"output: {type(self._output).__name__}")],
+        }
+
+        return update

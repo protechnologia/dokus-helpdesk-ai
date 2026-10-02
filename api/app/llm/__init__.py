@@ -9,7 +9,7 @@ from app.llm.base import LLMClient, LLMCompletion
 from app.llm.client_fake import FakeLLMClient
 from app.llm.errors import LLMConfigError, LLMError
 from app.llm.factory import get_llm_client
-from app.llm.messages import ChatMessage, ToolCall
+from app.llm.messages import ChatMessage, ToolCall, ToolDefinition
 
 __all__ = [
     "ChatMessage",
@@ -19,5 +19,6 @@ __all__ = [
     "LLMConfigError",
     "LLMError",
     "ToolCall",
+    "ToolDefinition",
     "get_llm_client",
 ]

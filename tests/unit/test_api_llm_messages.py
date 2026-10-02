@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.llm import ChatMessage, ToolCall
+from app.llm import ChatMessage, ToolCall, ToolDefinition
 
 
 def test_a_tool_result_must_point_at_its_call() -> None:
@@ -26,3 +26,11 @@ def test_a_model_turn_with_a_tool_call_is_valid() -> None:
 
     assert request.tool_calls[0].arguments["problem"] == "x"
     assert answer.call_id == request.tool_calls[0].call_id
+
+
+@pytest.mark.parametrize("name", ["respond gate close", "odpowiedź", "x" * 65, ""])
+def test_a_tool_name_outside_the_provider_format_is_rejected(name: str) -> None:
+    """Nazwa narzędzia ze spacją, znakiem spoza ASCII albo dłuższa niż 64 → ValidationError: Claude
+    i OpenAI odrzuciłyby całe żądanie."""
+    with pytest.raises(ValidationError):
+        ToolDefinition(name=name, description="Opis.", parameters={"type": "object"})

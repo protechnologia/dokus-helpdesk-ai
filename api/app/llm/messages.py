@@ -2,6 +2,28 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+# Nazwa narzędzia w formacie, który przyjmują i Claude, i OpenAI.
+TOOL_NAME_PATTERN = r"^[a-zA-Z0-9_-]{1,64}$"
+
+
+class ToolDefinition(BaseModel):
+    """
+    Description:
+    Narzędzie, które model może wywołać w turze: nazwa, opis dla modelu i schemat argumentów.
+
+    Do czego:
+    Własny typ, jak `ChatMessage`: graf buduje definicje z nazwy, opisu `.md` i schematu modelu
+    Pydantic, a format narzędzia u konkretnego dostawcy tłumaczy jego klient (CLAUDE.md -> „Plan
+    i TODO", p. 17). Tak samo opisuje się narzędzia wiedzy i narzędzie odpowiedzi grafu
+    (`respond_<graf>`).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name:        str            = Field(pattern=TOOL_NAME_PATTERN, examples=["respond_gate_close"])
+    description: str            = Field(min_length=1, examples=["Wydaje werdykt bramki."])
+    parameters:  dict[str, Any] = Field(examples=[{"type": "object", "properties": {}}])
+
 
 class ToolCall(BaseModel):
     """

@@ -61,17 +61,21 @@ class FakeRunTools(Node):
 
         Example result:
             {"messages": [ChatMessage(role="tool", call_id="call_1", content="…")],
+             "log": [LogEntry(node="run_tools", message="wywołania: find_tickets; źródła: 1")],
              "sources": [SourceRef(…)]}
         """
         self.calls.append(state)
 
-        calls = state.messages[-1].tool_calls if state.messages else []
+        calls   = state.messages[-1].tool_calls if state.messages else []
+        names   = ", ".join(call.name for call in calls) or "brak"
+        results = [
+            ChatMessage(role="tool", call_id=call.call_id, content=self._result_text)
+            for call in calls
+        ]
 
         update: dict[str, Any] = {
-            "messages": [
-                ChatMessage(role="tool", call_id=call.call_id, content=self._result_text)
-                for call in calls
-            ],
+            "messages": results,
+            "log":      [self.log_entry(f"wywołania: {names}; źródła: {len(self._sources)}")],
         }
 
         if self._sources:

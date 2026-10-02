@@ -22,7 +22,7 @@ filtr jakości, indeksacja i Qdrant, embedder PolDense, `LLMClient` z fabryką o
 o korpusie („Dane wejściowe", „Domena"). Nowe grafy z nich korzystają, a nie je zastępują.
 
 **Do wycofania dopiero, gdy następca działa:** `variants.json`, `loader_variants.py` i modele
-`variant_generation*`; prompty `text/prompt_suggest_*` (przechodzą do katalogów grafów);
+`variant_generation*`; prompty `text/prompt_suggest_*` (już skopiowane do `graph/suggest_*`);
 bezpośrednie wołanie wyszukiwania z routera `/search` (staje się narzędziem `find_tickets`).
 
 **Ta sekcja znika, gdy skończą się bloki 0, A, B, D i E planu** — wtedy kod dogoni dokument.
@@ -905,13 +905,16 @@ zamknięciem zgłoszenia albo przed wysyłką i dostaje werdykt; to on decyduje,
 przycisk. Stąd trzy wymagania na kontrakt:
 
 - **Werdykt jest danymi, nie prozą** — `{verdict, reasons[], missing[], hint}`. Wołający musi móc
-  pokazać listę braków w swoim UI, a nie wklejać akapit od modelu.
+  pokazać listę braków w swoim UI, a nie wklejać akapit od modelu. Model `Verdict`
+  (`model/gate_verdict.py`) odrzuca `block` bez `reasons` albo bez `hint`, więc zasadę 10
+  egzekwuje walidacja (i retry w `respond`), nie posłuszeństwo modelu.
 - **Awaria LLM-a nie może zablokować helpdesku.** Padnięty model = werdykt niedostępny,
   a wtedy **decyduje helpdesk** (`fail-open` po jego stronie — my zwracamy 503, patrz „Logi
   i obserwowalność"). Bramka jakości, która przy awarii zatrzymuje obsługę klienta, zostanie
   wyłączona po pierwszym incydencie i już nie wróci.
 - **Furtka jest częścią kontraktu, nie obejściem** — odpowiedź niesie informację, że werdykt da
-  się nadpisać. Zasada 10.
+  się nadpisać. Zasada 10. Jest stała dla każdego werdyktu, więc należy do modelu odpowiedzi API,
+  nie do `Verdict`.
 
 ### Trzy funkcje
 
@@ -959,7 +962,9 @@ Konsekwencje, których nie pomijamy:
   sekcji promptu**, nigdy przez sklejanie instrukcji; edycja reguł nie może przestawić formatu
   wyjścia ani znieść zakazu zmyślania. Test-strażnik promptu sprawdza to na złośliwym zestawie
   reguł („zignoruj poprzednie polecenia"), nie tylko na poprawnym.
-- **Pusty zestaw reguł = bramka przepuszcza i mówi o tym wprost** — nie „wszystko OK".
+- **Pusty zestaw reguł = wyjątek przy budowie stanu grafu, nie przepuszczenie** (zmiana
+  2026-10-02 — wcześniej „przepuszcza i mówi o tym wprost"). Bramka bez reguł nie ma czego
+  sprawdzać, a werdykt `pass` wyglądałby jak „wszystko OK".
 
 ### Ewaluacja bramek (osobna oś jakości)
 
@@ -1075,7 +1080,7 @@ dokus-helpdesk-ai/
 │       │                         # --- agent: katalog na jednostkę, właściwa + fake.py ---
 │       ├── tools/                # narzędzia agenta: kontrakty w base.py, katalog na narzędzie
 │       ├── nodes/                # węzły grafów: kontrakt Node, katalog na węzeł
-│       └── graph/                # grafy funkcji: base.py (merge_sources), katalog na graf ze state.py
+│       └── graph/                # grafy funkcji: base.py (GraphState i wspólne), fake.py, katalog na graf
 ├── embedder/                     # kolejna usługa: model PL za REST-em
 │   ├── Dockerfile
 │   ├── requirements.txt
@@ -1203,6 +1208,20 @@ dokus-helpdesk-ai/
       char_count      = meta.char_count,
       pages_processed = meta.pages_processed,
   )
+  ```
+
+- **Wynik złożony zwracamy przez zmienną.** Słownik, model albo wywołanie z kilkoma argumentami
+  najpierw przypisujemy do nazwanej zmiennej, po jednej pozycji na linię z wyrównaniem (w słowniku
+  wartości po dwukropku), a `return` oddaje samą zmienną. Jednolinijkowe `return f(x)` zostaje.
+
+  ```python
+  update = {
+      "messages":   [turn],
+      "iterations": iteration,
+      "log":        [self.log_entry(f"tura {iteration}: {action}")],
+  }
+
+  return update
   ```
 
 ## Warstwa CLI
@@ -1370,9 +1389,10 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
 
 ## Warstwa narzędzi agenta (`tools/`)
 
-- **W `tools/` jest wyłącznie to, co agent może wywołać.** Anonimizator i model tu nie trafiają:
-  anonimizacja to stały węzeł, którego agent nie może pominąć, a model jest wołającym, nie
-  narzędziem. Tabela narzędzi stoi na górze `tools/__init__.py`.
+- **W `tools/` jest wyłącznie to, co agent może wywołać i co się wykonuje.** Narzędzie odpowiedzi
+  grafu (`respond_<graf>`) tu nie trafia — nic go nie wykonuje, to kontrakt wyjścia grafu.
+  Anonimizator i model też nie: anonimizacja to stały węzeł, którego agent nie może pominąć,
+  a model jest wołającym, nie narzędziem. Tabela narzędzi stoi na górze `tools/__init__.py`.
 - **Na górze `tools/` kontrakty (`base.py`) i jedyny wspólny model `SourceRef` (`models.py`);
   w katalogu narzędzia `tool.py`, `fake.py` i `models.py` z modelami TYLKO tego narzędzia** —
   zapytanie (`FindTicketsQuery`), znaleziony element (`FoundTicket`), wynik (`FindTicketsResult`),
@@ -1425,18 +1445,22 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
 
 - **Kontrakt węzła (`Node` w `nodes/base.py`) to `name` i `run(state)`**; atrapa i węzeł właściwy
   mają ten sam kontrakt.
-- **Każdy graf ma własny `state.py` z pełnym modelem stanu — wspólnej klasy stanu nie ma
-  (2026-10-02).** Graf wie, jakich węzłów używa, więc deklaruje dokładnie te pola, które one
-  czytają (`input_text`, `anonymized`, `messages`, `iterations`; `sources` tylko grafy z narzędziami
-  wiedzy), plus `output` z typem swojego wyniku (`Verdict`, `ParsedTicket`…). Dzięki temu żadne
-  pole nie ma typu bazowego, więc odpada pułapka serializacji Pydantica (`model_dump()` zrzuca
-  z pola typowanego klasą bazową wyłącznie pola bazowe). Węzeł przyjmuje stan jako `BaseModel`
-  i czyta pola, których potrzebuje.
+- **Pola wspólne stanu w `GraphState` (`graph/base.py`), `state.py` grafu dziedziczy i dokłada
+  swoje** (zmiana 2026-10-02, wcześniej osobny pełny stan na graf): `input_text`, `anonymized`,
+  `messages`, `iterations`, `log` są w bazie; `output` w typie wyniku (`Verdict`, `ParsedTicket`…),
+  `sources` (tylko grafy z narzędziami wiedzy) i dane wejściowe (`rules`) — w grafie. LangGraph
+  czyta reduktory z pól odziedziczonych (sprawdzone). Pułapka serializacji Pydantica dotyczy pola
+  typowanego klasą bazową, nie dziedziczenia — dlatego żadnego pola ani listy nie typujemy
+  `GraphState`. Węzeł przyjmuje stan jako `BaseModel` i czyta pola, których potrzebuje.
 - **Węzeł zwraca wyłącznie zmieniane pola, a listy tylko nowymi elementami.** Listy łączą reduktory
-  z adnotacji pola (LangGraph czyta je stamtąd): `messages` — `operator.add`, `sources` —
-  `merge_sources` z `graph/base.py` (po kluczu `source:item_id`, pierwsze trafienie wygrywa).
-  **Cena osobnych stanów:** graf może zadeklarować pole bez reduktora i wtedy po cichu je nadpisuje
-  zamiast doklejać — pilnuje tego test grafów (p. 12).
+  z adnotacji pola (LangGraph czyta je stamtąd): `messages` i `log` — `operator.add` w bazie,
+  `sources` — `merge_sources` z `graph/base.py` (po kluczu `source:item_id`, pierwsze trafienie
+  wygrywa). `sources` deklaruje graf sam, więc może zapomnieć reduktora i wtedy po cichu nadpisuje
+  listę zamiast doklejać — pilnuje tego test grafów (p. 12).
+- **Każde wywołanie węzła dopisuje jeden wpis do `log`** (`LogEntry(node, message)` z
+  `nodes/models.py`, budowany przez `Node.log_entry()`) — przebieg grafu do odczytania bez
+  zewnętrznego tracingu. W `message` wyłącznie nazwy, liczby i identyfikatory, nigdy treść
+  zgłoszenia ani odpowiedzi modelu: log wraca w stanie razem z wynikiem.
 - **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `llm/messages.py`), żadnych typów
   LangChaina (2026-10-02).** Pętla rozmawia z modelem przez `LLMClient`, a format wiadomości
   u dostawcy tłumaczy jego klient (p. 17). Skoro i model, i narzędzia idą przez nasze kontrakty,
@@ -1461,6 +1485,44 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   z konstruktora.
 - **Test kontraktu węzłów sam znajduje węzły** (`test_api_nodes_contract.py`) i sprawdza, że nazwa
   węzła = nazwa jego katalogu — atrapa i węzeł właściwy wpinają się do grafu pod tą samą nazwą.
+
+## Warstwa grafów (`graph/`)
+
+- **LangSmith wyłącza import pakietu `app.graph`** — `langsmith.configure(enabled=False)`
+  w `graph/__init__.py`. Zmierzone 2026-10-02: przy `LANGSMITH_TRACING=true` LangGraph wysyła stan
+  każdego węzła, także `input_text` sprzed anonimizacji; przełącznik globalny wygrywa z ENV.
+  Pilnuje `test_api_graph_langsmith.py` (pada bez blokady — sprawdzone). Import LangGrapha ~1,1 s.
+- **`build_graph()` przyjmuje gotowe węzły, a krawędzie prowadzi po nazwach** — węzły zamienione
+  w argumentach dają ten sam graf, dwa o jednej nazwie to błąd przy składaniu.
+- **Prompt grafu składa `graph.py`: `system_prompt()` i `user_prompt(state)`**; treść zgłoszenia
+  bierze wyłącznie z `anonymized`, a stan przed anonimizacją to błąd, nie pusty prompt.
+- **Odpowiedź grafu przychodzi narzędziem `respond_<graf>`, nie tekstem (2026-10-02).** Definicja
+  w `respond_tool.py`, opis dla modelu w `respond_tool.md` (znaczenie pól — tylko tam, nie
+  w prompcie), schemat z modelu wyniku przez `json_schema_without_docs()` (`util/json_schema.py`),
+  który wycina docstringi i `examples` (notatki dla nas i wzory, które model przepisuje). Zysk:
+  koniec pętli rozstrzyga to, CO model wywołał, a nie brak wywołań; format ma jedno źródło; błąd
+  walidacji wraca tą samą drogą co błędne argumenty narzędzia. Schemat nie ma `sources` (zasada 9),
+  odpowiedź musi być jedynym wywołaniem w turze. Długi tekst w argumencie (`suggest_*`, `polish`)
+  — do zmierzenia w p. 25–28; `parse_ticket` — do rozstrzygnięcia w p. 24.
+- **Atrapa grafu (`build_fake_graph()`) jest jednorazowa** — `FakeAgent` ma zaplanowane tury, więc
+  trasa i CLI budują ją na każde wywołanie. `ainvoke` zwraca słownik, nie model stanu.
+- **Każdy graf wystawia to samo API** — `TOOL_NAMES`, `system_prompt()`, `user_prompt(state)`,
+  `model_tools(tools)`, `build_graph(…)`, `build_fake_graph()`, `example_state()` (oraz
+  `respond_tool()`, a w `suggest_*` `REQUIRES_HITS`). `test_api_graph_contract.py` sam znajduje
+  grafy w `app/graph/` i sprawdza je wszystkie, więc nowy graf jest objęty bez dopisywania.
+- **Dwa kształty przebiegu.** Bez narzędzi wiedzy: anonymize → agent → respond. Z nimi: pętla
+  agent ⇄ run_tools, a o kierunku po turze modelu decyduje wspólne `route_after_agent()` z
+  `graph/base.py` — tylko po tym, CO model wywołał (limit iteracji dochodzi w p. 9).
+- **Opis narzędzia wiedzy dla modelu leży w grafie jako `<nazwa narzędzia>.md`** — ten sam kod
+  z `tools/` służy różnym grafom różnie; definicję składa `tool_definitions()` z `graph/base.py`,
+  a narzędzie spoza `TOOL_NAMES` to błąd składania.
+- **Model wyniku wspólny dla kilku grafów — w `model/` (`Verdict`, `Proposal`); używany przez jeden
+  graf — w `graph/<graf>/models.py`** (`SearchDone`, `PolishedText`), jak modele narzędzi.
+- **`search` kończy się pustym `respond_search`** — wynikiem są źródła z `cite()` i zapytania
+  agenta z `messages`, nic z deklaracji modelu. **`parse_ticket` nie ma narzędzia odpowiedzi
+  ani własnego promptu** — prompt parsujący z `text/` to kontrakt artefaktu (p. 24).
+- **Reguły klienta (`gate_close`, `gate_reply`, `polish`) są wymagane: brak albo pusta lista to
+  `ValidationError` przy budowie stanu** (decyzja 2026-10-02) — graf w ogóle nie rusza.
 
 ## Warstwa LLM
 
@@ -2219,32 +2281,10 @@ generacji.
 - [x] **4. Atrapy wszystkich węzłów** — `FakeAgent`, `FakeRunTools`, `FakeRespond`; `anonymize`
   od razu właściwy (`AnonymizeNode`) na `FakeAnonymizer` z fabryką odmawiającą przy prawdziwym
   LLM; test kontraktu węzłów; reguły — „Warstwa węzłów".
-- [ ] **5. Wszystkie grafy na atrapach** — każdy katalog to `graph.py` (przebieg, definicje
-  narzędzi dla modelu, funkcja budująca graf z gotowych węzłów), `state.py` (pełny model stanu
-  grafu z `output` w typie jego wyniku), `fake.py` (ten sam graf złożony z atrap — do testów tras
-  i CLI), szkielet promptu startowego (`prompt_system.md` + `prompt_user.md`, wzorzec
-  z „Prompty"), opisy narzędzi dla modelu jako `.md` i `__init__.py`. LangGraph wchodzi tu jako
-  zależność (`up -d --build api`):
-
-  ```
-  api/app/graph/
-  ├── gate_close/          # bramka zamknięcia → Verdict
-  ├── gate_reply/          # bramka wysyłki → Verdict
-  ├── search/              # podobne zgłoszenia i fragmenty instrukcji → źródła + zapytania agenta
-  ├── parse_ticket/        # karta zgłoszenia → ParsedTicket
-  ├── suggest_questions/   # lista pytań → propozycja ze źródłami
-  ├── suggest_solution/    # odpowiedź z rozwiązaniem → propozycja ze źródłami (requires_hits)
-  ├── suggest_handoff/     # przekazanie do serwisu → propozycja
-  └── polish/              # „Popraw" → tekst (do potwierdzenia — nie ma go w nowej liście celów)
-  ```
-
-  LangSmith zablokowany. Prompty `questions` i `solution` przechodzą tu z `text/prompt_suggest_*`.
-  Bramki i „Popraw" bez narzędzi wiedzy i bez węzła `run_tools`, reguły bramek jako dane
-  w oddzielonej sekcji promptu. `parse_ticket` też bez narzędzi i bez własnego promptu — używa
-  promptu parsującego z `text/`, bo to kontrakt artefaktu (zasada 7), wspólny z masowym importem.
-  Atrapa grafu z narzędziami planuje agentowi najpierw wyszukanie, potem odpowiedź. *Dlaczego:*
-  wszystkie grafy naraz pokazują, czy węzły i kontrakty pasują zarówno do bramek, jak i do
-  generacji, zanim którykolwiek wypełnimy treścią.
+- [x] **5. Wszystkie grafy na atrapach** — `gate_close`, `gate_reply`, `search`, `parse_ticket`,
+  `suggest_questions`, `suggest_solution`, `suggest_handoff`, `polish` (ten ostatni do
+  potwierdzenia w p. 28); LangGraph jako zależność, LangSmith zablokowany, `GraphState` z logiem,
+  odpowiedź narzędziem `respond_<graf>`; reguły — „Warstwa grafów".
 - [ ] **6. Trasy i CLI na atrapach grafów** — `/gate/close`, `/gate/reply`, `/search`,
   `/parse-ticket`, `/suggest` z `variant` mapowanym na graf (422 przy nieznanym), `/polish`,
   `GET /variants` z rejestru grafów. *Dlaczego:* wariant zostaje parametrem, nie trasą, więc nowy
@@ -2274,23 +2314,26 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
 
 - [ ] **9. `agent`** — tura modelu z narzędziami: kontrakt nowej metody `LLMClient` obok
   `complete()` i `FakeLLMClient` ze scenariuszem powstają tu; definicje narzędzi dla modelu
-  z `name`, opisu `.md` i `query_model`; limit iteracji i decyzja: dalej pętla czy odpowiedź.
+  (`ToolDefinition`) z `name`, opisu `.md` i `query_model`; limit iteracji i rozgałęzienie po
+  wywołaniu: narzędzie wiedzy → `run_tools`, `respond_<graf>` → `respond`, sam tekst → błąd
+  formatu.
   *Dlaczego:* pętla to logika domeny i żyje w grafie, nie w kliencie — inaczej wyniki narzędzi
   omijałyby granicę anonimizacji, a zmiana dostawcy zmieniałaby zachowanie pętli.
 - [ ] **10. `run_tools`** — wywołania wyłącznie z listy dozwolonych, argumenty walidowane
   `query_model` (błąd wraca do modelu jako wiadomość `tool`, żeby mógł poprawić wywołanie), tekst
   z `render_for_model()` do `messages`, źródła z `cite()` do `sources`. *Dlaczego:* lista źródeł
   powstaje z wywołań narzędzi, nigdy z deklaracji modelu (zasada 9).
-- [ ] **11. `respond`** — walidacja ostatniej odpowiedzi modelu do typu wyniku grafu z jednym
-  retry; `requires_hits`: graf wymagający źródeł bez źródeł nie oddaje propozycji. *Dlaczego:*
+- [ ] **11. `respond`** — walidacja argumentów `respond_<graf>` do typu wyniku grafu; błąd wraca
+  do modelu jako wiadomość `tool` (jak w p. 10), z jednym retry; `requires_hits`: graf wymagający
+  źródeł bez źródeł nie oddaje propozycji. *Dlaczego:*
   „bez trafień nie ma rozwiązania" ma wynikać z kodu, nie z posłuszeństwa modelu.
-- [ ] **12. Test przechodzący po wszystkich grafach** — pierwszy węzeł to anonimizacja, prompt bez
-  komentarzy redakcyjnych, narzędzia tylko z listy dozwolonych, limit iteracji działa, złośliwy
-  zestaw reguł nie przestawia formatu, pola-listy w `state.py` mają właściwe reduktory
-  (`messages` — `operator.add`, `sources` — `merge_sources`); `parse_ticket` jako dopuszczony
-  wyjątek od własnego promptu. *Dlaczego:* przy katalogu na graf da się zapomnieć anonimizacji
-  albo reduktora, a jeden test łapie to dla każdego przyszłego grafu; stoi po p. 9–11, bo limit
-  i lista dozwolonych to zachowanie właściwych węzłów.
+- [ ] **12. Test przechodzący po wszystkich grafach** — `test_api_graph_contract.py` już sprawdza
+  na atrapach: anonimizacja pierwsza, prompty bez komentarzy redakcyjnych i z tekstem wyłącznie
+  po anonimizacji, model widzi tylko narzędzia z `TOOL_NAMES`, `sources` z `merge_sources`.
+  Zostaje to, co wymaga właściwych węzłów: limit iteracji, `run_tools` odrzucający narzędzie
+  spoza listy, złośliwy zestaw reguł nie przestawia formatu. *Dlaczego:* przy katalogu na graf da
+  się zapomnieć anonimizacji albo reduktora, a jeden test łapie to dla każdego przyszłego grafu;
+  stoi po p. 9–11, bo limit i lista dozwolonych to zachowanie właściwych węzłów.
 
 ### C. Decyzje
 
@@ -2316,8 +2359,10 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
 ### D. Model — zastępuje atrapę modelu z p. 9
 
 - [ ] **17. Tura z narzędziami u prawdziwych dostawców** — implementacja kontraktu z p. 9
-  w klientach Claude / OpenAI / Ollama; pętla zostaje w grafie. *Dlaczego:* format wywołań
-  narzędzi to wiedza dostawcy (zasada 4).
+  w klientach Claude / OpenAI / Ollama; pętla zostaje w grafie. `tool_choice` zostaje `auto` —
+  sprawdzić, czy wymuszony u Claude wyklucza extended thinking; tryb strict u OpenAI wymaga
+  przetłumaczenia schematu (wszystkie pola wymagane). *Dlaczego:* format wywołań narzędzi to
+  wiedza dostawcy (zasada 4).
 - [ ] **18. Dwie role LLM w konfiguracji** — zaufana i generująca, z flagą per endpoint „może
   widzieć surowe dane", domyślnie wyłączoną. *Dlaczego:* pomyłka tej flagi to przeciek, więc
   wyłączenie ochrony ma być jawnym aktem w konfiguracji.
@@ -2355,7 +2400,9 @@ każdy mierzy się osobno.
   najgroźniejszy błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach
   (e-Doręczenia: 6 zgłoszeń, 6 przyczyn), a zapytanie agenta nie powstaje już promptem korpusu.
 - [ ] **24. `parse_ticket`** — karta zgłoszenia promptem parsującym na modelu docelowym, porównana
-  z próbkami z `porownanie-modeli-parsowania.md`. *Dlaczego:* ten sam prompt buduje korpus przy
+  z próbkami z `porownanie-modeli-parsowania.md`; do rozstrzygnięcia, czy odpowiedź idzie
+  narzędziem `respond_parse_ticket` jak w innych grafach, czy JSON-em w tekście — prompt
+  parsujący to kontrakt artefaktu (zasada 7). *Dlaczego:* ten sam prompt buduje korpus przy
   masowym imporcie (p. 31) i przy powrocie zamkniętych zgłoszeń (p. 30), więc jego jakość na
   modelu docelowym rozstrzyga o jakości indeksu.
 - [ ] **25. `suggest_questions`** — prompt z 6.3 przemierzony na modelu docelowym z placeholderami,

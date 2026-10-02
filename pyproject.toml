@@ -88,6 +88,10 @@ ignore = [
 "scripts/*.py"         = ["B008"]
 "api/app/cli/*.py"     = ["B008"]
 "api/app/routers/*.py" = ["B008"]
+# Stan grafu (`GraphState` w base.py i state.py grafów) ma komentarz inline przy każdym polu,
+# a wyrównany typ `messages` sam zajmuje 89 znaków.
+"api/app/graph/base.py"    = ["E501"]
+"api/app/graph/*/state.py" = ["E501"]
 
 [tool.ruff.lint.isort]
 # Without this, `app` is taken for a third-party library and lands in the same block as pytest;

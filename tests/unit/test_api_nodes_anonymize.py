@@ -1,15 +1,9 @@
 import pytest
-from pydantic import BaseModel
 
 from app.anonymization import AnonymizationError, AnonymizedText, Anonymizer, FakeAnonymizer
+from app.graph import GraphState
+from app.nodes import LogEntry
 from app.nodes.anonymize.node import AnonymizeNode
-
-
-class State(BaseModel):
-    """Najmniejszy stan grafu, jakiego potrzebuje ten węzeł."""
-
-    input_text: str
-    anonymized: AnonymizedText | None = None
 
 
 class FailingAnonymizer(Anonymizer):
@@ -36,17 +30,21 @@ class FailingAnonymizer(Anonymizer):
 
 
 async def test_the_node_sets_the_anonymized_text() -> None:
-    """Wejście grafu → `anonymized` z wyniku anonimizatora; nic innego węzeł nie zmienia."""
+    """Wejście grafu → `anonymized` z wyniku anonimizatora i wpis w logu z samą długością tekstu;
+    nic innego węzeł nie zmienia."""
     anonymizer = FakeAnonymizer()
     node       = AnonymizeNode(anonymizer)
 
-    update = await node.run(State(input_text="Nie przychodzą przesyłki"))
+    update = await node.run(GraphState(input_text="Nie przychodzą przesyłki"))
 
-    assert update     == {"anonymized": AnonymizedText(text="Nie przychodzą przesyłki")}
+    assert update == {
+        "anonymized": AnonymizedText(text="Nie przychodzą przesyłki"),
+        "log":        [LogEntry(node="anonymize", message="zanonimizowano 24 zn.")],
+    }
     assert anonymizer.texts == ["Nie przychodzą przesyłki"]
 
 
 async def test_a_failed_anonymization_stops_the_graph() -> None:
     """Błąd anonimizatora → wychodzi z węzła: fail-closed, surowy tekst nie idzie dalej."""
     with pytest.raises(AnonymizationError):
-        await AnonymizeNode(FailingAnonymizer()).run(State(input_text="Jan Kowalski zgłasza…"))
+        await AnonymizeNode(FailingAnonymizer()).run(GraphState(input_text="Jan Kowalski zgłasza…"))

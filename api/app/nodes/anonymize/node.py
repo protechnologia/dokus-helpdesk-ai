@@ -41,15 +41,23 @@ class AnonymizeNode(Node):
     ) -> dict[str, Any]:
         """
         Description:
-        Anonimizuje `input_text` i ustawia `anonymized`.
+        Anonimizuje `input_text` i ustawia `anonymized`. Do logu idzie sama długość tekstu.
 
         Example args:
             state=SuggestSolutionState(input_text="Nie przychodzą przesyłki z e-Doręczeń")
 
         Example result:
-            {"anonymized": AnonymizedText(text="Nie przychodzą przesyłki z e-Doręczeń")}
+            {"anonymized": AnonymizedText(text="Nie przychodzą przesyłki z e-Doręczeń"),
+             "log": [LogEntry(node="anonymize", message="zanonimizowano 37 zn.")]}
 
         Raises:
             AnonymizationError: tekstu nie da się bezpiecznie zanonimizować
         """
-        return {"anonymized": await self._anonymizer.anonymize(state.input_text)}
+        anonymized = await self._anonymizer.anonymize(state.input_text)
+
+        update = {
+            "anonymized": anonymized,
+            "log":        [self.log_entry(f"zanonimizowano {len(state.input_text)} zn.")],
+        }
+
+        return update
