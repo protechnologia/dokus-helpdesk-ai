@@ -99,6 +99,22 @@ def anonymized_state(
     return state
 
 
+def filled_by(
+    graph: ModuleType,  # np. <module app.graph.parse_ticket>
+) -> tuple[str, ...]:
+    """
+    Description:
+    Pola wyniku, których model nie podaje, bo wypełnia je graf — dziś tylko w `parse_ticket`.
+
+    Example args:
+        graph=<module app.graph.parse_ticket>
+
+    Example result:
+        ("ticket_id", "date", "resolution_vocabulary_version")
+    """
+    return getattr(graph, "FILLED_BY_GRAPH", ())
+
+
 def allowed_tools(
     graph: ModuleType,  # np. <module app.graph.search>
 ) -> list:
@@ -146,23 +162,24 @@ async def test_the_fake_graph_runs_from_anonymization_to_output(graph: ModuleTyp
 
 @pytest.mark.parametrize("graph", RESPOND_GRAPHS, ids=name_of)
 async def test_the_fake_agent_answers_through_the_respond_tool(graph: ModuleType) -> None:
-    """Ostatnia tura atrapy agenta → wywołanie `respond_<graf>`, którego argumenty są wynikiem."""
-    state_type = type(graph.example_state())
-    state      = state_type(**await graph.build_fake_graph().ainvoke(graph.example_state()))
-    call       = state.messages[-1].tool_calls[0]
+    """Ostatnia tura atrapy agenta → wywołanie `respond_<graf>`, którego argumenty to wynik bez
+    pól, które wypełnia graf."""
+    state = graph.STATE(**await graph.build_fake_graph().ainvoke(graph.example_state()))
+    call  = state.messages[-1].tool_calls[0]
 
-    assert call.name                                         == graph.RESPOND_TOOL_NAME
-    assert output_type(graph).model_validate(call.arguments) == state.output
+    assert call.name      == graph.RESPOND_TOOL_NAME
+    assert call.arguments == state.output.model_dump(mode="json", exclude=set(filled_by(graph)))
 
 
 @pytest.mark.parametrize("graph", RESPOND_GRAPHS, ids=name_of)
 def test_the_respond_tool_follows_the_convention(graph: ModuleType) -> None:
     """Narzędzie odpowiedzi → `respond_<graf>`, schemat to dokładnie pola wyniku (bez `sources`,
     bo źródła daje `cite()`), bez docstringów i komentarzy redakcyjnych."""
-    tool = graph.respond_tool()
+    tool     = graph.respond_tool()
+    expected = set(output_type(graph).model_fields) - set(filled_by(graph))
 
     assert tool.name == f"respond_{name_of(graph)}"
-    assert set(tool.parameters.get("properties", {})) == set(output_type(graph).model_fields)
+    assert set(tool.parameters.get("properties", {})) == expected
     assert "sources"     not in tool.parameters.get("properties", {})
     assert "description" not in tool.parameters
     assert "<!--"        not in tool.description
@@ -203,14 +220,10 @@ def test_the_prompt_refuses_a_state_before_anonymization(graph: ModuleType) -> N
         graph.user_prompt(graph.example_state())
 
 
-@pytest.mark.parametrize(
-    "graph",
-    [graph for graph in GRAPHS if name_of(graph) != "parse_ticket"],
-    ids=name_of,
-)
+@pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
 def test_the_user_turn_carries_no_instructions(graph: ModuleType) -> None:
-    """Szablon tury użytkownika → dane i rusztowanie, bez reguł. `parse_ticket` wyjątkiem: jego
-    prompt to kontrakt artefaktu z regułami w turze użytkownika (zasada 7)."""
+    """Szablon tury użytkownika → dane i rusztowanie, bez reguł: instrukcja stoi w turze
+    systemowej i w opisie narzędzia odpowiedzi, także w prompcie parsującym."""
     template    = graph.graph.read_document(graph.graph.USER_FILE)
     scaffolding = re.sub(r"\{\{\w+\}\}", "", template)
 

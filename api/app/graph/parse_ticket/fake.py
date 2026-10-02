@@ -4,10 +4,10 @@ from langgraph.graph.state import CompiledStateGraph
 
 from app.anonymization import FakeAnonymizer
 from app.graph.parse_ticket.graph import build_graph
+from app.graph.parse_ticket.respond_tool import FILLED_BY_GRAPH, RESPOND_TOOL_NAME
 from app.graph.parse_ticket.state import ParseTicketState
-from app.llm import ChatMessage
 from app.model.ticket_parsed import ParsedTicket
-from app.nodes.agent import FakeAgent
+from app.nodes.agent import FakeAgent, tool_call_turn
 from app.nodes.anonymize import AnonymizeNode
 from app.nodes.respond import FakeRespond
 from app.service.loader_dict_resolution import get_resolution_classes
@@ -58,6 +58,8 @@ def example_state() -> ParseTicketState:
             "[klient] Od wczoraj nie przychodzą przesyłki.\n\n"
             "[konsultant] Zrestartowaliśmy kolejkę pobierania, przesyłki już spływają."
         ),
+        ticket_id  = "90101",
+        date       = date(2026, 9, 30),
         vocabulary = get_resolution_classes(),
     )
 
@@ -69,8 +71,8 @@ def build_fake_graph(
 ) -> CompiledStateGraph:
     """
     Description:
-    Ten sam graf co `build_graph`, złożony z atrap — do testów tras i CLI. Agent odpowiada kartą
-    jako JSON-em w tekście (tak każe prompt parsujący), a `respond` oddaje tę kartę.
+    Ten sam graf co `build_graph`, złożony z atrap — do testów tras i CLI. Agent wywołuje
+    `respond_parse_ticket` z polami karty bez `FILLED_BY_GRAPH`, a `respond` oddaje całą kartę.
 
     Graf jest jednorazowy: `FakeAgent` ma jedną turę. Na każde wywołanie buduj nowy.
 
@@ -81,7 +83,10 @@ def build_fake_graph(
         CompiledStateGraph, który na dowolny wątek oddaje `output` = podaną kartę
     """
     ticket = ticket if ticket is not None else default_ticket()
-    answer = ChatMessage(role="assistant", content=ticket.model_dump_json())
+    answer = tool_call_turn(
+        RESPOND_TOOL_NAME,
+        ticket.model_dump(mode="json", exclude=set(FILLED_BY_GRAPH)),
+    )
 
     graph = build_graph(
         anonymize = AnonymizeNode(FakeAnonymizer()),

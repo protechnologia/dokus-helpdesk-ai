@@ -24,8 +24,9 @@ o korpusie („Dane wejściowe", „Domena"). Nowe grafy z nich korzystają, a n
 **Wycofane 2026-10-02:** `variants.json`, `loader_variants.py`, modele `variant_generation*`
 i prompty `text/prompt_suggest_*` (nikt ich nie wołał, prompty żyją w `graph/suggest_*`),
 a `/search` przeszedł na graf `search` od razu, choć ten stoi na atrapach do p. 7 i 9–11 —
-świadomie, mimo „najpierw następca". `RagSearcher` zostaje dla `helpdesk rag search` i jako baza
-`find_tickets`.
+świadomie, mimo „najpierw następca". Tego samego dnia skasowane serwisy wołające model zwykłym
+tekstem: `TicketParser` i `RagSearcher`, a z nimi `helpdesk tickets parse` i `helpdesk rag search`
+— parsowanie i wyszukiwanie idą wyłącznie przez grafy (CLI wraca w p. 46).
 
 **Ta sekcja znika, gdy skończą się bloki 0, A, B, D i E planu** — wtedy kod dogoni dokument.
 
@@ -641,13 +642,13 @@ nowe zgłoszenie (surowy tekst)
 
 **Zapytanie do indeksu pisze agent, w kształcie korpusu (2026-10-02).** Surowy mail (powitanie,
 stopka, historia wątku) zaszumia wektor, więc do wyszukania idą dwa pola, z których zbudowano
-indeks: `problem` + `symptoms`. Dawniej (etap 5, `/search` → `RagSearcher`) sprowadzał do nich
-zgłoszenie osobny parser promptem korpusu. Teraz robi to agent — prompt mówi mu, jak pytać
-każde narzędzie — i może szukać kilka razy, w zgłoszeniach i w dokumentacji. Zysk: jedno
-wywołanie LLM mniej na każde wyszukiwanie. **Cena:** zapytanie nie powstaje już tym samym
-promptem co korpus, więc trafność zapytań agenta trzeba zmierzyć (p. 23); ryzyko jest małe, bo
-pomiar z etapu 4 dał 98,1% i dla zapytań surowych, i sparsowanych. Tekst do embeddingu nadal
-składa jedna funkcja, wspólna z `ParsedTicket.embedding_text()` (p. 7).
+indeks: `problem` + `symptoms`. Dawniej (etap 5, `/search` → `RagSearcher`, skasowany 2026-10-02)
+sprowadzał do nich zgłoszenie osobny parser promptem korpusu. Teraz robi to agent — prompt mówi mu,
+jak pytać każde narzędzie — i może szukać kilka razy, w zgłoszeniach i w dokumentacji. Zysk: jedno
+wywołanie LLM mniej na każde wyszukiwanie. **Cena:** zapytanie nie powstaje już tym samym promptem
+co korpus, więc trafność zapytań agenta trzeba zmierzyć (p. 23); ryzyko jest małe, bo pomiar z etapu
+4 dał 98,1% i dla zapytań surowych, i sparsowanych. Tekst do embeddingu nadal składa jedna funkcja,
+wspólna z `ParsedTicket.embedding_text()` (p. 7).
 
 Skoro **obie strony to ten sam rodzaj tekstu**, tryb `sts` był kandydatem wobec `query→passage`
 — pomiar rozstrzygnął na korzyść `query→passage` (patrz niżej).
@@ -1001,9 +1002,6 @@ merytorycznie").
 - Walidacja artefaktów: `helpdesk tickets validate data/parsed/`
 - Indeksacja do Qdranta: `helpdesk rag index <katalog>`
 - Pełna odbudowa indeksu: `helpdesk rag reindex` (kasuje kolekcję, wstaje z `data/parsed/`)
-- Zapytanie z konsoli: `helpdesk rag search "treść zgłoszenia"`
-  (**woła LLM raz na przebieg** — zapytanie jest parsowane przed embedowaniem; brak trafień to
-  wynik i kod wyjścia 0, a kod 2 znaczy „nie dało się odpowiedzieć")
 - Ewaluacja embeddera: `python scripts/eval_embeddings.py recall --model <nazwa>`
   (repo-level, nie CLI usługi — ładuje modele wprost, bez stawiania stacku)
 - Ewaluacja zbudowanego indeksu: `python scripts/eval_index.py recall --collection tickets`
@@ -1071,8 +1069,8 @@ dokus-helpdesk-ai/
 │       │                         #   wspólne modele API i mapowanie na górze pakietu
 │       │                         # --- nasza strona: podział po RODZAJU obiektu ---
 │       ├── model/                # ticket_*, validation_parsed_*, dict_resolution_*
-│       ├── service/              # parser_*, validator_*, prompt_*, loader_*
-│       ├── text/                 # prompt_*_{user,system}.md (nasze) + dict_*.json (klienta)
+│       ├── service/              # parser_*, validator_*, filter_*, loader_*, rag_indexer
+│       ├── text/                 # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
 │       ├── util/                 # html, validation_text, time
 │       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
 │       ├── llm/                  # LLMClient + fabryka + FakeLLMClient + cenniki
@@ -1167,8 +1165,8 @@ dokus-helpdesk-ai/
    modelami transportu.
 2. **Da się to opisać i przetestować, ani razu nie nazywając dziedziny?** → `util/`.
 3. **Model danych czy operacja na nich?** → `model/` albo `service/`.
-4. **Treść, którą człowiek czyta zdanie po zdaniu** (prompt, słownik pojęć)? → `text/`;
-   kod, który ją składa — nigdy tam.
+4. **Dane klienta, które klient zmienia bez deployu** (słownik, zestaw reguł)? → `text/`.
+   Prompt — treść czytana zdanie po zdaniu — leży w katalogu swojego grafu, nie w `text/`.
 5. **Narzędzie agenta, węzeł grafu albo przebieg funkcji?** → `tools/<narzędzie>/`,
    `nodes/<węzeł>/`, `graph/<funkcja>/` — każdy z wersją właściwą i atrapą (p. 1–5); prompt
    grafu leży w katalogu grafu.
@@ -1256,7 +1254,7 @@ Wspólne:
   instancja = jeden produkt" wpisanie nazwy klienta w komendę własnego narzędzia kłamałoby przy
   drugim wdrożeniu.
 - **Drzewo ma dwa poziomy: `helpdesk <obszar> <czynność>`; obszar to pakiet w `cli/`, czynność to
-  plik w nim** (`helpdesk rag search` → `cli/rag/search.py`, od 2026-10-02). Obszar zbiera to, co
+  plik w nim** (`helpdesk rag index` → `cli/rag/index.py`, od 2026-10-02). Obszar zbiera to, co
   dzieli zależności: `rag` woła Qdranta i embedder, `tickets` wytwarza artefakt LLM-em, a bramki
   i „Popraw" stoją **poza `rag`**, bo z definicji działają bez indeksu. Ścieżka = komenda to
   jedyna rzecz, która pozwala trafić z komendy do kodu bez czytania `cli.py`. Kod wspólny kilku
@@ -1323,7 +1321,7 @@ Wspólne:
   żądanie** — atrapa jest jednorazowa. Do p. 9 `build_function_graph()` zawsze oddaje atrapę,
   także przy prawdziwym `LLM_PROVIDER`: nic nie wychodzi z procesu, a odmowa położyłaby trasy na
   stacku dev. Test podmienia zależność przez `dependency_overrides`, wstawiając graf z atrap,
-  do których ma dostęp. `build_searcher()` zostaje dla CLI.
+  do których ma dostęp.
 
 ## Warstwa embeddera
 
@@ -1385,9 +1383,10 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
 - **Nazwa named vectora zawsze podawana jawnie przy wyszukiwaniu.** Kolekcja ma dwa, a szukanie po
   niewłaściwym nie jest błędem — zwraca wiarygodnie wyglądające bzdury (zmierzone: `query→sts` daje
   96,7% zamiast 98,3%, czyli spadek, nie awarię).
-- **Odcięte progiem trafienia są LICZONE, nie milcząco gubione** (`dropped_below_threshold`
-  w `SearchResult`) — inaczej ostry próg wygląda dokładnie tak samo jak pusty indeks, a to dwie
-  różne awarie. Przy `RAG_SCORE_MIN` = 0.48 odcinanie jest regułą, nie wyjątkiem.
+- **Odcięte progiem trafienia są LICZONE, nie milcząco gubione** (`dropped_below_threshold` w wyniku
+  `find_tickets`; do odpowiedzi `/search` wraca w p. 10) — inaczej ostry próg wygląda dokładnie tak
+  samo jak pusty indeks, a to dwie różne awarie. Przy `RAG_SCORE_MIN` = 0.48 odcinanie jest regułą,
+  nie wyjątkiem.
 - **`RAG_SCORE_MIN` = 0.48 stoi świadomie po stronie odsiewania śmieci** (pomiar na 171 rekordach,
   raport `data/docs/pomiar-progu-score.md`) — trafienie bez treści wygląda na odpowiedź, a przy
   47% singletonów „nic nie znalazłem" jest normalną odpowiedzią. Trzy pułapki strojenia:
@@ -1403,9 +1402,6 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
     trafień dystraktorów zamiast 2 z 80, a trafienia poprawne nie cierpią. Parser upodabnia do
     korpusu **także** zapytania bez odpowiednika. Odpowiednik dzisiejszego wyboru to okolice 0.52,
     ale 40 zapytań nie wystarcza, by to zabetonować — do przeliczenia w p. 33.
-- **Wynik wyszukiwania niesie także sparsowane zapytanie** — model przepisał wątek na `problem`
-  + `symptoms`, a nieoczekiwane odczytanie zgłoszenia jest pierwszą rzeczą tłumaczącą dziwną listę
-  trafień.
 
 ## Warstwa narzędzi agenta (`tools/`)
 
@@ -1523,7 +1519,8 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   koniec pętli rozstrzyga to, CO model wywołał, a nie brak wywołań; format ma jedno źródło; błąd
   walidacji wraca tą samą drogą co błędne argumenty narzędzia. Schemat nie ma `sources` (zasada 9),
   odpowiedź musi być jedynym wywołaniem w turze. Długi tekst w argumencie (`suggest_*`, `polish`)
-  — do zmierzenia w p. 25–28; `parse_ticket` — do rozstrzygnięcia w p. 24.
+  — do zmierzenia w p. 25–28. Także `parse_ticket` (`respond_parse_ticket`, 2026-10-02) — bez
+  pól `FILLED_BY_GRAPH` (`ticket_id`, `date`, wersja słownika), które dokłada graf ze stanu.
 - **Atrapa grafu (`build_fake_graph()`) jest jednorazowa** — `FakeAgent` ma zaplanowane tury, więc
   trasa i CLI budują ją na każde wywołanie. `ainvoke` zwraca słownik, nie model stanu.
 - **Każdy graf wystawia to samo API** — `STATE`, `TOOL_NAMES`, `system_prompt()`,
@@ -1540,8 +1537,12 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
 - **Model wyniku wspólny dla kilku grafów — w `model/` (`Verdict`, `Proposal`); używany przez jeden
   graf — w `graph/<graf>/models.py`** (`SearchDone`, `PolishedText`), jak modele narzędzi.
 - **`search` kończy się pustym `respond_search`** — wynikiem są źródła z `cite()` i zapytania
-  agenta z `messages`, nic z deklaracji modelu. **`parse_ticket` nie ma narzędzia odpowiedzi
-  ani własnego promptu** — prompt parsujący z `text/` to kontrakt artefaktu (p. 24).
+  agenta z `messages`, nic z deklaracji modelu.
+- **Prompt parsujący leży w `graph/parse_ticket/`, jak każdy prompt grafu (2026-10-02)** — i nadal
+  jest KONTRAKTEM ARTEFAKTU (zasada 7): `prompt_system.md` (rola, jak czytać wątek),
+  `respond_tool.md` (znaczenie pól, przykłady) i `prompt_user.md` (słownik i wątek) pod
+  testem-strażnikiem `test_api_graph_parse_ticket_prompt.py`, który zamraża frazy. Korpus przy
+  masowym imporcie (p. 31) zbuduje ten sam graf — innej drogi do tego promptu nie ma.
 - **Reguły klienta (`gate_close`, `gate_reply`, `polish`) są wymagane: brak albo pusta lista to
   `ValidationError` przy budowie stanu** (decyzja 2026-10-02) — graf w ogóle nie rusza.
 
@@ -1580,24 +1581,22 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
 ### Prompty
 
 - **Prompt = logika, nie konfiguracja** — szablony w repo, jeden plik na prompt, **nigdy w ENV**.
-  - **Gdzie leży treść:** prompty grafów — w katalogu swojego grafu (p. 5); prompt parsujący
-    i słowniki — w `api/app/text/`, bo prompt parsujący jest kontraktem artefaktu wspólnym dla
-    kilku miejsc. Kod składający nigdy nie leży w `text/`. Dotyczy TAKŻE promptu systemowego, bo
-    to również treść czytana zdanie po zdaniu. Moduł sięga po dokument jawną ścieżką.
+  - **Gdzie leży treść:** każdy prompt — także parsujący — w katalogu swojego grafu
+    (`prompt_system.md`, `prompt_user.md`, opisy narzędzi `.md`); w `api/app/text/` wyłącznie
+    dane klienta (słowniki, zestawy reguł). Kod składający leży w `graph.py` obok. Moduł sięga po
+    dokument jawną ścieżką.
   - **Cała instrukcja w turze systemowej, w turze użytkownika same dane** (wzorzec z 6.3).
     Kryterium podziału: co zmienia się między wywołaniami. Instrukcja jest stała, więc stanowi
     cache'owalny prefiks i konkuruje z wklejoną treścią z pozycji, którą modele ważą wyżej;
     ubocznie granica wstrzyknięcia robi się ostra, bo w turze użytkownika nie ma instrukcji,
     z którymi wklejone polecenie mogłoby się zlać. Jedyny wyjątek to **zdanie zamykające**
-    powtarzające kontrakt wyjścia PO danych — recency jest tam, gdzie format się trzyma. Prompt
-    parsujący trzyma reguły odwrotnie i tak zostaje, bo jest kontraktem artefaktu (zasada 7).
-  - **`text/` jest PŁASKI i mieszają się w nim dwa reżimy zmiany — to świadoma decyzja z ceną.**
-    `prompt_*.md` to NASZ kod: zmiana wymaga commita, review i testu-strażnika, bo zmienia
-    znaczenie wszystkich przyszłych artefaktów (zasada 7). `dict_resolution.json` to DANE
-    KLIENTA: zmiana to podbicie `version`, a od p. 29 edycja przez GUI. **Ścieżka tej różnicy
-    nie pokazuje**, więc niesie ją nagłówek każdego pliku (`<!-- -->` w markdownie, pole
-    `description` w JSON-ie) — i to jedyne miejsce, które ją pilnuje. Przy dokładaniu pliku do
-    `text/` napisz w nagłówku, do którego reżimu należy.
+    powtarzające kontrakt wyjścia PO danych — recency jest tam, gdzie format się trzyma. Od
+    2026-10-02 także prompt parsujący (wcześniej trzymał reguły w turze użytkownika).
+  - **Reżim zmiany widać po ścieżce.** Prompty (katalogi grafów) to NASZ kod: zmiana wymaga
+    commita, review i testu-strażnika, a przy prompcie parsującym zmienia znaczenie wszystkich
+    przyszłych artefaktów (zasada 7). `text/` to DANE KLIENTA: zmiana to podbicie `version`,
+    a od p. 29 edycja przez GUI. Dawniej oba reżimy mieszały się w płaskim `text/` i rozróżniał je
+    tylko nagłówek pliku — przeniesienie promptu parsującego do grafu to zlikwidowało.
   - **Treść promptu to dokument `.md`, moduł `.py` obok tylko go składa.** Prompt jest jedyną
     rzeczą w projekcie, którą człowiek musi kontrolować zdanie po zdaniu — sklejany z kilku
     stałych czyta się przez składnię Pythona, a jako dokument diff w review pokazuje zmianę
@@ -1966,7 +1965,8 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
   na inne pytanie: `integration` — „czy usługi są ze sobą spięte", `functional` — „czy produkt
   zachowuje się sensownie" (zgłoszenie na wejściu, trafienia na wyjściu). Rozdzielone, żeby
   30-sekundowy sprawdzian okablowania nie kosztował przebiegu wołającego LLM i Qdranta.
-  Pierwszy nosiciel powstał razem z `POST /search` (etap 5).
+  Dziś bez nosiciela: jedyny test (`/search` na `RagSearcherze`) wypadł razem z nim 2026-10-02,
+  a marker wraca z prawdziwym `find_tickets` (p. 7) i pomiarem pętli (p. 23).
 - **Test czytający compose musi tolerować tagi Compose'a** — `volumes: !reset []` jest poprawnym
   Compose'em, ale nieznanym tagiem dla `yaml.safe_load`, więc gołe wczytanie pliku wywala się
   dokładnie na linii, która stanowi o działaniu warstwy prod. Stąd własny loader z konstruktorem
@@ -2099,9 +2099,9 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   - **Gdyby padło na jedną maszynę:** embedder na CPU, LLM na GPU — nie odwrotnie i nie oba na
     GPU. Dwa procesy na jednej karcie dają najgorszą awarię: Ollama wpada w częściowy offload
     i **cicho zwalnia kilkukrotnie, bez błędu w logach**.
-- ~~**Masowe parsowanie korpusu w aplikacji**~~ — **odwrócone 2026-08-01**: `helpdesk tickets
-  parse` już to robi, zapisując artefakt po KAŻDYM zgłoszeniu. Masowemu importowi (p. 31) zostaje adapter SQL,
-  wznawianie i raport zbiorczy — nie sama zdolność parsowania. Ręczne parsowanie w czacie
+- ~~**Masowe parsowanie korpusu w aplikacji**~~ — **odwrócone 2026-08-01**: robił to `helpdesk
+  tickets parse` (artefakt po KAŻDYM zgłoszeniu), skasowany 2026-10-02 razem z `TicketParserem`
+  — masowy import (p. 31) pójdzie przez graf `parse_ticket`. Ręczne parsowanie w czacie
   skończone; z narzędzi został `scripts/select_parse_sample.py` (dobór warstwowy deterministyczny
   + próg 50 znaków liczony po stripie HTML-a).
 - **Framework RAG (LangChain / LlamaIndex)** — piszemy wprost na kliencie Qdranta; warstwa
@@ -2359,7 +2359,8 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
   stoi po p. 9–11, bo limit i lista dozwolonych to zachowanie właściwych węzłów.
 - [ ] **46. CLI dla grafów** (dopisany 2026-10-02, numer spoza kolejności) — `helpdesk gate
   close|reply`, `helpdesk suggest <wariant>`, „Popraw" i karta zgłoszenia na tej samej fabryce
-  grafów co trasy; `helpdesk rag search` przechodzi na graf. *Dlaczego:* odłożone z p. 6 — na
+  grafów co trasy; także wyszukiwanie i parsowanie zgłoszeń do korpusu (dawne `rag search`
+  i `tickets parse`, skasowane z serwisami 2026-10-02). *Dlaczego:* odłożone z p. 6 — na
   atrapach komenda zwracałaby stałe odpowiedzi.
 
 ### C. Decyzje
@@ -2426,12 +2427,11 @@ każdy mierzy się osobno.
   agenta wobec zapytań z parsera korpusu (golden set, `recall@1` i MRR). *Dlaczego:*
   najgroźniejszy błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach
   (e-Doręczenia: 6 zgłoszeń, 6 przyczyn), a zapytanie agenta nie powstaje już promptem korpusu.
-- [ ] **24. `parse_ticket`** — karta zgłoszenia promptem parsującym na modelu docelowym, porównana
-  z próbkami z `porownanie-modeli-parsowania.md`; do rozstrzygnięcia, czy odpowiedź idzie
-  narzędziem `respond_parse_ticket` jak w innych grafach, czy JSON-em w tekście — prompt
-  parsujący to kontrakt artefaktu (zasada 7). *Dlaczego:* ten sam prompt buduje korpus przy
-  masowym imporcie (p. 31) i przy powrocie zamkniętych zgłoszeń (p. 30), więc jego jakość na
-  modelu docelowym rozstrzyga o jakości indeksu.
+- [ ] **24. `parse_ticket`** — karta zgłoszenia promptem parsującym na modelu docelowym, porównana z
+  próbkami z `porownanie-modeli-parsowania.md` (zbierane jeszcze JSON-em w tekście — od 2026-10-02
+  karta wychodzi narzędziem `respond_parse_ticket`). *Dlaczego:* ten sam prompt buduje korpus przy
+  masowym imporcie (p. 31) i przy powrocie zamkniętych zgłoszeń (p. 30), więc jego jakość na modelu
+  docelowym rozstrzyga o jakości indeksu.
 - [ ] **25. `suggest_questions`** — prompt z 6.3 przemierzony na modelu docelowym z placeholderami,
   z regułą zgodności przyczyny z objawem; ewaluacja wariantu. *Dlaczego:* część zabiegów z 6.3
   powstała pod 11B, a znana dziura (pytanie o wygasłe konto przy awarii całego urzędu) czeka na
@@ -2461,7 +2461,8 @@ każdy mierzy się osobno.
 
 ### H. Korpus
 
-- [ ] **31. Masowy import z nowszego zrzutu** — anonimizacja przed parsowaniem, model parsujący
+- [ ] **31. Masowy import z nowszego zrzutu** — przez graf `parse_ticket` (zapis artefaktu po KAŻDYM
+  zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed parsowaniem, model parsujący
   wybrany na podstawie `porownanie-modeli-parsowania.md`, prompt dostosowany do placeholderów,
   czytnik SQL, wznawianie, raport, porządek w `data/parsed/` (golden200 zostaje). *Dlaczego:* to
   jedyny drogi przebieg (zasada 7), więc anonimizator i prompt muszą być gotowe przed nim.

@@ -1,20 +1,21 @@
 from pydantic import ValidationError
 
 
-def describe_validation_error(error: ValidationError) -> list[str]:   # e.g. 2 field errors
+def describe_validation_error(
+    error: ValidationError,  # np. 2 błędy pól
+) -> list[str]:
     """
     Description:
-    Flattens a pydantic error into one readable line per problem.
+    Spłaszcza błąd pydantica do jednej czytelnej linii na problem.
 
     Do czego:
-    Formats, never validates — it knows nothing about tickets and would read any pydantic model's
-    failure the same way, which is what puts it in `util/`. Both callers
-    (`parser_ticket_parsed.py` reporting a rejected LLM answer, `validator_ticket_parsed.py`
-    reporting a bad file) run over a whole corpus and produce hundreds of these, so the output has
-    to name the field: "resolution: …" is actionable, a raw pydantic dump is not.
+    Formatuje, nigdy nie waliduje — nie wie nic o zgłoszeniach i tak samo czyta porażkę dowolnego
+    modelu pydantica, i to stawia ją w `util/`. Wołający (`validator_ticket_parsed.py` raportujący
+    zły plik) przechodzi po całym korpusie i produkuje setki takich linii, więc wynik musi nazywać
+    pole: „resolution: …" da się naprawić, surowy zrzut pydantica nie.
 
-    Not confused with `app/errors.py`, which registers HTTP exception handlers — this one only
-    turns a validation failure into lines a human reads in a CLI report.
+    Nie mylić z `app/errors.py`, który rejestruje handlery wyjątków HTTP — ta funkcja tylko zamienia
+    porażkę walidacji na linie, które człowiek czyta w raporcie CLI.
 
     Example args:
         error=ValidationError(...)
@@ -25,7 +26,7 @@ def describe_validation_error(error: ValidationError) -> list[str]:   # e.g. 2 f
     lines: list[str] = []
 
     for entry in error.errors():
-        # Model-level validators report an empty location; name them for what they are.
+        # Walidatory poziomu modelu zgłaszają pustą lokalizację — nazwij je tym, czym są.
         location = ".".join(str(part) for part in entry["loc"]) or "rekord"
         lines.append(f"{location}: {entry['msg']}")
 

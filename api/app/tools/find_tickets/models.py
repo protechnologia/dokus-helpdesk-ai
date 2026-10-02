@@ -41,9 +41,8 @@ class FindTicketsResult(BaseModel):
     """
     Description:
     Co dało jedno wyszukiwanie `find_tickets`: zgłoszenia, które przeszły `RAG_SCORE_MIN`, i liczba
-    odciętych. Licznik idzie razem z elementami z tego samego powodu co w `SearchResult`: „nic nie
-    było" i „próg to wyciął" to różne odpowiedzi, a agent decydujący, czy ma dość materiału, musi
-    je rozróżniać.
+    odciętych. Licznik idzie razem z elementami, bo „nic nie było" i „próg to wyciął" to różne
+    odpowiedzi, a agent decydujący, czy ma dość materiału, musi je rozróżniać.
     """
 
     model_config = ConfigDict(extra="forbid")

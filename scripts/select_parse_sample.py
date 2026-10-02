@@ -1,9 +1,9 @@
 """Select a stratified, reproducible sample of ticket ids from data/raw/.
 
 Do czego:
-    Wybiera próbkę zgłoszeń do sparsowania i wypisuje ich identyfikatory — nic więcej.
-    Wyjście jest wejściem dla `helpdesk tickets parse -t <id> -t <id> …`, więc skrypt kończy
-    się tam, gdzie zaczyna się CLI usługi.
+    Wybiera próbkę zgłoszeń do sparsowania i zapisuje ich identyfikatory — nic więcej.
+    Parsowanie idzie przez graf `parse_ticket`; komenda CLI, która przyjmie tę listę, wraca
+    w p. 46 (dawne `helpdesk tickets parse` skasowano 2026-10-02 razem z `TicketParserem`).
 
     Skrypt jest repo-level, nie należy do usługi `api` (patrz „Warstwa CLI" w CLAUDE.md):
     nie importuje `api.app` i nie odpytuje żadnego endpointu.
@@ -29,7 +29,7 @@ Zasady:
 Historia:
     Powstał z `scripts/prepare_parse_batch.py` (commit 8d7114e, skasowany 2026-08-01 wraz
     z końcem ręcznego parsowania w czacie). Renderowanie do tekstu i porcjowanie wypadły —
-    robi to dziś `helpdesk tickets parse`. Został dobór i filtr, czyli to, czego CLI nie ma.
+    robił to `helpdesk tickets parse`, a zrobi graf `parse_ticket`. Został dobór i filtr.
 """
 
 import html
@@ -244,7 +244,7 @@ def select(
 
     # --- kontrola okna kontekstu ---
     # Liczona PRZED przebiegiem, bo odmowa w jego trakcie kosztuje czas GPU. Zgłoszenia ponad
-    # próg nie są usuwane z próbki: `tickets parse` odmówi ich sam, a my chcemy znać liczbę.
+    # próg nie są usuwane z próbki: parser odmówi ich sam, a my chcemy znać liczbę.
     budget    = int(num_ctx * CHARS_PER_TOKEN)
     too_long  = [i for i in picked if _thread_chars(tickets[i]) > budget]
 
@@ -271,17 +271,14 @@ def select(
 
     typer.echo("")
 
-    # Gotowa komenda zamiast surowej listy: przy 200 zgłoszeniach same `-t <id>` to ~1700 znaków
-    # w jednej linii, których nie da się zaznaczyć w terminalu. Zapis do pliku pozwala wkleić
-    # jedno podstawienie, a plik zostaje jako ślad, którą próbkę faktycznie puszczono.
+    # Plik zamiast surowej listy: przy 200 zgłoszeniach lista nie mieści się w terminalu, a plik
+    # zostaje jako ślad, którą próbkę faktycznie puszczono.
     GOLDEN_ROOT.mkdir(parents=True, exist_ok=True)
     ids_file.write_text("\n".join(str(i) for i in picked) + "\n", encoding="utf-8")
 
     typer.echo(f"Identyfikatory zapisane: {ids_file}")
-    typer.echo("")
-    typer.echo("Uruchomienie parsowania:")
-    typer.echo(f"  helpdesk tickets parse {parsed_dir} \\")
-    typer.echo(f"    $(sed 's/^/-t /' {ids_file} | tr '\\n' ' ')")
+    typer.echo(f"Katalog docelowy artefaktów: {parsed_dir}")
+    typer.echo("Parsowanie: graf `parse_ticket` — komenda CLI wraca w p. 46.")
 
 
 if __name__ == "__main__":

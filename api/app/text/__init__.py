@@ -8,13 +8,9 @@
 # a obraz robi `COPY app/ ./app/` — i właśnie dlatego jego usunięcie zepsułoby coś gdzie indziej
 # (wheel, zwykłe `pip install .`), a nie tutaj.
 #
-# CO TU LEŻY — dwa reżimy, które wyglądają podobnie, a nie są (CLAUDE.md -> „Prompty"):
-#   * NASZE, tylko przez gita, pod testem-strażnikiem: prompt_parse_ticket_user.md
-#     i prompt_parse_ticket_system.md. Ich edycja zmienia znaczenie każdego PRZYSZŁEGO artefaktu
-#     w data/parsed/ (zasada 7), więc nie są wystawiane klientowi ani edytowane w runtime.
-#     Prompty grafów leżą w katalogach grafów (app/graph/<graf>/), nie tutaj.
-#   * DANE KLIENTA, wersjonowane polem w pliku: dict_resolution.json i domyślne zestawy reguł
-#     dict_rules_<graf>.json (gate_close, gate_reply, polish). Przejmie je magazyn reguł (p. 29),
-#     gdzie staną się edytowalne przez GUI.
-# Katalog jest płaski, więc różnicy NIE widać w ścieżce — każdy plik mówi o swoim reżimie
-# w nagłówku i tylko ten nagłówek je rozróżnia.
+# CO TU LEŻY: WYŁĄCZNIE DANE KLIENTA, wersjonowane polem `version` w pliku — dict_resolution.json
+# i domyślne zestawy reguł dict_rules_<graf>.json (gate_close, gate_reply, polish). Przejmie je
+# magazyn reguł (p. 29), gdzie staną się edytowalne przez GUI. Prompty — nasz kod, pod
+# testami-strażnikami — leżą w katalogach grafów (app/graph/<graf>/), także prompt parsujący.
+# Dawniej oba reżimy mieszały się tutaj i rozróżniał je tylko nagłówek pliku (CLAUDE.md ->
+# „Prompty").

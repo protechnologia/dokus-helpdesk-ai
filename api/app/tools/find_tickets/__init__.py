@@ -6,7 +6,7 @@ Do czego:
 Agent podaje zgłoszenie w kształcie korpusu (`problem` + `symptoms`), narzędzie składa z tego tekst
 do embeddingu tak jak `ParsedTicket.embedding_text()`, zamienia go na wektor w trybie QUERY,
 dopasowuje do wektorów `problem` i przycina progiem `RAG_SCORE_MIN`. Parsera nie woła — to
-różnica wobec wyszukiwania z etapu 5 (`service/rag_searcher.py`), gdzie zgłoszenie parsował
+różnica wobec dawnego wyszukiwania z etapu 5 (skasowany `RagSearcher`), gdzie zgłoszenie parsował
 osobny krok. Treścią każdego elementu jest sparsowane zgłoszenie z payloadu Qdranta, więc `cause`
 i `solution` docierają do modelu jako pola, nigdy jako surowy mail.
 

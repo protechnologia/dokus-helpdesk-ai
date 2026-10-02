@@ -7,23 +7,21 @@ from app.cli.tickets import tickets
 
 # --- helpdesk: całe drzewo komend ------------------------------------------------------------
 #
-# Obszar to pakiet w `cli/`, czynność to plik w nim: `helpdesk rag search` → `cli/rag/search.py`.
+# Obszar to pakiet w `cli/`, czynność to plik w nim: `helpdesk rag index` → `cli/rag/index.py`.
 #
 # | komenda                   | plik                  | co robi                        |
 # |---------------------------|-----------------------|--------------------------------|
 # | `version`                 | `cli.py`              | wersja pakietu; smoke test CLI |
 # | `tickets validate <kat.>` | `tickets/validate.py` | artefakty wobec ParsedTicket   |
-# | `tickets parse`           | `tickets/parse.py`    | parsowanie data/raw/ przez LLM |
 # | `rag index <kat.>`        | `rag/index.py`        | artefakty do kolekcji Qdranta  |
 # | `rag reindex <kat.>`      | `rag/reindex.py`      | kolekcja od zera               |
-# | `rag search "<treść>"`    | `rag/search.py`       | podobne zgłoszenia             |
 #
-# Zaplanowane (p. 46): komendy na grafach — `gate close` / `gate reply` / „Popraw" stoją POZA
-# obszarem `rag`, bo z definicji działają bez indeksu.
+# Zaplanowane (p. 46): komendy na grafach — wyszukiwanie, parsowanie zgłoszeń, propozycje; bramki
+# i „Popraw" stoją POZA obszarem `rag`, bo z definicji działają bez indeksu.
 #
 # no_args_is_help: samo `helpdesk` drukuje drzewo, zamiast błędu użycia.
 cli = typer.Typer(
-    help            = "Narzędzia operatora: indeksacja, wyszukiwanie, ewaluacja.",
+    help            = "Narzędzia operatora: walidacja artefaktów i indeksacja.",
     no_args_is_help = True,
 )
 

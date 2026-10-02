@@ -30,8 +30,11 @@ async def read_ticket_card(
     Example result:
         TicketCard(ticket_id="41002", component="ePUAP", problem="Wysyłka kończy się błędem", …)
     """
+    raw   = to_raw_ticket(request)
     state = parse_ticket.STATE(
-        input_text = to_raw_ticket(request).as_thread(),
+        input_text = raw.as_thread(),
+        ticket_id  = raw.ticket_id,
+        date       = raw.date,
         vocabulary = get_resolution_classes(),
     )
     final = await run_graph(build(parse_ticket), state)

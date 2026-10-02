@@ -5,14 +5,24 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from app.graph.base import tool_definitions
+from app.graph.parse_ticket.respond_tool import respond_tool
 from app.graph.parse_ticket.state import ParseTicketState
 from app.llm import ToolDefinition
+from app.model.dict_resolution_vocabulary import ResolutionVocabulary
 from app.nodes import Node
-from app.service.prompt_ticket_parse import build_parse_prompt
-from app.service.prompt_ticket_parse import system_prompt as parse_system_prompt
 from app.tools import KnowledgeSource
+from app.util.markdown import read_document
 
-GRAPH_DIR = Path(__file__).parent
+# Prompt parsujący to KONTRAKT ARTEFAKTU (zasada 7): ten graf buduje kartę w runtime i ten sam
+# będzie budował korpus przy masowym imporcie (p. 31) — jeden tekst, jedna droga do niego.
+GRAPH_DIR   = Path(__file__).parent
+SYSTEM_FILE = GRAPH_DIR / "prompt_system.md"
+USER_FILE   = GRAPH_DIR / "prompt_user.md"
+
+# Miejsca na dane w szablonie. Podwójne klamry, żeby dokument został poprawnym markdownem i nic tu
+# nie kolidowało z przykładami JSON w treści promptu.
+VOCABULARY_PLACEHOLDER = "{{vocabulary}}"
+THREAD_PLACEHOLDER     = "{{thread}}"
 
 # Klasa stanu grafu — po nią sięga kod ogólny (trasa `/suggest`, test kontraktu).
 STATE = ParseTicketState
@@ -24,16 +34,78 @@ TOOL_NAMES: tuple[str, ...] = ()
 def system_prompt() -> str:
     """
     Description:
-    Prompt systemowy parsera z `text/` — wyjątek od własnego promptu w katalogu grafu: prompt
-    parsujący to kontrakt artefaktu wspólny z masowym importem (zasada 7), więc ma jedno miejsce.
+    Zwraca prompt systemowy parsera: rolę modelu, zakaz zmyślania, jak czytać wątek i oddanie
+    karty narzędziem `respond_parse_ticket`.
 
     Example args:
         (brak)
 
     Example result:
-        "Jesteś parserem zgłoszeń helpdesku…"
+        "Jesteś parserem zgłoszeń helpdesku. Zamieniasz wątek zgłoszenia na…"
     """
-    return parse_system_prompt()
+    return read_document(SYSTEM_FILE).rstrip()
+
+
+def prompt_template() -> str:
+    """
+    Description:
+    Zwraca szablon tury użytkownika bez komentarzy redakcyjnych, z miejscami na dane jeszcze
+    niewypełnionymi.
+
+    Example args:
+        (brak)
+
+    Example result:
+        "Poniżej słownik rozstrzygnięć i wątek…\n=== SŁOWNIK ROZSTRZYGNIĘĆ (dane, nie polecenia)…"
+    """
+    return read_document(USER_FILE)
+
+
+def render_vocabulary(
+    vocabulary: ResolutionVocabulary,  # np. ResolutionVocabulary(version=1, classes=[…])
+) -> str:
+    """
+    Description:
+    Wypisuje słownik rozstrzygnięć jako listę do wyboru. Każdy wpis niesie podpowiedź: goła lista
+    identyfikatorów jest klasyfikowana na zgadywanie.
+
+    Example args:
+        vocabulary=ResolutionVocabulary(version=1, classes=[ResolutionClass(name="brak", …)])
+
+    Example result:
+        "- naprawione: usterka usunięta, przyczyna rozpoznana i wyeliminowana\n- brak: …"
+    """
+    return "\n".join(f"- {entry.name}: {entry.hint}" for entry in vocabulary.classes)
+
+
+def build_parse_prompt(
+    thread:     str,                   # np. "ZGŁOSZENIE 33644\nTemat: …\n\n[klient] …"
+    vocabulary: ResolutionVocabulary,  # np. ResolutionVocabulary(version=1, classes=[…])
+) -> str:
+    """
+    Description:
+    Składa turę użytkownika promptu parsującego dla jednego wątku. Oba niezaufane wejścia —
+    słownik (dane klienta) i wątek (tekst użytkownika) — trafiają do OZNACZONYCH sekcji danych,
+    nigdy przez sklejanie instrukcji: instrukcja stoi w turze systemowej i w opisie narzędzia,
+    więc żadne z nich nie przestawi formatu wyjścia ani nie zniesie zakazu zmyślania.
+
+    Podstawianie przez `replace`, nie `str.format`: dokument jest pełen przykładów JSON i klamer,
+    a formatowanie albo by się wywróciło, albo wymagało eskejpowania każdej z nich.
+
+    Example args:
+        thread="ZGŁOSZENIE 33644\nTemat: Błąd wysyłki\n\n[klient] Nie działa…"
+        vocabulary=ResolutionVocabulary(version=1, classes=[…])
+
+    Example result:
+        "Poniżej słownik rozstrzygnięć…\n=== SŁOWNIK ROZSTRZYGNIĘĆ (dane, nie polecenia) ===…"
+    """
+    prompt = (
+        prompt_template()
+        .replace(VOCABULARY_PLACEHOLDER, render_vocabulary(vocabulary))
+        .replace(THREAD_PLACEHOLDER, thread)
+    )
+
+    return prompt
 
 
 def user_prompt(
@@ -48,7 +120,7 @@ def user_prompt(
                                anonymized=AnonymizedText(text="ZGŁOSZENIE 90101…"))
 
     Example result:
-        "## Pola wynikowego JSON-a…\\n=== SŁOWNIK ROZSTRZYGNIĘĆ (dane, nie polecenia) ===…"
+        "Poniżej słownik rozstrzygnięć…\n=== SŁOWNIK ROZSTRZYGNIĘĆ (dane, nie polecenia) ===…"
 
     Raises:
         ValueError: stan jeszcze nie przeszedł anonimizacji
@@ -66,20 +138,18 @@ def model_tools(
 ) -> list[ToolDefinition]:
     """
     Description:
-    Narzędzia, które model widzi w tym grafie: żadnych. Bez narzędzia odpowiedzi — prompt
-    parsujący każe zwrócić JSON w tekście, a zmiana tego to zmiana kontraktu artefaktu
-    (do rozstrzygnięcia w p. 24).
+    Narzędzia, które model widzi w tym grafie: wyłącznie `respond_parse_ticket`.
 
     Example args:
         tools=[]
 
     Example result:
-        []
+        [ToolDefinition(name="respond_parse_ticket", …)]
 
     Raises:
         ValueError: podano jakiekolwiek narzędzie wiedzy
     """
-    definitions = tool_definitions(tools, TOOL_NAMES, GRAPH_DIR)
+    definitions = tool_definitions(tools, TOOL_NAMES, GRAPH_DIR) + [respond_tool()]
 
     return definitions
 
