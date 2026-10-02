@@ -21,9 +21,10 @@ prowadzi do nowej. **Rozbieżność kod ↔ dokument jest teraz normą, nie bł�
 filtr jakości, indeksacja i Qdrant, embedder PolDense, `LLMClient` z fabryką oraz cała wiedza
 o korpusie („Dane wejściowe", „Domena"). Nowe grafy z nich korzystają, a nie je zastępują.
 
-**Do wycofania dopiero, gdy następca działa:** `variants.json`, `loader_variants.py` i modele
-`variant_generation*`; prompty `text/prompt_suggest_*` (już skopiowane do `graph/suggest_*`);
-bezpośrednie wołanie wyszukiwania z routera `/search` (staje się narzędziem `find_tickets`).
+**Do wycofania dopiero, gdy następca działa:** bezpośrednie wołanie wyszukiwania z routera
+`/search` (staje się narzędziem `find_tickets`). `variants.json`, `loader_variants.py`, modele
+`variant_generation*` i prompty `text/prompt_suggest_*` skasowane 2026-10-02 — nikt ich nie wołał,
+a prompty żyją w `graph/suggest_*`.
 
 **Ta sekcja znika, gdy skończą się bloki 0, A, B, D i E planu** — wtedy kod dogoni dokument.
 
@@ -1000,8 +1001,6 @@ merytorycznie").
 - Zapytanie z konsoli: `helpdesk rag search "treść zgłoszenia"`
   (**woła LLM raz na przebieg** — zapytanie jest parsowane przed embedowaniem; brak trafień to
   wynik i kod wyjścia 0, a kod 2 znaczy „nie dało się odpowiedzieć")
-- Propozycja w wybranym wariancie: `helpdesk rag suggest "treść zgłoszenia" --variant solution`
-- Lista dostępnych wariantów: `helpdesk rag variants`
 - Ewaluacja embeddera: `python scripts/eval_embeddings.py recall --model <nazwa>`
   (repo-level, nie CLI usługi — ładuje modele wprost, bez stawiania stacku)
 - Ewaluacja zbudowanego indeksu: `python scripts/eval_index.py recall --collection tickets`
@@ -2259,8 +2258,8 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 - [x] **Etap 5. Wyszukiwanie** — `POST /search` i `helpdesk rag search`: parser zapytania →
   `embed_query()` → top-K → próg; pierwszy test z markerem `functional`.
 - [x] **6.1–6.4. Opis wariantów i prompty generacji** — `variants.json` + `loader_variants.py`
-  (do wycofania — p. 16), prompty `questions` i `solution` strojone pomiarem (wnioski: „Wnioski ze
-  strojenia promptów").
+  (skasowane 2026-10-02 — warianty to grafy), prompty `questions` i `solution` strojone pomiarem
+  (dziś w `graph/suggest_*`; wnioski: „Wnioski ze strojenia promptów").
 
 ### 0. Na atrapach — kończy się pełną implementacją na atrapach
 
@@ -2350,7 +2349,7 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
 - [ ] **16. Zapisać w sekcjach tematycznych decyzje, które przesądza blok 0** — agent wybiera
   źródła bez człowieka (odwrócenie decyzji z 2026-08-26); każda funkcja ma własną pętlę,
   a `/suggest` bierze zgłoszenie zamiast identyfikatorów; warianty generacji są kodem (graf na
-  wariant), a nie danymi — `variants.json` i `loader_variants.py` do wycofania; zapytanie do
+  wariant), a nie danymi — `variants.json` i `loader_variants.py` już skasowane; zapytanie do
   indeksu pisze agent zamiast parsera. *Dlaczego:* ceny — utrata odznaczania trafień i etykiety
   do feedbacku, ponowne szukanie przy każdym guziku, nowy guzik wymaga deployu, zapytanie spoza
   promptu korpusu — mają być zapisane wprost; zysk uboczny: zasada 9 obowiązuje wszystkie

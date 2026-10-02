@@ -1,10 +1,11 @@
 <!-- Prompt grafu `suggest_questions` — strona systemowa.
 
-     PRZENIESIONY Z text/prompt_suggest_questions_system.md (strojenie 6.3) i dopasowany do pętli
+     PRZENIESIONY Z text/prompt_suggest_questions_system.md (strojenie 6.3; oryginał skasowany
+     2026-10-02) i dopasowany do pętli
      z narzędziami: trafienia agent zdobywa sam (`find_tickets`, `find_docs`) zamiast dostać je
      w sekcji {{hits}}, zgłoszenie przychodzi surowe (zanonimizowane), nie jako ParsedTicket, a
      lista wychodzi narzędziem `respond_suggest_questions`. Reszta treści bez zmian — przemierzenie
-     na modelu docelowym w p. 25. Stary plik zostaje do wycofania razem z variants.json.
+     na modelu docelowym w p. 25.
 
      Notatki niżej pochodzą ze strojenia na 11B i zostają, bo tłumaczą treść:
 

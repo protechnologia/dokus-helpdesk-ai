@@ -1,8 +1,8 @@
 """
 Description:
-Provider-agnostic access to a language model. Import from here (`from app.llm import LLMClient`)
-rather than from the submodules — the split between interface, fake and factory is an internal
-detail, while this surface is what the domain is allowed to know about a model.
+Dostęp do modelu językowego niezależny od dostawcy. Importuj stąd (`from app.llm import
+LLMClient`), nie z podmodułów — podział na interfejs, atrapę i fabrykę to szczegół wewnętrzny,
+a ta powierzchnia to wszystko, co domena może wiedzieć o modelu.
 """
 
 from app.llm.base import LLMClient, LLMCompletion

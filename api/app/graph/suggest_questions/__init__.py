@@ -8,8 +8,8 @@ Przebieg: anonymize → pętla agent ⇄ run_tools → respond. Narzędzia: `fin
 (opisy dla modelu obok, jako `.md`); koniec wywołaniem `respond_suggest_questions`. Działa przy
 pustym indeksie (`REQUIRES_HITS = False`).
 
-Status: na atrapach węzłów (`fake.py`); prompt przeniesiony z
-`text/prompt_suggest_questions_system.md`, przemierzenie na modelu docelowym w p. 25 (CLAUDE.md ->
+Status: na atrapach węzłów (`fake.py`); prompt przeniesiony z dawnego
+`text/prompt_suggest_questions_*`, przemierzenie na modelu docelowym w p. 25 (CLAUDE.md ->
 „Plan i TODO").
 """
 

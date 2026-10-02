@@ -14,9 +14,10 @@ from app.cli.tickets import tickets
 # | `tickets parse`            | tickets.py   | parsuje zgłoszenia z data/raw/ przez LLM        |
 # | `rag index <kat.>`         | rag.py       | dokłada artefakty do kolekcji Qdranta           |
 # | `rag reindex <kat.>`       | rag.py       | kasuje kolekcję i buduje ją od zera             |
+# | `rag search "<treść>"`     | rag.py       | szuka zgłoszeń podobnych do podanej treści      |
 #
-# Zaplanowane: `rag search` / `rag suggest` (etapy 5-6), `gate close` / `gate reply` / `polish`
-# (etapy 7-9). Bramki i „Popraw" stoją POZA grupą `rag` — z definicji działają bez indeksu.
+# Zaplanowane (p. 6): komendy na grafach — `gate close` / `gate reply` / `polish` stoją POZA grupą
+# `rag`, bo z definicji działają bez indeksu.
 #
 # no_args_is_help: samo `helpdesk` drukuje drzewo, zamiast błędu użycia.
 cli = typer.Typer(

@@ -8,8 +8,8 @@ Przebieg: anonymize → pętla agent ⇄ run_tools → respond. Narzędzia: `fin
 (opisy dla modelu obok, jako `.md`); koniec wywołaniem `respond_suggest_solution`. Bez trafień nie
 ma propozycji (`REQUIRES_HITS = True`, egzekwuje `respond` — p. 11).
 
-Status: na atrapach węzłów (`fake.py`); prompt przeniesiony z
-`text/prompt_suggest_solution_system.md`, przemierzenie na modelu docelowym w p. 26 (CLAUDE.md ->
+Status: na atrapach węzłów (`fake.py`); prompt przeniesiony z dawnego
+`text/prompt_suggest_solution_*`, przemierzenie na modelu docelowym w p. 26 (CLAUDE.md ->
 „Plan i TODO").
 """
 

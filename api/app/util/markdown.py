@@ -2,35 +2,36 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-# Editorial notes for us; they must never reach the model. Every prompt document in `text/` opens
-# with one saying which change regime the file belongs to (our code vs. customer data), and that
-# note is written for a reviewer, not for the model that will be handed the text.
+# Notatki redakcyjne dla nas — nie mają prawa dotrzeć do modelu. Każdy dokument promptu zaczyna się
+# taką notatką (reżim zmiany, uzasadnienia z pomiarów), pisaną dla recenzenta, nie dla modelu.
 _HTML_COMMENT = re.compile(r"<!--.*?-->\s*", re.DOTALL)
 
 
 @lru_cache
-def read_document(path: Path) -> str:   # e.g. Path("/code/app/text/prompt_suggest_questions.md")
+def read_document(
+    path: Path,  # np. Path("/code/app/graph/gate_close/prompt_system.md")
+) -> str:
     """
     Description:
-    Reads one markdown document and strips our editorial comments. Knows nothing about tickets or
-    prompts — it reads a file and removes HTML comments — which is why it lives in `util/` rather
-    than next to either of its callers.
+    Czyta jeden dokument markdown i wycina z niego nasze komentarze redakcyjne. Nie wie nic
+    o zgłoszeniach ani promptach — czyta plik i usuwa komentarze HTML — dlatego leży w `util/`,
+    a nie przy którymkolwiek z wołających.
 
-    Shared on purpose: the rule "an editorial note must not reach the model" holds for the parsing
-    prompt and for every generation variant alike, and a second copy of this regex would be a
-    second place to forget it.
+    Wspólna celowo: reguła „notatka redakcyjna nie dociera do modelu" dotyczy tak samo promptu
+    parsującego, promptów grafów i opisów narzędzi, a druga kopia tego wyrażenia byłaby drugim
+    miejscem, w którym da się o niej zapomnieć.
 
-    Cached per path, so a file is read once per process rather than on every ticket of a
-    1500-ticket run.
+    Pamiętana per ścieżka, więc plik jest czytany raz na proces, a nie przy każdym z 1500 zgłoszeń
+    przebiegu.
 
     Example args:
-        path=Path("/code/app/text/prompt_suggest_questions.md")
+        path=Path("/code/app/graph/gate_close/prompt_system.md")
 
     Example result:
-        "Jesteś asystentem wdrożeniowca helpdesku. Na podstawie zgłoszenia…"
+        "Jesteś bramką jakości helpdesku. Oceniasz, czy zgłoszenie można zamknąć…"
 
     Raises:
-        FileNotFoundError: the document is missing — a packaging error (it must be inside the
-            image, not only in the developer's checkout)
+        FileNotFoundError: brak dokumentu — błąd pakowania (musi być w obrazie, nie tylko
+            w kopii roboczej dewelopera)
     """
     return _HTML_COMMENT.sub("", path.read_text(encoding="utf-8")).lstrip()

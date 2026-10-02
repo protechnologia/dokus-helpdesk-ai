@@ -1,10 +1,10 @@
 <!-- Prompt grafu `suggest_solution` — strona systemowa.
 
-     PRZENIESIONY Z text/prompt_suggest_solution_system.md (strojenie 6.4) i dopasowany do pętli
+     PRZENIESIONY Z text/prompt_suggest_solution_system.md (strojenie 6.4; oryginał skasowany
+     2026-10-02) i dopasowany do pętli
      z narzędziami: historyczne zgłoszenia agent zdobywa sam (`find_tickets`, `find_docs`) zamiast
      dostać je w sekcji {{hits}}, a rozwiązanie wychodzi narzędziem `respond_suggest_solution`.
-     Reszta treści bez zmian — przemierzenie na modelu docelowym w p. 26. Stary plik zostaje do
-     wycofania razem z variants.json.
+     Reszta treści bez zmian — przemierzenie na modelu docelowym w p. 26.
 
      Cała instrukcja tutaj, w turze użytkownika same dane — wzorzec z podkroku 6.3, tam
      uzasadniony. JEDYNY WARIANT Z `REQUIRES_HITS = True`: bez źródeł węzeł `respond` nie odda
