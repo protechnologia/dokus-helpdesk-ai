@@ -1443,8 +1443,24 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   LangGraph jest **wyłącznie maszyną stanów** — `StructuredTool` z wcześniejszego planu okazał się
   zbędny. Prompt systemowy nie jest wiadomością; dokłada go węzeł `agent` przy każdej turze.
 - **`AnonymizedText` mieszka w `anonymization/`** — pakiecie na usługę anonimizatora, jak
-  `embedding/`. Osobny typ zamiast `str`, żeby granica była widoczna w sygnaturach: kod przyjmujący
-  `AnonymizedText` nie przyjmie surowego tekstu przez pomyłkę.
+  `embedding/` (kontrakt `Anonymizer`, `FakeAnonymizer`, fabryka `build_anonymizer`). Osobny typ
+  zamiast `str`, żeby granica była widoczna w sygnaturach: kod przyjmujący `AnonymizedText` nie
+  przyjmie surowego tekstu przez pomyłkę.
+- **`FakeAnonymizer` oddaje tekst BEZ ZMIAN, więc `build_anonymizer` odmawia go przy każdym
+  `LLM_PROVIDER` innym niż `fake`** (`AnonymizationConfigError` przy starcie). Do czasu prawdziwego
+  anonimizatora (p. 16) stack z modelem zewnętrznym po prostu nie wstanie — zamiast cicho wysłać
+  surowe zgłoszenie.
+- **Węzeł `anonymize` nie ma atrapy — od razu jest właściwy (`AnonymizeNode`) i nie łapie błędów
+  anonimizatora** (fail-closed). Atrapa węzła byłaby drugą drogą obok anonimizacji; test kontraktu
+  węzłów pilnuje, że w `anonymize/` jest tylko `node.py`.
+- **Atrapy pozostałych węzłów odtwarzają ustalony fragment stanu i zapisują stan w publicznym
+  `calls`.** `FakeAgent` oddaje zaplanowane tury po kolei (domyślnie jedna: odpowiedź bez narzędzi;
+  `tool_call_turn()` buduje turę z wywołaniem), a brak kolejnej tury to błąd, nie powtórka.
+  `FakeRunTools` odpowiada stałym tekstem na każde wywołanie z ostatniej tury, z jego `call_id`,
+  i dokłada `sources` tylko wtedy, gdy je podano. `FakeRespond` ustawia `output` na wynik
+  z konstruktora.
+- **Test kontraktu węzłów sam znajduje węzły** (`test_api_nodes_contract.py`) i sprawdza, że nazwa
+  węzła = nazwa jego katalogu — atrapa i węzeł właściwy wpinają się do grafu pod tą samą nazwą.
 
 ## Warstwa LLM
 
@@ -2199,12 +2215,9 @@ narzędzia.
   `anonymize/`, `agent/`, `run_tools/`, `respond/`; reduktor `merge_sources` w `graph/base.py`
   (stan ma każdy graf własny, w `state.py`); do tego `ChatMessage`/`ToolCall` (`llm/messages.py`)
   i `AnonymizedText` (`anonymization/`); reguły — „Warstwa węzłów".
-- [ ] **4. Atrapy wszystkich węzłów** — zwracają ustalony fragment stanu (np. `agent`: od razu
-  odpowiedź albo jedno wywołanie atrapy narzędzia). **Wyjątek: `anonymize/` nie dostaje atrapy
-  węzła** — od razu jest właściwy, na atrapie zależności (`FakeAnonymizer` → `AnonymizedText`
-  w pakiecie usługi, jak `embedding/`; dopuszczalny tylko przy `LLM_PROVIDER=fake`). *Dlaczego:*
-  grafy da się złożyć i uruchomić, zanim powstanie logika pętli; atrapa węzła anonimizacji byłaby
-  drugą drogą obok anonimizacji, której test z punktu 8 nie odróżniłby od prawdziwego węzła.
+- [x] **4. Atrapy wszystkich węzłów** — `FakeAgent`, `FakeRunTools`, `FakeRespond`; `anonymize`
+  od razu właściwy (`AnonymizeNode`) na `FakeAnonymizer` z fabryką odmawiającą przy prawdziwym
+  LLM; test kontraktu węzłów; reguły — „Warstwa węzłów".
 - [ ] **5. Wszystkie grafy na atrapach** — każdy katalog to `graph.py` (przebieg, definicje
   narzędzi dla modelu, funkcja budująca graf z wstrzykiwanymi zależnościami), `state.py` (pełny
   model stanu grafu z `output` w typie jego wyniku), `fake.py` (atrapa całego grafu dla testów

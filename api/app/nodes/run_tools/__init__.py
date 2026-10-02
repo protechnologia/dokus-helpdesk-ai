@@ -4,5 +4,11 @@ Węzeł `run_tools`: wykonuje wywołania narzędzi z ostatniej wiadomości model
 dozwolonych dla grafu. Argumenty waliduje `query_model` narzędzia; tekst z `render_for_model()`
 wraca do `messages` jako wiadomość `tool`, a źródła z `cite()` trafiają do `sources`.
 
-Status: katalog. Atrapa w p. 4, właściwy węzeł w p. 7 (CLAUDE.md -> „Plan i TODO").
+Status: atrapa (`FakeRunTools`); właściwy węzeł w p. 7 (CLAUDE.md -> „Plan i TODO").
 """
+
+from app.nodes.run_tools.fake import FakeRunTools
+
+__all__ = [
+    "FakeRunTools",
+]

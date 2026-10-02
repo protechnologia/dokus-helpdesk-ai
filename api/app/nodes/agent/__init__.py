@@ -5,5 +5,12 @@ z listy dozwolonych idą do `LLMClient`, odpowiedź (tekst albo wywołania narz�
 `messages`, a `iterations` rośnie o jeden. Na tej odpowiedzi graf decyduje: dalej pętla czy
 odpowiedź; po przekroczeniu limitu iteracji — odpowiedź.
 
-Status: katalog. Atrapa w p. 4, właściwy węzeł w p. 7 (CLAUDE.md -> „Plan i TODO").
+Status: atrapa (`FakeAgent`); właściwy węzeł w p. 7 (CLAUDE.md -> „Plan i TODO").
 """
+
+from app.nodes.agent.fake import FakeAgent, tool_call_turn
+
+__all__ = [
+    "FakeAgent",
+    "tool_call_turn",
+]
