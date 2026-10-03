@@ -1,7 +1,7 @@
 import httpx2
 import pytest
 
-pytestmark = [pytest.mark.integration, pytest.mark.integration_embedder]
+pytestmark = [pytest.mark.stack, pytest.mark.stack_embedder]
 
 # The one truth in this project that lives OUTSIDE our code: that the model actually distinguishes
 # the three prefix modes. Everything we can prove ourselves — that the right prefix is prepended,
@@ -14,10 +14,10 @@ pytestmark = [pytest.mark.integration, pytest.mark.integration_embedder]
 # waste — and nothing else in the suite would notice.
 #
 # This file replaced the fake's determinism tests (same text -> same vector, across HTTP). They
-# duplicated tests/unit/test_embedder_vectors.py while proving less: the regression they claimed to
-# guard against — a mapping deterministic within a process but not across processes — needs a
-# RESTART to surface, and calling the same uvicorn twice cannot show it. The golden-value test in
-# tests/unit catches that mutation instantly and without a stack.
+# duplicated tests/unit/embedder/test_embedder_vectors.py while proving less: the regression they
+# claimed to guard against — a mapping deterministic within a process but not across processes —
+# needs a RESTART to surface, and calling the same uvicorn twice cannot show it. The golden-value
+# test in tests/unit catches that mutation instantly and without a stack.
 
 TICKET_TEXT = "Nie udało się skomunikować z serwerem podczas podpisywania dokumentu"
 

@@ -10,7 +10,7 @@ from app.nodes.respond import FakeRespond
 
 # Kontrakt HTTP `POST /search` w procesie: kształt odpowiedzi (źródła + zapytania agenta),
 # walidacja żądania i to, co trasa wkłada do grafu. Że trasa jest zamontowana w obrazie, sprawdza
-# `integration_api`.
+# `stack_api`.
 
 TICKET = {"ticket_id": "41002", "body": "Od wczoraj nie przychodzą przesyłki z e-Doręczeń."}
 

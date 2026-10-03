@@ -15,19 +15,19 @@ każdy graf, a nie coś, co agent może wywołać albo pominąć; model jest wo�
 jednym z nich (CLAUDE.md -> „Trwa zmiana architektury").
 
 Tutaj: wspólne kontrakty (`base.py`) i jedyny model wspólny dla wszystkich narzędzi, `SourceRef`
-(`models.py`). W katalogu każdego narzędzia: implementacja (`tool.py`), jej atrapa (`fake.py`)
-i `models.py` z własnym zapytaniem, znalezionym elementem i wynikiem — bez wspólnej bazy — oraz
-`errors.py`, gdy narzędzie będzie miało własne błędy do zgłoszenia. Nowe narzędzie to nowy
-katalog. Opis, który czyta MODEL, leży obok adaptera w każdym grafie, nie tutaj: to treść
-promptu, czytana zdanie po zdaniu, i może się różnić między grafami używającymi tego samego
-narzędzia.
+(`models.py`). W katalogu każdego narzędzia: implementacja (`tool.py`), jej atrapa (`fake.py`),
+ich część wspólna (`base.py`: nazwa, tekst dla modelu, lista źródeł) i `models.py` z własnym
+zapytaniem, znalezionym elementem i wynikiem — bez wspólnej bazy — oraz `errors.py`, gdy
+narzędzie będzie miało własne błędy do zgłoszenia. Nowe narzędzie to nowy katalog. Opis, który
+czyta MODEL, leży obok adaptera w każdym grafie, nie tutaj: to treść promptu, czytana zdanie po
+zdaniu, i może się różnić między grafami używającymi tego samego narzędzia.
 
-Narzędzia (CLAUDE.md -> „Plan i TODO", blok 0; dziś modele i atrapy, właściwe w p. 7–8):
+| narzędzie      | rodzaj                    | zapytanie agenta             | na czym stoi        |
+|----------------|---------------------------|------------------------------|---------------------|
+| `find_tickets` | źródło wiedzy             | `problem` + `symptoms`       | embedder → Qdrant   |
+| `find_docs`    | źródło wiedzy, opcjonalne | zagadnienie / słowa kluczowe | kolekcja dokumentów |
 
-| narzędzie      | rodzaj                    | zapytanie agenta              | na czym stoi        |
-|----------------|---------------------------|-------------------------------|---------------------|
-| `find_tickets` | źródło wiedzy             | `problem` + `symptoms`        | embedder → Qdrant   |
-| `find_docs`    | źródło wiedzy, opcjonalne | zagadnienie / słowa kluczowe  | kolekcja dokumentów |
+`find_tickets` ma narzędzie właściwe i atrapę; `find_docs` na razie samą atrapę (p. 8).
 """
 
 from app.tools.base import AuxiliaryTool, KnowledgeSource

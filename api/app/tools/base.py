@@ -73,7 +73,8 @@ class KnowledgeSource(ABC):
             result=FindTicketsResult(items=[FoundTicket(…)], dropped_below_threshold=2)
 
         Example result:
-            "Przyczyny w trafieniach:\\n- certyfikat bez uprawnienia…\\n\\nTrafienie 33644 …"
+            "Znalezione zgłoszenia: 1 (odcięte progiem: 2)\\n\\nPrzyczyny (`cause`) w
+             trafieniach:\\n- [33644] Certyfikat bez uprawnienia…\\n\\n[33644] 2026-03-14 · …"
         """
 
     @abstractmethod

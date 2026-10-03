@@ -1,102 +1,126 @@
+"""
+Description:
+Kontrakt sparsowanego zgłoszenia. Jeden `ParsedTicket` to jeden plik JSON w `data/parsed/`, a ten
+model rozstrzyga, czy plik jest poprawnym artefaktem. Do indeksu nie trafiają surowe zgłoszenia,
+tylko ta struktura: z dwóch pól powstaje wektor, wszystkie jadą w payloadzie Qdranta.
+
+| pole                            | kto wypełnia                    | w wektorze |
+|---------------------------------|---------------------------------|------------|
+| `ticket_id`, `date`             | graf `parse_ticket`, ze źródła  | nie        |
+| `component`                     | model, z treści wątku           | nie        |
+| `problem`, `symptoms`           | model                           | tak        |
+| `error_codes`, `cause`          | model                           | nie        |
+| `solution`                      | model, razem z zastrzeżeniami   | nie        |
+| `resolution`                    | model, wartością ze słownika    | nie        |
+| `resolution_vocabulary_version` | graf `parse_ticket`             | nie        |
+| `questions_summary`             | model                           | nie        |
+
+Przykład — artefakt `data/parsed/33644.json`:
+
+    {
+      "ticket_id":         "33644",
+      "date":              "2026-03-14",
+      "component":         "ePUAP",
+      "problem":           "Wysyłka przez ePUAP kończy się błędem komunikacji",
+      "symptoms":          "Po kliknięciu Wyślij pojawia się komunikat o braku sieci",
+      "error_codes":       ["ERR-4210"],
+      "cause":             "Certyfikat bez uprawnienia AddDocumentToSign",
+      "solution":          "Wygenerowano certyfikat z właściwym uprawnieniem.",
+      "resolution":        "naprawione",
+      "questions_summary": "brak",
+      "resolution_vocabulary_version": 1
+    }
+
+O czym pamiętać przy zmianach:
+
+- Zmiana pól to zmiana kontraktu artefaktu: istniejące pliki przestają się walidować, a nowe pole
+  wymaga ponownego przebiegu LLM po korpusie (zasada 7).
+- Klucz spoza schematu jest błędem (`extra="forbid"`), a nie cichą stratą.
+- Puste pole tekstowe jest odrzucane. Brak wartości zapisuje się jawnie: `brak` albo
+  `nie dotyczy`.
+- `resolution` sprawdzamy wobec wersji słownika zapisanej w rekordzie, nie wobec dziś
+  skonfigurowanej.
+"""
+
 from datetime import date as Date
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.service.builder_embedding_text import build_embedding_text
 from app.service.loader_dict_resolution import get_resolution_classes
 
-# Every text field may say "there is nothing here" instead of being left out. A required field
-# forces the model to invent a value (CLAUDE.md -> "Jak projektować schemat odpowiedzi"), and an
-# invented cause is worse than a missing one — it looks like knowledge.
+# Jawne wyjścia: pole może powiedzieć „nic tu nie ma", zamiast wymuszać na modelu zmyślenie.
 NO_VALUE       = "brak"
 NOT_APPLICABLE = "nie dotyczy"
-
-# Fields that feed the embedding vector. Kept as a constant because indexing (stage 4) and the
-# runtime query (stage 5) MUST build the text the same way — two call sites drifting apart would
-# silently produce vectors that cannot be compared.
-EMBEDDED_FIELDS = ("problem", "symptoms")
 
 
 class ParsedTicket(BaseModel):
     """
     Description:
-    The contract of a parsed ticket — the durable artifact of the whole project. One instance is
-    one JSON file in `data/parsed/`, and this class is what decides whether that file is valid.
+    Sparsowane zgłoszenie — trwały artefakt projektu. Jedna instancja to jeden plik JSON
+    w `data/parsed/`.
 
     Do czego:
-    Raw tickets never reach the index. An LLM turns each conversation into this structure, and
-    only this structure feeds embeddings and the Qdrant payload (CLAUDE.md -> "Cel"). The LLM run
-    is expensive and one-off, so the artifact is permanent while embeddings and collections are
-    disposable — a re-index must never call the model again (rule 7).
+    Przebieg LLM jest drogi i jednorazowy, więc artefakt jest trwały, a embeddingi i kolekcje
+    Qdranta wymienne: re-index nigdy nie woła modelu ponownie (zasada 7).
 
     Flow:
-        1. An adapter in `ingest/` fills the fields taken straight from the source: `ticket_id`,
-           `date`.
-        2. The parsing prompt fills the rest from the whole conversation thread — including
-           `cause`, which no source column holds.
-        3. `resolution_vocabulary_version` records which vocabulary produced `resolution`, so a
-           later edit of that vocabulary does not silently invalidate this file.
-        4. Indexing embeds `problem` + `symptoms`; everything else travels in the payload.
+        1. Model wypełnia pola z treści całego wątku — także `cause`, której nie ma w żadnej
+           kolumnie źródła.
+        2. Graf `parse_ticket` dokłada `ticket_id`, `date` i wersję słownika: pochodzą ze źródła
+           i konfiguracji, nigdy od modelu.
+        3. Indeksacja embeduje `problem` + `symptoms` (`embedding_text()`); wszystkie pola jadą
+           w payloadzie.
 
-    Scope assumption: one product instance serves ONE helpdesked product, which is why there is
-    no `system` field — the application name is instance configuration, not per-record data.
+    Jedna instancja produktu obsługuje jeden helpdeskowany produkt, dlatego nie ma pola `system`:
+    nazwa aplikacji to konfiguracja instancji, nie dane rekordu.
     """
 
-    # Unknown keys are an ERROR, not something to drop quietly. Models do break a closed field
-    # list and invent their own keys, and that content is often valuable (CLAUDE.md -> "Jak
-    # projektować schemat odpowiedzi"). Pydantic's default would discard it without a trace —
-    # unacceptable when the LLM run producing it is expensive and one-off (rule 7). Failing loudly
-    # means the prompt or the schema gets fixed BEFORE the corpus-wide run, not after.
+    # Model potrafi dołożyć własne pole, często cenne; domyślnie Pydantic skasowałby je bez śladu.
     model_config = ConfigDict(extra="forbid")
 
-    # --- identity: from the adapter, never from the model ---
+    # --- tożsamość: ze źródła, nigdy od modelu ---
     ticket_id: str  = Field(examples=["33644"])
     date:      Date = Field(examples=["2026-03-14"])
 
-    # --- what the ticket is about ---
-    # Free text, not a vocabulary: the value set has a long thin tail (a handful of integrations
-    # dominate, the rest appear once or twice), so a closed enum would force a deploy per new
-    # customer integration. Cost accepted knowingly: spelling variants of the same service are
-    # likely across a full corpus run, so this field is DESCRIPTIVE and unfit as a Qdrant filter
-    # without normalisation (CLAUDE.md -> "Domena").
+    # --- czego dotyczy ---
+    # Pole swobodne, nie słownik: warianty zapisu tej samej usługi są pewne, więc bez normalizacji
+    # nie nadaje się na filtr Qdranta.
     component: str = Field(examples=["główna aplikacja", "ePUAP", "e-Doręczenia"])
 
-    # --- the vector side: the only two fields that become the embedding ---
+    # --- strona wektora: jedyne dwa pola, z których powstaje embedding ---
     problem:  str = Field(examples=["Wysyłka przez ePUAP kończy się błędem komunikacji"])
     symptoms: str = Field(examples=["Po kliknięciu Wyślij pojawia się komunikat o braku sieci"])
 
-    # --- the payload side: what the answer is built from ---
+    # --- strona payloadu: z tego powstaje odpowiedź ---
     error_codes: list[str] = Field(default_factory=list, examples=[["ERR-4210", "SQLSTATE 23000"]])
     cause:       str       = Field(examples=["Certyfikat bez uprawnienia AddDocumentToSign"])
-    # Caveats live INSIDE this text rather than in a field of their own. They are not decoration:
-    # "the setting is global", "works from now on, there is no route for the backlog" — dropping
-    # such a sentence turns the answer into its opposite, so both prompts must carry it over.
+    # Zastrzeżenia są częścią tego tekstu, nie osobnym polem; zgubione odwracają sens odpowiedzi.
     solution:    str       = Field(examples=["Wygenerowano certyfikat z właściwym uprawnieniem."])
 
-    # --- classification and diagnostics ---
+    # --- klasyfikacja i diagnostyka ---
     resolution: str = Field(examples=["naprawione"])
-    # The vocabulary is customer data and may change; the artifact must remember what it meant.
+    # Wersja słownika, z której pochodzi `resolution`: słownik to dane klienta i może się zmienić.
     resolution_vocabulary_version: int = Field(examples=[1])
-    # Empty in most records and that is the normal state, not a defect: only a minority of
-    # tickets contain a consultant's diagnostic question at all.
+    # Czego konsultant nie wiedział i o co dopytywał; `brak`, gdy nikt nie dopytywał.
     questions_summary: str = Field(default=NO_VALUE, examples=["pytano o wersję przeglądarki"])
 
     @field_validator("component", "problem", "symptoms", "cause", "solution", "questions_summary")
     @classmethod
-    def _reject_blank(cls, value: str) -> str:          # e.g. "  "
+    def _reject_blank(cls, value: str) -> str:          # np. "  "
         """
         Description:
-        Rejects empty and whitespace-only text. The schema already offers an explicit way out
-        (`brak` / `nie dotyczy`); a blank string is a different thing — a field the model skipped,
-        which would enter the corpus looking like an answered one.
+        Odrzuca tekst pusty albo z samych białych znaków. `brak` to odpowiedź, a pusty napis to
+        pole pominięte przez model, które w korpusie wyglądałoby jak wypełnione.
 
         Example args:
             value="   "
 
         Example result:
-            ValueError — the caller must write `brak` instead
+            ValueError — trzeba wpisać `brak`
 
         Raises:
-            ValueError: the value is empty or whitespace only
+            ValueError: wartość jest pusta albo składa się z białych znaków
         """
         if not value.strip():
             raise ValueError(f"pole nie może być puste — użyj {NO_VALUE!r} albo {NOT_APPLICABLE!r}")
@@ -107,25 +131,24 @@ class ParsedTicket(BaseModel):
     def _check_resolution_against_vocabulary(self) -> "ParsedTicket":
         """
         Description:
-        Verifies that `resolution` is a value the recorded vocabulary version actually declares.
-        Checked against the version stored IN the record, not against whatever is configured now —
-        otherwise editing the vocabulary would retroactively invalidate correct old artifacts,
-        which is exactly what versioning exists to prevent (rule 7).
+        Sprawdza, czy `resolution` jest wartością ze słownika w wersji zapisanej W REKORDZIE.
+        Gdyby sprawdzać wobec wersji skonfigurowanej dziś, edycja słownika unieważniałaby wstecznie
+        poprawne artefakty.
 
         Example args:
-            (self, already populated)
+            (self, już wypełniony)
 
         Example result:
-            The same instance, unchanged
+            Ta sama instancja, bez zmian
 
         Raises:
-            ValueError: `resolution` is outside the vocabulary, or the record was produced with a
-                vocabulary version this build no longer ships
+            ValueError: `resolution` jest spoza słownika albo rekord powstał z wersji słownika,
+                której ta instalacja nie ma
         """
         vocabulary = get_resolution_classes()
 
-        # A record from a newer (or older) vocabulary cannot be judged by the one we ship. Say so
-        # plainly instead of reporting a misleading "unknown value".
+        # Rekordu z innej wersji słownika nie da się ocenić naszą — mówimy to wprost, zamiast
+        # zgłaszać mylące „nieznana wartość".
         if self.resolution_vocabulary_version != vocabulary.version:
             raise ValueError(
                 f"rekord powstał ze słownika w wersji {self.resolution_vocabulary_version}, "
@@ -144,18 +167,19 @@ class ParsedTicket(BaseModel):
     def embedding_text(self) -> str:
         """
         Description:
-        Builds the text that becomes this record's vector. Lives on the model so indexing and the
-        runtime query cannot drift apart — two call sites assembling it by hand would eventually
-        produce vectors nobody can compare, and nothing would fail loudly.
-
-        `solution` is deliberately absent: we search by similarity of the PROBLEM, and a vector
-        polluted with the answer mixes both signals (CLAUDE.md -> "Domena").
+        Tekst, z którego powstaje wektor tego rekordu. Składa go `build_embedding_text()` — ta sama
+        funkcja, której używa zapytanie w `find_tickets`, więc obie strony porównania nie mogą się
+        po cichu rozjechać.
 
         Example args:
-            (none)
+            (brak)
 
         Example result:
             "Wysyłka przez ePUAP kończy się błędem komunikacji\\nPo kliknięciu Wyślij…"
         """
-        return "\n".join(getattr(self, field) for field in EMBEDDED_FIELDS)
+        text = build_embedding_text(
+            problem  = self.problem,
+            symptoms = self.symptoms,
+        )
 
+        return text

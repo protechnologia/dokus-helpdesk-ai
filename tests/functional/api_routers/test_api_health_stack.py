@@ -3,7 +3,7 @@ import pytest
 
 from app.errors import REQUEST_ID_HEADER
 
-pytestmark = [pytest.mark.integration, pytest.mark.integration_api]
+pytestmark = [pytest.mark.stack, pytest.mark.stack_api]
 
 # This is the DEPLOYMENT half of the split from CLAUDE.md -> "Testy". Nothing here re-checks the
 # response shape — unit tests on TestClient already prove that, and repeating it would only make

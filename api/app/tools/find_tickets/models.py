@@ -9,7 +9,7 @@ class FindTicketsQuery(BaseModel):
     O co agent pyta `find_tickets`: zgłoszenie opisane w kształcie korpusu — te same dwa pola,
     z których zbudowano wektory indeksu. Parsowanie zgłoszenia pod wyszukiwanie to zadanie agenta
     (jak to robić, mówi mu prompt), więc narzędzie nie woła parsera: składa z pól tekst do
-    embeddingu tą samą logiką co `ParsedTicket.embedding_text()` i szuka.
+    embeddingu tą samą funkcją co indeksacja (`build_embedding_text()`) i szuka.
     """
 
     # Nieznany argument (np. `limit`) to błąd — liczbę trafień i próg ustawia konfiguracja.

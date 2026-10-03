@@ -2,7 +2,7 @@
 
      To jest KONTRAKT ARTEFAKTU razem z respond_tool.md i prompt_user.md: każda zmiana tych trzech
      plików zmienia znaczenie wszystkich przyszłych plików w data/parsed/, więc żyją w gicie pod
-     testem-strażnikiem (tests/unit/test_api_graph_parse_ticket_prompt.py) i nigdy w konfiguracji
+     testem-strażnikiem (tests/unit/api_graph/test_api_graph_parse_ticket_prompt.py) i nigdy w konfiguracji
      klienta (CLAUDE.md → zasada 7, „Prompty"). Zmiana = pokaż przed/po i oczekiwany wpływ.
 
      Podział jak w innych grafach (2026-10-02): TU cała instrukcja — rola i jak czytać wątek;

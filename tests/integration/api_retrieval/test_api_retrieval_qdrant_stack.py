@@ -14,7 +14,7 @@ from app.retrieval import (
 )
 from tests.conftest import qdrant_url
 
-pytestmark = [pytest.mark.integration, pytest.mark.integration_qdrant]
+pytestmark = [pytest.mark.stack, pytest.mark.stack_qdrant]
 
 # What lives OUTSIDE our code and is therefore worth a running service: that Qdrant really accepts
 # a two-named-vector collection, really stores a payload alongside the vectors, really returns the

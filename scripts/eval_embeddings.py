@@ -47,7 +47,7 @@ sys.path.insert(0, str(REPO_ROOT / "api"))
 
 from app.model.ticket_parsed import ParsedTicket  # noqa: E402  (import po ustawieniu sys.path)
 
-DEFAULT_GOLDEN = REPO_ROOT / "data" / "golden" / "bielik-11b-golden200.json"
+DEFAULT_GOLDEN = REPO_ROOT / "data" / "golden" / "golden200.json"
 
 # Tryby prefiksów PER MODEL. Klucz to nazwa modelu na HF, wartość to mapowanie
 # rola -> prefiks. `document` jest tym, co w naszym kontrakcie nazywa się `passage`.
@@ -299,7 +299,7 @@ def recall(
     which of them wins is genuinely open (CLAUDE.md -> „Embeddingi").
 
     Example args:
-        golden=Path("data/golden/bielik-11b-golden200.json")
+        golden=Path("data/golden/golden200.json")
         models=["OPI-PIB/PolDense-150M"]
         k=5
         batch=32

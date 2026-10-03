@@ -102,7 +102,7 @@ class FakeQdrant:
 
     Same reasoning as `FakeEmbedder`: the real client crosses a process boundary, and what this
     file tests is the ORDER and CONTENT of what the indexer does, not whether Qdrant stores it —
-    that is covered by `integration_qdrant`.
+    that is covered by `stack_qdrant`.
     """
 
     def __init__(self) -> None:

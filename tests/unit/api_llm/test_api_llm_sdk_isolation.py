@@ -15,7 +15,7 @@ SDK_RULES = (
                                                            "llm/client_openai.py"]),
 )
 
-APP_ROOT = Path(__file__).resolve().parents[2] / "api" / "app"
+APP_ROOT = Path(__file__).resolve().parents[3] / "api" / "app"
 
 
 def _modules_importing(spellings: tuple[str, ...]) -> list[str]:

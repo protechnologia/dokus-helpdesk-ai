@@ -1,25 +1,53 @@
+"""
+Description:
+Wspólne zaplecze testów, które z hosta sięgają do działających usług: adresy usług i konfiguracja
+aplikacji z tymi adresami. Leży w korzeniu `tests/`, bo potrzebują go testy integracyjne,
+funkcjonalne i ewaluacyjne — różni je to, czego dowodzą, a nie sposób dotarcia do usługi.
+
+Rodzaj testu to jego folder, a marker mówi, czego test potrzebuje do uruchomienia:
+
+| marker           | czego wymaga                  | adres dla testu z hosta |
+|------------------|-------------------------------|-------------------------|
+| `stack`          | działającej usługi (parasol)  | —                       |
+| `stack_api`      | usługi `api`                  | `api_url()`             |
+| `stack_qdrant`   | Qdranta                       | `qdrant_url()`          |
+| `stack_embedder` | usługi `embedder`             | `embedder_url()`        |
+| `llm_live`       | prawdziwego, płatnego modelu  | — (z konfiguracji)      |
+
+Marker nosi tylko test, który potrzebuje działającej usługi albo płatnego modelu. Jednostkowe nie
+mają go nigdy, a w pozostałych rodzajach ma go mniejszość: większość testów integracyjnych
+i funkcjonalnych chodzi w procesie, na plikach i atrapach. Test bez markera nie potrzebuje
+niczego spoza repo i chodzi w domyślnym `pytest`.
+
+O czym pamiętać przy zmianach:
+
+- Markery rejestruje `pyproject.toml` i tam też domyślny przebieg je wyklucza (`addopts`). Nowy
+  marker dopisuje się w rejestrze i w tej tabelce, a jeśli stoi poza parasolem `stack` — także
+  w `addopts`.
+- Test z markerem `stack_<usługa>` nosi też `stack`, żeby `-m stack` brał wszystko, co wymaga
+  działającej usługi. `llm_live` stoi obok parasola celowo: `-m stack` nie może odpalić płatnego
+  modelu.
+- Adresów nie wpisuje się w plikach testów. Konfiguracja wskazuje nazwy z sieci compose
+  (`http://embedder:8000`), których z hosta nie da się rozwiązać, więc każdy test spoza kontenera
+  potrzebuje podmiany; powielona w plikach rozjeżdżała się po zmianie portu w jednym miejscu.
+- Każdy adres da się nadpisać zmienną środowiskową (`EMBEDDER_TEST_URL`, `QDRANT_TEST_URL`,
+  `API_TEST_URL`).
+"""
+
 import os
 
 import pytest
 
 from app.config import Settings
 
-# Where the services answer when a test runs ON THE HOST. The configured values point at
-# compose-internal names (`http://embedder:8000`, `http://qdrant:6333`), which resolve only inside
-# the compose network — so every host-side test needs these instead. Kept here rather than in each
-# file: the same four values were being repeated per test module, and a port changed in one place
-# would have left the others pointing at nothing.
-#
-# In `tests/` root rather than in `tests/integration/`, because `tests/functional/` needs the same
-# thing: what separates those two axes is cost and what they prove, not how they reach a service.
 EMBEDDER_URL_ENV     = "EMBEDDER_TEST_URL"
 EMBEDDER_URL_DEFAULT = "http://localhost:8001"
 
 QDRANT_URL_ENV       = "QDRANT_TEST_URL"
 QDRANT_URL_DEFAULT   = "http://localhost:6333"
 
-# Matches DOCKER_API_PORT in .env.example: 8000 is commonly taken by another local project, so the
-# base composition publishes 8010 instead.
+# Zgodne z DOCKER_API_PORT w `.env.example`: 8000 bywa zajęte przez inny lokalny projekt, więc
+# baza publikuje 8010.
 API_URL_ENV     = "API_TEST_URL"
 API_URL_DEFAULT = "http://localhost:8010"
 
@@ -27,10 +55,10 @@ API_URL_DEFAULT = "http://localhost:8010"
 def embedder_url() -> str:
     """
     Description:
-    Where the embedder answers from the host.
+    Adres, pod którym embedder odpowiada z hosta.
 
     Example args:
-        (none)
+        (brak)
 
     Example result:
         "http://localhost:8001"
@@ -41,10 +69,10 @@ def embedder_url() -> str:
 def qdrant_url() -> str:
     """
     Description:
-    Where Qdrant answers from the host.
+    Adres, pod którym Qdrant odpowiada z hosta.
 
     Example args:
-        (none)
+        (brak)
 
     Example result:
         "http://localhost:6333"
@@ -55,10 +83,10 @@ def qdrant_url() -> str:
 def api_url() -> str:
     """
     Description:
-    Where the `api` service answers from the host.
+    Adres, pod którym usługa `api` odpowiada z hosta.
 
     Example args:
-        (none)
+        (brak)
 
     Example result:
         "http://localhost:8010"
@@ -66,23 +94,41 @@ def api_url() -> str:
     return os.environ.get(API_URL_ENV, API_URL_DEFAULT)
 
 
-@pytest.fixture
-def host_settings() -> Settings:
+def build_host_settings() -> Settings:
     """
     Description:
-    The application's configuration with the service addresses rewritten for host access.
+    Konfiguracja aplikacji z adresami usług podmienionymi na dostępne z hosta. Cała reszta
+    przychodzi ze środowiska bez zmian — przede wszystkim dostawca LLM — więc test jedzie na
+    konfiguracji, z jaką działa produkt, a podmienione są tylko dwa adresy, które poza siecią
+    compose nie mają prawa zadziałać.
 
-    Everything else comes from the environment untouched — the LLM provider above all — so a test
-    exercises the configuration the product actually runs with, and only the two addresses that
-    cannot work outside the compose network are replaced.
+    Funkcja obok fixture `host_settings`, bo fixture o zakresie modułu (jeden pomiar na cały plik)
+    nie może użyć fixture o zakresie pojedynczego testu.
 
     Example args:
-        (none)
+        (brak)
 
     Example result:
         Settings(embedding_base_url="http://localhost:8001", qdrant_url="http://localhost:6333", …)
     """
-    return Settings(
+    settings = Settings(
         embedding_base_url = embedder_url(),
         qdrant_url         = qdrant_url(),
     )
+
+    return settings
+
+
+@pytest.fixture
+def host_settings() -> Settings:
+    """
+    Description:
+    Konfiguracja aplikacji z adresami usług dostępnymi z hosta (`build_host_settings()`).
+
+    Example args:
+        (brak)
+
+    Example result:
+        Settings(embedding_base_url="http://localhost:8001", qdrant_url="http://localhost:6333", …)
+    """
+    return build_host_settings()

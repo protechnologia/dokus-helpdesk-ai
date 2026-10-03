@@ -1,7 +1,7 @@
 import httpx2
 import pytest
 
-pytestmark = [pytest.mark.integration, pytest.mark.integration_api]
+pytestmark = [pytest.mark.stack, pytest.mark.stack_api]
 
 # The DEPLOYMENT half for POST /search: that the router is mounted in the built image and reachable
 # over the published port. Nothing here re-checks the response shape — unit tests on TestClient

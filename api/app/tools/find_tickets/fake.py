@@ -2,9 +2,8 @@ from collections.abc import Sequence
 from datetime import date
 
 from app.model.ticket_parsed import ParsedTicket
-from app.tools.base import KnowledgeSource
+from app.tools.find_tickets.base import FindTicketsBase
 from app.tools.find_tickets.models import FindTicketsQuery, FindTicketsResult, FoundTicket
-from app.tools.models import SourceRef
 
 
 def default_tickets() -> list[FoundTicket]:
@@ -29,7 +28,7 @@ def default_tickets() -> list[FoundTicket]:
         "resolution_vocabulary_version": 1,
     }
 
-    return [
+    tickets = [
         FoundTicket(score=0.91, ticket=ParsedTicket(
             **common,
             ticket_id         = "90001",
@@ -59,23 +58,22 @@ def default_tickets() -> list[FoundTicket]:
         )),
     ]
 
+    return tickets
 
-class FakeFindTickets(KnowledgeSource):
+
+class FakeFindTickets(FindTicketsBase):
     """
     Description:
-    Atrapa `find_tickets`: zamiast Qdranta i embeddera zwraca ustalony zestaw zgłoszeń, zawsze
-    ten sam, ze stałymi id. Na niej chodzą grafy, zanim powstanie prawdziwe narzędzie (p. 7),
-    i testy, którym wystarczy wiedzieć, CO agent dostał, a nie jak zostało znalezione.
+    Atrapa `find_tickets`: zamiast embeddera i Qdranta zwraca ustalony zestaw zgłoszeń, zawsze
+    ten sam, ze stałymi id. Służy grafom na atrapach i testom, którym wystarczy wiedzieć, CO agent
+    dostał, a nie jak zostało znalezione.
 
     Flow:
         1. Test (albo fabryka przy atrapach) tworzy ją z własnymi zgłoszeniami albo z zestawem
            wbudowanym; `dropped_below_threshold` pozwala odtworzyć wynik „próg wszystko wyciął".
         2. Każde `search()` zapisuje zapytanie w `queries` i zwraca ten sam wynik.
-        3. `render_for_model()` i `cite()` działają na wyniku jak w prawdziwym narzędziu.
+        3. `render_for_model()` i `cite()` pochodzą z klasy wspólnej z prawdziwym narzędziem.
     """
-
-    name        = "find_tickets"
-    query_model = FindTicketsQuery
 
     def __init__(
         self,
@@ -118,60 +116,3 @@ class FakeFindTickets(KnowledgeSource):
         self.queries.append(query)
 
         return self._result
-
-    def render_for_model(
-        self,
-        result: FindTicketsResult,  # np. FindTicketsResult(items=[…])
-    ) -> str:
-        """
-        Description:
-        Prosty tekst dla modelu: liczba trafień i po jednym bloku na zgłoszenie. Docelowy format
-        (osobny blok przyczyn przed rekordami) powstaje w prawdziwym narzędziu (p. 7).
-
-        Example args:
-            result=FindTicketsResult(items=[FoundTicket(…)], dropped_below_threshold=0)
-
-        Example result:
-            "Znalezione zgłoszenia: 1 (odcięte progiem: 0)\\n\\n[90001] 2026-02-10 · e-Doręczenia …"
-        """
-        header = (
-            f"Znalezione zgłoszenia: {len(result.items)} "
-            f"(odcięte progiem: {result.dropped_below_threshold})"
-        )
-
-        blocks = [
-            f"[{found.ticket.ticket_id}] {found.ticket.date.isoformat()} · "
-            f"{found.ticket.component} · podobieństwo {found.score:.2f}\n"
-            f"Problem: {found.ticket.problem}\n"
-            f"Objawy: {found.ticket.symptoms}\n"
-            f"Przyczyna: {found.ticket.cause}\n"
-            f"Rozwiązanie: {found.ticket.solution}"
-            for found in result.items
-        ]
-
-        return "\n\n".join([header, *blocks])
-
-    def cite(
-        self,
-        result: FindTicketsResult,  # np. FindTicketsResult(items=[…])
-    ) -> list[SourceRef]:
-        """
-        Description:
-        Jeden wpis na każde zgłoszenie z wyniku; tytułem jest `problem`.
-
-        Example args:
-            result=FindTicketsResult(items=[FoundTicket(score=0.91, ticket=ParsedTicket(…))])
-
-        Example result:
-            [SourceRef(source="find_tickets", item_id="90001", title="Nie przychodzą…", …)]
-        """
-        return [
-            SourceRef(
-                source  = self.name,
-                item_id = found.ticket.ticket_id,
-                title   = found.ticket.problem,
-                score   = found.score,
-                date    = found.ticket.date,
-            )
-            for found in result.items
-        ]

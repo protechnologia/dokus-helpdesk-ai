@@ -5,8 +5,8 @@ import pytest
 
 from tests.conftest import api_url, embedder_url
 
-# The addresses themselves live in `tests/conftest.py`, shared with `tests/functional/` — reaching
-# a service over its published port is the same problem for both axes.
+# The addresses themselves live in `tests/conftest.py`, shared with `tests/integration/` — reaching
+# a service over its published port is the same problem for both kinds of test.
 
 
 @pytest.fixture

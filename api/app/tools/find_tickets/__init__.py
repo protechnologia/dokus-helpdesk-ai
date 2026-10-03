@@ -1,28 +1,29 @@
 """
 Description:
-Źródło wiedzy: historyczne zgłoszenia podobne do bieżącego.
+Źródło wiedzy: historyczne zgłoszenia podobne do bieżącego. Agent podaje zgłoszenie w kształcie
+korpusu (`problem` + `symptoms`), narzędzie oddaje podobne zgłoszenia z przyczyną i rozwiązaniem
+— jako sparsowane pola z payloadu Qdranta, nigdy jako surowy mail.
 
-Do czego:
-Agent podaje zgłoszenie w kształcie korpusu (`problem` + `symptoms`), narzędzie składa z tego tekst
-do embeddingu tak jak `ParsedTicket.embedding_text()`, zamienia go na wektor w trybie QUERY,
-dopasowuje do wektorów `problem` i przycina progiem `RAG_SCORE_MIN`. Parsera nie woła — to
-różnica wobec dawnego wyszukiwania z etapu 5 (skasowany `RagSearcher`), gdzie zgłoszenie parsował
-osobny krok. Treścią każdego elementu jest sparsowane zgłoszenie z payloadu Qdranta, więc `cause`
-i `solution` docierają do modelu jako pola, nigdy jako surowy mail.
+| plik        | co zawiera                                                               |
+|-------------|--------------------------------------------------------------------------|
+| `models.py` | zapytanie, znaleziony element i wynik                                    |
+| `base.py`   | część wspólna narzędzia i atrapy: nazwa, tekst dla modelu, lista źródeł  |
+| `tool.py`   | `FindTickets` — wyszukiwanie przez embedder i Qdranta                    |
+| `fake.py`   | `FakeFindTickets` — ustalony zestaw zgłoszeń, bez usług                  |
 
-Co model musi zobaczyć (CLAUDE.md -> „Plan i TODO", p. 7): rozłączne przyczyny wszystkich trafień
-w jednym bloku PRZED rekordami, a przyczyny-sentinele („brak", „Brak ustalonej przyczyny…") jako
-„(nie ustalono)" i nigdy liczone jako zgodność. Przyczyna utopiona wśród sześciu innych pól do
-modelu nie dociera, a trzy puste przyczyny to nie trzy zgodne.
-
-Status: modele i atrapa (`FakeFindTickets`); `tool.py` powstaje w p. 7.
+Przykład zapytania i wyniku — w opisie `tool.py`; przykład tekstu, który czyta model — w opisie
+`base.py`.
 """
 
+from app.tools.find_tickets.base import FindTicketsBase
 from app.tools.find_tickets.fake import FakeFindTickets
 from app.tools.find_tickets.models import FindTicketsQuery, FindTicketsResult, FoundTicket
+from app.tools.find_tickets.tool import FindTickets
 
 __all__ = [
     "FakeFindTickets",
+    "FindTickets",
+    "FindTicketsBase",
     "FindTicketsQuery",
     "FindTicketsResult",
     "FoundTicket",
