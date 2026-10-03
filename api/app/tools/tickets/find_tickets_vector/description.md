@@ -13,8 +13,8 @@ jest streszczona w polach `problem`, `symptoms`, `cause`, `solution` i kilku
 pomocniczych. Dosłownych sformułowań klienta i części szczegółów może w karcie
 nie być, a `brak` w polu znaczy, że tego nie ustalono.
 
-Pytaj w kształcie karty, nie surowym mailem — bez powitań, podpisów i historii
-wątku:
+Pytaj w kształcie karty, nie przepisuj zgłoszenia wprost — bez powitań,
+podpisów i historii wątku:
 
 - `problem` — jednym-dwoma zdaniami, czego dotyczy kłopot;
 - `symptoms` — co widzi użytkownik, z komunikatem błędu, jeśli jest.
