@@ -14,9 +14,13 @@ fragmentem, nie treść; tę agent pobiera przez `read_docs`.
 Status: modele i atrapa. Narzędzie właściwe (`tool.py`) na Postgresie powstaje w p. 50.
 """
 
-from app.tools.find_docs_text.base import FindDocsTextToolBase
-from app.tools.find_docs_text.fake import FakeFindDocsTextTool
-from app.tools.find_docs_text.models import FindDocsTextQuery, FindDocsTextResult, MatchedSection
+from app.tools.docs.find_docs_text.base import FindDocsTextToolBase
+from app.tools.docs.find_docs_text.fake import FakeFindDocsTextTool
+from app.tools.docs.find_docs_text.models import (
+    FindDocsTextQuery,
+    FindDocsTextResult,
+    MatchedSection,
+)
 
 __all__ = [
     "FakeFindDocsTextTool",

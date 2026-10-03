@@ -8,14 +8,53 @@ import app.tools
 from app.tools import AuxiliaryTool, KnowledgeSource
 
 
+def tool_packages() -> list[str]:
+    """
+    Description:
+    Pakiety narzędzi: te pakiety w `app/tools/`, które nie mają już podpakietów. Folder materiału
+    (`tickets/`, `docs/`) sam narzędziem nie jest.
+
+    Example args:
+        (brak)
+
+    Example result:
+        ["app.tools.docs.find_docs_text", …, "app.tools.tickets.find_tickets_vector"]
+    """
+    walked   = pkgutil.walk_packages(app.tools.__path__, prefix="app.tools.")
+    packages = [module.name for module in walked if module.ispkg]
+
+    leaves = [
+        name for name in packages
+        if not any(other.startswith(f"{name}.") for other in packages)
+    ]
+
+    return leaves
+
+
+def package_of(
+    tool: type,  # np. FakeFindDocsTextTool
+) -> str:
+    """
+    Description:
+    Pakiet narzędzia, do którego należy klasa — katalog, w którym leży jej moduł.
+
+    Example args:
+        tool=FakeFindDocsTextTool
+
+    Example result:
+        "app.tools.docs.find_docs_text"
+    """
+    return tool.__module__.rsplit(".", 1)[0]
+
+
 def all_tools_of(
     kind: type,  # KnowledgeSource albo AuxiliaryTool
 ) -> list[type]:
     """
     Description:
-    Zbiera wszystkie klasy narzędzi danego rodzaju z pakietów w `app/tools/` — także te, których
-    jeszcze nie ma. Nowe narzędzie to nowy katalog, więc test ma je znaleźć sam, bez dopisywania
-    do listy.
+    Zbiera wszystkie klasy narzędzi danego rodzaju z pakietów w `app/tools/`, na każdej
+    głębokości — także te, których jeszcze nie ma. Nowe narzędzie to nowy katalog w folderze
+    materiału, więc test ma je znaleźć sam, bez dopisywania do listy.
 
     Example args:
         kind=KnowledgeSource
@@ -23,9 +62,8 @@ def all_tools_of(
     Example result:
         [FindTicketsVectorToolBase, FakeFindTicketsVectorTool, FindTicketsVectorTool, …]
     """
-    for module in pkgutil.iter_modules(app.tools.__path__):
-        if module.ispkg:
-            importlib.import_module(f"app.tools.{module.name}")
+    for name in tool_packages():
+        importlib.import_module(name)
 
     found:   list[type] = []
     pending: list[type] = list(kind.__subclasses__())
@@ -62,10 +100,7 @@ def arguments_model(
 def test_every_tool_package_brings_a_tool() -> None:
     """Pakiety narzędzi → co najmniej jedno narzędzie na pakiet: pusty katalog narzędzia oznacza,
     że importy w jego `__init__.py` coś pominęły."""
-    packages = {module.name for module in pkgutil.iter_modules(app.tools.__path__) if module.ispkg}
-    modules  = {cls.__module__.split(".")[2] for cls in TOOLS}
-
-    assert packages <= modules
+    assert set(tool_packages()) <= {package_of(cls) for cls in TOOLS}
 
 
 @pytest.mark.parametrize("source", SOURCES, ids=lambda cls: cls.__name__)
@@ -113,7 +148,7 @@ def test_real_and_fake_of_one_tool_share_a_material() -> None:
     materials_per_package: dict[str, set[str]] = {}
 
     for source in SOURCES:
-        package = source.__module__.split(".")[2]
+        package = package_of(source)
         materials_per_package.setdefault(package, set()).add(source.source)
 
     assert all(len(materials) == 1 for materials in materials_per_package.values())
@@ -125,7 +160,7 @@ def test_real_and_fake_of_one_tool_share_a_name_and_no_two_tools_do() -> None:
     names_per_package: dict[str, set[str]] = {}
 
     for tool in TOOLS:
-        package = tool.__module__.split(".")[2]
+        package = package_of(tool)
         names_per_package.setdefault(package, set()).add(tool.name)
 
     assert all(len(names) == 1 for names in names_per_package.values())

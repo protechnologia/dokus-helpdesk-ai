@@ -18,9 +18,9 @@ narzędzi dokumentacji wcale, a każdy graf musi działać z samymi zgłoszeniam
 Status: modele i atrapa. Narzędzie właściwe (`tool.py`) na kolekcji dokumentacji powstaje w p. 8.
 """
 
-from app.tools.find_docs_vector.base import FindDocsVectorToolBase
-from app.tools.find_docs_vector.fake import FakeFindDocsVectorTool
-from app.tools.find_docs_vector.models import (
+from app.tools.docs.find_docs_vector.base import FindDocsVectorToolBase
+from app.tools.docs.find_docs_vector.fake import FakeFindDocsVectorTool
+from app.tools.docs.find_docs_vector.models import (
     FindDocsVectorQuery,
     FindDocsVectorResult,
     FoundSection,

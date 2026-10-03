@@ -1,8 +1,12 @@
 from collections.abc import Sequence
 
-from app.tools.fake_docs import default_sections
-from app.tools.find_docs_text.base import FindDocsTextToolBase
-from app.tools.find_docs_text.models import FindDocsTextQuery, FindDocsTextResult, MatchedSection
+from app.tools.docs.fake_docs import default_sections
+from app.tools.docs.find_docs_text.base import FindDocsTextToolBase
+from app.tools.docs.find_docs_text.models import (
+    FindDocsTextQuery,
+    FindDocsTextResult,
+    MatchedSection,
+)
 
 
 def default_matched() -> list[MatchedSection]:

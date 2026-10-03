@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from app.tools.fake_docs import default_sections
-from app.tools.find_docs_vector import FindDocsVectorQuery, FoundSection
+from app.tools.docs.fake_docs import default_sections
+from app.tools.docs.find_docs_vector import FindDocsVectorQuery, FoundSection
 
 
 def test_an_empty_query_is_refused() -> None:

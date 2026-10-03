@@ -49,7 +49,7 @@ import pytest
 from app.config import Settings
 from app.embedding import EmbeddingClient
 from app.retrieval import QdrantClient
-from app.tools.find_tickets_vector import FindTicketsVectorQuery, FindTicketsVectorTool
+from app.tools.tickets.find_tickets_vector import FindTicketsVectorQuery, FindTicketsVectorTool
 from tests.conftest import build_host_settings
 
 pytestmark = [

@@ -30,9 +30,9 @@ O czym pamiętać przy zmianach:
 """
 
 from app.tools.base import KnowledgeSource
+from app.tools.docs.base import render_section_heading
+from app.tools.docs.read_docs.models import ReadDocsQuery, ReadDocsResult, ReadSection
 from app.tools.models import SourceRef
-from app.tools.read_docs.models import ReadDocsQuery, ReadDocsResult, ReadSection
-from app.tools.render_docs import render_section_heading
 
 NO_DATE = "(bez daty)"
 

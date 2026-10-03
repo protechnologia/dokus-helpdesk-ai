@@ -1,7 +1,7 @@
-from app.tools.fake_docs import default_sections, default_texts
-from app.tools.find_docs_text import FakeFindDocsTextTool, FindDocsTextQuery
-from app.tools.find_docs_vector import FakeFindDocsVectorTool, FindDocsVectorQuery
-from app.tools.read_docs import FakeReadDocsTool, ReadDocsQuery
+from app.tools.docs.fake_docs import default_sections, default_texts
+from app.tools.docs.find_docs_text import FakeFindDocsTextTool, FindDocsTextQuery
+from app.tools.docs.find_docs_vector import FakeFindDocsVectorTool, FindDocsVectorQuery
+from app.tools.docs.read_docs import FakeReadDocsTool, ReadDocsQuery
 
 
 def test_every_section_has_its_content() -> None:

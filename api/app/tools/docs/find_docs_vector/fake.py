@@ -1,8 +1,8 @@
 from collections.abc import Sequence
 
-from app.tools.fake_docs import default_sections
-from app.tools.find_docs_vector.base import FindDocsVectorToolBase
-from app.tools.find_docs_vector.models import (
+from app.tools.docs.fake_docs import default_sections
+from app.tools.docs.find_docs_vector.base import FindDocsVectorToolBase
+from app.tools.docs.find_docs_vector.models import (
     FindDocsVectorQuery,
     FindDocsVectorResult,
     FoundSection,

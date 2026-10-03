@@ -14,9 +14,9 @@ Status: modele i atrapa. Narzędzie właściwe (`tool.py`) na Postgresie powstaj
 prawdziwym korpusie ruszy po anonimizacji opisów (p. 19) i masowym imporcie (p. 31).
 """
 
-from app.tools.find_tickets_text.base import FindTicketsTextToolBase
-from app.tools.find_tickets_text.fake import FakeFindTicketsTextTool
-from app.tools.find_tickets_text.models import (
+from app.tools.tickets.find_tickets_text.base import FindTicketsTextToolBase
+from app.tools.tickets.find_tickets_text.fake import FakeFindTicketsTextTool
+from app.tools.tickets.find_tickets_text.models import (
     FindTicketsTextQuery,
     FindTicketsTextResult,
     MatchedTicket,

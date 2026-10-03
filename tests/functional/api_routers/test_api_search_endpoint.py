@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 
 from app.anonymization import FakeAnonymizer
-from app.factory import get_graph_builder
 from app.graph import search
+from app.graph.factory import get_graph_builder
 from app.graph.fake import FAKE_SEARCH_ARGUMENTS, fake_search_nodes
 from app.main import create_app
 from app.nodes.anonymize import AnonymizeNode

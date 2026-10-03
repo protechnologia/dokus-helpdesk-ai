@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.tools.find_tickets_vector import FindTicketsVectorQuery, FoundTicket
+from app.tools.tickets.find_tickets_vector import FindTicketsVectorQuery, FoundTicket
 
 # Zgłoszenie z prawdziwą treścią — w kształcie, w jakim `TicketPoint.from_ticket` zapisuje payload.
 VALID_TICKET = {

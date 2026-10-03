@@ -13,9 +13,9 @@ dokumentem i wydaniem, rozdziałem i krótkim opisem. Agent wybiera z niego sekc
 Status: modele i atrapa. Narzędzie właściwe (`tool.py`) powstaje w p. 51.
 """
 
-from app.tools.list_docs.base import ListDocsToolBase
-from app.tools.list_docs.fake import FakeListDocsTool
-from app.tools.list_docs.models import ListDocsArgs, ListDocsResult
+from app.tools.docs.list_docs.base import ListDocsToolBase
+from app.tools.docs.list_docs.fake import FakeListDocsTool
+from app.tools.docs.list_docs.models import ListDocsArgs, ListDocsResult
 
 __all__ = [
     "FakeListDocsTool",

@@ -4,7 +4,7 @@ To, co wspólne dla prawdziwego `find_tickets_text` i jego atrapy: nazwa, materi
 zapytania, tekst dla modelu (`render_for_model()`) i lista źródeł (`cite()`). Narzędzie i atrapa
 różnią się wyłącznie tym, skąd biorą wynik (`search()`).
 
-Rekordy wyglądają dokładnie tak jak w `find_tickets_vector` (`tools/render_tickets.py`). Stąd
+Rekordy wyglądają dokładnie tak jak w `find_tickets_vector` (`tools/tickets/base.py`). Stąd
 pochodzi tylko nagłówek i informacja, czym zgłoszenie znaleziono:
 
     Znalezione zgłoszenia: 2 (pominięte ponad limit: 0)
@@ -19,9 +19,9 @@ O czym pamiętać przy zmianach:
 """
 
 from app.tools.base import KnowledgeSource
-from app.tools.find_tickets_text.models import FindTicketsTextQuery, FindTicketsTextResult
 from app.tools.models import SourceRef
-from app.tools.render_tickets import render_found_tickets
+from app.tools.tickets.base import render_found_tickets
+from app.tools.tickets.find_tickets_text.models import FindTicketsTextQuery, FindTicketsTextResult
 
 # Etykiety dopasowania w tekście dla modelu.
 MATCH_LABELS = {

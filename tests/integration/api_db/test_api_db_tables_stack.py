@@ -28,8 +28,8 @@ from collections.abc import AsyncIterator
 import pytest
 
 from app.db import DocRow, DocsTable, PostgresClient, TicketRow, TicketsTable
-from app.tools.fake_docs import default_sections, default_texts
-from app.tools.find_tickets_text.fake import default_tickets
+from app.tools.docs.fake_docs import default_sections, default_texts
+from app.tools.tickets.find_tickets_text.fake import default_tickets
 from tests.conftest import build_postgres_client
 
 pytestmark = [pytest.mark.stack, pytest.mark.stack_postgres]

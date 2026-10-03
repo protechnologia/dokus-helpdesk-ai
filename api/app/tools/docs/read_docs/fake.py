@@ -1,18 +1,19 @@
 from collections.abc import Mapping, Sequence
 
 from app.model.doc_section import DocSection
-from app.tools.fake_docs import default_sections, default_texts
-from app.tools.read_docs.base import ReadDocsToolBase
-from app.tools.read_docs.errors import UnknownSectionError
-from app.tools.read_docs.models import ReadDocsQuery, ReadDocsResult, ReadSection
+from app.tools.docs.fake_docs import default_sections, default_texts
+from app.tools.docs.read_docs.base import ReadDocsToolBase
+from app.tools.docs.read_docs.errors import UnknownSectionError
+from app.tools.docs.read_docs.models import ReadDocsQuery, ReadDocsResult, ReadSection
 
 
 class FakeReadDocsTool(ReadDocsToolBase):
     """
     Description:
     Atrapa `read_docs`: zamiast bazy oddaje treść ze zmyślonej dokumentacji wspólnej dla
-    wszystkich atrap narzędzi dokumentacji (`tools/fake_docs.py`). Inaczej niż atrapy wyszukiwań
-    odpowiada NA TO, o co pytano — odczyt po identyfikatorze nie ma „zawsze tego samego wyniku".
+    wszystkich atrap narzędzi dokumentacji (`tools/docs/fake_docs.py`). Inaczej niż atrapy
+    wyszukiwań odpowiada NA TO, o co pytano — odczyt po identyfikatorze nie ma „zawsze tego
+    samego wyniku".
 
     Flow:
         1. Test tworzy ją z własnymi sekcjami i treściami albo z zestawem wbudowanym.

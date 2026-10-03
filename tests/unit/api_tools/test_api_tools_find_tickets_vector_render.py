@@ -3,7 +3,7 @@ from datetime import date
 import pytest
 
 from app.model.ticket_parsed import ParsedTicket
-from app.tools.find_tickets_vector import (
+from app.tools.tickets.find_tickets_vector import (
     FakeFindTicketsVectorTool,
     FindTicketsVectorResult,
     FoundTicket,

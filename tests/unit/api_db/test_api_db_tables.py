@@ -1,8 +1,8 @@
 import pytest
 
 from app.db import DbConfigError, DocRow, DocsTable, TicketRow, TicketsTable
-from app.tools.fake_docs import default_sections
-from app.tools.find_tickets_vector.fake import default_tickets
+from app.tools.docs.fake_docs import default_sections
+from app.tools.tickets.find_tickets_vector.fake import default_tickets
 
 # Tabele testowane bez bazy, na kliencie-atrapie zapisującym SQL i wartości: sprawdzamy, CO idzie
 # do bazy i jak czytamy odpowiedź. Że Postgres odpowiada na to tak, jak zakładamy, sprawdza test

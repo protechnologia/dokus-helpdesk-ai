@@ -13,6 +13,9 @@ Import tego pakietu wyłącza LangSmith (niżej), więc żaden graf nie ruszy z 
 
 Atrapy wspólne dla grafów z narzędziami wiedzy leżą w `fake.py` tego pakietu.
 
+Fabryka, z której trasy biorą grafy, leży w `factory.py`. Nie jest stąd eksportowana: po p. 9
+pociągnie konfigurację i klientów, a ten plik importuje każdy graf.
+
 Grafy (CLAUDE.md -> „Plan i TODO", p. 5; dziś na atrapach węzłów). Bez narzędzi wiedzy przebieg
 to anonymize → agent → respond, z nimi anonymize → agent ⇄ run_tools → respond. Każdy kończy się
 wywołaniem `respond_<graf>`, poza `parse_ticket` (JSON w tekście — p. 24):

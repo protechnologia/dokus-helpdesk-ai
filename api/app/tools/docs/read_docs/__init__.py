@@ -15,10 +15,10 @@ taka, którą model tylko zobaczył w spisie.
 Status: modele i atrapa. Narzędzie właściwe (`tool.py`) powstaje w p. 52.
 """
 
-from app.tools.read_docs.base import ReadDocsToolBase
-from app.tools.read_docs.errors import UnknownSectionError
-from app.tools.read_docs.fake import FakeReadDocsTool
-from app.tools.read_docs.models import ReadDocsQuery, ReadDocsResult, ReadSection
+from app.tools.docs.read_docs.base import ReadDocsToolBase
+from app.tools.docs.read_docs.errors import UnknownSectionError
+from app.tools.docs.read_docs.fake import FakeReadDocsTool
+from app.tools.docs.read_docs.models import ReadDocsQuery, ReadDocsResult, ReadSection
 
 __all__ = [
     "FakeReadDocsTool",

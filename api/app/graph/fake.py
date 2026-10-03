@@ -2,8 +2,8 @@ from pydantic import BaseModel
 
 from app.nodes.agent import FakeAgentNode, tool_call_turn
 from app.nodes.run_tools import FakeRunToolsNode
-from app.tools.find_tickets_vector.fake import FakeFindTicketsVectorTool, default_tickets
-from app.tools.find_tickets_vector.models import FindTicketsVectorResult
+from app.tools.tickets.find_tickets_vector.fake import FakeFindTicketsVectorTool, default_tickets
+from app.tools.tickets.find_tickets_vector.models import FindTicketsVectorResult
 
 # Zapytanie, które atrapa agenta wysyła do `find_tickets_vector` — w kształcie korpusu, zmyślone.
 FAKE_SEARCH_ARGUMENTS = {

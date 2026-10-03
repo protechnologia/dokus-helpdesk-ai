@@ -1,16 +1,16 @@
 from collections.abc import Sequence
 
 from app.model.doc_section import DocSection
-from app.tools.fake_docs import default_sections
-from app.tools.list_docs.base import ListDocsToolBase
-from app.tools.list_docs.models import ListDocsResult
+from app.tools.docs.fake_docs import default_sections
+from app.tools.docs.list_docs.base import ListDocsToolBase
+from app.tools.docs.list_docs.models import ListDocsResult
 
 
 class FakeListDocsTool(ListDocsToolBase):
     """
     Description:
     Atrapa `list_docs`: zamiast bazy zwraca ustalony spis treści — zmyśloną dokumentację wspólną
-    dla wszystkich atrap narzędzi dokumentacji (`tools/fake_docs.py`).
+    dla wszystkich atrap narzędzi dokumentacji (`tools/docs/fake_docs.py`).
 
     Flow:
         1. Test tworzy ją z własnymi sekcjami albo z zestawem wbudowanym.

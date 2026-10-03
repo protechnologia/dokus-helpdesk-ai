@@ -23,14 +23,14 @@ O czym pamiętać przy zmianach:
 
 - To narzędzie pomocnicze: zwraca wiersze spisu treści, nie treść, i niczego nie cytuje. Źródłem
   odpowiedzi jest dopiero sekcja odczytana przez `read_docs`.
-- Wiersz sekcji jest wspólny z listingiem i wyszukiwaniem tekstowym (`tools/render_docs.py`).
+- Wiersz sekcji jest wspólny z listingiem i wyszukiwaniem tekstowym (`tools/docs/base.py`).
 """
 
 from abc import abstractmethod
 
 from app.tools.base import AuxiliaryTool
-from app.tools.find_docs_vector.models import FindDocsVectorQuery, FindDocsVectorResult
-from app.tools.render_docs import render_section_row
+from app.tools.docs.base import render_section_row
+from app.tools.docs.find_docs_vector.models import FindDocsVectorQuery, FindDocsVectorResult
 
 
 class FindDocsVectorToolBase(AuxiliaryTool):

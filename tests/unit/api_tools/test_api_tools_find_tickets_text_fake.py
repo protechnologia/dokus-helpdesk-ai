@@ -1,7 +1,7 @@
-from app.tools.find_tickets_text import FakeFindTicketsTextTool, FindTicketsTextQuery
-from app.tools.find_tickets_text.models import MatchedTicket
-from app.tools.find_tickets_vector import FakeFindTicketsVectorTool, FindTicketsVectorQuery
-from app.tools.find_tickets_vector.fake import default_tickets as vector_tickets
+from app.tools.tickets.find_tickets_text import FakeFindTicketsTextTool, FindTicketsTextQuery
+from app.tools.tickets.find_tickets_text.models import MatchedTicket
+from app.tools.tickets.find_tickets_vector import FakeFindTicketsVectorTool, FindTicketsVectorQuery
+from app.tools.tickets.find_tickets_vector.fake import default_tickets as vector_tickets
 
 QUERY = FindTicketsTextQuery(exact=["Nie udało się skomunikować z serwerem"])
 

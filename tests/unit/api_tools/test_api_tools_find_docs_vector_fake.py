@@ -1,4 +1,4 @@
-from app.tools.find_docs_vector import FakeFindDocsVectorTool, FindDocsVectorQuery
+from app.tools.docs.find_docs_vector import FakeFindDocsVectorTool, FindDocsVectorQuery
 
 QUERY = FindDocsVectorQuery(text="uprawnienia kancelaria e-Doręczenia")
 

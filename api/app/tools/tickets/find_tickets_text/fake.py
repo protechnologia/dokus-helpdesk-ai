@@ -2,8 +2,8 @@ from collections.abc import Sequence
 from datetime import date
 
 from app.model.ticket_parsed import ParsedTicket
-from app.tools.find_tickets_text.base import FindTicketsTextToolBase
-from app.tools.find_tickets_text.models import (
+from app.tools.tickets.find_tickets_text.base import FindTicketsTextToolBase
+from app.tools.tickets.find_tickets_text.models import (
     FindTicketsTextQuery,
     FindTicketsTextResult,
     MatchedTicket,

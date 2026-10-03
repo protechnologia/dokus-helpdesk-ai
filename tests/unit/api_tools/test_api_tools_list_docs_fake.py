@@ -1,5 +1,5 @@
-from app.tools.fake_docs import default_sections
-from app.tools.list_docs import FakeListDocsTool, ListDocsArgs
+from app.tools.docs.fake_docs import default_sections
+from app.tools.docs.list_docs import FakeListDocsTool, ListDocsArgs
 
 
 async def test_the_listing_has_a_row_for_every_section() -> None:

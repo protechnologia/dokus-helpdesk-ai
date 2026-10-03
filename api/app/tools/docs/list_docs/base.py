@@ -23,7 +23,7 @@ O czym pamiętać przy zmianach:
 
 - To narzędzie pomocnicze: spis mówi, GDZIE jest instrukcja, nie co w niej stoi, i niczego nie
   cytuje. Źródłem odpowiedzi jest dopiero sekcja odczytana przez `read_docs`.
-- Wiersz sekcji jest wspólny z oboma wyszukiwaniami (`tools/render_docs.py`).
+- Wiersz sekcji jest wspólny z oboma wyszukiwaniami (`tools/docs/base.py`).
 - Spis jest stały między żądaniami. Przy małej dokumentacji taniej wstawić go do promptu
   systemowego niż wołać narzędziem — do rozstrzygnięcia przy właściwej dokumentacji (p. 15).
 """
@@ -31,8 +31,8 @@ O czym pamiętać przy zmianach:
 from abc import abstractmethod
 
 from app.tools.base import AuxiliaryTool
-from app.tools.list_docs.models import ListDocsArgs, ListDocsResult
-from app.tools.render_docs import render_section_row
+from app.tools.docs.base import render_section_row
+from app.tools.docs.list_docs.models import ListDocsArgs, ListDocsResult
 
 
 class ListDocsToolBase(AuxiliaryTool):

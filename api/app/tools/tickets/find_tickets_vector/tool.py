@@ -52,8 +52,8 @@ from app.embedding import EmbeddingClient
 from app.model.ticket_parsed import ParsedTicket
 from app.retrieval import VECTOR_PROBLEM, QdrantClient, RetrievalConfigError, TicketHit
 from app.service.builder_embedding_text import build_embedding_text
-from app.tools.find_tickets_vector.base import FindTicketsVectorToolBase
-from app.tools.find_tickets_vector.models import (
+from app.tools.tickets.find_tickets_vector.base import FindTicketsVectorToolBase
+from app.tools.tickets.find_tickets_vector.models import (
     FindTicketsVectorQuery,
     FindTicketsVectorResult,
     FoundTicket,

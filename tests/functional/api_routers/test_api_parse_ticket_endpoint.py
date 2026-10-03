@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 
 from app.anonymization import FakeAnonymizer
-from app.factory import get_graph_builder
 from app.graph import parse_ticket
+from app.graph.factory import get_graph_builder
 from app.main import create_app
 from app.nodes.agent import FakeAgentNode
 from app.nodes.anonymize import AnonymizeNode

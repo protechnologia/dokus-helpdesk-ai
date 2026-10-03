@@ -1,6 +1,6 @@
 from app.db import DocRow, TicketRow
-from app.tools.fake_docs import default_sections
-from app.tools.find_tickets_vector.fake import default_tickets
+from app.tools.docs.fake_docs import default_sections
+from app.tools.tickets.find_tickets_vector.fake import default_tickets
 
 
 def test_a_ticket_survives_the_trip_through_its_row() -> None:

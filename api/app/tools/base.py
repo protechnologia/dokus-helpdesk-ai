@@ -14,9 +14,9 @@ class KnowledgeSource(ABC):
     Do czego:
     Pierwszy z dwóch rodzajów narzędzi agenta (drugi to `AuxiliaryTool`). Wyróżnia go to, że jego
     wyniki mogą stać się ŹRÓDŁAMI odpowiedzi — które, mówi `cite()`. Nowe źródło to nowy katalog
-    w `app/tools/`: implementacja, jej atrapa i `models.py` z własnym zapytaniem, znalezionym
-    elementem i wynikiem. Grafy sięgają po źródło przez własny adapter, więc ten plik nie wie nic
-    o LangGraphie ani LangChainie.
+    w folderze swojego materiału (`app/tools/tickets/`, `app/tools/docs/`): implementacja, jej
+    atrapa i `models.py` z własnym zapytaniem, znalezionym elementem i wynikiem. Grafy sięgają po
+    źródło przez własny adapter, więc ten plik nie wie nic o LangGraphie ani LangChainie.
 
     Flow:
         1. Agent woła `search()` z argumentami zgodnymi z `query_model`. Jak źródło szuka, to

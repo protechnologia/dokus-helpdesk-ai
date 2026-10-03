@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.tools.find_tickets_text import FindTicketsTextQuery
+from app.tools.tickets.find_tickets_text import FindTicketsTextQuery
 
 
 def test_a_query_with_nothing_to_search_is_refused() -> None:

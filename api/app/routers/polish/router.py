@@ -2,8 +2,8 @@ import logging
 
 from fastapi import APIRouter, Depends
 
-from app.factory import GraphBuilder, get_graph_builder
 from app.graph import polish, run_graph
+from app.graph.factory import GraphBuilder, get_graph_builder
 from app.routers.polish.models import PolishRequest, PolishResponse
 from app.service.loader_dict_rules import get_rule_set
 

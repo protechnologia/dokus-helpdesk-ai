@@ -1,4 +1,4 @@
-from app.tools.find_docs_text import FakeFindDocsTextTool, FindDocsTextQuery
+from app.tools.docs.find_docs_text import FakeFindDocsTextTool, FindDocsTextQuery
 
 QUERY = FindDocsTextQuery(exact=["Nie udało się skomunikować z serwerem"])
 

@@ -1,4 +1,4 @@
-from app.tools.find_tickets_vector import FakeFindTicketsVectorTool, FindTicketsVectorQuery
+from app.tools.tickets.find_tickets_vector import FakeFindTicketsVectorTool, FindTicketsVectorQuery
 
 QUERY = FindTicketsVectorQuery(
     problem  = "Nie przychodzą przesyłki",

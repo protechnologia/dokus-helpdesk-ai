@@ -4,7 +4,7 @@ import pytest
 from app.embedding import EmbeddingClient
 from app.model.ticket_parsed import ParsedTicket
 from app.retrieval import VECTOR_PROBLEM, QdrantClient, RetrievalConfigError
-from app.tools.find_tickets_vector import FindTicketsVectorQuery, FindTicketsVectorTool
+from app.tools.tickets.find_tickets_vector import FindTicketsVectorQuery, FindTicketsVectorTool
 from tests.helpers_transport import capturing, with_transport
 
 # Narzędzie stoi na prawdziwych klientach embeddera i Qdranta, a podmieniony jest tylko transport

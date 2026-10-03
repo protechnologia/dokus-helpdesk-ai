@@ -15,14 +15,14 @@ Przykład zapytania i wyniku — w opisie `tool.py`; przykład tekstu, który cz
 `base.py`.
 """
 
-from app.tools.find_tickets_vector.base import FindTicketsVectorToolBase
-from app.tools.find_tickets_vector.fake import FakeFindTicketsVectorTool
-from app.tools.find_tickets_vector.models import (
+from app.tools.tickets.find_tickets_vector.base import FindTicketsVectorToolBase
+from app.tools.tickets.find_tickets_vector.fake import FakeFindTicketsVectorTool
+from app.tools.tickets.find_tickets_vector.models import (
     FindTicketsVectorQuery,
     FindTicketsVectorResult,
     FoundTicket,
 )
-from app.tools.find_tickets_vector.tool import FindTicketsVectorTool
+from app.tools.tickets.find_tickets_vector.tool import FindTicketsVectorTool
 
 __all__ = [
     "FakeFindTicketsVectorTool",

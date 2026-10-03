@@ -2,8 +2,8 @@ import logging
 
 from fastapi import APIRouter, Depends
 
-from app.factory import GraphBuilder, get_graph_builder
 from app.graph import parse_ticket, run_graph
+from app.graph.factory import GraphBuilder, get_graph_builder
 from app.routers.mapping import to_raw_ticket
 from app.routers.models import TicketRequest
 from app.routers.parse_ticket.models import TicketCard

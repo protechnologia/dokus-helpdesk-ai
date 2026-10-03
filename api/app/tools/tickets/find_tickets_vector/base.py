@@ -6,7 +6,7 @@ różnią się wyłącznie tym, skąd biorą wynik (`search()`), więc test na a
 tekst, który model dostanie na produkcji.
 
 Kształt rekordu — pola pod nazwami ze schematu — jest wspólny z `find_tickets_text` i opisany
-z przykładem w `tools/render_tickets.py`. Stąd pochodzi tylko nagłówek i informacja, jak
+z przykładem w `tools/tickets/base.py`. Stąd pochodzi tylko nagłówek i informacja, jak
 zgłoszenie znaleziono:
 
     Znalezione zgłoszenia: 2 (odcięte progiem: 1)
@@ -22,9 +22,12 @@ O czym pamiętać przy zmianach:
 """
 
 from app.tools.base import KnowledgeSource
-from app.tools.find_tickets_vector.models import FindTicketsVectorQuery, FindTicketsVectorResult
 from app.tools.models import SourceRef
-from app.tools.render_tickets import render_found_tickets
+from app.tools.tickets.base import render_found_tickets
+from app.tools.tickets.find_tickets_vector.models import (
+    FindTicketsVectorQuery,
+    FindTicketsVectorResult,
+)
 
 
 class FindTicketsVectorToolBase(KnowledgeSource):

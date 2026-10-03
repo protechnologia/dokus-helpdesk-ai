@@ -35,7 +35,7 @@ from app.embedding import EmbeddingClient
 from app.model.ticket_parsed import ParsedTicket
 from app.retrieval import QdrantClient
 from app.service.rag_indexer import TicketIndexer
-from app.tools.find_tickets_vector import FindTicketsVectorQuery, FindTicketsVectorTool
+from app.tools.tickets.find_tickets_vector import FindTicketsVectorQuery, FindTicketsVectorTool
 
 pytestmark = [
     pytest.mark.stack,

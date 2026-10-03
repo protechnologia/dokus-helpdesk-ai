@@ -1124,9 +1124,9 @@ dokus-helpdesk-ai/
 │       ├── db/                   # Postgres: client.py, table/<tabela>/ (klasa + .sql), row/
 │       ├── anonymization/        # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 19)
 │       │                         # --- agent: katalog na jednostkę, właściwa + fake.py ---
-│       ├── tools/                # narzędzia agenta: kontrakty w base.py, katalog na narzędzie
+│       ├── tools/                # narzędzia agenta: base.py, folder na materiał, katalog na narzędzie
 │       ├── nodes/                # węzły grafów: kontrakt Node, katalog na węzeł
-│       └── graph/                # grafy funkcji: base.py (GraphState i wspólne), fake.py, katalog na graf
+│       └── graph/                # grafy funkcji: base.py, factory.py, registry.py, fake.py, katalog na graf
 ├── embedder/                     # kolejna usługa: model PL za REST-em
 │   ├── Dockerfile
 │   ├── requirements.txt
@@ -1219,7 +1219,7 @@ dokus-helpdesk-ai/
 3. **Model danych czy operacja na nich?** → `model/` albo `service/`.
 4. **Dane klienta, które klient zmienia bez deployu** (słownik, zestaw reguł)? → `text/`.
    Prompt — treść czytana zdanie po zdaniu — leży w katalogu swojego grafu, nie w `text/`.
-5. **Narzędzie agenta, węzeł grafu albo przebieg funkcji?** → `tools/<narzędzie>/`,
+5. **Narzędzie agenta, węzeł grafu albo przebieg funkcji?** → `tools/<materiał>/<narzędzie>/`,
    `nodes/<węzeł>/`, `graph/<funkcja>/` — każdy z wersją właściwą i atrapą (p. 1–5); prompt
    grafu leży w katalogu grafu.
 
@@ -1369,8 +1369,8 @@ Wspólne:
   `graph/suggest_<wariant>` to guzik (`LABEL`, `REQUIRES_HITS`, `STATE`), więc nowy wariant to nowy
   katalog bez zmiany routera. Wariant bez narzędzi wiedzy nie ma `sources` w stanie i wraca
   z pustą listą.
-- **Trasy biorą graf z `factory.get_graph_builder()` (zależność FastAPI), budowany na każde
-  żądanie** — atrapa jest jednorazowa. Do p. 9 `build_function_graph()` zawsze oddaje atrapę,
+- **Trasy biorą graf z `graph/factory.py` (`get_graph_builder()`, zależność FastAPI), budowany
+  na każde żądanie** — atrapa jest jednorazowa. Do p. 9 `build_function_graph()` zawsze oddaje atrapę,
   także przy prawdziwym `LLM_PROVIDER`: nic nie wychodzi z procesu, a odmowa położyłaby trasy na
   stacku dev. Test podmienia zależność przez `dependency_overrides`, wstawiając graf z atrap,
   do których ma dostęp.
@@ -1529,11 +1529,12 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   i oddają wiersze spisu treści, a treść daje `read_docs` — jedyne narzędzie dokumentacji, które
   cytuje. Dzięki temu lista źródeł pokazuje to, co model przeczytał, a nie to, co zobaczył
   w spisie. Właściwe jest dziś tylko `find_tickets_vector`; reszta to modele i atrapy.
-- **Tekst wspólny dla narzędzi jednego materiału leży na górze `tools/`**: `render_tickets.py`
-  (rekord zgłoszenia — ten sam w obu wyszukiwaniach) i `render_docs.py` (wiersz
-  sekcji — ten sam w spisie i w obu wyszukiwaniach). Atrapy narzędzi dokumentacji stoją na jednej
-  zmyślonej dokumentacji (`fake_docs.py`), żeby identyfikator z atrapy wyszukiwania dało się
-  odczytać atrapą odczytu.
+- **Narzędzia leżą w folderze swojego materiału: `tools/tickets/` i `tools/docs/` (2026-10-03)**,
+  nazwanym jak `SourceRef.source`; katalog narzędzia zachowuje pełną nazwę, tę samą co plik
+  `.md` w grafie. `base.py` materiału trzyma tekst wspólny dla jego narzędzi: rekord zgłoszenia
+  (ten sam w obu wyszukiwaniach) oraz wiersz i nagłówek sekcji (spis, oba wyszukiwania, odczyt).
+  Atrapy narzędzi dokumentacji stoją na jednej zmyślonej dokumentacji (`docs/fake_docs.py`), żeby
+  identyfikator z atrapy wyszukiwania dało się odczytać atrapą odczytu.
 - **`SourceRef.score` trzeba podać, ale wolno podać `None`** — źródło znalezione dosłownie albo
   odczytane po identyfikatorze nie ma podobieństwa. Pole bez wartości domyślnej, żeby jego brak
   był decyzją narzędzia, a nie przeoczeniem; w odpowiedzi API to `null`.
@@ -1590,7 +1591,7 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   i trzy różne przyczyny** — najczęstszy kształt trafień w korpusie, na którym agent ma dopytywać,
   a nie zgadywać. Dane atrap są zmyślone, nigdy kopiowane z korpusu (PII).
 - **Test kontraktu sam znajduje narzędzia** (`test_api_tools_contract.py`: pakiety w `app/tools/`
-  → podklasy `KnowledgeSource`) i sprawdza to, czego `ABC` nie wymusza: `name`, `query_model`
+  na każdej głębokości → podklasy `KnowledgeSource`) i sprawdza to, czego `ABC` nie wymusza: `name`, `query_model`
   z `extra="forbid"` oraz jedną nazwę na pakiet. Nowe narzędzie jest objęte testem bez dopisywania
   go do żadnej listy.
 - **Każde źródło wiedzy jest tylko do odczytu** — wstrzyknięcie przez treść zgłoszenia może co
@@ -1649,6 +1650,9 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   Pilnuje `test_api_graph_langsmith.py` (pada bez blokady — sprawdzone). Import LangGrapha ~1,1 s.
 - **`build_graph()` przyjmuje gotowe węzły, a krawędzie prowadzi po nazwach** — węzły zamienione
   w argumentach dają ten sam graf, dwa o jednej nazwie to błąd przy składaniu.
+- **Fabryka grafów leży w `graph/factory.py`, jak fabryki innych pakietów, ale `graph/__init__.py`
+  jej nie eksportuje** — po p. 9 pociągnie `Settings` i klientów, a ten `__init__` importuje
+  każdy graf. Bierze się ją pełną ścieżką `app.graph.factory`.
 - **Prompt grafu składa `graph.py`: `system_prompt()` i `user_prompt(state)`**; treść zgłoszenia
   bierze wyłącznie z `anonymized`, a stan przed anonimizacją to błąd, nie pusty prompt.
 - **Odpowiedź grafu przychodzi narzędziem `respond_<graf>`, nie tekstem (2026-10-02).** Definicja
@@ -2475,7 +2479,8 @@ generacji.
 
 - [x] **1. Struktura `api/app/tools/` z listą narzędzi** — kontrakty (`base.py`), wspólny
   `SourceRef` (`models.py`), katalogi `find_tickets_vector/` i `find_docs_vector/` z własnymi
-  `models.py`, tabela narzędzi w `tools/__init__.py`; reguły — „Warstwa narzędzi agenta".
+  `models.py` (dziś w folderach materiałów), tabela narzędzi w `tools/__init__.py`; reguły —
+  „Warstwa narzędzi agenta".
 - [x] **2. Atrapy wszystkich narzędzi** — `FakeFindTicketsVectorTool` i `FakeFindDocsVectorTool` (`fake.py`
   w katalogu narzędzia) oraz test kontraktu, który sam znajduje narzędzia w `app/tools/`; reguły —
   „Warstwa narzędzi agenta".
@@ -2516,18 +2521,21 @@ punkty niżej to narzędzia właściwe.
 - [x] **48. Postgres ze słownikiem w compose** — usługa `postgres` z własnym obrazem (słownik
   sjp.pl z trzema poprawkami, konfiguracja `pl_search`), zmienne `POSTGRES_*`, marker
   `stack_postgres` i test na stacku; reguły — „Warstwa wyszukiwania tekstowego (Postgres)".
+- [ ] **54. Syntetyczna dokumentacja i golden set** — `data/instruction/` (dwa dokumenty, 20–30
+  sekcji dobranych pod zjawiska: dystraktory, dosłowne nazwy opcji, kod błędu, „nie-", nazwy
+  produktów, łącznik, sekcja przy limicie tokenów — potwierdzi ją dopiero walidator z p. 49)
+  i zestaw w `data/golden/` z zapytaniami w kształcie każdego narzędzia. *Dlaczego:* import
+  i narzędzia powstają przed właściwą dokumentacją (p. 55), a format metryczki ma się sprawdzić
+  na konkretnej paczce, zanim zamrozi go walidator; wynik mierzy okablowanie, nie skuteczność —
+  sekcje i zapytania pisze ten sam autor.
 - [ ] **49. Import dokumentacji** — `helpdesk docs validate|import <katalog>`: katalog na
   dokument, metryczka JSON (tytuł, wersja, data i wiersz na plik: stały identyfikator, tytuł,
   ścieżka rozdziału, krótki opis) oraz pliki `.md` z samą treścią; zapis do kolekcji dokumentacji
   w Qdrancie i do `DocsTable` w Postgresie; zgodność metryczki z katalogiem
-  w obie strony, limit 8192 tokenów, odmowa dokumentu syntetycznego we właściwym indeksie.
-  *Dlaczego:* podział robi człowiek z modelem przed wgraniem, więc aplikacja nie chunkuje, ale
-  musi odrzucić paczkę, w której sekcja po cichu wypada albo embedder ją ucina.
-- [ ] **54. Syntetyczna dokumentacja i golden set** — `data/instruction/` (dwa dokumenty, 20–30
-  sekcji dobranych pod zjawiska: dystraktory, dosłowne nazwy opcji, kod błędu, „nie-", nazwy
-  produktów, łącznik, sekcja przy limicie tokenów) i zestaw w `data/golden/` z zapytaniami
-  w kształcie każdego narzędzia. *Dlaczego:* narzędzia powstają przed właściwą dokumentacją
-  (p. 55); wynik mierzy okablowanie, nie skuteczność — sekcje i zapytania pisze ten sam autor.
+  w obie strony, limit 8192 tokenów, odmowa dokumentu syntetycznego we właściwym indeksie;
+  sprawdzany na paczce z p. 54. *Dlaczego:* podział robi człowiek z modelem przed wgraniem,
+  więc aplikacja nie chunkuje, ale musi odrzucić paczkę, w której sekcja po cichu wypada albo
+  embedder ją ucina.
 - [ ] **8. `find_docs_vector`** — wyszukiwanie w kolekcji dokumentacji; zwraca wiersze listingu
   (identyfikator, dokument, rozdział, opis), nie treść; jednostką wyniku jest plik z metryczki
   także wtedy, gdy wektor powstaje z jego fragmentu — fragment zwija się do pliku. *Dlaczego:*

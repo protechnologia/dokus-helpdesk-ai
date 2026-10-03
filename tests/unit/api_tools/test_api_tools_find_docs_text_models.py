@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.tools.find_docs_text import FindDocsTextQuery
+from app.tools.docs.find_docs_text import FindDocsTextQuery
 
 
 def test_a_query_with_nothing_to_search_is_refused() -> None:

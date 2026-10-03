@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from app.tools.read_docs import FakeReadDocsTool, ReadDocsQuery, UnknownSectionError
+from app.tools.docs.read_docs import FakeReadDocsTool, ReadDocsQuery, UnknownSectionError
 
 QUERY = ReadDocsQuery(section_ids=["usr-wysylka-status-w-toku", "adm-kancelaria-edoreczenia"])
 

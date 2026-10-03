@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from app.tools.read_docs import ReadDocsQuery
-from app.tools.read_docs.models import MAX_SECTIONS_PER_READ
+from app.tools.docs.read_docs import ReadDocsQuery
+from app.tools.docs.read_docs.models import MAX_SECTIONS_PER_READ
 
 
 def test_a_read_of_nothing_is_refused() -> None:

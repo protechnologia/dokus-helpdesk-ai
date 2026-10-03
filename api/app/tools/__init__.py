@@ -2,7 +2,7 @@
 Description:
 Wszystko, co może wywołać pętla agenta. Wspólne kontrakty i `SourceRef` importuje się stąd
 (`from app.tools import KnowledgeSource`); to, co należy do jednego narzędzia — jego modele —
-z pakietu tego narzędzia (`from app.tools.find_tickets_vector import FoundTicket`).
+z pakietu tego narzędzia (`from app.tools.tickets.find_tickets_vector import FoundTicket`).
 
 Każdy materiał ma dwie drogi wyszukiwania: `_vector` po znaczeniu (Qdrant) i `_text` po
 dosłownym brzmieniu (Postgres). Zgłoszenia wracają od razu w całości, bo są krótkie, a przyczyny
@@ -19,14 +19,19 @@ Celowo NIE ma tu anonimizatora ani modelu. Anonimizacja to stały węzeł, przez
 każdy graf, a nie coś, co agent może wywołać albo pominąć; model jest wołającym te narzędzia, nie
 jednym z nich (CLAUDE.md -> „Trwa zmiana architektury").
 
-Tutaj: wspólne kontrakty (`base.py`), jedyny model wspólny dla wszystkich narzędzi, `SourceRef`
-(`models.py`), tekst wspólny dla narzędzi jednego materiału (`render_tickets.py`, `render_docs.py`)
-i zmyślona dokumentacja atrap (`fake_docs.py`). W katalogu każdego narzędzia: implementacja
-(`tool.py`), jej atrapa (`fake.py`), ich część wspólna (`base.py`: nazwa, tekst dla modelu, lista
-źródeł) i `models.py` z własnym zapytaniem, znalezionym elementem i wynikiem — bez wspólnej bazy —
-oraz `errors.py`, gdy narzędzie będzie miało własne błędy do zgłoszenia. Nowe narzędzie to nowy
-katalog. Opis, który czyta MODEL, leży obok adaptera w każdym grafie, nie tutaj: to treść promptu,
-czytana zdanie po zdaniu, i może się różnić między grafami używającymi tego samego narzędzia.
+Trzy poziomy, na każdym `base.py` z tym, co wspólne poziom niżej:
+
+    tools/base.py, models.py        kontrakty i `SourceRef` — wspólne dla wszystkich narzędzi
+    tools/<materiał>/base.py        tekst wspólny dla narzędzi jednego materiału
+    tools/<materiał>/<narzędzie>/   narzędzie: `tool.py`, `fake.py`, `base.py`, `models.py`
+
+Materiały są dwa — `tickets/` i `docs/` — i nazywają się tak jak `SourceRef.source`. W katalogu
+narzędzia: implementacja (`tool.py`), jej atrapa (`fake.py`), ich część wspólna (`base.py`: nazwa,
+tekst dla modelu, lista źródeł) i `models.py` z własnym zapytaniem, znalezionym elementem
+i wynikiem — bez wspólnej bazy — oraz `errors.py`, gdy narzędzie ma własne błędy do zgłoszenia.
+Nowe narzędzie to nowy katalog w folderze swojego materiału. Opis, który czyta MODEL, leży obok
+adaptera w każdym grafie, nie tutaj: to treść promptu, czytana zdanie po zdaniu, i może się
+różnić między grafami używającymi tego samego narzędzia.
 
 | narzędzie             | rodzaj        | zapytanie agenta      | co oddaje                       |
 |-----------------------|---------------|-----------------------|---------------------------------|

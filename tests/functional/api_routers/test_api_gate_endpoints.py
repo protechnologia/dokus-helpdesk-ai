@@ -5,8 +5,8 @@ from fastapi.testclient import TestClient
 from langgraph.graph.state import CompiledStateGraph
 
 from app.anonymization import FakeAnonymizer
-from app.factory import get_graph_builder
 from app.graph import gate_close, gate_reply
+from app.graph.factory import get_graph_builder
 from app.main import create_app
 from app.model.gate_verdict import Verdict
 from app.nodes.agent import FakeAgentNode, tool_call_turn

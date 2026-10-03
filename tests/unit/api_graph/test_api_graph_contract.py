@@ -10,12 +10,12 @@ from pydantic import BaseModel
 import app.graph
 from app.anonymization import AnonymizedText
 from app.graph import merge_sources
-from app.tools.find_docs_text.fake import FakeFindDocsTextTool
-from app.tools.find_docs_vector.fake import FakeFindDocsVectorTool
-from app.tools.find_tickets_text.fake import FakeFindTicketsTextTool
-from app.tools.find_tickets_vector.fake import FakeFindTicketsVectorTool
-from app.tools.list_docs.fake import FakeListDocsTool
-from app.tools.read_docs.fake import FakeReadDocsTool
+from app.tools.docs.find_docs_text.fake import FakeFindDocsTextTool
+from app.tools.docs.find_docs_vector.fake import FakeFindDocsVectorTool
+from app.tools.docs.list_docs.fake import FakeListDocsTool
+from app.tools.docs.read_docs.fake import FakeReadDocsTool
+from app.tools.tickets.find_tickets_text.fake import FakeFindTicketsTextTool
+from app.tools.tickets.find_tickets_vector.fake import FakeFindTicketsVectorTool
 
 
 def all_graphs() -> list[ModuleType]:
