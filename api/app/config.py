@@ -62,11 +62,12 @@ class Settings(BaseSettings):
     # --- Postgres: indeks wyszukiwania tekstowego (od p. 29 także reguły bramek) ---
     # Host i port po stronie sieci compose. Hasło nie ma wartości w kodzie: compose podaje
     # dev-ową, a klient bazy ma odmówić startu bez niej (p. 49).
-    postgres_host:     str        = "postgres"
-    postgres_port:     int        = 5432
-    postgres_db:       str        = "helpdesk"
-    postgres_user:     str        = "helpdesk"
-    postgres_password: str | None = None                # np. "helpdesk"
+    postgres_host:            str        = "postgres"
+    postgres_port:            int        = 5432
+    postgres_db:              str        = "helpdesk"
+    postgres_user:            str        = "helpdesk"
+    postgres_password:        str | None = None         # np. "helpdesk"
+    postgres_timeout_seconds: float      = 30.0         # sekundy: łączenie i każde zapytanie
 
     # --- retrieval: tuning, NOT business logic ---
     # These two are knobs a deployment turns; the rules that read them are not. Scoring the hits

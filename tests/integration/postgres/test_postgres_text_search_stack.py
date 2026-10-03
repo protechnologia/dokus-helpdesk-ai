@@ -7,27 +7,30 @@ Prawda, której pilnuje ten plik, mieszka poza naszym kodem: w słowniku sjp.pl,
 Postgresa i w poprawkach nakładanych przy budowaniu obrazu (`postgres/dictionary/build.sh`,
 `postgres/initdb/10_text_search.sql`). Trzy drogi dopasowania, każda do czego innego:
 
-| droga   | zapytanie SQL              | do czego                                     |
-|---------|----------------------------|----------------------------------------------|
-| słowa   | `@@ plainto_tsquery(...)`  | słowa kluczowe w dowolnej odmianie           |
-| fraza   | `@@ phraseto_tsquery(...)` | cały komunikat, słowa w tej samej kolejności |
-| podciąg | `ILIKE '%...%'`            | kod błędu albo jego fragment, dosłownie      |
+| droga       | do czego                                     |
+|-------------|----------------------------------------------|
+| `words`     | słowa kluczowe w dowolnej odmianie           |
+| `phrase`    | cały komunikat, słowa w tej samej kolejności |
+| `substring` | kod błędu albo jego fragment, dosłownie      |
 
 Co się dzieje po drodze:
 
-1. Jedno połączenie na cały plik liczy wynik każdego przypadku z tabeli `CASES` — słownik ładuje
-   się raz na połączenie (około 0,6 s), więc połączenie na test wydłużałoby przebieg kilkanaście
-   razy.
-2. Test sparametryzowany po przypadkach porównuje wynik z oczekiwanym.
+1. Raz na cały plik teksty wszystkich przypadków z `CASES` trafiają do własnej tabeli testu,
+   po wierszu na przypadek; identyfikatorem wiersza jest nazwa przypadku.
+2. Dla każdego przypadku jego zapytanie szuka w tej tabeli drogą, którą przypadek wskazuje,
+   a wynikiem jest to, czy wiersz TEGO przypadku jest wśród trafień.
+3. Tabela jest kasowana, a test sparametryzowany po przypadkach porównuje wynik z oczekiwanym.
 
 O czym pamiętać przy zmianach:
 
 - Teksty są zmyślone, nigdy kopiowane z korpusu.
+- Tabela jest własna (`text_search_stack_test`), nigdy tabela narzędzia — test ją zakłada
+  i kasuje.
 - Przypadek z oczekiwaniem `False` jest tak samo ważny jak z `True`: „widoczne" nie może znaleźć
   „niewidoczne", a fragment kodu sklejonego z kropkami nie znajduje się słowami — dlatego
   istnieje droga przez podciąg.
-- Zapytania to SQL wprost przez sterownik, bo klient bazy w `api` powstaje z importem
-  dokumentacji (p. 49); wtedy nazwa konfiguracji przechodzi do niego.
+- SQL-a tu nie ma. Szuka `DocsTable` z `app/db/` — tymi samymi metodami, których użyją
+  narzędzia `find_*_text`.
 - Zmiana słownika wymaga przebudowy obrazu, a zmiana mapowania w `initdb/` — także odtworzenia
   wolumenu, bo skrypty startowe działają tylko na pustej bazie.
 """
@@ -35,23 +38,15 @@ O czym pamiętać przy zmianach:
 import asyncio
 from typing import NamedTuple
 
-import asyncpg
 import pytest
 
-from tests.conftest import postgres_dsn
+from app.db import DocRow, DocsTable
+from tests.conftest import build_postgres_client
 
 pytestmark = [pytest.mark.stack, pytest.mark.stack_postgres]
 
-# Konfiguracja wyszukiwania zakładana przez `postgres/initdb/10_text_search.sql`.
-CONFIG = "pl_search"
-
-# Nazwa konfiguracji idzie jako tekst rzutowany w zapytaniu: sterownik koduje parametr według
-# typu, który zgłasza serwer, a `regconfig` zgłasza się jako liczba.
-WORDS     = "SELECT to_tsvector($1::text::regconfig, $2) @@ plainto_tsquery($1::text::regconfig, $3)"
-PHRASE    = "SELECT to_tsvector($1::text::regconfig, $2) @@ phraseto_tsquery($1::text::regconfig, $3)"
-SUBSTRING = "SELECT $1::text ILIKE '%' || $2::text || '%'"
-
-CONFIG_PRESENT = "SELECT count(*) FROM pg_ts_config WHERE cfgname = $1"
+# Własna tabela testu: zakładana i kasowana tutaj, nigdy tabela, z której czyta narzędzie.
+TEST_TABLE = "text_search_stack_test"
 
 
 class Case(NamedTuple):
@@ -61,7 +56,7 @@ class Case(NamedTuple):
     """
 
     name:     str   # np. "odmiana: liczba mnoga"
-    mode:     str   # "words" | "phrase" | "substring"
+    mode:     str   # metoda tabeli: "words" | "phrase" | "substring"
     text:     str   # np. "Nie można połączyć się z serwerami."
     query:    str   # np. "serwer"
     expected: bool  # czy zapytanie ma znaleźć tekst
@@ -93,70 +88,87 @@ CASES = (
 
     # --- fraza: liczy się kolejność ---
     Case("fraza: cały komunikat", "phrase", "Komunikat: Nie udało się skomunikować z serwerem.", "nie udało się skomunikować z serwerem", True),
+    Case("fraza: inna odmiana",   "phrase", "Komunikat: Nie udało się skomunikować z serwerem.", "nie udało się skomunikować z serwerami", True),
     Case("fraza: inna kolejność", "phrase", "Z serwerem udało się skomunikować po restarcie.",   "skomunikować z serwerem",               False),
+    Case("fraza: brak słowa w środku", "phrase", "Komunikat: Nie udało się skomunikować z serwerem.", "nie udało skomunikować z serwerem", False),
 
     # --- podciąg: to, czego słowa nie znajdują ---
     Case("podciąg: fragment po kropce", "substring", "java.lang.OutOfMemoryError: Java heap space", "OutOfMemoryError", True),
     Case("podciąg: sam numer",          "substring", "Baza zwraca ORA-00942 przy raporcie.",        "00942",            True),
     Case("podciąg: wielkość liter",     "substring", "BŁĄD ŁĄCZA z bazą danych.",                   "błąd łącza",       True),
+
+    # --- podciąg: `%` i `_` w zapytaniu są zwykłymi znakami, nie wzorcem ---
+    Case("podciąg: % dosłownie",        "substring", "Wysyłka stanęła na 100% i zwróciła błąd.", "100%",              True),
+    Case("podciąg: % to nie dowolny ciąg", "substring", "Błąd serwera aplikacji przy zapisie.",  "Błąd%aplikacji",    False),
+    Case("podciąg: _ to nie dowolny znak", "substring", "Plik raport-2026.pdf nie otwiera się.", "raport_2026",       False),
 )
 
 
-async def _matches(
-    connection: asyncpg.Connection,  # otwarte połączenie z bazą na stacku
-    case:       Case,                # np. Case("odmiana: narzędnik", "words", "…", "serwer", True)
-) -> bool:
+def _row(
+    case:    Case,  # np. Case("odmiana: narzędnik", "words", "Nie udało się … z serwerem.", "serwer", True)
+    ordinal: int,   # miejsce przypadku w tabeli `CASES`
+) -> DocRow:
     """
     Description:
-    Odpowiada, czy zapytanie przypadku znajduje jego tekst drogą, którą przypadek wskazuje.
+    Wiersz tabeli dla jednego przypadku: tekst przypadku jako treść sekcji, a nazwa przypadku
+    jako jej identyfikator. Tytuł jest stały, żeby szukanie trafiało wyłącznie po treści.
 
     Example args:
-        connection=<asyncpg.Connection>
         case=Case("odmiana: narzędnik", "words", "Nie udało się … z serwerem.", "serwer", True)
+        ordinal=0
 
     Example result:
-        True
+        DocRow(section_id="odmiana: narzędnik", ordinal=0, body="Nie udało się…", …)
     """
-    # podciąg nie korzysta ze słownika, więc nie dostaje nazwy konfiguracji
-    if case.mode == "substring":
-        return await connection.fetchval(SUBSTRING, case.text, case.query)
+    row = DocRow(
+        section_id   = case.name,
+        ordinal      = ordinal,
+        document     = "Przypadki testu",
+        version      = "1",
+        chapter_path = "[]",
+        title        = "-",
+        description  = "-",
+        body         = case.text,
+    )
 
-    # fraza wymaga tej samej kolejności słów
-    if case.mode == "phrase":
-        return await connection.fetchval(PHRASE, CONFIG, case.text, case.query)
-
-    # słowa: wszystkie muszą wystąpić, w dowolnej kolejności i odmianie
-    return await connection.fetchval(WORDS, CONFIG, case.text, case.query)
+    return row
 
 
 async def _run_cases() -> dict[str, bool]:
     """
     Description:
-    Liczy wynik każdego przypadku w jednym połączeniu. Najpierw sprawdza, że konfiguracja
-    wyszukiwania w ogóle istnieje: baza z wolumenu założonego przed dodaniem skryptów startowych
-    odpowiada, ale konfiguracji nie ma, i bez tego sprawdzenia każdy przypadek padałby błędem,
-    który nie mówi, co naprawić.
+    Wypełnia własną tabelę tekstami przypadków i dla każdego sprawdza, czy jego zapytanie
+    znajduje jego wiersz. Zakładanie tabeli potwierdza przy okazji, że baza ma konfigurację
+    wyszukiwania — baza z wolumenu starszego niż skrypty startowe jej nie ma.
 
     Example args:
         (brak)
 
     Example result:
         {"odmiana: narzędnik": True, "nie-: twierdzenie ≠ zaprzeczenie": False, …}
+
+    Raises:
+        DbConfigError: w bazie nie ma konfiguracji wyszukiwania
     """
-    connection = await asyncpg.connect(postgres_dsn())
+    client = build_postgres_client()
+    table  = DocsTable(client, name=TEST_TABLE)
 
     try:
-        # --- konfiguracja z `initdb/` jest na miejscu ---
-        present = await connection.fetchval(CONFIG_PRESENT, CONFIG)
-        assert present == 1, (
-            f"W bazie nie ma konfiguracji wyszukiwania `{CONFIG}`. Skrypty z `postgres/initdb/` "
-            "działają tylko na pustym wolumenie — odtwórz wolumen `postgres_data`."
-        )
+        # --- tabela od zera: wiersz na przypadek; `create()` sprawdza konfigurację z `initdb/` ---
+        await table.drop()
+        await table.create()
+        await table.upsert([_row(case, ordinal) for ordinal, case in enumerate(CASES)])
 
-        # --- przypadki ---
-        outcomes = {case.name: await _matches(connection, case) for case in CASES}
+        # --- każde zapytanie swoją drogą; limit obejmuje całą tabelę ---
+        outcomes = {}
+
+        for case in CASES:
+            rows = await getattr(table, case.mode)(case.query, limit=len(CASES))
+            outcomes[case.name] = case.name in {row.section_id for row in rows}
+
+        await table.drop()
     finally:
-        await connection.close()
+        await client.aclose()
 
     return outcomes
 

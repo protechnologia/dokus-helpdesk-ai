@@ -6,14 +6,14 @@ funkcjonalne i ewaluacyjne — różni je to, czego dowodzą, a nie sposób dota
 
 Rodzaj testu to jego folder, a marker mówi, czego test potrzebuje do uruchomienia:
 
-| marker           | czego wymaga                  | adres dla testu z hosta |
-|------------------|-------------------------------|-------------------------|
-| `stack`          | działającej usługi (parasol)  | —                       |
-| `stack_api`      | usługi `api`                  | `api_url()`             |
-| `stack_qdrant`   | Qdranta                       | `qdrant_url()`          |
-| `stack_embedder` | usługi `embedder`             | `embedder_url()`        |
-| `stack_postgres` | Postgresa ze słownikiem       | `postgres_dsn()`        |
-| `llm_live`       | prawdziwego, płatnego modelu  | — (z konfiguracji)      |
+| marker           | czego wymaga                 | adres dla testu z hosta   |
+|------------------|------------------------------|---------------------------|
+| `stack`          | działającej usługi (parasol) | —                         |
+| `stack_api`      | usługi `api`                 | `api_url()`               |
+| `stack_qdrant`   | Qdranta                      | `qdrant_url()`            |
+| `stack_embedder` | usługi `embedder`            | `embedder_url()`          |
+| `stack_postgres` | Postgresa ze słownikiem      | `build_postgres_client()` |
+| `llm_live`       | prawdziwego, płatnego modelu | — (z konfiguracji)        |
 
 Marker nosi tylko test, który potrzebuje działającej usługi albo płatnego modelu. Jednostkowe nie
 mają go nigdy, a w pozostałych rodzajach ma go mniejszość: większość testów integracyjnych
@@ -36,10 +36,12 @@ O czym pamiętać przy zmianach:
 """
 
 import os
+from urllib.parse import urlsplit
 
 import pytest
 
 from app.config import Settings
+from app.db import PostgresClient
 
 EMBEDDER_URL_ENV     = "EMBEDDER_TEST_URL"
 EMBEDDER_URL_DEFAULT = "http://localhost:8001"
@@ -113,6 +115,36 @@ def postgres_dsn() -> str:
         "postgresql://helpdesk:helpdesk@localhost:5433/helpdesk"
     """
     return os.environ.get(POSTGRES_DSN_ENV, POSTGRES_DSN_DEFAULT)
+
+
+def build_postgres_client(
+    **overrides: object,  # np. password="zle-haslo" albo database="nie-ma-takiej"
+) -> PostgresClient:
+    """
+    Description:
+    Klient Postgresa połączony z bazą dostępną z hosta (`postgres_dsn()`). Argumenty nazwane
+    podmieniają pojedyncze części adresu — tak test odtwarza złe hasło albo nieistniejącą bazę.
+
+    Example args:
+        overrides={"password": "zle-haslo"}
+
+    Example result:
+        PostgresClient dla localhost:5433/helpdesk ze złym hasłem
+    """
+    address = urlsplit(postgres_dsn())
+
+    arguments = {
+        "host":     address.hostname,
+        "port":     address.port,
+        "database": address.path.lstrip("/"),
+        "user":     address.username,
+        "password": address.password,
+        **overrides,
+    }
+
+    client = PostgresClient(**arguments)
+
+    return client
 
 
 def build_host_settings() -> Settings:

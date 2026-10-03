@@ -189,7 +189,7 @@ od p. 19 `anonymizer`. LLM jest **zewnętrznym endpointem**, nie usługą w bazo
 - **Nie mieszaj trybów prefiksów PolDense w jednej przestrzeni wektorowej** (patrz „Embeddingi")
 - **Nie wrzucaj pola `solution` do embeddingu** — rozwiązanie żyje w payloadzie, nie w wektorze
 - **Nie indeksuj surowej treści maila** — indeksujemy wyłącznie sparsowane pola; jedyny wyjątek
-  to zanonimizowany opis zgłaszającego w indeksie tekstowym (p. 53), nigdy w wektorze
+  to zanonimizowany wątek w indeksie tekstowym (p. 53), nigdy w wektorze
 - **Nie kasuj i nie nadpisuj plików w `data/parsed/`** — to niepowtarzalny wynik przebiegu LLM
 - **Nie filtruj korpusu po `status = 'zamkniety'`** — Dokus kończy zgłoszenia na `rozwiazany`,
   `zamkniety` ma 5 sztuk na 1825 (patrz „Dane wejściowe")
@@ -907,7 +907,10 @@ przemierzenia (p. 25–27), ale wnioski o formie przenoszą się między modelam
   37%, a reguła słowna o zwięzłości nie dała ani jednego numerowanego kroku. Nie usuwać jako
   „zbędnego". **Wzór ma być schematyczny:** gotowe pytania model przepisuje dosłownie, a przykład
   z innej dziedziny ściąga uwagę z danych (najgorszy wynik ze wszystkich wariantów).
-- **Schemat działa wyłącznie z osobnym blokiem przyczyn** (p. 7) — sam daje kształt bez treści.
+- **Schemat działał na 11B wyłącznie z osobnym blokiem przyczyn** — sam dawał kształt bez treści.
+  Blok usunięty z wyniku narzędzi 2026-10-03 jako zabieg pod słaby model; gdyby pytania przy
+  klastrach wieloprzyczynowych wyszły na modelu docelowym słabo, to pierwsza rzecz do przywrócenia
+  (p. 25).
 - **Notatka `[dla wdrożeniowca: …]` jest nośna, choć wygląda na ozdobę** — zmusza model, żeby
   zajrzał w przyczyny przed napisaniem pytania; bez niej liczba pytań rośnie, a pokrycie spada.
   Odwrotnie z gotową formułką na wyjście („Brak pytań rozróżniających.") — model doklejał ją po
@@ -1118,6 +1121,7 @@ dokus-helpdesk-ai/
 │       ├── llm/                  # LLMClient + fabryka + FakeLLMClient + cenniki
 │       ├── embedding/            # EmbeddingClient (HTTP do `embedder`) + prefiksy
 │       ├── retrieval/            # klient Qdranta: indeksacja, wyszukiwanie (etap 4)
+│       ├── db/                   # Postgres: client.py, table/<tabela>/ (klasa + .sql), row/
 │       ├── anonymization/        # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 19)
 │       │                         # --- agent: katalog na jednostkę, właściwa + fake.py ---
 │       ├── tools/                # narzędzia agenta: kontrakty w base.py, katalog na narzędzie
@@ -1454,8 +1458,9 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
 ## Warstwa wyszukiwania tekstowego (Postgres)
 
 Usługa `postgres` to drugi indeks obok Qdranta: szuka po słowach w odmianie i po dosłownych
-ciągach, czego wektor nie robi. Dziś jest sama usługa ze słownikiem; klient i tabele dochodzą
-z importem dokumentacji (p. 49).
+ciągach, czego wektor nie robi. Po stronie `api` stoi pakiet `app/db/` z tabelami zgłoszeń
+i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czytać będą narzędzia
+`find_*_text`, `list_docs` i `read_docs` (p. 49–53).
 
 - **Trzy drogi dopasowania, każda do czego innego:** słowa (`plainto_tsquery` — dowolna kolejność
   i odmiana), fraza (`phraseto_tsquery` — cały komunikat w tej samej kolejności) i podciąg
@@ -1481,11 +1486,35 @@ z importem dokumentacji (p. 49).
 - **Skrypty z `initdb/` i zmienne `POSTGRES_DB/USER/PASSWORD` działają tylko na pustym
   wolumenie.** Zmiana mapowania albo hasła nie dociera do istniejącej bazy. Do p. 29 wolno
   odtworzyć wolumen `postgres_data`, bo tabele wyszukiwania odbudowują się z plików (zasada 8).
-- **Do bazy trafia wyłącznie tekst po anonimizacji** — surowy opis zostaje w `data/raw/`. Dzięki
+- **Do bazy trafia wyłącznie tekst po anonimizacji** — surowy wątek zostaje w `data/raw/`. Dzięki
   temu narzędzie może pokazać modelowi dopasowany fragment.
-- **Jeden pakiet klienta na usługę: `api/app/db/`** (jak `llm/`, `embedding/`), jedyne miejsce
-  importujące sterownik. Wyszukiwanie i reguły bramek (p. 29) dostają osobne schematy i role,
-  żeby przebudowa indeksu nie mogła dotknąć reguł.
+- **Pakiet `api/app/db/`: klient, tabele, wiersze — a reszta aplikacji używa tylko tabel.**
+  `client.py` to samo połączenie (pula, wykonanie SQL-a, tłumaczenie błędów sterownika).
+  `table/` ma katalog na tabelę (`tickets/`, `docs/`): klasę w `table.py` i jej SQL obok,
+  w `_create.sql` i `_upsert.sql`. Wspólna mechanika — szukanie, odczyt po identyfikatorach,
+  kasowanie — stoi w `table/base.py`. `row/` trzyma modele wierszy. Kod spoza pakietu buduje
+  klienta, podaje go tabeli i woła jej metody; samego klienta nie dotyka.
+- **Wiersz to płaskie odbicie kolumn tabeli** (`TicketRow`, `DocRow`): pole na kolumnę, w tych
+  samych typach. W tym kształcie wchodzi do tabeli i z niej wraca, także jako wynik szukania;
+  na modele dziedziny przechodzi się jawnie (`from_ticket()` / `to_ticket()`, `from_section()` /
+  `to_section()`).
+- **Zgłoszenia przeszukuje się w pełnym tekście wszystkiego naraz:** wątku po anonimizacji
+  i wszystkich pól opisowych sparsowanego rekordu, każde w swojej kolumnie tekstowej. Znaleziony
+  wiersz od razu niesie cały rekord, więc `find_tickets_text` nie zależy od Qdranta. W dokumentacji
+  przeszukiwany jest tytuł i treść sekcji; opis z metryczki nie, bo pisze go model.
+- **Przeszukiwany tekst baza łączy RAZ, przy zapisie wiersza** — w dwóch kolumnach wyliczanych
+  (`search_text` do podciągu, `search_vector` do słów i frazy). Zmierzone na 1100 wierszach:
+  łączenie kolumn i przepuszczanie ich przez słownik przy każdym zapytaniu trwa 4–5 s, z kolumną
+  wyliczaną — 1–2 ms, a zapis 1100 wierszy 5 s.
+- **Kodów błędów nie szuka się osobną drogą.** Kolumna `error_codes` jest częścią przeszukiwanego
+  tekstu, więc kod znajduje podciąg; równość z osobnym polem tylko by to dublowała.
+- **Zmiana kolumn nie dociera do istniejącej tabeli** — `CREATE TABLE IF NOT EXISTS` jej nie
+  rusza. Tabelę kasuje się i odbudowuje z plików.
+- **Nazwa tabeli jest sprawdzana wzorcem identyfikatora**, bo nie da się jej podać parametrem
+  zapytania; wszystko inne — zapytanie agenta, limit — idzie parametrem. Zapytanie do podciągu
+  przechodzi wcześniej przez unieszkodliwienie `%` i `_`.
+- **Wyszukiwanie i reguły bramek (p. 29) dostają osobne schematy i role**, żeby przebudowa
+  indeksu nie mogła dotknąć reguł.
 
 ## Warstwa narzędzi agenta (`tools/`)
 
@@ -1493,6 +1522,21 @@ z importem dokumentacji (p. 49).
   grafu (`respond_<graf>`) tu nie trafia — nic go nie wykonuje, to kontrakt wyjścia grafu.
   Anonimizator i model też nie: anonimizacja to stały węzeł, którego agent nie może pominąć,
   a model jest wołającym, nie narzędziem. Tabela narzędzi stoi na górze `tools/__init__.py`.
+- **Sześć narzędzi, dwa materiały (2026-10-03).** Zgłoszenia: `find_tickets_vector` (po znaczeniu)
+  i `find_tickets_text` (pola `exact` i `words`) — oba źródła wiedzy, oba oddają całe rekordy, bo
+  są krótkie, a przyczyny z kilku trafień model ma zobaczyć razem. Dokumentacja idzie
+  dwustopniowo: `list_docs`, `find_docs_vector` i `find_docs_text` to narzędzia pomocnicze
+  i oddają wiersze spisu treści, a treść daje `read_docs` — jedyne narzędzie dokumentacji, które
+  cytuje. Dzięki temu lista źródeł pokazuje to, co model przeczytał, a nie to, co zobaczył
+  w spisie. Właściwe jest dziś tylko `find_tickets_vector`; reszta to modele i atrapy.
+- **Tekst wspólny dla narzędzi jednego materiału leży na górze `tools/`**: `render_tickets.py`
+  (rekord zgłoszenia — ten sam w obu wyszukiwaniach) i `render_docs.py` (wiersz
+  sekcji — ten sam w spisie i w obu wyszukiwaniach). Atrapy narzędzi dokumentacji stoją na jednej
+  zmyślonej dokumentacji (`fake_docs.py`), żeby identyfikator z atrapy wyszukiwania dało się
+  odczytać atrapą odczytu.
+- **`SourceRef.score` trzeba podać, ale wolno podać `None`** — źródło znalezione dosłownie albo
+  odczytane po identyfikatorze nie ma podobieństwa. Pole bez wartości domyślnej, żeby jego brak
+  był decyzją narzędzia, a nie przeoczeniem; w odpowiedzi API to `null`.
 - **Na górze `tools/` kontrakty (`base.py`) i jedyny wspólny model `SourceRef` (`models.py`);
   w katalogu narzędzia `tool.py`, `fake.py` i `models.py` z modelami TYLKO tego narzędzia** —
   zapytanie (`FindTicketsVectorQuery`), znaleziony element (`FoundTicket`), wynik
@@ -1525,16 +1569,12 @@ z importem dokumentacji (p. 49).
   (p. 52), z tą samą regułą.
 - **Ten sam wynik daje dwie rzeczy: tekst dla modelu (`render_for_model`) i listę źródeł (`cite`)**
   — w węźle `run_tools` odpowiednio wiadomość `tool` i wpisy w `sources`. Tylko źródło wie, które
-  pola się liczą (np. osobny blok przyczyn w `find_tickets_vector`); lista źródeł powstaje
-  z `cite()`, nigdy z deklaracji modelu.
-- **Tekst `find_tickets_vector` dla modelu: nagłówek z licznikami, blok przyczyn, rekordy.** Blok
-  stoi przed rekordami i ma linię na trafienie; przyczyna nieustalona wchodzi do niego jako „(nie
-  ustalono)" — dosłowne `brak` albo zdanie „brak … przyczyny" (98 z 200 na golden200), nigdy po
-  samym prefiksie; rozstrzyga `no_cause()` z `service/normalizer_sentinel.py`, gdzie leży też
-  `no_solution()` filtra jakości i uwaga o sprzężeniu fraz z promptem parsującym. Rekordy niosą pola
-  pod nazwami ze schematu, bo prompty grafów odwołują się do nich po nazwie. Payload niezgodny
-  z `ParsedTicket` to `RetrievalConfigError` bez treści zgłoszenia w komunikacie: indeks z innej
-  wersji kontraktu naprawia przebudowa, nie czekanie.
+  pola się liczą i jak je pokazać; lista źródeł powstaje z `cite()`, nigdy z deklaracji modelu.
+- **Tekst narzędzi zgłoszeń dla modelu: nagłówek z licznikami i rekordy.** Rekordy niosą pola pod
+  nazwami ze schematu, bo prompty grafów odwołują się do nich po nazwie; `cause` zostaje
+  w brzmieniu parsera, także gdy mówi „brak". Payload niezgodny z `ParsedTicket` to
+  `RetrievalConfigError` bez treści zgłoszenia w komunikacie: indeks z innej wersji kontraktu
+  naprawia przebudowa, nie czekanie.
 - **Zapytanie niesie wyłącznie to, czego szukać** — schemat to `query_model` narzędzia. Ile pobrać
   i gdzie uciąć to strojenie (`RAG_TOP_K`, `RAG_SCORE_MIN`), nie decyzja modelu; nieznany argument
   to błąd walidacji (`extra="forbid"` w każdym modelu zapytania). **Kształt zapytania dobiera się do
@@ -1546,7 +1586,7 @@ z importem dokumentacji (p. 49).
 - **Atrapa narzędzia zwraca przy każdym wyszukaniu ten sam wynik, ze stałymi id, i zapisuje
   zapytania w publicznym `queries`** — test grafu sprawdza, o co pytał agent, a nie jak szukało
   narzędzie. Konstruktor przyjmuje własne elementy i `dropped_below_threshold`, więc scenariusz
-  „próg wszystko wyciął" to jedna linia. Wbudowany zestaw `FakeFindTicketsVector` to **jeden objaw
+  „próg wszystko wyciął" to jedna linia. Wbudowany zestaw `FakeFindTicketsVectorTool` to **jeden objaw
   i trzy różne przyczyny** — najczęstszy kształt trafień w korpusie, na którym agent ma dopytywać,
   a nie zgadywać. Dane atrap są zmyślone, nigdy kopiowane z korpusu (PII).
 - **Test kontraktu sam znajduje narzędzia** (`test_api_tools_contract.py`: pakiety w `app/tools/`
@@ -1593,10 +1633,10 @@ z importem dokumentacji (p. 49).
   anonimizatora** (fail-closed). Atrapa węzła byłaby drugą drogą obok anonimizacji; test kontraktu
   węzłów pilnuje, że w `anonymize/` jest tylko `node.py`.
 - **Atrapy pozostałych węzłów odtwarzają ustalony fragment stanu i zapisują stan w publicznym
-  `calls`.** `FakeAgent` oddaje zaplanowane tury po kolei (domyślnie jedna: odpowiedź bez narzędzi;
+  `calls`.** `FakeAgentNode` oddaje zaplanowane tury po kolei (domyślnie jedna: odpowiedź bez narzędzi;
   `tool_call_turn()` buduje turę z wywołaniem), a brak kolejnej tury to błąd, nie powtórka.
-  `FakeRunTools` odpowiada stałym tekstem na każde wywołanie z ostatniej tury, z jego `call_id`,
-  i dokłada `sources` tylko wtedy, gdy je podano. `FakeRespond` ustawia `output` na wynik
+  `FakeRunToolsNode` odpowiada stałym tekstem na każde wywołanie z ostatniej tury, z jego `call_id`,
+  i dokłada `sources` tylko wtedy, gdy je podano. `FakeRespondNode` ustawia `output` na wynik
   z konstruktora.
 - **Test kontraktu węzłów sam znajduje węzły** (`test_api_nodes_contract.py`) i sprawdza, że nazwa
   węzła = nazwa jego katalogu — atrapa i węzeł właściwy wpinają się do grafu pod tą samą nazwą.
@@ -1620,7 +1660,7 @@ z importem dokumentacji (p. 49).
   odpowiedź musi być jedynym wywołaniem w turze. Długi tekst w argumencie (`suggest_*`, `polish`)
   — do zmierzenia w p. 25–28. Także `parse_ticket` (`respond_parse_ticket`, 2026-10-02) — bez
   pól `FILLED_BY_GRAPH` (`ticket_id`, `date`, wersja słownika), które dokłada graf ze stanu.
-- **Atrapa grafu (`build_fake_graph()`) jest jednorazowa** — `FakeAgent` ma zaplanowane tury, więc
+- **Atrapa grafu (`build_fake_graph()`) jest jednorazowa** — `FakeAgentNode` ma zaplanowane tury, więc
   trasa i CLI budują ją na każde wywołanie. `ainvoke` zwraca słownik, nie model stanu.
 - **Każdy graf wystawia to samo API** — `STATE`, `TOOL_NAMES`, `system_prompt()`,
   `user_prompt(state)`, `model_tools(tools)`, `build_graph(…)`, `build_fake_graph()`,
@@ -2056,15 +2096,15 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 500 (0)            | 14 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 112 (30)           | 18 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 596 (0)            | 16 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 127 (45)           | 24 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 73 (9)             | 10 s |
-| ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 6 (3)              | 49 s |
+| ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 5 (3)              | 49 s |
 
 Liczby i czasy z 2026-10-03: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 9 s, a ewaluacyjne poniżej sekundy —
 całe 49 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
-(`pytest -m ""`): 691 testów, 72 s.
+(`pytest -m ""`): 801 testów, 66 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2357,9 +2397,8 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   - **Zły sygnał byłby gorszy niż żaden** — przy 103 pustych `cause` na 200 rekordów naiwne
     porównanie uznałoby trzy puste pola za „wszystkie zgodne", zamieniając brak wiedzy w pewność.
   - **Przy agencie ta ocena dostaje nowego odbiorcę:** decyzja „czy materiał wystarcza" to
-    kryterium stopu pętli. Pułapka pustego `cause` obowiązuje tam tak samo — stąd osobny blok
-    przyczyn z sentinelami jako „(nie ustalono)" (p. 7) i pomiar stopu na klastrach
-    wieloprzyczynowych (p. 23).
+    kryterium stopu pętli. Pułapka pustego `cause` obowiązuje tam tak samo — stąd pomiar stopu
+    na klastrach wieloprzyczynowych (p. 23).
 - **Automatyczny wybór wariantu generacji za człowieka** — guzik klika człowiek: system nie wie,
   czy zgłoszenie wymaga działania serwisu, a automat wymagałby **osądu LLM-a nad osądem LLM-a**,
   którego nie umiemy zmierzyć. **Wraca jako możliwość**, gdy dane z klikania dadzą podstawę do
@@ -2437,14 +2476,14 @@ generacji.
 - [x] **1. Struktura `api/app/tools/` z listą narzędzi** — kontrakty (`base.py`), wspólny
   `SourceRef` (`models.py`), katalogi `find_tickets_vector/` i `find_docs_vector/` z własnymi
   `models.py`, tabela narzędzi w `tools/__init__.py`; reguły — „Warstwa narzędzi agenta".
-- [x] **2. Atrapy wszystkich narzędzi** — `FakeFindTicketsVector` i `FakeFindDocsVector` (`fake.py`
+- [x] **2. Atrapy wszystkich narzędzi** — `FakeFindTicketsVectorTool` i `FakeFindDocsVectorTool` (`fake.py`
   w katalogu narzędzia) oraz test kontraktu, który sam znajduje narzędzia w `app/tools/`; reguły —
   „Warstwa narzędzi agenta".
 - [x] **3. Struktura `api/app/nodes/` z listą węzłów** — kontrakt `Node` (`base.py`), katalogi
   `anonymize/`, `agent/`, `run_tools/`, `respond/`; reduktor `merge_sources` w `graph/base.py`
   (stan ma każdy graf własny, w `state.py`); do tego `ChatMessage`/`ToolCall` (`llm/messages.py`)
   i `AnonymizedText` (`anonymization/`); reguły — „Warstwa węzłów".
-- [x] **4. Atrapy wszystkich węzłów** — `FakeAgent`, `FakeRunTools`, `FakeRespond`; `anonymize`
+- [x] **4. Atrapy wszystkich węzłów** — `FakeAgentNode`, `FakeRunToolsNode`, `FakeRespondNode`; `anonymize`
   od razu właściwy (`AnonymizeNode`) na `FakeAnonymizer` z fabryką odmawiającą przy prawdziwym
   LLM; test kontraktu węzłów; reguły — „Warstwa węzłów".
 - [x] **5. Wszystkie grafy na atrapach** — `gate_close`, `gate_reply`, `search`, `parse_ticket`,
@@ -2463,10 +2502,12 @@ wyłącznie `search()`.
 
 **Rozszerzony 2026-10-03:** każdy materiał ma wyszukiwanie wektorowe (`_vector`, Qdrant)
 i tekstowe (`_text`, Postgres), a dokumentacja dodatkowo listing i odczyt po identyfikatorze.
-Nowe punkty mają numery spoza kolejności (47–54), żeby nie rozjechać odwołań „p. N".
+Nowe punkty mają numery spoza kolejności (47–56), żeby nie rozjechać odwołań „p. N". Modele,
+atrapy i opisy `.md` wszystkich sześciu narzędzi już są, wpięte w trzy grafy z narzędziami;
+punkty niżej to narzędzia właściwe.
 
 - [x] **7. `find_tickets`** — `FindTickets` na embedderze i Qdrancie, bez parsera; tekst do
-  embeddingu z `build_embedding_text()`, blok przyczyn w tekście dla modelu; reguły — „Warstwa
+  embeddingu z `build_embedding_text()`; reguły — „Warstwa
   narzędzi agenta". Do grafów wchodzi z właściwymi węzłami (p. 9–10). Od p. 47 nazywa się
   `find_tickets_vector`.
 - [x] **47. Nazwy i źródła** — `find_tickets_vector` i `find_docs_vector` (katalogi, klasy, opisy
@@ -2478,8 +2519,7 @@ Nowe punkty mają numery spoza kolejności (47–54), żeby nie rozjechać odwo�
 - [ ] **49. Import dokumentacji** — `helpdesk docs validate|import <katalog>`: katalog na
   dokument, metryczka JSON (tytuł, wersja, data i wiersz na plik: stały identyfikator, tytuł,
   ścieżka rozdziału, krótki opis) oraz pliki `.md` z samą treścią; zapis do kolekcji dokumentacji
-  w Qdrancie i tabeli w Postgresie przez klienta w `api/app/db/` (pula połączeń, sterownik
-  w `api/requirements.txt`); zgodność metryczki z katalogiem
+  w Qdrancie i do `DocsTable` w Postgresie; zgodność metryczki z katalogiem
   w obie strony, limit 8192 tokenów, odmowa dokumentu syntetycznego we właściwym indeksie.
   *Dlaczego:* podział robi człowiek z modelem przed wgraniem, więc aplikacja nie chunkuje, ale
   musi odrzucić paczkę, w której sekcja po cichu wypada albo embedder ją ucina.
@@ -2504,11 +2544,14 @@ Nowe punkty mają numery spoza kolejności (47–54), żeby nie rozjechać odwo�
   błąd wracający do modelu, nigdy krótsza lista; jedyne narzędzie dokumentacji z `cite()`,
   a `SourceRef.score` staje się opcjonalny. *Dlaczego:* lista źródeł ma pokazywać to, co model
   przeczytał, a `requires_hits` wymusza wtedy odczyt przed rozwiązaniem.
-- [ ] **53. `find_tickets_text`** — te same pola `exact` i `words` po zanonimizowanym opisie
-  zgłaszającego (`exact` także równością na `error_codes`); zwraca ten sam rekord sparsowany co
+- [ ] **53. `find_tickets_text`** — te same pola `exact` i `words` po pełnym tekście zgłoszenia:
+  zanonimizowanym wątku i polach sparsowanego rekordu; zwraca ten sam rekord co
   `find_tickets_vector`. *Dlaczego:* parser gubi około połowy dosłownych komunikatów (14 z 30 na
   golden200), a `error_codes` jest niemal puste (9 z 200); w bloku A stoi na zmyślonych danych,
-  bo do bazy trafia wyłącznie tekst po anonimizacji — prawdziwe opisy przychodzą z p. 19 i p. 31.
+  bo do bazy trafia wyłącznie tekst po anonimizacji — prawdziwe wątki przychodzą z p. 19 i p. 31.
+- [ ] **56. `read_tickets`** — pełny tekst wątku po numerach zgłoszeń (`TicketsTable.read_by_id()`
+  już jest). *Dlaczego:* model, który dostał sparsowane zgłoszenie z wyszukiwania, ma móc
+  doczytać dokładny tekst całości; parser gubi konkrety, a wątek je ma.
 
 ### B. Węzły — po jednym punkcie na węzeł
 
@@ -2623,7 +2666,7 @@ każdy mierzy się osobno.
 - [ ] **25. `suggest_questions`** — prompt z 6.3 przemierzony na modelu docelowym z placeholderami,
   z regułą zgodności przyczyny z objawem; ewaluacja wariantu; sentinele `questions_summary`
   rozpoznaje `no_questions()` dopisane do `normalizer_sentinel.py`, a pomiar rozstrzyga, czy
-  „(nie ustalono)" w bloku przyczyn coś daje. *Dlaczego:* część zabiegów z 6.3 powstała pod 11B,
+  model radzi sobie bez osobnego bloku przyczyn przed rekordami. *Dlaczego:* część zabiegów z 6.3 powstała pod 11B,
   a znana dziura (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
 - [ ] **26. `suggest_solution`** — prompt z 6.4 przemierzony na modelu docelowym, z regułą
   zgodności trafienia z objawem i osobną regułą ostrzeżenia o kroku nieodwracalnym; ewaluacja
@@ -2654,14 +2697,13 @@ każdy mierzy się osobno.
   zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed parsowaniem, model parsujący
   wybrany na podstawie `porownanie-modeli-parsowania.md`, prompt dostosowany do placeholderów,
   czytnik SQL, wznawianie, raport, porządek w `data/parsed/` (golden200 zostaje); zanonimizowany
-  opis zgłaszającego idzie do tabeli wyszukiwania (p. 53). *Dlaczego:* to
+  wątek i sparsowany rekord idą do tabeli wyszukiwania (p. 53). *Dlaczego:* to
   jedyny drogi przebieg (zasada 7), więc anonimizator i prompt muszą być gotowe przed nim.
 - [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
   „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy. *Dlaczego:* 77 ze 123 zgłoszeń
   w lipcu, a żadna heurystyka nie odróżni broadcastu od sprawy.
 - [ ] **33. Przeliczenia na pełnym korpusie** — `RAG_SCORE_MIN` na zapytaniach sparsowanych,
-  porównanie embedderów, liczba wątków-projektów, `questions_summary`, rozkład `component`,
-  wzorzec przyczyny nieustalonej w `find_tickets_vector`.
+  porównanie embedderów, liczba wątków-projektów, `questions_summary`, rozkład `component`.
   *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na zapytaniach surowych.
 - [ ] **34. Tryb odświeżania korpusu** — kolejne zrzuty czy dostęp tylko do odczytu.
   *Dlaczego:* +130 zgłoszeń w miesiąc, więc jednorazowy zrzut szybko się starzeje.

@@ -64,6 +64,7 @@ services:
       POSTGRES_DB:               ${POSTGRES_DB:-helpdesk}
       POSTGRES_USER:             ${POSTGRES_USER:-helpdesk}
       POSTGRES_PASSWORD:         ${POSTGRES_PASSWORD:-helpdesk}
+      POSTGRES_TIMEOUT_SECONDS:  ${POSTGRES_TIMEOUT_SECONDS:-30}
     # --reload belongs to the dev layer, not to the image: the shipped CMD has no reloader.
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     healthcheck:

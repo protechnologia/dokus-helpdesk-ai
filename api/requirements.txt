@@ -19,3 +19,5 @@ langgraph==1.2.12
 # Przychodzi z LangGraphem, ale importujemy go wprost (app/graph/__init__.py wyłącza nim tracing),
 # więc deklarujemy jawnie — jak httpx wyżej.
 langsmith==0.14.3
+# Sterownik Postgresa. Importuje go dokładnie jeden moduł (app/db/client.py) — zasada 4.
+asyncpg==0.31.0
