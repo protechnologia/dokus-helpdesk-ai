@@ -5,11 +5,11 @@ propozycja, karta zgłoszenia, tekst) — błąd wraca do modelu jako wiadomoś�
 retry — i egzekwuje `requires_hits`: graf, który wymaga źródeł, bez źródeł nie oddaje propozycji
 (zasada 9).
 
-Status: atrapa (`FakeRespond`); właściwy węzeł w p. 11 (CLAUDE.md -> „Plan i TODO").
+Status: atrapa (`FakeRespondNode`); właściwy węzeł w p. 11 (CLAUDE.md -> „Plan i TODO").
 """
 
-from app.nodes.respond.fake import FakeRespond
+from app.nodes.respond.fake import FakeRespondNode
 
 __all__ = [
-    "FakeRespond",
+    "FakeRespondNode",
 ]

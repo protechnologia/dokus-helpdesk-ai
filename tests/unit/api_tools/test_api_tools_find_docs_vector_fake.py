@@ -1,48 +1,53 @@
-from app.tools.find_docs_vector import FakeFindDocsVector, FindDocsVectorQuery
+from app.tools.find_docs_vector import FakeFindDocsVectorTool, FindDocsVectorQuery
 
 QUERY = FindDocsVectorQuery(text="uprawnienia kancelaria e-Doręczenia")
 
+FOUND_IDS = ["adm-kancelaria-edoreczenia", "adm-kancelaria-epuap"]
+
 
 async def test_the_result_is_the_same_on_every_search() -> None:
-    """Dwa wyszukiwania → te same id w tej samej kolejności: atrapa ma być przewidywalna."""
-    tool = FakeFindDocsVector()
+    """Dwa wyszukiwania → te same sekcje w tej samej kolejności: atrapa ma być przewidywalna."""
+    tool = FakeFindDocsVectorTool()
 
-    first  = await tool.search(QUERY)
-    second = await tool.search(QUERY)
+    first  = await tool.find(QUERY)
+    second = await tool.find(QUERY)
 
-    assert [found.fragment_id for found in first.items]  == ["doc-1", "doc-2"]
-    assert [found.fragment_id for found in second.items] == ["doc-1", "doc-2"]
+    assert [found.section.section_id for found in first.items]  == FOUND_IDS
+    assert [found.section.section_id for found in second.items] == FOUND_IDS
 
 
 async def test_every_query_is_recorded() -> None:
     """Każde wyszukiwanie → zapytanie w `queries`, żeby test grafu sprawdził, o co pytał agent."""
-    tool = FakeFindDocsVector()
+    tool = FakeFindDocsVectorTool()
 
-    await tool.search(QUERY)
+    await tool.run(QUERY)
 
     assert tool.queries == [QUERY]
 
 
-async def test_cite_gives_one_source_per_fragment_shown() -> None:
-    """Każdy fragment z wyniku → jeden SourceRef z dokumentem i wersją w tytule, a jego id widać
-    w tekście dla modelu: cytować wolno tylko to, co model zobaczył."""
-    tool   = FakeFindDocsVector()
-    result = await tool.search(QUERY)
+async def test_the_model_gets_rows_it_can_read_by_id() -> None:
+    """Tekst dla modelu → identyfikator każdej sekcji w nawiasie, wydanie i podobieństwo, a treści
+    sekcji nie ma: po nią agent idzie do `read_docs`."""
+    tool = FakeFindDocsVectorTool()
 
-    refs = tool.cite(result)
-    text = tool.render_for_model(result)
+    text = await tool.run(QUERY)
 
-    assert [ref.item_id for ref in refs] == ["doc-1", "doc-2"]
-    assert all(ref.source == "docs" for ref in refs)
-    assert refs[0].title == "Instrukcja administratora 4.12"
-    assert all(f"[{ref.item_id}]" in text for ref in refs)
+    assert all(f"[{section_id}]" in text for section_id in FOUND_IDS)
+    assert text.count("Instrukcja administratora 4.12") == 2
+    assert "podobieństwo 0.74" in text
+    assert "nadaje administrator" not in text
 
 
-async def test_the_model_sees_the_release_of_each_fragment() -> None:
-    """Tekst dla modelu → wersja przy każdym fragmencie: instrukcja do nieznanego wydania jest
-    nie do odróżnienia od nieaktualnej."""
-    tool = FakeFindDocsVector()
+async def test_a_cut_threshold_is_told_apart_from_no_hits() -> None:
+    """Brak sekcji i licznik odciętych → nagłówek niesie oba: „nic nie było" i „próg wszystko
+    wyciął" to dla agenta różne sytuacje."""
+    tool = FakeFindDocsVectorTool(found=[], dropped_below_threshold=3)
 
-    text = tool.render_for_model(await tool.search(QUERY))
+    text = await tool.run(QUERY)
 
-    assert text.count("wersja 4.12") == 2
+    assert text == "Znalezione sekcje dokumentacji: 0 (odcięte progiem: 3)"
+
+
+def test_the_search_cannot_be_cited() -> None:
+    """Wyszukiwanie w dokumentacji → brak `cite()`: wiersz spisu treści nie jest źródłem."""
+    assert not hasattr(FakeFindDocsVectorTool(), "cite")

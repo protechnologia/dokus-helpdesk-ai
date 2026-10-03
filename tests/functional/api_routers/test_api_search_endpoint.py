@@ -6,7 +6,7 @@ from app.graph import search
 from app.graph.fake import FAKE_SEARCH_ARGUMENTS, fake_search_nodes
 from app.main import create_app
 from app.nodes.anonymize import AnonymizeNode
-from app.nodes.respond import FakeRespond
+from app.nodes.respond import FakeRespondNode
 
 # Kontrakt HTTP `POST /search` w procesie: kształt odpowiedzi (źródła + zapytania agenta),
 # walidacja żądania i to, co trasa wkłada do grafu. Że trasa jest zamontowana w obrazie, sprawdza
@@ -35,7 +35,7 @@ def test_the_graph_reads_the_whole_thread() -> None:
         AnonymizeNode(anonymizer),
         agent,
         run_tools,
-        FakeRespond(search.SearchDone()),
+        FakeRespondNode(search.SearchDone()),
     )
 
     app = create_app()

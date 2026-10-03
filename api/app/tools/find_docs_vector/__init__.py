@@ -1,26 +1,35 @@
 """
 Description:
-Źródło wiedzy: fragmenty dokumentacji produktu. OPCJONALNE — instancja bez skonfigurowanej
-kolekcji dokumentacji w ogóle nie rejestruje tego narzędzia, a każdy graf musi działać z samym
-`find_tickets_vector`.
+Narzędzie pomocnicze: sekcje dokumentacji produktu podobne znaczeniowo do zapytania. Zwraca
+wiersze spisu treści (identyfikator, dokument z wydaniem, rozdział, opis), nie treść — tę agent
+pobiera przez `read_docs`, i dopiero odczytana sekcja jest źródłem odpowiedzi.
 
 Do czego:
 Wnosi materiał, którego nie ma w korpusie zgłoszeń: jak funkcja ma działać, krok po kroku, a nie
-jak jeden urząd kiedyś się na niej potknął. Każdy fragment niesie wersję i datę dokumentu, bo
-instrukcja do starszego wydania wprowadza w błąd dokładnie tak jak odmowa obalona później nowszym
-zgłoszeniem (CLAUDE.md -> „Ryzyka jakości treści").
+jak jeden urząd kiedyś się na niej potknął. OPCJONALNE — instancja bez dokumentacji nie rejestruje
+narzędzi dokumentacji wcale, a każdy graf musi działać z samymi zgłoszeniami.
 
-Status: modele (tymczasowe) i atrapa (`FakeFindDocsVector`). Czy dokumentacja w ogóle istnieje
-i w jakiej formie, to otwarta decyzja (CLAUDE.md -> „Plan i TODO", p. 15); `tool.py` i wczytanie
-kolekcji powstają w p. 8.
+| plik        | co zawiera                                                   |
+|-------------|--------------------------------------------------------------|
+| `models.py` | zapytanie, znaleziona sekcja i wynik                         |
+| `base.py`   | część wspólna narzędzia i atrapy: nazwa i tekst dla modelu   |
+| `fake.py`   | `FakeFindDocsVectorTool` — ustalony zestaw sekcji, bez usług |
+
+Status: modele i atrapa. Narzędzie właściwe (`tool.py`) na kolekcji dokumentacji powstaje w p. 8.
 """
 
-from app.tools.find_docs_vector.fake import FakeFindDocsVector
-from app.tools.find_docs_vector.models import FindDocsVectorQuery, FindDocsVectorResult, FoundDoc
+from app.tools.find_docs_vector.base import FindDocsVectorToolBase
+from app.tools.find_docs_vector.fake import FakeFindDocsVectorTool
+from app.tools.find_docs_vector.models import (
+    FindDocsVectorQuery,
+    FindDocsVectorResult,
+    FoundSection,
+)
 
 __all__ = [
-    "FakeFindDocsVector",
+    "FakeFindDocsVectorTool",
+    "FindDocsVectorToolBase",
     "FindDocsVectorQuery",
     "FindDocsVectorResult",
-    "FoundDoc",
+    "FoundSection",
 ]

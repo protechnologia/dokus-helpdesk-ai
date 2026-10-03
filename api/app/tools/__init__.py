@@ -4,6 +4,11 @@ Wszystko, co może wywołać pętla agenta. Wspólne kontrakty i `SourceRef` imp
 (`from app.tools import KnowledgeSource`); to, co należy do jednego narzędzia — jego modele —
 z pakietu tego narzędzia (`from app.tools.find_tickets_vector import FoundTicket`).
 
+Każdy materiał ma dwie drogi wyszukiwania: `_vector` po znaczeniu (Qdrant) i `_text` po
+dosłownym brzmieniu (Postgres). Zgłoszenia wracają od razu w całości, bo są krótkie, a przyczyny
+z kilku trafień model ma zobaczyć razem. Dokumentacja idzie dwustopniowo: spis treści
+i wyszukiwarki oddają wiersze z identyfikatorem sekcji, a treść daje dopiero odczyt.
+
 Do czego:
 Dwa rodzaje narzędzi, rozdzielone kontraktem (patrz `base.py`):
     * `KnowledgeSource` — zwraca materiał, który odpowiedź może cytować, i sam mówi który
@@ -14,27 +19,33 @@ Celowo NIE ma tu anonimizatora ani modelu. Anonimizacja to stały węzeł, przez
 każdy graf, a nie coś, co agent może wywołać albo pominąć; model jest wołającym te narzędzia, nie
 jednym z nich (CLAUDE.md -> „Trwa zmiana architektury").
 
-Tutaj: wspólne kontrakty (`base.py`) i jedyny model wspólny dla wszystkich narzędzi, `SourceRef`
-(`models.py`). W katalogu każdego narzędzia: implementacja (`tool.py`), jej atrapa (`fake.py`),
-ich część wspólna (`base.py`: nazwa, tekst dla modelu, lista źródeł) i `models.py` z własnym
-zapytaniem, znalezionym elementem i wynikiem — bez wspólnej bazy — oraz `errors.py`, gdy
-narzędzie będzie miało własne błędy do zgłoszenia. Nowe narzędzie to nowy katalog. Opis, który
-czyta MODEL, leży obok adaptera w każdym grafie, nie tutaj: to treść promptu, czytana zdanie po
-zdaniu, i może się różnić między grafami używającymi tego samego narzędzia.
+Tutaj: wspólne kontrakty (`base.py`), jedyny model wspólny dla wszystkich narzędzi, `SourceRef`
+(`models.py`), tekst wspólny dla narzędzi jednego materiału (`render_tickets.py`, `render_docs.py`)
+i zmyślona dokumentacja atrap (`fake_docs.py`). W katalogu każdego narzędzia: implementacja
+(`tool.py`), jej atrapa (`fake.py`), ich część wspólna (`base.py`: nazwa, tekst dla modelu, lista
+źródeł) i `models.py` z własnym zapytaniem, znalezionym elementem i wynikiem — bez wspólnej bazy —
+oraz `errors.py`, gdy narzędzie będzie miało własne błędy do zgłoszenia. Nowe narzędzie to nowy
+katalog. Opis, który czyta MODEL, leży obok adaptera w każdym grafie, nie tutaj: to treść promptu,
+czytana zdanie po zdaniu, i może się różnić między grafami używającymi tego samego narzędzia.
 
-| narzędzie             | rodzaj             | zapytanie agenta             | na czym stoi        |
-|-----------------------|--------------------|------------------------------|---------------------|
-| `find_tickets_vector` | źródło wiedzy      | `problem` + `symptoms`       | embedder → Qdrant   |
-| `find_docs_vector`    | źródło, opcjonalne | zagadnienie / słowa kluczowe | kolekcja dokumentów |
+| narzędzie             | rodzaj        | zapytanie agenta      | co oddaje                       |
+|-----------------------|---------------|-----------------------|---------------------------------|
+| `find_tickets_vector` | źródło wiedzy | `problem`, `symptoms` | zgłoszenia z podobieństwem      |
+| `find_tickets_text`   | źródło wiedzy | `exact`, `words`      | zgłoszenia z etykietą trafienia |
+| `list_docs`           | pomocnicze    | —                     | spis treści dokumentacji        |
+| `find_docs_vector`    | pomocnicze    | `text`                | wiersze spisu z podobieństwem   |
+| `find_docs_text`      | pomocnicze    | `exact`, `words`      | wiersze spisu z fragmentem      |
+| `read_docs`           | źródło wiedzy | `section_ids`         | treść sekcji; jedyne cytuje     |
 
-`find_tickets_vector` ma narzędzie właściwe i atrapę; `find_docs_vector` na razie samą atrapę (p.
-8).
+`find_tickets_vector` ma narzędzie właściwe i atrapę; pozostałe na razie same modele i atrapy
+(p. 8 i 50–53). Narzędzia dokumentacji są opcjonalne: bez dokumentacji nie trafiają do rejestru.
 """
 
-from app.tools.base import AuxiliaryTool, KnowledgeSource
+from app.tools.base import AgentTool, AuxiliaryTool, KnowledgeSource
 from app.tools.models import SourceRef
 
 __all__ = [
+    "AgentTool",
     "AuxiliaryTool",
     "KnowledgeSource",
     "SourceRef",

@@ -17,7 +17,7 @@ def all_nodes() -> list[type[Node]]:
         (brak)
 
     Example result:
-        [AnonymizeNode, FakeAgent, FakeRunTools, FakeRespond]
+        [AnonymizeNode, FakeAgentNode, FakeRunToolsNode, FakeRespondNode]
     """
     for module in pkgutil.iter_modules(app.nodes.__path__):
         if module.ispkg:
@@ -38,14 +38,14 @@ NODES = all_nodes()
 
 
 def package_of(
-    node: type[Node],  # np. FakeAgent
+    node: type[Node],  # np. FakeAgentNode
 ) -> str:
     """
     Description:
     Nazwa pakietu węzła w `app/nodes/`.
 
     Example args:
-        node=FakeAgent
+        node=FakeAgentNode
 
     Example result:
         "agent"

@@ -156,8 +156,8 @@ def model_tools(
 
 def build_graph(
     anonymize: Node,  # np. AnonymizeNode(FakeAnonymizer())
-    agent:     Node,  # np. FakeAgent([ChatMessage(role="assistant", content='{"ticket_id": …}')])
-    respond:   Node,  # np. FakeRespond(ParsedTicket(…))
+    agent:     Node,  # np. FakeAgentNode([ChatMessage(role="assistant", content="{…}")])
+    respond:   Node,  # np. FakeRespondNode(ParsedTicket(…))
 ) -> CompiledStateGraph:
     """
     Description:
@@ -166,8 +166,8 @@ def build_graph(
 
     Example args:
         anonymize=AnonymizeNode(FakeAnonymizer())
-        agent=FakeAgent([…])
-        respond=FakeRespond(ParsedTicket(…))
+        agent=FakeAgentNode([…])
+        respond=FakeRespondNode(ParsedTicket(…))
 
     Example result:
         CompiledStateGraph: __start__ → anonymize → agent → respond → __end__

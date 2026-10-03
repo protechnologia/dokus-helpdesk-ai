@@ -10,7 +10,7 @@ from app.graph.suggest_solution.respond_tool import RESPOND_TOOL_NAME, respond_t
 from app.graph.suggest_solution.state import SuggestSolutionState
 from app.llm import ToolDefinition
 from app.nodes import Node
-from app.tools import KnowledgeSource
+from app.tools import AgentTool
 from app.util.markdown import read_document
 
 GRAPH_DIR   = Path(__file__).parent
@@ -22,8 +22,15 @@ TICKET_PLACEHOLDER = "{{ticket}}"
 # Klasa stanu grafu — po nią sięga kod ogólny (trasa `/suggest`, test kontraktu).
 STATE = SuggestSolutionState
 
-# Narzędzia wiedzy dozwolone w tym grafie; opis każdego dla modelu leży obok jako `<nazwa>.md`.
-TOOL_NAMES: tuple[str, ...] = ("find_tickets_vector", "find_docs_vector")
+# Narzędzia dozwolone w tym grafie; opis każdego dla modelu leży obok jako `<nazwa>.md`.
+TOOL_NAMES: tuple[str, ...] = (
+    "find_tickets_vector",  # zgłoszenia po znaczeniu
+    "find_tickets_text",    # zgłoszenia po dosłownym brzmieniu
+    "list_docs",            # spis treści dokumentacji
+    "find_docs_vector",     # sekcje dokumentacji po znaczeniu
+    "find_docs_text",       # sekcje dokumentacji po dosłownym brzmieniu
+    "read_docs",            # treść sekcji — jedyne narzędzie dokumentacji, które cytuje
+)
 
 # Wariant wymaga trafień: bez źródeł węzeł `respond` nie odda propozycji (zasada 9).
 REQUIRES_HITS = True
@@ -73,15 +80,15 @@ def user_prompt(
 
 
 def model_tools(
-    tools: Sequence[KnowledgeSource],  # np. [FakeFindTicketsVector(), FakeFindDocsVector()]
+    tools: Sequence[AgentTool],  # np. [FakeFindTicketsVectorTool(), FakeReadDocsTool()]
 ) -> list[ToolDefinition]:
     """
-    Description:
-    Narzędzia, które model widzi w tym grafie: podane narzędzia wiedzy (z listy dozwolonych) i na
-    końcu `respond_suggest_solution`.
+    Description: Narzędzia, które model widzi w tym grafie: podane narzędzia (z listy dozwolonych)
+    i na końcu `respond_suggest_solution`. Narzędzi dokumentacji może nie być — instancja bez
+    dokumentacji ich nie rejestruje.
 
     Example args:
-        tools=[FakeFindTicketsVector(), FakeFindDocsVector()]
+        tools=[FakeFindTicketsVectorTool(), FakeFindDocsVectorTool()]
 
     Example result:
         [ToolDefinition(name="find_tickets_vector", …), ToolDefinition(name="find_docs_vector", …),
@@ -97,9 +104,9 @@ def model_tools(
 
 def build_graph(
     anonymize: Node,  # np. AnonymizeNode(FakeAnonymizer())
-    agent:     Node,  # np. FakeAgent([tool_call_turn("find_tickets_vector", …), …])
-    run_tools: Node,  # np. FakeRunTools(sources=[…])
-    respond:   Node,  # np. FakeRespond(Proposal(text="…"))
+    agent:     Node,  # np. FakeAgentNode([tool_call_turn("find_tickets_vector", …), …])
+    run_tools: Node,  # np. FakeRunToolsNode(sources=[…])
+    respond:   Node,  # np. FakeRespondNode(Proposal(text="…"))
 ) -> CompiledStateGraph:
     """
     Description:
@@ -109,9 +116,9 @@ def build_graph(
 
     Example args:
         anonymize=AnonymizeNode(FakeAnonymizer())
-        agent=FakeAgent([…])
-        run_tools=FakeRunTools(sources=[…])
-        respond=FakeRespond(Proposal(text="…"))
+        agent=FakeAgentNode([…])
+        run_tools=FakeRunToolsNode(sources=[…])
+        respond=FakeRespondNode(Proposal(text="…"))
 
     Example result:
         CompiledStateGraph: __start__ → anonymize → agent ⇄ run_tools, agent → respond → __end__

@@ -1,4 +1,4 @@
-from app.tools.find_tickets_vector import FakeFindTicketsVector, FindTicketsVectorQuery
+from app.tools.find_tickets_vector import FakeFindTicketsVectorTool, FindTicketsVectorQuery
 
 QUERY = FindTicketsVectorQuery(
     problem  = "Nie przychodzą przesyłki",
@@ -9,7 +9,7 @@ QUERY = FindTicketsVectorQuery(
 async def test_the_result_is_the_same_on_every_search() -> None:
     """Dwa wyszukiwania → te same id w tej samej kolejności: atrapa ma być przewidywalna, żeby
     test grafu nie zależał od tego, którym z kolei wywołaniem jest."""
-    tool = FakeFindTicketsVector()
+    tool = FakeFindTicketsVectorTool()
 
     first  = await tool.search(QUERY)
     second = await tool.search(QUERY)
@@ -21,7 +21,7 @@ async def test_the_result_is_the_same_on_every_search() -> None:
 async def test_the_default_set_has_one_symptom_and_distinct_causes() -> None:
     """Zestaw wbudowany → jeden objaw, różne przyczyny: najczęstszy kształt trafień w korpusie,
     na którym agent ma dopytywać zamiast zgadywać."""
-    result = await FakeFindTicketsVector().search(QUERY)
+    result = await FakeFindTicketsVectorTool().search(QUERY)
 
     assert len({found.ticket.problem for found in result.items}) == 1
     assert len({found.ticket.cause   for found in result.items}) == 3
@@ -29,7 +29,7 @@ async def test_the_default_set_has_one_symptom_and_distinct_causes() -> None:
 
 async def test_every_query_is_recorded() -> None:
     """Każde wyszukiwanie → zapytanie w `queries`, żeby test grafu sprawdził, o co pytał agent."""
-    tool = FakeFindTicketsVector()
+    tool = FakeFindTicketsVectorTool()
 
     await tool.search(QUERY)
 
@@ -39,7 +39,7 @@ async def test_every_query_is_recorded() -> None:
 async def test_cite_gives_one_source_per_ticket_shown() -> None:
     """Każde zgłoszenie z wyniku → jeden SourceRef z id, tytułem i datą zgłoszenia, a jego id
     widać w tekście dla modelu: cytować wolno tylko to, co model zobaczył."""
-    tool   = FakeFindTicketsVector()
+    tool   = FakeFindTicketsVectorTool()
     result = await tool.search(QUERY)
 
     refs = tool.cite(result)
@@ -55,7 +55,7 @@ async def test_cite_gives_one_source_per_ticket_shown() -> None:
 async def test_an_empty_result_says_what_the_threshold_cut() -> None:
     """Brak zgłoszeń i trzy odcięte → tekst mówi o obu, a lista źródeł jest pusta: „nic nie
     było" i „próg to wyciął" to dla agenta różne sytuacje."""
-    tool   = FakeFindTicketsVector(tickets=[], dropped_below_threshold=3)
+    tool   = FakeFindTicketsVectorTool(tickets=[], dropped_below_threshold=3)
     result = await tool.search(QUERY)
 
     assert tool.cite(result) == []

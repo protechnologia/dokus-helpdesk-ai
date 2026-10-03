@@ -17,7 +17,7 @@ def build_function_graph(
     nie ma czego chronić odmową, a odmowa położyłaby trasy na stacku dev z prawdziwym modelem.
     Wybór po konfiguracji (klient LLM, anonimizator, narzędzia) wchodzi tu razem z p. 9.
 
-    Atrapa jest jednorazowa (`FakeAgent` ma zaplanowane tury), dlatego graf powstaje na każde
+    Atrapa jest jednorazowa (`FakeAgentNode` ma zaplanowane tury), dlatego graf powstaje na każde
     żądanie, a nie raz na proces.
 
     Example args:

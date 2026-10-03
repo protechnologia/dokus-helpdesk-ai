@@ -35,7 +35,7 @@ from app.embedding import EmbeddingClient
 from app.model.ticket_parsed import ParsedTicket
 from app.retrieval import QdrantClient
 from app.service.rag_indexer import TicketIndexer
-from app.tools.find_tickets_vector import FindTicketsVector, FindTicketsVectorQuery
+from app.tools.find_tickets_vector import FindTicketsVectorQuery, FindTicketsVectorTool
 
 pytestmark = [
     pytest.mark.stack,
@@ -168,7 +168,7 @@ async def test_a_ticket_asked_by_its_own_fields_comes_back_first_and_whole(
     zapisanemu: payload z Qdranta wraca do `ParsedTicket` bez strat. Asercja na ranking, nie na
     wysokość score."""
     embedder, qdrant = clients
-    tool   = FindTicketsVector(embedder=embedder, qdrant=qdrant, top_k=5, score_min=-1.0)
+    tool   = FindTicketsVectorTool(embedder=embedder, qdrant=qdrant, top_k=5, score_min=-1.0)
     query  = FindTicketsVectorQuery(problem=ticket.problem, symptoms=ticket.symptoms)
     result = await tool.search(query)
 
@@ -183,7 +183,7 @@ async def test_a_threshold_nothing_passes_counts_everything_as_dropped(
     """Próg powyżej każdego możliwego podobieństwa → pusty wynik i komplet policzony jako odcięty:
     ostry próg nie może wyglądać jak pusty indeks."""
     embedder, qdrant = clients
-    tool   = FindTicketsVector(embedder=embedder, qdrant=qdrant, top_k=5, score_min=1.1)
+    tool   = FindTicketsVectorTool(embedder=embedder, qdrant=qdrant, top_k=5, score_min=1.1)
     result = await tool.search(
         FindTicketsVectorQuery(problem=TICKETS[0].problem, symptoms=TICKETS[0].symptoms)
     )

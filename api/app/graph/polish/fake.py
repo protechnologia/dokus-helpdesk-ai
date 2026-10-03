@@ -5,9 +5,9 @@ from app.graph.polish.graph import build_graph
 from app.graph.polish.models import PolishedText
 from app.graph.polish.respond_tool import RESPOND_TOOL_NAME
 from app.graph.polish.state import PolishState
-from app.nodes.agent import FakeAgent, tool_call_turn
+from app.nodes.agent import FakeAgentNode, tool_call_turn
 from app.nodes.anonymize import AnonymizeNode
-from app.nodes.respond import FakeRespond
+from app.nodes.respond import FakeRespondNode
 
 # Tekst atrapy, gdy nikt nie podał własnego — stały, żeby test, który przypadkiem na nim polega,
 # padł głośno.
@@ -41,7 +41,7 @@ def build_fake_graph(
     Ten sam graf co `build_graph`, złożony z atrap — do testów tras i CLI. Agent wywołuje
     `respond_polish` z tekstem w argumentach, a `respond` oddaje ten tekst.
 
-    Graf jest jednorazowy: `FakeAgent` ma jedną turę. Na każde wywołanie buduj nowy.
+    Graf jest jednorazowy: `FakeAgentNode` ma jedną turę. Na każde wywołanie buduj nowy.
 
     Example args:
         polished=PolishedText(text="Dzień dobry, przesyłki już docierają…")
@@ -53,8 +53,8 @@ def build_fake_graph(
 
     graph = build_graph(
         anonymize = AnonymizeNode(FakeAnonymizer()),
-        agent     = FakeAgent([answer]),
-        respond   = FakeRespond(polished),
+        agent     = FakeAgentNode([answer]),
+        respond   = FakeRespondNode(polished),
     )
 
     return graph

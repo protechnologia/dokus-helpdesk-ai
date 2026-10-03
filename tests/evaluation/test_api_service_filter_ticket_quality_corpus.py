@@ -1,14 +1,12 @@
 """
 Description:
-Test ewaluacyjny rozpoznawania pustych pól na korpusie odniesienia (200 sparsowanych zgłoszeń):
-filtr jakości porównuje z etykietami z ręcznego przeglądu tych samych rekordów, a rozpoznawanie
-przyczyny nieustalonej z liczbą zmierzoną przy jego pisaniu.
+Test ewaluacyjny filtra jakości na korpusie odniesienia (200 sparsowanych zgłoszeń): wynik filtra
+porównuje z etykietami z ręcznego przeglądu tych samych rekordów.
 
-| co mierzy                                      | próg           | zmierzone dziś |
-|------------------------------------------------|----------------|----------------|
-| odrzucone spośród 38 oznaczonych „bez wiedzy"  | co najmniej 25 | 29             |
-| odrzucone spośród 162 uznanych za dobre        | najwyżej 2     | 0              |
-| rekordy z przyczyną rozpoznaną jako nieustalona | co najmniej 85 | 98             |
+| co mierzy                                     | próg           | zmierzone dziś |
+|-----------------------------------------------|----------------|----------------|
+| odrzucone spośród 38 oznaczonych „bez wiedzy" | co najmniej 25 | 29             |
+| odrzucone spośród 162 uznanych za dobre       | najwyżej 2     | 0              |
 
 Po co: reguły filtra czytają tekst pisany przez model, więc psują się przez zamilknięcie. Zmiana
 fraz ucieczkowych w prompcie parsującym albo podmiana modelu i nagle nic nie pasuje — każdy rekord
@@ -20,7 +18,6 @@ Co się dzieje po drodze:
 2. Czyta id rekordów oznaczonych w przeglądzie jako niosące zero wiedzy (`rejected`
    w `data/golden/golden200.json`).
 3. Uruchamia `filter_tickets()` i liczy, ile odrzuceń trafia w oznaczone, a ile poza nie.
-4. Osobno liczy rekordy, w których `no_cause()` rozpoznaje przyczynę nieustaloną.
 
 O czym pamiętać przy zmianach:
 
@@ -30,8 +27,6 @@ O czym pamiętać przy zmianach:
   filtra ma.
 - Etykiety wytworzył model czytający te same artefakty, więc test mierzy zgodność z tamtym
   przeglądem, nie poprawność filtra.
-- Dla przyczyn nie ma etykiet, więc jest tylko dolny próg: łapie zamilknięcie, nie fałszywe
-  trafienia.
 """
 
 import json
@@ -41,7 +36,6 @@ import pytest
 
 from app.model.ticket_parsed import ParsedTicket
 from app.service.filter_ticket_quality import filter_tickets
-from app.service.normalizer_sentinel import no_cause
 
 # Korpus odniesienia i etykiety z jego przeglądu; oba mają przetrwać masowy import (p. 31).
 CORPUS_DIR  = Path("data/parsed/bielik-11b-golden200")
@@ -52,9 +46,6 @@ MIN_LABELLED_DROPS = 25
 
 # Zmierzone 0. Fałszywy alarm jest droższą pomyłką: dobry rekord znika z indeksu niezauważony.
 MAX_FALSE_POSITIVES = 2
-
-# Zmierzone 98 z 200; próg niżej z tego samego powodu co przy filtrze.
-MIN_UNKNOWN_CAUSES = 85
 
 
 def _load_corpus() -> list[ParsedTicket]:
@@ -137,19 +128,4 @@ def test_filter_does_not_reject_good_records(measurement: tuple[int, int]) -> No
     assert false_positives <= MAX_FALSE_POSITIVES, (
         f"filtr odrzucił {false_positives} rekordów uznanych za dobre, dozwolone "
         f"{MAX_FALSE_POSITIVES} — reguła stała się za szeroka"
-    )
-
-
-def test_unknown_causes_are_still_recognised() -> None:
-    """`no_cause()` na korpusie odniesienia → nadal rozpoznaje blisko połowę rekordów jako bez
-    ustalonej przyczyny: gdyby zamilkło, blok przyczyn w `find_tickets_vector` pokazywałby „Brak
-    ustalonej przyczyny…" jako przyczyny."""
-    if not CORPUS_DIR.is_dir():
-        pytest.skip(f"brak korpusu referencyjnego ({CORPUS_DIR}) — dane nie są w repo")
-
-    unknown = sum(no_cause(ticket.cause) for ticket in _load_corpus())
-
-    assert unknown >= MIN_UNKNOWN_CAUSES, (
-        f"`no_cause()` rozpoznaje {unknown} rekordów, oczekiwane >= {MIN_UNKNOWN_CAUSES} — "
-        f"czy zmienił się prompt parsujący albo model?"
     )

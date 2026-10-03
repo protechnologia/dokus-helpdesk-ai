@@ -4,14 +4,13 @@ import pytest
 
 from app.model.ticket_parsed import ParsedTicket
 from app.tools.find_tickets_vector import (
-    FakeFindTicketsVector,
+    FakeFindTicketsVectorTool,
     FindTicketsVectorResult,
     FoundTicket,
 )
-from app.tools.find_tickets_vector.base import CAUSE_NOT_ESTABLISHED, CAUSES_HEADING
 
-# Tekst dla modelu i lista źródeł są wspólne dla narzędzia i atrapy (`FindTicketsVectorBase`), więc
-# sprawdzamy je na atrapie z produkcji — bez embeddera i Qdranta.
+# Tekst dla modelu i lista źródeł są wspólne dla narzędzia i atrapy (`FindTicketsVectorToolBase`),
+# więc sprawdzamy je na atrapie z produkcji — bez embeddera i Qdranta.
 
 
 def _found(
@@ -64,38 +63,24 @@ def _render(
         items=(_found("90001", "Zacięta kolejka pobierania"),)
 
     Example result:
-        "Znalezione zgłoszenia: 1 (odcięte progiem: 0)\\n\\nPrzyczyny (`cause`) w trafieniach:…"
+        "Znalezione zgłoszenia: 1 (odcięte progiem: 0)\\n\\n[90001] 2026-02-10 · podobieństwo…"
     """
     result = FindTicketsVectorResult(items=list(items))
-    text   = FakeFindTicketsVector().render_for_model(result)
+    text   = FakeFindTicketsVectorTool().render_for_model(result)
 
     return text
 
 
-def test_the_causes_block_comes_before_the_records() -> None:
-    """Dwa trafienia → blok przyczyn stoi przed pierwszym rekordem i ma po linii na trafienie:
-    przyczyna utopiona w polach rekordu do modelu nie dociera."""
+def test_every_hit_is_a_record_with_its_cause() -> None:
+    """Dwa trafienia → dwa rekordy, każdy z własnym `cause` w oryginalnym brzmieniu, także gdy
+    przyczyny nie ustalono: model ma widzieć, co zapisał parser."""
     text = _render(
         _found("90001", "Zacięta kolejka pobierania"),
-        _found("90002", "Plik blokady po aktualizacji"),
-    )
-
-    assert text.index(CAUSES_HEADING) < text.index("[90001] 2026-02-10")
-    assert "- [90001] Zacięta kolejka pobierania\n- [90002] Plik blokady po aktualizacji" in text
-
-
-def test_unknown_causes_are_not_shown_as_agreeing() -> None:
-    """Trzy trafienia bez ustalonej przyczyny → trzy razy „(nie ustalono)" w bloku, a rekord
-    zachowuje oryginalne brzmienie: trzy puste przyczyny to nie trzy zgodne."""
-    text = _render(
-        _found("90001", "brak"),
         _found("90002", "Brak ustalonej przyczyny w wątku."),
-        _found("90003", "brak"),
     )
 
-    block = text.split("\n\n")[1]
-
-    assert block.count(CAUSE_NOT_ESTABLISHED) == 3
+    assert text.count("\n\n[") == 2
+    assert "cause: Zacięta kolejka pobierania"        in text
     assert "cause: Brak ustalonej przyczyny w wątku." in text
 
 
@@ -128,7 +113,7 @@ def test_error_codes_are_joined_and_their_absence_is_said_out_loud() -> None:
 
 def test_an_empty_result_is_the_header_alone() -> None:
     """Brak trafień → sam nagłówek z licznikami, bez pustego bloku przyczyn."""
-    tool = FakeFindTicketsVector()
+    tool = FakeFindTicketsVectorTool()
     text = tool.render_for_model(FindTicketsVectorResult(items=[], dropped_below_threshold=3))
 
     assert text == "Znalezione zgłoszenia: 0 (odcięte progiem: 3)"

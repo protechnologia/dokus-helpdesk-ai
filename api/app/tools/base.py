@@ -19,16 +19,13 @@ class KnowledgeSource(ABC):
     o LangGraphie ani LangChainie.
 
     Flow:
-        1. Agent woła `search()` z argumentami zgodnymi z `query_model` — wyszukiwanie
-           SEMANTYCZNE: zapytanie zamieniane jest na wektor i dopasowywane po podobieństwie,
-           nigdy wyszukiwane po id.
+        1. Agent woła `search()` z argumentami zgodnymi z `query_model`. Jak źródło szuka, to
+           jego sprawa: po znaczeniu (`find_tickets_vector`), po dosłownym brzmieniu
+           (`find_tickets_text`) albo po identyfikatorach (`read_docs`).
         2. `render_for_model()` zamienia wynik na tekst, który czyta model — to własna
            serializacja źródła, bo tylko ono wie, które jego pola się liczą i jak je pokazać.
         3. `cite()` zamienia ten sam wynik na źródła, które może wnieść do odpowiedzi. W adapterze
            grafu te dwie rzeczy stają się treścią i artefaktem narzędzia.
-
-    Bez odczytu po id: dziś nic nie potrzebuje znalezionego elementu ponownie po zakończeniu
-    pętli. Odczyt wraca razem z krokiem human-in-the-loop (CLAUDE.md -> „Plan i TODO", p. 44).
 
     Każda implementacja musi być tylko do odczytu: prompt wstrzyknięty przez treść zgłoszenia może
     co najwyżej skierować agenta do nietrafionego materiału, nigdy zmienić zawartości indeksu.
@@ -51,8 +48,8 @@ class KnowledgeSource(ABC):
     ) -> BaseModel:
         """
         Description:
-        Znajduje materiał podobny znaczeniowo do zapytania, od najlepszego, już przycięty progiem
-        źródła. Przyjmuje obiekt klasy `query_model` i zwraca własny wynik źródła.
+        Znajduje materiał odpowiadający zapytaniu, od najlepszego, już przycięty progiem albo
+        limitem źródła. Przyjmuje obiekt klasy `query_model` i zwraca własny wynik źródła.
 
         Example args:
             query=FindTicketsVectorQuery(problem="Wysyłka przez ePUAP kończy się błędem",
@@ -77,8 +74,10 @@ class KnowledgeSource(ABC):
             result=FindTicketsVectorResult(items=[FoundTicket(…)], dropped_below_threshold=2)
 
         Example result:
-            "Znalezione zgłoszenia: 1 (odcięte progiem: 2)\\n\\nPrzyczyny (`cause`) w
-             trafieniach:\\n- [33644] Certyfikat bez uprawnienia…\\n\\n[33644] 2026-03-14 · …"
+            Znalezione zgłoszenia: 1 (odcięte progiem: 2)
+
+            [33644] 2026-03-14 · podobieństwo 0.87
+            …
         """
 
     @abstractmethod
@@ -118,14 +117,15 @@ class KnowledgeSource(ABC):
 class AuxiliaryTool(ABC):
     """
     Description:
-    Narzędzie, które agent woła po coś innego niż materiał do cytowania — pierwszymi będą
-    planowane notatki agenta.
+    Narzędzie, które agent woła po coś innego niż materiał do cytowania: spis treści
+    dokumentacji i jej wyszukiwarki, a później notatki agenta.
 
     Do czego:
     Drugi rodzaj narzędzia agenta, oddzielony od `KnowledgeSource` z samej konstrukcji: zwraca
     zwykły tekst i nie ma `cite()`, więc jego wynik nigdy nie trafi na listę źródeł odpowiedzi.
-    Tylko po to ten rodzaj istnieje — notatka, którą model napisał sam dla siebie, nie jest
-    dowodem, a kontrakt sprawia, że nie da się jej za taki uznać przez pomyłkę.
+    Tylko po to ten rodzaj istnieje. Wiersz spisu treści mówi, GDZIE jest instrukcja, a nie co
+    w niej stoi — odpowiedź oparta na samym wierszu nie ma źródła, i kontrakt sprawia, że nie da
+    się go jej przypisać przez pomyłkę. Źródłem jest dopiero odczytana sekcja (`read_docs`).
 
     Flow:
         1. Agent woła narzędzie z argumentami zgodnymi z `args_model`.
@@ -166,3 +166,7 @@ class AuxiliaryTool(ABC):
             None
         """
         return None
+
+
+# Każde narzędzie, które może dostać agent — tym typem przyjmuje je kod składający grafy.
+AgentTool = KnowledgeSource | AuxiliaryTool

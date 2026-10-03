@@ -4,9 +4,9 @@ from app.anonymization import AnonymizedText, FakeAnonymizer
 from app.graph.gate_close import RESPOND_TOOL_NAME, GateCloseState, build_fake_graph, build_graph
 from app.llm import LLMError
 from app.model.gate_verdict import Verdict
-from app.nodes.agent import FakeAgent
+from app.nodes.agent import FakeAgentNode
 from app.nodes.anonymize import AnonymizeNode
-from app.nodes.respond import FakeRespond
+from app.nodes.respond import FakeRespondNode
 
 TICKET = "Nie przychodzą przesyłki z e-Doręczeń. Zrestartowano usługę odbioru."
 
@@ -61,8 +61,8 @@ async def test_the_fake_graph_returns_the_given_verdict() -> None:
 async def test_the_agent_runs_only_after_anonymization() -> None:
     """Przebieg → anonimizator dostaje `input_text`, a agent stan z już ustawionym `anonymized`."""
     anonymizer = FakeAnonymizer()
-    agent      = FakeAgent()
-    graph      = build_graph(AnonymizeNode(anonymizer), agent, FakeRespond(BLOCK))
+    agent      = FakeAgentNode()
+    graph      = build_graph(AnonymizeNode(anonymizer), agent, FakeRespondNode(BLOCK))
 
     await graph.ainvoke(make_state())
 
@@ -81,9 +81,9 @@ async def test_every_node_leaves_its_entry_in_the_log() -> None:
 def test_swapped_nodes_build_the_same_graph() -> None:
     """Węzły w zamienionych argumentach → ten sam przebieg: krawędzie idą po nazwach węzłów."""
     graph = build_graph(
-        anonymize = FakeRespond(BLOCK),
+        anonymize = FakeRespondNode(BLOCK),
         agent     = AnonymizeNode(FakeAnonymizer()),
-        respond   = FakeAgent(),
+        respond   = FakeAgentNode(),
     )
 
     assert {(edge.source, edge.target) for edge in graph.get_graph().edges} == EXPECTED_EDGES
@@ -92,11 +92,11 @@ def test_swapped_nodes_build_the_same_graph() -> None:
 def test_two_nodes_with_one_name_fail_at_build() -> None:
     """Dwa agenty zamiast agenta i `respond` → błąd przy składaniu, a nie graf bez werdyktu."""
     with pytest.raises(ValueError):
-        build_graph(AnonymizeNode(FakeAnonymizer()), FakeAgent(), FakeAgent())
+        build_graph(AnonymizeNode(FakeAnonymizer()), FakeAgentNode(), FakeAgentNode())
 
 
 async def test_the_fake_graph_is_single_use() -> None:
-    """Drugie wywołanie tej samej atrapy grafu → błąd: `FakeAgent` ma jedną turę, więc atrapę
+    """Drugie wywołanie tej samej atrapy grafu → błąd: `FakeAgentNode` ma jedną turę, więc atrapę
     buduje się na każde wywołanie."""
     graph = build_fake_graph()
 

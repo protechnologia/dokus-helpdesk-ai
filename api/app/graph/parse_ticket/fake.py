@@ -7,9 +7,9 @@ from app.graph.parse_ticket.graph import build_graph
 from app.graph.parse_ticket.respond_tool import FILLED_BY_GRAPH, RESPOND_TOOL_NAME
 from app.graph.parse_ticket.state import ParseTicketState
 from app.model.ticket_parsed import ParsedTicket
-from app.nodes.agent import FakeAgent, tool_call_turn
+from app.nodes.agent import FakeAgentNode, tool_call_turn
 from app.nodes.anonymize import AnonymizeNode
-from app.nodes.respond import FakeRespond
+from app.nodes.respond import FakeRespondNode
 from app.service.loader_dict_resolution import get_resolution_classes
 
 
@@ -74,7 +74,7 @@ def build_fake_graph(
     Ten sam graf co `build_graph`, złożony z atrap — do testów tras i CLI. Agent wywołuje
     `respond_parse_ticket` z polami karty bez `FILLED_BY_GRAPH`, a `respond` oddaje całą kartę.
 
-    Graf jest jednorazowy: `FakeAgent` ma jedną turę. Na każde wywołanie buduj nowy.
+    Graf jest jednorazowy: `FakeAgentNode` ma jedną turę. Na każde wywołanie buduj nowy.
 
     Example args:
         ticket=None
@@ -90,8 +90,8 @@ def build_fake_graph(
 
     graph = build_graph(
         anonymize = AnonymizeNode(FakeAnonymizer()),
-        agent     = FakeAgent([answer]),
-        respond   = FakeRespond(ticket),
+        agent     = FakeAgentNode([answer]),
+        respond   = FakeRespondNode(ticket),
     )
 
     return graph

@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.anonymization import AnonymizedText
 from app.llm import ChatMessage, ToolDefinition
 from app.nodes import LogEntry
-from app.tools import KnowledgeSource, SourceRef
+from app.tools import AgentTool, KnowledgeSource, SourceRef
 from app.util.json_schema import json_schema_without_docs
 from app.util.markdown import read_document
 
@@ -95,18 +95,19 @@ def route_after_agent(
 
 
 def tool_definitions(
-    tools:     Sequence[KnowledgeSource],  # np. [FakeFindTicketsVector(), FakeFindDocsVector()]
-    allowed:   Sequence[str],              # np. ("find_tickets_vector", "find_docs_vector")
-    graph_dir: Path,                       # np. Path("/code/app/graph/search")
+    tools:     Sequence[AgentTool],  # np. [FakeFindTicketsVectorTool(), FakeListDocsTool()]
+    allowed:   Sequence[str],        # np. ("find_tickets_vector", "list_docs")
+    graph_dir: Path,                 # np. Path("/code/app/graph/search")
 ) -> list[ToolDefinition]:
     """
     Description:
-    Definicje narzędzi wiedzy dla modelu w danym grafie: nazwa narzędzia, opis z
-    `<graph_dir>/<nazwa>.md` i schemat `query_model` bez dokumentacji. Opis leży w grafie, nie
-    w `tools/`, bo to treść promptu i różni się między grafami używającymi tego samego narzędzia.
+    Definicje narzędzi dla modelu w danym grafie: nazwa narzędzia, opis z
+    `<graph_dir>/<nazwa>.md` i schemat argumentów bez dokumentacji — `query_model` źródła wiedzy
+    albo `args_model` narzędzia pomocniczego. Opis leży w grafie, nie w `tools/`, bo to treść
+    promptu i różni się między grafami używającymi tego samego narzędzia.
 
     Example args:
-        tools=[FakeFindTicketsVector()]
+        tools=[FakeFindTicketsVectorTool()]
         allowed=("find_tickets_vector", "find_docs_vector")
         graph_dir=Path("/code/app/graph/search")
 
@@ -125,7 +126,10 @@ def tool_definitions(
         ToolDefinition(
             name        = tool.name,
             description = read_document(graph_dir / f"{tool.name}.md").rstrip(),
-            parameters  = json_schema_without_docs(tool.query_model),
+            parameters  = json_schema_without_docs(
+                # oba rodzaje trzymają model argumentów pod inną nazwą
+                tool.query_model if isinstance(tool, KnowledgeSource) else tool.args_model
+            ),
         )
         for tool in tools
     ]

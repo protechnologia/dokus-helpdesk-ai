@@ -1,13 +1,13 @@
-from datetime import date as Date
-
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.model.doc_section import DocSection
 
 
 class FindDocsVectorQuery(BaseModel):
     """
     Description:
     O co agent pyta `find_docs_vector`: zagadnienie albo słowa kluczowe funkcji czy procedury,
-    której wyjaśnienia potrzebuje. Dopasowywane znaczeniowo do fragmentów dokumentacji.
+    której wyjaśnienia potrzebuje. Dopasowywane znaczeniowo do sekcji dokumentacji.
     """
 
     # Nieznany argument to błąd, jak w FindTicketsVectorQuery.
@@ -16,36 +16,30 @@ class FindDocsVectorQuery(BaseModel):
     text: str = Field(min_length=1, examples=["uprawnienia kancelaria e-Doręczenia"])
 
 
-class FoundDoc(BaseModel):
+class FoundSection(BaseModel):
     """
     Description:
-    Jeden fragment dokumentacji produktu zwrócony przez `find_docs_vector`.
+    Jedna sekcja dokumentacji zwrócona przez `find_docs_vector`: podobieństwo, z jakim ją
+    znaleziono, i jej opis z metryczki. Treści sekcji tu nie ma — daje ją `read_docs`.
 
-    Kształt TYMCZASOWY: czy dokumentacja istnieje i w jakiej formie, jest wciąż otwarte
-    (CLAUDE.md -> „Plan i TODO", p. 15), więc są tu tylko pola, których plan już wymaga — który
-    fragment (to cytuje odpowiedź), który dokument, które wydanie opisuje, treść — do przejrzenia
-    przy wczytaniu kolekcji (p. 8). Wydanie jest wymagane, nie opcjonalne: instrukcja do starszej
-    wersji wprowadza w błąd dokładnie tak jak odmowa obalona później nowszym zgłoszeniem.
+    Jednostką jest zawsze sekcja z metryczki, także gdy wektor powstał z jej fragmentu: fragment
+    zwija się do sekcji, więc wyszukiwanie wektorowe i tekstowe wskazują ten sam identyfikator.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    fragment_id: str         = Field(min_length=1, examples=["doc-7"])
-    score:       float       = Field(examples=[0.62])
-    document:    str         = Field(min_length=1, examples=["Instrukcja administratora"])
-    version:     str         = Field(min_length=1, examples=["4.12"])
-    date:        Date | None = Field(default=None, examples=["2026-05-04"])
-    text:        str         = Field(min_length=1, examples=["Aby nadać uprawnienie, otwórz…"])
+    score:   float = Field(examples=[0.74])
+    section: DocSection
 
 
 class FindDocsVectorResult(BaseModel):
     """
     Description:
-    Co dało jedno wyszukiwanie `find_docs_vector`: fragmenty, które przeszły próg, i liczba
+    Co dało jedno wyszukiwanie `find_docs_vector`: sekcje, które przeszły próg, i liczba
     odciętych — liczona z tego samego powodu co w `FindTicketsVectorResult`.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    items:                   list[FoundDoc] = Field(default_factory=list)
-    dropped_below_threshold: int            = Field(default=0, ge=0, examples=[1])
+    items:                   list[FoundSection] = Field(default_factory=list)
+    dropped_below_threshold: int                = Field(default=0, ge=0, examples=[1])

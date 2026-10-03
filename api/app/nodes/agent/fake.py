@@ -18,7 +18,7 @@ def tool_call_turn(
 ) -> ChatMessage:
     """
     Description:
-    Buduje turę modelu z jednym wywołaniem narzędzia — do zaplanowania w `FakeAgent`.
+    Buduje turę modelu z jednym wywołaniem narzędzia — do zaplanowania w `FakeAgentNode`.
 
     Example args:
         name="find_tickets_vector"
@@ -35,7 +35,7 @@ def tool_call_turn(
     return turn
 
 
-class FakeAgent(Node):
+class FakeAgentNode(Node):
     """
     Description:
     Atrapa węzła `agent`: zamiast pytać model, oddaje zaplanowane tury po kolei. Domyślnie jedna
@@ -64,7 +64,7 @@ class FakeAgent(Node):
                    ChatMessage(role="assistant", content="…")]
 
         Example result:
-            FakeAgent oddająca te dwie tury po kolei
+            FakeAgentNode oddająca te dwie tury po kolei
         """
         default_turn = ChatMessage(role="assistant", content=DEFAULT_ANSWER)
 
@@ -95,7 +95,7 @@ class FakeAgent(Node):
         self.calls.append(state)
 
         if self._next >= len(self._turns):
-            raise LLMError(f"FakeAgent: skończyły się zaplanowane tury ({len(self._turns)})")
+            raise LLMError(f"FakeAgentNode: skończyły się zaplanowane tury ({len(self._turns)})")
 
         turn = self._turns[self._next]
         self._next += 1

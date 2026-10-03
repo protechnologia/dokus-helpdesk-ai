@@ -10,7 +10,7 @@ from app.tools import SourceRef
 DEFAULT_TOOL_RESULT = "fake-tool-result"
 
 
-class FakeRunTools(Node):
+class FakeRunToolsNode(Node):
     """
     Description:
     Atrapa węzła `run_tools`: nie woła narzędzi, tylko na każde wywołanie z ostatniej tury modelu
@@ -40,7 +40,7 @@ class FakeRunTools(Node):
             sources=[SourceRef(source="tickets", item_id="90001", …)]
 
         Example result:
-            FakeRunTools odpowiadająca tym tekstem na każde wywołanie
+            FakeRunToolsNode odpowiadająca tym tekstem na każde wywołanie
         """
         self._result_text = result_text
         self._sources     = list(sources)

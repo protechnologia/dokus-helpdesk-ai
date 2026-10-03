@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from app.nodes.base import Node
 
 
-class FakeRespond(Node):
+class FakeRespondNode(Node):
     """
     Description:
     Atrapa węzła `respond`: nie waliduje odpowiedzi modelu, tylko ustawia `output` na wynik podany
@@ -30,7 +30,7 @@ class FakeRespond(Node):
             output=Verdict(verdict="pass", …)
 
         Example result:
-            FakeRespond zwracająca ten wynik przy każdym wywołaniu
+            FakeRespondNode zwracająca ten wynik przy każdym wywołaniu
         """
         self._output = output
 

@@ -19,8 +19,8 @@ Co się dzieje po drodze:
 
 1. Czyta zapytania z `data/golden/golden200.json` (162, każde ze wskazanym rekordem-celem)
    i z `data/golden/distractors.json` (16, bez odpowiednika w indeksie).
-2. Każde wysyła do `FindTicketsVector` polami `query_problem` i `query_symptoms`, na skonfigurowanej
-   kolekcji, z `RAG_TOP_K` i `RAG_SCORE_MIN` z konfiguracji.
+2. Każde wysyła do `FindTicketsVectorTool` polami `query_problem` i `query_symptoms`, na
+   skonfigurowanej kolekcji, z `RAG_TOP_K` i `RAG_SCORE_MIN` z konfiguracji.
 3. Liczy, ile razy rekord-cel wrócił jako pierwszy, ile razy wrócił w ogóle i ile dystraktorów
    dostało choć jedno trafienie.
 
@@ -49,7 +49,7 @@ import pytest
 from app.config import Settings
 from app.embedding import EmbeddingClient
 from app.retrieval import QdrantClient
-from app.tools.find_tickets_vector import FindTicketsVector, FindTicketsVectorQuery
+from app.tools.find_tickets_vector import FindTicketsVectorQuery, FindTicketsVectorTool
 from tests.conftest import build_host_settings
 
 pytestmark = [
@@ -134,10 +134,10 @@ async def _measure(
     settings: Settings,  # np. Settings(embedding_base_url="http://localhost:8001", …)
 ) -> Measurement:
     """
-    Description:
-    Przepuszcza oba zestawy przez `FindTicketsVector` zbudowane tak jak w produkcie: skonfigurowana
-    kolekcja, `RAG_TOP_K` i `RAG_SCORE_MIN` z konfiguracji. Pustą kolekcję odrzuca od razu —
-    inaczej wszystkie liczby wyszłyby zerowe i wyglądały na zepsute wyszukiwanie.
+    Description: Przepuszcza oba zestawy przez `FindTicketsVectorTool` zbudowane tak jak
+    w produkcie: skonfigurowana kolekcja, `RAG_TOP_K` i `RAG_SCORE_MIN` z konfiguracji. Pustą
+    kolekcję odrzuca od razu — inaczej wszystkie liczby wyszłyby zerowe i wyglądały na zepsute
+    wyszukiwanie.
 
     Example args:
         settings=Settings(embedding_base_url="http://localhost:8001", …)
@@ -159,7 +159,7 @@ async def _measure(
         collection = settings.qdrant_collection,
         timeout    = settings.qdrant_timeout_seconds,
     )
-    tool = FindTicketsVector(
+    tool = FindTicketsVectorTool(
         embedder  = embedder,
         qdrant    = qdrant,
         top_k     = settings.rag_top_k,

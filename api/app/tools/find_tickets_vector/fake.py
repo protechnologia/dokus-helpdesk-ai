@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import date
 
 from app.model.ticket_parsed import ParsedTicket
-from app.tools.find_tickets_vector.base import FindTicketsVectorBase
+from app.tools.find_tickets_vector.base import FindTicketsVectorToolBase
 from app.tools.find_tickets_vector.models import (
     FindTicketsVectorQuery,
     FindTicketsVectorResult,
@@ -65,7 +65,7 @@ def default_tickets() -> list[FoundTicket]:
     return tickets
 
 
-class FakeFindTicketsVector(FindTicketsVectorBase):
+class FakeFindTicketsVectorTool(FindTicketsVectorToolBase):
     """
     Description:
     Atrapa `find_tickets_vector`: zamiast embeddera i Qdranta zwraca ustalony zestaw zgłoszeń,
@@ -93,7 +93,7 @@ class FakeFindTicketsVector(FindTicketsVectorBase):
             dropped_below_threshold=0
 
         Example result:
-            FakeFindTicketsVector zwracająca wbudowane trzy zgłoszenia przy każdym wyszukaniu
+            FakeFindTicketsVectorTool zwracająca wbudowane trzy zgłoszenia przy każdym wyszukaniu
         """
         self._result = FindTicketsVectorResult(
             items                   = list(tickets) if tickets is not None else default_tickets(),

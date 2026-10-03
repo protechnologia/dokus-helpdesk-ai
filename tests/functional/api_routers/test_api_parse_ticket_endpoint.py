@@ -4,9 +4,9 @@ from app.anonymization import FakeAnonymizer
 from app.factory import get_graph_builder
 from app.graph import parse_ticket
 from app.main import create_app
-from app.nodes.agent import FakeAgent
+from app.nodes.agent import FakeAgentNode
 from app.nodes.anonymize import AnonymizeNode
-from app.nodes.respond import FakeRespond
+from app.nodes.respond import FakeRespondNode
 
 # Kontrakt HTTP `POST /parse-ticket`: karta zgłoszenia pole po polu, bez pól wewnętrznych.
 
@@ -34,11 +34,11 @@ def test_a_ticket_without_body_is_refused() -> None:
 
 def test_the_route_puts_the_ticket_identity_into_the_state() -> None:
     """`/parse-ticket` → id i data zgłoszenia z żądania trafiają do stanu, nie do modelu."""
-    agent = FakeAgent()
+    agent = FakeAgentNode()
     graph = parse_ticket.build_graph(
         AnonymizeNode(FakeAnonymizer()),
         agent,
-        FakeRespond(parse_ticket.default_ticket()),
+        FakeRespondNode(parse_ticket.default_ticket()),
     )
 
     app = create_app()

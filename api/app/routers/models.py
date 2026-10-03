@@ -46,16 +46,18 @@ class TicketRequest(BaseModel):
 class SourceItem(BaseModel):
     """
     Description:
-    Jedno źródło odpowiedzi: które narzędzie co znalazło, z jakim podobieństwem i kiedy materiał
-    powstał. Powstaje z `cite()` narzędzi, nigdy z deklaracji modelu (zasada 9).
+    Jedno źródło odpowiedzi: z jakiego materiału pochodzi („tickets", „docs"), co to jest, z jakim
+    podobieństwem je znaleziono i kiedy powstało. Powstaje z `cite()` narzędzi, nigdy z deklaracji
+    modelu (zasada 9).
     """
 
-    source:  str         = Field(examples=["tickets"])
-    item_id: str         = Field(examples=["33644"])
-    title:   str         = Field(examples=["Wysyłka przez ePUAP kończy się błędem"])
-    score:   float       = Field(examples=[0.87])
+    source:  str          = Field(examples=["tickets"])
+    item_id: str          = Field(examples=["33644"])
+    title:   str          = Field(examples=["Wysyłka przez ePUAP kończy się błędem"])
+    # Puste, gdy źródło znaleziono dosłownie albo odczytano po identyfikatorze.
+    score:   float | None = Field(examples=[0.87])
     # Zawsze, gdy jest: od niej zależą dezaktualizacja, sprzeczności i sezonowość.
-    date:    Date | None = Field(default=None, examples=["2026-03-14"])
+    date:    Date | None  = Field(default=None, examples=["2026-03-14"])
 
 
 class ErrorResponse(BaseModel):

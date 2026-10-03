@@ -1,6 +1,7 @@
-<!-- Opis narzędzia `find_tickets_vector` w grafie `suggest_solution` — czyta go MODEL razem ze schematem
-     argumentów (`FindTicketsVectorQuery` bez docstringów). Opis jest per graf, bo ten sam kod narzędzia
-     służy różnym celom. Szkielet z p. 5; treść w p. 26, trafność zapytań agenta w p. 23.
+<!-- Opis narzędzia `find_tickets_vector` w grafie `suggest_solution` — czyta go MODEL razem ze
+     schematem argumentów (`FindTicketsVectorQuery` bez docstringów). Opis jest per graf,
+     bo ten sam kod narzędzia służy różnym celom. Treść i pomiar trafności zapytań agenta
+     w p. 26.
 
      Komentarze redakcyjne jak ten są wycinane przed wysłaniem. -->
 Szuka w bazie historycznych zgłoszeń spraw podobnych do opisanego problemu. Zwraca zgłoszenia

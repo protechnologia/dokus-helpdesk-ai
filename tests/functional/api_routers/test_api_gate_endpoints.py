@@ -9,9 +9,9 @@ from app.factory import get_graph_builder
 from app.graph import gate_close, gate_reply
 from app.main import create_app
 from app.model.gate_verdict import Verdict
-from app.nodes.agent import FakeAgent, tool_call_turn
+from app.nodes.agent import FakeAgentNode, tool_call_turn
 from app.nodes.anonymize import AnonymizeNode
-from app.nodes.respond import FakeRespond
+from app.nodes.respond import FakeRespondNode
 from app.service.loader_dict_rules import get_rule_set
 
 # Kontrakt HTTP obu bramek w procesie: kształt werdyktu, furtka, wersja reguł i to, co trasa
@@ -41,11 +41,13 @@ class GateGraph:
             GateGraph z publicznymi `anonymizer`, `agent` i `compiled`
         """
         self.anonymizer = FakeAnonymizer()
-        self.agent      = FakeAgent([tool_call_turn(graph.RESPOND_TOOL_NAME, BLOCK.model_dump())])
+        self.agent      = FakeAgentNode(
+            [tool_call_turn(graph.RESPOND_TOOL_NAME, BLOCK.model_dump())]
+        )
         self.compiled: CompiledStateGraph = graph.build_graph(
             AnonymizeNode(self.anonymizer),
             self.agent,
-            FakeRespond(BLOCK),
+            FakeRespondNode(BLOCK),
         )
 
 

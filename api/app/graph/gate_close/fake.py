@@ -5,9 +5,9 @@ from app.graph.gate_close.graph import build_graph
 from app.graph.gate_close.respond_tool import RESPOND_TOOL_NAME
 from app.graph.gate_close.state import GateCloseState
 from app.model.gate_verdict import Verdict
-from app.nodes.agent import FakeAgent, tool_call_turn
+from app.nodes.agent import FakeAgentNode, tool_call_turn
 from app.nodes.anonymize import AnonymizeNode
-from app.nodes.respond import FakeRespond
+from app.nodes.respond import FakeRespondNode
 
 # Werdykt atrapy, gdy nikt nie podał własnego — stały, żeby test, który przypadkiem na nim polega,
 # padł głośno.
@@ -42,7 +42,7 @@ def build_fake_graph(
     prawdziwym węzłem na `FakeAnonymizer`, agent wywołuje `respond_gate_close` z werdyktem
     w argumentach, a `respond` oddaje ten werdykt.
 
-    Graf jest jednorazowy: `FakeAgent` ma jedną turę, więc drugie wywołanie tego samego grafu
+    Graf jest jednorazowy: `FakeAgentNode` ma jedną turę, więc drugie wywołanie tego samego grafu
     kończy się błędem. Na każde wywołanie buduj nowy.
 
     Example args:
@@ -55,8 +55,8 @@ def build_fake_graph(
 
     graph = build_graph(
         anonymize = AnonymizeNode(FakeAnonymizer()),
-        agent     = FakeAgent([answer]),
-        respond   = FakeRespond(verdict),
+        agent     = FakeAgentNode([answer]),
+        respond   = FakeRespondNode(verdict),
     )
 
     return graph

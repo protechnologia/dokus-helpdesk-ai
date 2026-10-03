@@ -8,26 +8,26 @@ korpusu (`problem` + `symptoms`), narzędzie oddaje podobne zgłoszenia z przycz
 |-------------|-------------------------------------------------------------------------|
 | `models.py` | zapytanie, znaleziony element i wynik                                   |
 | `base.py`   | część wspólna narzędzia i atrapy: nazwa, tekst dla modelu, lista źródeł |
-| `tool.py`   | `FindTicketsVector` — wyszukiwanie przez embedder i Qdranta             |
-| `fake.py`   | `FakeFindTicketsVector` — ustalony zestaw zgłoszeń, bez usług           |
+| `tool.py`   | `FindTicketsVectorTool` — wyszukiwanie przez embedder i Qdranta         |
+| `fake.py`   | `FakeFindTicketsVectorTool` — ustalony zestaw zgłoszeń, bez usług       |
 
 Przykład zapytania i wyniku — w opisie `tool.py`; przykład tekstu, który czyta model — w opisie
 `base.py`.
 """
 
-from app.tools.find_tickets_vector.base import FindTicketsVectorBase
-from app.tools.find_tickets_vector.fake import FakeFindTicketsVector
+from app.tools.find_tickets_vector.base import FindTicketsVectorToolBase
+from app.tools.find_tickets_vector.fake import FakeFindTicketsVectorTool
 from app.tools.find_tickets_vector.models import (
     FindTicketsVectorQuery,
     FindTicketsVectorResult,
     FoundTicket,
 )
-from app.tools.find_tickets_vector.tool import FindTicketsVector
+from app.tools.find_tickets_vector.tool import FindTicketsVectorTool
 
 __all__ = [
-    "FakeFindTicketsVector",
-    "FindTicketsVector",
-    "FindTicketsVectorBase",
+    "FakeFindTicketsVectorTool",
+    "FindTicketsVectorTool",
+    "FindTicketsVectorToolBase",
     "FindTicketsVectorQuery",
     "FindTicketsVectorResult",
     "FoundTicket",

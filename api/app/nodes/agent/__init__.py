@@ -6,12 +6,12 @@ z listy dozwolonych (z narzędziem odpowiedzi `respond_<graf>`) idą do `LLMClie
 wiedzy → `run_tools`, `respond_<graf>` → `respond`, sam tekst → błąd formatu; po przekroczeniu
 limitu iteracji — `respond`.
 
-Status: atrapa (`FakeAgent`); właściwy węzeł w p. 9 (CLAUDE.md -> „Plan i TODO").
+Status: atrapa (`FakeAgentNode`); właściwy węzeł w p. 9 (CLAUDE.md -> „Plan i TODO").
 """
 
-from app.nodes.agent.fake import FakeAgent, tool_call_turn
+from app.nodes.agent.fake import FakeAgentNode, tool_call_turn
 
 __all__ = [
-    "FakeAgent",
+    "FakeAgentNode",
     "tool_call_turn",
 ]

@@ -6,7 +6,7 @@ from app.graph import GraphState, merge_sources, route_after_agent, tool_definit
 from app.llm import ChatMessage
 from app.nodes.agent import tool_call_turn
 from app.tools import SourceRef
-from app.tools.find_tickets_vector.fake import FakeFindTicketsVector
+from app.tools.find_tickets_vector.fake import FakeFindTicketsVectorTool
 
 
 def make_ref(
@@ -86,7 +86,9 @@ def test_tool_definitions_take_the_description_from_the_graph(tmp_path: Path) ->
     description = tmp_path / "find_tickets_vector.md"
     description.write_text("<!-- notatka -->\nSzuka zgłoszeń.\n", encoding="utf-8")
 
-    [definition] = tool_definitions([FakeFindTicketsVector()], ("find_tickets_vector",), tmp_path)
+    tools = [FakeFindTicketsVectorTool()]
+
+    [definition] = tool_definitions(tools, ("find_tickets_vector",), tmp_path)
 
     assert definition.description                  == "Szuka zgłoszeń."
     assert set(definition.parameters["properties"]) == {"problem", "symptoms"}
@@ -96,4 +98,4 @@ def test_tool_definitions_take_the_description_from_the_graph(tmp_path: Path) ->
 def test_tool_definitions_refuse_a_tool_outside_the_list(tmp_path: Path) -> None:
     """Narzędzie spoza listy dozwolonych grafu → błąd składania, nie definicja dla modelu."""
     with pytest.raises(ValueError):
-        tool_definitions([FakeFindTicketsVector()], (), tmp_path)
+        tool_definitions([FakeFindTicketsVectorTool()], (), tmp_path)

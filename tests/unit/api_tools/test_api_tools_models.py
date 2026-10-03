@@ -7,7 +7,7 @@ from app.tools import SourceRef
 
 
 def make_ref(
-    source:  str = "find_tickets_vector",                           # e.g. "find_docs_vector"
+    source:  str = "tickets",                                # e.g. "docs"
     item_id: str = "33644",                                  # e.g. "doc-7"
     title:   str = "Wysyłka przez ePUAP kończy się błędem",  # e.g. "Instrukcja administratora 4.12"
 ) -> SourceRef:
@@ -43,10 +43,18 @@ def test_key_tells_sources_apart() -> None:
 
 
 def test_a_ref_without_a_score_is_refused() -> None:
-    """A reference with no score → ValidationError: every source comes from a search, and a
-    default would let an unranked source pass as ranked."""
+    """A reference with the score left out → ValidationError: a default would let a tool forget
+    the score of a ranked source without anyone noticing."""
     with pytest.raises(ValidationError):
         SourceRef(source="docs", item_id="doc-7", title="Instrukcja administratora 4.12")
+
+
+def test_a_ref_may_state_that_it_has_no_score() -> None:
+    """An explicit `score=None` → accepted: a source found literally or read by its id has no
+    similarity, and saying so is the tool's decision."""
+    ref = SourceRef(source="docs", item_id="doc-7", title="Instrukcja administratora", score=None)
+
+    assert ref.score is None
 
 
 @pytest.mark.parametrize("field", ["source", "item_id", "title"])

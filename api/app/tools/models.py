@@ -32,15 +32,19 @@ class SourceRef(BaseModel):
     przeczytał ją już jako tekst, a jej kopia niosłaby każde źródło dwa razy przez stan grafu.
     `date` jest zawsze, bo od niej zależą dezaktualizacja, sprzeczności i sezonowość (CLAUDE.md ->
     „Twarde reguły promptu generacji").
+
+    `score` trzeba podać zawsze, ale wolno podać `None`: źródło znalezione dosłownie albo
+    odczytane po identyfikatorze nie ma podobieństwa. Pole bez wartości domyślnej, żeby brak
+    podobieństwa był decyzją narzędzia, a nie przeoczeniem.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    source:  str         = Field(min_length=1, examples=["tickets"])
-    item_id: str         = Field(min_length=1, examples=["33644"])
-    title:   str         = Field(min_length=1, examples=["Wysyłka przez ePUAP kończy się błędem"])
-    score:   float       = Field(examples=[0.87])
-    date:    Date | None = Field(default=None, examples=["2026-03-14"])
+    source:  str          = Field(min_length=1, examples=["tickets"])
+    item_id: str          = Field(min_length=1, examples=["33644"])
+    title:   str          = Field(min_length=1, examples=["Wysyłka przez ePUAP kończy się błędem"])
+    score:   float | None = Field(examples=[0.87])
+    date:    Date | None  = Field(default=None, examples=["2026-03-14"])
 
     @property
     def key(self) -> str:

@@ -6,9 +6,9 @@ from pydantic import BaseModel, Field
 from app.graph import GraphState, merge_sources
 from app.llm import ChatMessage, LLMError
 from app.nodes import Node
-from app.nodes.agent import FakeAgent, tool_call_turn
-from app.nodes.respond import FakeRespond
-from app.nodes.run_tools import FakeRunTools
+from app.nodes.agent import FakeAgentNode, tool_call_turn
+from app.nodes.respond import FakeRespondNode
+from app.nodes.run_tools import FakeRunToolsNode
 from app.tools import SourceRef
 
 
@@ -32,7 +32,7 @@ SEARCH = tool_call_turn(
 
 async def test_the_agent_answers_at_once_by_default() -> None:
     """Atrapa bez planu → jedna tura z odpowiedzią, bez narzędzi, i iteracja podbita o jeden."""
-    update = await FakeAgent().run(State(input_text="x"))
+    update = await FakeAgentNode().run(State(input_text="x"))
 
     assert update["iterations"]            == 1
     assert update["messages"][0].role      == "assistant"
@@ -42,7 +42,7 @@ async def test_the_agent_answers_at_once_by_default() -> None:
 async def test_the_agent_plays_its_turns_in_order() -> None:
     """Plan „szukaj, potem odpowiedz" → najpierw wywołanie narzędzia, potem odpowiedź; trzecie
     wywołanie to błąd, bo graf zawołał agenta częściej, niż test zakładał."""
-    agent  = FakeAgent([SEARCH, ChatMessage(role="assistant", content="Odpowiedź")])
+    agent  = FakeAgentNode([SEARCH, ChatMessage(role="assistant", content="Odpowiedź")])
     state  = State(input_text="x")
 
     first  = await agent.run(state)
@@ -61,7 +61,9 @@ async def test_run_tools_answers_every_call_by_its_id() -> None:
     ref   = SourceRef(source="tickets", item_id="90001", title="Brak przesyłek", score=0.91)
     state = State(input_text="x", messages=[SEARCH])
 
-    update = await FakeRunTools(result_text="Znalezione zgłoszenia: 1", sources=[ref]).run(state)
+    node  = FakeRunToolsNode(result_text="Znalezione zgłoszenia: 1", sources=[ref])
+
+    update = await node.run(state)
 
     assert [message.call_id for message in update["messages"]] == ["call_1"]
     assert update["messages"][0].content == "Znalezione zgłoszenia: 1"
@@ -70,14 +72,14 @@ async def test_run_tools_answers_every_call_by_its_id() -> None:
 
 async def test_run_tools_without_sources_leaves_the_field_alone() -> None:
     """Atrapa bez źródeł → aktualizacja bez `sources`: graf bez narzędzi wiedzy nie ma tego pola."""
-    update = await FakeRunTools().run(State(input_text="x", messages=[SEARCH]))
+    update = await FakeRunToolsNode().run(State(input_text="x", messages=[SEARCH]))
 
     assert "sources" not in update
 
 
 async def test_respond_sets_the_given_output() -> None:
     """Atrapa `respond` → `output` równy wynikowi z konstruktora, a stan zapisany w `calls`."""
-    respond = FakeRespond(Verdict(verdict="pass"))
+    respond = FakeRespondNode(Verdict(verdict="pass"))
 
     update = await respond.run(State(input_text="x"))
 
@@ -87,7 +89,7 @@ async def test_respond_sets_the_given_output() -> None:
 
 @pytest.mark.parametrize(
     "node",
-    [FakeAgent(), FakeRunTools(), FakeRespond(Verdict(verdict="pass"))],
+    [FakeAgentNode(), FakeRunToolsNode(), FakeRespondNode(Verdict(verdict="pass"))],
     ids=lambda node: node.name,
 )
 async def test_every_fake_node_logs_one_entry_under_its_name(node: Node) -> None:
@@ -99,6 +101,6 @@ async def test_every_fake_node_logs_one_entry_under_its_name(node: Node) -> None
 
 async def test_the_agent_logs_which_tools_it_called() -> None:
     """Tura z wywołaniem narzędzia → wpis w logu nazywa narzędzie, nie cytuje argumentów."""
-    update = await FakeAgent([SEARCH]).run(State(input_text="x"))
+    update = await FakeAgentNode([SEARCH]).run(State(input_text="x"))
 
     assert update["log"][0].message == "tura 1: narzędzia: find_tickets_vector"

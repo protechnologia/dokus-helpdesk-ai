@@ -5,9 +5,9 @@ from app.graph.suggest_handoff.graph import build_graph
 from app.graph.suggest_handoff.respond_tool import RESPOND_TOOL_NAME
 from app.graph.suggest_handoff.state import SuggestHandoffState
 from app.model.suggest_proposal import Proposal
-from app.nodes.agent import FakeAgent, tool_call_turn
+from app.nodes.agent import FakeAgentNode, tool_call_turn
 from app.nodes.anonymize import AnonymizeNode
-from app.nodes.respond import FakeRespond
+from app.nodes.respond import FakeRespondNode
 
 # Propozycja atrapy, gdy nikt nie podał własnej — stała, żeby test, który przypadkiem na niej
 # polega, padł głośno.
@@ -40,7 +40,7 @@ def build_fake_graph(
     Ten sam graf co `build_graph`, złożony z atrap — do testów tras i CLI. Agent wywołuje
     `respond_suggest_handoff` z propozycją w argumentach, a `respond` oddaje tę propozycję.
 
-    Graf jest jednorazowy: `FakeAgent` ma jedną turę. Na każde wywołanie buduj nowy.
+    Graf jest jednorazowy: `FakeAgentNode` ma jedną turę. Na każde wywołanie buduj nowy.
 
     Example args:
         proposal=Proposal(text="Przekazujemy sprawę do serwisu…")
@@ -52,8 +52,8 @@ def build_fake_graph(
 
     graph = build_graph(
         anonymize = AnonymizeNode(FakeAnonymizer()),
-        agent     = FakeAgent([answer]),
-        respond   = FakeRespond(proposal),
+        agent     = FakeAgentNode([answer]),
+        respond   = FakeRespondNode(proposal),
     )
 
     return graph

@@ -5,27 +5,30 @@ import pytest
 from pydantic import BaseModel
 
 import app.tools
-from app.tools import KnowledgeSource
+from app.tools import AuxiliaryTool, KnowledgeSource
 
 
-def all_knowledge_sources() -> list[type[KnowledgeSource]]:
+def all_tools_of(
+    kind: type,  # KnowledgeSource albo AuxiliaryTool
+) -> list[type]:
     """
     Description:
-    Zbiera wszystkie klasy źródeł wiedzy z pakietów w `app/tools/` — także te, których jeszcze
-    nie ma. Nowe narzędzie to nowy katalog, więc test ma je znaleźć sam, bez dopisywania do listy.
+    Zbiera wszystkie klasy narzędzi danego rodzaju z pakietów w `app/tools/` — także te, których
+    jeszcze nie ma. Nowe narzędzie to nowy katalog, więc test ma je znaleźć sam, bez dopisywania
+    do listy.
 
     Example args:
-        (brak)
+        kind=KnowledgeSource
 
     Example result:
-        [FakeFindTicketsVector, FakeFindDocsVector]
+        [FindTicketsVectorToolBase, FakeFindTicketsVectorTool, FindTicketsVectorTool, …]
     """
     for module in pkgutil.iter_modules(app.tools.__path__):
         if module.ispkg:
             importlib.import_module(f"app.tools.{module.name}")
 
-    found:   list[type[KnowledgeSource]] = []
-    pending: list[type[KnowledgeSource]] = list(KnowledgeSource.__subclasses__())
+    found:   list[type] = []
+    pending: list[type] = list(kind.__subclasses__())
 
     while pending:
         cls = pending.pop()
@@ -35,14 +38,32 @@ def all_knowledge_sources() -> list[type[KnowledgeSource]]:
     return found
 
 
-SOURCES = all_knowledge_sources()
+SOURCES   = all_tools_of(KnowledgeSource)
+AUXILIARY = all_tools_of(AuxiliaryTool)
+TOOLS     = [*SOURCES, *AUXILIARY]
 
 
-def test_every_tool_package_brings_a_source() -> None:
-    """Pakiety narzędzi → co najmniej jedno źródło na pakiet: pusty katalog narzędzia oznacza,
+def arguments_model(
+    tool: type,  # np. FakeFindTicketsVectorTool albo FakeListDocsTool
+) -> type[BaseModel]:
+    """
+    Description:
+    Model argumentów narzędzia — oba rodzaje trzymają go pod inną nazwą.
+
+    Example args:
+        tool=FakeListDocsTool
+
+    Example result:
+        ListDocsArgs
+    """
+    return tool.query_model if issubclass(tool, KnowledgeSource) else tool.args_model
+
+
+def test_every_tool_package_brings_a_tool() -> None:
+    """Pakiety narzędzi → co najmniej jedno narzędzie na pakiet: pusty katalog narzędzia oznacza,
     że importy w jego `__init__.py` coś pominęły."""
     packages = {module.name for module in pkgutil.iter_modules(app.tools.__path__) if module.ispkg}
-    modules  = {cls.__module__.split(".")[2] for cls in SOURCES}
+    modules  = {cls.__module__.split(".")[2] for cls in TOOLS}
 
     assert packages <= modules
 
@@ -55,11 +76,27 @@ def test_every_source_declares_name_and_query_model(source: type[KnowledgeSource
     assert issubclass(getattr(source, "query_model", object), BaseModel)
 
 
-@pytest.mark.parametrize("source", SOURCES, ids=lambda cls: cls.__name__)
-def test_every_query_model_refuses_unknown_arguments(source: type[KnowledgeSource]) -> None:
-    """Każdy `query_model` → `extra="forbid"`: model wymyślający argumenty ma dostać błąd, a nie
-    zostać po cichu zignorowany."""
-    assert source.query_model.model_config.get("extra") == "forbid"
+@pytest.mark.parametrize("tool", AUXILIARY, ids=lambda cls: cls.__name__)
+def test_every_auxiliary_tool_declares_name_and_args_model(tool: type[AuxiliaryTool]) -> None:
+    """Każde narzędzie pomocnicze → niepusta `name` i `args_model` będący modelem Pydantica, jak
+    `query_model` u źródeł wiedzy."""
+    assert isinstance(getattr(tool, "name", None), str) and tool.name
+    assert issubclass(getattr(tool, "args_model", object), BaseModel)
+
+
+@pytest.mark.parametrize("tool", AUXILIARY, ids=lambda cls: cls.__name__)
+def test_an_auxiliary_tool_has_nothing_to_cite_with(tool: type[AuxiliaryTool]) -> None:
+    """Każde narzędzie pomocnicze → bez `cite()` i bez `source`: jego wynik nie ma jak trafić na
+    listę źródeł, i ma tak zostać z samej konstrukcji."""
+    assert not hasattr(tool, "cite")
+    assert not hasattr(tool, "source")
+
+
+@pytest.mark.parametrize("tool", TOOLS, ids=lambda cls: cls.__name__)
+def test_every_arguments_model_refuses_unknown_arguments(tool: type) -> None:
+    """Każdy model argumentów → `extra="forbid"`: model wymyślający argumenty ma dostać błąd,
+    a nie zostać po cichu zignorowany."""
+    assert arguments_model(tool).model_config.get("extra") == "forbid"
 
 
 @pytest.mark.parametrize("source", SOURCES, ids=lambda cls: cls.__name__)
@@ -87,9 +124,9 @@ def test_real_and_fake_of_one_tool_share_a_name_and_no_two_tools_do() -> None:
     modelowi tak samo, a dwa różne narzędzia nigdy."""
     names_per_package: dict[str, set[str]] = {}
 
-    for source in SOURCES:
-        package = source.__module__.split(".")[2]
-        names_per_package.setdefault(package, set()).add(source.name)
+    for tool in TOOLS:
+        package = tool.__module__.split(".")[2]
+        names_per_package.setdefault(package, set()).add(tool.name)
 
     assert all(len(names) == 1 for names in names_per_package.values())
 

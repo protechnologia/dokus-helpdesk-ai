@@ -52,7 +52,7 @@ from app.embedding import EmbeddingClient
 from app.model.ticket_parsed import ParsedTicket
 from app.retrieval import VECTOR_PROBLEM, QdrantClient, RetrievalConfigError, TicketHit
 from app.service.builder_embedding_text import build_embedding_text
-from app.tools.find_tickets_vector.base import FindTicketsVectorBase
+from app.tools.find_tickets_vector.base import FindTicketsVectorToolBase
 from app.tools.find_tickets_vector.models import (
     FindTicketsVectorQuery,
     FindTicketsVectorResult,
@@ -102,7 +102,7 @@ def found_ticket_from_hit(
     return found
 
 
-class FindTicketsVector(FindTicketsVectorBase):
+class FindTicketsVectorTool(FindTicketsVectorToolBase):
     """
     Description:
     `find_tickets_vector` na prawdziwym indeksie: embedder liczy wektor zapytania, Qdrant znajduje
@@ -138,7 +138,7 @@ class FindTicketsVector(FindTicketsVectorBase):
             score_min=0.48
 
         Example result:
-            FindTicketsVector gotowe do wyszukiwania w kolekcji `tickets`
+            FindTicketsVectorTool gotowe do wyszukiwania w kolekcji `tickets`
         """
         self._embedder  = embedder
         self._qdrant    = qdrant

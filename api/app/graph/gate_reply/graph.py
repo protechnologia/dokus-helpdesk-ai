@@ -95,8 +95,8 @@ def model_tools(
 
 def build_graph(
     anonymize: Node,  # np. AnonymizeNode(FakeAnonymizer())
-    agent:     Node,  # np. FakeAgent()
-    respond:   Node,  # np. FakeRespond(Verdict(verdict="pass"))
+    agent:     Node,  # np. FakeAgentNode()
+    respond:   Node,  # np. FakeRespondNode(Verdict(verdict="pass"))
 ) -> CompiledStateGraph:
     """
     Description:
@@ -106,8 +106,8 @@ def build_graph(
 
     Example args:
         anonymize=AnonymizeNode(FakeAnonymizer())
-        agent=FakeAgent()
-        respond=FakeRespond(Verdict(verdict="pass"))
+        agent=FakeAgentNode()
+        respond=FakeRespondNode(Verdict(verdict="pass"))
 
     Example result:
         CompiledStateGraph: __start__ → anonymize → agent → respond → __end__

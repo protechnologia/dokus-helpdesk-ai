@@ -4,7 +4,7 @@ import pytest
 from app.embedding import EmbeddingClient
 from app.model.ticket_parsed import ParsedTicket
 from app.retrieval import VECTOR_PROBLEM, QdrantClient, RetrievalConfigError
-from app.tools.find_tickets_vector import FindTicketsVector, FindTicketsVectorQuery
+from app.tools.find_tickets_vector import FindTicketsVectorQuery, FindTicketsVectorTool
 from tests.helpers_transport import capturing, with_transport
 
 # Narzędzie stoi na prawdziwych klientach embeddera i Qdranta, a podmieniony jest tylko transport
@@ -79,7 +79,7 @@ def _tool(
     top_k:         int         = 5,      # np. 5 — RAG_TOP_K
     embedder_seen: list | None = None,   # żądania do embeddera, gdy test je sprawdza
     qdrant_seen:   list | None = None,   # żądania do Qdranta, gdy test je sprawdza
-) -> FindTicketsVector:
+) -> FindTicketsVectorTool:
     """
     Description:
     Buduje narzędzie na prawdziwych klientach z podmienionym transportem: embedder oddaje jeden
@@ -89,7 +89,7 @@ def _tool(
         hits=[_hit("90001", 0.71)]
 
     Example result:
-        FindTicketsVector odpowiadające jednym trafieniem, bez żadnej usługi
+        FindTicketsVectorTool odpowiadające jednym trafieniem, bez żadnej usługi
     """
     embedder = with_transport(
         EmbeddingClient(base_url="http://embedder:8000"),
@@ -109,7 +109,7 @@ def _tool(
         ),
     )
 
-    tool = FindTicketsVector(embedder=embedder, qdrant=qdrant, top_k=top_k, score_min=score_min)
+    tool = FindTicketsVectorTool(embedder=embedder, qdrant=qdrant, top_k=top_k, score_min=score_min)
 
     return tool
 

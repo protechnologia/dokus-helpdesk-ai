@@ -7,7 +7,7 @@ from app.graph.search.models import SearchDone
 from app.graph.search.respond_tool import RESPOND_TOOL_NAME
 from app.graph.search.state import SearchState
 from app.nodes.anonymize import AnonymizeNode
-from app.nodes.respond import FakeRespond
+from app.nodes.respond import FakeRespondNode
 
 
 def example_state() -> SearchState:
@@ -35,7 +35,7 @@ def build_fake_graph() -> CompiledStateGraph:
     `find_tickets_vector` (trzy zgłoszenia o jednym objawie i trzech przyczynach), potem wywołuje
     `respond_search`; w stanie zostają trzy źródła i jedno zapytanie agenta.
 
-    Graf jest jednorazowy: `FakeAgent` ma zaplanowane tury. Na każde wywołanie buduj nowy.
+    Graf jest jednorazowy: `FakeAgentNode` ma zaplanowane tury. Na każde wywołanie buduj nowy.
 
     Example args:
         (brak)
@@ -49,7 +49,7 @@ def build_fake_graph() -> CompiledStateGraph:
         anonymize = AnonymizeNode(FakeAnonymizer()),
         agent     = agent,
         run_tools = run_tools,
-        respond   = FakeRespond(SearchDone()),
+        respond   = FakeRespondNode(SearchDone()),
     )
 
     return graph

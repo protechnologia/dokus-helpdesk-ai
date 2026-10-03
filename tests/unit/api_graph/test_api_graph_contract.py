@@ -10,8 +10,12 @@ from pydantic import BaseModel
 import app.graph
 from app.anonymization import AnonymizedText
 from app.graph import merge_sources
-from app.tools.find_docs_vector.fake import FakeFindDocsVector
-from app.tools.find_tickets_vector.fake import FakeFindTicketsVector
+from app.tools.find_docs_text.fake import FakeFindDocsTextTool
+from app.tools.find_docs_vector.fake import FakeFindDocsVectorTool
+from app.tools.find_tickets_text.fake import FakeFindTicketsTextTool
+from app.tools.find_tickets_vector.fake import FakeFindTicketsVectorTool
+from app.tools.list_docs.fake import FakeListDocsTool
+from app.tools.read_docs.fake import FakeReadDocsTool
 
 
 def all_graphs() -> list[ModuleType]:
@@ -38,8 +42,16 @@ def all_graphs() -> list[ModuleType]:
 GRAPHS         = all_graphs()
 RESPOND_GRAPHS = [graph for graph in GRAPHS if hasattr(graph, "RESPOND_TOOL_NAME")]
 
-# Każde narzędzie wiedzy, jakie dziś istnieje — test wybiera z nich dozwolone dla grafu.
-KNOWLEDGE_TOOLS = [FakeFindTicketsVector(), FakeFindDocsVector()]
+# Każde narzędzie agenta, jakie dziś istnieje, w kolejności z `TOOL_NAMES` grafów — test wybiera
+# z nich dozwolone dla grafu.
+AGENT_TOOLS = [
+    FakeFindTicketsVectorTool(),
+    FakeFindTicketsTextTool(),
+    FakeListDocsTool(),
+    FakeFindDocsVectorTool(),
+    FakeFindDocsTextTool(),
+    FakeReadDocsTool(),
+]
 
 # Znacznik zamiast tekstu po anonimizacji — gdy jest w prompcie, a tekstu surowego nie ma, prompt
 # wziął treść z `anonymized`.
@@ -120,15 +132,15 @@ def allowed_tools(
 ) -> list:
     """
     Description:
-    Atrapy narzędzi wiedzy z listy dozwolonych dla grafu.
+    Atrapy narzędzi z listy dozwolonych dla grafu.
 
     Example args:
         graph=<module app.graph.search>
 
     Example result:
-        [FakeFindTicketsVector(), FakeFindDocsVector()]
+        [FakeFindTicketsVectorTool(), FakeFindTicketsTextTool(), FakeListDocsTool(), …]
     """
-    return [tool for tool in KNOWLEDGE_TOOLS if tool.name in graph.TOOL_NAMES]
+    return [tool for tool in AGENT_TOOLS if tool.name in graph.TOOL_NAMES]
 
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
@@ -251,7 +263,7 @@ def test_a_tool_outside_the_list_is_refused(graph: ModuleType) -> None:
     """Graf bez `find_tickets_vector` na liście dozwolonych → podanie go to błąd składania, nie
     cichy dostęp do indeksu (bramki i „Popraw" mają działać przy pustym indeksie)."""
     with pytest.raises(ValueError):
-        graph.model_tools([FakeFindTicketsVector()])
+        graph.model_tools([FakeFindTicketsVectorTool()])
 
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
