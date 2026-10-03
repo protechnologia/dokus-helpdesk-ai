@@ -1,3 +1,56 @@
+"""
+Description:
+Indeksacja: z katalogu sparsowanych zgłoszeń (`data/parsed/`) buduje kolekcję Qdranta, po której
+w runtime szuka się podobnych zgłoszeń. Nie woła LLM-a — tylko embedder i Qdranta — więc indeks
+da się skasować i odbudować jedną komendą.
+
+    data/parsed/*.json → filtr jakości → embedder (`problem` + `symptoms`) → Qdrant
+
+| metoda      | komenda                 | co robi                                          |
+|-------------|-------------------------|--------------------------------------------------|
+| `build()`   | `rag index <katalog>`   | dokłada artefakty, nadpisując punkty tych samych |
+| `rebuild()` | `rag reindex <katalog>` | kasuje kolekcję i buduje od zera                 |
+
+Przed — artefakt `data/parsed/33644.json`:
+
+    {
+      "ticket_id":         "33644",
+      "date":              "2026-03-14",
+      "component":         "ePUAP",
+      "problem":           "Wysyłka przez ePUAP kończy się błędem komunikacji",
+      "symptoms":          "Po kliknięciu Wyślij pojawia się komunikat o braku sieci",
+      "error_codes":       ["ERR-4210"],
+      "cause":             "Certyfikat bez uprawnienia AddDocumentToSign",
+      "solution":          "Wygenerowano certyfikat z właściwym uprawnieniem.",
+      "resolution":        "naprawione",
+      "questions_summary": "brak",
+      "resolution_vocabulary_version": 1
+    }
+
+Po — punkt w Qdrancie:
+
+    {
+      "id":      "df3b51f3-9eac-56f3-9f28-6253f23dd731",
+      "vector":  {
+        "problem": [0.0123, -0.0456, …],
+        "sts":     [0.0987, -0.0654, …]
+      },
+      "payload": { …te same pola co w artefakcie… }
+    }
+
+Co się dzieje po drodze:
+
+1. Filtr jakości odsiewa rekordy bez wiedzy (np. `solution` = „brak"); raport mówi, które
+   odpadły i dlaczego.
+2. Z `problem` + `symptoms` powstaje tekst do embeddingu. `solution` do wektora nie wchodzi —
+   szukamy po podobieństwie problemu, nie rozwiązania.
+3. Embedder liczy z tego tekstu dwa wektory (dziś po 768 liczb): `problem` w trybie passage,
+   z nim porównywane jest zapytanie, i `sts` w trybie symetrycznym, którego dziś nikt nie czyta.
+4. `id` punktu jest wyliczane z `ticket_id`, więc ponowna indeksacja nadpisuje punkt, zamiast
+   go dublować.
+5. Cały artefakt jedzie w payloadzie — z niego powstaje później propozycja odpowiedzi.
+"""
+
 import logging
 from pathlib import Path
 
@@ -102,12 +155,14 @@ class TicketIndexer:
 
         warning = drop_rate_warning(report)
 
-        return IndexBuildReport(
+        build_report = IndexBuildReport(
             read     = len(tickets),
             indexed  = indexed,
             filtered = report,
             warnings = [warning] if warning else [],
         )
+
+        return build_report
 
     async def rebuild(
         self,
@@ -162,10 +217,12 @@ class TicketIndexer:
         if not directory.is_dir():
             raise NotADirectoryError(f"nie jest katalogiem: {directory}")
 
-        return [
+        tickets = [
             ParsedTicket.model_validate_json(path.read_text(encoding="utf-8"))
             for path in sorted(directory.glob("*.json"))
         ]
+
+        return tickets
 
     def _kept_tickets(
         self,

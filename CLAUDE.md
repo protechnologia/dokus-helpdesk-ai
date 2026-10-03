@@ -1769,6 +1769,11 @@ Raises:                      # only when the method raises
 - Konstruktor: `Example result:` = opis skonfigurowanej instancji.
 - **Docstring nietrywialnej klasy rozbudowany**, nie jednolinijkowy: „Do czego" (przeznaczenie
   + rola w architekturze) i „Flow" (przebieg krok po kroku, z odwołaniem do metod).
+- **Nietrywialny moduł ma na górze opis pisany jak odpowiedź na „do czego to jest?"**:
+  przeznaczenie pełnym zdaniem, tabelka, gdy plik jest listą (reguły, komendy, metody), przykład
+  przed i po, gdy przekształca dane (zmyślony, ale „po" zdjęte z uruchomionego kodu), kroki jako
+  lista numerowana, na końcu to, o czym pamiętać przy zmianach. Historia decyzji i pomiarów
+  zostaje w CLAUDE.md, nie w pliku. Wzór: `service/rag_indexer.py`, `service/parser_ticket_raw.py`.
 
 ## Konfiguracja i deploy
 
