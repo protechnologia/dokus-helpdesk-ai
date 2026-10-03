@@ -21,7 +21,7 @@ O czym pamiętać przy zmianach:
   samych elementach wyniku.
 """
 
-from app.tools.base import KnowledgeSource
+from app.tools.base import KnowledgeSource, read_description
 from app.tools.models import SourceRef
 from app.tools.tickets.base import render_found_tickets
 from app.tools.tickets.find_tickets_vector.models import (
@@ -46,6 +46,7 @@ class FindTicketsVectorToolBase(KnowledgeSource):
     """
 
     name        = "find_tickets_vector"
+    description = read_description(__file__)
     source      = "tickets"
     query_model = FindTicketsVectorQuery
 

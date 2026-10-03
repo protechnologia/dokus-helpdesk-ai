@@ -15,21 +15,13 @@ CREATE TABLE IF NOT EXISTS {table} (
     questions_summary             text    NOT NULL,     -- o co dopytywał konsultant
     thread                        text    NOT NULL,     -- pełny tekst wątku po anonimizacji
 
-    -- Przeszukiwany tekst: wątek i wszystkie pola opisowe rekordu, każde w swojej linii.
-    -- Poza nim zostaje tylko `resolution` — etykieta ze słownika, taka sama w setkach zgłoszeń.
-    search_text text GENERATED ALWAYS AS (
-        thread || E'\n' || component || E'\n' || problem || E'\n' || symptoms || E'\n' ||
-        error_codes || E'\n' || cause || E'\n' || solution || E'\n' || questions_summary
-    ) STORED,
+    -- Przeszukiwany tekst: sam wątek. Pola rekordu do niego nie wchodzą — to słowa parsera, nie
+    -- zgłoszenia, a trafienie ma dać się wskazać w wątku. Kopia wątku pod nazwą kolumny, w której
+    -- szuka klasa bazowa tabel.
+    search_text text GENERATED ALWAYS AS (thread) STORED,
 
-    -- Słowa tego samego tekstu po przejściu przez polski słownik. Wyrażenie musi być powtórzone:
-    -- kolumna wyliczana nie może czytać innej kolumny wyliczanej.
-    search_vector tsvector GENERATED ALWAYS AS (
-        to_tsvector('pl_search',
-            thread || E'\n' || component || E'\n' || problem || E'\n' || symptoms || E'\n' ||
-            error_codes || E'\n' || cause || E'\n' || solution || E'\n' || questions_summary
-        )
-    ) STORED
+    -- Słowa wątku po przejściu przez polski słownik.
+    search_vector tsvector GENERATED ALWAYS AS (to_tsvector('pl_search', thread)) STORED
 );
 
 -- Indeks pełnotekstowy: słowa i fraza. Nazwa z przedrostkiem tabeli, bo musi być jedyna w bazie.

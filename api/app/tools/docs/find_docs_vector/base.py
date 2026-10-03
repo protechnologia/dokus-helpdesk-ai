@@ -28,7 +28,7 @@ O czym pamiętać przy zmianach:
 
 from abc import abstractmethod
 
-from app.tools.base import AuxiliaryTool
+from app.tools.base import AuxiliaryTool, read_description
 from app.tools.docs.base import render_section_row
 from app.tools.docs.find_docs_vector.models import FindDocsVectorQuery, FindDocsVectorResult
 
@@ -48,8 +48,9 @@ class FindDocsVectorToolBase(AuxiliaryTool):
         2. `render()` robi z niego tekst: nagłówek z licznikami i po wierszu na sekcję.
     """
 
-    name       = "find_docs_vector"
-    args_model = FindDocsVectorQuery
+    name        = "find_docs_vector"
+    description = read_description(__file__)
+    args_model  = FindDocsVectorQuery
 
     @abstractmethod
     async def find(

@@ -40,6 +40,24 @@ async def test_the_model_reads_the_same_records_as_from_the_vector_search() -> N
     assert "podobieństwo" not in text
 
 
+async def test_the_thread_stands_under_its_record() -> None:
+    """Tekst dla modelu → pod każdym rekordem jego wątek między liniami z numerem zgłoszenia:
+    szczegół, którego karta nie niesie, model znajduje w wątku."""
+    tool = FakeFindTicketsTextTool()
+
+    text = tool.render_for_model(await tool.search(QUERY))
+
+    record, thread, end = (
+        text.index("[90011] 2026-03-02"),
+        text.index("--- wątek 90011 ---"),
+        text.index("--- koniec wątku 90011 ---"),
+    )
+
+    assert record < thread < end < text.index("[90012] 2026-01-05")
+    assert "ok. 40 MB" in text[thread:end]
+    assert "ok. 40 MB" not in text[record:thread]
+
+
 async def test_cite_gives_sources_without_a_score() -> None:
     """Każde zgłoszenie z wyniku → jeden SourceRef z materiału „tickets" bez podobieństwa:
     dopasowanie dosłowne nie ma stopnia."""
@@ -57,7 +75,8 @@ async def test_a_ticket_found_both_ways_has_one_key() -> None:
     na liście źródeł odpowiedzi znajdzie się raz."""
     shared = vector_tickets()[0].ticket
     vector = FakeFindTicketsVectorTool()
-    text   = FakeFindTicketsTextTool(tickets=[MatchedTicket(matched_by="words", ticket=shared)])
+    found  = MatchedTicket(matched_by="words", ticket=shared, thread="Od wczoraj brak przesyłek.")
+    text   = FakeFindTicketsTextTool(tickets=[found])
 
     vector_query = FindTicketsVectorQuery(problem="x", symptoms="y")
 

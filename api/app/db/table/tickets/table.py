@@ -4,9 +4,9 @@ Tabela wyszukiwania tekstowego zgłoszeń. Wiersz to jedno zgłoszenie: każde p
 rekordu w swojej kolumnie i pełny tekst wątku PO ANONIMIZACJI. Kolumny i indeks widać wprost
 w `_create.sql` obok.
 
-Szuka się we wszystkim naraz: baza łączy wątek i wszystkie pola opisowe rekordu w `search_text`
-i liczy z nich `search_vector`. Poza przeszukiwanym tekstem zostaje tylko `resolution` — to
-etykieta ze słownika, taka sama w setkach zgłoszeń.
+Szuka się wyłącznie w wątku. Pola rekordu leżą w tabeli po to, żeby znaleziony wiersz niósł
+cały rekord, ale do przeszukiwanego tekstu nie wchodzą: pisał je parser, więc trafienie w nie
+nie byłoby trafieniem w to, co napisano w zgłoszeniu.
 
 O czym pamiętać przy zmianach:
 
@@ -154,8 +154,8 @@ class TicketsTable(TextTable):
     ) -> list[TicketRow]:
         """
         Description:
-        Znajduje zgłoszenia zawierające wszystkie słowa zapytania — w dowolnej kolejności
-        i odmianie, w wątku albo w polach rekordu.
+        Znajduje zgłoszenia, których wątek zawiera wszystkie słowa zapytania — w dowolnej
+        kolejności i odmianie.
 
         Example args:
             query="załącznik limit"

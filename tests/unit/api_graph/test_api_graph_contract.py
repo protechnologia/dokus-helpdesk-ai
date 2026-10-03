@@ -245,8 +245,8 @@ def test_the_user_turn_carries_no_instructions(graph: ModuleType) -> None:
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
 def test_the_model_sees_exactly_the_allowed_tools(graph: ModuleType) -> None:
-    """Narzędzia wiedzy z listy dozwolonych → po definicji na każde (opis z `.md` grafu, bez
-    komentarzy redakcyjnych), a na końcu narzędzie odpowiedzi, jeśli graf je ma."""
+    """Narzędzia wiedzy z listy dozwolonych → po definicji na każde (opis z katalogu narzędzia,
+    bez komentarzy redakcyjnych), a na końcu narzędzie odpowiedzi, jeśli graf je ma."""
     respond     = [graph.RESPOND_TOOL_NAME] if graph in RESPOND_GRAPHS else []
     definitions = graph.model_tools(allowed_tools(graph))
 

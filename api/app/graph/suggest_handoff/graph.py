@@ -86,7 +86,7 @@ def model_tools(
     Raises:
         ValueError: podano jakiekolwiek narzędzie wiedzy
     """
-    definitions = tool_definitions(tools, TOOL_NAMES, GRAPH_DIR) + [respond_tool()]
+    definitions = tool_definitions(tools, TOOL_NAMES) + [respond_tool()]
 
     return definitions
 

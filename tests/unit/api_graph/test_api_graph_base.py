@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 from app.graph import GraphState, merge_sources, route_after_agent, tool_definitions
@@ -80,22 +78,19 @@ def test_the_route_follows_what_the_model_called(turn: ChatMessage, target: str)
     assert route_after_agent(state_after(turn), respond_tool_name="respond_search") == target
 
 
-def test_tool_definitions_take_the_description_from_the_graph(tmp_path: Path) -> None:
-    """Narzędzie z listy dozwolonych → opis z `<graf>/<nazwa>.md` bez komentarzy redakcyjnych,
-    schemat zapytania bez docstringów."""
-    description = tmp_path / "find_tickets_vector.md"
-    description.write_text("<!-- notatka -->\nSzuka zgłoszeń.\n", encoding="utf-8")
+def test_tool_definitions_take_the_description_from_the_tool() -> None:
+    """Narzędzie z listy dozwolonych → opis niesiony przez narzędzie, schemat zapytania bez
+    docstringów."""
+    tool = FakeFindTicketsVectorTool()
 
-    tools = [FakeFindTicketsVectorTool()]
+    [definition] = tool_definitions([tool], ("find_tickets_vector",))
 
-    [definition] = tool_definitions(tools, ("find_tickets_vector",), tmp_path)
-
-    assert definition.description                  == "Szuka zgłoszeń."
+    assert definition.description                   == tool.description
     assert set(definition.parameters["properties"]) == {"problem", "symptoms"}
     assert "description" not in definition.parameters
 
 
-def test_tool_definitions_refuse_a_tool_outside_the_list(tmp_path: Path) -> None:
+def test_tool_definitions_refuse_a_tool_outside_the_list() -> None:
     """Narzędzie spoza listy dozwolonych grafu → błąd składania, nie definicja dla modelu."""
     with pytest.raises(ValueError):
-        tool_definitions([FakeFindTicketsVectorTool()], (), tmp_path)
+        tool_definitions([FakeFindTicketsVectorTool()], ())

@@ -9,11 +9,12 @@ Wnosi materiał, którego nie ma w korpusie zgłoszeń: jak funkcja ma działać
 jak jeden urząd kiedyś się na niej potknął. OPCJONALNE — instancja bez dokumentacji nie rejestruje
 narzędzi dokumentacji wcale, a każdy graf musi działać z samymi zgłoszeniami.
 
-| plik        | co zawiera                                                   |
-|-------------|--------------------------------------------------------------|
-| `models.py` | zapytanie, znaleziona sekcja i wynik                         |
-| `base.py`   | część wspólna narzędzia i atrapy: nazwa i tekst dla modelu   |
-| `fake.py`   | `FakeFindDocsVectorTool` — ustalony zestaw sekcji, bez usług |
+| plik             | co zawiera                                                   |
+|------------------|--------------------------------------------------------------|
+| `models.py`      | zapytanie, znaleziona sekcja i wynik                         |
+| `description.md` | opis narzędzia dla modelu, ten sam w każdym grafie           |
+| `base.py`        | część wspólna narzędzia i atrapy: nazwa i tekst dla modelu   |
+| `fake.py`        | `FakeFindDocsVectorTool` — ustalony zestaw sekcji, bez usług |
 
 Status: modele i atrapa. Narzędzie właściwe (`tool.py`) na kolekcji dokumentacji powstaje w p. 8.
 """

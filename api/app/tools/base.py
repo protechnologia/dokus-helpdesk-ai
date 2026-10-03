@@ -1,9 +1,35 @@
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import ClassVar
 
 from pydantic import BaseModel
 
 from app.tools.models import SourceRef
+from app.util.markdown import read_document
+
+# Opis narzędzia dla modelu leży w katalogu narzędzia pod tą nazwą.
+DESCRIPTION_FILE = "description.md"
+
+
+def read_description(
+    module_file: str,  # np. "/code/app/tools/tickets/find_tickets_vector/base.py"
+) -> str:
+    """
+    Description:
+    Czyta opis narzędzia dla modelu z `description.md` leżącego obok podanego modułu, bez
+    komentarzy redakcyjnych. Woła ją klasa wspólna narzędzia i atrapy, więc oba przedstawiają się
+    modelowi tym samym tekstem.
+
+    Example args:
+        module_file="/code/app/tools/tickets/find_tickets_vector/base.py"
+
+    Example result:
+        "Szuka w bazie historycznych zgłoszeń spraw podobnych do opisanego problemu, od…"
+
+    Raises:
+        FileNotFoundError: narzędzie nie ma opisu
+    """
+    return read_document(Path(module_file).parent / DESCRIPTION_FILE).rstrip()
 
 
 class KnowledgeSource(ABC):
@@ -33,6 +59,9 @@ class KnowledgeSource(ABC):
 
     # Nazwa narzędzia — pod nią woła je model.
     name: ClassVar[str]
+
+    # Opis dla modelu: jak pytać narzędzie i co ono oddaje. Ten sam w każdym grafie.
+    description: ClassVar[str]
 
     # Nazwa MATERIAŁU („tickets", „docs"); trafia do `SourceRef.source`. Narzędzia szukające w tym
     # samym materiale różnymi drogami mają ją wspólną, więc to samo zgłoszenie jest źródłem raz.
@@ -134,6 +163,9 @@ class AuxiliaryTool(ABC):
 
     # Nazwa narzędzia.
     name: ClassVar[str]
+
+    # Opis dla modelu — ta sama rola co w KnowledgeSource.
+    description: ClassVar[str]
 
     # Klasa argumentów — ta sama rola co `query_model` w KnowledgeSource.
     args_model: ClassVar[type[BaseModel]]

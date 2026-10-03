@@ -1,6 +1,5 @@
 import operator
 from collections.abc import Sequence
-from pathlib import Path
 from typing import Annotated, Literal
 
 from langgraph.graph.state import CompiledStateGraph
@@ -11,7 +10,6 @@ from app.llm import ChatMessage, ToolDefinition
 from app.nodes import LogEntry
 from app.tools import AgentTool, KnowledgeSource, SourceRef
 from app.util.json_schema import json_schema_without_docs
-from app.util.markdown import read_document
 
 
 class GraphState(BaseModel):
@@ -95,21 +93,19 @@ def route_after_agent(
 
 
 def tool_definitions(
-    tools:     Sequence[AgentTool],  # np. [FakeFindTicketsVectorTool(), FakeListDocsTool()]
-    allowed:   Sequence[str],        # np. ("find_tickets_vector", "list_docs")
-    graph_dir: Path,                 # np. Path("/code/app/graph/search")
+    tools:   Sequence[AgentTool],  # np. [FakeFindTicketsVectorTool(), FakeListDocsTool()]
+    allowed: Sequence[str],        # np. ("find_tickets_vector", "list_docs")
 ) -> list[ToolDefinition]:
     """
     Description:
-    Definicje narzędzi dla modelu w danym grafie: nazwa narzędzia, opis z
-    `<graph_dir>/<nazwa>.md` i schemat argumentów bez dokumentacji — `query_model` źródła wiedzy
-    albo `args_model` narzędzia pomocniczego. Opis leży w grafie, nie w `tools/`, bo to treść
-    promptu i różni się między grafami używającymi tego samego narzędzia.
+    Definicje narzędzi dla modelu w danym grafie: nazwa narzędzia, jego opis i schemat argumentów
+    bez dokumentacji — `query_model` źródła wiedzy albo `args_model` narzędzia pomocniczego. Opis
+    należy do narzędzia (`description.md` w jego katalogu) i jest ten sam w każdym grafie; graf
+    decyduje tylko, które narzędzia model widzi.
 
     Example args:
         tools=[FakeFindTicketsVectorTool()]
         allowed=("find_tickets_vector", "find_docs_vector")
-        graph_dir=Path("/code/app/graph/search")
 
     Example result:
         [ToolDefinition(name="find_tickets_vector", description="Szuka historycznych zgłoszeń…", …)]
@@ -125,7 +121,7 @@ def tool_definitions(
     definitions = [
         ToolDefinition(
             name        = tool.name,
-            description = read_document(graph_dir / f"{tool.name}.md").rstrip(),
+            description = tool.description,
             parameters  = json_schema_without_docs(
                 # oba rodzaje trzymają model argumentów pod inną nazwą
                 tool.query_model if isinstance(tool, KnowledgeSource) else tool.args_model

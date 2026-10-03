@@ -6,8 +6,8 @@ Importuj wspólne elementy stąd (`from app.graph import GraphState`).
 Do czego:
 Tutaj (`base.py`) to, czego potrzebują stany wszystkich grafów: pola wspólne (`GraphState`)
 i reduktor `merge_sources` dla grafów ze źródłami. W katalogu każdego grafu: przebieg
-(`graph.py`), stan dziedziczący po `GraphState` (`state.py`), atrapa grafu (`fake.py`), prompt
-startowy i opisy narzędzi dla modelu (`.md`).
+(`graph.py`), stan dziedziczący po `GraphState` (`state.py`), atrapa grafu (`fake.py`), prompty
+i opis narzędzia odpowiedzi (`.md`). Opisy narzędzi agenta leżą przy narzędziach, w `tools/`.
 
 Import tego pakietu wyłącza LangSmith (niżej), więc żaden graf nie ruszy z włączonym tracingiem.
 

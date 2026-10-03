@@ -1,8 +1,8 @@
 <!-- Prompt grafu `search` — strona systemowa.
 
      SZKIELET z p. 5; prompt pętli (jak szukać, kiedy materiał wystarcza) i jego pomiar w p. 23
-     (CLAUDE.md -> „Plan i TODO"). Jak pytać KAŻDE narzędzie, mówi jego opis (`find_tickets_vector.md`,
-     `find_docs_vector.md`), nie ten plik.
+     (CLAUDE.md -> „Plan i TODO"). Jak pytać KAŻDE narzędzie, mówi jego opis (`description.md`
+     w katalogu narzędzia), nie ten plik.
 
      NAJGROŹNIEJSZY BŁĄD AGENTA: stop przy zgodnym objawie i rozłącznych przyczynach
      (e-Doręczenia: 6 zgłoszeń, 6 przyczyn) — stąd akapit o objawie i przyczynie.

@@ -30,7 +30,7 @@ O czym pamiętać przy zmianach:
 
 from abc import abstractmethod
 
-from app.tools.base import AuxiliaryTool
+from app.tools.base import AuxiliaryTool, read_description
 from app.tools.docs.base import render_section_row
 from app.tools.docs.list_docs.models import ListDocsArgs, ListDocsResult
 
@@ -50,8 +50,9 @@ class ListDocsToolBase(AuxiliaryTool):
         2. `render()` robi z niego tekst: nagłówek z licznikami i po wierszu na sekcję.
     """
 
-    name       = "list_docs"
-    args_model = ListDocsArgs
+    name        = "list_docs"
+    description = read_description(__file__)
+    args_model  = ListDocsArgs
 
     @abstractmethod
     async def load(self) -> ListDocsResult:

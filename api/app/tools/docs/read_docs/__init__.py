@@ -5,12 +5,13 @@ dostał ze spisu treści (`list_docs`) albo z wyszukiwania (`find_docs_vector`, 
 Jedyne narzędzie dokumentacji, które cytuje: źródłem odpowiedzi jest sekcja przeczytana, nie
 taka, którą model tylko zobaczył w spisie.
 
-| plik        | co zawiera                                                              |
-|-------------|-------------------------------------------------------------------------|
-| `models.py` | zapytanie (identyfikatory, najwyżej pięć), odczytana sekcja i wynik     |
-| `errors.py` | `UnknownSectionError` — nieznany identyfikator, bez wyniku częściowego  |
-| `base.py`   | część wspólna narzędzia i atrapy: nazwa, tekst dla modelu, lista źródeł |
-| `fake.py`   | `FakeReadDocsTool` — zmyślona dokumentacja, bez usług                   |
+| plik             | co zawiera                                                              |
+|------------------|-------------------------------------------------------------------------|
+| `models.py`      | zapytanie (identyfikatory, najwyżej pięć), odczytana sekcja i wynik     |
+| `errors.py`      | `UnknownSectionError` — nieznany identyfikator, bez wyniku częściowego  |
+| `description.md` | opis narzędzia dla modelu, ten sam w każdym grafie                      |
+| `base.py`        | część wspólna narzędzia i atrapy: nazwa, tekst dla modelu, lista źródeł |
+| `fake.py`        | `FakeReadDocsTool` — zmyślona dokumentacja, bez usług                   |
 
 Status: modele i atrapa. Narzędzie właściwe (`tool.py`) powstaje w p. 52.
 """

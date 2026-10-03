@@ -29,7 +29,7 @@ O czym pamiętać przy zmianach:
 - Źródło z tego narzędzia nie ma podobieństwa (`score=None`): sekcję wskazano po identyfikatorze.
 """
 
-from app.tools.base import KnowledgeSource
+from app.tools.base import KnowledgeSource, read_description
 from app.tools.docs.base import render_section_heading
 from app.tools.docs.read_docs.models import ReadDocsQuery, ReadDocsResult, ReadSection
 from app.tools.models import SourceRef
@@ -79,6 +79,7 @@ class ReadDocsToolBase(KnowledgeSource):
     """
 
     name        = "read_docs"
+    description = read_description(__file__)
     source      = "docs"
     query_model = ReadDocsQuery
 

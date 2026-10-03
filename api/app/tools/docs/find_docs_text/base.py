@@ -30,7 +30,7 @@ O czym pamiętać przy zmianach:
 
 from abc import abstractmethod
 
-from app.tools.base import AuxiliaryTool
+from app.tools.base import AuxiliaryTool, read_description
 from app.tools.docs.base import render_section_row
 from app.tools.docs.find_docs_text.models import FindDocsTextQuery, FindDocsTextResult
 
@@ -57,8 +57,9 @@ class FindDocsTextToolBase(AuxiliaryTool):
            i dopasowany fragment.
     """
 
-    name       = "find_docs_text"
-    args_model = FindDocsTextQuery
+    name        = "find_docs_text"
+    description = read_description(__file__)
+    args_model  = FindDocsTextQuery
 
     @abstractmethod
     async def find(

@@ -24,19 +24,20 @@ Trzy poziomy, na każdym `base.py` z tym, co wspólne poziom niżej:
     tools/base.py, models.py        kontrakty i `SourceRef` — wspólne dla wszystkich narzędzi
     tools/<materiał>/base.py        tekst wspólny dla narzędzi jednego materiału
     tools/<materiał>/<narzędzie>/   narzędzie: `tool.py`, `fake.py`, `base.py`, `models.py`
+                                    i `description.md`
 
 Materiały są dwa — `tickets/` i `docs/` — i nazywają się tak jak `SourceRef.source`. W katalogu
 narzędzia: implementacja (`tool.py`), jej atrapa (`fake.py`), ich część wspólna (`base.py`: nazwa,
 tekst dla modelu, lista źródeł) i `models.py` z własnym zapytaniem, znalezionym elementem
 i wynikiem — bez wspólnej bazy — oraz `errors.py`, gdy narzędzie ma własne błędy do zgłoszenia.
-Nowe narzędzie to nowy katalog w folderze swojego materiału. Opis, który czyta MODEL, leży obok
-adaptera w każdym grafie, nie tutaj: to treść promptu, czytana zdanie po zdaniu, i może się
-różnić między grafami używającymi tego samego narzędzia.
+Nowe narzędzie to nowy katalog w folderze swojego materiału. Opis, który czyta MODEL, leży
+w katalogu narzędzia (`description.md`) i jest ten sam w każdym grafie: mówi, jak pytać
+narzędzie i co ono oddaje. Po co wyniki w danej funkcji, mówi prompt grafu.
 
 | narzędzie             | rodzaj        | zapytanie agenta      | co oddaje                       |
 |-----------------------|---------------|-----------------------|---------------------------------|
 | `find_tickets_vector` | źródło wiedzy | `problem`, `symptoms` | zgłoszenia z podobieństwem      |
-| `find_tickets_text`   | źródło wiedzy | `exact`, `words`      | zgłoszenia z etykietą trafienia |
+| `find_tickets_text`   | źródło wiedzy | `exact`, `words`      | zgłoszenia z etykietą i wątkiem |
 | `list_docs`           | pomocnicze    | —                     | spis treści dokumentacji        |
 | `find_docs_vector`    | pomocnicze    | `text`                | wiersze spisu z podobieństwem   |
 | `find_docs_text`      | pomocnicze    | `exact`, `words`      | wiersze spisu z fragmentem      |

@@ -4,12 +4,13 @@ Description:
 korpusu (`problem` + `symptoms`), narzędzie oddaje podobne zgłoszenia z przyczyną i rozwiązaniem
 — jako sparsowane pola z payloadu Qdranta, nigdy jako surowy mail.
 
-| plik        | co zawiera                                                              |
-|-------------|-------------------------------------------------------------------------|
-| `models.py` | zapytanie, znaleziony element i wynik                                   |
-| `base.py`   | część wspólna narzędzia i atrapy: nazwa, tekst dla modelu, lista źródeł |
-| `tool.py`   | `FindTicketsVectorTool` — wyszukiwanie przez embedder i Qdranta         |
-| `fake.py`   | `FakeFindTicketsVectorTool` — ustalony zestaw zgłoszeń, bez usług       |
+| plik             | co zawiera                                                              |
+|------------------|-------------------------------------------------------------------------|
+| `models.py`      | zapytanie, znaleziony element i wynik                                   |
+| `description.md` | opis narzędzia dla modelu, ten sam w każdym grafie                      |
+| `base.py`        | część wspólna narzędzia i atrapy: nazwa, tekst dla modelu, lista źródeł |
+| `tool.py`        | `FindTicketsVectorTool` — wyszukiwanie przez embedder i Qdranta         |
+| `fake.py`        | `FakeFindTicketsVectorTool` — ustalony zestaw zgłoszeń, bez usług       |
 
 Przykład zapytania i wyniku — w opisie `tool.py`; przykład tekstu, który czyta model — w opisie
 `base.py`.

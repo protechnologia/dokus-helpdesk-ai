@@ -22,7 +22,7 @@ TICKET_PLACEHOLDER = "{{ticket}}"
 # Klasa stanu grafu — po nią sięga kod ogólny (trasa `/suggest`, test kontraktu).
 STATE = SearchState
 
-# Narzędzia dozwolone w tym grafie; opis każdego dla modelu leży obok jako `<nazwa>.md`.
+# Narzędzia dozwolone w tym grafie; opis każdego dla modelu leży w katalogu narzędzia.
 TOOL_NAMES: tuple[str, ...] = (
     "find_tickets_vector",  # zgłoszenia po znaczeniu
     "find_tickets_text",    # zgłoszenia po dosłownym brzmieniu
@@ -90,7 +90,7 @@ def model_tools(
     Raises:
         ValueError: narzędzie spoza listy dozwolonych
     """
-    definitions = tool_definitions(tools, TOOL_NAMES, GRAPH_DIR) + [respond_tool()]
+    definitions = tool_definitions(tools, TOOL_NAMES) + [respond_tool()]
 
     return definitions
 

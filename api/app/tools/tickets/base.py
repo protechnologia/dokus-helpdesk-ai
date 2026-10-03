@@ -40,6 +40,8 @@ O czym pamiętać przy zmianach:
 - Ten tekst jest częścią promptu: jego kształt stroi się pomiarem razem z promptami grafów
   (p. 23, 25–26), nie na oko.
 - Bez trafień zostaje sam nagłówek.
+- Wyszukiwanie tekstowe dokłada pod rekordem wątek zgłoszenia (`render_ticket_thread()`):
+  karta streszcza sprawę, a dosłowne brzmienie, po którym szukano, bywa tylko w wątku.
 - Osobnego bloku przyczyn przed rekordami już nie ma (2026-10-03). Powstał pod model 11B, do
   którego przyczyna schowana wśród pól rekordu nie docierała; czy mocny model radzi sobie bez
   niego, sprawdza pomiar w p. 25.
@@ -81,6 +83,36 @@ def render_ticket_record(
         f"solution: {ticket.solution}",
         f"resolution: {ticket.resolution}",
         f"questions_summary: {ticket.questions_summary}",
+    ]
+
+    return "\n".join(lines)
+
+
+def render_ticket_thread(
+    ticket_id: str,  # np. "90011"
+    thread:    str,  # np. "ZGŁOSZENIE 90011 z 2026-03-02\nTemat: Błąd przy podpisie\n…"
+) -> str:
+    """
+    Description:
+    Wątek zgłoszenia w tekście dla modelu: treść po anonimizacji między dwiema liniami z numerem
+    zgłoszenia. Wątek ma własne puste linie, więc bez ogranicznika nie byłoby widać, gdzie się
+    kończy i gdzie zaczyna następny rekord.
+
+    Example args:
+        ticket_id="90011"
+        thread="ZGŁOSZENIE 90011 z 2026-03-02\nTemat: Błąd przy podpisie\n…"
+
+    Example result:
+        --- wątek 90011 ---
+        ZGŁOSZENIE 90011 z 2026-03-02
+        Temat: Błąd przy podpisie
+        …
+        --- koniec wątku 90011 ---
+    """
+    lines = [
+        f"--- wątek {ticket_id} ---",
+        thread.strip(),
+        f"--- koniec wątku {ticket_id} ---",
     ]
 
     return "\n".join(lines)

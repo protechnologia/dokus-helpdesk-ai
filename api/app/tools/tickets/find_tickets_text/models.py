@@ -53,8 +53,9 @@ class FindTicketsTextQuery(BaseModel):
 class MatchedTicket(BaseModel):
     """
     Description:
-    Jedno historyczne zgłoszenie zwrócone przez `find_tickets_text`: czym je znaleziono i całe
-    sparsowane zgłoszenie — to samo, które oddaje `find_tickets_vector`.
+    Jedno historyczne zgłoszenie zwrócone przez `find_tickets_text`: czym je znaleziono, całe
+    sparsowane zgłoszenie — to samo, które oddaje `find_tickets_vector` — i wątek, z którego
+    powstało.
 
     Podobieństwa tu nie ma: dopasowanie dosłowne nie ma stopnia, a etykieta mówi więcej niż
     liczba — trafienie po przepisanym komunikacie waży inaczej niż po słowach kluczowych.
@@ -64,6 +65,8 @@ class MatchedTicket(BaseModel):
 
     matched_by: MatchKind = Field(examples=["exact"])
     ticket:     ParsedTicket
+    # Wątek po anonimizacji: karta gubi dosłowne brzmienie, po którym tu się szuka.
+    thread:     str       = Field(min_length=1, examples=["ZGŁOSZENIE 90011 z 2026-03-02\n…"])
 
 
 class FindTicketsTextResult(BaseModel):

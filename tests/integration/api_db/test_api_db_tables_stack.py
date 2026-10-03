@@ -34,11 +34,10 @@ from tests.conftest import build_postgres_client
 
 pytestmark = [pytest.mark.stack, pytest.mark.stack_postgres]
 
-# Dwa zmyślone zgłoszenia; słowo „szuflada" jest tylko w wątku pierwszego, nie w jego polach.
-TICKETS = [matched.ticket for matched in default_tickets()]
-ROWS    = [
-    TicketRow.from_ticket(TICKETS[0], thread="Dzień dobry, od rana szuflada podpisów nie działa."),
-    TicketRow.from_ticket(TICKETS[1], thread="Witam, od stycznia nie da się zapisać pisma."),
+# Dwa zmyślone zgłoszenia z atrapy narzędzia, każde ze swoim wątkiem. „Załącznik" jest tylko
+# w wątku pierwszego, „dostawca" tylko w jego polach.
+ROWS = [
+    TicketRow.from_ticket(matched.ticket, thread=matched.thread) for matched in default_tickets()
 ]
 
 # Cztery zmyślone sekcje z dwóch dokumentów, z miejscem każdej w jej dokumencie.
@@ -127,19 +126,18 @@ async def test_tickets_are_read_back_as_they_were_written(tickets: TicketsTable)
     assert read == [ROWS[1], ROWS[0]]
 
 
-async def test_a_ticket_is_found_by_its_thread_and_by_its_fields(tickets: TicketsTable) -> None:
-    """Słowo tylko z wątku i słowo tylko z pola `cause` → w obu wypadkach to samo zgłoszenie:
-    przeszukiwany jest pełny tekst zgłoszenia, nie jedna kolumna."""
-    by_thread = await tickets.words("szuflady", limit=5)
-    by_cause  = await tickets.words("limit zasobów", limit=5)
+async def test_a_ticket_is_found_by_its_thread_and_not_by_its_fields(tickets: TicketsTable) -> None:
+    """Słowo tylko z wątku, w innej odmianie → zgłoszenie znalezione; słowo tylko z pól rekordu
+    → nic: pola pisał parser, a trafienie ma dać się wskazać w wątku."""
+    by_thread = await tickets.words("załączniki", limit=5)
+    by_fields = await tickets.words("dostawca", limit=5)
 
     assert by_thread == [ROWS[0]]
-    assert by_cause  == [ROWS[0]]
+    assert by_fields == []
 
 
-async def test_an_error_code_is_found_as_a_substring(tickets: TicketsTable) -> None:
-    """Fragment komunikatu z pola `error_codes`, inną wielkością liter → oba zgłoszenia, które
-    go noszą: kody są częścią przeszukiwanego tekstu."""
+async def test_a_message_is_found_as_a_substring_of_the_thread(tickets: TicketsTable) -> None:
+    """Fragment komunikatu inną wielkością liter → oba zgłoszenia, w których wątku padł."""
     found = await tickets.substring("SKOMUNIKOWAĆ Z SERWEREM", limit=5)
 
     assert found == ROWS

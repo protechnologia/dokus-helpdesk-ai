@@ -5,11 +5,12 @@ komunikacie, kodzie — albo po słowach kluczowych w dowolnej odmianie. Uzupeł
 `find_docs_vector`, które szuka po znaczeniu. Zwraca wiersze spisu treści z dopasowanym
 fragmentem, nie treść; tę agent pobiera przez `read_docs`.
 
-| plik        | co zawiera                                                 |
-|-------------|------------------------------------------------------------|
-| `models.py` | zapytanie (`exact`, `words`), znaleziona sekcja i wynik    |
-| `base.py`   | część wspólna narzędzia i atrapy: nazwa i tekst dla modelu |
-| `fake.py`   | `FakeFindDocsTextTool` — ustalony zestaw sekcji, bez usług |
+| plik             | co zawiera                                                 |
+|------------------|------------------------------------------------------------|
+| `models.py`      | zapytanie (`exact`, `words`), znaleziona sekcja i wynik    |
+| `description.md` | opis narzędzia dla modelu, ten sam w każdym grafie         |
+| `base.py`        | część wspólna narzędzia i atrapy: nazwa i tekst dla modelu |
+| `fake.py`        | `FakeFindDocsTextTool` — ustalony zestaw sekcji, bez usług |
 
 Status: modele i atrapa. Narzędzie właściwe (`tool.py`) na Postgresie powstaje w p. 50.
 """

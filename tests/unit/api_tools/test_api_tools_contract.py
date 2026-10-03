@@ -119,6 +119,14 @@ def test_every_auxiliary_tool_declares_name_and_args_model(tool: type[AuxiliaryT
     assert issubclass(getattr(tool, "args_model", object), BaseModel)
 
 
+@pytest.mark.parametrize("tool", TOOLS, ids=lambda cls: cls.__name__)
+def test_every_tool_describes_itself_to_the_model(tool: type) -> None:
+    """Każde narzędzie → niepusty `description` bez komentarza redakcyjnego: z niego graf składa
+    definicję dla modelu, a notatka dla nas nie ma prawa do niego dotrzeć."""
+    assert isinstance(getattr(tool, "description", None), str) and tool.description
+    assert "<!--" not in tool.description
+
+
 @pytest.mark.parametrize("tool", AUXILIARY, ids=lambda cls: cls.__name__)
 def test_an_auxiliary_tool_has_nothing_to_cite_with(tool: type[AuxiliaryTool]) -> None:
     """Każde narzędzie pomocnicze → bez `cite()` i bez `source`: jego wynik nie ma jak trafić na

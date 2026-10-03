@@ -9,6 +9,37 @@ from app.tools.tickets.find_tickets_text.models import (
     MatchedTicket,
 )
 
+# Wątki w kształcie `RawTicket.as_thread()`, po anonimizacji. Zmyślone, jak całe zgłoszenia.
+THREAD_90011 = "\n".join([
+    "ZGŁOSZENIE 90011 z 2026-03-02",
+    "Temat: Błąd przy podpisie",
+    "",
+    "OPIS ZGŁASZAJĄCEGO:",
+    "Dzień dobry, przy podpisywaniu pisma z dużym załącznikiem (skan, ok. 40 MB) wyskakuje",
+    "„Nie udało się skomunikować z serwerem”. Mniejsze pliki podpisują się bez problemu.",
+    "Pozdrawiam, {KLIENT_1}",
+    "",
+    "KOMENTARZ 1 — konsultant, 2026-03-02 11:20 (typ: rozwiazanie):",
+    "Podnieśliśmy limity zasobów serwera, podpis dużych plików powinien już działać.",
+])
+THREAD_90012 = "\n".join([
+    "ZGŁOSZENIE 90012 z 2026-01-05",
+    "Temat: Nie da się zapisać pisma",
+    "",
+    "OPIS ZGŁASZAJĄCEGO:",
+    "Od 2 stycznia przy zapisie nowego pisma dostajemy „Nie udało się skomunikować z serwerem”.",
+    "W grudniu wszystko działało.",
+    "",
+    "KOMENTARZ 1 — konsultant, 2026-01-05 09:05 (typ: zwyczajny):",
+    "Czy błąd pojawia się przy każdym rejestrze, czy tylko w kancelarii?",
+    "",
+    "KOMENTARZ 2 — klient, 2026-01-05 09:40 (typ: zwyczajny):",
+    "Przy każdym.",
+    "",
+    "KOMENTARZ 3 — konsultant, 2026-01-05 10:15 (typ: rozwiazanie):",
+    "Brakowało sekwencji numeracji na 2026 rok. Założyliśmy ją, zapis działa.",
+])
+
 
 def default_tickets() -> list[MatchedTicket]:
     """
@@ -16,7 +47,9 @@ def default_tickets() -> list[MatchedTicket]:
     Wbudowany zestaw atrapy: dwa zmyślone zgłoszenia z tym samym komunikatem na ekranie i dwiema
     różnymi przyczynami — tak wygląda w tym korpusie trafienie po dosłownym komunikacie: objaw
     już był, ale o przyczynie rozstrzyga kontekst czynności. Jedno znalezione po dosłownym
-    komunikacie, drugie po słowach kluczowych. Treść jest wymyślona, nie skopiowana z korpusu.
+    komunikacie, drugie po słowach kluczowych. Każde niesie wątek, z którego powstało: w pierwszym
+    widać szczegół, którego karta nie ma (rozmiar pliku). Treść jest wymyślona, nie skopiowana
+    z korpusu.
 
     Example args:
         (brak)
@@ -31,7 +64,7 @@ def default_tickets() -> list[MatchedTicket]:
     }
 
     tickets = [
-        MatchedTicket(matched_by="exact", ticket=ParsedTicket(
+        MatchedTicket(matched_by="exact", thread=THREAD_90011, ticket=ParsedTicket(
             **common,
             ticket_id         = "90011",
             date              = date(2026, 3, 2),
@@ -42,7 +75,7 @@ def default_tickets() -> list[MatchedTicket]:
             resolution        = "naprawione",
             questions_summary = "pytano o rozmiar podpisywanego pliku i porę wystąpienia błędu",
         )),
-        MatchedTicket(matched_by="words", ticket=ParsedTicket(
+        MatchedTicket(matched_by="words", thread=THREAD_90012, ticket=ParsedTicket(
             **common,
             ticket_id         = "90012",
             date              = date(2026, 1, 5),
