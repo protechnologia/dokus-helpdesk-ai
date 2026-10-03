@@ -1,0 +1,2 @@
+# Kontekst budowania to ten katalog; do obrazu idą wyłącznie słownik i skrypty startowe.
+*.md

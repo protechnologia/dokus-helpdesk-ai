@@ -59,8 +59,10 @@ COMPOSE_VAR_PATTERN = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)[^}]*\}")
 # EMBEDDING_BACKEND) is a valid entry, and one owned by nobody is a dead entry.
 SERVICE_SETTINGS: tuple[type[BaseSettings], ...] = (ApiSettings, EmbedderSettings)
 
-# Which compose service is configured by which Settings class. Qdrant is absent on purpose: it is
-# a third-party image with its own contract, so none of our classes describes it.
+# Which compose service is configured by which Settings class. Qdrant and Postgres are absent on
+# purpose: both run third-party software with its own contract (our Postgres image only adds a
+# dictionary), so none of our classes describes them. The POSTGRES_* names the database container
+# receives are still covered — `api` reads the same variables, so edges (2) and (4) see them.
 SETTINGS_BY_SERVICE: dict[str, type[BaseSettings]] = {
     "api":      ApiSettings,
     "embedder": EmbedderSettings,

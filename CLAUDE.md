@@ -20,6 +20,7 @@
 - [Warstwa API](#warstwa-api)
 - [Warstwa embeddera](#warstwa-embeddera)
 - [Warstwa retrievalu (Qdrant)](#warstwa-retrievalu-qdrant)
+- [Warstwa wyszukiwania tekstowego (Postgres)](#warstwa-wyszukiwania-tekstowego-postgres)
 - [Warstwa narzędzi agenta (`tools/`)](#warstwa-narzędzi-agenta-tools)
 - [Warstwa węzłów (`nodes/`)](#warstwa-węzłów-nodes)
 - [Warstwa grafów (`graph/`)](#warstwa-grafów-graph)
@@ -172,12 +173,13 @@ Werdykt blokujący da się **świadomie obejść** (patrz „Bramki jakości").
   nasze kontrakty (patrz „Świadomie pominięte": framework RAG).
 - Deploy: Docker Compose
 
-- **Relacyjna baza — od p. 29**, wyłącznie pod **reguły bramek, ich wersje i audyt werdyktów**
-  (patrz „Bramki jakości"). Nie jest źródłem prawdy dla korpusu ani dla wektorów.
+- **Relacyjna baza: Postgres z polskim słownikiem — od p. 48** jako indeks wyszukiwania
+  tekstowego (zgłoszenia, dokumentacja), a od p. 29 w osobnym schemacie także **reguły bramek, ich
+  wersje i audyt werdyktów** (patrz „Bramki jakości"). Nie jest źródłem prawdy dla korpusu ani dla
+  wektorów — indeks tekstowy odbudowuje się z plików jak Qdrant (zasada 8).
 
-Usługi w compose: `api` (FastAPI + CLI), `embedder` (model PL za REST-em), `qdrant`, od p. 19
-`anonymizer`, od p. 29 baza reguł. LLM jest **zewnętrznym endpointem**, nie usługą w bazowym
-compose.
+Usługi w compose: `api` (FastAPI + CLI), `embedder` (model PL za REST-em), `qdrant`, `postgres`,
+od p. 19 `anonymizer`. LLM jest **zewnętrznym endpointem**, nie usługą w bazowym compose.
 
 ## Don't (szybka lista czerwonych flag)
 
@@ -186,7 +188,8 @@ compose.
 - **Nie odpalaj testów na żywym LLM bez pytania**
 - **Nie mieszaj trybów prefiksów PolDense w jednej przestrzeni wektorowej** (patrz „Embeddingi")
 - **Nie wrzucaj pola `solution` do embeddingu** — rozwiązanie żyje w payloadzie, nie w wektorze
-- **Nie indeksuj surowej treści maila** — indeksujemy wyłącznie sparsowane pola
+- **Nie indeksuj surowej treści maila** — indeksujemy wyłącznie sparsowane pola; jedyny wyjątek
+  to zanonimizowany opis zgłaszającego w indeksie tekstowym (p. 53), nigdy w wektorze
 - **Nie kasuj i nie nadpisuj plików w `data/parsed/`** — to niepowtarzalny wynik przebiegu LLM
 - **Nie filtruj korpusu po `status = 'zamkniety'`** — Dokus kończy zgłoszenia na `rozwiazany`,
   `zamkniety` ma 5 sztuk na 1825 (patrz „Dane wejściowe")
@@ -522,7 +525,7 @@ schemat pierwotny miał 17 i był projektowany pod ten jeden korpus, nie pod pro
 | `component`   | czego dotyczy: główna aplikacja / ePUAP / e-Doręczenia… | nie |
 | `problem`     | zwięzły opis problemu (1–2 zdania)              | **tak** |
 | `symptoms`    | objawy widziane przez użytkownika               | **tak** |
-| `error_codes` | kody błędów, sygnatury, identyfikatory urządzeń | nie (→ sparse, p. 45) |
+| `error_codes` | kody błędów, sygnatury, identyfikatory urządzeń | nie (→ tekstowo, p. 53) |
 | `cause`       | ustalona przyczyna                              | nie |
 | `solution`    | co rozwiązało sprawę, **wraz z zastrzeżeniami** | **nie** |
 | `resolution`  | klasa rozstrzygnięcia — **słownik konfigurowalny** | nie |
@@ -552,8 +555,9 @@ Zasady schematu (rozwinięcie „Jak projektować schemat odpowiedzi" niżej):
   Qdranta. Powód: szukamy po *podobieństwie problemu*, nie rozwiązania — wektor zanieczyszczony
   rozwiązaniem miesza oba sygnały.
   - **Tekst do embeddingu skleja jedna funkcja (`build_embedding_text()` w `service/`), nie
-    wywołania.** Woła ją indeksacja (`ParsedTicket.embedding_text()`) i zapytanie (`find_tickets`);
-    dwa miejsca robiące to ręcznie rozjechałyby się **bezgłośnie**, dając wektory nieporównywalne.
+    wywołania.** Woła ją indeksacja (`ParsedTicket.embedding_text()`) i zapytanie
+    (`find_tickets_vector`); dwa miejsca robiące to ręcznie rozjechałyby się **bezgłośnie**, dając
+    wektory nieporównywalne.
 - **`component` jest polem SWOBODNYM, nie słownikiem** — słownik trafia do promptu jako
   podpowiedź, ale nic go nie egzekwuje. Decyzja świadoma, z policzonym kosztem: rozkład wartości
   ma długi cienki ogon (ePUAP i eNadawca to 125 ze 131 trafień w próbce, reszta po 1–2 rekordy),
@@ -669,8 +673,8 @@ nowe zgłoszenie (surowy tekst)
       │
       ├─ [anonimizacja] → AnonymizedText (stały węzeł, nie narzędzie agenta)
       ├─ [pętla agenta] ⇄ narzędzia z listy dozwolonych dla tej funkcji, np.:
-      │        find_tickets(problem, symptoms) → [embedder] → top-K z Qdranta → próg score
-      │        find_docs(zagadnienie / słowa kluczowe) → [embedder] → kolekcja dokumentacji
+      │        find_tickets_vector(problem, symptoms) → [embedder] → top-K z Qdranta → próg score
+      │        find_docs_vector(zagadnienie / słowa kluczowe) → [embedder] → kolekcja dokumentacji
       └─ [odpowiedź] → propozycja + źródła z `cite()` (payload, nie surowe maile)
 ```
 
@@ -1064,8 +1068,8 @@ merytorycznie").
 - Jeden rodzaj: `pytest tests/unit/`, `pytest tests/integration/`, `pytest tests/functional/`
 - Na stacku: `pytest tests/integration/ tests/functional/ -m stack` (albo `-m stack_<usługa>`)
 - Ewaluacyjne: `pytest tests/evaluation/` — bez korpusu odniesienia w `data/` testy się pomijają;
-  z pomiarem `find_tickets` na golden secie: `pytest tests/evaluation/ -m ""` (stack i zbudowany
-  indeks)
+  z pomiarem `find_tickets_vector` na golden secie: `pytest tests/evaluation/ -m ""` (stack
+  i zbudowany indeks)
 - Na żywym LLM: `pytest -m llm_live` — **kosztuje / bije po sieci, pytaj przed**
 - **Podając marker, podaj też folder** — marker odsiewa dopiero PO imporcie, więc bez ścieżki
   pytest wczytuje wszystkie pliki testowe, żeby uruchomić kilkanaście (kolekcja podzbioru spada
@@ -1079,7 +1083,7 @@ merytorycznie").
 
 ```
 dokus-helpdesk-ai/
-├── docker-compose.yml            # baza — api + embedder + qdrant
+├── docker-compose.yml            # baza — api + embedder + qdrant + postgres
 ├── docker-compose.gpu.yml        # warstwa: rezerwacja GPU dla embeddera
 ├── docker-compose.prod.yml       # warstwa: kod z obrazu (volumes: !reset [])
 ├── .env                          # wartości lokalne — NIE w repo
@@ -1092,6 +1096,7 @@ dokus-helpdesk-ai/
 │   ├── raw/                      # zgłoszenia źródłowe jak przyszły
 │   ├── parsed/                   # sparsowane JSON-y (trwały artefakt, zasada 7)
 │   ├── golden/                   # zestawy do ewaluacji: golden set, dystraktory
+│   ├── instruction/              # dokumentacja: katalog na dokument, metryczka + pliki .md (p. 49)
 │   └── docs/                     # raporty z pomiarów i dokumenty projektu (patrz niżej)
 ├── api/                          # folder = usługa z compose, nazwany tak samo
 │   ├── Dockerfile
@@ -1127,6 +1132,10 @@ dokus-helpdesk-ai/
 │       ├── models.py             # kontrakt HTTP: EmbedRequest/EmbedResponse, tryby prefiksów
 │       ├── encoding/             # Encoder + fabryka + FakeEncoder — tu wchodzi PolDense
 │       └── routers/              # /health, /embed
+├── postgres/                     # kolejna usługa: Postgres z polskim słownikiem
+│   ├── Dockerfile                # pobiera słownik sjp.pl (commit + suma kontrolna)
+│   ├── dictionary/               # build.sh z poprawkami słownika, custom_words.txt z nazwami własnymi
+│   └── initdb/                   # konfiguracja wyszukiwania `pl_search` (tylko pusty wolumen)
 ├── tests/
 │   ├── unit/                     # podfoldery <usługa>_<pakiet>: api_tools/, api_service/, embedder/…
 │   ├── integration/              # jednostka + prawdziwa zależność: pliki, FastAPI, LangGraph, Qdrant
@@ -1165,7 +1174,7 @@ dokus-helpdesk-ai/
   jeden serwis i zmienia się razem z nim. **Cena:** kilka importów więcej i rzeczy zmieniające się
   razem leżą osobno. **Wyjątek:** `ParsedTicket.embedding_text()` zostaje na modelu, ale tylko
   woła `build_embedding_text()` z `service/` — tę samą funkcję, której używa zapytanie
-  `find_tickets`, bo dwa miejsca sklejające ten tekst rozjechałyby się **bezgłośnie**.
+  `find_tickets_vector`, bo dwa miejsca sklejające ten tekst rozjechałyby się **bezgłośnie**.
 - **Nazwa pliku mówi, CO ROBI, nie czego dotyczy** — `validator_ticket_parsed.py`, nie
   `artifacts.py`. W `service/` oś `<rola>_<przedmiot>` (`parser_`, `validator_`, `builder_`,
   `loader_`, `filter_`, `normalizer_`), w `model/` prefiks tematyczny grupujący alfabetycznie (`ticket_*`,
@@ -1423,9 +1432,9 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   niewłaściwym nie jest błędem — zwraca wiarygodnie wyglądające bzdury (zmierzone: `query→sts` daje
   96,7% zamiast 98,3%, czyli spadek, nie awarię).
 - **Odcięte progiem trafienia są LICZONE, nie milcząco gubione** (`dropped_below_threshold` w wyniku
-  `find_tickets`; do odpowiedzi `/search` wraca w p. 10) — inaczej ostry próg wygląda dokładnie tak
-  samo jak pusty indeks, a to dwie różne awarie. Przy `RAG_SCORE_MIN` = 0.48 odcinanie jest regułą,
-  nie wyjątkiem.
+  `find_tickets_vector`; do odpowiedzi `/search` wraca w p. 10) — inaczej ostry próg wygląda
+  dokładnie tak samo jak pusty indeks, a to dwie różne awarie. Przy `RAG_SCORE_MIN` = 0.48 odcinanie
+  jest regułą, nie wyjątkiem.
 - **`RAG_SCORE_MIN` = 0.48 stoi świadomie po stronie odsiewania śmieci** (pomiar na 171 rekordach,
   raport `data/docs/pomiar-progu-score.md`) — trafienie bez treści wygląda na odpowiedź, a przy
   47% singletonów „nic nie znalazłem" jest normalną odpowiedzią. Trzy pułapki strojenia:
@@ -1442,6 +1451,42 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
     korpusu **także** zapytania bez odpowiednika. Odpowiednik dzisiejszego wyboru to okolice 0.52,
     ale 40 zapytań nie wystarcza, by to zabetonować — do przeliczenia w p. 33.
 
+## Warstwa wyszukiwania tekstowego (Postgres)
+
+Usługa `postgres` to drugi indeks obok Qdranta: szuka po słowach w odmianie i po dosłownych
+ciągach, czego wektor nie robi. Dziś jest sama usługa ze słownikiem; klient i tabele dochodzą
+z importem dokumentacji (p. 49).
+
+- **Trzy drogi dopasowania, każda do czego innego:** słowa (`plainto_tsquery` — dowolna kolejność
+  i odmiana), fraza (`phraseto_tsquery` — cały komunikat w tej samej kolejności) i podciąg
+  (`ILIKE '%…%'` — kod błędu albo jego fragment). Konfiguracja wyszukiwania nazywa się `pl_search`.
+- **Kody idą przez podciąg, nie przez słownik.** Parser pełnotekstowy skleja kod z interpunkcją
+  w jeden token (`java.lang.outofmemoryerror`, `crl/ocsp`, `-00942`), więc fragmentu kodu słowami
+  nie znajdzie. Bez `pg_trgm`: przy ~1800 opisach `ILIKE` nie potrzebuje indeksu, a dopasowanie
+  przybliżone szumi (przy progu 0,6 „widoczne sprawy" zwracało „niewidoczne").
+- **Słownik sjp.pl ma trzy poprawki, każda zmierzona przed i po** (`postgres/dictionary/`,
+  `postgres/initdb/`). Reguła przedrostka „nie-" wypada, a zaprzeczone hasła wchodzą jako osobne
+  słowa — inaczej „niewidoczne" sprowadza się do „widoczny", czyli problem do jego braku. Nazwy
+  własne z `custom_words.txt` dostają odmianę hasła-wzorca („eNadawca" jak „nadawca"). Wyraz
+  z łącznikiem wchodzi do indeksu wyłącznie jako części, bo inaczej „e-Doręczenia" nie znajduje
+  „e-Doręczeń".
+- **Słownik odmienia, ale nie zna słowotwórstwa** — „komunikacja" nie znajduje „skomunikować".
+  To zostaje zadaniem embeddera.
+- **Dlaczego nie filtr tekstowy Qdranta:** zmierzony na 1.12.5 wymaga wszystkich słów, ale nie
+  odmienia („serwer" nie znajduje „serwerem") i nie zna frazy.
+- **Słownik ładuje się w KAŻDEJ sesji: około 0,6 s i 32 MB na połączenie.** Klient musi trzymać
+  pulę; połączenie na zapytanie dokładałoby pół sekundy do każdego wyszukania.
+- **Słownik jest pobierany przy budowaniu obrazu**, przypięty commitem i sumą kontrolną — pierwszy
+  build wymaga sieci. Zmiana `custom_words.txt` to `docker compose up -d --build postgres`.
+- **Skrypty z `initdb/` i zmienne `POSTGRES_DB/USER/PASSWORD` działają tylko na pustym
+  wolumenie.** Zmiana mapowania albo hasła nie dociera do istniejącej bazy. Do p. 29 wolno
+  odtworzyć wolumen `postgres_data`, bo tabele wyszukiwania odbudowują się z plików (zasada 8).
+- **Do bazy trafia wyłącznie tekst po anonimizacji** — surowy opis zostaje w `data/raw/`. Dzięki
+  temu narzędzie może pokazać modelowi dopasowany fragment.
+- **Jeden pakiet klienta na usługę: `api/app/db/`** (jak `llm/`, `embedding/`), jedyne miejsce
+  importujące sterownik. Wyszukiwanie i reguły bramek (p. 29) dostają osobne schematy i role,
+  żeby przebudowa indeksu nie mogła dotknąć reguł.
+
 ## Warstwa narzędzi agenta (`tools/`)
 
 - **W `tools/` jest wyłącznie to, co agent może wywołać i co się wykonuje.** Narzędzie odpowiedzi
@@ -1450,21 +1495,25 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   a model jest wołającym, nie narzędziem. Tabela narzędzi stoi na górze `tools/__init__.py`.
 - **Na górze `tools/` kontrakty (`base.py`) i jedyny wspólny model `SourceRef` (`models.py`);
   w katalogu narzędzia `tool.py`, `fake.py` i `models.py` z modelami TYLKO tego narzędzia** —
-  zapytanie (`FindTicketsQuery`), znaleziony element (`FoundTicket`), wynik (`FindTicketsResult`),
-  bez wspólnych baz. `errors.py` dochodzi, gdy narzędzie ma własne błędy. `base.py` w katalogu
-  narzędzia to część wspólna z atrapą (nazwa, `render_for_model()`, `cite()`): różni je wyłącznie
-  `search()`, więc test na atrapie sprawdza tekst, który model dostaje na produkcji. **Bez typów
-  generycznych i bez modeli bazowych — świadomie (2026-10-02):** kod wspólny dla narzędzi potrzebuje wyłącznie
-  zapisu cytowania, więc tylko on jest wspólny. Uboczny zysk: lista typowana klasą bazową
-  serializuje **wyłącznie pola bazowe** — `model_dump()` gubi resztę bez błędu i bez ostrzeżenia
-  (sprawdzone na Pydantic 2.10) — a konkretny `SourceRef` tej pułapki nie ma.
+  zapytanie (`FindTicketsVectorQuery`), znaleziony element (`FoundTicket`), wynik
+  (`FindTicketsVectorResult`), bez wspólnych baz. `errors.py` dochodzi, gdy narzędzie ma własne
+  błędy. `base.py` w katalogu narzędzia to część wspólna z atrapą (nazwa, `render_for_model()`,
+  `cite()`): różni je wyłącznie `search()`, więc test na atrapie sprawdza tekst, który model dostaje
+  na produkcji. **Bez typów generycznych i bez modeli bazowych — świadomie (2026-10-02):** kod
+  wspólny dla narzędzi potrzebuje wyłącznie zapisu cytowania, więc tylko on jest wspólny. Uboczny
+  zysk: lista typowana klasą bazową serializuje **wyłącznie pola bazowe** — `model_dump()` gubi
+  resztę bez błędu i bez ostrzeżenia (sprawdzone na Pydantic 2.10) — a konkretny `SourceRef` tej
+  pułapki nie ma.
 - **Dwa rodzaje, rozdzielone kontraktem, nie konwencją.** `KnowledgeSource` zwraca materiał, który
   odpowiedź może cytować, i sam mówi które (`cite()`). `AuxiliaryTool` zwraca **wyłącznie tekst**
   i nie ma `cite()`, więc jego wynik (np. notatka agenta) **nie ma jak** trafić na listę źródeł.
 - **Wyszukiwanie jest semantyczne, id służy do cytowania.** Agent woła `search()` z zapytaniem
   opisanym słowami — dopasowanie po znaczeniu. `item_id` w `SourceRef` identyfikuje znaleziony
   element na liście źródeł; **klucz to `source:item_id`**, bo id są unikalne tylko w obrębie
-  narzędzia, a deduplikacja po samym id scaliłaby zgłoszenie z fragmentem dokumentacji.
+  materiału, a deduplikacja po samym id scaliłaby zgłoszenie z fragmentem dokumentacji.
+  **`source` nazywa materiał („tickets", „docs"), nie narzędzie (2026-10-03):** to samo zgłoszenie
+  znalezione wektorowo i tekstowo jest na liście raz. Warunek: oba indeksy mają tę samą jednostkę
+  — przy dokumentacji plik z metryczki, także gdy wektor powstał z jego fragmentu.
 - **`SourceRef` niesie jednolinijkowy `title`, ale nie treść.** Tytuł (`problem` zgłoszenia,
   nazwa i wersja dokumentu) pozwala człowiekowi rozpoznać źródło bez otwierania — samo id wystarcza
   przy zgłoszeniu, które helpdesk ma u siebie, ale nie przy fragmencie dokumentacji. Treść model
@@ -1472,22 +1521,24 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
 - **Bez odczytu po id — `retrieve()` usunięty (2026-10-02).** Po pętli nikt nie potrzebuje
   znalezionego elementu ponownie. Wraca z HITL (p. 44), a wtedy **„wszystko albo nic"**: brakujące
   id to błąd, nigdy krótsza lista — propozycja z czterech rekordów zamiast pięciu wygląda dokładnie
-  jak poprawna.
-- **Ten sam wynik daje dwie rzeczy: tekst dla modelu (`render_for_model`) i listę źródeł
-  (`cite`)** — w węźle `run_tools` odpowiednio wiadomość `tool` i wpisy w `sources`. Tylko źródło wie, które
-  pola się liczą (np. osobny blok przyczyn w `find_tickets`); lista źródeł powstaje z `cite()`,
-  nigdy z deklaracji modelu.
-- **Tekst `find_tickets` dla modelu: nagłówek z licznikami, blok przyczyn, rekordy.** Blok stoi
-  przed rekordami i ma linię na trafienie; przyczyna nieustalona wchodzi do niego jako
-  „(nie ustalono)" — dosłowne `brak` albo zdanie „brak … przyczyny" (98 z 200 na golden200), nigdy
-  po samym prefiksie; rozstrzyga `no_cause()` z `service/normalizer_sentinel.py`, gdzie leży też
-  `no_solution()` filtra jakości i uwaga o sprzężeniu fraz z promptem parsującym. Rekordy niosą pola pod nazwami ze schematu, bo prompty grafów odwołują się
-  do nich po nazwie. Payload niezgodny z `ParsedTicket` to `RetrievalConfigError` bez treści
-  zgłoszenia w komunikacie: indeks z innej wersji kontraktu naprawia przebudowa, nie czekanie.
+  jak poprawna. Dokumentacja dostaje odczyt po id wcześniej, jako narzędzie agenta `read_docs`
+  (p. 52), z tą samą regułą.
+- **Ten sam wynik daje dwie rzeczy: tekst dla modelu (`render_for_model`) i listę źródeł (`cite`)**
+  — w węźle `run_tools` odpowiednio wiadomość `tool` i wpisy w `sources`. Tylko źródło wie, które
+  pola się liczą (np. osobny blok przyczyn w `find_tickets_vector`); lista źródeł powstaje
+  z `cite()`, nigdy z deklaracji modelu.
+- **Tekst `find_tickets_vector` dla modelu: nagłówek z licznikami, blok przyczyn, rekordy.** Blok
+  stoi przed rekordami i ma linię na trafienie; przyczyna nieustalona wchodzi do niego jako „(nie
+  ustalono)" — dosłowne `brak` albo zdanie „brak … przyczyny" (98 z 200 na golden200), nigdy po
+  samym prefiksie; rozstrzyga `no_cause()` z `service/normalizer_sentinel.py`, gdzie leży też
+  `no_solution()` filtra jakości i uwaga o sprzężeniu fraz z promptem parsującym. Rekordy niosą pola
+  pod nazwami ze schematu, bo prompty grafów odwołują się do nich po nazwie. Payload niezgodny
+  z `ParsedTicket` to `RetrievalConfigError` bez treści zgłoszenia w komunikacie: indeks z innej
+  wersji kontraktu naprawia przebudowa, nie czekanie.
 - **Zapytanie niesie wyłącznie to, czego szukać** — schemat to `query_model` narzędzia. Ile pobrać
   i gdzie uciąć to strojenie (`RAG_TOP_K`, `RAG_SCORE_MIN`), nie decyzja modelu; nieznany argument
-  to błąd walidacji (`extra="forbid"` w każdym modelu zapytania). **Kształt zapytania dobiera się
-  do indeksu:** `find_tickets` przyjmuje `problem` + `symptoms`, czyli pola, z których zbudowano
+  to błąd walidacji (`extra="forbid"` w każdym modelu zapytania). **Kształt zapytania dobiera się do
+  indeksu:** `find_tickets_vector` przyjmuje `problem` + `symptoms`, czyli pola, z których zbudowano
   wektory, i nie woła parsera — sparsowanie zgłoszenia pod wyszukiwanie to zadanie agenta.
 - **Kontrakty nie importują LangGrapha ani LangChaina** — definicję narzędzia dla modelu buduje
   graf z `name`, opisu `.md` i `query_model.model_json_schema()`. Wymiana orkiestratora ma nie
@@ -1495,7 +1546,7 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
 - **Atrapa narzędzia zwraca przy każdym wyszukaniu ten sam wynik, ze stałymi id, i zapisuje
   zapytania w publicznym `queries`** — test grafu sprawdza, o co pytał agent, a nie jak szukało
   narzędzie. Konstruktor przyjmuje własne elementy i `dropped_below_threshold`, więc scenariusz
-  „próg wszystko wyciął" to jedna linia. Wbudowany zestaw `FakeFindTickets` to **jeden objaw
+  „próg wszystko wyciął" to jedna linia. Wbudowany zestaw `FakeFindTicketsVector` to **jeden objaw
   i trzy różne przyczyny** — najczęstszy kształt trafień w korpusie, na którym agent ma dopytywać,
   a nie zgadywać. Dane atrap są zmyślone, nigdy kopiowane z korpusu (PII).
 - **Test kontraktu sam znajduje narzędzia** (`test_api_tools_contract.py`: pakiety w `app/tools/`
@@ -1700,12 +1751,12 @@ zapytania), korpus `data/parsed/bielik-11b-golden200/` (200 artefaktów) i dystr
 `data/golden/distractors.json` — materiał wielokrotnego użytku przy każdej zmianie modelu.
 
 - **Każde zapytanie ma dwa kształty: `query_raw` i `query_problem` + `query_symptoms`** (dopisane
-  2026-10-03, także w dystraktorach). Drugi to kształt narzędzia `find_tickets`, napisany
+  2026-10-03, także w dystraktorach). Drugi to kształt narzędzia `find_tickets_vector`, napisany
   **wyłącznie z `query_raw`, bez wglądu w rekord-cel**, według opisu narzędzia dla agenta.
   Zastępuje zapytanie agenta do czasu pomiaru z p. 23, więc **nie wolno go poprawiać pod wynik**.
   Przez narzędzie daje rekord-cel na pierwszym miejscu w 152 ze 162 zapytań (93,8%, wobec 98,1%
   dla surowych), w pierwszej piątce w 161, a próg 0.48 przechodzi 160; trafienie dostają 3 z 16
-  dystraktorów. Pilnuje tego `tests/evaluation/test_api_tools_find_tickets_golden_stack.py`.
+  dystraktorów. Pilnuje tego `tests/evaluation/test_api_tools_find_tickets_vector_golden_stack.py`.
 
 - **Zapytanie zna WYŁĄCZNIE to, co widzi zgłaszający** — nigdy przyczyny ani terminologii
   z rozwiązania. Inaczej zadanie staje się za łatwe dla **wszystkich** modeli i pomiar przestaje
@@ -1914,8 +1965,8 @@ Raises:                      # only when the method raises
   projekt, a baza, która nie wstaje po `up`, jest gorsza niż nietypowy numer.
 - **`DOCKER_*_PORT` rusza wyłącznie stronę hosta.** W mapowaniu `adres:port_hosta:port_kontenera`
   o znaczeniu członu decyduje wyłącznie **pozycja**, a strony są nierównoważne: port kontenera jest
-  **stały** (8000 dla obu aplikacji, 6333 dla Qdranta) i to jego używają usługi, rozmawiając ze
-  sobą po nazwie (`EMBEDDING_BASE_URL`, `QDRANT_URL`). Zmiana `DOCKER_EMBEDDER_PORT` jest
+  **stały** (8000 dla obu aplikacji, 6333 dla Qdranta, 5432 dla Postgresa) i to jego używają
+  usługi, rozmawiając ze sobą po nazwie (`EMBEDDING_BASE_URL`, `QDRANT_URL`, `POSTGRES_HOST`). Zmiana `DOCKER_EMBEDDER_PORT` jest
   **niewidoczna wewnątrz sieci compose** — pułapka realna, bo nazwa brzmi podobnie do
   `EMBEDDING_BASE_URL`, a robi co innego. Uboczny skutek: `api` i `embedder` mają w kontenerze ten
   sam port 8000 i **to nie jest konflikt** — kolidują dopiero porty hosta.
@@ -2005,15 +2056,15 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 495 (0)            | 14 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 94 (12)            | 19 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 500 (0)            | 14 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 112 (30)           | 18 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 73 (9)             | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 6 (3)              | 49 s |
 
 Liczby i czasy z 2026-10-03: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 9 s, a ewaluacyjne poniżej sekundy —
 całe 49 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
-(`pytest -m ""`): 668 testów, 75 s.
+(`pytest -m ""`): 691 testów, 72 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2045,7 +2096,7 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   niczego spoza repo, więc nic nie pada przez brak stacku.) Jedyny wyjątek: test ewaluacyjny na
   korpusie z `data/` pomija się bez danych, bo `data/` celowo nie ma w repo.
 - **Markery nazywają wymagania, nie rodzaj (zmiana 2026-10-03):** `stack_api`, `stack_qdrant`,
-  `stack_embedder` + parasol `stack` (działająca usługa) i `llm_live` (płatny model, **poza**
+  `stack_embedder`, `stack_postgres` + parasol `stack` (działająca usługa) i `llm_live` (płatny model, **poza**
   parasolem, żeby `-m stack` go nie łapał). Wszystkie rejestrowane w `pyproject.toml`. Dawne `integration*` i `functional` mieszały
   rodzaj z wymaganiem.
 - **Funkcjonalne dzielą się po tym, czego potrzebują.** Bez markera: cała aplikacja w procesie
@@ -2179,9 +2230,10 @@ Rejestr odrzuconych rozwiązań — narzędzi/podejść, które celowo pominęli
 taką decyzję w trakcie pracy, **dopisz ją tu** (co + jednozdaniowe dlaczego). Jeśli zadanie
 wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 
-- ~~**Relacyjna baza (MariaDB)**~~ — **odwrócone 2026-07-31**: SQL wchodzi w p. 29, ale
-  wyłącznie jako magazyn **reguł, ich wersji i audytu werdyktów**. Źródłem prawdy dla korpusu
-  dalej są JSON-y w `data/parsed/`, indeksem Qdrant (zasady 7 i 8 bez zmian).
+- ~~**Relacyjna baza (MariaDB)**~~ — **odwrócone 2026-07-31**: SQL wchodzi w p. 29 jako magazyn
+  **reguł, ich wersji i audytu werdyktów**, a od 2026-10-03 (p. 48) ten sam Postgres jest też
+  indeksem wyszukiwania tekstowego. Źródłem prawdy dla korpusu dalej są JSON-y w `data/parsed/`,
+  a oba indeksy — Qdrant i tabele wyszukiwania — odbudowują się z plików (zasady 7 i 8 bez zmian).
 - **Frontend (React SPA)** — na starcie API + CLI; UI to p. 45.
 - **Warstwa `docker-compose.gpu.yml`** — nie powstaje (2026-08-05): embedder chodzi na CPU, a LLM
   jest zewnętrznym endpointem, więc nie ma czego z czym dzielić. Gdy pojawi się maszyna z kartą,
@@ -2201,8 +2253,9 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   nie `StructuredTool`), wiadomości to nasze `ChatMessage`, model wołamy przez `LLMClient`, nie
   przez modele czatowe LangChaina — z LangChaina nie używamy niczego; **LangSmith zablokowany
   jawnie** — jego tracing wysyła pełne prompty do chmury, czyli dane sprzed anonimizacji.
-- **Hybrid search (dense + BM25/sparse)** — świadomie na później (p. 45), mimo że kody błędów
-  i nazwy urządzeń go potrzebują; najpierw czysty dense z pomiarem.
+- ~~**Hybrid search (dense + BM25/sparse)**~~ — **odwrócone 2026-10-03**: wyszukiwanie tekstowe
+  wchodzi jako osobne narzędzia agenta na Postgresie (`find_*_text`, p. 50 i 53), bez fuzji wyników
+  z wektorowymi — agent sam wybiera drogę, a próg `RAG_SCORE_MIN` zostaje przy cosinusie.
 - **Reranker (cross-encoder na top-10)** — dopiero gdy pomiar pokaże, że top-5 gubi trafienia.
 - **Synthetic queries jako dodatkowy named vector** — rozważane, nieprzyjęte.
 - **Automatyczna wysyłka odpowiedzi do klienta** — produktem jest propozycja dla wdrożeniowca.
@@ -2382,10 +2435,10 @@ oraz `__init__.py`; narzędzie ma do tego własne `models.py`.** Osobny graf na 
 generacji.
 
 - [x] **1. Struktura `api/app/tools/` z listą narzędzi** — kontrakty (`base.py`), wspólny
-  `SourceRef` (`models.py`), katalogi `find_tickets/` i `find_docs/` z własnymi `models.py`,
-  tabela narzędzi w `tools/__init__.py`; reguły — „Warstwa narzędzi agenta".
-- [x] **2. Atrapy wszystkich narzędzi** — `FakeFindTickets` i `FakeFindDocs` (`fake.py` w katalogu
-  narzędzia) oraz test kontraktu, który sam znajduje narzędzia w `app/tools/`; reguły —
+  `SourceRef` (`models.py`), katalogi `find_tickets_vector/` i `find_docs_vector/` z własnymi
+  `models.py`, tabela narzędzi w `tools/__init__.py`; reguły — „Warstwa narzędzi agenta".
+- [x] **2. Atrapy wszystkich narzędzi** — `FakeFindTicketsVector` i `FakeFindDocsVector` (`fake.py`
+  w katalogu narzędzia) oraz test kontraktu, który sam znajduje narzędzia w `app/tools/`; reguły —
   „Warstwa narzędzi agenta".
 - [x] **3. Struktura `api/app/nodes/` z listą węzłów** — kontrakt `Node` (`base.py`), katalogi
   `anonymize/`, `agent/`, `run_tools/`, `respond/`; reduktor `merge_sources` w `graph/base.py`
@@ -2405,16 +2458,57 @@ generacji.
 ### A. Narzędzia — po jednym punkcie na narzędzie
 
 Właściwe `tool.py` obok atrapy. `cite()` i `render_for_model()` są wspólne dla atrapy
-i prawdziwego narzędzia (`base.py` w katalogu narzędzia, wzór: `find_tickets`) — różni je
+i prawdziwego narzędzia (`base.py` w katalogu narzędzia, wzór: `find_tickets_vector`) — różni je
 wyłącznie `search()`.
+
+**Rozszerzony 2026-10-03:** każdy materiał ma wyszukiwanie wektorowe (`_vector`, Qdrant)
+i tekstowe (`_text`, Postgres), a dokumentacja dodatkowo listing i odczyt po identyfikatorze.
+Nowe punkty mają numery spoza kolejności (47–54), żeby nie rozjechać odwołań „p. N".
 
 - [x] **7. `find_tickets`** — `FindTickets` na embedderze i Qdrancie, bez parsera; tekst do
   embeddingu z `build_embedding_text()`, blok przyczyn w tekście dla modelu; reguły — „Warstwa
-  narzędzi agenta". Do grafów wchodzi z właściwymi węzłami (p. 9–10).
-- [ ] **8. `find_docs`** — kolekcja dokumentacji (wczytanie, podział na fragmenty, deterministyczne
-  id fragmentu, wersja i data) i narzędzie na niej; bez skonfigurowanej kolekcji narzędzie nie
-  trafia do rejestru. *Dlaczego:* id do cytowania, data dla dezaktualizacji; zależy od decyzji
-  z p. 15.
+  narzędzi agenta". Do grafów wchodzi z właściwymi węzłami (p. 9–10). Od p. 47 nazywa się
+  `find_tickets_vector`.
+- [x] **47. Nazwy i źródła** — `find_tickets_vector` i `find_docs_vector` (katalogi, klasy, opisy
+  w grafach); `SourceRef.source` nazywa materiał („tickets", „docs"); reguły — „Warstwa narzędzi
+  agenta".
+- [x] **48. Postgres ze słownikiem w compose** — usługa `postgres` z własnym obrazem (słownik
+  sjp.pl z trzema poprawkami, konfiguracja `pl_search`), zmienne `POSTGRES_*`, marker
+  `stack_postgres` i test na stacku; reguły — „Warstwa wyszukiwania tekstowego (Postgres)".
+- [ ] **49. Import dokumentacji** — `helpdesk docs validate|import <katalog>`: katalog na
+  dokument, metryczka JSON (tytuł, wersja, data i wiersz na plik: stały identyfikator, tytuł,
+  ścieżka rozdziału, krótki opis) oraz pliki `.md` z samą treścią; zapis do kolekcji dokumentacji
+  w Qdrancie i tabeli w Postgresie przez klienta w `api/app/db/` (pula połączeń, sterownik
+  w `api/requirements.txt`); zgodność metryczki z katalogiem
+  w obie strony, limit 8192 tokenów, odmowa dokumentu syntetycznego we właściwym indeksie.
+  *Dlaczego:* podział robi człowiek z modelem przed wgraniem, więc aplikacja nie chunkuje, ale
+  musi odrzucić paczkę, w której sekcja po cichu wypada albo embedder ją ucina.
+- [ ] **54. Syntetyczna dokumentacja i golden set** — `data/instruction/` (dwa dokumenty, 20–30
+  sekcji dobranych pod zjawiska: dystraktory, dosłowne nazwy opcji, kod błędu, „nie-", nazwy
+  produktów, łącznik, sekcja przy limicie tokenów) i zestaw w `data/golden/` z zapytaniami
+  w kształcie każdego narzędzia. *Dlaczego:* narzędzia powstają przed właściwą dokumentacją
+  (p. 55); wynik mierzy okablowanie, nie skuteczność — sekcje i zapytania pisze ten sam autor.
+- [ ] **8. `find_docs_vector`** — wyszukiwanie w kolekcji dokumentacji; zwraca wiersze listingu
+  (identyfikator, dokument, rozdział, opis), nie treść; jednostką wyniku jest plik z metryczki
+  także wtedy, gdy wektor powstaje z jego fragmentu — fragment zwija się do pliku. *Dlaczego:*
+  treść model pobiera odczytem (p. 52) i tylko odczyt trafia na listę źródeł, a wyszukiwanie
+  tekstowe i wektorowe muszą wskazywać ten sam identyfikator; co embedować — całą treść czy sam
+  nagłówek — rozstrzyga pomiar.
+- [ ] **50. `find_docs_text`** — pola `exact` (dosłowne ciągi, `ILIKE`) i `words` (indeks
+  pełnotekstowy ze słownikiem); wiersze listingu z dopasowanym fragmentem i etykietą, czym
+  znaleziono. *Dlaczego:* model wie, czy ma kod, czy słowa kluczowe, ale nie wie, jak leżą w bazie.
+- [ ] **51. `list_docs`** — listing z metryczek jako narzędzie pomocnicze. *Dlaczego:* przy małej
+  dokumentacji lepszy bywa listing w prompcie systemowym (cache'owany prefiks, bez tury) — do
+  rozstrzygnięcia przy właściwej dokumentacji (p. 15).
+- [ ] **52. `read_docs`** — treść po liście identyfikatorów, z limitem; nieznany identyfikator to
+  błąd wracający do modelu, nigdy krótsza lista; jedyne narzędzie dokumentacji z `cite()`,
+  a `SourceRef.score` staje się opcjonalny. *Dlaczego:* lista źródeł ma pokazywać to, co model
+  przeczytał, a `requires_hits` wymusza wtedy odczyt przed rozwiązaniem.
+- [ ] **53. `find_tickets_text`** — te same pola `exact` i `words` po zanonimizowanym opisie
+  zgłaszającego (`exact` także równością na `error_codes`); zwraca ten sam rekord sparsowany co
+  `find_tickets_vector`. *Dlaczego:* parser gubi około połowy dosłownych komunikatów (14 z 30 na
+  golden200), a `error_codes` jest niemal puste (9 z 200); w bloku A stoi na zmyślonych danych,
+  bo do bazy trafia wyłącznie tekst po anonimizacji — prawdziwe opisy przychodzą z p. 19 i p. 31.
 
 ### B. Węzły — po jednym punkcie na węzeł
 
@@ -2461,9 +2555,10 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
 - [ ] **14. Które endpointy mogą widzieć surowe dane** — własny sprzęt, RunPod (Secure czy
   Community Cloud), dostawca komercyjny. *Dlaczego:* kryterium to granica zaufania endpointu,
   a nie to, czy model zaufany i generujący są tym samym modelem.
-- [ ] **15. Czy są instrukcje i skąd** — format, wersje, kto aktualizuje. *Dlaczego:* to źródło
-  opcjonalne, a instrukcja do starej wersji psuje odpowiedź tak samo jak odmowa obalona nowszym
-  rekordem.
+- [ ] **15. Czy są instrukcje i skąd** — format rozstrzygnięty 2026-10-03 (metryczka i pliki `.md`,
+  p. 49); zostaje: kto przygotowuje wydania, ile wydań trzyma indeks i czy listing mieści się
+  w prompcie. *Dlaczego:* to źródło opcjonalne, a instrukcja do starej wersji psuje odpowiedź tak
+  samo jak odmowa obalona nowszym rekordem.
 - [ ] **16. Zapisać w sekcjach tematycznych decyzje, które przesądza blok 0** — agent wybiera
   źródła bez człowieka (odwrócenie decyzji z 2026-08-26); każda funkcja ma własną pętlę,
   a `/suggest` bierze zgłoszenie zamiast identyfikatorów; warianty generacji są kodem (graf na
@@ -2488,7 +2583,8 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
 
 - [ ] **19. Usługa `anonymizer` w compose** — słownik osób ze źródła (z rolami), NER i regex
   z sumami kontrolnymi, deterministycznie, na CPU; fail-closed, pseudonimy spójne w wątku,
-  mapowanie wraca do helpdesku; mierzona w dwie strony (przecieki i zniszczona wiedza).
+  mapowanie wraca do helpdesku; mierzona w dwie strony (przecieki i zniszczona wiedza — w tym
+  kody i komunikaty błędów, po których szuka `find_tickets_text`).
   *Dlaczego:* surowy tekst nie opuszcza sieci compose; słownik daje role tam, gdzie flaga autora
   jest bezużyteczna (Automat mailowy), a nadgorliwość w korpusie jest nieodwracalna.
 - [ ] **20. Detektor sekretów w tej samej usłudze** — kontekst dla haseł słownikowych, entropia
@@ -2514,7 +2610,9 @@ każdy mierzy się osobno.
   pomiar pętli wobec wszystkich narzędzi naraz (tryb bez pętli zostaje jako odniesienie i tryb
   awaryjny), w zestawie klastry wieloprzyczynowe; osobna oś — trafność zapytań pisanych przez
   agenta wobec zapytań z parsera korpusu (golden set, `recall@1` i MRR; punkt odniesienia to pola
-  `query_problem` + `query_symptoms` golden setu — 152 ze 162 na pierwszym miejscu). *Dlaczego:*
+  `query_problem` + `query_symptoms` golden setu — 152 ze 162 na pierwszym miejscu); wkład
+  narzędzi `_text` liczony osobno — czy znajdują coś, czego wektor nie znajduje, jest dziś
+  niezmierzone. *Dlaczego:*
   najgroźniejszy błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach
   (e-Doręczenia: 6 zgłoszeń, 6 przyczyn), a zapytanie agenta nie powstaje już promptem korpusu.
 - [ ] **24. `parse_ticket`** — karta zgłoszenia promptem parsującym na modelu docelowym, porównana z
@@ -2541,8 +2639,8 @@ każdy mierzy się osobno.
 
 ### G. Reguły i powrót do korpusu
 
-- [ ] **29. Magazyn reguł w SQL** — czwarta usługa compose; wersje, audyt werdyktów, kontrola
-  dostępu do edycji; później też magazyn notatek. *Dlaczego:* klient stroi reguły bez deployu,
+- [ ] **29. Magazyn reguł w SQL** — osobny schemat i osobna rola w Postgresie z p. 48, nie nowa
+  usługa; wersje, audyt werdyktów, kontrola dostępu do edycji; później też magazyn notatek. *Dlaczego:* klient stroi reguły bez deployu,
   a edycja to zmiana konfiguracji produkcyjnej.
 - [ ] **30. Zamknięte zgłoszenie wraca do korpusu** — tylko z pozytywnym werdyktem bramki, kartą
   z grafu `parse_ticket`; do rozstrzygnięcia: zapis automatyczny czy kolejka do akceptacji i kto
@@ -2555,24 +2653,30 @@ każdy mierzy się osobno.
 - [ ] **31. Masowy import z nowszego zrzutu** — przez graf `parse_ticket` (zapis artefaktu po KAŻDYM
   zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed parsowaniem, model parsujący
   wybrany na podstawie `porownanie-modeli-parsowania.md`, prompt dostosowany do placeholderów,
-  czytnik SQL, wznawianie, raport, porządek w `data/parsed/` (golden200 zostaje). *Dlaczego:* to
+  czytnik SQL, wznawianie, raport, porządek w `data/parsed/` (golden200 zostaje); zanonimizowany
+  opis zgłaszającego idzie do tabeli wyszukiwania (p. 53). *Dlaczego:* to
   jedyny drogi przebieg (zasada 7), więc anonimizator i prompt muszą być gotowe przed nim.
 - [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
   „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy. *Dlaczego:* 77 ze 123 zgłoszeń
   w lipcu, a żadna heurystyka nie odróżni broadcastu od sprawy.
 - [ ] **33. Przeliczenia na pełnym korpusie** — `RAG_SCORE_MIN` na zapytaniach sparsowanych,
   porównanie embedderów, liczba wątków-projektów, `questions_summary`, rozkład `component`,
-  wzorzec przyczyny nieustalonej w `find_tickets`.
+  wzorzec przyczyny nieustalonej w `find_tickets_vector`.
   *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na zapytaniach surowych.
 - [ ] **34. Tryb odświeżania korpusu** — kolejne zrzuty czy dostęp tylko do odczytu.
   *Dlaczego:* +130 zgłoszeń w miesiąc, więc jednorazowy zrzut szybko się starzeje.
 - [ ] **35. Backup `data/parsed/`.** *Dlaczego:* jedyny artefakt, którego odtworzenie kosztuje
   ponowny przebieg LLM.
+- [ ] **55. Przygotowanie właściwej dokumentacji** (dopisany 2026-10-03) — podział mocnym modelem
+  na pliki `.md` i metryczkę, skrypt sprawdzający, że każda sekcja jest dosłownym podciągiem
+  źródła i że sekcje pokrywają całość, przegląd opisów przez człowieka. *Dlaczego:* dokumentacja
+  wraca do promptu jako cytowane źródło, więc parafraza modelu stałaby się „tak mówi instrukcja";
+  model dzieli i opisuje, treści nie przepisuje.
 
 ### I. Przed produkcją
 
-- [ ] **36. Uwierzytelnianie API.** *Dlaczego:* endpointy są otwarte, a reguły bramek będą
-  edytowalne.
+- [ ] **36. Uwierzytelnianie API i własne hasło Postgresa.** *Dlaczego:* endpointy są otwarte,
+  reguły bramek będą edytowalne, a compose ma dla bazy hasło dev-owe.
 - [ ] **37. Budżet i limity wywołań zewnętrznych** — z cache'owaniem promptu. *Dlaczego:* bramki
   dają ruch proporcjonalny do całej pracy helpdesku, pętla mnoży wywołania, a model zewnętrzny to
   koszt per wywołanie.
@@ -2595,8 +2699,9 @@ każdy mierzy się osobno.
 
 - [ ] **44. Notatki agenta i HITL w pętli** — notatki jako narzędzie pomocnicze w `tools/notes/`
   (sterują szukaniem, nigdy generacją), przerwanie pętli na decyzję człowieka — z nim wraca
-  `retrieve()`, odczyt znalezionego elementu po id. *Dlaczego:* odłożone świadomie; kontrakt
+  `retrieve()`, odczyt znalezionego zgłoszenia po id (dokumentacja ma odczyt od p. 52).
+  *Dlaczego:* odłożone świadomie; kontrakt
   narzędzia pomocniczego z p. 1 i magazyn z p. 29 mają je przyjąć bez zmian we wspólnych węzłach.
-- [ ] **45. Rozszerzenia** — wyszukiwanie hybrydowe pod kody błędów, reranker, frontend,
+- [ ] **45. Rozszerzenia** — reranker, frontend,
   rozbicie wątków-projektów, kolejność diagnostyczna w `questions`. *Dlaczego:* każde czeka na
   pomiar, który pokaże, że jest potrzebne.

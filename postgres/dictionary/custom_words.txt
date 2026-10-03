@@ -1,0 +1,11 @@
+# Nazwy własne, których słownik ogólny nie zna, a w zgłoszeniach występują w odmianie.
+# Format: <słowo małymi literami> <hasło ze słownika, które odmienia się tak samo>
+#
+# Dopisanie słowa wymaga przebudowy obrazu (`docker compose up -d --build postgres`); istniejące
+# dane nie wymagają przeliczenia tylko wtedy, gdy tego słowa jeszcze w nich nie indeksowano.
+# Nazw pisanych z łącznikiem („e-Doręczenia", „ePUAP-ie") nie trzeba tu wpisywać — konfiguracja
+# wyszukiwania rozbija je na części.
+
+enadawca  nadawca
+epuap     pułap
+dokus     wirus

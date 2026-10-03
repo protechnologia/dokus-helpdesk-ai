@@ -56,6 +56,14 @@ services:
       # starts, reports healthy and quietly runs on the code default.
       RAG_TOP_K:                 ${RAG_TOP_K:-5}
       RAG_SCORE_MIN:             ${RAG_SCORE_MIN:-0.48}
+      # Postgres: host i port to strona KONTENERA (nazwa usługi i 5432), nie DOCKER_POSTGRES_PORT.
+      # Baza, użytkownik i hasło to te same zmienne, które dostaje usługa `postgres` — jedno
+      # źródło, więc obie strony nie mogą się rozjechać.
+      POSTGRES_HOST:             ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT:             ${POSTGRES_PORT:-5432}
+      POSTGRES_DB:               ${POSTGRES_DB:-helpdesk}
+      POSTGRES_USER:             ${POSTGRES_USER:-helpdesk}
+      POSTGRES_PASSWORD:         ${POSTGRES_PASSWORD:-helpdesk}
     # --reload belongs to the dev layer, not to the image: the shipped CMD has no reloader.
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     healthcheck:
@@ -117,7 +125,42 @@ services:
     # binary we would have to add ourselves. Qdrant is not gated on by anything here anyway.
     restart: unless-stopped
 
+  # --- postgres: indeks wyszukiwania tekstowego (od p. 29 także reguły bramek) ---
+  postgres:
+    # Własny obraz, bo polski słownik musi leżeć w katalogu Postgresa: `postgres/Dockerfile`
+    # pobiera słownik sjp.pl i nakłada poprawki, `postgres/initdb/` zakłada konfigurację
+    # wyszukiwania `pl_search`.
+    build: ./postgres
+    ports:
+      # 5433, nie 5432: lokalny Postgres na domyślnym porcie jest na maszynach deweloperskich
+      # częsty, a baza, która nie wstaje po `up`, jest gorsza niż nietypowy numer.
+      - "${DOCKER_BIND_ADDR:-127.0.0.1}:${DOCKER_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      # Od wersji 18 obraz trzyma dane w podkatalogu wersji, więc montuje się katalog nadrzędny.
+      # Wolumen to wygoda, nie kopia: tabele wyszukiwania odbudowują się z plików (zasada 8).
+      # Zmieni się to z p. 29 — reguły bramek będą tu źródłem prawdy i wejdą do backupu.
+      - postgres_data:/var/lib/postgresql
+    # Obraz czyta te trzy zmienne TYLKO przy pierwszym starcie na pustym wolumenie; późniejsza
+    # zmiana hasła w .env nie zmienia hasła w istniejącej bazie. Hasło domyślne jest dev-owe
+    # i wystarcza przy nasłuchu na 127.0.0.1 — wdrożenie podaje własne (CLAUDE.md -> p. 36).
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-helpdesk}
+      POSTGRES_USER:     ${POSTGRES_USER:-helpdesk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-helpdesk}
+    healthcheck:
+      # Po TCP, nie po gnieździe: w trakcie inicjalizacji obraz stawia serwer tymczasowy, który
+      # słucha tylko na gnieździe, więc sonda po gnieździe zgłaszałaby gotowość za wcześnie.
+      # `$$` zostawia zmienną kontenerowi — bez tego podstawiałby ją compose.
+      test:         ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval:     10s
+      timeout:      3s
+      retries:      3
+      start_period: 30s
+    restart: unless-stopped
+
 volumes:
   qdrant_storage:
+  # Dane Postgresa. Skasowanie wolumenu uruchamia skrypty z `postgres/initdb/` od nowa.
+  postgres_data:
   # Downloaded model weights. Safe to delete — the next start refetches them.
   hf_cache:

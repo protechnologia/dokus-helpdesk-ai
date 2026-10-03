@@ -53,6 +53,7 @@ markers = [
     "stack_api: requires a reachable api service",
     "stack_qdrant: requires a reachable Qdrant instance",
     "stack_embedder: requires a reachable embedder service",
+    "stack_postgres: requires a reachable Postgres with the Polish dictionary",
     "llm_live: hits a real, billable LLM — outside the stack umbrella on purpose",
 ]
 
@@ -89,6 +90,9 @@ ignore = [
 # a wyrównany typ `messages` sam zajmuje 89 znaków.
 "api/app/graph/base.py"    = ["E501"]
 "api/app/graph/*/state.py" = ["E501"]
+# Tabela przypadków (tekst w bazie, zapytanie, oczekiwanie) czyta się wierszami; przełamana na
+# kilka linii przestaje być tabelą.
+"tests/integration/postgres/test_postgres_text_search_stack.py" = ["E501"]
 
 [tool.ruff.lint.isort]
 # Without this, `app` is taken for a third-party library and lands in the same block as pytest;

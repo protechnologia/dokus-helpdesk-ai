@@ -12,6 +12,7 @@ Rodzaj testu to jego folder, a marker mówi, czego test potrzebuje do uruchomien
 | `stack_api`      | usługi `api`                  | `api_url()`             |
 | `stack_qdrant`   | Qdranta                       | `qdrant_url()`          |
 | `stack_embedder` | usługi `embedder`             | `embedder_url()`        |
+| `stack_postgres` | Postgresa ze słownikiem       | `postgres_dsn()`        |
 | `llm_live`       | prawdziwego, płatnego modelu  | — (z konfiguracji)      |
 
 Marker nosi tylko test, który potrzebuje działającej usługi albo płatnego modelu. Jednostkowe nie
@@ -31,7 +32,7 @@ O czym pamiętać przy zmianach:
   (`http://embedder:8000`), których z hosta nie da się rozwiązać, więc każdy test spoza kontenera
   potrzebuje podmiany; powielona w plikach rozjeżdżała się po zmianie portu w jednym miejscu.
 - Każdy adres da się nadpisać zmienną środowiskową (`EMBEDDER_TEST_URL`, `QDRANT_TEST_URL`,
-  `API_TEST_URL`).
+  `API_TEST_URL`, `POSTGRES_TEST_DSN`).
 """
 
 import os
@@ -50,6 +51,12 @@ QDRANT_URL_DEFAULT   = "http://localhost:6333"
 # baza publikuje 8010.
 API_URL_ENV     = "API_TEST_URL"
 API_URL_DEFAULT = "http://localhost:8010"
+
+
+# Zgodne z wartościami domyślnymi z compose: baza, użytkownik i hasło `helpdesk`, port hosta
+# z DOCKER_POSTGRES_PORT. Przy własnych wartościach w `.env` test dostaje DSN przez zmienną.
+POSTGRES_DSN_ENV     = "POSTGRES_TEST_DSN"
+POSTGRES_DSN_DEFAULT = "postgresql://helpdesk:helpdesk@localhost:5433/helpdesk"
 
 
 def embedder_url() -> str:
@@ -92,6 +99,20 @@ def api_url() -> str:
         "http://localhost:8010"
     """
     return os.environ.get(API_URL_ENV, API_URL_DEFAULT)
+
+
+def postgres_dsn() -> str:
+    """
+    Description:
+    Adres połączenia, pod którym Postgres odpowiada z hosta.
+
+    Example args:
+        (brak)
+
+    Example result:
+        "postgresql://helpdesk:helpdesk@localhost:5433/helpdesk"
+    """
+    return os.environ.get(POSTGRES_DSN_ENV, POSTGRES_DSN_DEFAULT)
 
 
 def build_host_settings() -> Settings:

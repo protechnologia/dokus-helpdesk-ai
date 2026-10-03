@@ -19,8 +19,8 @@ class Settings(BaseSettings):
         3. Field types and defaults apply; a missing required value fails fast at construction.
 
     Field names map to ENV names by upper-casing: `qdrant_url` <- `QDRANT_URL`. The prefixes
-    (`LLM_`, `EMBEDDING_`, `QDRANT_`) are the only namespacing — there is one `.env` for the
-    whole compose project, not one per service.
+    (`LLM_`, `EMBEDDING_`, `QDRANT_`, `POSTGRES_`) are the only namespacing — there is one `.env`
+    for the whole compose project, not one per service.
     """
 
     model_config = SettingsConfigDict(
@@ -58,6 +58,15 @@ class Settings(BaseSettings):
     qdrant_url:              str   = "http://qdrant:6333"
     qdrant_collection:       str   = "tickets"
     qdrant_timeout_seconds:  float = 30.0               # seconds
+
+    # --- Postgres: indeks wyszukiwania tekstowego (od p. 29 także reguły bramek) ---
+    # Host i port po stronie sieci compose. Hasło nie ma wartości w kodzie: compose podaje
+    # dev-ową, a klient bazy ma odmówić startu bez niej (p. 49).
+    postgres_host:     str        = "postgres"
+    postgres_port:     int        = 5432
+    postgres_db:       str        = "helpdesk"
+    postgres_user:     str        = "helpdesk"
+    postgres_password: str | None = None                # np. "helpdesk"
 
     # --- retrieval: tuning, NOT business logic ---
     # These two are knobs a deployment turns; the rules that read them are not. Scoring the hits
