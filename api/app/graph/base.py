@@ -39,8 +39,8 @@ class GraphState(BaseModel):
 
 
 def merge_sources(
-    current: list[SourceRef],  # np. [SourceRef(source="find_tickets", item_id="90001", …)]
-    new:     list[SourceRef],  # np. [SourceRef(source="find_tickets", item_id="90001", …), …]
+    current: list[SourceRef],  # np. [SourceRef(source="tickets", item_id="90001", …)]
+    new:     list[SourceRef],  # np. [SourceRef(source="tickets", item_id="90001", …), …]
 ) -> list[SourceRef]:
     """
     Description:
@@ -65,7 +65,7 @@ def merge_sources(
 
 
 def route_after_agent(
-    state:             GraphState,  # np. SearchState(messages=[tool_call_turn("find_tickets", …)])
+    state:             GraphState,  # np. SearchState(messages=[tool_call_turn("find_tickets_vector", …)])
     respond_tool_name: str,         # np. "respond_search"
 ) -> Literal["run_tools", "respond"]:
     """
@@ -77,7 +77,7 @@ def route_after_agent(
     z węzłem `agent` (p. 9).
 
     Example args:
-        state=SearchState(messages=[tool_call_turn("find_tickets", {…})], …)
+        state=SearchState(messages=[tool_call_turn("find_tickets_vector", {…})], …)
         respond_tool_name="respond_search"
 
     Example result:
@@ -95,8 +95,8 @@ def route_after_agent(
 
 
 def tool_definitions(
-    tools:     Sequence[KnowledgeSource],  # np. [FakeFindTickets(), FakeFindDocs()]
-    allowed:   Sequence[str],              # np. ("find_tickets", "find_docs")
+    tools:     Sequence[KnowledgeSource],  # np. [FakeFindTicketsVector(), FakeFindDocsVector()]
+    allowed:   Sequence[str],              # np. ("find_tickets_vector", "find_docs_vector")
     graph_dir: Path,                       # np. Path("/code/app/graph/search")
 ) -> list[ToolDefinition]:
     """
@@ -106,12 +106,12 @@ def tool_definitions(
     w `tools/`, bo to treść promptu i różni się między grafami używającymi tego samego narzędzia.
 
     Example args:
-        tools=[FakeFindTickets()]
-        allowed=("find_tickets", "find_docs")
+        tools=[FakeFindTicketsVector()]
+        allowed=("find_tickets_vector", "find_docs_vector")
         graph_dir=Path("/code/app/graph/search")
 
     Example result:
-        [ToolDefinition(name="find_tickets", description="Szuka historycznych zgłoszeń…", …)]
+        [ToolDefinition(name="find_tickets_vector", description="Szuka historycznych zgłoszeń…", …)]
 
     Raises:
         ValueError: narzędzie spoza listy dozwolonych dla tego grafu

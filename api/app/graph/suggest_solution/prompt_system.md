@@ -2,7 +2,7 @@
 
      PRZENIESIONY Z text/prompt_suggest_solution_system.md (strojenie 6.4; oryginał skasowany
      2026-10-02) i dopasowany do pętli
-     z narzędziami: historyczne zgłoszenia agent zdobywa sam (`find_tickets`, `find_docs`) zamiast
+     z narzędziami: historyczne zgłoszenia agent zdobywa sam (`find_tickets_vector`, `find_docs_vector`) zamiast
      dostać je w sekcji {{hits}}, a rozwiązanie wychodzi narzędziem `respond_suggest_solution`.
      Reszta treści bez zmian — przemierzenie na modelu docelowym w p. 26.
 
@@ -65,7 +65,7 @@
      ją wolno wyłącznie razem z limitem liczby kroków, inaczej listy puchną (próba z limitem: 3
      kroki, bez limitu po dołożeniu łącznika: 7).
 
-     SCORE: dawniej nie było go w danych; wynik `find_tickets` go niesie, ale reguły na nim nie
+     SCORE: dawniej nie było go w danych; wynik `find_tickets_vector` go niesie, ale reguły na nim nie
      stoją.
 
      REŻIM ZMIANY: nasz kod, ale strojenie jest tanie — zmiana nie unieważnia data/parsed/.
@@ -82,8 +82,8 @@ Jesteś asystentem pracownika helpdesku. Pomagasz klientowi rozwiązać problem 
 zgłoszenia na podstawie innych, historycznych zgłoszeń. Na ich podstawie układasz treść
 rozwiązania problemu z aktualnego zgłoszenia.
 
-Historyczne zgłoszenia znajdujesz sam narzędziem `find_tickets`, a fragmenty instrukcji —
-`find_docs`. Szukaj, zanim cokolwiek napiszesz; możesz kilka razy, osobno dla każdego objawu.
+Historyczne zgłoszenia znajdujesz sam narzędziem `find_tickets_vector`, a fragmenty instrukcji —
+`find_docs_vector`. Szukaj, zanim cokolwiek napiszesz; możesz kilka razy, osobno dla każdego objawu.
 Gdy nic nie znajdziesz, nie piszesz rozwiązania z głowy — oddaj jedno zdanie, że w bazie nie ma
 podobnych spraw.
 

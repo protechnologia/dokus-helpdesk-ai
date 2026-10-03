@@ -3,12 +3,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.model.ticket_parsed import ParsedTicket
 
 
-class FindTicketsQuery(BaseModel):
+class FindTicketsVectorQuery(BaseModel):
     """
     Description:
-    O co agent pyta `find_tickets`: zgłoszenie opisane w kształcie korpusu — te same dwa pola,
-    z których zbudowano wektory indeksu. Parsowanie zgłoszenia pod wyszukiwanie to zadanie agenta
-    (jak to robić, mówi mu prompt), więc narzędzie nie woła parsera: składa z pól tekst do
+    O co agent pyta `find_tickets_vector`: zgłoszenie opisane w kształcie korpusu — te same dwa
+    pola, z których zbudowano wektory indeksu. Parsowanie zgłoszenia pod wyszukiwanie to zadanie
+    agenta (jak to robić, mówi mu prompt), więc narzędzie nie woła parsera: składa z pól tekst do
     embeddingu tą samą funkcją co indeksacja (`build_embedding_text()`) i szuka.
     """
 
@@ -22,7 +22,7 @@ class FindTicketsQuery(BaseModel):
 class FoundTicket(BaseModel):
     """
     Description:
-    Jedno historyczne zgłoszenie zwrócone przez `find_tickets`: podobieństwo, z jakim je
+    Jedno historyczne zgłoszenie zwrócone przez `find_tickets_vector`: podobieństwo, z jakim je
     znaleziono, i sparsowane zgłoszenie z payloadu Qdranta.
 
     Całe `ParsedTicket`, a nie wybrany podzbiór pól: payload jest zapisywany z tego modelu
@@ -37,12 +37,12 @@ class FoundTicket(BaseModel):
     ticket: ParsedTicket
 
 
-class FindTicketsResult(BaseModel):
+class FindTicketsVectorResult(BaseModel):
     """
     Description:
-    Co dało jedno wyszukiwanie `find_tickets`: zgłoszenia, które przeszły `RAG_SCORE_MIN`, i liczba
-    odciętych. Licznik idzie razem z elementami, bo „nic nie było" i „próg to wyciął" to różne
-    odpowiedzi, a agent decydujący, czy ma dość materiału, musi je rozróżniać.
+    Co dało jedno wyszukiwanie `find_tickets_vector`: zgłoszenia, które przeszły `RAG_SCORE_MIN`,
+    i liczba odciętych. Licznik idzie razem z elementami, bo „nic nie było" i „próg to wyciął" to
+    różne odpowiedzi, a agent decydujący, czy ma dość materiału, musi je rozróżniać.
     """
 
     model_config = ConfigDict(extra="forbid")

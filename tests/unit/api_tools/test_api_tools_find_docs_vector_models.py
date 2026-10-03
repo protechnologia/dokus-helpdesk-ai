@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.tools.find_docs import FindDocsQuery, FoundDoc
+from app.tools.find_docs_vector import FindDocsVectorQuery, FoundDoc
 
 
 def make_found(
@@ -29,7 +29,7 @@ def make_found(
 def test_an_empty_query_is_refused() -> None:
     """A query with no text → ValidationError: there is nothing to match the fragments against."""
     with pytest.raises(ValidationError):
-        FindDocsQuery(text="")
+        FindDocsVectorQuery(text="")
 
 
 def test_a_fragment_without_its_release_is_refused() -> None:

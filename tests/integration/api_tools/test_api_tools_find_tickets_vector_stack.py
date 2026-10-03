@@ -1,7 +1,7 @@
 """
 Description:
-Test integracyjny narzędzia `find_tickets` z prawdziwym embedderem i prawdziwym Qdrantem: czy to,
-co zapisuje indeksacja, wraca przez narzędzie. Wymaga działającego stacku.
+Test integracyjny narzędzia `find_tickets_vector` z prawdziwym embedderem i prawdziwym Qdrantem: czy
+to, co zapisuje indeksacja, wraca przez narzędzie. Wymaga działającego stacku.
 
 | scenariusz                                  | oczekiwanie                                 |
 |---------------------------------------------|---------------------------------------------|
@@ -17,8 +17,8 @@ Co się dzieje po drodze:
 
 O czym pamiętać przy zmianach:
 
-- Kolekcja jest własna (`find_tickets_integration_test`), nigdy skonfigurowana `tickets` — test
-  ją tworzy i kasuje, a z prawdziwym indeksem skończyłoby się to jego utratą.
+- Kolekcja jest własna (`find_tickets_vector_integration_test`), nigdy skonfigurowana `tickets` —
+  test ją tworzy i kasuje, a z prawdziwym indeksem skończyłoby się to jego utratą.
 - Asercje są na ranking i równość rekordu, nigdy na wysokość score.
 - Tryb embeddera, przestrzeń wektorów, liczenie progu i tłumaczenie błędów sprawdzają testy
   jednostkowe na podmienionym transporcie; trafność wyszukiwania to sprawa testów ewaluacyjnych.
@@ -35,7 +35,7 @@ from app.embedding import EmbeddingClient
 from app.model.ticket_parsed import ParsedTicket
 from app.retrieval import QdrantClient
 from app.service.rag_indexer import TicketIndexer
-from app.tools.find_tickets import FindTickets, FindTicketsQuery
+from app.tools.find_tickets_vector import FindTicketsVector, FindTicketsVectorQuery
 
 pytestmark = [
     pytest.mark.stack,
@@ -44,7 +44,7 @@ pytestmark = [
 ]
 
 # Własna kolekcja, nigdy skonfigurowana — patrz opis modułu.
-TEST_COLLECTION = "find_tickets_integration_test"
+TEST_COLLECTION = "find_tickets_vector_integration_test"
 
 
 def _ticket(
@@ -127,7 +127,7 @@ async def clients(
         tmp_path=Path("/tmp/pytest-0")
 
     Example result:
-        (EmbeddingClient(…), QdrantClient(collection="find_tickets_integration_test"))
+        (EmbeddingClient(…), QdrantClient(collection="find_tickets_vector_integration_test"))
     """
     embedder = EmbeddingClient(
         base_url = host_settings.embedding_base_url,
@@ -168,8 +168,9 @@ async def test_a_ticket_asked_by_its_own_fields_comes_back_first_and_whole(
     zapisanemu: payload z Qdranta wraca do `ParsedTicket` bez strat. Asercja na ranking, nie na
     wysokość score."""
     embedder, qdrant = clients
-    tool   = FindTickets(embedder=embedder, qdrant=qdrant, top_k=5, score_min=-1.0)
-    result = await tool.search(FindTicketsQuery(problem=ticket.problem, symptoms=ticket.symptoms))
+    tool   = FindTicketsVector(embedder=embedder, qdrant=qdrant, top_k=5, score_min=-1.0)
+    query  = FindTicketsVectorQuery(problem=ticket.problem, symptoms=ticket.symptoms)
+    result = await tool.search(query)
 
     assert result.items[0].ticket == ticket
     assert len(result.items) == len(TICKETS)
@@ -182,9 +183,9 @@ async def test_a_threshold_nothing_passes_counts_everything_as_dropped(
     """Próg powyżej każdego możliwego podobieństwa → pusty wynik i komplet policzony jako odcięty:
     ostry próg nie może wyglądać jak pusty indeks."""
     embedder, qdrant = clients
-    tool   = FindTickets(embedder=embedder, qdrant=qdrant, top_k=5, score_min=1.1)
+    tool   = FindTicketsVector(embedder=embedder, qdrant=qdrant, top_k=5, score_min=1.1)
     result = await tool.search(
-        FindTicketsQuery(problem=TICKETS[0].problem, symptoms=TICKETS[0].symptoms)
+        FindTicketsVectorQuery(problem=TICKETS[0].problem, symptoms=TICKETS[0].symptoms)
     )
 
     assert result.items == []

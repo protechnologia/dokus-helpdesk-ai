@@ -38,7 +38,7 @@ class ToolCall(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     call_id:   str            = Field(min_length=1, examples=["call_1"])
-    name:      str            = Field(min_length=1, examples=["find_tickets"])
+    name:      str            = Field(min_length=1, examples=["find_tickets_vector"])
     arguments: dict[str, Any] = Field(default_factory=dict, examples=[{"problem": "…"}])
 
 

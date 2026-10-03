@@ -12,7 +12,7 @@ class AgentQuery(BaseModel):
     dziwną listę trafień najczęściej tłumaczy to, o co agent zapytał, a nie samo wyszukiwanie.
     """
 
-    tool:      str            = Field(examples=["find_tickets"])
+    tool:      str            = Field(examples=["find_tickets_vector"])
     arguments: dict[str, Any] = Field(examples=[{"problem": "Brak przesyłek"}])
 
 

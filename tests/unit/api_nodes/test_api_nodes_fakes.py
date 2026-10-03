@@ -24,7 +24,10 @@ class Verdict(BaseModel):
     verdict: str
 
 
-SEARCH = tool_call_turn("find_tickets", {"problem": "Brak przesyłek", "symptoms": "pusta skrzynka"})
+SEARCH = tool_call_turn(
+    "find_tickets_vector",
+    {"problem": "Brak przesyłek", "symptoms": "pusta skrzynka"},
+)
 
 
 async def test_the_agent_answers_at_once_by_default() -> None:
@@ -45,7 +48,7 @@ async def test_the_agent_plays_its_turns_in_order() -> None:
     first  = await agent.run(state)
     second = await agent.run(state)
 
-    assert first["messages"][0].tool_calls[0].name == "find_tickets"
+    assert first["messages"][0].tool_calls[0].name == "find_tickets_vector"
     assert second["messages"][0].content          == "Odpowiedź"
 
     with pytest.raises(LLMError):
@@ -55,7 +58,7 @@ async def test_the_agent_plays_its_turns_in_order() -> None:
 async def test_run_tools_answers_every_call_by_its_id() -> None:
     """Tura z wywołaniem narzędzia → jedna wiadomość `tool` z tym samym `call_id` i źródła, jeśli
     je podano."""
-    ref   = SourceRef(source="find_tickets", item_id="90001", title="Brak przesyłek", score=0.91)
+    ref   = SourceRef(source="tickets", item_id="90001", title="Brak przesyłek", score=0.91)
     state = State(input_text="x", messages=[SEARCH])
 
     update = await FakeRunTools(result_text="Znalezione zgłoszenia: 1", sources=[ref]).run(state)
@@ -98,4 +101,4 @@ async def test_the_agent_logs_which_tools_it_called() -> None:
     """Tura z wywołaniem narzędzia → wpis w logu nazywa narzędzie, nie cytuje argumentów."""
     update = await FakeAgent([SEARCH]).run(State(input_text="x"))
 
-    assert update["log"][0].message == "tura 1: narzędzia: find_tickets"
+    assert update["log"][0].message == "tura 1: narzędzia: find_tickets_vector"

@@ -2,8 +2,12 @@ from collections.abc import Sequence
 from datetime import date
 
 from app.model.ticket_parsed import ParsedTicket
-from app.tools.find_tickets.base import FindTicketsBase
-from app.tools.find_tickets.models import FindTicketsQuery, FindTicketsResult, FoundTicket
+from app.tools.find_tickets_vector.base import FindTicketsVectorBase
+from app.tools.find_tickets_vector.models import (
+    FindTicketsVectorQuery,
+    FindTicketsVectorResult,
+    FoundTicket,
+)
 
 
 def default_tickets() -> list[FoundTicket]:
@@ -61,12 +65,12 @@ def default_tickets() -> list[FoundTicket]:
     return tickets
 
 
-class FakeFindTickets(FindTicketsBase):
+class FakeFindTicketsVector(FindTicketsVectorBase):
     """
     Description:
-    Atrapa `find_tickets`: zamiast embeddera i Qdranta zwraca ustalony zestaw zgłoszeń, zawsze
-    ten sam, ze stałymi id. Służy grafom na atrapach i testom, którym wystarczy wiedzieć, CO agent
-    dostał, a nie jak zostało znalezione.
+    Atrapa `find_tickets_vector`: zamiast embeddera i Qdranta zwraca ustalony zestaw zgłoszeń,
+    zawsze ten sam, ze stałymi id. Służy grafom na atrapach i testom, którym wystarczy wiedzieć, CO
+    agent dostał, a nie jak zostało znalezione.
 
     Flow:
         1. Test (albo fabryka przy atrapach) tworzy ją z własnymi zgłoszeniami albo z zestawem
@@ -89,29 +93,31 @@ class FakeFindTickets(FindTicketsBase):
             dropped_below_threshold=0
 
         Example result:
-            FakeFindTickets zwracająca wbudowane trzy zgłoszenia przy każdym wyszukaniu
+            FakeFindTicketsVector zwracająca wbudowane trzy zgłoszenia przy każdym wyszukaniu
         """
-        self._result = FindTicketsResult(
+        self._result = FindTicketsVectorResult(
             items                   = list(tickets) if tickets is not None else default_tickets(),
             dropped_below_threshold = dropped_below_threshold,
         )
 
         # Publiczne celowo: testy sprawdzają, o co pytał agent.
-        self.queries: list[FindTicketsQuery] = []
+        self.queries: list[FindTicketsVectorQuery] = []
 
     async def search(
         self,
-        query: FindTicketsQuery,  # np. FindTicketsQuery(problem="Nie przychodzą przesyłki", …)
-    ) -> FindTicketsResult:
+        query: FindTicketsVectorQuery,  # np. FindTicketsVectorQuery(problem="Brak przesyłek", …)
+    ) -> FindTicketsVectorResult:
         """
         Description:
         Zapisuje zapytanie i zwraca ustalony wynik — niezależnie od treści zapytania.
 
         Example args:
-            query=FindTicketsQuery(problem="Nie przychodzą przesyłki", symptoms="pusta skrzynka")
+            query=FindTicketsVectorQuery(problem="Nie przychodzą przesyłki",
+                                         symptoms="pusta skrzynka")
 
         Example result:
-            FindTicketsResult(items=[FoundTicket(score=0.91, …), …], dropped_below_threshold=0)
+            FindTicketsVectorResult(items=[FoundTicket(score=0.91, …), …],
+                                    dropped_below_threshold=0)
         """
         self.queries.append(query)
 

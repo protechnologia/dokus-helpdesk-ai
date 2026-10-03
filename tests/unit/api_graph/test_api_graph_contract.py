@@ -10,8 +10,8 @@ from pydantic import BaseModel
 import app.graph
 from app.anonymization import AnonymizedText
 from app.graph import merge_sources
-from app.tools.find_docs.fake import FakeFindDocs
-from app.tools.find_tickets.fake import FakeFindTickets
+from app.tools.find_docs_vector.fake import FakeFindDocsVector
+from app.tools.find_tickets_vector.fake import FakeFindTicketsVector
 
 
 def all_graphs() -> list[ModuleType]:
@@ -39,7 +39,7 @@ GRAPHS         = all_graphs()
 RESPOND_GRAPHS = [graph for graph in GRAPHS if hasattr(graph, "RESPOND_TOOL_NAME")]
 
 # Każde narzędzie wiedzy, jakie dziś istnieje — test wybiera z nich dozwolone dla grafu.
-KNOWLEDGE_TOOLS = [FakeFindTickets(), FakeFindDocs()]
+KNOWLEDGE_TOOLS = [FakeFindTicketsVector(), FakeFindDocsVector()]
 
 # Znacznik zamiast tekstu po anonimizacji — gdy jest w prompcie, a tekstu surowego nie ma, prompt
 # wziął treść z `anonymized`.
@@ -126,7 +126,7 @@ def allowed_tools(
         graph=<module app.graph.search>
 
     Example result:
-        [FakeFindTickets(), FakeFindDocs()]
+        [FakeFindTicketsVector(), FakeFindDocsVector()]
     """
     return [tool for tool in KNOWLEDGE_TOOLS if tool.name in graph.TOOL_NAMES]
 
@@ -244,14 +244,14 @@ def test_the_model_sees_exactly_the_allowed_tools(graph: ModuleType) -> None:
 
 @pytest.mark.parametrize(
     "graph",
-    [graph for graph in GRAPHS if "find_tickets" not in graph.TOOL_NAMES],
+    [graph for graph in GRAPHS if "find_tickets_vector" not in graph.TOOL_NAMES],
     ids=name_of,
 )
 def test_a_tool_outside_the_list_is_refused(graph: ModuleType) -> None:
-    """Graf bez `find_tickets` na liście dozwolonych → podanie go to błąd składania, nie cichy
-    dostęp do indeksu (bramki i „Popraw" mają działać przy pustym indeksie)."""
+    """Graf bez `find_tickets_vector` na liście dozwolonych → podanie go to błąd składania, nie
+    cichy dostęp do indeksu (bramki i „Popraw" mają działać przy pustym indeksie)."""
     with pytest.raises(ValueError):
-        graph.model_tools([FakeFindTickets()])
+        graph.model_tools([FakeFindTicketsVector()])
 
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)

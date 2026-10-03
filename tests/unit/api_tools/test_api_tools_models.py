@@ -7,7 +7,7 @@ from app.tools import SourceRef
 
 
 def make_ref(
-    source:  str = "find_tickets",                           # e.g. "find_docs"
+    source:  str = "find_tickets_vector",                           # e.g. "find_docs_vector"
     item_id: str = "33644",                                  # e.g. "doc-7"
     title:   str = "Wysyłka przez ePUAP kończy się błędem",  # e.g. "Instrukcja administratora 4.12"
 ) -> SourceRef:
@@ -16,12 +16,12 @@ def make_ref(
     Builds a valid source reference, so each test changes only the one field it is about.
 
     Example args:
-        source="find_tickets"
+        source="tickets"
         item_id="33644"
         title="Wysyłka przez ePUAP kończy się błędem"
 
     Example result:
-        SourceRef(source="find_tickets", item_id="33644", title="Wysyłka…", score=0.87, …)
+        SourceRef(source="tickets", item_id="33644", title="Wysyłka…", score=0.87, …)
     """
     return SourceRef(
         source  = source,
@@ -35,10 +35,10 @@ def make_ref(
 def test_key_tells_sources_apart() -> None:
     """The same id from two tools → two different keys, so de-duplicating the sources of one
     answer never merges a ticket with a documentation fragment."""
-    ticket   = make_ref(source="find_tickets", item_id="33644")
-    fragment = make_ref(source="find_docs",    item_id="33644")
+    ticket   = make_ref(source="tickets", item_id="33644")
+    fragment = make_ref(source="docs",    item_id="33644")
 
-    assert ticket.key   == "find_tickets:33644"
+    assert ticket.key   == "tickets:33644"
     assert ticket.key   != fragment.key
 
 
@@ -46,7 +46,7 @@ def test_a_ref_without_a_score_is_refused() -> None:
     """A reference with no score → ValidationError: every source comes from a search, and a
     default would let an unranked source pass as ranked."""
     with pytest.raises(ValidationError):
-        SourceRef(source="find_docs", item_id="doc-7", title="Instrukcja administratora 4.12")
+        SourceRef(source="docs", item_id="doc-7", title="Instrukcja administratora 4.12")
 
 
 @pytest.mark.parametrize("field", ["source", "item_id", "title"])
@@ -61,4 +61,4 @@ def test_an_unknown_field_is_refused() -> None:
     """A key outside the contract → ValidationError, the same reasoning as on ParsedTicket: drift
     is a mistake to surface, not an extension to absorb."""
     with pytest.raises(ValidationError):
-        SourceRef(source="find_tickets", item_id="33644", title="x", score=0.87, rank=1)
+        SourceRef(source="tickets", item_id="33644", title="x", score=0.87, rank=1)

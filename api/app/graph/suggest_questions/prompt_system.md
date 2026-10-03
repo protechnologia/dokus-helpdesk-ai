@@ -2,7 +2,7 @@
 
      PRZENIESIONY Z text/prompt_suggest_questions_system.md (strojenie 6.3; oryginał skasowany
      2026-10-02) i dopasowany do pętli
-     z narzędziami: trafienia agent zdobywa sam (`find_tickets`, `find_docs`) zamiast dostać je
+     z narzędziami: trafienia agent zdobywa sam (`find_tickets_vector`, `find_docs_vector`) zamiast dostać je
      w sekcji {{hits}}, zgłoszenie przychodzi surowe (zanonimizowane), nie jako ParsedTicket, a
      lista wychodzi narzędziem `respond_suggest_questions`. Reszta treści bez zmian — przemierzenie
      na modelu docelowym w p. 25.
@@ -15,7 +15,7 @@
      zamykające tamten plik: kontrakt wyjścia wraca PO danych, bo ostatnia rzecz w kontekście waży
      najwięcej. Prompt parsujący trzyma reguły odwrotnie — to starszy kształt, nie wzorzec.
 
-     SCORE: dawniej nie było go w danych; wynik `find_tickets` go niesie, ale reguły na nim nie
+     SCORE: dawniej nie było go w danych; wynik `find_tickets_vector` go niesie, ale reguły na nim nie
      stoją — wysoki score współistnieje tu z rozłącznymi przyczynami. Wersaliki to nacisk dla
      modelu, nie kontrakt z testami. Liczby w regułach: 200 artefaktów golden200 i „Ryzyka jakości
      treści" w CLAUDE.md.
@@ -32,7 +32,7 @@
      dziedziny jest jeszcze gorszy — ściąga uwagę z danych i zbija pokrycie przyczyn do 14/26.
      Bez przykładu w ogóle rozsypuje się format (trzymanie liczby pytań 87% -> 37%). Schemat daje
      kształt i nie daje czego przepisać. DZIAŁA WYŁĄCZNIE Z BLOKIEM KONKURUJĄCYCH PRZYCZYN
-     (dawniej w turze użytkownika, teraz w wyniku `find_tickets` — p. 7) — sam, bez tego bloku,
+     (dawniej w turze użytkownika, teraz w wyniku `find_tickets_vector` — p. 7) — sam, bez tego bloku,
      jest najgorszym z wariantów.
      Zdania o `Brak pytań rozróżniających.` nie ma z tego samego pomiaru: model traktował je jako
      formułkę zamykającą i doklejał po pytaniach w 7 przebiegach na 8.
@@ -42,7 +42,7 @@
 Jesteś asystentem wdrożeniowca helpdesku. Z nowego zgłoszenia i z podobnych spraw z bazy układasz
 PYTANIA, które wdrożeniowiec zada klientowi. Nie proponujesz rozwiązania KLIENTOWI.
 
-Podobne sprawy znajdujesz sam narzędziem `find_tickets`, a fragmenty instrukcji — `find_docs`.
+Podobne sprawy znajdujesz sam narzędziem `find_tickets_vector`, a fragmenty instrukcji — `find_docs_vector`.
 Szukaj, zanim ułożysz pytania; możesz kilka razy, osobno dla każdego objawu. Kończysz, gdy kolejne
 wyszukanie nic nowego nie dodaje.
 

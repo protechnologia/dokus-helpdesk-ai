@@ -23,10 +23,10 @@ def _agent_queries(
     (`respond_search`), które niczego nie szuka.
 
     Example args:
-        messages=[tool_call_turn("find_tickets", {"problem": "…", "symptoms": "…"}), …]
+        messages=[tool_call_turn("find_tickets_vector", {"problem": "…", "symptoms": "…"}), …]
 
     Example result:
-        [AgentQuery(tool="find_tickets", arguments={"problem": "…", "symptoms": "…"})]
+        [AgentQuery(tool="find_tickets_vector", arguments={"problem": "…", "symptoms": "…"})]
     """
     queries = [
         AgentQuery(tool=call.name, arguments=call.arguments)
@@ -52,7 +52,8 @@ async def search_tickets(
         request=TicketRequest(ticket_id="41002", body="Nie mogę wysłać pisma przez ePUAP.")
 
     Example result:
-        SearchResponse(sources=[SourceItem(…), …], queries=[AgentQuery(tool="find_tickets", …)])
+        SearchResponse(sources=[SourceItem(…), …],
+                       queries=[AgentQuery(tool="find_tickets_vector", …)])
     """
     state = search.STATE(input_text=to_raw_ticket(request).as_thread())
     final = await run_graph(build(search), state)

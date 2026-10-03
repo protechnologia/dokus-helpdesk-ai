@@ -23,7 +23,7 @@ TICKET_PLACEHOLDER = "{{ticket}}"
 STATE = SearchState
 
 # Narzędzia wiedzy dozwolone w tym grafie; opis każdego dla modelu leży obok jako `<nazwa>.md`.
-TOOL_NAMES: tuple[str, ...] = ("find_tickets", "find_docs")
+TOOL_NAMES: tuple[str, ...] = ("find_tickets_vector", "find_docs_vector")
 
 
 def system_prompt() -> str:
@@ -65,19 +65,19 @@ def user_prompt(
 
 
 def model_tools(
-    tools: Sequence[KnowledgeSource],  # np. [FakeFindTickets(), FakeFindDocs()]
+    tools: Sequence[KnowledgeSource],  # np. [FakeFindTicketsVector(), FakeFindDocsVector()]
 ) -> list[ToolDefinition]:
     """
     Description:
     Narzędzia, które model widzi w tym grafie: podane narzędzia wiedzy (z listy dozwolonych) i na
-    końcu `respond_search`. `find_docs` bywa nieobecne — bez kolekcji dokumentacji nie trafia do
-    rejestru (p. 8).
+    końcu `respond_search`. `find_docs_vector` bywa nieobecne — bez kolekcji dokumentacji nie trafia
+    do rejestru (p. 8).
 
     Example args:
-        tools=[FakeFindTickets(), FakeFindDocs()]
+        tools=[FakeFindTicketsVector(), FakeFindDocsVector()]
 
     Example result:
-        [ToolDefinition(name="find_tickets", …), ToolDefinition(name="find_docs", …),
+        [ToolDefinition(name="find_tickets_vector", …), ToolDefinition(name="find_docs_vector", …),
          ToolDefinition(name="respond_search", …)]
 
     Raises:
@@ -90,7 +90,7 @@ def model_tools(
 
 def build_graph(
     anonymize: Node,  # np. AnonymizeNode(FakeAnonymizer())
-    agent:     Node,  # np. FakeAgent([tool_call_turn("find_tickets", …), …])
+    agent:     Node,  # np. FakeAgent([tool_call_turn("find_tickets_vector", …), …])
     run_tools: Node,  # np. FakeRunTools(sources=[…])
     respond:   Node,  # np. FakeRespond(SearchDone())
 ) -> CompiledStateGraph:

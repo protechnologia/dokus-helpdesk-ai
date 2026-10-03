@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.tools.find_tickets import FindTicketsQuery, FoundTicket
+from app.tools.find_tickets_vector import FindTicketsVectorQuery, FoundTicket
 
 # Zgłoszenie z prawdziwą treścią — w kształcie, w jakim `TicketPoint.from_ticket` zapisuje payload.
 VALID_TICKET = {
@@ -26,14 +26,14 @@ def test_an_empty_query_field_is_refused(field: str) -> None:
     query = {"problem": "Wysyłka ePUAP kończy się błędem", "symptoms": "komunikat o braku sieci"}
 
     with pytest.raises(ValidationError):
-        FindTicketsQuery(**{**query, field: ""})
+        FindTicketsVectorQuery(**{**query, field: ""})
 
 
 def test_a_query_with_an_invented_argument_is_refused() -> None:
     """Argument spoza schematu → ValidationError: liczbę trafień ustawia konfiguracja, a model
     wymyślający parametry ma być widoczny, nie po cichu pominięty."""
     with pytest.raises(ValidationError):
-        FindTicketsQuery(problem="Błąd wysyłki", symptoms="nie dotyczy", limit=50)
+        FindTicketsVectorQuery(problem="Błąd wysyłki", symptoms="nie dotyczy", limit=50)
 
 
 def test_the_ticket_is_validated_by_its_own_contract() -> None:

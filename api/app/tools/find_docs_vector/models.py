@@ -3,14 +3,14 @@ from datetime import date as Date
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class FindDocsQuery(BaseModel):
+class FindDocsVectorQuery(BaseModel):
     """
     Description:
-    O co agent pyta `find_docs`: zagadnienie albo słowa kluczowe funkcji czy procedury, której
-    wyjaśnienia potrzebuje. Dopasowywane znaczeniowo do fragmentów dokumentacji.
+    O co agent pyta `find_docs_vector`: zagadnienie albo słowa kluczowe funkcji czy procedury,
+    której wyjaśnienia potrzebuje. Dopasowywane znaczeniowo do fragmentów dokumentacji.
     """
 
-    # Nieznany argument to błąd, jak w FindTicketsQuery.
+    # Nieznany argument to błąd, jak w FindTicketsVectorQuery.
     model_config = ConfigDict(extra="forbid")
 
     text: str = Field(min_length=1, examples=["uprawnienia kancelaria e-Doręczenia"])
@@ -19,7 +19,7 @@ class FindDocsQuery(BaseModel):
 class FoundDoc(BaseModel):
     """
     Description:
-    Jeden fragment dokumentacji produktu zwrócony przez `find_docs`.
+    Jeden fragment dokumentacji produktu zwrócony przez `find_docs_vector`.
 
     Kształt TYMCZASOWY: czy dokumentacja istnieje i w jakiej formie, jest wciąż otwarte
     (CLAUDE.md -> „Plan i TODO", p. 15), więc są tu tylko pola, których plan już wymaga — który
@@ -38,11 +38,11 @@ class FoundDoc(BaseModel):
     text:        str         = Field(min_length=1, examples=["Aby nadać uprawnienie, otwórz…"])
 
 
-class FindDocsResult(BaseModel):
+class FindDocsVectorResult(BaseModel):
     """
     Description:
-    Co dało jedno wyszukiwanie `find_docs`: fragmenty, które przeszły próg, i liczba odciętych —
-    liczona z tego samego powodu co w `FindTicketsResult`.
+    Co dało jedno wyszukiwanie `find_docs_vector`: fragmenty, które przeszły próg, i liczba
+    odciętych — liczona z tego samego powodu co w `FindTicketsVectorResult`.
     """
 
     model_config = ConfigDict(extra="forbid")

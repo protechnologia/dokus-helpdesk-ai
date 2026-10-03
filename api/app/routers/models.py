@@ -50,7 +50,7 @@ class SourceItem(BaseModel):
     powstał. Powstaje z `cite()` narzędzi, nigdy z deklaracji modelu (zasada 9).
     """
 
-    source:  str         = Field(examples=["find_tickets"])
+    source:  str         = Field(examples=["tickets"])
     item_id: str         = Field(examples=["33644"])
     title:   str         = Field(examples=["Wysyłka przez ePUAP kończy się błędem"])
     score:   float       = Field(examples=[0.87])

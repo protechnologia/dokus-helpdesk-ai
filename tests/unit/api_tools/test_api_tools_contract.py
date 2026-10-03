@@ -18,7 +18,7 @@ def all_knowledge_sources() -> list[type[KnowledgeSource]]:
         (brak)
 
     Example result:
-        [FakeFindTickets, FakeFindDocs]
+        [FakeFindTicketsVector, FakeFindDocsVector]
     """
     for module in pkgutil.iter_modules(app.tools.__path__):
         if module.ispkg:
@@ -60,6 +60,26 @@ def test_every_query_model_refuses_unknown_arguments(source: type[KnowledgeSourc
     """Każdy `query_model` → `extra="forbid"`: model wymyślający argumenty ma dostać błąd, a nie
     zostać po cichu zignorowany."""
     assert source.query_model.model_config.get("extra") == "forbid"
+
+
+@pytest.mark.parametrize("source", SOURCES, ids=lambda cls: cls.__name__)
+def test_every_source_names_its_material(source: type[KnowledgeSource]) -> None:
+    """Każde źródło → niepusta `source` inna niż `name`: na listę źródeł trafia nazwa materiału,
+    więc to samo zgłoszenie znalezione dwoma narzędziami jest na niej raz."""
+    assert isinstance(getattr(source, "source", None), str) and source.source
+    assert source.source != source.name
+
+
+def test_real_and_fake_of_one_tool_share_a_material() -> None:
+    """Materiał → jeden na pakiet narzędzia: źródła z atrapy i z prawdziwego narzędzia mają ten
+    sam klucz, inaczej test na atrapie sprawdzałby inną listę źródeł niż produkcja."""
+    materials_per_package: dict[str, set[str]] = {}
+
+    for source in SOURCES:
+        package = source.__module__.split(".")[2]
+        materials_per_package.setdefault(package, set()).add(source.source)
+
+    assert all(len(materials) == 1 for materials in materials_per_package.values())
 
 
 def test_real_and_fake_of_one_tool_share_a_name_and_no_two_tools_do() -> None:

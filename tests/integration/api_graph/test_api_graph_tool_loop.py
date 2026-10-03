@@ -65,4 +65,4 @@ async def test_sources_and_queries_come_from_the_run(graph: ModuleType) -> None:
     query = state.messages[0].tool_calls[0]
 
     assert [ref.item_id for ref in state.sources] == ["90001", "90002", "90003"]
-    assert (query.name, query.arguments)          == ("find_tickets", FAKE_SEARCH_ARGUMENTS)
+    assert (query.name, query.arguments)          == ("find_tickets_vector", FAKE_SEARCH_ARGUMENTS)

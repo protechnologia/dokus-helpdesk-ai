@@ -53,17 +53,17 @@ def to_raw_ticket(
 
 
 def to_source_items(
-    sources: list[SourceRef],  # np. [SourceRef(source="find_tickets", item_id="33644", …)]
+    sources: list[SourceRef],  # np. [SourceRef(source="tickets", item_id="33644", …)]
 ) -> list[SourceItem]:
     """
     Description:
     Zamienia źródła ze stanu grafu na model API, pole po polu.
 
     Example args:
-        sources=[SourceRef(source="find_tickets", item_id="33644", title="…", score=0.87)]
+        sources=[SourceRef(source="tickets", item_id="33644", title="…", score=0.87)]
 
     Example result:
-        [SourceItem(source="find_tickets", item_id="33644", title="…", score=0.87, date=None)]
+        [SourceItem(source="tickets", item_id="33644", title="…", score=0.87, date=None)]
     """
     items = [
         SourceItem(

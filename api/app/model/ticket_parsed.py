@@ -168,8 +168,8 @@ class ParsedTicket(BaseModel):
         """
         Description:
         Tekst, z którego powstaje wektor tego rekordu. Składa go `build_embedding_text()` — ta sama
-        funkcja, której używa zapytanie w `find_tickets`, więc obie strony porównania nie mogą się
-        po cichu rozjechać.
+        funkcja, której używa zapytanie w `find_tickets_vector`, więc obie strony porównania nie
+        mogą się po cichu rozjechać.
 
         Example args:
             (brak)

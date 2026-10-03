@@ -12,7 +12,7 @@ DEFAULT_ANSWER = "fake-agent-answer"
 
 
 def tool_call_turn(
-    name:      str,             # np. "find_tickets"
+    name:      str,             # np. "find_tickets_vector"
     arguments: dict[str, Any],  # np. {"problem": "Brak przesyłek", "symptoms": "pusta skrzynka"}
     call_id:   str = "call_1",  # np. "call_2"
 ) -> ChatMessage:
@@ -21,11 +21,11 @@ def tool_call_turn(
     Buduje turę modelu z jednym wywołaniem narzędzia — do zaplanowania w `FakeAgent`.
 
     Example args:
-        name="find_tickets"
+        name="find_tickets_vector"
         arguments={"problem": "Brak przesyłek", "symptoms": "pusta skrzynka"}
 
     Example result:
-        ChatMessage(role="assistant", tool_calls=[ToolCall(name="find_tickets", …)])
+        ChatMessage(role="assistant", tool_calls=[ToolCall(name="find_tickets_vector", …)])
     """
     turn = ChatMessage(
         role       = "assistant",
@@ -60,7 +60,8 @@ class FakeAgent(Node):
         Ustala tury, które atrapa odda, i zakłada dziennik wywołań.
 
         Example args:
-            turns=[tool_call_turn("find_tickets", {…}), ChatMessage(role="assistant", content="…")]
+            turns=[tool_call_turn("find_tickets_vector", {…}),
+                   ChatMessage(role="assistant", content="…")]
 
         Example result:
             FakeAgent oddająca te dwie tury po kolei

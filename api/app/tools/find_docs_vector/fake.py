@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import date
 
 from app.tools.base import KnowledgeSource
-from app.tools.find_docs.models import FindDocsQuery, FindDocsResult, FoundDoc
+from app.tools.find_docs_vector.models import FindDocsVectorQuery, FindDocsVectorResult, FoundDoc
 from app.tools.models import SourceRef
 
 
@@ -41,11 +41,11 @@ def default_docs() -> list[FoundDoc]:
     ]
 
 
-class FakeFindDocs(KnowledgeSource):
+class FakeFindDocsVector(KnowledgeSource):
     """
     Description:
-    Atrapa `find_docs`: zamiast kolekcji dokumentacji zwraca ustalony zestaw fragmentów, zawsze
-    ten sam, ze stałymi id. Ta sama rola co `FakeFindTickets`.
+    Atrapa `find_docs_vector`: zamiast kolekcji dokumentacji zwraca ustalony zestaw fragmentów,
+    zawsze ten sam, ze stałymi id. Ta sama rola co `FakeFindTicketsVector`.
 
     Flow:
         1. Test tworzy ją z własnymi fragmentami albo z zestawem wbudowanym.
@@ -53,8 +53,9 @@ class FakeFindDocs(KnowledgeSource):
         3. `render_for_model()` i `cite()` działają na wyniku jak w prawdziwym narzędziu.
     """
 
-    name        = "find_docs"
-    query_model = FindDocsQuery
+    name        = "find_docs_vector"
+    source      = "docs"
+    query_model = FindDocsVectorQuery
 
     def __init__(
         self,
@@ -70,29 +71,30 @@ class FakeFindDocs(KnowledgeSource):
             dropped_below_threshold=0
 
         Example result:
-            FakeFindDocs zwracająca wbudowane dwa fragmenty przy każdym wyszukaniu
+            FakeFindDocsVector zwracająca wbudowane dwa fragmenty przy każdym wyszukaniu
         """
-        self._result = FindDocsResult(
+        self._result = FindDocsVectorResult(
             items                   = list(docs) if docs is not None else default_docs(),
             dropped_below_threshold = dropped_below_threshold,
         )
 
         # Publiczne celowo: testy sprawdzają, o co pytał agent.
-        self.queries: list[FindDocsQuery] = []
+        self.queries: list[FindDocsVectorQuery] = []
 
     async def search(
         self,
-        query: FindDocsQuery,  # np. FindDocsQuery(text="uprawnienia kancelaria")
-    ) -> FindDocsResult:
+        query: FindDocsVectorQuery,  # np. FindDocsVectorQuery(text="uprawnienia kancelaria")
+    ) -> FindDocsVectorResult:
         """
         Description:
         Zapisuje zapytanie i zwraca ustalony wynik — niezależnie od treści zapytania.
 
         Example args:
-            query=FindDocsQuery(text="uprawnienia kancelaria e-Doręczenia")
+            query=FindDocsVectorQuery(text="uprawnienia kancelaria e-Doręczenia")
 
         Example result:
-            FindDocsResult(items=[FoundDoc(fragment_id="doc-1", …), …], dropped_below_threshold=0)
+            FindDocsVectorResult(items=[FoundDoc(fragment_id="doc-1", …), …],
+                                 dropped_below_threshold=0)
         """
         self.queries.append(query)
 
@@ -100,7 +102,7 @@ class FakeFindDocs(KnowledgeSource):
 
     def render_for_model(
         self,
-        result: FindDocsResult,  # np. FindDocsResult(items=[…])
+        result: FindDocsVectorResult,  # np. FindDocsVectorResult(items=[…])
     ) -> str:
         """
         Description:
@@ -108,7 +110,7 @@ class FakeFindDocs(KnowledgeSource):
         i wersją, żeby model mógł zaznaczyć, którego wydania dotyczy instrukcja.
 
         Example args:
-            result=FindDocsResult(items=[FoundDoc(…)], dropped_below_threshold=0)
+            result=FindDocsVectorResult(items=[FoundDoc(…)], dropped_below_threshold=0)
 
         Example result:
             "Znalezione fragmenty dokumentacji: 1 (odcięte progiem: 0)\\n\\n[doc-1] …"
@@ -129,22 +131,22 @@ class FakeFindDocs(KnowledgeSource):
 
     def cite(
         self,
-        result: FindDocsResult,  # np. FindDocsResult(items=[…])
+        result: FindDocsVectorResult,  # np. FindDocsVectorResult(items=[…])
     ) -> list[SourceRef]:
         """
         Description:
         Jeden wpis na każdy fragment z wyniku; tytułem jest dokument z wersją.
 
         Example args:
-            result=FindDocsResult(items=[FoundDoc(fragment_id="doc-1", …)])
+            result=FindDocsVectorResult(items=[FoundDoc(fragment_id="doc-1", …)])
 
         Example result:
-            [SourceRef(source="find_docs", item_id="doc-1",
+            [SourceRef(source="docs", item_id="doc-1",
                        title="Instrukcja administratora 4.12", …)]
         """
         return [
             SourceRef(
-                source  = self.name,
+                source  = self.source,
                 item_id = found.fragment_id,
                 title   = f"{found.document} {found.version}",
                 score   = found.score,

@@ -29,7 +29,7 @@ class FakeRunTools(Node):
     def __init__(
         self,
         result_text: str = DEFAULT_TOOL_RESULT,  # np. "Znalezione zgłoszenia: 3 …"
-        sources:     Sequence[SourceRef] = (),   # np. [SourceRef(source="find_tickets", …)]
+        sources:     Sequence[SourceRef] = (),   # np. [SourceRef(source="tickets", …)]
     ):
         """
         Description:
@@ -37,7 +37,7 @@ class FakeRunTools(Node):
 
         Example args:
             result_text="Znalezione zgłoszenia: 3"
-            sources=[SourceRef(source="find_tickets", item_id="90001", …)]
+            sources=[SourceRef(source="tickets", item_id="90001", …)]
 
         Example result:
             FakeRunTools odpowiadająca tym tekstem na każde wywołanie
@@ -57,11 +57,12 @@ class FakeRunTools(Node):
         Odpowiada na wywołania narzędzi z ostatniej tury modelu.
 
         Example args:
-            state=SuggestSolutionState(messages=[tool_call_turn("find_tickets", {…})], …)
+            state=SuggestSolutionState(messages=[tool_call_turn("find_tickets_vector", {…})], …)
 
         Example result:
             {"messages": [ChatMessage(role="tool", call_id="call_1", content="…")],
-             "log": [LogEntry(node="run_tools", message="wywołania: find_tickets; źródła: 1")],
+             "log": [LogEntry(node="run_tools",
+                              message="wywołania: find_tickets_vector; źródła: 1")],
              "sources": [SourceRef(…)]}
         """
         self.calls.append(state)

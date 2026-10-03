@@ -13,13 +13,15 @@ def test_a_tool_result_must_point_at_its_call() -> None:
 
 def test_only_the_model_requests_tools() -> None:
     """Wywołania narzędzi w wiadomości `user` → ValidationError: narzędzia zleca wyłącznie model."""
+    call = ToolCall(call_id="call_1", name="find_tickets_vector")
+
     with pytest.raises(ValidationError):
-        ChatMessage(role="user", tool_calls=[ToolCall(call_id="call_1", name="find_tickets")])
+        ChatMessage(role="user", tool_calls=[call])
 
 
 def test_a_model_turn_with_a_tool_call_is_valid() -> None:
     """Odpowiedź modelu z wywołaniem i wynik z tym samym `call_id` → oba poprawne."""
-    call = ToolCall(call_id="call_1", name="find_tickets", arguments={"problem": "x"})
+    call = ToolCall(call_id="call_1", name="find_tickets_vector", arguments={"problem": "x"})
 
     request = ChatMessage(role="assistant", tool_calls=[call])
     answer  = ChatMessage(role="tool", content="Znalezione zgłoszenia: 3", call_id="call_1")

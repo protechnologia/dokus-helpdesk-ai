@@ -1,7 +1,7 @@
 """
 Description:
-Test ewaluacyjny narzędzia `find_tickets` na golden secie: czy narzędzie w konfiguracji, z jaką
-jedzie produkt, oddaje agentowi zgłoszenie, o które pyta zapytanie, i czy na zapytania bez
+Test ewaluacyjny narzędzia `find_tickets_vector` na golden secie: czy narzędzie w konfiguracji,
+z jaką jedzie produkt, oddaje agentowi zgłoszenie, o które pyta zapytanie, i czy na zapytania bez
 odpowiednika w bazie nie oddaje nic. Wymaga działającego stacku z zaindeksowanym korpusem
 odniesienia.
 
@@ -19,7 +19,7 @@ Co się dzieje po drodze:
 
 1. Czyta zapytania z `data/golden/golden200.json` (162, każde ze wskazanym rekordem-celem)
    i z `data/golden/distractors.json` (16, bez odpowiednika w indeksie).
-2. Każde wysyła do `FindTickets` polami `query_problem` i `query_symptoms`, na skonfigurowanej
+2. Każde wysyła do `FindTicketsVector` polami `query_problem` i `query_symptoms`, na skonfigurowanej
    kolekcji, z `RAG_TOP_K` i `RAG_SCORE_MIN` z konfiguracji.
 3. Liczy, ile razy rekord-cel wrócił jako pierwszy, ile razy wrócił w ogóle i ile dystraktorów
    dostało choć jedno trafienie.
@@ -49,7 +49,7 @@ import pytest
 from app.config import Settings
 from app.embedding import EmbeddingClient
 from app.retrieval import QdrantClient
-from app.tools.find_tickets import FindTickets, FindTicketsQuery
+from app.tools.find_tickets_vector import FindTicketsVector, FindTicketsVectorQuery
 from tests.conftest import build_host_settings
 
 pytestmark = [
@@ -83,7 +83,7 @@ class Measurement(NamedTuple):
     distractors_with_hits: int  # dystraktory z co najmniej jednym trafieniem
 
 
-def _load_golden_queries() -> list[tuple[str, FindTicketsQuery]]:
+def _load_golden_queries() -> list[tuple[str, FindTicketsVectorQuery]]:
     """
     Description:
     Czyta zapytania golden setu w kształcie narzędzia, każde w parze z id rekordu-celu.
@@ -92,13 +92,16 @@ def _load_golden_queries() -> list[tuple[str, FindTicketsQuery]]:
         (brak)
 
     Example result:
-        [("90001", FindTicketsQuery(problem="Nie przychodzą przesyłki…", symptoms="…")), …]
+        [("90001", FindTicketsVectorQuery(problem="Nie przychodzą przesyłki…", symptoms="…")), …]
     """
     golden  = json.loads(GOLDEN_FILE.read_text(encoding="utf-8"))
     queries = [
         (
             str(entry["expected_ticket_id"]),
-            FindTicketsQuery(problem=entry["query_problem"], symptoms=entry["query_symptoms"]),
+            FindTicketsVectorQuery(
+                problem  = entry["query_problem"],
+                symptoms = entry["query_symptoms"],
+            ),
         )
         for entry in golden["queries"]
     ]
@@ -106,7 +109,7 @@ def _load_golden_queries() -> list[tuple[str, FindTicketsQuery]]:
     return queries
 
 
-def _load_distractor_queries() -> list[FindTicketsQuery]:
+def _load_distractor_queries() -> list[FindTicketsVectorQuery]:
     """
     Description:
     Czyta dystraktory w kształcie narzędzia: zapytania, na które poprawną odpowiedzią jest pusta
@@ -116,11 +119,11 @@ def _load_distractor_queries() -> list[FindTicketsQuery]:
         (brak)
 
     Example result:
-        [FindTicketsQuery(problem="Nie drukuje się raport kasowy", symptoms="…"), …]
+        [FindTicketsVectorQuery(problem="Nie drukuje się raport kasowy", symptoms="…"), …]
     """
     distractors = json.loads(DISTRACTORS_FILE.read_text(encoding="utf-8"))
     queries     = [
-        FindTicketsQuery(problem=entry["query_problem"], symptoms=entry["query_symptoms"])
+        FindTicketsVectorQuery(problem=entry["query_problem"], symptoms=entry["query_symptoms"])
         for entry in distractors["queries"]
     ]
 
@@ -132,7 +135,7 @@ async def _measure(
 ) -> Measurement:
     """
     Description:
-    Przepuszcza oba zestawy przez `FindTickets` zbudowane tak jak w produkcie: skonfigurowana
+    Przepuszcza oba zestawy przez `FindTicketsVector` zbudowane tak jak w produkcie: skonfigurowana
     kolekcja, `RAG_TOP_K` i `RAG_SCORE_MIN` z konfiguracji. Pustą kolekcję odrzuca od razu —
     inaczej wszystkie liczby wyszłyby zerowe i wyglądały na zepsute wyszukiwanie.
 
@@ -156,7 +159,7 @@ async def _measure(
         collection = settings.qdrant_collection,
         timeout    = settings.qdrant_timeout_seconds,
     )
-    tool = FindTickets(
+    tool = FindTicketsVector(
         embedder  = embedder,
         qdrant    = qdrant,
         top_k     = settings.rag_top_k,

@@ -17,16 +17,16 @@ Grafy (CLAUDE.md -> „Plan i TODO", p. 5; dziś na atrapach węzłów). Bez nar
 to anonymize → agent → respond, z nimi anonymize → agent ⇄ run_tools → respond. Każdy kończy się
 wywołaniem `respond_<graf>`, poza `parse_ticket` (JSON w tekście — p. 24):
 
-| graf                | narzędzia wiedzy        | wynik          |
-|---------------------|-------------------------|----------------|
-| `gate_close`        | —                       | `Verdict`      |
-| `gate_reply`        | —                       | `Verdict`      |
-| `search`            | find_tickets, find_docs | `SearchDone`   |
-| `parse_ticket`      | —                       | `ParsedTicket` |
-| `suggest_questions` | find_tickets, find_docs | `Proposal`     |
-| `suggest_solution`  | find_tickets, find_docs | `Proposal`     |
-| `suggest_handoff`   | —                       | `Proposal`     |
-| `polish`            | —                       | `PolishedText` |
+| graf                | narzędzia wiedzy                      | wynik          |
+|---------------------|---------------------------------------|----------------|
+| `gate_close`        | —                                     | `Verdict`      |
+| `gate_reply`        | —                                     | `Verdict`      |
+| `search`            | find_tickets_vector, find_docs_vector | `SearchDone`   |
+| `parse_ticket`      | —                                     | `ParsedTicket` |
+| `suggest_questions` | find_tickets_vector, find_docs_vector | `Proposal`     |
+| `suggest_solution`  | find_tickets_vector, find_docs_vector | `Proposal`     |
+| `suggest_handoff`   | —                                     | `Proposal`     |
+| `polish`            | —                                     | `PolishedText` |
 """
 
 import langsmith

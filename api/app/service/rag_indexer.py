@@ -275,7 +275,7 @@ class TicketIndexer:
 
         for start in range(0, len(tickets), EMBED_BATCH_SIZE):
             batch = tickets[start : start + EMBED_BATCH_SIZE]
-            # Ten sam tekst składa zapytanie w `find_tickets` — obie strony przez
+            # Ten sam tekst składa zapytanie w `find_tickets_vector` — obie strony przez
             # `build_embedding_text()`, żeby nie rozjechały się bezgłośnie.
             texts = [ticket.embedding_text() for ticket in batch]
 

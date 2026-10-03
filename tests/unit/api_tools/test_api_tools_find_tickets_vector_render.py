@@ -3,10 +3,14 @@ from datetime import date
 import pytest
 
 from app.model.ticket_parsed import ParsedTicket
-from app.tools.find_tickets import FakeFindTickets, FindTicketsResult, FoundTicket
-from app.tools.find_tickets.base import CAUSE_NOT_ESTABLISHED, CAUSES_HEADING
+from app.tools.find_tickets_vector import (
+    FakeFindTicketsVector,
+    FindTicketsVectorResult,
+    FoundTicket,
+)
+from app.tools.find_tickets_vector.base import CAUSE_NOT_ESTABLISHED, CAUSES_HEADING
 
-# Tekst dla modelu i lista źródeł są wspólne dla narzędzia i atrapy (`FindTicketsBase`), więc
+# Tekst dla modelu i lista źródeł są wspólne dla narzędzia i atrapy (`FindTicketsVectorBase`), więc
 # sprawdzamy je na atrapie z produkcji — bez embeddera i Qdranta.
 
 
@@ -62,8 +66,8 @@ def _render(
     Example result:
         "Znalezione zgłoszenia: 1 (odcięte progiem: 0)\\n\\nPrzyczyny (`cause`) w trafieniach:…"
     """
-    result = FindTicketsResult(items=list(items))
-    text   = FakeFindTickets().render_for_model(result)
+    result = FindTicketsVectorResult(items=list(items))
+    text   = FakeFindTicketsVector().render_for_model(result)
 
     return text
 
@@ -124,8 +128,8 @@ def test_error_codes_are_joined_and_their_absence_is_said_out_loud() -> None:
 
 def test_an_empty_result_is_the_header_alone() -> None:
     """Brak trafień → sam nagłówek z licznikami, bez pustego bloku przyczyn."""
-    tool = FakeFindTickets()
-    text = tool.render_for_model(FindTicketsResult(items=[], dropped_below_threshold=3))
+    tool = FakeFindTicketsVector()
+    text = tool.render_for_model(FindTicketsVectorResult(items=[], dropped_below_threshold=3))
 
     assert text == "Znalezione zgłoszenia: 0 (odcięte progiem: 3)"
 

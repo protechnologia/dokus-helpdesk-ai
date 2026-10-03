@@ -23,7 +23,7 @@ TICKET_PLACEHOLDER = "{{ticket}}"
 STATE = SuggestQuestionsState
 
 # Narzędzia wiedzy dozwolone w tym grafie; opis każdego dla modelu leży obok jako `<nazwa>.md`.
-TOOL_NAMES: tuple[str, ...] = ("find_tickets", "find_docs")
+TOOL_NAMES: tuple[str, ...] = ("find_tickets_vector", "find_docs_vector")
 
 # Wariant działa przy pustym indeksie — trafienia wzbogacają pytania, ale nie są konieczne.
 REQUIRES_HITS = False
@@ -73,7 +73,7 @@ def user_prompt(
 
 
 def model_tools(
-    tools: Sequence[KnowledgeSource],  # np. [FakeFindTickets(), FakeFindDocs()]
+    tools: Sequence[KnowledgeSource],  # np. [FakeFindTicketsVector(), FakeFindDocsVector()]
 ) -> list[ToolDefinition]:
     """
     Description:
@@ -81,10 +81,10 @@ def model_tools(
     końcu `respond_suggest_questions`.
 
     Example args:
-        tools=[FakeFindTickets(), FakeFindDocs()]
+        tools=[FakeFindTicketsVector(), FakeFindDocsVector()]
 
     Example result:
-        [ToolDefinition(name="find_tickets", …), ToolDefinition(name="find_docs", …),
+        [ToolDefinition(name="find_tickets_vector", …), ToolDefinition(name="find_docs_vector", …),
          ToolDefinition(name="respond_suggest_questions", …)]
 
     Raises:
@@ -97,7 +97,7 @@ def model_tools(
 
 def build_graph(
     anonymize: Node,  # np. AnonymizeNode(FakeAnonymizer())
-    agent:     Node,  # np. FakeAgent([tool_call_turn("find_tickets", …), …])
+    agent:     Node,  # np. FakeAgent([tool_call_turn("find_tickets_vector", …), …])
     run_tools: Node,  # np. FakeRunTools(sources=[…])
     respond:   Node,  # np. FakeRespond(Proposal(text="…"))
 ) -> CompiledStateGraph:

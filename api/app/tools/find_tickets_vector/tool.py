@@ -1,21 +1,21 @@
 """
 Description:
-Prawdziwe narzędzie `find_tickets`: na zapytanie agenta znajduje w Qdrancie historyczne zgłoszenia
-o podobnym problemie. Nie woła LLM-a ani parsera — tylko embedder i Qdranta.
+Prawdziwe narzędzie `find_tickets_vector`: na zapytanie agenta znajduje w Qdrancie historyczne
+zgłoszenia o podobnym problemie. Nie woła LLM-a ani parsera — tylko embedder i Qdranta.
 
     zapytanie agenta → tekst do embeddingu → wektor (tryb query) → Qdrant (wektory `problem`)
                      → próg `RAG_SCORE_MIN` → zgłoszenia z payloadu
 
 Przed — zapytanie agenta:
 
-    FindTicketsQuery(
+    FindTicketsVectorQuery(
         problem  = "Nie przychodzą przesyłki z e-Doręczeń",
         symptoms = "Brak nowych przesyłek w skrzynce, nadawcy potwierdzają wysyłkę",
     )
 
 Po — wynik `search()` (Qdrant oddał 5 trafień, próg 0.48 przeszły 2):
 
-    FindTicketsResult(
+    FindTicketsVectorResult(
         items = [
             FoundTicket(score=0.71, ticket=ParsedTicket(ticket_id="90001", …)),
             FoundTicket(score=0.52, ticket=ParsedTicket(ticket_id="90003", …)),
@@ -52,8 +52,12 @@ from app.embedding import EmbeddingClient
 from app.model.ticket_parsed import ParsedTicket
 from app.retrieval import VECTOR_PROBLEM, QdrantClient, RetrievalConfigError, TicketHit
 from app.service.builder_embedding_text import build_embedding_text
-from app.tools.find_tickets.base import FindTicketsBase
-from app.tools.find_tickets.models import FindTicketsQuery, FindTicketsResult, FoundTicket
+from app.tools.find_tickets_vector.base import FindTicketsVectorBase
+from app.tools.find_tickets_vector.models import (
+    FindTicketsVectorQuery,
+    FindTicketsVectorResult,
+    FoundTicket,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -98,10 +102,10 @@ def found_ticket_from_hit(
     return found
 
 
-class FindTickets(FindTicketsBase):
+class FindTicketsVector(FindTicketsVectorBase):
     """
     Description:
-    `find_tickets` na prawdziwym indeksie: embedder liczy wektor zapytania, Qdrant znajduje
+    `find_tickets_vector` na prawdziwym indeksie: embedder liczy wektor zapytania, Qdrant znajduje
     najbliższe zgłoszenia, próg odcina za słabe.
 
     Do czego:
@@ -134,7 +138,7 @@ class FindTickets(FindTicketsBase):
             score_min=0.48
 
         Example result:
-            FindTickets gotowe do wyszukiwania w kolekcji `tickets`
+            FindTicketsVector gotowe do wyszukiwania w kolekcji `tickets`
         """
         self._embedder  = embedder
         self._qdrant    = qdrant
@@ -143,19 +147,19 @@ class FindTickets(FindTicketsBase):
 
     async def search(
         self,
-        query: FindTicketsQuery,  # np. FindTicketsQuery(problem="Nie przychodzą przesyłki", …)
-    ) -> FindTicketsResult:
+        query: FindTicketsVectorQuery,  # np. FindTicketsVectorQuery(problem="Brak przesyłek", …)
+    ) -> FindTicketsVectorResult:
         """
         Description:
         Znajduje zgłoszenia o problemie podobnym do zapytania, od najbardziej podobnego, już
         przycięte progiem.
 
         Example args:
-            query=FindTicketsQuery(problem="Nie przychodzą przesyłki z e-Doręczeń",
+            query=FindTicketsVectorQuery(problem="Nie przychodzą przesyłki z e-Doręczeń",
                                    symptoms="Brak nowych przesyłek w skrzynce")
 
         Example result:
-            FindTicketsResult(items=[FoundTicket(score=0.71, …)], dropped_below_threshold=3)
+            FindTicketsVectorResult(items=[FoundTicket(score=0.71, …)], dropped_below_threshold=3)
 
         Raises:
             EmbeddingError: embedder jest nieosiągalny albo odpowiedział błędem
@@ -182,13 +186,13 @@ class FindTickets(FindTicketsBase):
 
         # Same liczby: treść zapytania i trafień to dane klienta.
         logger.info(
-            "find_tickets hits=%d dropped=%d score_min=%.3f",
+            "find_tickets_vector hits=%d dropped=%d score_min=%.3f",
             len(kept),
             dropped,
             self._score_min,
         )
 
-        result = FindTicketsResult(
+        result = FindTicketsVectorResult(
             items                   = [found_ticket_from_hit(hit) for hit in kept],
             dropped_below_threshold = dropped,
         )

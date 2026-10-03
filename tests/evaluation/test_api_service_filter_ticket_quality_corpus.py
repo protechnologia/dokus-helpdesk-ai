@@ -142,7 +142,7 @@ def test_filter_does_not_reject_good_records(measurement: tuple[int, int]) -> No
 
 def test_unknown_causes_are_still_recognised() -> None:
     """`no_cause()` na korpusie odniesienia → nadal rozpoznaje blisko połowę rekordów jako bez
-    ustalonej przyczyny: gdyby zamilkło, blok przyczyn w `find_tickets` pokazywałby „Brak
+    ustalonej przyczyny: gdyby zamilkło, blok przyczyn w `find_tickets_vector` pokazywałby „Brak
     ustalonej przyczyny…" jako przyczyny."""
     if not CORPUS_DIR.is_dir():
         pytest.skip(f"brak korpusu referencyjnego ({CORPUS_DIR}) — dane nie są w repo")

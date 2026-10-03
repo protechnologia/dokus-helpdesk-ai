@@ -2,7 +2,7 @@
 Description:
 Wszystko, co może wywołać pętla agenta. Wspólne kontrakty i `SourceRef` importuje się stąd
 (`from app.tools import KnowledgeSource`); to, co należy do jednego narzędzia — jego modele —
-z pakietu tego narzędzia (`from app.tools.find_tickets import FoundTicket`).
+z pakietu tego narzędzia (`from app.tools.find_tickets_vector import FoundTicket`).
 
 Do czego:
 Dwa rodzaje narzędzi, rozdzielone kontraktem (patrz `base.py`):
@@ -22,12 +22,13 @@ narzędzie będzie miało własne błędy do zgłoszenia. Nowe narzędzie to now
 czyta MODEL, leży obok adaptera w każdym grafie, nie tutaj: to treść promptu, czytana zdanie po
 zdaniu, i może się różnić między grafami używającymi tego samego narzędzia.
 
-| narzędzie      | rodzaj                    | zapytanie agenta             | na czym stoi        |
-|----------------|---------------------------|------------------------------|---------------------|
-| `find_tickets` | źródło wiedzy             | `problem` + `symptoms`       | embedder → Qdrant   |
-| `find_docs`    | źródło wiedzy, opcjonalne | zagadnienie / słowa kluczowe | kolekcja dokumentów |
+| narzędzie             | rodzaj             | zapytanie agenta             | na czym stoi        |
+|-----------------------|--------------------|------------------------------|---------------------|
+| `find_tickets_vector` | źródło wiedzy      | `problem` + `symptoms`       | embedder → Qdrant   |
+| `find_docs_vector`    | źródło, opcjonalne | zagadnienie / słowa kluczowe | kolekcja dokumentów |
 
-`find_tickets` ma narzędzie właściwe i atrapę; `find_docs` na razie samą atrapę (p. 8).
+`find_tickets_vector` ma narzędzie właściwe i atrapę; `find_docs_vector` na razie samą atrapę (p.
+8).
 """
 
 from app.tools.base import AuxiliaryTool, KnowledgeSource

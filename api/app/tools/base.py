@@ -34,8 +34,12 @@ class KnowledgeSource(ABC):
     co najwyżej skierować agenta do nietrafionego materiału, nigdy zmienić zawartości indeksu.
     """
 
-    # Nazwa narzędzia; trafia też do `SourceRef.source`.
+    # Nazwa narzędzia — pod nią woła je model.
     name: ClassVar[str]
+
+    # Nazwa MATERIAŁU („tickets", „docs"); trafia do `SourceRef.source`. Narzędzia szukające w tym
+    # samym materiale różnymi drogami mają ją wspólną, więc to samo zgłoszenie jest źródłem raz.
+    source: ClassVar[str]
 
     # Klasa zapytania: adapter robi z niej schemat argumentów dla modelu i nią je waliduje.
     query_model: ClassVar[type[BaseModel]]
@@ -43,7 +47,7 @@ class KnowledgeSource(ABC):
     @abstractmethod
     async def search(
         self,
-        query: BaseModel,  # np. FindTicketsQuery(problem="Wysyłka ePUAP kończy się błędem", …)
+        query: BaseModel,  # np. FindTicketsVectorQuery(problem="Wysyłka ePUAP z błędem", …)
     ) -> BaseModel:
         """
         Description:
@@ -51,18 +55,18 @@ class KnowledgeSource(ABC):
         źródła. Przyjmuje obiekt klasy `query_model` i zwraca własny wynik źródła.
 
         Example args:
-            query=FindTicketsQuery(problem="Wysyłka przez ePUAP kończy się błędem",
-                                   symptoms="Po kliknięciu Wyślij komunikat o braku sieci")
+            query=FindTicketsVectorQuery(problem="Wysyłka przez ePUAP kończy się błędem",
+                                         symptoms="Po kliknięciu Wyślij komunikat o braku sieci")
 
         Example result:
-            FindTicketsResult(items=[FoundTicket(score=0.87, ticket=ParsedTicket(…))],
-                              dropped_below_threshold=2)
+            FindTicketsVectorResult(items=[FoundTicket(score=0.87, ticket=ParsedTicket(…))],
+                                    dropped_below_threshold=2)
         """
 
     @abstractmethod
     def render_for_model(
         self,
-        result: BaseModel,  # np. FindTicketsResult(items=[…])
+        result: BaseModel,  # np. FindTicketsVectorResult(items=[…])
     ) -> str:
         """
         Description:
@@ -70,7 +74,7 @@ class KnowledgeSource(ABC):
         Strukturalny wynik nigdy nie trafia do modelu wprost — model widzi wyłącznie ten tekst.
 
         Example args:
-            result=FindTicketsResult(items=[FoundTicket(…)], dropped_below_threshold=2)
+            result=FindTicketsVectorResult(items=[FoundTicket(…)], dropped_below_threshold=2)
 
         Example result:
             "Znalezione zgłoszenia: 1 (odcięte progiem: 2)\\n\\nPrzyczyny (`cause`) w
@@ -80,7 +84,7 @@ class KnowledgeSource(ABC):
     @abstractmethod
     def cite(
         self,
-        result: BaseModel,  # np. FindTicketsResult(items=[…])
+        result: BaseModel,  # np. FindTicketsVectorResult(items=[…])
     ) -> list[SourceRef]:
         """
         Description:
@@ -89,10 +93,10 @@ class KnowledgeSource(ABC):
         źródło. Lista źródeł powstaje stąd, nigdy z tego, co model deklaruje, że wykorzystał.
 
         Example args:
-            result=FindTicketsResult(items=[FoundTicket(score=0.87, ticket=ParsedTicket(…))])
+            result=FindTicketsVectorResult(items=[FoundTicket(score=0.87, ticket=ParsedTicket(…))])
 
         Example result:
-            [SourceRef(source="find_tickets", item_id="33644", title="Wysyłka przez ePUAP…",
+            [SourceRef(source="tickets", item_id="33644", title="Wysyłka przez ePUAP…",
                        score=0.87, date=date(2026, 3, 14))]
         """
 

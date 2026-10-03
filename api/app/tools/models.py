@@ -6,8 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field
 class SourceRef(BaseModel):
     """
     Description:
-    Jeden wpis na liście źródeł, które cytuje odpowiedź: które narzędzie co znalazło, z jakim
-    podobieństwem i kiedy materiał powstał.
+    Jeden wpis na liście źródeł, które cytuje odpowiedź: z jakiego materiału pochodzi („tickets",
+    „docs"), co to jest, z jakim podobieństwem je znaleziono i kiedy powstało.
 
     Do czego:
     JEDYNY model wspólny dla wszystkich narzędzi agenta. Każde narzędzie trzyma swoje zapytanie,
@@ -36,7 +36,7 @@ class SourceRef(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    source:  str         = Field(min_length=1, examples=["find_tickets"])
+    source:  str         = Field(min_length=1, examples=["tickets"])
     item_id: str         = Field(min_length=1, examples=["33644"])
     title:   str         = Field(min_length=1, examples=["Wysyłka przez ePUAP kończy się błędem"])
     score:   float       = Field(examples=[0.87])
@@ -47,14 +47,15 @@ class SourceRef(BaseModel):
         """
         Description:
         Tożsamość źródła we wszystkich narzędziach. Id są unikalne tylko w obrębie jednego
-        narzędzia — zgłoszenie i fragment dokumentacji mogą oba mieć „33644" — więc usuwanie
+        materiału — zgłoszenie i fragment dokumentacji mogą oba mieć „33644" — więc usuwanie
         powtórzeń w źródłach jednej odpowiedzi po samym `item_id` po cichu scaliłoby dwa
-        niezwiązane materiały.
+        niezwiązane materiały. `source` nazywa materiał, nie narzędzie: to samo zgłoszenie
+        znalezione dwoma narzędziami ma jeden klucz i trafia na listę raz.
 
         Example args:
             (brak)
 
         Example result:
-            "find_tickets:33644"
+            "tickets:33644"
         """
         return f"{self.source}:{self.item_id}"

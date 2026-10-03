@@ -4,9 +4,10 @@ Graf `suggest_solution` — wariant generacji „Gotowa odpowiedź": rozwiązani
 wyłącznie z podobnych spraw, które agent sam znajduje. Wynik to `Proposal`; źródła z `cite()`
 leżą w `sources`.
 
-Przebieg: anonymize → pętla agent ⇄ run_tools → respond. Narzędzia: `find_tickets`, `find_docs`
-(opisy dla modelu obok, jako `.md`); koniec wywołaniem `respond_suggest_solution`. Bez trafień nie
-ma propozycji (`REQUIRES_HITS = True`, egzekwuje `respond` — p. 11).
+Przebieg: anonymize → pętla agent ⇄ run_tools → respond. Narzędzia: `find_tickets_vector`,
+`find_docs_vector` (opisy dla modelu obok, jako `.md`); koniec wywołaniem
+`respond_suggest_solution`. Bez trafień nie ma propozycji (`REQUIRES_HITS = True`, egzekwuje
+`respond` — p. 11).
 
 Status: na atrapach węzłów (`fake.py`); prompt przeniesiony z dawnego
 `text/prompt_suggest_solution_*`, przemierzenie na modelu docelowym w p. 26 (CLAUDE.md ->

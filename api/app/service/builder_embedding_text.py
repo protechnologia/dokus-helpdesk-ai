@@ -6,7 +6,7 @@ linii. Jedyne miejsce, które to robi — wołają je obie strony porównania:
 | strona     | kto woła                        | tryb embeddera |
 |------------|---------------------------------|----------------|
 | indeksacja | `ParsedTicket.embedding_text()` | passage        |
-| zapytanie  | narzędzie `find_tickets`        | query          |
+| zapytanie  | narzędzie `find_tickets_vector` | query          |
 
 Przed — dwa pola:
 

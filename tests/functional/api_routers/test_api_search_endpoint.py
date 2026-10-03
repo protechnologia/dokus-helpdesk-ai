@@ -23,7 +23,7 @@ def test_sources_and_agent_queries_go_out() -> None:
     assert response.status_code == 200
     assert [item["item_id"] for item in response.json()["sources"]] == ["90001", "90002", "90003"]
     assert response.json()["queries"] == [
-        {"tool": "find_tickets", "arguments": FAKE_SEARCH_ARGUMENTS},
+        {"tool": "find_tickets_vector", "arguments": FAKE_SEARCH_ARGUMENTS},
     ]
 
 

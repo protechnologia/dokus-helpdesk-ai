@@ -1,13 +1,13 @@
 """
 Description:
-To, co wspólne dla prawdziwego `find_tickets` i jego atrapy: nazwa, klasa zapytania, tekst dla
-modelu (`render_for_model()`) i lista źródeł (`cite()`). Narzędzie i atrapa różnią się wyłącznie
+To, co wspólne dla prawdziwego `find_tickets_vector` i jego atrapy: nazwa, klasa zapytania, tekst
+dla modelu (`render_for_model()`) i lista źródeł (`cite()`). Narzędzie i atrapa różnią się wyłącznie
 tym, skąd biorą wynik (`search()`), więc test na atrapie sprawdza ten sam tekst, który model
 dostanie na produkcji.
 
 Przed — wynik wyszukiwania:
 
-    FindTicketsResult(
+    FindTicketsVectorResult(
         items = [
             FoundTicket(score=0.91, ticket=ParsedTicket(ticket_id="90001", …)),
             FoundTicket(score=0.86, ticket=ParsedTicket(ticket_id="90003", cause="brak", …)),
@@ -58,7 +58,11 @@ O czym pamiętać przy zmianach:
 
 from app.service.normalizer_sentinel import no_cause
 from app.tools.base import KnowledgeSource
-from app.tools.find_tickets.models import FindTicketsQuery, FindTicketsResult, FoundTicket
+from app.tools.find_tickets_vector.models import (
+    FindTicketsVectorQuery,
+    FindTicketsVectorResult,
+    FoundTicket,
+)
 from app.tools.models import SourceRef
 
 CAUSE_NOT_ESTABLISHED = "(nie ustalono)"
@@ -98,28 +102,29 @@ def render_ticket(
     return "\n".join(lines)
 
 
-class FindTicketsBase(KnowledgeSource):
+class FindTicketsVectorBase(KnowledgeSource):
     """
     Description:
-    Wspólna część `find_tickets`: wszystko poza samym wyszukaniem.
+    Wspólna część `find_tickets_vector`: wszystko poza samym wyszukaniem.
 
     Do czego:
-    Po tej klasie dziedziczą `FindTickets` (embedder i Qdrant) oraz `FakeFindTickets` (ustalony
-    zestaw). Każda dokłada wyłącznie `search()`, więc tekst dla modelu i lista źródeł są te same
-    w testach i na produkcji.
+    Po tej klasie dziedziczą `FindTicketsVector` (embedder i Qdrant) oraz `FakeFindTicketsVector`
+    (ustalony zestaw). Każda dokłada wyłącznie `search()`, więc tekst dla modelu i lista źródeł są
+    te same w testach i na produkcji.
 
     Flow:
-        1. `search()` podklasy zwraca `FindTicketsResult`.
+        1. `search()` podklasy zwraca `FindTicketsVectorResult`.
         2. `render_for_model()` robi z niego tekst: nagłówek, blok przyczyn, rekordy.
         3. `cite()` robi z niego listę źródeł — po jednym wpisie na rekord z tekstu.
     """
 
-    name        = "find_tickets"
-    query_model = FindTicketsQuery
+    name        = "find_tickets_vector"
+    source      = "tickets"
+    query_model = FindTicketsVectorQuery
 
     def render_for_model(
         self,
-        result: FindTicketsResult,  # np. FindTicketsResult(items=[…], dropped_below_threshold=1)
+        result: FindTicketsVectorResult,  # np. FindTicketsVectorResult(items=[…])
     ) -> str:
         """
         Description:
@@ -127,7 +132,7 @@ class FindTicketsBase(KnowledgeSource):
         wszystkich trafień i rekordy. Bez trafień zostaje sam nagłówek.
 
         Example args:
-            result=FindTicketsResult(items=[FoundTicket(…)], dropped_below_threshold=1)
+            result=FindTicketsVectorResult(items=[FoundTicket(…)], dropped_below_threshold=1)
 
         Example result:
             "Znalezione zgłoszenia: 1 (odcięte progiem: 1)\\n\\nPrzyczyny (`cause`) w
@@ -161,21 +166,21 @@ class FindTicketsBase(KnowledgeSource):
 
     def cite(
         self,
-        result: FindTicketsResult,  # np. FindTicketsResult(items=[…])
+        result: FindTicketsVectorResult,  # np. FindTicketsVectorResult(items=[…])
     ) -> list[SourceRef]:
         """
         Description:
         Jeden wpis na każde zgłoszenie z wyniku; tytułem jest `problem`.
 
         Example args:
-            result=FindTicketsResult(items=[FoundTicket(score=0.91, ticket=ParsedTicket(…))])
+            result=FindTicketsVectorResult(items=[FoundTicket(score=0.91, ticket=ParsedTicket(…))])
 
         Example result:
-            [SourceRef(source="find_tickets", item_id="90001", title="Nie przychodzą…", …)]
+            [SourceRef(source="tickets", item_id="90001", title="Nie przychodzą…", …)]
         """
         refs = [
             SourceRef(
-                source  = self.name,
+                source  = self.source,
                 item_id = found.ticket.ticket_id,
                 title   = found.ticket.problem,
                 score   = found.score,

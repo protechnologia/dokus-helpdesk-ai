@@ -4,10 +4,10 @@ Normalizacja sentineli: rozpoznaje pola sparsowanego zgłoszenia, które mówią
 własnymi słowami. Parser ma w takim wypadku wpisać dosłownie `brak`, ale często pisze całe zdanie,
 które wygląda jak treść — tu wszystkie te zapisy sprowadzają się do jednej odpowiedzi tak/nie.
 
-| funkcja         | pole       | kto woła                                 | na golden200 |
-|-----------------|------------|------------------------------------------|--------------|
-| `no_solution()` | `solution` | reguła `no_resolution` filtra jakości    | 29 rekordów  |
-| `no_cause()`    | `cause`    | blok przyczyn w narzędziu `find_tickets` | 98 rekordów  |
+| funkcja         | pole       | kto woła                                        | na golden200 |
+|-----------------|------------|-------------------------------------------------|--------------|
+| `no_solution()` | `solution` | reguła `no_resolution` filtra jakości           | 29 rekordów  |
+| `no_cause()`    | `cause`    | blok przyczyn w narzędziu `find_tickets_vector` | 98 rekordów  |
 
 Przykłady:
 
