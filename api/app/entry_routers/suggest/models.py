@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from app.entry_routers.models import SourceItem, TicketRequest, UsageItem
+from app.entry_routers.models import LogItem, SourceItem, TicketRequest, UsageItem
 
 
 class SuggestRequest(TicketRequest):
@@ -26,6 +26,7 @@ class SuggestResponse(BaseModel):
     text:    str              = Field(examples=["1. Od kiedy nie przychodzą przesyłki? …"])
     sources: list[SourceItem] = Field(default_factory=list)
     usage:   UsageItem
+    log:     list[LogItem]    = Field(default_factory=list)
 
 
 class VariantInfo(BaseModel):

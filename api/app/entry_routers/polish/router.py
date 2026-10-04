@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from app.agent_graphs import polish, run_graph
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
 from app.core_service.loader_dict_rules import get_rule_set
-from app.entry_routers.mapping import to_usage_item
+from app.entry_routers.mapping import to_log_items, to_usage_item
 from app.entry_routers.polish.models import PolishRequest, PolishResponse
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,7 @@ async def polish_text(
     response = PolishResponse(
         text  = final.output.text,
         usage = to_usage_item(final.usage),
+        log   = to_log_items(final.log),
     )
 
     return response

@@ -1389,6 +1389,10 @@ Wspólne:
   zgłoszenia daje `/parse-ticket`.
 - **Każda odpowiedź trasy opartej na grafie niesie `usage`** — liczbę wywołań modelu, tokeny
   w czterech klasach i `cost_usd` całej sprawy, żeby wołający widział koszt bez logów.
+- **Każda taka odpowiedź niesie też `log` (2026-10-04)** — wpisy przebiegu grafu ze stanu
+  (`node`, `message`), w kolejności wywołań węzłów, zawsze, bez flagi w żądaniu. `message` jest
+  tekstem dla człowieka, nie do parsowania; treści zgłoszenia w nim nie ma (pilnuje test trasy
+  `/search`).
 - **Źródła w odpowiedzi to materiał, który agent ODCZYTAŁ, i nie mają `score` (2026-10-04).**
   Odczyt po numerze nie zna podobieństwa; widzi je tylko model, w wyniku wyszukiwania. `/search`
   oddaje więc karty przeczytane przez agenta, a nie wszystko, co wyszukiwanie znalazło.
@@ -1815,9 +1819,18 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
     interfejsu), a wyjątek trzeba tłumaczyć w komentarzu przy każdym takim imporcie.
 - **Domyślnie `FakeLLMClient`** (offline) — `up` i `pytest` nic nie wysyłają i nic nie kosztują;
   realny dostawca włączany jawnie w ENV.
-- **Endpoint zgodny z API OpenAI** (Ollama, vLLM, proxy) → model lokalny tym samym klientem,
-  wystarczy `LLM_BASE_URL` + `LLM_MODEL`. **Tą samą drogą wchodzi model self-hosted** (RunPod,
-  Ollama na sąsiedniej maszynie).
+- **Klient OpenAI mówi API Responses, nie Chat Completions (2026-10-04).** Powód: `gpt-6.1-sol`
+  nie przyjmuje w Chat Completions narzędzi (żąda `reasoning_effort=none`, którego sam nie
+  obsługuje), a tura z narzędziami ma stanąć na tym samym kliencie. Na API Responses odpowiada
+  każdy z 14 modeli cennika, także starsze — sprawdzone po jednym wywołaniu na model. Żądanie
+  idzie ze `store: False`, bo to API domyślnie przechowuje odpowiedzi u dostawcy przez 30 dni.
+- **`temperature` u OpenAI przyjmują tylko rodziny `gpt-5.4` i `gpt-4.1`**; `gpt-6`, `gpt-5.6`,
+  `gpt-5.5` i `o4-mini` odpowiadają na nią błędem 400 (sprawdzone 2026-10-04). Klient trzyma
+  listę rodzin PRZYJMUJĄCYCH, jak klient Claude'a, więc nowy model parametru nie dostanie;
+  test pilnuje, że każdy wiersz cennika jest po jednej ze stron.
+- **Endpoint zgodny z API OpenAI** (Ollama, vLLM, RunPod) mówi Chat Completions i idzie przez
+  dostawcę `ollama` — osobnego klienta z zerowym cennikiem. `LLM_BASE_URL` przy dostawcy
+  `openai` to pośrednik, który mówi API Responses.
   Inny kształt API (Azure) → osobny klient, nie `if` w istniejącym.
 - **Wywołania async z jawnym timeoutem.**
 - **`temperature` z ENV** (domyślnie `0`) — parsowanie zgłoszeń zawsze na `0`.
@@ -1849,13 +1862,35 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Cztery klasy tokenów są rozłączne u każdego dostawcy:** `prompt_tokens` to samo świeże
   wejście, obok zapis do cache, odczyt z cache i wyjście. OpenAI podaje obie klasy cache wewnątrz
   licznika wejścia, więc rozdziela je klient; zapis jest tam inną stawką za te same tokeny, nie
-  dopłatą. Licznik zapisu u OpenAI znamy z SDK i dokumentacji, nie z żywej odpowiedzi — do
-  sprawdzenia przy p. 17.
+  dopłatą. Licznik zapisu przyszedł w żywej odpowiedzi `gpt-6.1-sol`: niemal całe nowe wejście
+  tury jest zapisem (świeże zostają pojedyncze tokeny), więc mnożnik 1,25 dotyczy tam prawie
+  każdego nowego tokenu.
 - **Pierwszy przebieg pętli na żywym modelu (2026-10-04, sonda poza repo: `gpt-5.4-mini`,
   zmyślone zgłoszenie, atrapy narzędzi):** cztery tury — oba wyszukiwania naraz, odczyt kart
   WSZYSTKICH znalezionych numerów, odczyt wątku zgłoszenia bez karty, odpowiedź; 0,0075 USD
   z cache wobec 0,0153 bez. Stały początek (prompt i osiem narzędzi) to 3,6 tys. tokenów. To
   jeden przypadek, nie pomiar — pomiar jest w p. 23–26.
+- **Ten sam przebieg na `gpt-6.1-sol` (2026-10-04, API Responses, rozumowanie domyślne):** cztery
+  tury, 0,0193 USD, 18 s, 15 tokenów rozumowania. Model użył tylko wyszukiwania wektorowego,
+  przeczytał karty wszystkich trzech numerów, a potem WĄTKI WSZYSTKICH TRZECH — wbrew promptowi
+  i opisowi narzędzia („czytaj te, które wybrałeś po kartach"). Na prawdziwych wątkach to będzie
+  główny koszt sprawy; do zmierzenia i przycięcia w p. 23–26. Zapis rozmowy:
+  `data/docs/przebieg-suggest-solution-gpt-6.1-sol-2026-10-04.md`.
+- **Po zmianie promptów tego samego dnia („instrukcje sprawdzasz zawsze", w `suggest_solution`
+  też ostrzejsze zdanie o wątkach) i powtórce sondy:** model woła `list_docs` w pierwszej turze
+  razem z wyszukiwaniem, więc bez dodatkowej tury, i czyta jedną sekcję — luźno związaną, która
+  trafia na listę źródeł, choć odpowiedź z niej nie korzysta. Wątki nadal czyta wszystkie: szukał
+  w nich szczegółów, których karty nie niosą, a to zdanie w prompcie dopuszcza. Koszt 0,0223 USD
+  (+15%). Jeden przebieg, nie pomiar.
+- **Trzecia sonda: sekcja instrukcji z tropem, którego nie ma w zgłoszeniach.** Model wybrał ze
+  spisu właściwą sekcję, przeczytał ją, a potem SPRAWDZAŁ jej trop w zgłoszeniach (drugie
+  wyszukiwanie wektorowe i tekstowe po dosłownym wpisie z instrukcji; 7 tur, 32 s). W odpowiedzi
+  trop trafił tylko do uwag dla wdrożeniowca, jako niepotwierdzony zgłoszeniami — bo prompt
+  `suggest_solution` kazał brać fakty wyłącznie z historycznych zgłoszeń. Po zmianie reguły
+  (fakty z odczytanych zgłoszeń I sekcji instrukcji) ten sam trop wszedł do odpowiedzi jako
+  pierwsza przyczyna i pierwszy krok, obok trzech przyczyn ze zgłoszeń, a uwaga dla wdrożeniowca
+  nazywa sekcję, na której stoi (4 tury, 0,0245 USD). „Instrukcje zawsze" i reguła o źródle
+  faktów muszą więc iść w parze.
 
 ### Prompty
 
@@ -2241,15 +2276,15 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 787 (0)            | 17 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 803 (0)            | 17 s |
 | integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 144 (53)           | 41 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 76 (9)             | 9 s  |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 78 (9)             | 9 s  |
 | ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 5 (3)              | 40 s |
 
 Liczby i czasy z 2026-10-04: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 9 s, a ewaluacyjne poniżej sekundy —
 całe 40 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
-(`pytest -m ""`): 1012 testów, 79 s.
+(`pytest -m ""`): 1030 testów, 79 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2718,7 +2753,8 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
   `complete()` i `FakeLLMClient` ze scenariuszem powstają tu; definicje narzędzi dla modelu
   (`ToolDefinition`) z `name`, opisu `.md` i `query_model`; limit iteracji i rozgałęzienie po
   wywołaniu: narzędzie wiedzy → `run_tools`, `respond_<graf>` → `respond`, sam tekst → błąd
-  formatu.
+  formatu; wiadomość w stanie grafu musi umieć przenieść nieprzezroczysty element dostawcy
+  (rozumowanie u OpenAI, blok myślenia u Claude'a), który trzeba odesłać w następnej turze.
   *Dlaczego:* pętla to logika domeny i żyje w grafie, nie w kliencie — inaczej wyniki narzędzi
   omijałyby granicę anonimizacji, a zmiana dostawcy zmieniałaby zachowanie pętli.
 - [ ] **10. `run_tools`** — wywołania wyłącznie z listy dozwolonych, argumenty walidowane
@@ -2772,12 +2808,14 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
 ### D. Model — zastępuje atrapę modelu z p. 9
 
 - [ ] **17. Tura z narzędziami u prawdziwych dostawców** — implementacja kontraktu z p. 9
-  w klientach Claude / OpenAI / Ollama; pętla zostaje w grafie. `tool_choice` zostaje `auto` —
-  sprawdzić, czy wymuszony u Claude wyklucza extended thinking; tryb strict u OpenAI wymaga
-  przetłumaczenia schematu (wszystkie pola wymagane); tura z narzędziami ma prosić o cache
-  promptu tak jak `complete()` u Claude'a i zwracać zużycie do `LLMUsage`; licznik zapisu do
-  cache u OpenAI sprawdzić na żywej odpowiedzi. *Dlaczego:* format wywołań narzędzi to wiedza
-  dostawcy (zasada 4).
+  w klientach Claude / OpenAI / Ollama; pętla zostaje w grafie. U OpenAI przez API Responses
+  (klient już na nim stoi), bez przechowywania u dostawcy: elementy rozumowania wracają do modelu
+  w następnej turze w postaci zaszyfrowanej. Wywołanie narzędzia WYMUSZONE tam, gdzie dostawca
+  pozwala łączyć je z rozumowaniem (każda tura ma być wywołaniem), w przeciwnym razie `auto`
+  z jednym ponowieniem — do sprawdzenia u obu dostawców; tryb strict u OpenAI wymaga
+  przetłumaczenia schematu (wszystkie pola wymagane), sonda szła bez niego; tura z narzędziami
+  ma prosić o cache promptu tak jak `complete()` u Claude'a i zwracać zużycie do `LLMUsage`.
+  *Dlaczego:* format wywołań narzędzi to wiedza dostawcy (zasada 4).
 - [ ] **18. Dwie role LLM w konfiguracji** — zaufana i generująca, z flagą per endpoint „może
   widzieć surowe dane", domyślnie wyłączoną. *Dlaczego:* pomyłka tej flagi to przeciek, więc
   wyłączenie ochrony ma być jawnym aktem w konfiguracji.
@@ -2832,7 +2870,12 @@ każdy mierzy się osobno.
   przyczyn przed rekordami. *Dlaczego:* część zabiegów z 6.3 powstała pod 11B, a znana dziura
   (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
 - [ ] **26. `suggest_solution`** — prompt z 6.4 przemierzony na modelu docelowym, z regułą
-  zgodności trafienia z objawem i osobną regułą ostrzeżenia o kroku nieodwracalnym; ewaluacja
+  zgodności trafienia z objawem i osobną regułą ostrzeżenia o kroku nieodwracalnym; do
+  rozstrzygnięcia pomiarem: kiedy model ma czytać wątki (w sondzie `gpt-6.1-sol` brał wszystkie,
+  także po zaostrzeniu zdania w prompcie), czy „instrukcje zawsze" nie dokłada do źródeł sekcji,
+  z których odpowiedź nie korzysta, i jak ważyć instrukcję wobec zgłoszeń (od 2026-10-04 prompt
+  bierze fakty z obu na równi; w sondzie krok z instrukcji stanął pierwszy, choć żadne
+  zgłoszenie go nie potwierdzało); ewaluacja
   wariantu. *Dlaczego:* ostrzeżenie nie padło w żadnym z czterech pomiarów, a bez reguły zgodności
   model kazał wygasić duplikat kontrahenta przy zgłoszeniu o przenoszeniu zasobów.
 - [ ] **27. `suggest_handoff`** — prompt niosący, co sprawdzono i czego brakuje; ewaluacja

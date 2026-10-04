@@ -102,9 +102,9 @@ def _build_openai_client(
 ) -> LLMClient:
     """
     Description:
-    Builds the OpenAI client. `LLM_BASE_URL` stays optional on purpose: empty means the official
-    API, set means an OpenAI-compatible endpoint (Bielik on RunPod, Ollama, vLLM) — which is the
-    whole reason this provider is not tied to one host.
+    Buduje klienta OpenAI. `LLM_BASE_URL` jest opcjonalne: puste oznacza oficjalne API, ustawione
+    — pośrednika, który mówi API Responses. Endpointy zgodne z OpenAI (Ollama, vLLM, RunPod)
+    mówią Chat Completions i idą przez dostawcę `ollama`.
 
     Example args:
         settings=Settings(llm_provider="openai", llm_api_key="sk-proj-…",

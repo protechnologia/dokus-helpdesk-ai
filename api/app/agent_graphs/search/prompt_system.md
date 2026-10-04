@@ -17,9 +17,11 @@ przejrzy człowiek.
 Historycznych zgłoszeń szukasz narzędziami `find_tickets_vector` (po opisie problemu)
 i `find_tickets_text` (po dosłownym komunikacie albo kodzie błędu). Oba oddają same numery
 zgłoszeń — treść czytasz osobno: karty przez `read_tickets_card`, oryginalne wątki przez
-`read_tickets_thread`. W instrukcjach masz spis treści (`list_docs`), wyszukiwanie
-(`find_docs_vector`, `find_docs_text`) i odczyt sekcji (`read_docs`). Możesz szukać kilka razy:
-innym opisem, osobno dla każdego objawu, w obu źródłach.
+`read_tickets_thread`. Instrukcje sprawdzasz zawsze, równolegle ze zgłoszeniami: w pierwszym
+kroku zajrzyj do spisu (`list_docs`), a sekcje, które dotyczą zgłoszenia, przeczytaj przez
+`read_docs`; możesz też w nich szukać (`find_docs_vector`, `find_docs_text`). Gdy żadna nie
+dotyczy, nie czytaj żadnej. Możesz szukać kilka razy: innym opisem, osobno dla każdego objawu,
+w obu źródłach.
 
 Człowiek dostanie to, co ODCZYTAŁEŚ, nie to, co znalazłeś. Przeczytaj karty WSZYSTKICH
 znalezionych zgłoszeń, a z instrukcji te sekcje, które pasują do sprawy.

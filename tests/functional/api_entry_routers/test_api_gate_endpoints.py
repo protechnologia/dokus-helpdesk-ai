@@ -90,13 +90,16 @@ def test_the_verdict_goes_out_with_the_override_and_the_rules_version(
     path:  str,
     body:  dict[str, str],
 ) -> None:
-    """Werdykt grafu → odpowiedź z uzasadnieniem i wskazówką, `overridable` = true (zasada 10)
-    i wersją zestawu reguł, którą go wydano."""
+    """Werdykt grafu → odpowiedź z uzasadnieniem i wskazówką, `overridable` = true (zasada 10),
+    wersją zestawu reguł, którą go wydano, i logiem przebiegu: anonimizacja, model, odpowiedź."""
     graph_name = graph.__name__.split(".")[-1]
     response   = client_with(GateGraph(graph)).post(path, json=body)
+    answer     = response.json()
+    log        = answer.pop("log")
 
     assert response.status_code == 200
-    assert response.json() == {
+    assert [entry["node"] for entry in log] == ["anonymize", "agent", "respond"]
+    assert answer == {
         "verdict":       "block",
         "reasons":       ["Nie widać, co zrobiono."],
         "missing":       [],

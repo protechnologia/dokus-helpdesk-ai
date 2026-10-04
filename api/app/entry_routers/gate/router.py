@@ -4,11 +4,12 @@ from fastapi import APIRouter, Depends
 
 from app.agent_graphs import gate_close, gate_reply, run_graph
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
+from app.agent_nodes.models import LogEntry
 from app.core_model.gate_verdict import Verdict
 from app.core_service.loader_dict_rules import get_rule_set
 from app.engine_llm import LLMUsage
 from app.entry_routers.gate.models import GateReplyRequest, VerdictResponse
-from app.entry_routers.mapping import to_raw_ticket, to_usage_item
+from app.entry_routers.mapping import to_log_items, to_raw_ticket, to_usage_item
 from app.entry_routers.models import TicketRequest
 
 logger = logging.getLogger(__name__)
@@ -17,19 +18,21 @@ router = APIRouter(tags=["gates"])
 
 
 def _to_response(
-    verdict:       Verdict,   # np. Verdict(verdict="block", reasons=["…"], hint="…")
-    rules_version: int,       # np. 1
-    usage:         LLMUsage,  # np. LLMUsage(calls=1, prompt_tokens=2100, cost_usd=0.0091)
+    verdict:       Verdict,         # np. Verdict(verdict="block", reasons=["…"], hint="…")
+    rules_version: int,             # np. 1
+    usage:         LLMUsage,        # np. LLMUsage(calls=1, prompt_tokens=2100, cost_usd=0.0091)
+    log:           list[LogEntry],  # np. [LogEntry(node="agent", message="tura 1: …"), …]
 ) -> VerdictResponse:
     """
     Description:
-    Zamienia werdykt grafu na odpowiedź bramki — z furtką, wersją zestawu reguł i zużyciem
-    modelu.
+    Zamienia werdykt grafu na odpowiedź bramki — z furtką, wersją zestawu reguł, zużyciem
+    modelu i logiem przebiegu.
 
     Example args:
         verdict=Verdict(verdict="block", reasons=["Nie widać, co zrobiono."], hint="Dopisz…")
         rules_version=1
         usage=LLMUsage(calls=1, prompt_tokens=2100, completion_tokens=90, cost_usd=0.0091)
+        log=[LogEntry(node="anonymize", message="zanonimizowano 72 zn.")]
 
     Example result:
         VerdictResponse(verdict="block", …, overridable=True, rules_version=1)
@@ -41,6 +44,7 @@ def _to_response(
         hint          = verdict.hint,
         rules_version = rules_version,
         usage         = to_usage_item(usage),
+        log           = to_log_items(log),
     )
 
     return response
@@ -68,7 +72,7 @@ async def check_close(
 
     logger.info("gate_close ticket_id=%s verdict=%s", request.ticket_id, final.output.verdict)
 
-    return _to_response(final.output, rules.version, final.usage)
+    return _to_response(final.output, rules.version, final.usage, final.log)
 
 
 @router.post("/gate/reply", response_model=VerdictResponse)
@@ -92,4 +96,4 @@ async def check_reply(
 
     logger.info("gate_reply ticket_id=%s verdict=%s", request.ticket_id, final.output.verdict)
 
-    return _to_response(final.output, rules.version, final.usage)
+    return _to_response(final.output, rules.version, final.usage, final.log)

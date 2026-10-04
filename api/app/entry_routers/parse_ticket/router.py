@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from app.agent_graphs import parse_ticket, run_graph
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
 from app.core_service.loader_dict_resolution import get_resolution_classes
-from app.entry_routers.mapping import to_raw_ticket, to_usage_item
+from app.entry_routers.mapping import to_log_items, to_raw_ticket, to_usage_item
 from app.entry_routers.models import TicketRequest
 from app.entry_routers.parse_ticket.models import TicketCard
 
@@ -52,6 +52,7 @@ async def read_ticket_card(
         resolution        = card.resolution,
         questions_summary = card.questions_summary,
         usage             = to_usage_item(final.usage),
+        log               = to_log_items(final.log),
     )
 
     logger.info("parse_ticket ticket_id=%s", request.ticket_id)

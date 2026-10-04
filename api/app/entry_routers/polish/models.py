@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from app.entry_routers.models import UsageItem
+from app.entry_routers.models import LogItem, UsageItem
 
 
 class PolishRequest(BaseModel):
@@ -21,5 +21,6 @@ class PolishResponse(BaseModel):
     nigdy w miejsce oryginału automatycznie.
     """
 
-    text:  str = Field(examples=["Dzień dobry, przesyłki z e-Doręczeń już docierają…"])
+    text:  str           = Field(examples=["Dzień dobry, przesyłki z e-Doręczeń już docierają…"])
     usage: UsageItem
+    log:   list[LogItem] = Field(default_factory=list)

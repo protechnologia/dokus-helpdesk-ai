@@ -1,10 +1,11 @@
 from datetime import date as Date
 
+from app.agent_nodes.models import LogEntry
 from app.agent_tools import SourceRef
 from app.core_model.ticket_raw import RawTicket
 from app.core_model.ticket_raw_comment import RawComment
 from app.engine_llm import LLMUsage
-from app.entry_routers.models import SourceItem, TicketRequest, UsageItem
+from app.entry_routers.models import LogItem, SourceItem, TicketRequest, UsageItem
 
 # Mapowanie modeli API na domenowe i z powrotem, wspólne dla tras. Pisane ręcznie, nie kopiowaniem
 # pól hurtem: oba modele wolno rozjechać, a automat przekazałby dalej wszystko, co API akurat
@@ -106,3 +107,21 @@ def to_usage_item(
     )
 
     return item
+
+
+def to_log_items(
+    log: list[LogEntry],  # np. [LogEntry(node="agent", message="tura 1: narzędzia: …"), …]
+) -> list[LogItem]:
+    """
+    Description:
+    Zamienia log przebiegu ze stanu grafu na model API, pole po polu, w kolejności wpisów.
+
+    Example args:
+        log=[LogEntry(node="anonymize", message="zanonimizowano 72 zn.")]
+
+    Example result:
+        [LogItem(node="anonymize", message="zanonimizowano 72 zn.")]
+    """
+    items = [LogItem(node=entry.node, message=entry.message) for entry in log]
+
+    return items

@@ -48,6 +48,33 @@ def test_the_response_carries_the_model_usage_of_the_run() -> None:
     }
 
 
+def test_the_response_carries_the_log_of_the_run() -> None:
+    """Odpowiedź → log przebiegu grafu, wpis na wywołanie węzła, w kolejności: anonimizacja,
+    dwie tury z narzędziami (szukaj, czytaj), tura z odpowiedzią. Wołający widzi przebieg sprawy
+    bez sięgania do logów."""
+    log = TestClient(create_app()).post("/search", json=TICKET).json()["log"]
+
+    assert [entry["node"] for entry in log] == [
+        "anonymize",
+        "agent", "run_tools",
+        "agent", "run_tools",
+        "agent", "respond",
+    ]
+    assert "find_tickets_vector" in log[1]["message"]
+    assert "read_tickets_card"   in log[3]["message"]
+
+
+def test_the_log_carries_no_ticket_text() -> None:
+    """Log w odpowiedzi → same nazwy, liczby i identyfikatory; treść zgłoszenia do niego nie
+    trafia, także we fragmencie."""
+    log = TestClient(create_app()).post("/search", json=TICKET).json()["log"]
+
+    for entry in log:
+        assert set(entry) == {"node", "message"}
+        assert TICKET["body"] not in entry["message"]
+        assert "przesyłki"    not in entry["message"]
+
+
 def test_the_cost_of_the_run_goes_out_rounded() -> None:
     """Trzy tury po 0,002 USD → koszt 0,006 w odpowiedzi, bez szumu sumowania ułamków."""
     agent, run_tools = fake_search_nodes(search.RESPOND_TOOL_NAME, search.SearchDone())

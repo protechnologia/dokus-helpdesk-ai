@@ -25,8 +25,8 @@ def test_variants_list_the_registry() -> None:
 
 @pytest.mark.parametrize("variant", sorted(VARIANTS))
 def test_every_variant_answers_in_one_shape(variant: str) -> None:
-    """Każdy wariant → ten sam kształt: wariant, tekst propozycji, źródła; wariant bez narzędzi
-    wiedzy z pustą listą źródeł."""
+    """Każdy wariant → ten sam kształt: wariant, tekst propozycji, źródła i log przebiegu od
+    anonimizacji do odpowiedzi; wariant bez narzędzi wiedzy z pustą listą źródeł."""
     response = TestClient(create_app()).post("/suggest", json={**TICKET, "variant": variant})
     body     = response.json()
 
@@ -34,6 +34,8 @@ def test_every_variant_answers_in_one_shape(variant: str) -> None:
     assert body["variant"] == variant
     assert body["text"]
     assert bool(body["sources"]) == bool(VARIANTS[variant].TOOL_NAMES)
+    assert body["log"][0]["node"]  == "anonymize"
+    assert body["log"][-1]["node"] == "respond"
 
 
 def test_an_unknown_variant_is_refused() -> None:

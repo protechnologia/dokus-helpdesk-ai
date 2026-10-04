@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.entry_routers.models import UsageItem
+from app.entry_routers.models import LogItem, UsageItem
 
 
 class VerdictResponse(BaseModel):
@@ -23,6 +23,7 @@ class VerdictResponse(BaseModel):
     overridable:   bool                     = Field(default=True, examples=[True])
     rules_version: int                      = Field(examples=[1])
     usage:         UsageItem
+    log:           list[LogItem]            = Field(default_factory=list)
 
 
 class GateReplyRequest(BaseModel):

@@ -78,6 +78,21 @@ class UsageItem(BaseModel):
     cost_usd:           float = Field(examples=[0.0916])
 
 
+class LogItem(BaseModel):
+    """
+    Description:
+    Jeden krok przebiegu grafu: który węzeł co zrobił. Lista takich wpisów wraca w odpowiedzi
+    każdej trasy opartej na grafie, żeby wołający widział przebieg sprawy — kolejność węzłów,
+    tury modelu, wywołane narzędzia — bez sięgania do logów.
+
+    `message` jest tekstem dla człowieka i może się zmieniać; nie nadaje się do parsowania. Niesie
+    wyłącznie nazwy, liczby i identyfikatory, nigdy treść zgłoszenia ani odpowiedzi modelu.
+    """
+
+    node:    str = Field(examples=["agent"])
+    message: str = Field(examples=["tura 1: narzędzia: find_tickets_vector"])
+
+
 class ErrorResponse(BaseModel):
     """
     Description:
