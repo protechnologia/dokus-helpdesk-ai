@@ -2,124 +2,116 @@
 
 ## Spis treści
 
-- [⚠ Trwa zmiana architektury (od 2026-10-02)](#trwa-zmiana-architektury-od-2026-10-02)
-- [Cel](#cel)
-- [Zasady naczelne (NIE łamać bez wyraźnej
-  decyzji)](#zasady-naczelne-nie-łamać-bez-wyraźnej-decyzji)
-- [Stack](#stack)
-- [Don't (szybka lista czerwonych flag)](#dont-szybka-lista-czerwonych-flag)
-- [Praca z agentem](#praca-z-agentem)
-- [Dane wejściowe (stan: znany — analiza
-  2026-07-29)](#dane-wejściowe-stan-znany--analiza-2026-07-29)
-- [Domena: kontrakt sparsowanego zgłoszenia](#domena-kontrakt-sparsowanego-zgłoszenia)
-- [RAG — architektura](#rag--architektura)
-- [Bramki jakości i asysta pisania (noga 2)](#bramki-jakości-i-asysta-pisania-noga-2)
-- [Commands](#commands)
-- [Podział na foldery i pliki](#podział-na-foldery-i-pliki)
-- [Warstwy kodu](#warstwy-kodu)
-- [Styl kodu](#styl-kodu)
-- [Warstwa CLI](#warstwa-cli)
-- [Warstwa API](#warstwa-api)
-- [Warstwa embeddera](#warstwa-embeddera)
-- [Warstwa bazy wektorowej (Qdrant)](#warstwa-bazy-wektorowej-qdrant)
-- [Warstwa wyszukiwania tekstowego (Postgres)](#warstwa-wyszukiwania-tekstowego-postgres)
-- [Warstwa narzędzi agenta (`agent_tools/`)](#warstwa-narzędzi-agenta-agent_tools)
-- [Warstwa węzłów (`agent_nodes/`)](#warstwa-węzłów-agent_nodes)
-- [Warstwa grafów (`agent_graphs/`)](#warstwa-grafów-agent_graphs)
-- [Warstwa LLM](#warstwa-llm)
-- [Komentarze w kodzie](#komentarze-w-kodzie)
-- [Docstringi](#docstringi)
-- [Konfiguracja i deploy](#konfiguracja-i-deploy)
-- [Logi i obserwowalność](#logi-i-obserwowalność)
-- [Frontend (jeszcze nie budujemy)](#frontend-jeszcze-nie-budujemy)
-- [Dokumentacja](#dokumentacja)
-- [Testy](#testy)
-- [Świadomie pominięte (NIE dodawać bez pytania)](#świadomie-pominięte-nie-dodawać-bez-pytania)
-- [Plan i TODO](#plan-i-todo)
+- [Produkt](#produkt)
+  - [Cel](#cel)
+  - [Jak to działa](#jak-to-działa)
+  - [Zasady produktu](#zasady-produktu)
+  - [Stack](#stack)
+- [Zasady ogólne](#zasady-ogólne)
+  - [Zasady techniczne](#zasady-techniczne)
+  - [Praca z agentem](#praca-z-agentem)
+  - [Dokumentacja](#dokumentacja)
+- [Styl kodu i komentarzy](#styl-kodu-i-komentarzy)
+  - [Podział na foldery i pliki](#podział-na-foldery-i-pliki)
+  - [Warstwy kodu](#warstwy-kodu)
+  - [Styl kodu](#styl-kodu)
+  - [Komentarze w kodzie](#komentarze-w-kodzie)
+  - [Docstringi](#docstringi)
+- [Dane](#dane)
+  - [Historyczne zgłoszenia](#historyczne-zgłoszenia)
+  - [Instrukcje](#instrukcje)
+- [Architektura](#architektura)
+  - [Domena: kontrakt sparsowanego zgłoszenia](#domena-kontrakt-sparsowanego-zgłoszenia)
+  - [Bramki jakości i asysta pisania (noga 2)](#bramki-jakości-i-asysta-pisania-noga-2)
+  - [Warstwa CLI](#warstwa-cli)
+  - [Warstwa API](#warstwa-api)
+  - [Warstwa embeddera](#warstwa-embeddera)
+  - [Warstwa bazy wektorowej (Qdrant)](#warstwa-bazy-wektorowej-qdrant)
+  - [Warstwa wyszukiwania tekstowego (Postgres)](#warstwa-wyszukiwania-tekstowego-postgres)
+  - [Warstwa narzędzi agenta (`agent_tools/`)](#warstwa-narzędzi-agenta-agent_tools)
+  - [Warstwa węzłów (`agent_nodes/`)](#warstwa-węzłów-agent_nodes)
+  - [Warstwa grafów (`agent_graphs/`)](#warstwa-grafów-agent_graphs)
+  - [Warstwa LLM](#warstwa-llm)
+  - [Frontend (jeszcze nie budujemy)](#frontend-jeszcze-nie-budujemy)
+- [Uruchamianie i utrzymanie](#uruchamianie-i-utrzymanie)
+  - [Commands](#commands)
+  - [Konfiguracja i deploy](#konfiguracja-i-deploy)
+  - [Logi i obserwowalność](#logi-i-obserwowalność)
+  - [Testy](#testy)
+- [Zakres i plan](#zakres-i-plan)
+  - [Świadomie pominięte](#świadomie-pominięte)
+  - [Plan](#plan)
+  - [Na później](#na-później)
 
-## Trwa zmiana architektury (od 2026-10-02)
+## Produkt
 
-**Kod i ten plik opisują dziś dwa różne momenty — czytaj go z tą świadomością.** Po rozmowie
-z kierownictwem zmieniliśmy kierunek: kod jest jeszcze w starej architekturze, a „Plan i TODO"
-prowadzi do nowej. **Rozbieżność kod ↔ dokument jest teraz normą, nie błędem** — zanim cokolwiek
-„naprawisz", sprawdź w tabeli, po której stronie zmiany leży to, na co patrzysz.
+### Cel
 
-| | było (kod i dotychczasowe decyzje) | będzie (cel planu) |
-|---|---|---|
-| model generujący | Bielik 11B self-hosted; prompty `questions` i `solution` strojone pod 11B | mocny model zewnętrzny — Bielik okazał się za słaby |
-| dane do modelu | surowe; PII chroniła kontrola dostępu, bo LLM był lokalny | anonimizowane przed wyjściem (`anonymizer`: słownik osób, NER, regex), fail-closed; wyłączalne jawnie dla zaufanego endpointu |
-| przebieg funkcji | serwis wołany z handlera (`/search` → `service/rag_searcher.py`) | graf LangGraph na funkcję: anonimizacja → pętla agenta z narzędziami → odpowiedź (`agent_graphs/`, `agent_nodes/`, `agent_tools/`) |
-| zapytanie do indeksu | zgłoszenie parsowane promptem korpusu przed jednym wyszukaniem; `/search` zwraca tę kartę | agent sam pisze `problem` + `symptoms` i może szukać kilka razy; `/search` zwraca zapytania agenta, kartę daje graf `parse_ticket` |
-| wybór materiału | człowiek zaznacza trafienia, `/suggest` bierze identyfikatory (zaprojektowane, nie zaimplementowane) | agent sam dociąga źródła i decyduje, czy wystarczą; człowiek w pętli — później |
-| warianty generacji | dane: `text/variants.json` + `service/loader_variants.py`, guzik bez deployu | kod: osobny graf na wariant, nowy guzik = nowy katalog + deploy |
-| źródła wiedzy | wyłącznie zgłoszenia | zgłoszenia + opcjonalnie fragmenty instrukcji (druga kolekcja) |
+Wsparcie LLM dla helpdesku aplikacji Dokus i pracujących z nim wdrożeniowców. Produkt daje
+propozycje i werdykty, które zatwierdza człowiek.
 
-**Bez zmian — fundament, na którym stają grafy:** kontrakt `ParsedTicket` i prompt parsujący,
-filtr jakości, indeksacja i Qdrant, embedder PolDense, `LLMClient` z fabryką oraz cała wiedza
-o korpusie („Dane wejściowe", „Domena"). Nowe grafy z nich korzystają, a nie je zastępują.
+Stoi na **dwóch nogach**, które da się budować i wdrażać niezależnie:
 
-**Wycofane 2026-10-02:** `variants.json`, `loader_variants.py`, modele `variant_generation*`
-i prompty `text/prompt_suggest_*` (nikt ich nie wołał, prompty żyją w `agent_graphs/suggest_*`),
-a `/search` przeszedł na graf `search` od razu, choć ten stoi na atrapach do p. 9–11 —
-świadomie, mimo „najpierw następca". Tego samego dnia skasowane serwisy wołające model zwykłym
-tekstem: `TicketParser` i `RagSearcher`, a z nimi `helpdesk tickets parse` i `helpdesk rag search`
-— parsowanie i wyszukiwanie idą wyłącznie przez grafy (CLI wraca w p. 46).
+**Noga 1 — odpowiedź oparta na wiedzy.** Na nowe zgłoszenie agent sam dociera do wiedzy: szuka
+podobnych spraw w historycznych zgłoszeniach i właściwych sekcji w instrukcjach, czyta je
+i przygotowuje propozycję — pytania do klienta, rozwiązanie albo przekazanie sprawy — z listą
+źródeł, które przeczytał.
 
-**Ta sekcja znika, gdy skończą się bloki 0, A, B, D i E planu** — wtedy kod dogoni dokument.
-
-## Cel
-
-Wsparcie LLM dla aplikacji helpdesk i pracujących z nią wdrożeniowców.
-
-Produkt stoi na **dwóch nogach**, które da się budować i wdrażać niezależnie:
-
-**Noga 1 — wykorzystanie bazy wiedzy (RAG).** Na wejściu mamy **historyczną bazę zgłoszeń** —
-zrzut produkcyjnej bazy MariaDB helpdesku, zawężony do **modułu Dokus** (patrz „Dane wejściowe").
-Z niej budujemy **bazę wektorową**, a na jej podstawie aplikacja **podpowiada podobne zgłoszenia
-i fragmenty instrukcji** oraz **przygotowuje propozycję odpowiedzi** na nowe zgłoszenie (listę
-pytań, rozwiązanie albo przekazanie sprawy), opartą o rozwiązania podobnych spraw z przeszłości.
-
-**Noga 2 — asysta przy pisaniu i bramki jakości.** Trzy funkcje, które działają **na treści,
-którą wdrożeniowiec właśnie pisze**, i nie potrzebują ani Qdranta, ani embeddera:
+**Noga 2 — asysta przy pisaniu i bramki jakości.** Trzy funkcje działające na treści, którą
+wdrożeniowiec właśnie pisze, bez sięgania do wiedzy:
 1. **bramka zamknięcia** — zgłoszenia nie da się zamknąć, jeśli z treści nie wynika, co było
    problemem i co zostało zrobione,
-2. **bramka wysyłki** — wiadomość nie wychodzi, jeśli łamie reguły walidacyjne (prośba o hasło,
-   potoczne słownictwo…),
-3. **„Popraw"** — wdrożeniowiec pisze byle jak, klika przycisk, a model zwraca ten sam sens
-   w poprawnej, spójnej stylistycznie formie.
+2. **bramka wysyłki** — wiadomość nie wychodzi, jeśli łamie reguły (prośba o hasło, potoczne
+   słownictwo…),
+3. **„Popraw"** — wdrożeniowiec pisze byle jak, a model zwraca ten sam sens w poprawnej formie.
 
-**Dlaczego to jedna aplikacja, a nie dwie.** Noga 2 jest użyteczna **przy pustym i przy słabym
-indeksie** — to ona utrzymuje wartość produktu, zanim RAG cokolwiek zwróci. Co ważniejsze,
-**noga 2 karmi nogę 1**: zgłoszenie, którego nie wolno zamknąć bez opisu problemu i rozwiązania,
-jest z definicji dobrym materiałem do korpusu. Skala strat jest zmierzona: z 1825 zgłoszeń
-**do zaproponowania komuś innemu nadaje się ~690**, a 26% rekordów z kompletem danych nie niesie
-żadnej wiedzy („Już powinno działać", „Zamykam") — patrz „Ile z tego naprawdę wejdzie do
-indeksu". **Bramka zamknięcia atakuje dokładnie to źródło strat**, tyle że w zgłoszeniach
-**przyszłych**.
+**Dlaczego to jedna aplikacja.** Noga 2 działa przy pustym indeksie i karmi nogę 1: zgłoszenie,
+którego nie wolno zamknąć bez opisu problemu i rozwiązania, jest dobrym materiałem do bazy wiedzy.
+Dziś z 1825 zgłoszeń do zaproponowania komuś innemu nadaje się ok. 690, a 26% rekordów
+z kompletem danych nie niesie żadnej wiedzy. Bramka zamknięcia atakuje to źródło strat
+w zgłoszeniach przyszłych.
 
-Kluczowa decyzja architektoniczna nogi 1: **do RAG nie trafiają surowe zgłoszenia.** Każda
-konwersacja przechodzi najpierw przez LLM, który zwraca **ustrukturyzowany JSON** (problem,
-objawy, przyczyna, rozwiązanie, klasa rozstrzygnięcia…). Dopiero ten JSON jest źródłem embeddingów
-i payloadu.
+**Człowiek zawsze zatwierdza — i zawsze może przejść dalej.** Produktem jest propozycja odpowiedzi
+i werdykt bramki, nigdy automatyczna wysyłka ani nieodwołalne „nie". Werdykt blokujący da się
+świadomie obejść.
 
-**Człowiek zawsze zatwierdza — i zawsze może przejść dalej.** Produktem jest *propozycja*
-odpowiedzi i *werdykt* bramki, nigdy automatyczna wysyłka do klienta ani nieodwołalne „nie".
-Werdykt blokujący da się **świadomie obejść** (patrz „Bramki jakości").
+### Jak to działa
 
-## Zasady naczelne (NIE łamać bez wyraźnej decyzji)
+**Każda funkcja produktu to osobny graf.** Bramki, wyszukiwanie, karta zgłoszenia, trzy warianty
+propozycji i „Popraw" mają ten sam przebieg: anonimizacja → pętla agenta z narzędziami → odpowiedź
+w ustalonym kształcie. Trasa API i komenda CLI tylko uruchamiają graf. Nowa funkcja to nowy katalog
+grafu, bez zmian w pozostałych.
 
-1. **Konfiguracja wyłącznie przez ENV** (pydantic-settings) — żadnych sekretów ani
-   endpointów na sztywno w kodzie.
-2. **Komunikacja = REST (HTTP/JSON)** między komponentami.
-3. **Modularność.** Każdy komponent = osobna usługa w `docker-compose`, którą da się podmienić
-   lub zaktualizować **bez zmian w pozostałych** (i bez zmian w logice biznesowej).
-4. **Abstrakcja dostawcy LLM** — logika nigdy nie rozmawia bezpośrednio z SDK dostawcy.
-   To samo dotyczy **embeddera**: domena woła `EmbeddingClient`, nie `sentence-transformers`.
-5. **Dev montuje kod z hosta** (zmiany żywe bez rebuildu); **prod kopiuje kod do obrazu** —
-   uruchamiamy dokładnie tę wersję, którą zbudowaliśmy.
-6. **Praca zawsze w izolowanym `venv`** — nigdy przeciw systemowemu Pythonowi. Przed każdą
-   komendą Pythona (`pytest`/`ruff`/`pip`) `.venv` musi istnieć i być aktywny; jeśli go nie ma —
-   najpierw utwórz i aktywuj.
+**Generuje mocny model zewnętrzny, a dane wychodzą do niego po anonimizacji.** Model lokalny okazał
+się za słaby. Anonimizacja jest stałym pierwszym węzłem każdego grafu: agent nie może jej pominąć,
+a jej awaria zatrzymuje przebieg, zamiast przepuścić surowe zgłoszenie. Wyłącza się ją jawnie,
+tylko dla zaufanego endpointu.
+
+**Agent sam dociera do wiedzy, narzędziami.** Model nie dostaje gotowych trafień, tylko narzędzia
+z listy dozwolonej dla danej funkcji. Najpierw wyszukuje — po znaczeniu albo dosłownie — potem
+czyta wybrany materiał: karty i wątki historycznych zgłoszeń oraz sekcje instrukcji. Może szukać
+kilka razy i sam ocenia, czy materiał wystarcza. Bramki i „Popraw" narzędzi wiedzy nie mają, więc
+działają przy pustym indeksie.
+
+**Odpowiedź stoi na tym, co agent przeczytał.** Lista źródeł powstaje z wywołań odczytu, nie
+z deklaracji modelu, a wariant wymagający źródeł bez źródeł nie oddaje propozycji. Na końcu zawsze
+jest człowiek: dostaje propozycję albo werdykt ze źródłami i sam decyduje.
+
+**Rozwój to dokładanie narzędzi.** Narzędzie jest katalogiem z kontraktem, więc kolejne źródło
+wiedzy nie zmienia grafów ani węzłów. Kandydaci, jeszcze bez decyzji (p. 58): czytanie kodu
+aplikacji i dostęp do instancji testowej, na której agent sprawdzi opisany objaw. To drugie byłoby
+pierwszym narzędziem, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzji
+o granicach.
+
+**Stan na dziś.** Szkielet stoi w całości, a część jednostek to atrapy: pętla agenta, wykonanie
+narzędzi i odpowiedź, anonimizator oraz sześć z ośmiu narzędzi.
+
+### Zasady produktu
+
+Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje się kod i reszta pliku.
+
+#### Co obowiązuje
+
 7. **Sparsowany JSON zgłoszenia jest trwałym artefaktem na dysku, nie efektem ubocznym.**
    Embeddingi i kolekcje Qdranta są wymienne i odtwarzalne — przebieg LLM jest drogi
    i jednorazowy. Re-index **nigdy** nie wymaga ponownego wołania LLM.
@@ -161,7 +153,32 @@ Werdykt blokujący da się **świadomie obejść** (patrz „Bramki jakości").
     aplikacja helpdesku (patrz „Bramki jakości"). Nie budujemy tu iluzji, że to my „nie
     pozwalamy" — to zmienia kontrakt i obowiązki obu stron.
 
-## Stack
+#### Czego nie robić
+
+- **Nie importuj SDK dostawcy poza plikiem klienta** (dotyczy też `sentence-transformers`
+  poza usługą `embedder`)
+- **Nie odpalaj testów na żywym LLM bez pytania**
+- **Nie mieszaj trybów prefiksów PolDense w jednej przestrzeni wektorowej** (patrz „Embeddingi")
+- **Nie wrzucaj pola `solution` do embeddingu** — rozwiązanie żyje w payloadzie, nie w wektorze
+- **Nie indeksuj surowej treści maila** — indeksujemy wyłącznie sparsowane pola; jedyny wyjątek
+  to zanonimizowany wątek w indeksie tekstowym (p. 53), nigdy w wektorze
+- **Nie kasuj i nie nadpisuj plików w `data/parsed/`** — to niepowtarzalny wynik przebiegu LLM
+- **Nie filtruj korpusu po `status = 'zamkniety'`** — Dokus kończy zgłoszenia na `rozwiazany`,
+  `zamkniety` ma 5 sztuk na 1825 (patrz „Historyczne zgłoszenia")
+- **Nie szukaj rozwiązań w tabeli `rozwiazanie`** — jest martwa; rozwiązanie to `komentarz`
+  z `typ IN ('rozwiazanie','konczacy_zgloszenie')`
+- **Nie wybieraj zakresu po `grupa_id` ani `projektid`** — tylko po `modulid = 116`
+- **Nie wołaj Qdranta ani embeddera z bramek i „Popraw"** — mają działać przy pustym indeksie
+- **Nie pozwól „Popraw" dodać treści merytorycznej** — poprawiamy formę, nie fakty (zasada 9)
+- **Nie wstawiaj reguł klienta do promptu przez sklejanie instrukcji** — wyłącznie jako dane
+  w oddzielonej sekcji (prompt injection)
+- **Nie rób z werdyktu twardego „nie"** — furtka dla człowieka jest częścią kontraktu (zasada 10)
+- **Nie rób osobnego endpointu na każdy guzik** — `variant` jest parametrem `/suggest`
+- **Nie streszczaj `questions_summary` do kategorii** („pytano o konfigurację") — konkrety
+  (nazwy, ustawienia, wersje) są całą wartością tego pola
+- **Nie wrzucaj do `questions_summary` pytań proceduralnych** („czy problem nadal występuje?")
+
+### Stack
 
 - Python, FastAPI, Pydantic, pydantic-settings, Typer (CLI)
 - **Baza wektorowa: Qdrant** — jedyna baza na tym etapie (brak SQL — patrz „Świadomie pominięte")
@@ -183,32 +200,24 @@ Werdykt blokujący da się **świadomie obejść** (patrz „Bramki jakości").
 Usługi w compose: `api` (FastAPI + CLI), `embedder` (model PL za REST-em), `qdrant`, `postgres`,
 od p. 19 `anonymizer`. LLM jest **zewnętrznym endpointem**, nie usługą w bazowym compose.
 
-## Don't (szybka lista czerwonych flag)
+## Zasady ogólne
 
-- **Nie importuj SDK dostawcy poza plikiem klienta** (dotyczy też `sentence-transformers`
-  poza usługą `embedder`)
-- **Nie odpalaj testów na żywym LLM bez pytania**
-- **Nie mieszaj trybów prefiksów PolDense w jednej przestrzeni wektorowej** (patrz „Embeddingi")
-- **Nie wrzucaj pola `solution` do embeddingu** — rozwiązanie żyje w payloadzie, nie w wektorze
-- **Nie indeksuj surowej treści maila** — indeksujemy wyłącznie sparsowane pola; jedyny wyjątek
-  to zanonimizowany wątek w indeksie tekstowym (p. 53), nigdy w wektorze
-- **Nie kasuj i nie nadpisuj plików w `data/parsed/`** — to niepowtarzalny wynik przebiegu LLM
-- **Nie filtruj korpusu po `status = 'zamkniety'`** — Dokus kończy zgłoszenia na `rozwiazany`,
-  `zamkniety` ma 5 sztuk na 1825 (patrz „Dane wejściowe")
-- **Nie szukaj rozwiązań w tabeli `rozwiazanie`** — jest martwa; rozwiązanie to `komentarz`
-  z `typ IN ('rozwiazanie','konczacy_zgloszenie')`
-- **Nie wybieraj zakresu po `grupa_id` ani `projektid`** — tylko po `modulid = 116`
-- **Nie wołaj Qdranta ani embeddera z bramek i „Popraw"** — mają działać przy pustym indeksie
-- **Nie pozwól „Popraw" dodać treści merytorycznej** — poprawiamy formę, nie fakty (zasada 9)
-- **Nie wstawiaj reguł klienta do promptu przez sklejanie instrukcji** — wyłącznie jako dane
-  w oddzielonej sekcji (prompt injection)
-- **Nie rób z werdyktu twardego „nie"** — furtka dla człowieka jest częścią kontraktu (zasada 10)
-- **Nie rób osobnego endpointu na każdy guzik** — `variant` jest parametrem `/suggest`
-- **Nie streszczaj `questions_summary` do kategorii** („pytano o konfigurację") — konkrety
-  (nazwy, ustawienia, wersje) są całą wartością tego pola
-- **Nie wrzucaj do `questions_summary` pytań proceduralnych** („czy problem nadal występuje?")
+### Zasady techniczne
 
-## Praca z agentem
+1. **Konfiguracja wyłącznie przez ENV** (pydantic-settings) — żadnych sekretów ani
+   endpointów na sztywno w kodzie.
+2. **Komunikacja = REST (HTTP/JSON)** między komponentami.
+3. **Modularność.** Każdy komponent = osobna usługa w `docker-compose`, którą da się podmienić
+   lub zaktualizować **bez zmian w pozostałych** (i bez zmian w logice biznesowej).
+4. **Abstrakcja dostawcy LLM** — logika nigdy nie rozmawia bezpośrednio z SDK dostawcy.
+   To samo dotyczy **embeddera**: domena woła `EmbeddingClient`, nie `sentence-transformers`.
+5. **Dev montuje kod z hosta** (zmiany żywe bez rebuildu); **prod kopiuje kod do obrazu** —
+   uruchamiamy dokładnie tę wersję, którą zbudowaliśmy.
+6. **Praca zawsze w izolowanym `venv`** — nigdy przeciw systemowemu Pythonowi. Przed każdą
+   komendą Pythona (`pytest`/`ruff`/`pip`) `.venv` musi istnieć i być aktywny; jeśli go nie ma —
+   najpierw utwórz i aktywuj.
+
+### Praca z agentem
 
 - **Prośba o plan = zostajesz w planowaniu.** „Jaki masz plan?" / „co proponujesz?" → przedstaw
   plan i **czekaj**. Odpowiedzi na pytania doprecyzowujące to NIE jest zgoda na implementację.
@@ -217,7 +226,321 @@ od p. 19 `anonymizer`. LLM jest **zewnętrznym endpointem**, nie usługą w bazo
 - **Commity bez trailerów współautorstwa** (`Co-Authored-By` itp.).
 - Język komunikacji: polski.
 
-## Dane wejściowe (stan: znany — analiza 2026-07-29)
+### Dokumentacja
+
+- **CLAUDE.md** — „dlaczego": zasady, trwałe decyzje, pułapki, świadome pominięcia. Sekcje nie
+  odwołują się do siebie nawzajem („patrz …", „wyżej", „niżej") — każda ma być zrozumiała sama,
+  żeby dało się ją przenieść albo przepisać bez poprawiania pozostałych (2026-10-04). Wyjątkiem są
+  numery punktów planu („p. N"), bo są stałe. Starsze odwołania usuwamy przy zmianach w sekcji,
+  nie hurtem.
+- **`data/docs/` — raporty z pomiarów i dokumenty projektu, POZA repo.** Katalog jest w `data/`,
+  więc obejmuje go `.gitignore` (2026-08-20). Powód: **raport cytujący korpus niesie PII**, choćby
+  autor tego nie zamierzał — wystarczy wkleić zrzut z konsoli operującej na zgłoszeniach, żeby
+  trafiły tam nazwiska użytkowników. Zdarzyło się przy pomiarze progu: trzy nazwiska w wyjściu
+  `eval_threshold.py detail`, wyłapane dopiero przy commicie. Wnioski trwałe przenoś **do
+  CLAUDE.md** (bez cytatów), a plik z pomiarem zostaw w `data/docs/`.
+- **README** — „jak": uruchomienie i kontrakt dla użytkownika. Proponowany podział na sekcje:
+  1. **Stack** — technologie i ich role.
+  2. **Flow działania** — ogólny algorytm (wejście → etapy → wyjście).
+  3. **Przykład end-to-end** — konkretne zgłoszenie wejściowe, trafienia z RAG i wynikowa
+     propozycja odpowiedzi (ilustracja działania, nie sztywny format).
+  4. **Szybkie uruchomienie** — np.:
+     ```bash
+     cp .env.example .env   # utwórz lokalną konfigurację z szablonu
+     docker compose build   # zbuduj obrazy wszystkich usług
+     docker compose up -d   # uruchom całą kompozycję
+     ```
+  5. **Konfiguracja** — wszystkie zmienne środowiskowe w tabeli (nazwa, domyślna, opis).
+  6. **API** — tabela endpointów, a pod nią opis każdego (wywołanie, przykład wejścia, przykład
+     wyjścia).
+  7. **Integracje** — zawartość `integrations/` z przykładem użycia.
+  8. **Uwagi techniczne.**
+  9. **Testy** — jak uruchomić, markery.
+  10. **Typowe procedury** — same kroki instruktażowe (rationale zostaje w CLAUDE.md).
+
+## Styl kodu i komentarzy
+
+### Podział na foldery i pliki
+
+```
+dokus-helpdesk-ai/
+├── docker-compose.yml            # baza — api + embedder + qdrant + postgres
+├── docker-compose.gpu.yml        # warstwa: rezerwacja GPU dla embeddera
+├── docker-compose.prod.yml       # warstwa: kod z obrazu (volumes: !reset [])
+├── .env                          # wartości lokalne — NIE w repo
+├── .env.example                  # kontrakt konfiguracji — W repo
+├── pyproject.toml                # pytest/lint + pakietowanie (entry-point `helpdesk`)
+├── requirements-dev.txt          # zależności testów/lintera (poza obrazem)
+├── CLAUDE.md / README.md
+├── scripts/                      # narzędzia repo niezwiązane z usługą (patrz „Warstwa CLI")
+├── data/                         # artefakty — NIE w repo (PII)
+│   ├── raw/                      # zgłoszenia źródłowe jak przyszły
+│   ├── parsed/                   # sparsowane JSON-y (trwały artefakt, zasada 7)
+│   ├── golden/                   # zestawy do ewaluacji: zgłoszenia, dystraktory, dokumentacja
+│   ├── instruction/              # dokumentacja: katalog na dokument, manifest.json + pliki .md
+│   └── docs/                     # raporty z pomiarów i dokumenty projektu (patrz niżej)
+├── api/                          # folder = usługa z compose, nazwany tak samo
+│   ├── Dockerfile
+│   ├── .dockerignore
+│   ├── requirements.txt          # zależności RUNTIME tej usługi (do obrazu)
+│   ├── scripts/                  # skrypty deweloperskie (python api/scripts/…)
+│   └── app/                      # kod aplikacji
+│       ├── entry_cli/            # CLI (Typer): pakiet na obszar, plik na komendę — cienkie adaptery
+│       ├── main.py               # montaż aplikacji, middleware, handlery wyjątków
+│       ├── config.py             # Settings (pydantic-settings)
+│       ├── entry_routers/        # trasy: katalog na zasób (router.py + models.py z modelami API);
+│       │                         #   wspólne modele API i mapowanie na górze pakietu
+│       │                         # --- nasza strona: podział po RODZAJU obiektu ---
+│       ├── core_model/           # ticket_*, validation_parsed_*, dict_resolution_*
+│       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, rag_indexer
+│       ├── core_text/            # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
+│       ├── core_util/            # html, validation_text, time
+│       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
+│       ├── engine_llm/           # LLMClient + fabryka; client/, pricing/, models/
+│       ├── engine_embedding/     # EmbeddingClient (HTTP do `embedder`) + prefiksy
+│       ├── engine_anonymization/ # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 19)
+│       ├── db_qdrant/            # Qdrant: client.py, collection/ point/, hit/
+│       ├── db_postgres/          # Postgres: client.py, table/<tabela>/ (klasa + .sql), row/
+│       │                         # --- agent: katalog na jednostkę, właściwa + fake.py ---
+│       ├── agent_tools/          # narzędzia agenta: base.py, folder na materiał, katalog na narzędzie
+│       ├── agent_nodes/          # węzły grafów: kontrakt Node, katalog na węzeł
+│       └── agent_graphs/         # grafy funkcji: base.py, factory.py, registry.py, fake.py, katalog na graf
+├── embedder/                     # kolejna usługa: model PL za REST-em
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── embedder_app/             # pakiet nazwany rozłącznie z `app` z `api/` (patrz „Testy")
+│       ├── main.py               # montaż aplikacji
+│       ├── config.py             # Settings tej usługi (własne, kodu nie dzielimy)
+│       ├── models.py             # kontrakt HTTP: EmbedRequest/EmbedResponse, tryby prefiksów
+│       ├── encoding/             # Encoder + fabryka + FakeEncoder — tu wchodzi PolDense
+│       └── entry_routers/              # /health, /embed
+├── postgres/                     # kolejna usługa: Postgres z polskim słownikiem
+│   ├── Dockerfile                # pobiera słownik sjp.pl (commit + suma kontrolna)
+│   ├── dictionary/               # build.sh z poprawkami słownika, custom_words.txt z nazwami własnymi
+│   └── initdb/                   # konfiguracja wyszukiwania `pl_search` (tylko pusty wolumen)
+├── tests/
+│   ├── unit/                     # podfoldery <usługa>_<pakiet>: api_agent_tools/, api_core_service/, embedder/…
+│   ├── integration/              # jednostka + prawdziwa zależność: pliki, FastAPI, LangGraph, Qdrant
+│   ├── functional/               # cała aplikacja przez HTTP albo komendę
+│   └── evaluation/               # golden sety
+├── integrations/<język>/         # klienci dla konsumentów API
+└── samples/                      # zanonimizowane dane do testów i ewaluacji
+```
+
+- **Folder = usługa z compose**; wszystko do zbudowania obrazu leży w nim, nie w korzeniu.
+  Korzeń należy do infrastruktury: compose, `.env*`, dokumentacja, config testów.
+- **Testy w korzeniu, nie w folderze usługi** — nie trafiają do obrazu, a integracyjne sięgają
+  kilku usług. Ten sam plik może być w `unit/` i `integration/` (stąd `--import-mode=importlib`).
+- **Dwa pliki zależności:** `<usługa>/requirements.txt` = runtime, do obrazu;
+  `requirements-dev.txt` w korzeniu = testy/lint, nigdy w obrazie.
+
+### Warstwy kodu
+
+- **Dwie osie podziału, granicą jest przekroczenie granicy procesu.** Co rozmawia z usługą
+  zewnętrzną, dostaje **własny pakiet** (`engine_llm/`, `engine_embedding/`): interfejs,
+  implementacje, fabryka, wyjątki i modele transportu razem, żeby podmiana dostawcy była zmianą
+  jednego katalogu — dlatego te modele **nie wychodzą** do `core_model/`. Reszta idzie osią
+  techniczną (`core_model` / `core_service` / `core_text` / `core_util`).
+- **Każdy pakiet w `app/` ma przedrostek swojej grupy (2026-10-04):** `agent_` to przebieg
+  (grafy, węzły, narzędzia), `core_` nasza strona (`core_model/`, `core_service/`, `core_text/`,
+  `core_util/`), `db_` magazyny, `engine_` klienci usług liczących (`engine_llm/`,
+  `engine_embedding/`, `engine_anonymization/`), a `entry_` wejścia (`entry_routers/`,
+  `entry_cli/`). Bez przedrostka zostają pliki spinające całość: `main.py`, `config.py`,
+  `errors.py`. Przedrostek nazywa rolę, nie bibliotekę: nie `langgraph_`, bo LangGrapha importuje
+  tylko `agent_graphs/`, a narzędzia mają od niego nie zależeć.
+- **Pakiety baz nazywają się od bazy: `db_qdrant/` i `db_postgres/` (2026-10-04, wcześniej
+  `retrieval/` i `db/`).** Odkąd Postgres też wyszukuje, „retrieval" pasowało do obu, a „db" nie
+  mówiło, o którą bazę chodzi. `engine_llm/` zostaje nazwą roli, bo ma interfejs i wymiennych
+  dostawców; te dwa pakiety mają po jednej implementacji i piszą w języku swojej bazy. Błędy:
+  `DbQdrantError` i `DbPostgresError` z wariantami `…ConfigError`; nie `PostgresError`, bo tak
+  nazywa się klasa sterownika `asyncpg`.
+- **Transport vs domena.** Transport = rozmowa z usługą zewnętrzną (LLM, embedder, Qdrant); domena =
+  logika, nieświadoma tego, co pod spodem. Domena dostaje klienta transportowego przez
+  konstruktor, nigdy nie sięga po SDK.
+- **Klient per usługa.** Jedna implementacja → klient tworzony wprost. Klient
+  wymienny → z fabryki po configu (np. LLM: atrapa na dev, model zewnętrzny na prod).
+- **„Klient" znaczy przekroczenie granicy procesu.** `EmbeddingClient` w `api` mówi HTTP-em do
+  usługi `embedder`; to, co **wewnątrz** tej usługi liczy wektory, klientem nie jest i tak się
+  nie nazywa (`Encoder`, `FakeEncoder`) — inaczej ta sama nazwa znaczyłaby dwie różne rzeczy
+  w dwóch usługach. Wzorzec za to jest ten sam po obu stronach: interfejs + implementacja
+  offline (`Fake…`) + fabryka po ENV z fail-fast.
+- **Granica `core_model` / `core_service` działa w OBIE strony:** w `core_model/` wyłącznie modele,
+  jeden na plik; w `core_service/` ani jednego modelu Pydantic. Model wychodzi z serwisu nawet
+  wtedy, gdy używa go jeden serwis i zmienia się razem z nim. **Cena:** kilka importów więcej i
+  rzeczy zmieniające się razem leżą osobno. **Wyjątek:** `ParsedTicket.embedding_text()` zostaje na
+  modelu, ale tylko woła `build_embedding_text()` z `core_service/` — tę samą funkcję, której używa
+  zapytanie `find_tickets_vector`, bo dwa miejsca sklejające ten tekst rozjechałyby się
+  **bezgłośnie**.
+- **Nazwa pliku mówi, CO ROBI, nie czego dotyczy** — `validator_ticket_parsed.py`, nie
+  `artifacts.py`. W `core_service/` oś `<rola>_<przedmiot>` (`parser_`, `validator_`, `builder_`,
+  `loader_`, `filter_`, `normalizer_`), w `core_model/` prefiks tematyczny grupujący alfabetycznie
+  (`ticket_*`, `validation_parsed_*`, `dict_*`, `filter_*`).
+  - **Gdy reguł jest wiele i przybywa ich szybciej niż logiki wokół nich, idą do osobnego pliku**
+    (`filter_ticket_quality.py` + `filter_ticket_quality_rules.py`): dwa różne rytmy zmian, a plik
+    reguł czyta się jak listę, nie jak kod. Każda reguła to funkcja modułowa — bezstanowa, więc
+    klasa dałaby tylko miejsce na `self` — a krotka `RULES` na końcu jest tym, po czym iteruje
+    orkiestrator i po czym parametryzują się testy. Dołożenie reguły to dopisanie funkcji.
+  - **Znany koszt tej konwencji, do rozstrzygnięcia przy masowym imporcie (p. 31):** wszystkie
+    czytniki źródeł produkują ten sam `RawTicket`, więc wariant SQL musi dołożyć źródło do nazwy
+    (`parser_ticket_raw_sql`) albo oba dostaną sufiks. Nazwa opisuje WYNIK, a te pliki różni ŹRÓDŁO.
+- **`core_util/` to funkcje bezstanowe bez wiedzy o dziedzinie** — kryterium: czy da się je opisać
+  i przetestować, ani razu nie mówiąc „zgłoszenie". Stąd `strip_html()` i
+  `describe_validation_error()` są tam, a nie przy swoich wywołujących; drugi powód jest
+  praktyczny — czytnik SQL z masowego importu (p. 31) potrzebuje tego samego strippera.
+- **Funkcja czy klasa — rozstrzyga stan, nie symetria.** Implementacja z cyklem życia (wagi
+  modelu, sesja HTTP) to obiekt budowany raz; obliczenie bezstanowe zostaje funkcją modułową
+  wołaną przez tę implementację (`deterministic_vector` wewnątrz `FakeEncoder`).
+- **Handlery cienkie** — żądanie → serwis → odpowiedź; zero logiki i LLM w handlerze.
+- **Osobne modele domenowe i API.** Encje/obiekty domeny nie wychodzą wprost przez HTTP —
+  przepisujemy jawnie. Chroni kontrakt i blokuje wyciek pól wewnętrznych (ID, scoring). Modele API
+  żyją przy trasach jak modele narzędzi przy narzędziach: `entry_routers/<zasób>/models.py` dla
+  jednej trasy, `entry_routers/models.py` dla wspólnych (zgłoszenie, źródło, błąd); mapowanie w
+  `entry_routers/mapping.py`. Obiektu `router` pakiet zasobu nie wystawia — przesłoniłby moduł
+  `router.py`, więc `main.py` importuje go pełną ścieżką.
+- **Katalog z samymi danymi (`core_text/`) potrzebuje `__init__.py`**, choć nikt go nie importuje:
+  `[tool.setuptools.packages.find]` wykrywa pakiety po tym pliku, a bez niego treść wypada
+  z dystrybucji i `FileNotFoundError` wychodzi dopiero w runtime. Powód jest zapisany w samym
+  pliku — pusty `__init__.py` w katalogu bez kodu wygląda jak pozostałość do sprzątnięcia.
+
+**Gdzie to położyć — cztery pytania, po kolei:**
+
+1. **Rozmawia z usługą zewnętrzną?** → pakiet tej usługi (`engine_llm/`, `engine_embedding/`), razem
+   z jej modelami transportu.
+2. **Da się to opisać i przetestować, ani razu nie nazywając dziedziny?** → `core_util/`.
+3. **Model danych czy operacja na nich?** → `core_model/` albo `core_service/`.
+4. **Dane klienta, które klient zmienia bez deployu** (słownik, zestaw reguł)? → `core_text/`.
+   Prompt — treść czytana zdanie po zdaniu — leży w katalogu swojego grafu, nie w `core_text/`.
+5. **Narzędzie agenta, węzeł grafu albo przebieg funkcji?** → `agent_tools/<materiał>/<narzędzie>/`,
+   `agent_nodes/<węzeł>/`, `agent_graphs/<funkcja>/` — każdy z wersją właściwą i atrapą (p. 1–5);
+   prompt grafu leży w katalogu grafu.
+
+### Styl kodu
+
+- **Kod i identyfikatory po angielsku, docstringi i komentarze po polsku** (zmiana 2026-10-02 —
+  wcześniej wszystko po angielsku). Nagłówki formatu docstringu (`Description:`, `Example args:`…)
+  zostają bez zmian, a przykład przy sygnaturze to `# np. …`. Starszy kod ma jeszcze angielskie
+  komentarze — tłumaczymy plik przy okazji zmian w nim, nie hurtem.
+- **Brak autoformattera — świadomie.** `ruff format`/`black` zjadłyby pionowe wyrównanie `=`
+  (niżej). Używamy `ruff check` (linter), nie formattera.
+- **Importy zawsze na górze modułu.** Lazy import tylko przy realnym problemie (cykl albo
+  faktycznie opcjonalna zależność) — nie „na wszelki wypadek". Konsekwencja przyjęta świadomie:
+  import modułu pociąga jego zależności; przy zależnościach twardych to OK.
+  - **Jedyny dziś wyjątek: SDK dostawców LLM w `engine_llm/factory.py`** — importowane wewnątrz
+    builderów, bo problem został **zmierzony, nie przeczuty** (patrz „Warstwa LLM"). Wzorzec do
+    naśladowania przy kolejnych wyjątkach: liczba przed decyzją, powód w komentarzu przy imporcie.
+- Type hints obowiązkowe w sygnaturach; zamiast nieotypowanego `dict` — model Pydantic
+  lub `TypedDict`.
+- **Nazwy opisują intencję** — `fetch_invoice_summary`, nie `get_data`.
+- **Kilka liczb w wywołaniu podajemy z nazwami, także w tabelach danych** (cennik:
+  `price(input=2.00, output=8.00, cache_read=0.25, cache_write=1.00)`). Same liczby w nawiasie
+  nie mówią, która jest która; gdy nazwy pól są za długie na jedną linię, pomocnik dostaje
+  krótsze.
+- **Casing:** `snake_case` funkcje/zmienne, `PascalCase` klasy, `UPPER_CASE` stałe.
+- **f-stringi** do formatowania, nie `%` ani `.format()`.
+- **Wczesne wyjścia** (guard clauses) zamiast zagnieżdżonych `if/else`.
+- **Bez martwego i zakomentowanego kodu** — kasuj, git pamięta.
+- **Bez łapania gołego `Exception`** — konkretne typy.
+- **Dekompozycja metod — wg testowalności, NIE wg długości.** Liczba linii nie jest metryką.
+  Wydzielamy, gdy spełnione choć jedno kryterium:
+  1. **Czystość/testowalność** — blok da się przetestować bez I/O (sieć, SDK, dysk).
+  2. **Ponowne użycie.**
+  3. **Zaciemnia główny przepływ.**
+  Żadne z nich → **nie tnij** (rozbicie liniowego kodu wołanego raz to „ravioli code").
+- **Metoda publiczna = orkiestrator.** Gdy klasa ma jedną główną metodę publiczną, trzyma ona
+  przepływ na wysokim poziomie i deleguje do prywatnych helperów — czyta się ją jak spis kroków
+  (zbuduj → wywołaj → zmapuj), a szczegóły siedzą w metodach prywatnych.
+- **Pionowe wyrównanie `=`** w wieloliniowych blokach argumentów nazwanych i przypisań —
+  nazwy dopełniane spacjami do najdłuższej w bloku:
+
+  ```python
+  metadata = Metadata(
+      content_type    = meta.content_type,
+      language        = meta.language,
+      char_count      = meta.char_count,
+      pages_processed = meta.pages_processed,
+  )
+  ```
+
+- **Wynik złożony zwracamy przez zmienną.** Słownik, model albo wywołanie z kilkoma argumentami
+  najpierw przypisujemy do nazwanej zmiennej, po jednej pozycji na linię z wyrównaniem (w słowniku
+  wartości po dwukropku), a `return` oddaje samą zmienną. Jednolinijkowe `return f(x)` zostaje.
+
+  ```python
+  update = {
+      "messages":   [turn],
+      "iterations": iteration,
+      "log":        [self.log_entry(f"tura {iteration}: {action}")],
+  }
+
+  return update
+  ```
+
+### Komentarze w kodzie
+
+- Gęste, prowadzące wzrok.
+- **„Dlaczego", nie „co"** — komentarz tłumaczy sedno: nieoczywiste zachowania API/SDK,
+  obejścia, magiczne liczby, reguły biznesowe.
+- **Separatory bloków** w ciele funkcji, nazwa opisuje blok np. `# --- build request ---`.
+- **Każda gałąź osobno** — przy wielu `except`/`if` komentarz przy KAŻDEJ klauzuli.
+- **Przykładowe wartości argumentów inline przy sygnaturze**. Dotyczy
+  WSZYSTKICH metod, też prywatnych helperów:
+
+  ```python
+  def __init__(
+      self,
+      api_key:  str,        # e.g. "sk-proj-...HNkA"
+      base_url: str,        # e.g. "https://api.openai.com/v1"
+      model:    str,        # e.g. "gpt-4o-mini"
+      timeout:  float = 60, # seconds
+  ):
+  ```
+
+- **Wieloliniowo tylko z inline-komentarzem na każdej linii; inaczej jedna linia** (długie OK):
+
+  ```python
+  # obvious → one line, even if long
+  client = OpenAILLMClient(api_key=key, base_url=url, model=model, timeout=60)
+  
+  # less obvious → split and comment each line
+  except (
+      APITimeoutError,     # network didn't respond within the timeout
+      APIConnectionError,  # could not establish a connection
+  ) as exc:
+  ```
+
+### Docstringi
+
+- **Stały format, na KAŻDEJ metodzie** (też prywatnej i też implementacji metody
+  interfejsu, nie tylko na abstrakcyjnej):
+
+```
+Description:
+<what it does, briefly>
+
+Example args:
+    arg1=...
+    arg2=...
+
+Example result:
+    <example return value>
+
+Raises:                      # only when the method raises
+    <Exception>: <when>
+```
+
+- Bez bloku `Args:` — opis argumentów idzie inline przy sygnaturze.
+- Konstruktor: `Example result:` = opis skonfigurowanej instancji.
+- **Docstring nietrywialnej klasy rozbudowany**, nie jednolinijkowy: „Do czego" (przeznaczenie
+  + rola w architekturze) i „Flow" (przebieg krok po kroku, z odwołaniem do metod).
+- **Nietrywialny moduł ma na górze opis pisany jak odpowiedź na „do czego to jest?"**: przeznaczenie
+  pełnym zdaniem, tabelka, gdy plik jest listą (reguły, komendy, metody), przykład przed i po, gdy
+  przekształca dane (zmyślony, ale „po" zdjęte z uruchomionego kodu), kroki jako lista numerowana,
+  na końcu to, o czym pamiętać przy zmianach. Historia decyzji i pomiarów zostaje w CLAUDE.md, nie w
+  pliku. Wzór: `core_service/rag_indexer.py`, `core_service/parser_ticket_raw.py`.
+
+## Dane
+
+### Historyczne zgłoszenia
 
 Dostaliśmy **zrzut MySQL/MariaDB bazy `helpdesk`** (`mysql_helpdesk_20260724-141140.sql`, 37 MB,
 MariaDB 10.3, aplikacja na Doctrine/Symfony, 21 tabel). Nie jest to eksport plikowy ani skrzynka
@@ -230,6 +553,18 @@ przestałby być widoczny). Eksport jest odtwarzalny i nie woła LLM-a, więc **
 7** — w razie potrzeby wolno go powtórzyć albo zmienić jego kształt. Kolumny z hasłami nie są
 czytane przez żadne zapytanie tego skryptu.
 
+**Droga od źródła do indeksu** (offline, odpalana świadomie z CLI):
+
+```
+zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedTicket (JSON na dysku)
+                                                                    │
+                              data/parsed/*.json ──────────────────┘
+                                     │
+                                     ├─ filtr jakości (raportuje, co odrzuca)
+                                     ├─ [embedder] problem+symptoms → wektory
+                                     └─ upsert do Qdranta (wektory + payload)
+```
+
 - **Import to cienka warstwa adapterów** — jeden czytnik na format źródłowy
   (`core_service/parser_ticket_raw.py`, przy masowym imporcie obok wariantu SQL); reszta systemu
   widzi wyłącznie znormalizowany `RawTicket`. **Model `RawTicket` mieszka w `core_model/`, czytnik w
@@ -241,7 +576,7 @@ czytane przez żadne zapytanie tego skryptu.
   nigdy w logach na INFO, nigdy w commicie; `data/` w `.gitignore`, w repo tylko zanonimizowane
   przykłady.
 
-### Zakres korpusu: wyłącznie moduł Dokus
+#### Zakres korpusu: wyłącznie moduł Dokus
 
 **Interesuje nas jedna aplikacja — Dokus, czyli `zgloszenie.modulid = 116`.** Reszta bazy
 (30 923 zgłoszenia dla ~124 modułów: Karty Kontowe, Podatki, KiP, FK…) jest poza zakresem.
@@ -273,7 +608,7 @@ naprawdę wejdzie do indeksu" — realny lejek jest o ~35% węższy.
 ≤ 50 zn., **186** przez brak komentarza > 50 zn. Obie liczby są poprawne — mierzą co innego,
 więc przy etapie 4 nie należy szukać „zgubionych" 88 rekordów.
 
-### Ile z tego naprawdę wejdzie do indeksu (pomiar na 661 sparsowanych, 2026-07-29)
+#### Ile z tego naprawdę wejdzie do indeksu
 
 Liczby niżej pochodzą z **ręcznego sparsowania 661 zgłoszeń** (36% modułu, 44% korpusu po
 filtrze długościowym), nie z szacunku. Materiał źródłowy: `data/docs/synteza-korpusu-i-pojemnosc-rag.md`.
@@ -304,7 +639,7 @@ rekordów (53%) należy do klasy powtarzalnej.
 **Ale 47% użytecznych rekordów to singletony** — nie mają w próbce bliskiego sąsiada. Dla nich
 właściwą odpowiedzią jest „nowy typ problemu", nie naciągana propozycja.
 
-### Powtarza się OBJAW, nie PRZYCZYNA — najważniejszy wniosek z korpusu
+#### Powtarza się OBJAW, nie PRZYCZYNA — najważniejszy wniosek z korpusu
 
 To jedno zdanie przesądza o kształcie produktu i wraca w niemal każdej decyzji niżej.
 
@@ -344,7 +679,7 @@ największy 14 vs 55). Objawy się zlewają, przyczyny nie.
    ma (patrz „Świadomie pominięte"). To ten sam wniosek, który unieważnił rekordy syntetyczne:
    wiedza „między rekordami" jest dostępna, o ile rekordy zostaną osobno.
 
-### Mapowanie tabel na `ParsedTicket`
+#### Mapowanie tabel na `ParsedTicket`
 
 | nasze pole | źródło w bazie |
 |---|---|
@@ -362,7 +697,7 @@ największy 14 vs 55). Objawy się zlewają, przyczyny nie.
 „Świadomie pominięte"), ale adapter nadal ją czyta: wartość „Automat mailowy" wyznacza rekordy
 wymagające czyszczenia cytowanej historii przed parsowaniem.
 
-### Pułapki tej bazy (sprawdzone na danych, nie zgadywane)
+#### Pułapki tej bazy
 
 - **Statusem końcowym Dokusa jest `rozwiazany` (1735), nie `zamkniety` (5).** W całej bazie jest
   odwrotnie (26 933 `zamkniety`). Filtr `resolved` napisany pod „resztę bazy" **odrzuciłby cały
@@ -452,7 +787,7 @@ wymagające czyszczenia cytowanej historii przed parsowaniem.
   i `instytucje_to_kategorie.kategoriaid` wskazują na `instytucja(id)` zamiast na
   `modul_zgloszenia(id)` / `kategoria(id)`. Nie joinować po nich.
 
-### Ryzyka jakości treści (zmierzone na 661 rekordach)
+#### Ryzyka jakości treści
 
 Rzeczy, które przechodzą każdy sprawdzian formalny, a psują odpowiedź. Kolejność wg skali.
 
@@ -488,7 +823,7 @@ Rzeczy, które przechodzą każdy sprawdzian formalny, a psują odpowiedź. Kole
 - **Utrata danych: 5 rekordów w próbce, 0 rozwiązań.** Cały ten temat wypadnie z indeksu.
   Trzeba to powiedzieć wprost, zamiast udawać, że system pomoże.
 
-### Wiedza najlepiej przenośna między urzędami
+#### Wiedza najlepiej przenośna między urzędami
 
 Odwrotna strona powyższych ryzyk — to działa zawsze i jest najtańszym zyskiem:
 
@@ -513,7 +848,29 @@ Odwrotna strona powyższych ryzyk — to działa zawsze i jest najtańszym zyski
   uprawnień, widoczności, słowniki. Najtrwalsza treść w korpusie; **filtr etapu 4 nie może
   karać ich za brak objawu.**
 
-## Domena: kontrakt sparsowanego zgłoszenia
+### Instrukcje
+
+Drugi materiał obok zgłoszeń: dokumentacja aplikacji podzielona na podrozdziały. Właściwej
+dokumentacji jeszcze nie ma (p. 15, p. 55) — import i narzędzia powstają na paczce syntetycznej.
+
+- **Jednostką jest podrozdział, w całości.** Na podrozdziały dzieli człowiek z modelem przed
+  wgraniem; agent wyszukuje podrozdziały i czyta je w całości.
+- **Paczka to katalog na dokument w `data/instruction/`:** `manifest.json` (`document`, `version`,
+  `date`, `synthetic` i `sections` w kolejności dokumentu: `section_id`, `chapter_path`, `title`,
+  `description`) oraz plik `<section_id>.md` z samą treścią na sekcję.
+- **Wydanie (`version`) jest wymagane** — instrukcja do starszej wersji wprowadza w błąd tak samo
+  jak odmowa obalona później nowszym zgłoszeniem.
+- **Opis sekcji (`description`) pisze model, treść jest dosłowna.** Dlatego przeszukiwany jest
+  tytuł i treść, a opis służy tylko do spisu i do wyników wyszukiwania.
+- **Podrozdział bywa dłuższy niż jeden wektor:** limit embeddera, 8192 tokeny, to ok. 18 tys.
+  znaków. Stąd cała treść leży w Postgresie, a do Qdranta idzie pocięta na fragmenty (p. 49).
+- **Paczka syntetyczna (2026-10-04):** dwa zmyślone dokumenty, 27 sekcji, `synthetic: true`,
+  z zestawem 66 zapytań w `data/golden/docs-synthetic.json`. Mierzy okablowanie narzędzi, nie
+  skuteczność, i nie może trafić do właściwego indeksu.
+
+## Architektura
+
+### Domena: kontrakt sparsowanego zgłoszenia
 
 Serce projektu. **Ten schemat jest kontraktem** — trzyma go model Pydantic w
 `api/app/core_model/ticket_parsed.py` i to on rozstrzyga, co jest poprawnym artefaktem.
@@ -598,7 +955,7 @@ Zasady schematu (rozwinięcie „Jak projektować schemat odpowiedzi" niżej):
     po sensie („Brak ustalonej przyczyny…", „Brak szczegółów…") — 103, a `startswith("brak")`
     daje 143, bo łapie 72 realne przyczyny w rodzaju „Brak uprawnienia do kancelarii".
 
-### Reguły parsowania wyprowadzone z korpusu
+#### Reguły parsowania wyprowadzone z korpusu
 
 Wejście do promptu z etapu 1. Czytaj **cały wątek**, nie komentarz wybrany po `typ` · zapisuj
 **rozstrzygnięcie końcowe, nie pierwszą hipotezę**, a trop odrzucony wspomnij jednym zdaniem ·
@@ -631,7 +988,7 @@ wdrożeniowcowi cztery odpowiedzi na pytania, których nie zadał.
 odrzuca). Rozbicie na wiele rekordów rozważamy dopiero, gdy pomiar pokaże, że te rekordy
 realnie psują trafienia — patrz „Świadomie pominięte".
 
-### `questions_summary` — synteza bez konkretów jest bezwartościowa
+#### `questions_summary` — synteza bez konkretów jest bezwartościowa
 
 Synteza tego, **czego konsultant nie wiedział i o co dopytywał**. Jedyne miejsce w korpusie, gdzie
 widać **jak ten helpdesk diagnozuje** — tego nie da się wyprowadzić z `problem` i `symptoms`.
@@ -655,301 +1012,14 @@ odsiewać wpisy stwierdzające, że pytań nie było, a nie zakładać puste pol
   domykanie sprawy, nie diagnostyka (~⅓ pytań w korpusie). Podsunięte jako propozycja są gorsze
   niż jej brak: wyglądają na odpowiedź, a są szumem. Ta sama pułapka co „Już powinno działać".
 
-## RAG — architektura
-
-**Indeksacja** (offline, odpalana świadomie z CLI):
-
-```
-zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedTicket (JSON na dysku)
-                                                                    │
-                              data/parsed/*.json ──────────────────┘
-                                     │
-                                     ├─ filtr jakości (raportuje, co odrzuca)
-                                     ├─ [embedder] problem+symptoms → wektory
-                                     └─ upsert do Qdranta (wektory + payload)
-```
-
-**Zapytanie** (runtime — graf funkcji wybranej przez człowieka, patrz „Plan i TODO", blok 0):
-
-```
-nowe zgłoszenie (surowy tekst)
-      │
-      ├─ [anonimizacja] → AnonymizedText (stały węzeł, nie narzędzie agenta)
-      ├─ [pętla agenta] ⇄ narzędzia z listy dozwolonych dla tej funkcji, np.:
-      │        find_tickets_vector(problem, symptoms) → [embedder] → top-K z Qdranta → próg score
-      │                                               → numery zgłoszeń
-      │        read_tickets_card(numery) → karty z Qdranta        (odczyt cytuje)
-      │        find_docs_vector(zagadnienie) → [embedder] → opisy sekcji dokumentacji
-      │        read_docs(identyfikatory) → treść sekcji           (odczyt cytuje)
-      └─ [odpowiedź] → propozycja + źródła z `cite()` odczytów
-```
-
-**Zapytanie do indeksu pisze agent, w kształcie korpusu (2026-10-02).** Surowy mail (powitanie,
-stopka, historia wątku) zaszumia wektor, więc do wyszukania idą dwa pola, z których zbudowano
-indeks: `problem` + `symptoms`. Dawniej (etap 5, `/search` → `RagSearcher`, skasowany 2026-10-02)
-sprowadzał do nich zgłoszenie osobny parser promptem korpusu. Teraz robi to agent — prompt mówi mu,
-jak pytać każde narzędzie — i może szukać kilka razy, w zgłoszeniach i w dokumentacji. Zysk: jedno
-wywołanie LLM mniej na każde wyszukiwanie. **Cena:** zapytanie nie powstaje już tym samym promptem
-co korpus, więc trafność zapytań agenta trzeba zmierzyć (p. 23); ryzyko jest małe, bo pomiar z etapu
-4 dał 98,1% i dla zapytań surowych, i sparsowanych. Tekst do embeddingu nadal składa jedna funkcja
-(`build_embedding_text()`), wspólna dla indeksacji i zapytania.
-
-Skoro **obie strony to ten sam rodzaj tekstu**, tryb `sts` był kandydatem wobec `query→passage`
-— pomiar rozstrzygnął na korzyść `query→passage` (patrz niżej).
-
-**Poza tym etapy są rozdzielone.** Masowe parsowanie korpusu (drogie, jednorazowe) nie jest
-wołane ani przy indeksacji, ani przy zapytaniu.
-
-### Embeddingi i prefiksy PolDense (najłatwiejsza rzecz do zepsucia)
-
-PolDense rozróżnia tryby **prefiksem doklejanym do tekstu wejściowego**. Ten sam tekst z innym
-prefiksem daje **inny wektor** — trybów **nie wolno mieszać w jednej przestrzeni wektorowej**.
-
-| tryb | prefiks | zastosowanie |
-|---|---|---|
-| query   | `[query]: ` | nowe zgłoszenie w runtime (pytanie do bazy) |
-| passage | *(brak)*    | podsumowanie problemu przy indeksacji (dokument-cel) |
-| sts     | `[sts]: `   | porównania zgłoszenie↔zgłoszenie: „podobne przypadki", zwijanie trafień — **u nas dziś nikt tego nie woła**, patrz niżej |
-
-**Skala różnicy jest zmierzona, nie założona** (PolDense-150M, ten sam tekst w trzech trybach,
-2026-08-05): `cos(query, passage) = 0,544`, `cos(passage, sts) = 0,814`. Gdyby prefiks był
-kosmetyką, wyszłoby 1,0 — te liczby pokazują, że tryby dają **inne wektory**. Pilnuje ich test
-na stacku (`stack_embedder`), bo to prawda mieszkająca **poza naszym kodem**: przy
-podmianie modelu w etapie 3 trzeba ją sprawdzić od nowa.
-
-**Ale to NIE jest miara szkody przy pomyleniu trybów** — i to jest korekta wcześniejszego zapisu.
-Zmierzone na zbudowanym indeksie (2026-08-13, 60 zapytań): poprawne `query→problem` daje
-`recall@1` 98,3%, pomylone `passage→problem` — **93,3%**, a `query→sts` — **96,7%**. Cosinus 0,544
-sugerował załamanie, wyszedł spadek o kilka punktów: **ranking jest odporniejszy niż odległość**,
-bo błąd przesuwa wszystkie wektory podobnie i kolejność w dużej mierze ocaleje.
-Konsekwencja praktyczna: **pomyłka prefiksu nie objawi się jako awaria, tylko jako „trochę gorsze
-wyniki"** — czyli coś, co łatwo złożyć na karb modelu albo korpusu. Dlatego trybów pilnuje test
-na progu podobieństwa, a nie pomiar recall, i dlatego `embed_query/passage/sts` są trzema
-nazwanymi metodami zamiast jednej z parametrem.
-
-Konsekwencje:
-
-- Opakowujemy to w **`embed_query()` / `embed_passage()` / `embed_sts()`** — nikt nie skleja
-  prefiksu ręcznie w kodzie domenowym. **Trzy nazwane metody, nigdy jedna z parametrem `mode`:**
-  parametr da się przekazać ze zmiennej trzy poziomy wyżej i nikt nie zauważy, który tryb leci
-  na drut; nazwa metody wymusza wybór **w miejscu wywołania**.
-- **Tabela prefiksów w naszym kodzie (`MODE_PREFIXES`) jest źródłem prawdy — nie `prompts`
-  modelu.** Kuszące `model.encode(prompt_name="query")` czyta
-  `config_sentence_transformers.json`, gdzie PolDense deklaruje **tylko `query` i `document`**;
-  `sts` by tam nie istniał i biblioteka rzuciłaby błędem. To nie usterka karty modelu, tylko
-  granica formatu: pole `prompts` opisuje **asymetrię** (prefiks na jedną stronę porównania),
-  a STS jest z definicji symetryczny — obie strony dostają ten sam prefiks, więc nie ma czego
-  rozróżniać. Tryb `[sts]: ` jest potwierdzony u autorów w karcie modelu.
-- **Normalizacja wektorów należy do NAS, nie do modelu.** PolDense ma w `modules.json` wyłącznie
-  `Transformer` + `Pooling`, **bez `Normalize`** — surowe wyjście ma dowolne długości, podczas gdy
-  `FakeEncoder` produkuje jednostkowe. Bez `normalize_embeddings=True` próg `RAG_SCORE_MIN`
-  znaczyłby co innego w testach niż na produkcji. Flaga zostaje **bezwarunkowo**, także dla modeli
-  mających `Normalize` w pipelinie (BGE-M3) — tam jest redundantna, nigdy szkodliwa (dzielenie
-  przez 1). Zdanie się na normalizację Qdranta nie wystarcza: ewaluacja z etapu 3 liczy
-  podobieństwa **poza bazą**.
-- **Nie wolno mieszać stron:** `[query]:` szuka wyłącznie po wektorach passage, `[sts]:`
-  wyłącznie po wektorach sts.
-- **Którym trybem szukać — ROZSTRZYGNIĘTE OSTATECZNIE: `query→passage`, także dla zapytań
-  sparsowanych.** Zmierzone 2026-08-13 na zbudowanym indeksie
-  (`python scripts/eval_index.py modes`, 162 zapytania, 171 punktów):
-
-  | wejście | tryb | recall@1 | MRR |
-  |---|---|---:|---:|
-  | surowe | `query→passage` | **98,1** | **0,988** |
-  | surowe | `sts→sts` | 96,9 | 0,980 |
-  | **sparsowane** | `query→passage` | **98,1** | **0,990** |
-  | **sparsowane** | `sts→sts` | 96,3 | 0,976 |
-
-  **Argument za `sts→sts` upadł — i to w odwrotną stronę, niż zakładał.** Brzmiał: skoro zapytanie
-  parsujemy przed wyszukaniem, obie strony stają się tym samym gatunkiem tekstu, więc tryb
-  symetryczny powinien zacząć wygrywać. Po sparsowaniu przewaga `query→passage` **rośnie** (+1,2 pp
-  → +1,9 pp na @1, MRR +0,008 → +0,014). Prawdopodobna przyczyna: `sts` ocenia **równoważność**
-  dwóch zdań, a my szukamy dokumentu **odpowiadającego na pytanie** — ta asymetria zostaje nawet
-  przy podobnym wyglądzie obu tekstów, bo cel niesie `problem` + `symptoms`, a zapytanie sam opis
-  kłopotu.
-  - **Zastrzeżenie do liczb, nie do wniosku:** jako „zapytanie sparsowane" użyto `expected_problem`
-    z golden setu (kopia pola `problem` rekordu-celu), a nie wyniku parsera na cudzym zgłoszeniu.
-    To właściwy **gatunek** tekstu, ale bliższy celowi niż prawdziwy parse — zawyża **obie**
-    kolumny tak samo, więc różnica między trybami zostaje miarodajna, a wartości bezwzględne nie.
-    Przy 162 zapytaniach jedno trafienie waży 0,6 pp, czyli +1,9 pp to około trzy zapytania;
-    kierunek jest spójny w czterech pomiarach, ale to nie jest przepaść.
-- **Dwa named vectors na rekord** (`problem` = passage, `sts` = sts). **Wektor `sts` stracił
-  WSZYSTKIE trzy uzasadnienia i mimo to zostaje — świadomie, nie przez przeoczenie.** Kolejno:
-  dedup wykreślony, wyszukiwanie rozstrzygnięte na korzyść `query→passage`, a zwijanie trafień
-  wykreślone 2026-08-19 (wszystkie trzy w „Świadomie pominięte"). **Nie kasować go jako
-  „niewykorzystany".** Buduje się go dalej, bo kosztuje jedno wywołanie embeddera na rekord przy
-  indeksacji, a usunięcie i późniejszy powrót kosztowałyby **pełny re-index**. Wraca do gry razem
-  ze zwijaniem albo z „podobnymi przypadkami" — oba porównują zgłoszenie ze zgłoszeniem, czyli
-  symetrycznie z definicji.
-- Zmiana modelu embeddingowego albo trybu ⇒ **nowa kolekcja i pełny re-index** (tani — JSON-y
-  leżą na dysku).
-
-### Wybór modelu i trybu — zmierzony 2026-08-05
-
-**Decyzja: `OPI-PIB/PolDense-150M`, tryb `query→passage`.** Pełny raport:
-`data/docs/pomiar-embedderow.md`; narzędzie: `scripts/eval_embeddings.py`.
-
-Zmierzone na 165 syntetycznych zapytaniach wobec korpusu 200 rekordów (nieprzefiltrowanego —
-odrzucone zostają jako dystraktory), pomiar powtórzony dwukrotnie z identycznym wynikiem:
-
-| tryb | recall@1 | recall@5 | MRR |
-|---|---:|---:|---:|
-| `query→passage` | **98,2** | 100,0 | **0,988** |
-| `sts→sts` | 97,0 | 99,4 | 0,980 |
-
-- **Model wybrany BEZ rozstrzygającego pomiaru — świadomie.** `recall@1` = 98,2% przy 200
-  rekordach to **sufit**: pozostali kandydaci (PolDense-68M, mmlw, BGE-M3, Nomic v2-moe)
-  zmieściliby się w granicach jednego–dwóch zapytań, więc wybór „po liczbach" byłby wyborem po
-  szumie. Do porównania **wracamy na pełnym korpusie** (p. 33) — przy 200 rekordach metryka
-  nadal stoi przy suficie.
-- **Wymiar 768** (`hidden_size` 768, pooling CLS, `ModernBertModel`). **Wariant 1B wypadł
-  świadomie:** na CPU latencja wyszukiwania byłaby rzędu sekundy, zanim LLM zacznie generować.
-- **Że to sufit, a nie jakość modelu, wiemy z GRUPY KONTROLNEJ.** Do pomiaru dołożono
-  `nomic-embed-text-v1.5` (anglojęzyczny), z progami interpretacji ustalonymi **przed** przebiegiem.
-  Wyszło 87,9% — czyli sygnał w zapytaniach jest w dużej mierze leksykalny, choć pomiar różnicuje
-  o 10,3 pp. **Bez kontroli 98,2% zapisalibyśmy jako sukces modelu.**
-- **Tryb rozstrzygnięty POŁOWICZNIE — domknięte 2026-08-13.** Tu `query→passage` wygrał na
-  zapytaniach SUROWYCH (u kontroli różnica większa: 3,7 pp), a oś „zapytanie sparsowane" została
-  dołożona przy etapie 4: **`query→passage` wygrywa także tam, i to wyraźniej** (patrz „Embeddingi
-  i prefiksy PolDense"). Zastrzeżenie metodologiczne stąd zostaje aktualne: pomiar nie wymagał
-  przebiegu LLM, bo za zapytanie sparsowane posłużyło pole `expected_problem` z golden setu.
-- **Zaostrzanie zapytań wyczerpane jako droga.** Usunięcie sygnatur i numerów z 18 zapytań
-  kosztowało PolDense 0,6 pp, kontrolę 3,0 pp. **Parafrazowanie nic nie da** — parafraza to ta sama
-  treść, a embedder semantyczny istnieje po to, by ją rozpoznawać. Rząd trudności zmieni wyłącznie
-  większy korpus.
-- **Wniosek produktowy:** przy tej skuteczności wąskim gardłem **nie jest model**, tylko jakość
-  i kompletność samych zgłoszeń — czyli filtr z etapu 4 i bramka zamknięcia z nogi 2.
-
-### Generacja propozycji odpowiedzi
-
-Wspólne dla wszystkich wariantów:
-
-- **Trafienia dają treść merytoryczną, prompt zadaje styl.** Do promptu idą pola z payloadu
-  (`problem`, `cause`, `solution` + metadane: score, data, `ticket_id`) — **nie** surowe maile.
-- **Placeholdery zamiast danych** (`{IMIĘ}`, `{NR_URZĄDZENIA}`), nawiasy kwadratowe na
-  instrukcje dla człowieka (`[dla serwisanta: sprawdź wersję firmware]`).
-- Propozycja **zawsze** wraca z listą źródeł (numery zgłoszeń i sekcji, które model odczytał,
-  z tytułami), **liczoną z wywołań narzędzi, nie z deklaracji modelu** — wdrożeniowiec musi móc
-  zweryfikować, skąd to się wzięło. Wariant
-  nieoparty na trafieniach wraca z **pustą listą źródeł**, i to jest informacja, nie brak danych.
-
-#### Warianty generacji (guziki)
-
-Wdrożeniowiec wybiera **rodzaj** odpowiedzi. Trzy warianty startowe:
-
-| wariant | co generuje | wymaga trafień |
-|---|---|---|
-| `questions` | pytania, które warto zadać w ramach zgłoszenia | nie (trafienia wzbogacają) |
-| `solution`  | rozwiązanie — gdy zgłoszenie nie wymaga działania serwisu | **tak** |
-| `handoff`   | informacja o przekazaniu zgłoszenia do dalszych prac po stronie serwisu | nie |
-
-- **Wariant deklaruje, czy potrzebuje trafień** (`requires_hits`). To pole rozstrzyga, **które
-  guziki działają przy pustym indeksie** — `questions` i `handoff` są użyteczne od pierwszego
-  dnia, `solution` bez trafień nie ma z czego powstać (zasada 9). Egzekwuje to **kod węzła
-  odpowiedzi**, nie posłuszeństwo modelu.
-- **`questions` działa dwutorowo i to jest zamierzone:** bez trafień generuje pytania z ogólnej
-  wiedzy o zgłoszeniu, z trafieniami dokłada `questions_summary` z podobnych spraw — czyli to,
-  o co realnie dopytywał ten helpdesk. Dlatego `requires_hits = false`, ale trafienia istotnie
-  podnoszą jakość. **`questions_summary` w trafieniach jest zwykle WYPEŁNIONE** (84% artefaktów —
-  patrz sekcja o tym polu; wcześniejsze „~83% pustych" mieszało pomiar na surowych zgłoszeniach
-  z artefaktami). Ryzykiem nie jest więc puste pole, tylko **sentinel w przebraniu** („Brak pytań
-  ze strony prowadzącego sprawę.") — 28 na 200 rekordów, wygląda jak treść i wpada do promptu.
-- **Prompt wariantu `questions` odpowiada za to, żeby nie przepisać cudzych pytań.** Materiał
-  historyczny to **wzorzec, nie treść do skopiowania** — instrukcja musi kazać: odrzuć pytania
-  niepasujące do bieżącego kontekstu, przeformułuj pod to zgłoszenie, **pomiń te, na które
-  odpowiedź już jest w treści**. Bez tego model podsunie „czy wykonano CTRL+F5 po aktualizacji?"
-  na zgłoszenie, w którym żadnej aktualizacji nie było.
-- **Wszystkie warianty zwracają ten sam kształt:** tekst propozycji + źródła + wariant, którym
-  powstał. Dzięki temu nowy guzik — nowy katalog grafu — nie dotyka routera ani UI helpdesku.
-
-#### Wariant wybiera człowiek — system nie podpowiada
-
-**Podpowiadanie guzika po score wypadło z zakresu (2026-08-20)**, patrz „Świadomie pominięte".
-Powód w jednym zdaniu: **wysoki score nie znaczy „mam rozwiązanie"** — sześć zgłoszeń o niemal
-identycznym `problem` i sześciu rozłącznych przyczynach wpada do top-5 razem, z wysokimi score,
-więc podpowiedź `solution` byłaby wtedy błędna, a właściwą reakcją jest dopytanie. Rozróżnić te
-dwie sytuacje umiałaby dopiero ocena zgodności `cause`, której nie budujemy.
-
-Konsekwencje dla produktu:
-
-- **UI rysuje trzy równorzędne przyciski.** Wdrożeniowiec wybiera rodzaj odpowiedzi sam.
-- **„Nic nie znaleziono" niesie już sama pusta lista trafień** z `/search` (plus
-  `dropped_below_threshold`, gdy odciął je próg) — osobna flaga „nowy typ problemu" nie jest
-  do tego potrzebna.
-- **`questions` pozostaje wariantem najsensowniejszym przy tym korpusie**, ale to wiedza dla
-  wdrożeniowca i dla dokumentacji, nie reguła w kodzie.
-- **Wraca jako możliwość, gdy dane z klikania dadzą podstawę do oceny** — każde kliknięcie jest
-  etykietą treningową (p. 42).
-
-#### Twarde reguły promptu generacji (wyprowadzone z korpusu)
-
-- **Data rekordu idzie do promptu bezwarunkowo.** Trzy niezależne powody: dezaktualizacja
-  (odmowa obalona przez nowszy rekord), sprzeczność między rekordami, i **sezonowość** — „nie
-  działa numeracja" w pierwszym tygodniu stycznia to prawie na pewno brak sekwencji na nowy rok.
-- **Przy rozbieżnych liczbach podaj zakres i daty, nigdy jednej wartości.**
-- **Kanał w odpowiedzi obowiązkowo** — bez niego odpowiedź bywa odwrotnością prawdy.
-- **Nakładka ostrzeżeń działa przy KAŻDYM wariancie**, nie konkuruje z nim. Najcenniejsza
-  operacyjnie treść korpusu to nie rozwiązania, tylko ostrzeżenia — zwłaszcza gdy działanie
-  jest **nieodwracalne**.
-  - **ALE DZIŚ NIE DZIAŁA — zmierzone 2026-08-26.** Na zgłoszeniu o masowej wysyłce ePUAP
-    („statusy w toku, UPP nie przyszły"), czyli **sztandarowym przykładzie operacji nieodwracalnej
-    w tym korpusie**, linia `[UWAGA: …]` nie padła **ani razu w żadnym z 11 wariantów promptu**,
-    choć prompt jej wprost wymaga. Model pytał o ponowienie wysyłki bez słowa ostrzeżenia.
-    **Strojenie `solution` (2026-08-28) to potwierdziło — czwarty pomiar z rzędu, oba modele, obie
-    wersje promptu, zero trafień.** Ostrzeżenie żyje dziś wyłącznie jako człon placeholdera uwag,
-    którego model nie musi wypełnić; potrzebna osobna reguła (p. 26).
-- **Obowiązkowe miejsce na „czego NIE robić"** — „czy trzeba coś powtórzyć?" jest pierwszym
-  pytaniem klienta po każdej takiej diagnozie.
-- **Zastrzeżenia przenoszone w komplecie** (cztery wymiary — patrz „Domena"). Rekord potrafi
-  nieść naraz obejście, zmianę docelową i zalecenie, żeby z obejścia nie korzystać; model
-  streszczający to jednym zdaniem gubi trzecią informację.
-
-#### Wnioski ze strojenia promptów (2026-08, Bielik 11B i model odniesienia)
-
-Raporty: `data/docs/pomiar-wariantow-promptu-questions-2026-08-26.md`,
-`data/docs/pomiar-promptu-solution-2026-08-28.md`. Mierzone na 11B — przy modelu docelowym do
-przemierzenia (p. 25–27), ale wnioski o formie przenoszą się między modelami.
-
-- **Wzór odpowiedzi jest jedyną kotwicą FORMY** — bez niego trzymanie liczby pytań spada z 87% na
-  37%, a reguła słowna o zwięzłości nie dała ani jednego numerowanego kroku. Nie usuwać jako
-  „zbędnego". **Wzór ma być schematyczny:** gotowe pytania model przepisuje dosłownie, a przykład
-  z innej dziedziny ściąga uwagę z danych (najgorszy wynik ze wszystkich wariantów).
-- **Schemat działał na 11B wyłącznie z osobnym blokiem przyczyn** — sam dawał kształt bez treści.
-  Blok usunięty z wyniku narzędzi 2026-10-03 jako zabieg pod słaby model; gdyby pytania przy
-  klastrach wieloprzyczynowych wyszły na modelu docelowym słabo, to pierwsza rzecz do przywrócenia
-  (p. 25).
-- **Notatka `[dla wdrożeniowca: …]` jest nośna, choć wygląda na ozdobę** — zmusza model, żeby
-  zajrzał w przyczyny przed napisaniem pytania; bez niej liczba pytań rośnie, a pokrycie spada.
-  Odwrotnie z gotową formułką na wyjście („Brak pytań rozróżniających.") — model doklejał ją po
-  treści w 7 przebiegach na 8, więc ją usunięto.
-- **Forma przenosi się między modelami, treść nie — w obie strony.** Wzór dał na Bieliku 8/8 form,
-  ale nazywanie luki w bazie spadło z 6/8 na 2/8; u mocnego modelu ta sama zmiana nic nie
-  kosztowała. Wniosek mierzony tylko na mocnym modelu byłby fałszywy.
-- **Reguła wyrażona pośrednio albo przez rozróżnienie jest na 11B martwa** („NIE ZMYŚLASZ" →
-  obietnice terminów wobec klienta; „przenoś tylko wartości narzucone z zewnątrz" → wartości z
-  jednej instalacji jako polecenie). Naprawa: reguła pozytywna albo zakaz wyliczający klasy wprost.
-- **Limit liczby kroków i uwag to decyzja o TREŚCI** — model sam wybiera, co poświęci. **Reguła
-  rozbijająca bez limitu puchnie** (procedura klik po kliku: 3 kroki z limitem, 7 bez).
-- **Zakaz przepisywania cudzych pytań jest darmowy** (0–1 przypadków we wszystkich wariantach).
-- **Znana dziura w obu promptach: brak reguły zgodności przyczyny z objawem** — przy awarii całego
-  urzędu model pytał o wygasłe konto jednego użytkownika, a przy przenoszeniu zasobów kazał wygasić
-  duplikat kontrahenta (operacja o trwałym skutku). Do dopisania z pomiarem (p. 25–26).
-- **Metryka „pokrycie przyczyn" nagradza mechaniczne przepisanie** — komplet punktów bywa wynikiem
-  bezwartościowym; liczby rozstrzygają o formie i patologiach, o sensie — nie.
-- **Metodyka:** odpowiedzi modelu odniesienia zbierać w **świeżym czacie** (sesja robocza zna
-  intencję reguł), a weryfikację na innych zgłoszeniach robić **wcześniej niż na końcu** — trzy
-  wady były niewidoczne na zgłoszeniu, na którym strojono.
-- **Otwarte: treść surowa obok sparsowanej w prompcie generacji.** Parser gubi konkret („dwa pliki
-  zip ze zdjęciami" → „w formacie zip"), pomiar był niespójny; tańszą stroną błędu jest podać obie.
-
-## Bramki jakości i asysta pisania (noga 2)
+### Bramki jakości i asysta pisania (noga 2)
 
 Ścieżka **niezależna od RAG**: wejściem jest tekst, który wdrożeniowiec właśnie napisał, wyjściem
 werdykt albo poprawiony tekst. **Żadna z tych funkcji nie dotyka Qdranta ani embeddera** — ich
 grafy nie dostają narzędzi wiedzy. Konsekwencja praktyczna: działają przy pustym indeksie i na
 świeżym wdrożeniu.
 
-### Kontrakt: my opiniujemy, helpdesk egzekwuje
+#### Kontrakt: my opiniujemy, helpdesk egzekwuje
 
 Blokada dzieje się **w aplikacji helpdesku**, nie u nas. Helpdesk woła nasz endpoint przed
 zamknięciem zgłoszenia albo przed wysyłką i dostaje werdykt; to on decyduje, czy pokazać
@@ -967,7 +1037,7 @@ przycisk. Stąd trzy wymagania na kontrakt:
   się nadpisać. Zasada 10. Jest stała dla każdego werdyktu, więc należy do modelu odpowiedzi API,
   nie do `Verdict`.
 
-### Trzy funkcje
+#### Trzy funkcje
 
 | funkcja | wejście | wyjście | endpoint |
 |---|---|---|---|
@@ -992,7 +1062,7 @@ najostrzejsze ograniczenie: **przepisuje formę, nie treść.** Nie wolno jej do
 rozwiązania, liczby, terminu ani nazwy, których nie było w wejściu (zasada 9). Wynik zawsze
 wraca do akceptacji człowieka — nigdy nie zastępuje oryginału automatycznie.
 
-### Reguły jako dane — świadome złamanie „prompt = logika"
+#### Reguły jako dane — świadome złamanie „prompt = logika"
 
 Dotąd obowiązywało: **prompt siedzi w repo, nigdy w konfiguracji**. Tu robimy wyjątek, bo klient
 ma **sam** stroić wymagania („co musi zawierać zamknięcie", „czego nie wolno w wiadomości",
@@ -1019,7 +1089,7 @@ Konsekwencje, których nie pomijamy:
   2026-10-02 — wcześniej „przepuszcza i mówi o tym wprost"). Bramka bez reguł nie ma czego
   sprawdzać, a werdykt `pass` wyglądałby jak „wszystko OK".
 
-### Ewaluacja bramek (osobna oś jakości)
+#### Ewaluacja bramek (osobna oś jakości)
 
 Retrievalu i generacji nie mierzy się tak samo — bramek też nie. Tu metryką są **fałszywe
 alarmy i przepuszczenia**, mierzone na zbiorze realnych zamknięć i wiadomości z korpusu
@@ -1033,280 +1103,7 @@ merytorycznie").
 - **Dla „Popraw" osobne kryterium: brak nowych faktów.** Porównanie wejścia z wyjściem pod kątem
   dodanych liczb/nazw/kroków — to jedyna oś, na której ta funkcja może zaszkodzić klientowi.
 
-## Commands
-
-**Uruchomienie**
-- Dev (kod montowany z hosta): `docker compose -f docker-compose.yml up -d`
-- Prod (bez montowania): `docker compose -f docker-compose.prod.yml up -d`
-- Z GPU dla embeddera: warstwa `docker-compose.gpu.yml`
-- Po zmianie zależności lub `Dockerfile` (albo kodu na prodzie): `docker compose up -d --build
-  <usługa>`
-- Weryfikacja realnej konfiguracji: `docker compose config` (nie zawartość `.env`)
-
-**Przygotowanie danych (skrypty repo)**
-- Eksport zgłoszeń ze zrzutu do `data/raw/`: `python scripts/export_raw_tickets.py export
-  --module-id 116` (wymaga kontenera z zaimportowanym zrzutem; kontrola liczb wobec bazy na końcu
-  przebiegu)
-
-**Pipeline danych (CLI `helpdesk`)**
-- Walidacja artefaktów: `helpdesk tickets validate data/parsed/`
-- Indeksacja do Qdranta: `helpdesk rag index <katalog>`
-- Pełna odbudowa indeksu: `helpdesk rag reindex` (kasuje kolekcję, wstaje z `data/parsed/`)
-- Ewaluacja embeddera: `python scripts/eval_embeddings.py recall --model <nazwa>`
-  (repo-level, nie CLI usługi — ładuje modele wprost, bez stawiania stacku)
-- Ewaluacja zbudowanego indeksu: `python scripts/eval_index.py recall --collection tickets`
-  (**wymaga stacku** — mierzy przez usługę embeddera i Qdranta, czyli tę samą drogę co produkcja;
-  ten sam wzór recall/MRR co wyżej, żeby liczby dało się porównać)
-- Porównanie trybów wyszukiwania: `python scripts/eval_index.py modes --collection tickets`
-  (`query→passage` vs `sts→sts`, na zapytaniach surowych i sparsowanych — cztery pomiary w jednej
-  tabeli; wymaga stacku)
-- Pomiar progu odcięcia: `python scripts/eval_threshold.py table` (rozkłady + tabela koszt/zysk
-  per kandydat na próg), `... detail --threshold 0.48` (co ten próg robi z każdym dystraktorem
-  i które trafienia poprawne kosztuje) oraz `... plot` (wykres obu rozkładów z linią progu do
-  `data/docs/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz
-  `data/golden/distractors.json`; sam golden set mierzy tylko połowę rozkładu
-
-**Bramki jakości i asysta pisania**
-- Sprawdzenie zamknięcia z konsoli: `helpdesk gate close --file <plik>`
-- Sprawdzenie wiadomości: `helpdesk gate reply --file <plik>`
-- Poprawa tekstu: `helpdesk polish --file <plik>`
-- Podgląd aktywnego zestawu reguł: `helpdesk rules show --gate close`
-- Ewaluacja bramek (fałszywe alarmy/przepuszczenia): `helpdesk eval gates --gate close`
-
-**Testy i jakość**
-- Lint: `ruff check .`
-- Wszystko, co nie potrzebuje stacku ani płatnego modelu (każdy rodzaj testu): `pytest`
-- Wszystko naraz: `pytest -m ""` — **jedno polecenie na cały przebieg**; wymaga stacku
-- Jeden rodzaj: `pytest tests/unit/`, `pytest tests/integration/`, `pytest tests/functional/`
-- Na stacku: `pytest tests/integration/ tests/functional/ -m stack` (albo `-m stack_<usługa>`)
-- Ewaluacyjne: `pytest tests/evaluation/` — bez korpusu odniesienia w `data/` testy się pomijają;
-  z pomiarem `find_tickets_vector` na golden secie: `pytest tests/evaluation/ -m ""` (stack
-  i zbudowany indeks)
-- Na żywym LLM: `pytest -m llm_live` — **kosztuje / bije po sieci, pytaj przed**
-- **Podając marker, podaj też folder** — marker odsiewa dopiero PO imporcie, więc bez ścieżki
-  pytest wczytuje wszystkie pliki testowe, żeby uruchomić kilkanaście (kolekcja podzbioru spada
-  wtedy trzykrotnie). Foldery i markery można łączyć:
-  `pytest tests/integration/ tests/functional/ -m "stack_qdrant or stack_api"`
-
-**CLI / pakiet**
-- `pip install -e .` — tylko po zmianie `pyproject.toml`, po zmianie kodu nigdy
-
-## Podział na foldery i pliki
-
-```
-dokus-helpdesk-ai/
-├── docker-compose.yml            # baza — api + embedder + qdrant + postgres
-├── docker-compose.gpu.yml        # warstwa: rezerwacja GPU dla embeddera
-├── docker-compose.prod.yml       # warstwa: kod z obrazu (volumes: !reset [])
-├── .env                          # wartości lokalne — NIE w repo
-├── .env.example                  # kontrakt konfiguracji — W repo
-├── pyproject.toml                # pytest/lint + pakietowanie (entry-point `helpdesk`)
-├── requirements-dev.txt          # zależności testów/lintera (poza obrazem)
-├── CLAUDE.md / README.md
-├── scripts/                      # narzędzia repo niezwiązane z usługą (patrz „Warstwa CLI")
-├── data/                         # artefakty — NIE w repo (PII)
-│   ├── raw/                      # zgłoszenia źródłowe jak przyszły
-│   ├── parsed/                   # sparsowane JSON-y (trwały artefakt, zasada 7)
-│   ├── golden/                   # zestawy do ewaluacji: golden set, dystraktory
-│   ├── instruction/              # dokumentacja: katalog na dokument, metryczka + pliki .md (p. 49)
-│   └── docs/                     # raporty z pomiarów i dokumenty projektu (patrz niżej)
-├── api/                          # folder = usługa z compose, nazwany tak samo
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── requirements.txt          # zależności RUNTIME tej usługi (do obrazu)
-│   ├── scripts/                  # skrypty deweloperskie (python api/scripts/…)
-│   └── app/                      # kod aplikacji
-│       ├── entry_cli/            # CLI (Typer): pakiet na obszar, plik na komendę — cienkie adaptery
-│       ├── main.py               # montaż aplikacji, middleware, handlery wyjątków
-│       ├── config.py             # Settings (pydantic-settings)
-│       ├── entry_routers/        # trasy: katalog na zasób (router.py + models.py z modelami API);
-│       │                         #   wspólne modele API i mapowanie na górze pakietu
-│       │                         # --- nasza strona: podział po RODZAJU obiektu ---
-│       ├── core_model/           # ticket_*, validation_parsed_*, dict_resolution_*
-│       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, rag_indexer
-│       ├── core_text/            # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
-│       ├── core_util/            # html, validation_text, time
-│       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
-│       ├── engine_llm/           # LLMClient + fabryka; client/, pricing/, models/
-│       ├── engine_embedding/     # EmbeddingClient (HTTP do `embedder`) + prefiksy
-│       ├── engine_anonymization/ # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 19)
-│       ├── db_qdrant/            # Qdrant: client.py, collection/ point/, hit/
-│       ├── db_postgres/          # Postgres: client.py, table/<tabela>/ (klasa + .sql), row/
-│       │                         # --- agent: katalog na jednostkę, właściwa + fake.py ---
-│       ├── agent_tools/          # narzędzia agenta: base.py, folder na materiał, katalog na narzędzie
-│       ├── agent_nodes/          # węzły grafów: kontrakt Node, katalog na węzeł
-│       └── agent_graphs/         # grafy funkcji: base.py, factory.py, registry.py, fake.py, katalog na graf
-├── embedder/                     # kolejna usługa: model PL za REST-em
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── embedder_app/             # pakiet nazwany rozłącznie z `app` z `api/` (patrz „Testy")
-│       ├── main.py               # montaż aplikacji
-│       ├── config.py             # Settings tej usługi (własne, kodu nie dzielimy)
-│       ├── models.py             # kontrakt HTTP: EmbedRequest/EmbedResponse, tryby prefiksów
-│       ├── encoding/             # Encoder + fabryka + FakeEncoder — tu wchodzi PolDense
-│       └── entry_routers/              # /health, /embed
-├── postgres/                     # kolejna usługa: Postgres z polskim słownikiem
-│   ├── Dockerfile                # pobiera słownik sjp.pl (commit + suma kontrolna)
-│   ├── dictionary/               # build.sh z poprawkami słownika, custom_words.txt z nazwami własnymi
-│   └── initdb/                   # konfiguracja wyszukiwania `pl_search` (tylko pusty wolumen)
-├── tests/
-│   ├── unit/                     # podfoldery <usługa>_<pakiet>: api_agent_tools/, api_core_service/, embedder/…
-│   ├── integration/              # jednostka + prawdziwa zależność: pliki, FastAPI, LangGraph, Qdrant
-│   ├── functional/               # cała aplikacja przez HTTP albo komendę
-│   └── evaluation/               # golden sety
-├── integrations/<język>/         # klienci dla konsumentów API
-└── samples/                      # zanonimizowane dane do testów i ewaluacji
-```
-
-- **Folder = usługa z compose**; wszystko do zbudowania obrazu leży w nim, nie w korzeniu.
-  Korzeń należy do infrastruktury: compose, `.env*`, dokumentacja, config testów.
-- **Testy w korzeniu, nie w folderze usługi** — nie trafiają do obrazu, a integracyjne sięgają
-  kilku usług. Ten sam plik może być w `unit/` i `integration/` (stąd `--import-mode=importlib`).
-- **Dwa pliki zależności:** `<usługa>/requirements.txt` = runtime, do obrazu;
-  `requirements-dev.txt` w korzeniu = testy/lint, nigdy w obrazie.
-
-## Warstwy kodu
-
-- **Dwie osie podziału, granicą jest przekroczenie granicy procesu.** Co rozmawia z usługą
-  zewnętrzną, dostaje **własny pakiet** (`engine_llm/`, `engine_embedding/`): interfejs,
-  implementacje, fabryka, wyjątki i modele transportu razem, żeby podmiana dostawcy była zmianą
-  jednego katalogu — dlatego te modele **nie wychodzą** do `core_model/`. Reszta idzie osią
-  techniczną (`core_model` / `core_service` / `core_text` / `core_util`).
-- **Każdy pakiet w `app/` ma przedrostek swojej grupy (2026-10-04):** `agent_` to przebieg
-  (grafy, węzły, narzędzia), `core_` nasza strona (`core_model/`, `core_service/`, `core_text/`,
-  `core_util/`), `db_` magazyny, `engine_` klienci usług liczących (`engine_llm/`,
-  `engine_embedding/`, `engine_anonymization/`), a `entry_` wejścia (`entry_routers/`,
-  `entry_cli/`). Bez przedrostka zostają pliki spinające całość: `main.py`, `config.py`,
-  `errors.py`. Przedrostek nazywa rolę, nie bibliotekę: nie `langgraph_`, bo LangGrapha importuje
-  tylko `agent_graphs/`, a narzędzia mają od niego nie zależeć.
-- **Pakiety baz nazywają się od bazy: `db_qdrant/` i `db_postgres/` (2026-10-04, wcześniej
-  `retrieval/` i `db/`).** Odkąd Postgres też wyszukuje, „retrieval" pasowało do obu, a „db" nie
-  mówiło, o którą bazę chodzi. `engine_llm/` zostaje nazwą roli, bo ma interfejs i wymiennych
-  dostawców; te dwa pakiety mają po jednej implementacji i piszą w języku swojej bazy. Błędy:
-  `DbQdrantError` i `DbPostgresError` z wariantami `…ConfigError`; nie `PostgresError`, bo tak
-  nazywa się klasa sterownika `asyncpg`.
-- **Transport vs domena.** Transport = rozmowa z usługą zewnętrzną (LLM, embedder, Qdrant); domena =
-  logika, nieświadoma tego, co pod spodem. Domena dostaje klienta transportowego przez
-  konstruktor, nigdy nie sięga po SDK.
-- **Klient per usługa.** Jedna implementacja → klient tworzony wprost. Klient
-  wymienny → z fabryki po configu (np. LLM: atrapa na dev, model zewnętrzny na prod).
-- **„Klient" znaczy przekroczenie granicy procesu.** `EmbeddingClient` w `api` mówi HTTP-em do
-  usługi `embedder`; to, co **wewnątrz** tej usługi liczy wektory, klientem nie jest i tak się
-  nie nazywa (`Encoder`, `FakeEncoder`) — inaczej ta sama nazwa znaczyłaby dwie różne rzeczy
-  w dwóch usługach. Wzorzec za to jest ten sam po obu stronach: interfejs + implementacja
-  offline (`Fake…`) + fabryka po ENV z fail-fast.
-- **Granica `core_model` / `core_service` działa w OBIE strony:** w `core_model/` wyłącznie modele,
-  jeden na plik; w `core_service/` ani jednego modelu Pydantic. Model wychodzi z serwisu nawet
-  wtedy, gdy używa go jeden serwis i zmienia się razem z nim. **Cena:** kilka importów więcej i
-  rzeczy zmieniające się razem leżą osobno. **Wyjątek:** `ParsedTicket.embedding_text()` zostaje na
-  modelu, ale tylko woła `build_embedding_text()` z `core_service/` — tę samą funkcję, której używa
-  zapytanie `find_tickets_vector`, bo dwa miejsca sklejające ten tekst rozjechałyby się
-  **bezgłośnie**.
-- **Nazwa pliku mówi, CO ROBI, nie czego dotyczy** — `validator_ticket_parsed.py`, nie
-  `artifacts.py`. W `core_service/` oś `<rola>_<przedmiot>` (`parser_`, `validator_`, `builder_`,
-  `loader_`, `filter_`, `normalizer_`), w `core_model/` prefiks tematyczny grupujący alfabetycznie
-  (`ticket_*`, `validation_parsed_*`, `dict_*`, `filter_*`).
-  - **Gdy reguł jest wiele i przybywa ich szybciej niż logiki wokół nich, idą do osobnego pliku**
-    (`filter_ticket_quality.py` + `filter_ticket_quality_rules.py`): dwa różne rytmy zmian, a plik
-    reguł czyta się jak listę, nie jak kod. Każda reguła to funkcja modułowa — bezstanowa, więc
-    klasa dałaby tylko miejsce na `self` — a krotka `RULES` na końcu jest tym, po czym iteruje
-    orkiestrator i po czym parametryzują się testy. Dołożenie reguły to dopisanie funkcji.
-  - **Znany koszt tej konwencji, do rozstrzygnięcia przy masowym imporcie (p. 31):** wszystkie
-    czytniki źródeł produkują ten sam `RawTicket`, więc wariant SQL musi dołożyć źródło do nazwy
-    (`parser_ticket_raw_sql`) albo oba dostaną sufiks. Nazwa opisuje WYNIK, a te pliki różni ŹRÓDŁO.
-- **`core_util/` to funkcje bezstanowe bez wiedzy o dziedzinie** — kryterium: czy da się je opisać
-  i przetestować, ani razu nie mówiąc „zgłoszenie". Stąd `strip_html()` i
-  `describe_validation_error()` są tam, a nie przy swoich wywołujących; drugi powód jest
-  praktyczny — czytnik SQL z masowego importu (p. 31) potrzebuje tego samego strippera.
-- **Funkcja czy klasa — rozstrzyga stan, nie symetria.** Implementacja z cyklem życia (wagi
-  modelu, sesja HTTP) to obiekt budowany raz; obliczenie bezstanowe zostaje funkcją modułową
-  wołaną przez tę implementację (`deterministic_vector` wewnątrz `FakeEncoder`).
-- **Handlery cienkie** — żądanie → serwis → odpowiedź; zero logiki i LLM w handlerze.
-- **Osobne modele domenowe i API.** Encje/obiekty domeny nie wychodzą wprost przez HTTP —
-  przepisujemy jawnie. Chroni kontrakt i blokuje wyciek pól wewnętrznych (ID, scoring). Modele API
-  żyją przy trasach jak modele narzędzi przy narzędziach: `entry_routers/<zasób>/models.py` dla
-  jednej trasy, `entry_routers/models.py` dla wspólnych (zgłoszenie, źródło, błąd); mapowanie w
-  `entry_routers/mapping.py`. Obiektu `router` pakiet zasobu nie wystawia — przesłoniłby moduł
-  `router.py`, więc `main.py` importuje go pełną ścieżką.
-- **Katalog z samymi danymi (`core_text/`) potrzebuje `__init__.py`**, choć nikt go nie importuje:
-  `[tool.setuptools.packages.find]` wykrywa pakiety po tym pliku, a bez niego treść wypada
-  z dystrybucji i `FileNotFoundError` wychodzi dopiero w runtime. Powód jest zapisany w samym
-  pliku — pusty `__init__.py` w katalogu bez kodu wygląda jak pozostałość do sprzątnięcia.
-
-**Gdzie to położyć — cztery pytania, po kolei:**
-
-1. **Rozmawia z usługą zewnętrzną?** → pakiet tej usługi (`engine_llm/`, `engine_embedding/`), razem
-   z jej modelami transportu.
-2. **Da się to opisać i przetestować, ani razu nie nazywając dziedziny?** → `core_util/`.
-3. **Model danych czy operacja na nich?** → `core_model/` albo `core_service/`.
-4. **Dane klienta, które klient zmienia bez deployu** (słownik, zestaw reguł)? → `core_text/`.
-   Prompt — treść czytana zdanie po zdaniu — leży w katalogu swojego grafu, nie w `core_text/`.
-5. **Narzędzie agenta, węzeł grafu albo przebieg funkcji?** → `agent_tools/<materiał>/<narzędzie>/`,
-   `agent_nodes/<węzeł>/`, `agent_graphs/<funkcja>/` — każdy z wersją właściwą i atrapą (p. 1–5);
-   prompt grafu leży w katalogu grafu.
-
-## Styl kodu
-
-- **Kod i identyfikatory po angielsku, docstringi i komentarze po polsku** (zmiana 2026-10-02 —
-  wcześniej wszystko po angielsku). Nagłówki formatu docstringu (`Description:`, `Example args:`…)
-  zostają bez zmian, a przykład przy sygnaturze to `# np. …`. Starszy kod ma jeszcze angielskie
-  komentarze — tłumaczymy plik przy okazji zmian w nim, nie hurtem.
-- **Brak autoformattera — świadomie.** `ruff format`/`black` zjadłyby pionowe wyrównanie `=`
-  (niżej). Używamy `ruff check` (linter), nie formattera.
-- **Importy zawsze na górze modułu.** Lazy import tylko przy realnym problemie (cykl albo
-  faktycznie opcjonalna zależność) — nie „na wszelki wypadek". Konsekwencja przyjęta świadomie:
-  import modułu pociąga jego zależności; przy zależnościach twardych to OK.
-  - **Jedyny dziś wyjątek: SDK dostawców LLM w `engine_llm/factory.py`** — importowane wewnątrz
-    builderów, bo problem został **zmierzony, nie przeczuty** (patrz „Warstwa LLM"). Wzorzec do
-    naśladowania przy kolejnych wyjątkach: liczba przed decyzją, powód w komentarzu przy imporcie.
-- Type hints obowiązkowe w sygnaturach; zamiast nieotypowanego `dict` — model Pydantic
-  lub `TypedDict`.
-- **Nazwy opisują intencję** — `fetch_invoice_summary`, nie `get_data`.
-- **Kilka liczb w wywołaniu podajemy z nazwami, także w tabelach danych** (cennik:
-  `price(input=2.00, output=8.00, cache_read=0.25, cache_write=1.00)`). Same liczby w nawiasie
-  nie mówią, która jest która; gdy nazwy pól są za długie na jedną linię, pomocnik dostaje
-  krótsze.
-- **Casing:** `snake_case` funkcje/zmienne, `PascalCase` klasy, `UPPER_CASE` stałe.
-- **f-stringi** do formatowania, nie `%` ani `.format()`.
-- **Wczesne wyjścia** (guard clauses) zamiast zagnieżdżonych `if/else`.
-- **Bez martwego i zakomentowanego kodu** — kasuj, git pamięta.
-- **Bez łapania gołego `Exception`** — konkretne typy.
-- **Dekompozycja metod — wg testowalności, NIE wg długości.** Liczba linii nie jest metryką.
-  Wydzielamy, gdy spełnione choć jedno kryterium:
-  1. **Czystość/testowalność** — blok da się przetestować bez I/O (sieć, SDK, dysk).
-  2. **Ponowne użycie.**
-  3. **Zaciemnia główny przepływ.**
-  Żadne z nich → **nie tnij** (rozbicie liniowego kodu wołanego raz to „ravioli code").
-- **Metoda publiczna = orkiestrator.** Gdy klasa ma jedną główną metodę publiczną, trzyma ona
-  przepływ na wysokim poziomie i deleguje do prywatnych helperów — czyta się ją jak spis kroków
-  (zbuduj → wywołaj → zmapuj), a szczegóły siedzą w metodach prywatnych.
-- **Pionowe wyrównanie `=`** w wieloliniowych blokach argumentów nazwanych i przypisań —
-  nazwy dopełniane spacjami do najdłuższej w bloku:
-
-  ```python
-  metadata = Metadata(
-      content_type    = meta.content_type,
-      language        = meta.language,
-      char_count      = meta.char_count,
-      pages_processed = meta.pages_processed,
-  )
-  ```
-
-- **Wynik złożony zwracamy przez zmienną.** Słownik, model albo wywołanie z kilkoma argumentami
-  najpierw przypisujemy do nazwanej zmiennej, po jednej pozycji na linię z wyrównaniem (w słowniku
-  wartości po dwukropku), a `return` oddaje samą zmienną. Jednolinijkowe `return f(x)` zostaje.
-
-  ```python
-  update = {
-      "messages":   [turn],
-      "iterations": iteration,
-      "log":        [self.log_entry(f"tura {iteration}: {action}")],
-  }
-
-  return update
-  ```
-
-## Warstwa CLI
+### Warstwa CLI
 
 Trzy kategorie, których nie mieszamy:
 1. **Repo-level** — `scripts/*.py`, narzędzia niezwiązane z żadną usługą (przygotowanie danych,
@@ -1353,13 +1150,13 @@ Wspólne:
 - CLI to cienkie adaptery nad serwisami domenowymi (jak handlery HTTP) — zero logiki w komendzie.
 - **Komendy niszczące (`index rebuild`) pytają o potwierdzenie** albo wymagają `--yes`.
 
-### Gotchas
+#### Gotchas
 
 - **Tekst pomocy przez `help=`** — inaczej Typer wstawi do `--help` docstring pisany dla
   programisty.
 - **`@cli.callback()` nawet przy jednej komendzie** — inaczej Typer zwija drzewo i odpala ją wprost.
 
-## Warstwa API
+### Warstwa API
 
 - **`/health` mówi „ok" tylko o samym API** — o stanie zależności nie mówi nic.
 - **Bramki i „Popraw" nie mają dostępu do retrievalu** — ich grafy nie mają narzędzi wiedzy na
@@ -1412,7 +1209,7 @@ Wspólne:
   położyłaby trasy na stacku dev. Test podmienia zależność przez `dependency_overrides`, wstawiając
   graf z atrap, do których ma dostęp.
 
-## Warstwa embeddera
+### Warstwa embeddera
 
 Dwie strony granicy procesu: `Encoder` **wewnątrz** usługi `embedder` liczy wektory,
 `EmbeddingClient` **w `api`** rozmawia z nią HTTP-em. Ta sama nazwa po obu stronach znaczyłaby
@@ -1453,7 +1250,42 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   „Embedder timed out". Stąd domyślne **120 s**. Uwaga przy strojeniu: `/health` odpowiada, zanim
   model policzy pierwszy wektor, więc **healthcheck nie chroni przed tym timeoutem**.
 
-## Warstwa bazy wektorowej (Qdrant)
+#### Embeddingi i prefiksy PolDense
+
+Embedder to `OPI-PIB/PolDense-150M`: ModernBERT, wymiar 768, liczony na CPU. Wybrany 2026-08-05
+razem z trybem wyszukiwania `query→passage`. Na 200 rekordach daje `recall@1` 98% — to sufit
+zadania, nie dowód przewagi modelu (anglojęzyczny model kontrolny miał 88%), więc porównanie
+z innymi modelami wraca na pełnym korpusie (p. 33). Wąskim gardłem nie jest model, tylko jakość
+i kompletność zgłoszeń. Raport: `data/docs/pomiar-embedderow.md`.
+
+PolDense rozróżnia tryby prefiksem doklejanym do tekstu. Ten sam tekst z innym prefiksem daje inny
+wektor:
+
+| tryb | prefiks | zastosowanie |
+|---|---|---|
+| query   | `[query]: ` | zapytanie do bazy w runtime |
+| passage | *(brak)*    | rekord przy indeksacji |
+| sts     | `[sts]: `   | porównanie zgłoszenia ze zgłoszeniem — dziś nikt tego nie woła |
+
+- **Trybów nie wolno mieszać w jednej przestrzeni wektorowej:** `[query]:` szuka wyłącznie po
+  wektorach passage, `[sts]:` wyłącznie po wektorach sts.
+- **Pomyłka prefiksu nie objawia się awarią, tylko „trochę gorszymi wynikami"** (`recall@1` 98,3%
+  → 93,3%), czyli czymś, co łatwo złożyć na karb modelu. Dlatego trybów pilnuje test na stacku,
+  a `embed_query()` / `embed_passage()` / `embed_sts()` to trzy nazwane metody, nigdy jedna
+  z parametrem `mode` — nazwa wymusza wybór w miejscu wywołania.
+- **Tabela prefiksów w naszym kodzie (`MODE_PREFIXES`) jest źródłem prawdy, nie `prompts` modelu.**
+  PolDense deklaruje tam tylko `query` i `document`, więc tryb `sts` wzięty stamtąd skończyłby się
+  błędem biblioteki.
+- **Normalizacja wektorów należy do nas:** `normalize_embeddings=True` bezwarunkowo. PolDense nie
+  ma modułu `Normalize`, a bez flagi próg `RAG_SCORE_MIN` znaczyłby co innego w testach niż na
+  produkcji.
+- **Szukamy `query→passage`, także gdy zapytanie ma kształt korpusu** — zmierzone 2026-08-13:
+  `recall@1` 98,1% wobec 96,3–96,9% dla `sts→sts`.
+- **Rekord ma dwa named vectors: `problem` (passage) i `sts`.** Wektora `sts` nikt dziś nie
+  używa, ale zostaje — nie kasować go jako niewykorzystanego. Budowa kosztuje jedno wywołanie
+  embeddera na rekord, a usunięcie i powrót kosztowałyby pełny re-index.
+
+### Warstwa bazy wektorowej (Qdrant)
 
 - **Pakiet `api/app/db_qdrant/`: klient, kolekcje, punkty, trafienia — a reszta aplikacji używa
   tylko kolekcji (2026-10-04).** `client.py` to samo połączenie (żądanie HTTP, tłumaczenie błędów)
@@ -1473,7 +1305,11 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   zawsze. Cena: z odczytem wracają wektory, których wołający zwykle nie potrzebuje.
 - **Kolekcja dokumentacji: jeden nazwany wektor `section`, w payloadzie opis sekcji z metryczki
   bez treści** — treść leży w Postgresie. Nazwę kolekcji podaje wołający; zmienna ENV dojdzie
-  z importem (p. 49). Co embedować i czy dzielić sekcję na fragmenty, rozstrzyga pomiar (p. 8).
+  z importem (p. 49). Punktów będzie kilka na sekcję (decyzja 2026-10-04, wchodzi z p. 49): import
+  tnie treść po akapitach, trafienia zwija się po `section_id`, a cała sekcja zostaje tylko
+  w Postgresie. Zmierzone na paczce syntetycznej: 8192 tokeny to ok. 18 tys. znaków, sekcja przy
+  limicie liczy się na CPU ponad minutę, dłuższą embedder ucina bez błędu, a szczegół z końca
+  długiej sekcji jeden wektor gubi. Długość fragmentu rozstrzyga pomiar (p. 8).
 - **Kolekcja ma `aclose()`, które zamyka jej klienta** — narzędzie dostaje kolekcję, nie klienta,
   a ma po sobie sprzątać jednym wywołaniem. Klient wspólny dla kilku kolekcji zamyka się wtedy
   kilka razy; powtórne zamknięcie nic nie robi.
@@ -1519,7 +1355,7 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
     korpusu **także** zapytania bez odpowiednika. Odpowiednik dzisiejszego wyboru to okolice 0.52,
     ale 40 zapytań nie wystarcza, by to zabetonować — do przeliczenia w p. 33.
 
-## Warstwa wyszukiwania tekstowego (Postgres)
+### Warstwa wyszukiwania tekstowego (Postgres)
 
 Usługa `postgres` to drugi indeks obok Qdranta: szuka po słowach w odmianie i po dosłownych
 ciągach, czego wektor nie robi. Po stronie `api` stoi pakiet `app/db_postgres/` z tabelami zgłoszeń
@@ -1584,7 +1420,8 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Kodów błędów nie szuka się osobną drogą.** Kod znajduje podciąg w wątku; pole `error_codes`
   karty tylko go powtarza (2% słów spoza wątku), więc osobne szukanie po nim nic by nie dało.
   Podciąg nie przechodzi przez złamanie linii: komunikat rozbity w wątku na dwie linie nie
-  zostanie znaleziony w całości.
+  zostanie znaleziony w całości. Naprawa w p. 50 (decyzja 2026-10-04): w `search_text`
+  i w zapytaniu każdy ciąg białych znaków staje się jedną spacją; `body` zostaje dosłowne.
 - **Zmiana kolumn nie dociera do istniejącej tabeli** — `CREATE TABLE IF NOT EXISTS` jej nie
   rusza. Tabelę kasuje się i odbudowuje z plików.
 - **Nazwa tabeli jest sprawdzana wzorcem identyfikatora**, bo nie da się jej podać parametrem
@@ -1593,7 +1430,7 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Wyszukiwanie i reguły bramek (p. 29) dostają osobne schematy i role**, żeby przebudowa
   indeksu nie mogła dotknąć reguł.
 
-## Warstwa narzędzi agenta (`agent_tools/`)
+### Warstwa narzędzi agenta (`agent_tools/`)
 
 - **W `agent_tools/` jest wyłącznie to, co agent może wywołać i co się wykonuje.** Narzędzie
   odpowiedzi grafu (`respond_<graf>`) tu nie trafia — nic go nie wykonuje, to kontrakt wyjścia
@@ -1676,7 +1513,8 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   i gdzie uciąć to strojenie (`RAG_TOP_K`, `RAG_SCORE_MIN`), nie decyzja modelu; nieznany argument
   to błąd walidacji (`extra="forbid"` w każdym modelu zapytania). **Kształt zapytania dobiera się do
   indeksu:** `find_tickets_vector` przyjmuje `problem` + `symptoms`, czyli pola, z których zbudowano
-  wektory, i nie woła parsera — sparsowanie zgłoszenia pod wyszukiwanie to zadanie agenta.
+  wektory, i nie woła parsera — sparsowanie zgłoszenia pod wyszukiwanie to zadanie agenta. Cena:
+  zapytanie nie powstaje tym samym promptem co korpus, więc jego trafność trzeba zmierzyć (p. 23).
 - **Kontrakty nie importują LangGrapha ani LangChaina** — definicję narzędzia dla modelu buduje
   graf z `name`, `description` i `query_model.model_json_schema()`. Wymiana orkiestratora ma nie
   dotykać narzędzi.
@@ -1695,7 +1533,7 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Każde narzędzie jest tylko do odczytu** — wstrzyknięcie przez treść zgłoszenia może co
   najwyżej skierować agenta do nietrafionego materiału, nie zmienić indeksu.
 
-## Warstwa węzłów (`agent_nodes/`)
+### Warstwa węzłów (`agent_nodes/`)
 
 - **Kontrakt węzła (`Node` w `agent_nodes/base.py`) to `name` i `run(state)`**; atrapa i węzeł
   właściwy mają ten sam kontrakt.
@@ -1749,7 +1587,22 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   nazwa węzła = nazwa jego katalogu — atrapa i węzeł właściwy wpinają się do grafu pod tą samą
   nazwą.
 
-## Warstwa grafów (`agent_graphs/`)
+### Warstwa grafów (`agent_graphs/`)
+
+Przebieg grafu z narzędziami wiedzy:
+
+```
+nowe zgłoszenie (surowy tekst)
+      │
+      ├─ [anonimizacja] → AnonymizedText (stały węzeł, nie narzędzie agenta)
+      ├─ [pętla agenta] ⇄ narzędzia z listy dozwolonych dla tej funkcji, np.:
+      │        find_tickets_vector(problem, symptoms) → [embedder] → top-K z Qdranta → próg score
+      │                                               → numery zgłoszeń
+      │        read_tickets_card(numery) → karty z Qdranta        (odczyt cytuje)
+      │        find_docs_vector(zagadnienie) → [embedder] → opisy sekcji dokumentacji
+      │        read_docs(identyfikatory) → treść sekcji           (odczyt cytuje)
+      └─ [odpowiedź] → propozycja + źródła z `cite()` odczytów
+```
 
 - **LangSmith wyłącza import pakietu `app.agent_graphs`** — `langsmith.configure(enabled=False)` w
   `agent_graphs/__init__.py`. Zmierzone 2026-10-02: przy `LANGSMITH_TRACING=true` LangGraph wysyła
@@ -1783,6 +1636,9 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Dwa kształty przebiegu.** Bez narzędzi wiedzy: anonymize → agent → respond. Z nimi: pętla
   agent ⇄ run_tools, a o kierunku po turze modelu decyduje wspólne `route_after_agent()` z
   `agent_graphs/base.py` — tylko po tym, CO model wywołał (limit iteracji dochodzi w p. 9).
+- **Każda funkcja ma własną pętlę i sama dociąga materiał (2026-10-02)** — `/suggest` bierze
+  zgłoszenie, nie identyfikatory trafień. Cena: człowiek nie odznacza trafień przed generacją,
+  więc ginie też etykieta do feedbacku, a każdy guzik szuka od nowa.
 - **Graf decyduje, które narzędzia model widzi (`TOOL_NAMES`), ale nie trzyma ich opisów** — te
   leżą przy narzędziach; definicję składa `tool_definitions()` z `agent_graphs/base.py`, a narzędzie
   spoza `TOOL_NAMES` to błąd składania.
@@ -1799,7 +1655,32 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Reguły klienta (`gate_close`, `gate_reply`, `polish`) są wymagane: brak albo pusta lista to
   `ValidationError` przy budowie stanu** (decyzja 2026-10-02) — graf w ogóle nie rusza.
 
-## Warstwa LLM
+#### Warianty generacji
+
+Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
+
+| wariant | co generuje | wymaga trafień |
+|---|---|---|
+| `questions` | pytania, które warto zadać w ramach zgłoszenia | nie (trafienia wzbogacają) |
+| `solution`  | rozwiązanie — gdy zgłoszenie nie wymaga działania serwisu | **tak** |
+| `handoff`   | informacja o przekazaniu zgłoszenia do dalszych prac po stronie serwisu | nie |
+
+- **Wariant to kod: osobny graf na wariant (2026-10-02).** Cena: nowy guzik wymaga deployu.
+  Zysk: zasada 9 obowiązuje każdy wariant, bo piszemy je my.
+- **Wariant deklaruje, czy potrzebuje źródeł (`requires_hits`), a egzekwuje to kod węzła
+  odpowiedzi, nie posłuszeństwo modelu.** `questions` i `handoff` działają przy pustym indeksie,
+  `solution` bez źródeł nie ma z czego powstać (zasada 9). Wariant bez narzędzi wiedzy wraca
+  z pustą listą źródeł, i to jest informacja, nie brak danych.
+- **Wszystkie warianty zwracają ten sam kształt:** tekst propozycji, źródła i wariant, którym
+  powstał.
+- **`questions` działa dwutorowo:** bez trafień pyta na podstawie samego zgłoszenia,
+  z trafieniami dokłada `questions_summary` z podobnych spraw. Ryzykiem nie jest puste pole, tylko
+  sentinel w przebraniu („Brak pytań ze strony prowadzącego sprawę.") — 28 na 200 rekordów.
+- **Prompt `questions` nie może przepisać cudzych pytań.** Materiał historyczny to wzorzec:
+  odrzuć pytania niepasujące do sprawy, przeformułuj pod to zgłoszenie, pomiń te, na które
+  odpowiedź już jest w treści.
+
+### Warstwa LLM
 
 - **Jeden plik importuje SDK dostawcy** — reszta kodu tylko przez `LLMClient` (zasada 4).
   Zmiana API komercyjne → model on-prem = zmiana konfiguracji/klienta, nie logiki.
@@ -1892,7 +1773,7 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   nazywa sekcję, na której stoi (4 tury, 0,0245 USD). „Instrukcje zawsze" i reguła o źródle
   faktów muszą więc iść w parze.
 
-### Prompty
+#### Prompty
 
 - **Prompt = logika, nie konfiguracja** — szablony w repo, jeden plik na prompt, **nigdy w ENV**.
   - **Gdzie leży treść:** każdy prompt — także parsujący — w katalogu swojego grafu
@@ -1947,7 +1828,51 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Zmiana promptu = pokaż przed/po + oczekiwany wpływ.** Nie przepisujemy promptów po cichu
   przy okazji innej zmiany.
   
-### Ewaluacja jakości
+#### Twarde reguły promptu generacji
+
+- **Data rekordu idzie do promptu bezwarunkowo** — z trzech powodów: dezaktualizacja (odmowa
+  obalona przez nowszy rekord), sprzeczność między rekordami i sezonowość („nie działa numeracja"
+  w pierwszym tygodniu stycznia to prawie na pewno brak sekwencji na nowy rok).
+- **Przy rozbieżnych liczbach podaj zakres i daty, nigdy jednej wartości.**
+- **Kanał w odpowiedzi obowiązkowo** — bez niego odpowiedź bywa odwrotnością prawdy.
+- **Ostrzeżenia działają przy każdym wariancie**, zwłaszcza gdy działanie jest nieodwracalne —
+  to najcenniejsza operacyjnie treść korpusu. **Dziś nie działają:** w czterech pomiarach linia
+  `[UWAGA: …]` nie padła ani razu, także na zgłoszeniu o masowej wysyłce ePUAP. Potrzebna osobna
+  reguła (p. 26).
+- **Obowiązkowe miejsce na „czego NIE robić"** — „czy trzeba coś powtórzyć?" jest pierwszym
+  pytaniem klienta po każdej diagnozie.
+- **Zastrzeżenia przenoszone w komplecie**, we wszystkich czterech wymiarach: skutek uboczny,
+  zasięg zmiany, zakres czasowy, kompletność naprawy wstecznej. Model streszczający rekord jednym
+  zdaniem gubi część z nich.
+- **Brakujące dane jako placeholdery** (`{IMIĘ}`, `{NR_URZĄDZENIA}`), instrukcje dla człowieka
+  w nawiasach kwadratowych (`[dla serwisanta: sprawdź wersję firmware]`).
+
+#### Wnioski ze strojenia promptów
+
+Zmierzone w 2026-08 na słabszym modelu lokalnym i na modelu odniesienia; na modelu docelowym do
+przemierzenia (p. 25–27). Raporty: `data/docs/pomiar-wariantow-promptu-questions-2026-08-26.md`,
+`data/docs/pomiar-promptu-solution-2026-08-28.md`.
+
+- **Wzór odpowiedzi jest jedyną kotwicą formy** — bez niego trzymanie liczby pytań spadło z 87%
+  na 37%. Ma być schematyczny: gotowe pytania model przepisuje dosłownie, a przykład z innej
+  dziedziny odciąga go od danych.
+- **Notatka `[dla wdrożeniowca: …]` jest nośna, choć wygląda na ozdobę** — zmusza model, żeby
+  zajrzał w przyczyny przed napisaniem pytania. Gotowa formułka na wyjście szkodzi: model dokleja
+  ją po treści.
+- **Reguła wyrażona pośrednio albo przez rozróżnienie bywa martwa.** Działa reguła pozytywna albo
+  zakaz wyliczający klasy wprost.
+- **Limit liczby kroków i uwag to decyzja o treści** — model sam wybiera, co poświęci, a reguła
+  rozbijająca bez limitu puchnie.
+- **Forma przenosi się między modelami, treść nie** — wniosek zmierzony na jednym modelu trzeba
+  sprawdzić na docelowym.
+- **Znana dziura: brak reguły zgodności przyczyny z objawem** — przy awarii całego urzędu model
+  pytał o wygasłe konto jednego użytkownika (p. 25–26).
+- **Metryka „pokrycie przyczyn" nagradza mechaniczne przepisanie** — liczby rozstrzygają o formie
+  i patologiach, o sensie nie.
+- **Metodyka:** odpowiedzi modelu odniesienia zbierać w świeżym czacie, a weryfikację na innych
+  zgłoszeniach robić wcześnie — trzy wady były niewidoczne na zgłoszeniu, na którym strojono.
+
+#### Ewaluacja jakości
 
 Jakość wyjścia LLM **mierz, nie oceniaj na oko.** Zbuduj golden set wejść, rubrykę
 (fakty / kompletność / halucynacje / użyteczność) i zapisuj raport z datą i wersją promptu.
@@ -1956,7 +1881,7 @@ W tym projekcie mierzymy **dwie osie osobno**: jakość **retrievalu** (`recall@
 ticket w ogóle wpadł do top-5) i jakość **generacji** (czy propozycja odpowiedzi jest użyteczna).
 Zła odpowiedź przy dobrym trafieniu to inny problem niż dobra odpowiedź z pustego indeksu.
 
-#### Golden set retrievalu — reguły wyprowadzone z budowy (2026-08-05)
+##### Golden set retrievalu — reguły wyprowadzone z budowy (2026-08-05)
 
 Zestaw to **syntetyczne zapytania**, nie pary historycznych zgłoszeń: produkt bierze nowe
 zgłoszenie i szuka podobnych, więc para `ticket ↔ ticket` mierzyłaby coś, czego produkt nie robi.
@@ -2037,70 +1962,82 @@ dobre rozwiązanie: pierwsze mają trafiać w niewiadome, drugie w sprawdzony kr
 - **Mierz osobno osie: do kiedy / co zrobić / do kogo / za ile** — sprawdzian formatu jest na
   nie ślepy, a to po nie produkt istnieje.
 
-## Komentarze w kodzie
+### Frontend (jeszcze nie budujemy)
 
-- Gęste, prowadzące wzrok.
-- **„Dlaczego", nie „co"** — komentarz tłumaczy sedno: nieoczywiste zachowania API/SDK,
-  obejścia, magiczne liczby, reguły biznesowe.
-- **Separatory bloków** w ciele funkcji, nazwa opisuje blok np. `# --- build request ---`.
-- **Każda gałąź osobno** — przy wielu `except`/`if` komentarz przy KAŻDEJ klauzuli.
-- **Przykładowe wartości argumentów inline przy sygnaturze**. Dotyczy
-  WSZYSTKICH metod, też prywatnych helperów:
+Na tym etapie projekt to **API + CLI**; UI dochodzi później (p. 45). Gdy dojdzie,
+obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przypadkiem:
 
-  ```python
-  def __init__(
-      self,
-      api_key:  str,        # e.g. "sk-proj-...HNkA"
-      base_url: str,        # e.g. "https://api.openai.com/v1"
-      model:    str,        # e.g. "gpt-4o-mini"
-      timeout:  float = 60, # seconds
-  ):
-  ```
+- Front to **statyka wpiekana w `api`** (`api/app/static/`), nie osobna usługa compose — dlatego nie
+  występuje w warstwach compose (wyjątek od zasady 3: to nie komponent gadający REST-em).
+- Pełny React (SPA) + Ant Design v6 (React ≥18; `antd` i `@ant-design/icons` w tej samej generacji
+  major). Bez komponentów za paywallem.
+- Pliki statyczne z React serwowane przez FastAPI — z tego samego origin. Dev: Vite z proxy `/api`.
+- Wygląd przez tokeny antd w `ConfigProvider`. Bez Tailwinda.
+- Nie rozbijaj małych komponentów na kilkanaście plików (np. nawigacja jako dane w configu, nie
+  JSX).
+- Wykresy: `@ant-design/charts`.
 
-- **Wieloliniowo tylko z inline-komentarzem na każdej linii; inaczej jedna linia** (długie OK):
+## Uruchamianie i utrzymanie
 
-  ```python
-  # obvious → one line, even if long
-  client = OpenAILLMClient(api_key=key, base_url=url, model=model, timeout=60)
-  
-  # less obvious → split and comment each line
-  except (
-      APITimeoutError,     # network didn't respond within the timeout
-      APIConnectionError,  # could not establish a connection
-  ) as exc:
-  ```
+### Commands
 
-## Docstringi
+**Uruchomienie**
+- Dev (kod montowany z hosta): `docker compose -f docker-compose.yml up -d`
+- Prod (bez montowania): `docker compose -f docker-compose.prod.yml up -d`
+- Z GPU dla embeddera: warstwa `docker-compose.gpu.yml`
+- Po zmianie zależności lub `Dockerfile` (albo kodu na prodzie): `docker compose up -d --build
+  <usługa>`
+- Weryfikacja realnej konfiguracji: `docker compose config` (nie zawartość `.env`)
 
-- **Stały format, na KAŻDEJ metodzie** (też prywatnej i też implementacji metody
-  interfejsu, nie tylko na abstrakcyjnej):
+**Przygotowanie danych (skrypty repo)**
+- Eksport zgłoszeń ze zrzutu do `data/raw/`: `python scripts/export_raw_tickets.py export
+  --module-id 116` (wymaga kontenera z zaimportowanym zrzutem; kontrola liczb wobec bazy na końcu
+  przebiegu)
 
-```
-Description:
-<what it does, briefly>
+**Pipeline danych (CLI `helpdesk`)**
+- Walidacja artefaktów: `helpdesk tickets validate data/parsed/`
+- Indeksacja do Qdranta: `helpdesk rag index <katalog>`
+- Pełna odbudowa indeksu: `helpdesk rag reindex` (kasuje kolekcję, wstaje z `data/parsed/`)
+- Ewaluacja embeddera: `python scripts/eval_embeddings.py recall --model <nazwa>`
+  (repo-level, nie CLI usługi — ładuje modele wprost, bez stawiania stacku)
+- Ewaluacja zbudowanego indeksu: `python scripts/eval_index.py recall --collection tickets`
+  (**wymaga stacku** — mierzy przez usługę embeddera i Qdranta, czyli tę samą drogę co produkcja;
+  ten sam wzór recall/MRR co wyżej, żeby liczby dało się porównać)
+- Porównanie trybów wyszukiwania: `python scripts/eval_index.py modes --collection tickets`
+  (`query→passage` vs `sts→sts`, na zapytaniach surowych i sparsowanych — cztery pomiary w jednej
+  tabeli; wymaga stacku)
+- Pomiar progu odcięcia: `python scripts/eval_threshold.py table` (rozkłady + tabela koszt/zysk
+  per kandydat na próg), `... detail --threshold 0.48` (co ten próg robi z każdym dystraktorem
+  i które trafienia poprawne kosztuje) oraz `... plot` (wykres obu rozkładów z linią progu do
+  `data/docs/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz
+  `data/golden/distractors.json`; sam golden set mierzy tylko połowę rozkładu
 
-Example args:
-    arg1=...
-    arg2=...
+**Bramki jakości i asysta pisania**
+- Sprawdzenie zamknięcia z konsoli: `helpdesk gate close --file <plik>`
+- Sprawdzenie wiadomości: `helpdesk gate reply --file <plik>`
+- Poprawa tekstu: `helpdesk polish --file <plik>`
+- Podgląd aktywnego zestawu reguł: `helpdesk rules show --gate close`
+- Ewaluacja bramek (fałszywe alarmy/przepuszczenia): `helpdesk eval gates --gate close`
 
-Example result:
-    <example return value>
+**Testy i jakość**
+- Lint: `ruff check .`
+- Wszystko, co nie potrzebuje stacku ani płatnego modelu (każdy rodzaj testu): `pytest`
+- Wszystko naraz: `pytest -m ""` — **jedno polecenie na cały przebieg**; wymaga stacku
+- Jeden rodzaj: `pytest tests/unit/`, `pytest tests/integration/`, `pytest tests/functional/`
+- Na stacku: `pytest tests/integration/ tests/functional/ -m stack` (albo `-m stack_<usługa>`)
+- Ewaluacyjne: `pytest tests/evaluation/` — bez korpusu odniesienia w `data/` testy się pomijają;
+  z pomiarem `find_tickets_vector` na golden secie: `pytest tests/evaluation/ -m ""` (stack
+  i zbudowany indeks)
+- Na żywym LLM: `pytest -m llm_live` — **kosztuje / bije po sieci, pytaj przed**
+- **Podając marker, podaj też folder** — marker odsiewa dopiero PO imporcie, więc bez ścieżki
+  pytest wczytuje wszystkie pliki testowe, żeby uruchomić kilkanaście (kolekcja podzbioru spada
+  wtedy trzykrotnie). Foldery i markery można łączyć:
+  `pytest tests/integration/ tests/functional/ -m "stack_qdrant or stack_api"`
 
-Raises:                      # only when the method raises
-    <Exception>: <when>
-```
+**CLI / pakiet**
+- `pip install -e .` — tylko po zmianie `pyproject.toml`, po zmianie kodu nigdy
 
-- Bez bloku `Args:` — opis argumentów idzie inline przy sygnaturze.
-- Konstruktor: `Example result:` = opis skonfigurowanej instancji.
-- **Docstring nietrywialnej klasy rozbudowany**, nie jednolinijkowy: „Do czego" (przeznaczenie
-  + rola w architekturze) i „Flow" (przebieg krok po kroku, z odwołaniem do metod).
-- **Nietrywialny moduł ma na górze opis pisany jak odpowiedź na „do czego to jest?"**: przeznaczenie
-  pełnym zdaniem, tabelka, gdy plik jest listą (reguły, komendy, metody), przykład przed i po, gdy
-  przekształca dane (zmyślony, ale „po" zdjęte z uruchomionego kodu), kroki jako lista numerowana,
-  na końcu to, o czym pamiętać przy zmianach. Historia decyzji i pomiarów zostaje w CLAUDE.md, nie w
-  pliku. Wzór: `core_service/rag_indexer.py`, `core_service/parser_ticket_raw.py`.
-
-## Konfiguracja i deploy
+### Konfiguracja i deploy
 
 **Konfiguracja (ENV):**
 - Cała konfiguracja przez ENV (pydantic-settings) — żadnych sekretów/endpointów na sztywno.
@@ -2204,7 +2141,7 @@ Raises:                      # only when the method raises
 - **Pinowane tagiem, bazowy digestem** (`python:3.12-slim@sha256:…`) — ruchomy tag daje przy
   rebuildzie inny obraz niż testowany. Dotyczy też obrazu Qdranta.
 
-## Logi i obserwowalność
+### Logi i obserwowalność
 
 - **Request-ID = korelacja logów, nie monitoring.** Nadawany/propagowany w middleware
   (nagłówek + logi), pozwala zszyć wpisy jednego żądania.
@@ -2229,50 +2166,7 @@ Raises:                      # only when the method raises
 - **Treści promptów/odpowiedzi/danych użytkownika: DEBUG, nigdy INFO.** Treść zgłoszenia
   i trafienia z RAG to dane klienta — na INFO wyłącznie identyfikatory i score.
 
-## Frontend (jeszcze nie budujemy)
-
-Na tym etapie projekt to **API + CLI**; UI dochodzi później (p. 45). Gdy dojdzie,
-obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przypadkiem:
-
-- Front to **statyka wpiekana w `api`** (`api/app/static/`), nie osobna usługa compose — dlatego nie
-  występuje w warstwach compose (wyjątek od zasady 3: to nie komponent gadający REST-em).
-- Pełny React (SPA) + Ant Design v6 (React ≥18; `antd` i `@ant-design/icons` w tej samej generacji
-  major). Bez komponentów za paywallem.
-- Pliki statyczne z React serwowane przez FastAPI — z tego samego origin. Dev: Vite z proxy `/api`.
-- Wygląd przez tokeny antd w `ConfigProvider`. Bez Tailwinda.
-- Nie rozbijaj małych komponentów na kilkanaście plików (np. nawigacja jako dane w configu, nie
-  JSX).
-- Wykresy: `@ant-design/charts`.
-
-## Dokumentacja
-
-- **CLAUDE.md** — „dlaczego": zasady, trwałe decyzje, pułapki, świadome pominięcia.
-- **`data/docs/` — raporty z pomiarów i dokumenty projektu, POZA repo.** Katalog jest w `data/`,
-  więc obejmuje go `.gitignore` (2026-08-20). Powód: **raport cytujący korpus niesie PII**, choćby
-  autor tego nie zamierzał — wystarczy wkleić zrzut z konsoli operującej na zgłoszeniach, żeby
-  trafiły tam nazwiska użytkowników. Zdarzyło się przy pomiarze progu: trzy nazwiska w wyjściu
-  `eval_threshold.py detail`, wyłapane dopiero przy commicie. Wnioski trwałe przenoś **do
-  CLAUDE.md** (bez cytatów), a plik z pomiarem zostaw w `data/docs/`.
-- **README** — „jak": uruchomienie i kontrakt dla użytkownika. Proponowany podział na sekcje:
-  1. **Stack** — technologie i ich role.
-  2. **Flow działania** — ogólny algorytm (wejście → etapy → wyjście).
-  3. **Przykład end-to-end** — konkretne zgłoszenie wejściowe, trafienia z RAG i wynikowa
-     propozycja odpowiedzi (ilustracja działania, nie sztywny format).
-  4. **Szybkie uruchomienie** — np.:
-     ```bash
-     cp .env.example .env   # utwórz lokalną konfigurację z szablonu
-     docker compose build   # zbuduj obrazy wszystkich usług
-     docker compose up -d   # uruchom całą kompozycję
-     ```
-  5. **Konfiguracja** — wszystkie zmienne środowiskowe w tabeli (nazwa, domyślna, opis).
-  6. **API** — tabela endpointów, a pod nią opis każdego (wywołanie, przykład wejścia, przykład
-     wyjścia).
-  7. **Integracje** — zawartość `integrations/` z przykładem użycia.
-  8. **Uwagi techniczne.**
-  9. **Testy** — jak uruchomić, markery.
-  10. **Typowe procedury** — same kroki instruktażowe (rationale zostaje w CLAUDE.md).
-
-## Testy
+### Testy
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
@@ -2443,7 +2337,9 @@ instancji klienta i atrapy jego własnych odpowiedzi.
 | `capturing()`      | zapisuje wysłane żądania |
 | `raising()`        | transport nie odpowiada wcale |
 
-## Świadomie pominięte (NIE dodawać bez pytania)
+## Zakres i plan
+
+### Świadomie pominięte
 
 Rejestr odrzuconych rozwiązań — narzędzi/podejść, które celowo pominęliśmy. Gdy podejmiemy
 taką decyzję w trakcie pracy, **dopisz ją tu** (co + jednozdaniowe dlaczego). Jeśli zadanie
@@ -2600,16 +2496,16 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   projektu to jedna aplikacja; ich włączenie to nowa decyzja, nie rozszerzenie filtra —
   **łamie założenie „jedna instancja = jeden produkt"** (wraca pole `system` do schematu
   i do embeddingu, czyli ponowny przebieg LLM po korpusie), a do tego przestaje działać
-  założenie o wiarygodnym `typ` komentarza (patrz „Dane wejściowe").
+  założenie o wiarygodnym `typ` komentarza (patrz „Historyczne zgłoszenia").
 - **Załączniki zgłoszeń** — 16 634 plików w całej bazie, ale `zalacznik` trzyma tylko ścieżki,
   samych plików w zrzucie nie ma; treść zgłoszenia i wątku wystarcza.
 
-## Plan i TODO
+### Plan
 
 Jedna lista: co budujemy, w jakiej kolejności i czego nie wolno zapomnieć przed produkcją. Dawniej
 osobne „TODO" i „Plan tworzenia aplikacji" — połączone 2026-10-02 po zmianie kierunku (mocne
 modele zewnętrzne, anonimizacja, agent z narzędziami). Każdy punkt: cel — dlaczego. **Odwołania
-„p. N" w reszcie pliku wskazują punkt tej listy.**
+„p. N" w reszcie pliku wskazują punkt tej listy albo listy odłożonych — numeracja jest wspólna.**
 
 **Rytm pracy:** punkt przed wdrożeniem rozpisujemy na podkroki, gdy nie da się go sprawdzić jednym
 kryterium; po zakończeniu oznaczamy `[x]` i zwijamy do jednej linii — ale najpierw przenosimy trwałe
@@ -2623,7 +2519,7 @@ wejścia do odpowiedzi bez modelu i Qdranta. Potem po jednym punkcie na narzędz
 treść promptów stroi się na modelu docelowym, a ten nie ruszy bez anonimizatora. Blok 0 nie
 czeka na decyzje z bloku C.
 
-### Zrobione
+#### Zrobione
 
 Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („filtr etapu 4",
 „pomiar z etapu 3").
@@ -2646,7 +2542,7 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
   (skasowane 2026-10-02 — warianty to grafy), prompty `questions` i `solution` strojone pomiarem
   (dziś w `agent_graphs/suggest_*`; wnioski: „Wnioski ze strojenia promptów").
 
-### 0. Na atrapach — kończy się pełną implementacją na atrapach
+#### 0. Na atrapach — kończy się pełną implementacją na atrapach
 
 **Każda jednostka — narzędzie, węzeł, graf — to katalog z wersją właściwą i jej atrapą (`fake.py`)
 oraz `__init__.py`; narzędzie ma do tego własne `models.py`.** Osobny graf na każdy wariant
@@ -2675,7 +2571,7 @@ generacji.
   z `RagSearchera`), `/parse-ticket`, `/suggest` + `GET /variants` z rejestru, `/polish`; reguły
   z `core_text/dict_rules_*`; reguły — „Warstwa API". CLI dla grafów odłożone do p. 46.
 
-### A. Narzędzia — po jednym punkcie na narzędzie
+#### A. Narzędzia — po jednym punkcie na narzędzie
 
 Właściwe `tool.py` obok atrapy. `cite()` i `render_for_model()` są wspólne dla atrapy
 i prawdziwego narzędzia (`base.py` w katalogu narzędzia, wzór: `find_tickets_vector`) — różni je
@@ -2697,31 +2593,32 @@ punkty niżej to narzędzia właściwe.
 - [x] **48. Postgres ze słownikiem w compose** — usługa `postgres` z własnym obrazem (słownik
   sjp.pl z trzema poprawkami, konfiguracja `pl_search`), zmienne `POSTGRES_*`, marker
   `stack_postgres` i test na stacku; reguły — „Warstwa wyszukiwania tekstowego (Postgres)".
-- [ ] **54. Syntetyczna dokumentacja i golden set** — `data/instruction/` (dwa dokumenty, 20–30
-  sekcji dobranych pod zjawiska: dystraktory, dosłowne nazwy opcji, kod błędu, „nie-", nazwy
-  produktów, łącznik, sekcja przy limicie tokenów — potwierdzi ją dopiero walidator z p. 49)
-  i zestaw w `data/golden/` z zapytaniami w kształcie każdego narzędzia. *Dlaczego:* import
-  i narzędzia powstają przed właściwą dokumentacją (p. 55), a format metryczki ma się sprawdzić
-  na konkretnej paczce, zanim zamrozi go walidator; wynik mierzy okablowanie, nie skuteczność —
-  sekcje i zapytania pisze ten sam autor.
+- [x] **54. Syntetyczna dokumentacja i golden set** (2026-10-04) — dwa dokumenty, 27 sekcji
+  w `data/instruction/syntetyczna-instrukcja-*` i 66 zapytań w kształcie czterech narzędzi
+  w `data/golden/docs-synthetic.json`; mierzy okablowanie, nie skuteczność. Trzy oczekiwania
+  zestawu czekają na p. 8 i p. 50.
 - [ ] **49. Import dokumentacji** — `helpdesk docs validate|import <katalog>`: katalog na
-  dokument, metryczka JSON (tytuł, wersja, data i wiersz na plik: stały identyfikator, tytuł,
-  ścieżka rozdziału, krótki opis) oraz pliki `.md` z samą treścią; zapis do `DocsCollection`
-  w Qdrancie (jej nazwa jako nowa zmienna ENV) i do `DocsTable` w Postgresie; zgodność metryczki
-  z katalogiem w obie strony, limit 8192 tokenów, odmowa dokumentu syntetycznego we właściwym
-  indeksie;
-  sprawdzany na paczce z p. 54. *Dlaczego:* podział robi człowiek z modelem przed wgraniem,
-  więc aplikacja nie chunkuje, ale musi odrzucić paczkę, w której sekcja po cichu wypada albo
-  embedder ją ucina.
+  dokument, w nim `manifest.json` (`document`, `version`, `date`, `synthetic` i `sections`
+  w kolejności dokumentu: `section_id`, `chapter_path`, `title`, `description`) oraz plik
+  `<section_id>.md` z samą treścią na sekcję; cała sekcja idzie do `DocsTable`, a pocięta po
+  akapitach na fragmenty do `DocsCollection` (jej nazwa jako nowa zmienna ENV); zgodność
+  manifestu z katalogiem w obie strony, ostrzeżenie o sekcjach powyżej progu długości bez odmowy
+  (próg przy p. 55), odmowa dokumentu syntetycznego we właściwym indeksie; sprawdzany na paczce
+  z p. 54. *Dlaczego:* na podrozdziały dzieli człowiek z modelem i w tej postaci czyta je agent;
+  aplikacja tnie tylko pod wektor, bo jeden wektor na długi podrozdział gubi szczegóły, a ponad
+  8192 tokeny embedder ucina po cichu.
 - [ ] **8. `find_docs_vector`** — wyszukiwanie w kolekcji dokumentacji; zwraca wiersze listingu
   (identyfikator, dokument, rozdział, opis), nie treść; jednostką wyniku jest plik z metryczki
   także wtedy, gdy wektor powstaje z jego fragmentu — fragment zwija się do pliku. *Dlaczego:*
   treść model pobiera odczytem (p. 52) i tylko odczyt trafia na listę źródeł, a wyszukiwanie
-  tekstowe i wektorowe muszą wskazywać ten sam identyfikator; co embedować — całą treść czy sam
-  nagłówek — rozstrzyga pomiar.
+  tekstowe i wektorowe muszą wskazywać ten sam identyfikator; pomiar na paczce z p. 54
+  rozstrzyga długość fragmentu (odniesienie: sam tytuł i opis) i osobny próg podobieństwa —
+  w sondzie zapytania bez odpowiednika dostawały 0,31–0,38, a poprawne 0,37–0,60.
 - [ ] **50. `find_docs_text`** — pola `exact` (dosłowne ciągi, `ILIKE`) i `words` (indeks
-  pełnotekstowy ze słownikiem); wiersze listingu z dopasowanym fragmentem i etykietą, czym
-  znaleziono. *Dlaczego:* model wie, czy ma kod, czy słowa kluczowe, ale nie wie, jak leżą w bazie.
+  pełnotekstowy ze słownikiem); wiersze listingu z etykietą, czym znaleziono; przed nim spacje
+  zamiast białych znaków w `search_text` obu tabel i w zapytaniu. *Dlaczego:* model wie, czy ma
+  kod, czy słowa kluczowe, ale nie wie, jak leżą w bazie, a komunikat złamany między liniami
+  jest dziś dla podciągu nie do znalezienia.
 - [ ] **51. `list_docs`** — listing z metryczek jako narzędzie pomocnicze. *Dlaczego:* przy małej
   dokumentacji lepszy bywa listing w prompcie systemowym (cache'owany prefiks, bez tury) — do
   rozstrzygnięcia przy właściwej dokumentacji (p. 15).
@@ -2744,7 +2641,7 @@ punkty niżej to narzędzia właściwe.
   samą treść. *Dlaczego:* parser gubi konkrety, a wątek je ma; model czyta go dla zgłoszeń, które
   wybrał po kartach, i dla tych, które karty nie mają.
 
-### B. Węzły — po jednym punkcie na węzeł
+#### B. Węzły — po jednym punkcie na węzeł
 
 Właściwe węzły na atrapach zależności. Grafy już działają na atrapach węzłów, więc właściwe
 wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
@@ -2783,7 +2680,7 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
   i koszt przebiegu (`usage` ze stanu grafu). *Dlaczego:* odłożone z p. 6 — na atrapach komenda
   zwracałaby stałe odpowiedzi.
 
-### C. Decyzje
+#### C. Decyzje
 
 - [ ] **13. Czy anonimizacja jest wymogiem prawnym** — rozstrzyga IOD; alternatywą jest umowa
   powierzenia z regionem EU i brakiem retencji. *Dlaczego:* przesądza, jak szczelny ma być
@@ -2796,16 +2693,10 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
   p. 49); zostaje: kto przygotowuje wydania, ile wydań trzyma indeks i czy listing mieści się
   w prompcie. *Dlaczego:* to źródło opcjonalne, a instrukcja do starej wersji psuje odpowiedź tak
   samo jak odmowa obalona nowszym rekordem.
-- [ ] **16. Zapisać w sekcjach tematycznych decyzje, które przesądza blok 0** — agent wybiera
-  źródła bez człowieka (odwrócenie decyzji z 2026-08-26); każda funkcja ma własną pętlę,
-  a `/suggest` bierze zgłoszenie zamiast identyfikatorów; warianty generacji są kodem (graf na
-  wariant), a nie danymi — `variants.json` i `loader_variants.py` już skasowane; zapytanie do
-  indeksu pisze agent zamiast parsera. *Dlaczego:* ceny — utrata odznaczania trafień i etykiety
-  do feedbacku, ponowne szukanie przy każdym guziku, nowy guzik wymaga deployu, zapytanie spoza
-  promptu korpusu — mają być zapisane wprost; zysk uboczny: zasada 9 obowiązuje wszystkie
-  warianty, bo piszemy je my.
+- [x] **16. Decyzje przesądzone przez blok 0 zapisane z cenami** (2026-10-04) — agent wybiera
+  materiał, każda funkcja ma własną pętlę, warianty są kodem, zapytanie do indeksu pisze agent.
 
-### D. Model — zastępuje atrapę modelu z p. 9
+#### D. Model — zastępuje atrapę modelu z p. 9
 
 - [ ] **17. Tura z narzędziami u prawdziwych dostawców** — implementacja kontraktu z p. 9
   w klientach Claude / OpenAI / Ollama; pętla zostaje w grafie. U OpenAI przez API Responses
@@ -2820,7 +2711,7 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
   widzieć surowe dane", domyślnie wyłączoną. *Dlaczego:* pomyłka tej flagi to przeciek, więc
   wyłączenie ochrony ma być jawnym aktem w konfiguracji.
 
-### E. Anonimizacja — zastępuje atrapę anonimizatora z p. 4
+#### E. Anonimizacja — zastępuje atrapę anonimizatora z p. 4
 
 - [ ] **19. Usługa `anonymizer` w compose** — słownik osób ze źródła (z rolami), NER i regex
   z sumami kontrolnymi, deterministycznie, na CPU; fail-closed, pseudonimy spójne w wątku,
@@ -2833,7 +2724,7 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
   a hasło roota w cudzym API to incydent; dotąd dług przed wdrożeniem, teraz warunek pierwszego
   wywołania zewnętrznego.
 
-### F. Grafy — po jednym punkcie na graf: treść promptu i pomiar
+#### F. Grafy — po jednym punkcie na graf: treść promptu i pomiar
 
 Na prawdziwym modelu i anonimizatorze (bloki D–E). Każdy pomiar ≥2 przebiegi, z czytaniem surowych
 odpowiedzi i raportem z datą i wersją promptu (patrz „Ewaluacja jakości"); przy generacji do
@@ -2886,7 +2777,7 @@ każdy mierzy się osobno.
   w zakresie. *Dlaczego:* jedyna funkcja zwracająca tekst do wysłania, więc dodany fakt trafia
   prosto do klienta.
 
-### G. Reguły i powrót do korpusu
+#### G. Reguły i powrót do korpusu
 
 - [ ] **29. Magazyn reguł w SQL** — osobny schemat i osobna rola w Postgresie z p. 48, nie nowa
   usługa; wersje, audyt werdyktów, kontrola dostępu do edycji; później też magazyn notatek.
@@ -2897,7 +2788,7 @@ każdy mierzy się osobno.
   fakty trafiają do bazy z akceptacją człowieka; poza nią ścieżka runtime jest wobec indeksu tylko
   do odczytu.
 
-### H. Korpus
+#### H. Korpus
 
 - [ ] **31. Masowy import z nowszego zrzutu** — przez graf `parse_ticket` (zapis artefaktu po KAŻDYM
   zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed parsowaniem, model parsujący
@@ -2921,7 +2812,7 @@ każdy mierzy się osobno.
   wraca do promptu jako cytowane źródło, więc parafraza modelu stałaby się „tak mówi instrukcja";
   model dzieli i opisuje, treści nie przepisuje.
 
-### I. Przed produkcją
+#### I. Przed produkcją
 
 - [ ] **36. Uwierzytelnianie API i własne hasło Postgresa.** *Dlaczego:* endpointy są otwarte,
   reguły bramek będą edytowalne, a compose ma dla bazy hasło dev-owe.
@@ -2945,7 +2836,9 @@ każdy mierzy się osobno.
 - [ ] **43. `EMBEDDING_NUM_THREADS` po pomiarze.** *Dlaczego:* `torch` bierze wszystkie rdzenie
   i przy indeksacji głodzi `api` i Qdranta.
 
-### J. Później
+### Na później
+
+Rzeczy odłożone świadomie, bez miejsca w kolejności planu. Każdy punkt: cel — dlaczego.
 
 - [ ] **44. Notatki agenta i HITL w pętli** — notatki jako narzędzie pomocnicze w
   `agent_tools/notes/` (sterują szukaniem, nigdy generacją), przerwanie pętli na decyzję człowieka
@@ -2955,3 +2848,8 @@ każdy mierzy się osobno.
 - [ ] **45. Rozszerzenia** — reranker, frontend,
   rozbicie wątków-projektów, kolejność diagnostyczna w `questions`. *Dlaczego:* każde czeka na
   pomiar, który pokaże, że jest potrzebne.
+- [ ] **58. Narzędzia: kod aplikacji i instancja testowa** — czytanie kodu aplikacji jako kolejne
+  źródło wiedzy i dostęp do instancji testowej, na której agent sprawdzi opisany objaw.
+  *Dlaczego:* kandydaci bez decyzji; narzędzie jest katalogiem z kontraktem, więc dojdą bez zmian
+  w grafach i węzłach, ale instancja testowa byłaby pierwszym narzędziem, które coś wykonuje,
+  a nie tylko czyta — wymaga osobnej decyzji o granicach.

@@ -6,7 +6,7 @@ do `messages` jako wiadomość `tool`, a źródła z `cite()` odczytów trafiaj�
 Wywołanie ponad limit swojego narzędzia (`limits.py`, wartości z `AGENT_MAX_CALLS_*`) dostaje
 błąd zamiast wyniku.
 
-Status: atrapa (`FakeRunToolsNode`); właściwy węzeł w p. 10 (CLAUDE.md -> „Plan i TODO").
+Status: atrapa (`FakeRunToolsNode`); właściwy węzeł w p. 10 (CLAUDE.md -> „Plan").
 """
 
 from app.agent_nodes.run_tools.fake import FakeRunToolsNode, FakeToolAnswer

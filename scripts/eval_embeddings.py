@@ -3,7 +3,7 @@
 Do czego:
     Rozstrzyga dwie decyzje, których etap 2 świadomie nie podjął: KTÓRY MODEL i KTÓRY TRYB.
     Obie zapadają pomiarem, nie z góry — i to ten pomiar kasuje jeden z dwóch named vectors
-    (CLAUDE.md -> „Wybór modelu embeddingowego i trybu — mierzyć, nie zgadywać").
+    (CLAUDE.md -> „Embeddingi i prefiksy PolDense").
 
     Skrypt jest repo-level: nie odpytuje usługi `embedder` i nie stawia stacku, bo ładuje modele
     wprost. Importuje jednak `app.core_model` — po to, żeby tekst do embeddingu budował TA SAMA

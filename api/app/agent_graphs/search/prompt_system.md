@@ -1,7 +1,7 @@
 <!-- Prompt grafu `search` — strona systemowa.
 
      SZKIELET z p. 5; prompt pętli (jak szukać, kiedy materiał wystarcza) i jego pomiar w p. 23
-     (CLAUDE.md -> „Plan i TODO"). Jak pytać KAŻDE narzędzie, mówi jego opis (`description.md`
+     (CLAUDE.md -> „Plan"). Jak pytać KAŻDE narzędzie, mówi jego opis (`description.md`
      w katalogu narzędzia), nie ten plik.
 
      NAJGROŹNIEJSZY BŁĄD AGENTA: stop przy zgodnym objawie i rozłącznych przyczynach

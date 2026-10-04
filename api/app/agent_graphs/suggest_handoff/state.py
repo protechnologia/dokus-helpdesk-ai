@@ -9,7 +9,7 @@ class SuggestHandoffState(GraphState):
     zgłoszenie z wątkiem.
 
     Bez `sources` — przekazanie opiera się na tym, co sprawdzono w wątku, nie na bazie, więc
-    wraca z pustą listą źródeł (CLAUDE.md -> „Generacja propozycji odpowiedzi").
+    wraca z pustą listą źródeł (CLAUDE.md -> „Warianty generacji").
     """
 
     output: Proposal | None = None  # propozycja przekazania; ustawia węzeł `respond`

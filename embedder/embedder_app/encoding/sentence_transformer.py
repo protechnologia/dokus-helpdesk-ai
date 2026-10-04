@@ -30,7 +30,7 @@ class SentenceTransformerEncoder(Encoder):
     Description:
     The real backend (`EMBEDDING_BACKEND=sentence-transformers`): loads a local Polish embedding
     model through `sentence-transformers` and turns ticket text into vectors. The ONLY module in
-    the project allowed to import that library (CLAUDE.md -> "Don't"), which is what makes
+    the project allowed to import that library (CLAUDE.md -> „Czego nie robić"), which is what makes
     swapping PolDense for mmlw or BGE-M3 an ENV change rather than a code change.
 
     Flow:

@@ -10,7 +10,7 @@ identyfikatory, odczyty treść (opisy dla modelu w katalogach narzędzi); konie
 
 Status: na atrapach węzłów (`fake.py`); prompt przeniesiony z dawnego
 `core_text/prompt_suggest_questions_*`, przemierzenie na modelu docelowym w p. 25 (CLAUDE.md ->
-„Plan i TODO").
+„Plan").
 """
 
 from app.agent_graphs.suggest_questions.fake import build_fake_graph, example_state

@@ -13,7 +13,7 @@ class AnonymizeNode(Node):
     widzi dalej model zewnętrzny.
 
     Fail-closed: błąd anonimizatora nie jest tu łapany — graf się zatrzymuje, zamiast puścić dalej
-    tekst bez anonimizacji. Atrapy tego węzła nie ma (CLAUDE.md -> „Plan i TODO", p. 4): w testach
+    tekst bez anonimizacji. Atrapy tego węzła nie ma (CLAUDE.md -> „Plan", p. 4): w testach
     dostaje `FakeAnonymizer`, czyli atrapę zależności, nie węzła.
     """
 

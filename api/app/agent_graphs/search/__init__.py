@@ -9,7 +9,7 @@ Przebieg: anonymize → pętla agent ⇄ run_tools → respond. Narzędzia: wysz
 identyfikatory, odczyty treść (opisy dla modelu w katalogach narzędzi); koniec wywołaniem
 `respond_search` bez argumentów.
 
-Status: na atrapach węzłów (`fake.py`); prompt pętli i pomiar w p. 23 (CLAUDE.md -> „Plan i TODO").
+Status: na atrapach węzłów (`fake.py`); prompt pętli i pomiar w p. 23 (CLAUDE.md -> „Plan").
 """
 
 from app.agent_graphs.search.fake import build_fake_graph, example_state

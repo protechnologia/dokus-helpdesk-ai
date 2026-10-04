@@ -1,6 +1,6 @@
 <!-- Prompt grafu `suggest_handoff` — strona systemowa.
 
-     SZKIELET z p. 5; treść i pomiar w p. 27 (CLAUDE.md -> „Plan i TODO"). Dawnego promptu tego
+     SZKIELET z p. 5; treść i pomiar w p. 27 (CLAUDE.md -> „Plan"). Dawnego promptu tego
      wariantu nie było — dawny variants.json wskazywał pliki, które nigdy nie powstały.
 
      TU JEST CAŁA INSTRUKCJA, w turze użytkownika tylko dane (CLAUDE.md -> „Prompty").

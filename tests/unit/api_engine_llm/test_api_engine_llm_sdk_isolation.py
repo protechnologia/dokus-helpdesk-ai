@@ -4,7 +4,8 @@ import pytest
 
 # One row per provider SDK: which modules may import it, and the import spellings that pull it in.
 # Spellings are matched as substrings against source lines, which is coarse on purpose — a guard
-# that only understood one spelling would miss the other (CLAUDE.md -> rule 4 and the "Don't" list).
+# that only understood one spelling would miss the other (CLAUDE.md -> rule 4 and the
+# „Czego nie robić" list).
 #
 # The OpenAI SDK has TWO allowed modules, not one: Ollama speaks the same protocol, so its client
 # drives the same SDK against a local server. Both are transport clients, which is what rule 4

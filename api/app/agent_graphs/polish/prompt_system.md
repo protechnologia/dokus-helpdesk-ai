@@ -1,6 +1,6 @@
 <!-- Prompt grafu `polish` („Popraw") — strona systemowa.
 
-     SZKIELET z p. 5; treść i pomiar braku nowych faktów w p. 28 (CLAUDE.md -> „Plan i TODO").
+     SZKIELET z p. 5; treść i pomiar braku nowych faktów w p. 28 (CLAUDE.md -> „Plan").
      Do potwierdzenia, czy „Popraw" zostaje w zakresie.
 
      TU JEST CAŁA INSTRUKCJA, w turze użytkownika tylko dane (CLAUDE.md -> „Prompty").

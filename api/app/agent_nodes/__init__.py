@@ -8,7 +8,7 @@ Stanu tu nie ma — pola wspólne to `GraphState` w `app/agent_graphs/base.py`, 
 `state.py`. W katalogu każdego węzła: implementacja (`node.py`) i atrapa (`fake.py`). Węzeł używany
 przez jeden graf mieszka w katalogu tego grafu, nie tutaj.
 
-Węzły (CLAUDE.md -> „Plan i TODO", blok 0; `anonymize` właściwy, reszta atrapy — właściwe p. 9–11):
+Węzły (CLAUDE.md -> „Plan", blok 0; `anonymize` właściwy, reszta atrapy — właściwe p. 9–11):
 
 | węzeł       | co robi                                                                  |
 |-------------|--------------------------------------------------------------------------|

@@ -9,7 +9,7 @@ wraca z pustą listą źródeł i działa przy pustym indeksie (`REQUIRES_HITS =
 narzędzie modelu to `respond_suggest_handoff` (`respond_tool.py`).
 
 Status: na atrapach węzłów (`fake.py`); prompt to szkielet, treść i pomiar w p. 27 (CLAUDE.md ->
-„Plan i TODO").
+„Plan").
 """
 
 from app.agent_graphs.suggest_handoff.fake import build_fake_graph, example_state

@@ -13,7 +13,7 @@ class RawTicket(BaseModel):
     """
     Description:
     Jedno zgłoszenie źródłowe w znormalizowanym kształcie. Tylko ten kształt widzi reszta systemu
-    — nazwy kolumn, HTML i układ pliku zostają w czytniku (CLAUDE.md -> „Dane wejściowe").
+    — nazwy kolumn, HTML i układ pliku zostają w czytniku (CLAUDE.md -> „Historyczne zgłoszenia").
 
     Do czego:
     Leży w `core_model/`, a nie przy czytniku, który go wypełnia, bo jest WEJŚCIOWĄ połową

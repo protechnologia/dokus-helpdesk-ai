@@ -18,7 +18,7 @@ Dwa rodzaje narzędzi, rozdzielone kontraktem (patrz `base.py`):
 
 Celowo NIE ma tu anonimizatora ani modelu. Anonimizacja to stały węzeł, przez który przechodzi
 każdy graf, a nie coś, co agent może wywołać albo pominąć; model jest wołającym te narzędzia, nie
-jednym z nich (CLAUDE.md -> „Trwa zmiana architektury").
+jednym z nich (CLAUDE.md -> „Jak to działa").
 
 Trzy poziomy, na każdym `base.py` z tym, co wspólne poziom niżej:
 

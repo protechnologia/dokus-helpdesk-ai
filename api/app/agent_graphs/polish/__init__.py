@@ -2,7 +2,7 @@
 Description:
 Graf `polish` — „Popraw": notatki wdrożeniowca przepisane na poprawną formę, bez zmiany treści
 (zasada 9). Jedyny graf, który zwraca tekst do wysłania (`PolishedText`), zawsze do akceptacji
-człowieka. Do potwierdzenia, czy zostaje w zakresie (CLAUDE.md -> „Plan i TODO", p. 28).
+człowieka. Do potwierdzenia, czy zostaje w zakresie (CLAUDE.md -> „Plan", p. 28).
 
 Przebieg: anonymize → agent → respond. Bez narzędzi wiedzy i bez `run_tools`. Jedyne narzędzie
 modelu to `respond_polish` (`respond_tool.py`). Zasady stylu przychodzą w stanie (`rules`)

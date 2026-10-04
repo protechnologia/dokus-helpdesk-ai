@@ -11,7 +11,7 @@ def build_anonymizer(
     Description:
     Wybiera anonimizator z konfiguracji. Dziś jest tylko atrapa, a ta nie anonimizuje — więc
     przy prawdziwym dostawcy LLM fabryka odmawia startu, zamiast wypuścić surowy tekst do modelu
-    zewnętrznego. Prawdziwy anonimizator dochodzi w p. 19 (CLAUDE.md -> „Plan i TODO").
+    zewnętrznego. Prawdziwy anonimizator dochodzi w p. 19 (CLAUDE.md -> „Plan").
 
     Example args:
         settings=Settings(llm_provider="fake")

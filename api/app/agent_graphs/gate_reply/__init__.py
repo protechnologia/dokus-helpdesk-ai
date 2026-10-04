@@ -9,7 +9,7 @@ modelu to `respond_gate_reply` (`respond_tool.py`). Reguły wysyłki przychodzą
 i trafiają do oddzielonej sekcji danych w turze użytkownika.
 
 Status: na atrapach węzłów (`fake.py`); prompt to szkielet, treść i pomiar w p. 22 (CLAUDE.md ->
-„Plan i TODO").
+„Plan").
 """
 
 from app.agent_graphs.gate_reply.fake import build_fake_graph, example_state

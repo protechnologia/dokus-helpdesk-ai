@@ -6,7 +6,7 @@ zewnętrznego. Importuj stąd (`from app.engine_anonymization import Anonymizer`
 Do czego:
 Pakiet na usługę za granicą procesu, jak `engine_embedding/` (CLAUDE.md -> „Warstwy kodu"): kontrakt
 (`base.py`), atrapa (`fake.py`), fabryka (`factory.py`), błędy i typ `AnonymizedText`. Klient
-prawdziwej usługi `anonymizer` dochodzi w p. 19 (CLAUDE.md -> „Plan i TODO").
+prawdziwej usługi `anonymizer` dochodzi w p. 19 (CLAUDE.md -> „Plan").
 """
 
 from app.engine_anonymization.base import Anonymizer
