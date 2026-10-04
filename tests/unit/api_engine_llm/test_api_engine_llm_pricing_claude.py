@@ -1,7 +1,7 @@
 import pytest
 
 from app.engine_llm import LLMConfigError
-from app.engine_llm.pricing_claude import PRICES, calculate_cost_usd, price_of
+from app.engine_llm.pricing.claude import PRICES, calculate_cost_usd, price_of
 
 
 def test_known_model_has_price():
@@ -40,7 +40,7 @@ def test_unknown_model_raises_config_error():
 
     # Komunikat ma prowadzić do naprawy: nazwa modelu i miejsce, gdzie dopisać stawki.
     assert "claude-nieistniejacy-9" in str(exc.value)
-    assert "pricing_claude.py" in str(exc.value)
+    assert "pricing/claude.py" in str(exc.value)
 
 
 def test_cost_of_plain_call():
@@ -66,6 +66,26 @@ def test_cached_tokens_are_billed_at_their_own_rates():
     )
 
     assert cost == pytest.approx(1.35)
+
+
+def test_cache_read_rate_follows_the_model():
+    """Odczyt z cache → mnożnik z wiersza modelu, nie jedna stała: Fable 5.1 liczy 0,025 stawki
+    wejścia, Opus 5.5 — 0,05, pozostałe 0,10."""
+    def cached_million(model: str) -> float:
+        return calculate_cost_usd(model, 0, 0, cache_read_tokens=1_000_000)
+
+    assert cached_million("claude-fable-5-1")  == pytest.approx(10.00 * 0.025)
+    assert cached_million("claude-opus-5-5")   == pytest.approx( 4.00 * 0.05)
+    assert cached_million("claude-sonnet-5-5") == pytest.approx( 2.00 * 0.10)
+
+
+def test_the_strongest_model_is_priced():
+    """Najmocniejszy model z cennika → 10 USD za milion wejścia i 50 za milion wyjścia; bez
+    wiersza klient odmówiłby startu."""
+    price = price_of("claude-fable-5-1")
+
+    assert price.input_per_million  == 10.00
+    assert price.output_per_million == 50.00
 
 
 def test_cache_read_is_cheaper_than_fresh_input():

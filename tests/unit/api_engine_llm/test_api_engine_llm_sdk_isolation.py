@@ -10,9 +10,9 @@ import pytest
 # drives the same SDK against a local server. Both are transport clients, which is what rule 4
 # permits — the rule bans the SDK from the DOMAIN, not from a second client.
 SDK_RULES = (
-    ("anthropic", ("import anthropic", "from anthropic"), ["engine_llm/client_claude.py"]),
-    ("openai",    ("import openai",    "from openai"),    ["engine_llm/client_ollama.py",
-                                                           "engine_llm/client_openai.py"]),
+    ("anthropic", ("import anthropic", "from anthropic"), ["engine_llm/client/claude.py"]),
+    ("openai",    ("import openai",    "from openai"),    ["engine_llm/client/ollama.py",
+                                                           "engine_llm/client/openai.py"]),
 )
 
 APP_ROOT = Path(__file__).resolve().parents[3] / "api" / "app"
@@ -30,7 +30,7 @@ def _modules_importing(spellings: tuple[str, ...]) -> list[str]:
         spellings=("import anthropic", "from anthropic")
 
     Example result:
-        ["engine_llm/client_claude.py"]
+        ["engine_llm/client/claude.py"]
     """
     offenders = []
 
@@ -50,7 +50,7 @@ def _modules_importing(spellings: tuple[str, ...]) -> list[str]:
 def test_only_transport_clients_import_the_sdk(
     sdk:             str,               # e.g. "openai"
     spellings:       tuple[str, ...],   # e.g. ("import openai", "from openai")
-    allowed_modules: list[str],         # e.g. ["engine_llm/client_openai.py"]
+    allowed_modules: list[str],         # e.g. ["engine_llm/client/openai.py"]
 ):
     """SDK dostawcy importowany wyłącznie w klientach transportowych — domena go nie zna."""
     offenders = _modules_importing(spellings)
@@ -65,7 +65,7 @@ def test_only_transport_clients_import_the_sdk(
 def test_the_guard_actually_finds_the_import(
     sdk:             str,               # e.g. "openai"
     spellings:       tuple[str, ...],   # e.g. ("import openai", "from openai")
-    allowed_modules: list[str],         # e.g. ["engine_llm/client_openai.py"]
+    allowed_modules: list[str],         # e.g. ["engine_llm/client/openai.py"]
 ):
     """Strażnik widzi import w dozwolonych plikach — inaczej przechodziłby też po ich usunięciu."""
     # Bez tego asercja wyżej byłaby spełniona również przez pustą listę wynikającą z zepsutego

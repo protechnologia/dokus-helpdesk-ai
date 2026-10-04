@@ -2,6 +2,8 @@ from datetime import date as Date
 
 from pydantic import BaseModel, Field
 
+from app.entry_routers.models import UsageItem
+
 
 class TicketCard(BaseModel):
     """
@@ -25,3 +27,4 @@ class TicketCard(BaseModel):
     solution:          str       = Field(examples=["brak"])
     resolution:        str       = Field(examples=["naprawione"])
     questions_summary: str       = Field(examples=["brak"])
+    usage:             UsageItem

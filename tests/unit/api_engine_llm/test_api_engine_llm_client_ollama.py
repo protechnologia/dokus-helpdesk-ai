@@ -2,8 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from app.engine_llm import LLMConfigError, LLMError, client_ollama
-from app.engine_llm.client_ollama import OllamaLLMClient
+from app.engine_llm import LLMConfigError, LLMError
+from app.engine_llm.client import ollama as client_ollama
+from app.engine_llm.client.ollama import OllamaLLMClient
 
 MODEL = "SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0"
 

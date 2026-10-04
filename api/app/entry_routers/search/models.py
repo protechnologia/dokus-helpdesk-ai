@@ -2,7 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.entry_routers.models import SourceItem
+from app.entry_routers.models import SourceItem, UsageItem
 
 
 class AgentQuery(BaseModel):
@@ -25,3 +25,4 @@ class SearchResponse(BaseModel):
 
     sources: list[SourceItem] = Field(default_factory=list)
     queries: list[AgentQuery] = Field(default_factory=list)
+    usage:   UsageItem

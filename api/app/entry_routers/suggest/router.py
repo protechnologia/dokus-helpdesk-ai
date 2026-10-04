@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.agent_graphs import run_graph
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
 from app.agent_graphs.registry import variant_graphs
-from app.entry_routers.mapping import to_raw_ticket, to_source_items
+from app.entry_routers.mapping import to_raw_ticket, to_source_items, to_usage_item
 from app.entry_routers.suggest.models import (
     SuggestRequest,
     SuggestResponse,
@@ -77,6 +77,7 @@ async def suggest_answer(
         variant = request.variant,
         text    = final.output.text,
         sources = to_source_items(sources),
+        usage   = to_usage_item(final.usage),
     )
 
     logger.info(

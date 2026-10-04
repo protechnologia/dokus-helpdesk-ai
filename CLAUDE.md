@@ -1127,7 +1127,7 @@ dokus-helpdesk-ai/
 │       ├── core_text/            # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
 │       ├── core_util/            # html, validation_text, time
 │       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
-│       ├── engine_llm/           # LLMClient + fabryka + FakeLLMClient + cenniki
+│       ├── engine_llm/           # LLMClient + fabryka; client/, pricing/, models/
 │       ├── engine_embedding/     # EmbeddingClient (HTTP do `embedder`) + prefiksy
 │       ├── engine_anonymization/ # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 19)
 │       ├── db_qdrant/            # Qdrant: client.py, collection/ point/, hit/
@@ -1383,6 +1383,8 @@ Wspólne:
   wyszukiwania i odczyty, bez `respond_search`), obok źródeł z `cite()`. Źle odczytany
   `component` albo zgubiony kod błędu są niewidoczne w samej liście źródeł; pełną kartę nowego
   zgłoszenia daje `/parse-ticket`.
+- **Każda odpowiedź trasy opartej na grafie niesie `usage`** — liczbę wywołań modelu, tokeny
+  w czterech klasach i `cost_usd` całej sprawy, żeby wołający widział koszt bez logów.
 - **Źródła w odpowiedzi to materiał, który agent ODCZYTAŁ, i nie mają `score` (2026-10-04).**
   Odczyt po numerze nie zna podobieństwa; widzi je tylko model, w wyniku wyszukiwania. `/search`
   oddaje więc karty przeczytane przez agenta, a nie wszystko, co wyszukiwanie znalazło.
@@ -1713,7 +1715,7 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   sam limit stoi w opisie narzędzia dla modelu: miejsce `{{max_calls}}` w `description.md`
   wypełnia `tool_definitions()`, więc narzędzie bez limitu to błąd składania. Ile jedno
   wywołanie może pobrać (20 kart, 5 wątków, 5 sekcji), zostaje stałą w modelu zapytania.
-- **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `engine_llm/messages.py`), żadnych typów
+- **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `engine_llm/models/messages.py`), żadnych typów
   LangChaina (2026-10-02).** Pętla rozmawia z modelem przez `LLMClient`, a format wiadomości
   u dostawcy tłumaczy jego klient (p. 17). Skoro i model, i narzędzia idą przez nasze kontrakty,
   LangGraph jest **wyłącznie maszyną stanów** — `StructuredTool` z wcześniejszego planu okazał się
@@ -1820,6 +1822,31 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Retry sieciowy tylko z backoffem i capem prób.**
 - **Loguj każde wywołanie:** model, tokeny in/out, latencja, koszt (log strukturalny). Treści
   promptu/odpowiedzi **nigdy na INFO** (dane użytkownika) — tylko DEBUG.
+- **Pakiet `engine_llm/` ma trzy foldery (2026-10-04):** `client/` (plik na dostawcę: `claude`,
+  `openai`, `ollama`, `fake`), `pricing/` (cenniki i wspólny `ModelPrice`) i `models/`
+  (`messages`, `completion`, `usage`). `client/__init__.py` celowo niczego nie importuje — SDK
+  ładują się sekundami, więc klienta bierze się pełną ścieżką.
+- **Koszt przebiegu jest w stanie grafu i w odpowiedzi każdej trasy (2026-10-04).** Węzeł `agent`
+  zwraca zużycie SWOJEJ tury (`LLMUsage`: wywołania, cztery klasy tokenów, `cost_usd`), a reduktor
+  `add_usage` w `GraphState` je sumuje; trasy oddają to jako `usage`. Na atrapach wywołania są
+  policzone, a tokeny i koszt wynoszą zero — prawdziwe zero, nie brak danych. CLI wypisze to samo
+  razem z komendami grafów (p. 46).
+- **Cache promptu: u Claude'a włączony w każdym żądaniu (`cache_control` na górnym poziomie),
+  u OpenAI działa bez naszego udziału.** Obejmuje początek żądania w kolejności narzędzia →
+  prompt systemowy → wiadomości, więc w pętli z narzędziami cała dotychczasowa rozmowa jest
+  odczytem za ułamek stawki. Cena u Claude'a: pierwszy zapis kosztuje 1,25 stawki wejścia.
+  Warunek: początek identyczny co do znaku — stąd instrukcja w turze systemowej i stała kolejność
+  narzędzi.
+- **Cenniki sprawdzone z opublikowanymi 2026-10-04; każdy model to jedna linia z trzema
+  liczbami: wejście, wyjście i mnożnik odczytu z cache** (od 0,025 do 0,25 stawki wejścia, bez
+  wartości domyślnej), żeby tabelę dało się porównać z cennikiem na oko. Cennik OpenAI nie
+  liczy stawki ZAPISU do cache, którą nowe rodziny już mają (1,25 stawki) — klient nie odczytuje
+  tego licznika, więc pierwsza tura jest lekko zaniżona; do domknięcia w p. 17.
+- **Pierwszy przebieg pętli na żywym modelu (2026-10-04, sonda poza repo: `gpt-5.4-mini`,
+  zmyślone zgłoszenie, atrapy narzędzi):** cztery tury — oba wyszukiwania naraz, odczyt kart
+  WSZYSTKICH znalezionych numerów, odczyt wątku zgłoszenia bez karty, odpowiedź; 0,0075 USD
+  z cache wobec 0,0153 bez. Stały początek (prompt i osiem narzędzi) to 3,6 tys. tokenów. To
+  jeden przypadek, nie pomiar — pomiar jest w p. 23–26.
 
 ### Prompty
 
@@ -2205,15 +2232,15 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 764 (0)            | 17 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 140 (53)           | 41 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 74 (9)             | 9 s  |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 779 (0)            | 17 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 144 (53)           | 41 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 76 (9)             | 9 s  |
 | ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 5 (3)              | 40 s |
 
 Liczby i czasy z 2026-10-04: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 9 s, a ewaluacyjne poniżej sekundy —
 całe 40 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
-(`pytest -m ""`): 983 testy, 75 s.
+(`pytest -m ""`): 1004 testy, 79 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2591,7 +2618,7 @@ generacji.
 - [x] **3. Struktura `api/app/agent_nodes/` z listą węzłów** — kontrakt `Node` (`base.py`), katalogi
   `anonymize/`, `agent/`, `run_tools/`, `respond/`; reduktor `merge_sources` w
   `agent_graphs/base.py` (stan ma każdy graf własny, w `state.py`); do tego `ChatMessage`/`ToolCall`
-  (`engine_llm/messages.py`) i `AnonymizedText` (`engine_anonymization/`); reguły — „Warstwa
+  (`engine_llm/models/messages.py`) i `AnonymizedText` (`engine_anonymization/`); reguły — „Warstwa
   węzłów".
 - [x] **4. Atrapy wszystkich węzłów** — `FakeAgentNode`, `FakeRunToolsNode`, `FakeRespondNode`;
   `anonymize` od razu właściwy (`AnonymizeNode`) na `FakeAnonymizer` z fabryką odmawiającą przy
@@ -2707,8 +2734,9 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
 - [ ] **46. CLI dla grafów** (dopisany 2026-10-02, numer spoza kolejności) — `helpdesk gate
   close|reply`, `helpdesk suggest <wariant>`, „Popraw" i karta zgłoszenia na tej samej fabryce
   grafów co trasy; także wyszukiwanie i parsowanie zgłoszeń do korpusu (dawne `rag search`
-  i `tickets parse`, skasowane z serwisami 2026-10-02). *Dlaczego:* odłożone z p. 6 — na
-  atrapach komenda zwracałaby stałe odpowiedzi.
+  i `tickets parse`, skasowane z serwisami 2026-10-02); każda komenda wypisuje zużycie modelu
+  i koszt przebiegu (`usage` ze stanu grafu). *Dlaczego:* odłożone z p. 6 — na atrapach komenda
+  zwracałaby stałe odpowiedzi.
 
 ### C. Decyzje
 
@@ -2737,8 +2765,10 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
 - [ ] **17. Tura z narzędziami u prawdziwych dostawców** — implementacja kontraktu z p. 9
   w klientach Claude / OpenAI / Ollama; pętla zostaje w grafie. `tool_choice` zostaje `auto` —
   sprawdzić, czy wymuszony u Claude wyklucza extended thinking; tryb strict u OpenAI wymaga
-  przetłumaczenia schematu (wszystkie pola wymagane). *Dlaczego:* format wywołań narzędzi to
-  wiedza dostawcy (zasada 4).
+  przetłumaczenia schematu (wszystkie pola wymagane); tura z narzędziami ma prosić o cache
+  promptu tak jak `complete()` u Claude'a, zwracać zużycie do `LLMUsage`, a klient OpenAI
+  odczytywać także licznik zapisu do cache. *Dlaczego:* format wywołań narzędzi to wiedza
+  dostawcy (zasada 4).
 - [ ] **18. Dwie role LLM w konfiguracji** — zaufana i generująca, z flagą per endpoint „może
   widzieć surowe dane", domyślnie wyłączoną. *Dlaczego:* pomyłka tej flagi to przeciek, więc
   wyłączenie ochrony ma być jawnym aktem w konfiguracji.
@@ -2843,9 +2873,10 @@ każdy mierzy się osobno.
 
 - [ ] **36. Uwierzytelnianie API i własne hasło Postgresa.** *Dlaczego:* endpointy są otwarte,
   reguły bramek będą edytowalne, a compose ma dla bazy hasło dev-owe.
-- [ ] **37. Budżet i limity wywołań zewnętrznych** — z cache'owaniem promptu; limity wywołań
-  narzędzi na przebieg już są (`AGENT_MAX_CALLS_*`), do rozważenia wyniesienie do ENV także tego,
-  ile jedno wywołanie może pobrać. *Dlaczego:* bramki dają ruch proporcjonalny do całej pracy
+- [ ] **37. Budżet i limity wywołań zewnętrznych** — limity wywołań narzędzi na przebieg
+  (`AGENT_MAX_CALLS_*`), koszt przebiegu w odpowiedzi (`usage`) i cache promptu już są; zostaje
+  budżet na okres i jego egzekwowanie oraz wyniesienie do ENV tego, ile jedno wywołanie może
+  pobrać. *Dlaczego:* bramki dają ruch proporcjonalny do całej pracy
   helpdesku, pętla mnoży wywołania, a model zewnętrzny to koszt per wywołanie.
 - [ ] **38. Punkt wpięcia i zachowanie przy 503 uzgodnione z helpdeskiem.** *Dlaczego:* bez
   hooka bramek nikt nie woła, a o fail-open decyduje tamta strona.

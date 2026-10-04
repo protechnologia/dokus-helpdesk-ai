@@ -11,9 +11,10 @@ from anthropic import (
     AsyncAnthropic,
 )
 
-from app.engine_llm.base import LLMClient, LLMCompletion
+from app.engine_llm.base import LLMClient
 from app.engine_llm.errors import LLMError
-from app.engine_llm.pricing_claude import calculate_cost_usd, price_of
+from app.engine_llm.models.completion import LLMCompletion
+from app.engine_llm.pricing.claude import calculate_cost_usd, price_of
 
 # Ceiling on ONE answer, not a target. A parsed ticket is a small JSON object, but a thread with a
 # quoted mail history can push the model into a long answer; cutting it off mid-JSON would waste
@@ -28,6 +29,15 @@ MAX_OUTPUT_TOKENS = 8_000
 # after this build defaults to NOT sending the parameter — a new model that quietly ignored an
 # unsupported knob would be a worse outcome than one that never received it.
 MODELS_ACCEPTING_TEMPERATURE = ("claude-haiku-4-5",)
+
+# Cache promptu, włączony w każdym żądaniu. Jedno pole na górnym poziomie żądania: dostawca sam
+# ustawia punkt cache i przesuwa go wraz z rozmową. Cache obejmuje POCZĄTEK żądania w kolejności
+# narzędzia → prompt systemowy → wiadomości, więc w pętli z narzędziami cała dotychczasowa rozmowa
+# jest odczytem (ułamek stawki wejścia), a pełną stawką płaci się tylko za to, co doszło.
+# Czas życia 5 minut, odnawiany przy każdym odczycie. Cena: pierwszy zapis kosztuje 1,25 stawki
+# wejścia — gdy ten sam początek nie wróci w ciągu 5 minut, płacimy te 25% za nic. Początki
+# krótsze niż minimum modelu (512–4096 tokenów) nie są cache'owane wcale.
+PROMPT_CACHE = {"type": "ephemeral"}
 
 
 class ClaudeLLMClient(LLMClient):
@@ -113,23 +123,7 @@ class ClaudeLLMClient(LLMClient):
                 with nothing usable
         """
         started_at = time.perf_counter()
-
-        # --- build request ---
-        # The system prompt is a TOP-LEVEL argument in this API, not a message with role="system".
-        # Passing it as a message would make the model read it as user text and quietly weaken
-        # every instruction it carries. Omitted entirely when absent — an explicit None is rejected.
-        request: dict = {
-            "model":      self._model,
-            "max_tokens": MAX_OUTPUT_TOKENS,
-            "messages":   [{"role": "user", "content": prompt}],
-        }
-
-        # Sent only where it is still accepted — elsewhere it is a hard 400, not a warning.
-        if self._accepts_temperature:
-            request["temperature"] = self._temperature
-
-        if system is not None:
-            request["system"] = system
+        request    = self._build_request(prompt, system)
 
         # --- call the provider ---
         try:
@@ -154,6 +148,45 @@ class ClaudeLLMClient(LLMClient):
         self._log_call(prompt, completion)
 
         return completion
+
+    def _build_request(
+        self,
+        prompt: str,         # np. "ZGŁOSZENIE 33644\nTemat: …\n\n[klient] Nie działa…"
+        system: str | None,  # np. "Jesteś parserem zgłoszeń helpdesku."
+    ) -> dict:
+        """
+        Description:
+        Składa żądanie do Messages API. Wydzielone z `complete()`, bo jest czyste: test sprawdza
+        kształt żądania bez sieci i bez klucza.
+
+        Example args:
+            prompt="ZGŁOSZENIE 33644\nTemat: Błąd wysyłki\n\n[klient] Nie działa…"
+            system="Jesteś parserem zgłoszeń helpdesku."
+
+        Example result:
+            {"model": "claude-haiku-4-5", "max_tokens": 1500,
+             "cache_control": {"type": "ephemeral"},
+             "messages": [{"role": "user", "content": "ZGŁOSZENIE 33644…"}],
+             "temperature": 0.0, "system": "Jesteś parserem…"}
+        """
+        # Prompt systemowy jest w tym API argumentem NA GÓRNYM POZIOMIE, a nie wiadomością o roli
+        # „system": podany jako wiadomość byłby czytany jak tekst użytkownika i osłabiłby każdą
+        # instrukcję. Gdy go nie ma, pole pomijamy — jawne None jest odrzucane.
+        request: dict = {
+            "model":         self._model,
+            "max_tokens":    MAX_OUTPUT_TOKENS,
+            "cache_control": PROMPT_CACHE,
+            "messages":      [{"role": "user", "content": prompt}],
+        }
+
+        # Wysyłane tylko tam, gdzie nadal jest przyjmowane — gdzie indziej to twarde 400.
+        if self._accepts_temperature:
+            request["temperature"] = self._temperature
+
+        if system is not None:
+            request["system"] = system
+
+        return request
 
     def _to_completion(
         self,

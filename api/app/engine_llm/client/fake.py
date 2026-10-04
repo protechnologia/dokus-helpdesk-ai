@@ -3,8 +3,9 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel, Field
 
-from app.engine_llm.base import LLMClient, LLMCompletion
+from app.engine_llm.base import LLMClient
 from app.engine_llm.errors import LLMError
+from app.engine_llm.models.completion import LLMCompletion
 
 # Returned when nobody scripted an answer. A constant (not an echo of the prompt) so a test that
 # accidentally asserts on it fails loudly instead of passing on coincidental input.

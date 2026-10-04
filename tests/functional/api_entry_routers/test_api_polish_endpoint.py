@@ -12,8 +12,12 @@ def test_the_polished_text_goes_out() -> None:
         json={"ticket_id": "41002", "text": "przesylki juz ida"},
     )
 
+    body = response.json()
+
     assert response.status_code == 200
-    assert response.json() == {"text": "fake-polish-text"}
+    assert body["text"]               == "fake-polish-text"
+    assert body["usage"]["llm_calls"] == 1
+    assert body["usage"]["cost_usd"]  == 0.0
 
 
 def test_empty_notes_are_refused() -> None:

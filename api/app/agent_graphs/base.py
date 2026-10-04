@@ -9,14 +9,33 @@ from app.agent_nodes import LogEntry
 from app.agent_tools import AgentTool, KnowledgeSource, SourceRef
 from app.core_util.json_schema import json_schema_without_docs
 from app.engine_anonymization import AnonymizedText
-from app.engine_llm import ChatMessage, ToolDefinition
+from app.engine_llm import ChatMessage, LLMUsage, ToolDefinition
+
+
+def add_usage(
+    current: LLMUsage,  # np. LLMUsage(calls=1, prompt_tokens=4820, cost_usd=0.0321)
+    new:     LLMUsage,  # np. LLMUsage(calls=1, prompt_tokens=5100, cost_usd=0.0214)
+) -> LLMUsage:
+    """
+    Description:
+    Reduktor pola `usage` w stanie grafu: dodaje zużycie modelu z kolejnej tury do dotychczasowej
+    sumy. Węzeł `agent` zwraca zużycie SWOJEJ tury, a nie sumę — sumuje stan.
+
+    Example args:
+        current=LLMUsage(calls=1, prompt_tokens=4820, cost_usd=0.0321)
+        new=LLMUsage(calls=1, prompt_tokens=5100, cost_usd=0.0214)
+
+    Example result:
+        LLMUsage(calls=2, prompt_tokens=9920, cost_usd=0.0535)
+    """
+    return current.plus(new)
 
 
 class GraphState(BaseModel):
     """
     Description:
     Pola stanu, które czytają albo piszą wspólne węzły każdego grafu: wejście, jego wersja po
-    anonimizacji, rozmowa z modelem, licznik tur i log przebiegu.
+    anonimizacji, rozmowa z modelem, licznik tur, zużycie modelu i log przebiegu.
 
     Do czego:
     `state.py` każdego grafu dziedziczy po tej klasie i dokłada własne pola — `output` w typie
@@ -33,6 +52,7 @@ class GraphState(BaseModel):
     anonymized: AnonymizedText | None                      = None                         # ustawia węzeł `anonymize`
     messages:   Annotated[list[ChatMessage], operator.add] = Field(default_factory=list)  # rozmowa z modelem; reduktor dokleja nowe wiadomości
     iterations: int                                        = 0                            # liczba tur modelu; podbija węzeł `agent`
+    usage:      Annotated[LLMUsage, add_usage]             = Field(default_factory=LLMUsage)  # tokeny i koszt wywołań modelu; reduktor sumuje tury
     log:        Annotated[list[LogEntry], operator.add]    = Field(default_factory=list)  # przebieg: po wpisie od każdego wywołania węzła
 
 

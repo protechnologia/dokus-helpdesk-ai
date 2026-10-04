@@ -1,6 +1,6 @@
 from app.config import Settings
 from app.engine_llm.base import LLMClient
-from app.engine_llm.client_fake import FakeLLMClient
+from app.engine_llm.client.fake import FakeLLMClient
 from app.engine_llm.errors import LLMConfigError
 
 # The vendor clients are imported INSIDE their builders, not here — the deliberate exception to
@@ -85,7 +85,7 @@ def _build_claude_client(
     Raises:
         LLMConfigError: `LLM_API_KEY` or `LLM_MODEL` is missing, or the model has no known price
     """
-    from app.engine_llm.client_claude import ClaudeLLMClient
+    from app.engine_llm.client.claude import ClaudeLLMClient
 
     _require_key_and_model(settings, PROVIDER_CLAUDE)
 
@@ -116,7 +116,7 @@ def _build_openai_client(
     Raises:
         LLMConfigError: `LLM_API_KEY` or `LLM_MODEL` is missing, or the model has no known price
     """
-    from app.engine_llm.client_openai import OpenAILLMClient
+    from app.engine_llm.client.openai import OpenAILLMClient
 
     _require_key_and_model(settings, PROVIDER_OPENAI)
 
@@ -146,7 +146,7 @@ def _build_ollama_client(
     Raises:
         LLMConfigError: `LLM_MODEL` is missing — there is no sensible default for which model to run
     """
-    from app.engine_llm.client_ollama import OllamaLLMClient
+    from app.engine_llm.client.ollama import OllamaLLMClient
 
     if not settings.llm_model:
         raise LLMConfigError(f"LLM_PROVIDER={PROVIDER_OLLAMA!r} wymaga ustawienia: LLM_MODEL")

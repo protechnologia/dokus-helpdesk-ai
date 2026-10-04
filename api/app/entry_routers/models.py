@@ -58,6 +58,26 @@ class SourceItem(BaseModel):
     date:    Date | None = Field(default=None, examples=["2026-03-14"])
 
 
+class UsageItem(BaseModel):
+    """
+    Description:
+    Zużycie modelu przy jednym żądaniu: liczba wywołań, tokeny i koszt w dolarach. Wraca
+    w odpowiedzi każdej trasy opartej na grafie, żeby wołający widział koszt jednej sprawy bez
+    sięgania do logów.
+
+    Tokeny są w czterech klasach, tak jak rozliczają je dostawcy: świeże wejście, wyjście oraz
+    zapis i odczyt cache promptu. Koszt jest sumą po wszystkich turach modelu. Na atrapach modelu
+    wywołania są policzone, a tokeny i koszt wynoszą zero.
+    """
+
+    llm_calls:          int   = Field(examples=[3])
+    prompt_tokens:      int   = Field(examples=[18200])
+    completion_tokens:  int   = Field(examples=[940])
+    cache_write_tokens: int   = Field(default=0, examples=[0])
+    cache_read_tokens:  int   = Field(default=0, examples=[0])
+    cost_usd:           float = Field(examples=[0.0916])
+
+
 class ErrorResponse(BaseModel):
     """
     Description:

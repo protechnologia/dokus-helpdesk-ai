@@ -4,7 +4,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.agent_nodes.base import Node
-from app.engine_llm import ChatMessage, LLMError, ToolCall
+from app.engine_llm import ChatMessage, LLMError, LLMUsage, ToolCall
 
 # Odpowiedź atrapy, gdy nikt nie zaplanował tur — stała, a nie echo wejścia, żeby test, który
 # przypadkiem na niej polega, padł głośno.
@@ -43,8 +43,9 @@ class FakeAgentNode(Node):
 
     Flow:
         1. Test tworzy ją z listą tur (np. najpierw `tool_call_turn(…)`, potem odpowiedź).
-        2. Każde `run()` zapisuje stan w `calls`, dokleja kolejną turę do `messages` i podbija
-           `iterations`.
+        2. Każde `run()` zapisuje stan w `calls`, dokleja kolejną turę do `messages`, podbija
+           `iterations` i dokłada zużycie modelu jednej tury (`usage`) — domyślnie jedno
+           wywołanie bez tokenów i kosztu, bo atrapa niczego nie wysyła.
         3. Brak kolejnej tury to błąd, nie powtórka: graf zawołał agenta częściej, niż test
            zakładał.
     """
@@ -54,22 +55,28 @@ class FakeAgentNode(Node):
     def __init__(
         self,
         turns: Sequence[ChatMessage] | None = None,  # np. [tool_call_turn(…), ChatMessage(…)]
+        usage: LLMUsage | None = None,               # np. LLMUsage(calls=1, cost_usd=0.02)
     ):
         """
         Description:
-        Ustala tury, które atrapa odda, i zakłada dziennik wywołań.
+        Ustala tury, które atrapa odda, zużycie modelu zgłaszane przy każdej z nich i zakłada
+        dziennik wywołań.
 
         Example args:
             turns=[tool_call_turn("find_tickets_vector", {…}),
                    ChatMessage(role="assistant", content="…")]
+            usage=LLMUsage(calls=1, prompt_tokens=5000, completion_tokens=100, cost_usd=0.02)
 
         Example result:
-            FakeAgentNode oddająca te dwie tury po kolei
+            FakeAgentNode oddająca te dwie tury po kolei, każdą za 0.02 USD
         """
         default_turn = ChatMessage(role="assistant", content=DEFAULT_ANSWER)
 
         self._turns: list[ChatMessage] = list(turns) if turns is not None else [default_turn]
         self._next:  int               = 0
+
+        # Atrapa nie woła modelu: jedna tura to jedno wywołanie, zero tokenów i zero kosztu.
+        self._usage: LLMUsage = usage if usage is not None else LLMUsage(calls=1)
 
         # Publiczne celowo: testy sprawdzają, z jakim stanem agent był wołany.
         self.calls: list[BaseModel] = []
@@ -87,6 +94,7 @@ class FakeAgentNode(Node):
 
         Example result:
             {"messages": [ChatMessage(role="assistant", …)], "iterations": 1,
+             "usage": LLMUsage(calls=1),
              "log": [LogEntry(node="agent", message="tura 1: odpowiedź")]}
 
         Raises:
@@ -107,6 +115,7 @@ class FakeAgentNode(Node):
         update = {
             "messages":   [turn],
             "iterations": iteration,
+            "usage":      self._usage,
             "log":        [self.log_entry(f"tura {iteration}: {action}")],
         }
 

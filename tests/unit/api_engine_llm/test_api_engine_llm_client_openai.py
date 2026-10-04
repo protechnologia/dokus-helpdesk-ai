@@ -1,7 +1,7 @@
 import pytest
 
 from app.engine_llm import LLMError
-from app.engine_llm.client_openai import MODELS_REJECTING_TEMPERATURE, OpenAILLMClient
+from app.engine_llm.client.openai import MODELS_REJECTING_TEMPERATURE, OpenAILLMClient
 
 API_KEY = "sk-proj-test-key"
 MODEL   = "gpt-5.4-mini"

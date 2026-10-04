@@ -3,7 +3,8 @@ from datetime import date as Date
 from app.agent_tools import SourceRef
 from app.core_model.ticket_raw import RawTicket
 from app.core_model.ticket_raw_comment import RawComment
-from app.entry_routers.models import SourceItem, TicketRequest
+from app.engine_llm import LLMUsage
+from app.entry_routers.models import SourceItem, TicketRequest, UsageItem
 
 # Mapowanie modeli API na domenowe i z powrotem, wspólne dla tras. Pisane ręcznie, nie kopiowaniem
 # pól hurtem: oba modele wolno rozjechać, a automat przekazałby dalej wszystko, co API akurat
@@ -14,6 +15,10 @@ UNKNOWN_ROLE = "nieznany"
 
 # W miejscu znacznika czasu, którego źródło nie podało; znaczenie niesie kolejność komentarzy.
 UNKNOWN_TIME = ""
+
+# Do ilu miejsc po przecinku koszt wraca w odpowiedzi. Suma ułamków z kilku tur ma na końcu szum
+# (0.006000000000000001), a jedno wywołanie taniego modelu kosztuje ułamki centa.
+COST_DIGITS = 6
 
 
 def to_raw_ticket(
@@ -76,3 +81,28 @@ def to_source_items(
     ]
 
     return items
+
+
+def to_usage_item(
+    usage: LLMUsage,  # np. LLMUsage(calls=3, prompt_tokens=18200, cost_usd=0.0916)
+) -> UsageItem:
+    """
+    Description:
+    Zamienia zużycie modelu ze stanu grafu na model API, pole po polu; koszt zaokrągla.
+
+    Example args:
+        usage=LLMUsage(calls=3, prompt_tokens=18200, completion_tokens=940, cost_usd=0.0916)
+
+    Example result:
+        UsageItem(llm_calls=3, prompt_tokens=18200, completion_tokens=940, cost_usd=0.0916)
+    """
+    item = UsageItem(
+        llm_calls          = usage.calls,
+        prompt_tokens      = usage.prompt_tokens,
+        completion_tokens  = usage.completion_tokens,
+        cache_write_tokens = usage.cache_write_tokens,
+        cache_read_tokens  = usage.cache_read_tokens,
+        cost_usd           = round(usage.cost_usd, COST_DIGITS),
+    )
+
+    return item

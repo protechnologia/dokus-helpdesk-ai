@@ -12,6 +12,7 @@ from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
 from app.agent_nodes.run_tools import FakeRunToolsNode
 from app.engine_anonymization import FakeAnonymizer
+from app.engine_llm import LLMUsage
 
 # Grafy z pętlą agent ⇄ run_tools.
 LOOP_GRAPHS = [search, suggest_questions, suggest_solution]
@@ -140,3 +141,49 @@ def test_the_factory_gives_tool_graphs_the_limits_from_the_configuration(
     assert received["limits"]["read_docs"] == 7
     assert set(received["limits"]) >= set(search.TOOL_NAMES)
     assert build_function_graph(gate_close) is not None
+
+
+async def test_the_cost_of_every_model_turn_adds_up_in_the_state() -> None:
+    """Trzy tury modelu po 0,02 USD → w stanie trzy wywołania, suma tokenów i 0,06 USD: zużycie
+    zwraca węzeł `agent` dla swojej tury, a sumuje stan grafu."""
+    turn_usage = LLMUsage(
+        calls             = 1,
+        prompt_tokens     = 5000,
+        completion_tokens = 100,
+        cache_read_tokens = 400,
+        cost_usd          = 0.02,
+    )
+    agent = FakeAgentNode(
+        [
+            tool_call_turn("find_tickets_vector", FAKE_SEARCH_ARGUMENTS, call_id="call_1"),
+            tool_call_turn("read_tickets_card", FAKE_READ_ARGUMENTS, call_id="call_2"),
+            tool_call_turn(search.RESPOND_TOOL_NAME, {}, call_id="call_3"),
+        ],
+        usage = turn_usage,
+    )
+    graph = search.build_graph(
+        anonymize = AnonymizeNode(FakeAnonymizer()),
+        agent     = agent,
+        run_tools = FakeRunToolsNode(result_text="{}"),
+        respond   = FakeRespondNode(search.SearchDone()),
+    )
+
+    state = search.STATE(**await graph.ainvoke(search.example_state()))
+
+    assert state.usage.calls             == 3
+    assert state.usage.prompt_tokens     == 15000
+    assert state.usage.completion_tokens == 300
+    assert state.usage.cache_read_tokens == 1200
+    assert state.usage.cost_usd          == pytest.approx(0.06)
+    assert state.usage.calls             == state.iterations
+
+
+@pytest.mark.parametrize("graph", LOOP_GRAPHS, ids=graph_name)
+async def test_a_fake_run_counts_model_calls_and_costs_nothing(graph: ModuleType) -> None:
+    """Przebieg na atrapach → wywołania modelu policzone, tokeny i koszt zerowe: atrapa niczego
+    nie wysyła, więc zero jest prawdziwym zerem, a nie brakiem danych."""
+    state = await run_fake(graph)
+
+    assert state.usage.calls         == 3
+    assert state.usage.prompt_tokens == 0
+    assert state.usage.cost_usd      == 0.0

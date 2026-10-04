@@ -12,9 +12,10 @@ from openai import (
     AsyncOpenAI,
 )
 
-from app.engine_llm.base import LLMClient, LLMCompletion
+from app.engine_llm.base import LLMClient
 from app.engine_llm.errors import LLMConfigError, LLMError
-from app.engine_llm.pricing_selfhosted import calculate_cost_usd
+from app.engine_llm.models.completion import LLMCompletion
+from app.engine_llm.pricing.selfhosted import calculate_cost_usd
 
 # Fallbacks used when nothing is configured. Both are ENV settings (`LLM_NUM_CTX`,
 # `LLM_MAX_OUTPUT_TOKENS`) because they depend on the model and the machine, not on this code.
@@ -71,7 +72,7 @@ class OllamaLLMClient(LLMClient):
     Do czego:
     This is the path Bielik takes (CLAUDE.md -> "Warstwa LLM"): the endpoint is OpenAI-compatible,
     so the vendor SDK still does the talking, but the pricing and the operational assumptions come
-    from `pricing_selfhosted` — our own hardware bills no tokens.
+    from `pricing/selfhosted.py` — our own hardware bills no tokens.
 
     Flow:
         1. `get_llm_client()` builds it from `Settings`, requiring only `LLM_MODEL` and a base URL.

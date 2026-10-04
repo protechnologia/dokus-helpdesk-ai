@@ -1,7 +1,7 @@
 import pytest
 
 from app.engine_llm import LLMError
-from app.engine_llm.client_claude import MODELS_ACCEPTING_TEMPERATURE, ClaudeLLMClient
+from app.engine_llm.client.claude import MODELS_ACCEPTING_TEMPERATURE, ClaudeLLMClient
 
 API_KEY = "sk-ant-test-key"
 MODEL   = "claude-haiku-4-5"
@@ -216,14 +216,45 @@ def test_unknown_model_family_withholds_temperature():
 
 def test_prices_the_model_that_actually_answered():
     """Model z odpowiedzi rozstrzyga o cenie — rachunek idzie za tym, co faktycznie policzyło."""
-    # Klient prosi o Haiku (1/5 USD), odpowiada Sonnet (3/15 USD).
+    # Klient prosi o Haiku (1/5 USD), odpowiada Opus 5.5 (4/20 USD).
     response = StubResponse(
         blocks = [StubBlock("ok")],
         usage  = StubUsage(input_tokens=1_000_000, output_tokens=0),
-        model  = "claude-sonnet-5",
+        model  = "claude-opus-5-5",
     )
 
     completion = make_client()._to_completion(response, elapsed_ms=1.0)
 
-    assert completion.model    == "claude-sonnet-5"
-    assert completion.cost_usd == pytest.approx(3.00)
+    assert completion.model    == "claude-opus-5-5"
+    assert completion.cost_usd == pytest.approx(4.00)
+
+
+def test_every_request_asks_for_prompt_caching():
+    """Żądanie → pole `cache_control` na górnym poziomie: dostawca sam prowadzi punkt cache,
+    a w pętli z narzędziami dotychczasowa rozmowa jest wtedy odczytem za ułamek stawki."""
+    request = make_client()._build_request("ZGŁOSZENIE 41002…", system="Jesteś parserem.")
+
+    assert request["cache_control"] == {"type": "ephemeral"}
+
+
+def test_the_request_carries_the_system_prompt_at_the_top_level():
+    """Prompt systemowy → argument na górnym poziomie, a nie wiadomość: jako wiadomość byłby
+    czytany jak tekst użytkownika. Gdy go nie ma, pola nie ma wcale."""
+    client = make_client()
+
+    with_system    = client._build_request("treść", system="Jesteś parserem.")
+    without_system = client._build_request("treść", system=None)
+
+    assert with_system["system"]   == "Jesteś parserem."
+    assert with_system["messages"] == [{"role": "user", "content": "treść"}]
+    assert "system" not in without_system
+
+
+def test_the_request_sends_temperature_only_where_it_is_accepted():
+    """Haiku 4.5 → `temperature` w żądaniu; nowszy model → pole pominięte, bo API odpowiada na
+    nie błędem 400."""
+    accepting = ClaudeLLMClient(api_key=API_KEY, model=MODEL, temperature=0.0)
+    refusing  = ClaudeLLMClient(api_key=API_KEY, model=MODEL_WITHOUT_TEMPERATURE)
+
+    assert accepting._build_request("treść", None)["temperature"] == 0.0
+    assert "temperature" not in refusing._build_request("treść", None)

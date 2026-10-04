@@ -11,9 +11,10 @@ from openai import (
     AsyncOpenAI,
 )
 
-from app.engine_llm.base import LLMClient, LLMCompletion
+from app.engine_llm.base import LLMClient
 from app.engine_llm.errors import LLMError
-from app.engine_llm.pricing_openai import calculate_cost_usd, price_of
+from app.engine_llm.models.completion import LLMCompletion
+from app.engine_llm.pricing.openai import calculate_cost_usd, price_of
 
 # Ceiling on ONE answer, not a target. Set far above a parsed ticket's size because reasoning models
 # spend part of this budget on tokens the caller never sees: exhausting it mid-JSON wastes the whole

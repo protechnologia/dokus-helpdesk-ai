@@ -1,4 +1,4 @@
-from app.engine_llm.pricing_selfhosted import calculate_cost_usd, price_of
+from app.engine_llm.pricing.selfhosted import calculate_cost_usd, price_of
 
 
 def test_every_model_is_free():

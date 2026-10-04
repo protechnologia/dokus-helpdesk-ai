@@ -22,6 +22,16 @@ BLOCK = Verdict(verdict="block", reasons=["Nie widać, co zrobiono."], hint="Dop
 TICKET = {"ticket_id": "41002", "body": "Nie przychodzą przesyłki z e-Doręczeń."}
 REPLY  = {"ticket_id": "41002", "message": "Proszę podać hasło do skrzynki."}
 
+# Zużycie modelu na atrapie: jedna tura, bez tokenów i kosztu.
+ONE_FAKE_CALL = {
+    "llm_calls":          1,
+    "prompt_tokens":      0,
+    "completion_tokens":  0,
+    "cache_write_tokens": 0,
+    "cache_read_tokens":  0,
+    "cost_usd":           0.0,
+}
+
 
 class GateGraph:
     """Graf bramki z atrap, do których test ma dostęp: anonimizator zapisuje wejście, agent stan."""
@@ -93,6 +103,7 @@ def test_the_verdict_goes_out_with_the_override_and_the_rules_version(
         "hint":          "Dopisz, co zmieniono.",
         "overridable":   True,
         "rules_version": get_rule_set(graph_name).version,
+        "usage":         ONE_FAKE_CALL,
     }
 
 

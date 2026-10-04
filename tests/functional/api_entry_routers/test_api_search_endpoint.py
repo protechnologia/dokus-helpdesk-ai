@@ -10,6 +10,7 @@ from app.agent_graphs.fake import (
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
 from app.engine_anonymization import FakeAnonymizer
+from app.engine_llm import LLMUsage
 from app.main import create_app
 
 # Kontrakt HTTP `POST /search` w procesie: kształt odpowiedzi (źródła + zapytania agenta),
@@ -30,6 +31,42 @@ def test_sources_and_agent_queries_go_out() -> None:
         {"tool": "find_tickets_vector", "arguments": FAKE_SEARCH_ARGUMENTS},
         {"tool": "read_tickets_card",   "arguments": FAKE_READ_ARGUMENTS},
     ]
+
+
+def test_the_response_carries_the_model_usage_of_the_run() -> None:
+    """Odpowiedź → zużycie modelu z całego przebiegu: trzy wywołania (szukaj, czytaj, odpowiedz),
+    a na atrapach zero tokenów i zerowy koszt. Wołający widzi koszt sprawy bez sięgania do logów."""
+    response = TestClient(create_app()).post("/search", json=TICKET)
+
+    assert response.json()["usage"] == {
+        "llm_calls":          3,
+        "prompt_tokens":      0,
+        "completion_tokens":  0,
+        "cache_write_tokens": 0,
+        "cache_read_tokens":  0,
+        "cost_usd":           0.0,
+    }
+
+
+def test_the_cost_of_the_run_goes_out_rounded() -> None:
+    """Trzy tury po 0,002 USD → koszt 0,006 w odpowiedzi, bez szumu sumowania ułamków."""
+    agent, run_tools = fake_search_nodes(search.RESPOND_TOOL_NAME, search.SearchDone())
+    agent._usage     = LLMUsage(calls=1, prompt_tokens=100, completion_tokens=10, cost_usd=0.002)
+    graph            = search.build_graph(
+        AnonymizeNode(FakeAnonymizer()),
+        agent,
+        run_tools,
+        FakeRespondNode(search.SearchDone()),
+    )
+
+    app = create_app()
+    app.dependency_overrides[get_graph_builder] = lambda: (lambda module: graph)
+
+    usage = TestClient(app).post("/search", json=TICKET).json()["usage"]
+
+    assert usage["llm_calls"]     == 3
+    assert usage["prompt_tokens"] == 300
+    assert usage["cost_usd"]      == 0.006
 
 
 def test_a_source_carries_no_score() -> None:

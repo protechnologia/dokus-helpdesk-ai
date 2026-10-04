@@ -1,7 +1,7 @@
 import pytest
 
 from app.engine_llm.errors import LLMConfigError
-from app.engine_llm.pricing_openai import PRICES, calculate_cost_usd, price_of
+from app.engine_llm.pricing.openai import PRICES, calculate_cost_usd, price_of
 
 
 def test_prices_a_known_model():
@@ -50,6 +50,26 @@ def test_cached_tokens_are_discounted_not_added():
     )
 
     assert cost == pytest.approx(0.75 * 0.10)
+
+
+def test_cache_read_rate_follows_the_model():
+    """Odczyt z cache → mnożnik z wiersza modelu: 0,25 stawki wejścia dla o4-mini i gpt-4.1,
+    0,05 dla gpt-6.1-sol, 0,10 dla pozostałych."""
+    def cached_million(model: str) -> float:
+        return calculate_cost_usd(model, 1_000_000, 0, cache_read_tokens=1_000_000)
+
+    assert cached_million("o4-mini")     == pytest.approx(1.10 * 0.25)
+    assert cached_million("gpt-4.1")     == pytest.approx(2.00 * 0.25)
+    assert cached_million("gpt-6.1-sol") == pytest.approx(2.00 * 0.05)
+    assert cached_million("gpt-5.4")     == pytest.approx(2.50 * 0.10)
+
+
+def test_the_strongest_model_is_priced():
+    """Najmocniejszy model z cennika → 10 USD za milion wejścia i 50 za milion wyjścia."""
+    price = price_of("gpt-6-astra")
+
+    assert price.input_per_million  == 10.00
+    assert price.output_per_million == 50.00
 
 
 def test_cache_larger_than_prompt_does_not_go_negative():

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from app.agent_graphs import run_graph, search
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
 from app.engine_llm import ChatMessage
-from app.entry_routers.mapping import to_raw_ticket, to_source_items
+from app.entry_routers.mapping import to_raw_ticket, to_source_items, to_usage_item
 from app.entry_routers.models import TicketRequest
 from app.entry_routers.search.models import AgentQuery, SearchResponse
 
@@ -61,6 +61,7 @@ async def search_tickets(
     response = SearchResponse(
         sources = to_source_items(final.sources),
         queries = _agent_queries(final.messages),
+        usage   = to_usage_item(final.usage),
     )
 
     # Same identyfikatory i liczby — źródła niosą dane klientów (CLAUDE.md -> „Logi").

@@ -14,15 +14,18 @@ TICKET = {"ticket_id": "41002", "body": "Od wczoraj nie przychodzą przesyłki z
 
 
 def test_the_card_goes_out_field_by_field() -> None:
-    """Atrapa grafu → karta z polami korpusu; wersja słownika rozstrzygnięć zostaje w domenie."""
+    """Atrapa grafu → karta z polami korpusu i zużyciem modelu; wersja słownika rozstrzygnięć
+    zostaje w domenie."""
     response = TestClient(create_app()).post("/parse-ticket", json=TICKET)
     expected = parse_ticket.default_ticket().model_dump(
         mode    = "json",
         exclude = {"resolution_vocabulary_version"},
     )
+    body = response.json()
 
     assert response.status_code == 200
-    assert response.json() == expected
+    assert body.pop("usage")["llm_calls"] == 1
+    assert body == expected
 
 
 def test_a_ticket_without_body_is_refused() -> None:

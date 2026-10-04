@@ -2,9 +2,9 @@ import pytest
 
 from app.config import Settings
 from app.engine_llm import FakeLLMClient, LLMConfigError, LLMError, get_llm_client
-from app.engine_llm.client_claude import ClaudeLLMClient
-from app.engine_llm.client_ollama import OllamaLLMClient
-from app.engine_llm.client_openai import OpenAILLMClient
+from app.engine_llm.client.claude import ClaudeLLMClient
+from app.engine_llm.client.ollama import OllamaLLMClient
+from app.engine_llm.client.openai import OpenAILLMClient
 
 
 def _settings(provider: str, **overrides) -> Settings:   # e.g. "fake"

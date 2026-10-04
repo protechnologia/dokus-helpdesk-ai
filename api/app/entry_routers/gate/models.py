@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.entry_routers.models import UsageItem
+
 
 class VerdictResponse(BaseModel):
     """
@@ -20,6 +22,7 @@ class VerdictResponse(BaseModel):
     hint:          str                      = Field(default="", examples=["Dopisz, co zmieniono."])
     overridable:   bool                     = Field(default=True, examples=[True])
     rules_version: int                      = Field(examples=[1])
+    usage:         UsageItem
 
 
 class GateReplyRequest(BaseModel):
