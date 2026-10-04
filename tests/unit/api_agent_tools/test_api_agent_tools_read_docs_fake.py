@@ -1,3 +1,4 @@
+import json
 from datetime import date
 
 import pytest
@@ -13,8 +14,8 @@ async def test_sections_come_back_in_the_order_asked() -> None:
 
     result = await tool.search(QUERY)
 
-    assert [item.section.section_id for item in result.items] == QUERY.section_ids
-    assert "nieodwracalne doręczenie" in result.items[0].text
+    assert [item.section.section_id for item in result.sections] == QUERY.section_ids
+    assert "nieodwracalne doręczenie" in result.sections[0].text
 
 
 async def test_an_unknown_id_fails_the_whole_read() -> None:
@@ -40,30 +41,33 @@ async def test_every_query_is_recorded() -> None:
 
 
 async def test_the_model_sees_the_content_with_its_release() -> None:
-    """Tekst dla modelu → przy każdej sekcji identyfikator, dokument z wersją, data wydania
-    i treść: instrukcja do nieznanego wydania jest nie do odróżnienia od nieaktualnej."""
+    """Tekst dla modelu → JSON: przy każdej sekcji identyfikator, dokument z wersją, data wydania
+    i treść — instrukcja do nieznanego wydania jest nie do odróżnienia od nieaktualnej."""
     tool = FakeReadDocsTool()
+    body = json.loads(tool.render_for_model(await tool.search(QUERY)))
 
-    text = tool.render_for_model(await tool.search(QUERY))
+    first = body["sections"][0]
 
-    assert text.startswith("Odczytane sekcje dokumentacji: 2")
-    assert "[usr-wysylka-status-w-toku] Instrukcja użytkownika 4.12" in text
-    assert text.count("wydanie z 2026-05-04") == 2
-    assert "ponowna wysyłka utworzy drugie, nieodwracalne doręczenie" in text
+    assert first["section"]["section_id"] == "usr-wysylka-status-w-toku"
+    assert first["section"]["document"]   == "Instrukcja użytkownika"
+    assert first["section"]["version"]    == "4.12"
+    assert [item["section"]["date"] for item in body["sections"]] == ["2026-05-04", "2026-05-04"]
+    assert "ponowna wysyłka utworzy drugie, nieodwracalne doręczenie" in first["text"]
 
 
 async def test_cite_gives_one_source_per_section_read() -> None:
-    """Każda odczytana sekcja → jeden SourceRef z materiału „docs", z dokumentem i tytułem sekcji,
-    bez podobieństwa; jego id widać w tekście dla modelu."""
+    """Każda odczytana sekcja → jeden SourceRef z materiału „docs", z dokumentem i tytułem sekcji;
+    cytowane są dokładnie te sekcje, które model dostał w tekście."""
     tool   = FakeReadDocsTool()
     result = await tool.search(QUERY)
 
     refs = tool.cite(result)
-    text = tool.render_for_model(result)
+    body = json.loads(tool.render_for_model(result))
 
     assert [ref.item_id for ref in refs] == QUERY.section_ids
     assert all(ref.source == "docs" for ref in refs)
-    assert all(ref.score is None for ref in refs)
     assert refs[0].title == "Instrukcja użytkownika 4.12 — Status „W toku” przy wysyłce ePUAP"
     assert refs[0].date  == date(2026, 5, 4)
-    assert all(f"[{ref.item_id}]" in text for ref in refs)
+    assert [ref.item_id for ref in refs] == [
+        item["section"]["section_id"] for item in body["sections"]
+    ]

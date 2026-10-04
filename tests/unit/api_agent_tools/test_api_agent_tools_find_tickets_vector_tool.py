@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 
@@ -127,7 +129,7 @@ async def test_the_query_is_embedded_in_query_mode_from_problem_and_symptoms() -
     dla rekordu o tych polach składa indeksacja, inaczej wektory nie byłyby porównywalne."""
     seen: list = []
 
-    await _tool([], embedder_seen=seen).search(QUERY)
+    await _tool([], embedder_seen=seen).find(QUERY)
 
     indexed = ParsedTicket(**{**_payload("90001"), **QUERY.model_dump()})
 
@@ -140,7 +142,7 @@ async def test_the_search_goes_to_the_problem_vectors_with_top_k() -> None:
     wolno porównywać wyłącznie z wektorami `problem`, a liczby trafień nie ustala agent."""
     seen: list = []
 
-    await _tool([], top_k=7, qdrant_seen=seen).search(QUERY)
+    await _tool([], top_k=7, qdrant_seen=seen).find(QUERY)
 
     assert seen[0]["body"]["query"] == QUERY_VECTOR
     assert seen[0]["body"]["using"] == VECTOR_PROBLEM
@@ -158,58 +160,68 @@ async def test_hits_below_the_threshold_are_dropped_and_counted() -> None:
         _hit("90006", 0.33),
     ]
 
-    result = await _tool(hits, score_min=0.48).search(QUERY)
+    result = await _tool(hits, score_min=0.48).find(QUERY)
 
-    assert [found.ticket.ticket_id for found in result.items] == ["90001", "90003"]
-    assert [found.score for found in result.items] == [0.71, 0.52]
+    assert [found.ticket_id for found in result.tickets] == ["90001", "90003"]
+    assert [found.score for found in result.tickets]     == [0.71, 0.52]
     assert result.dropped_below_threshold == 3
 
 
-async def test_a_hit_comes_back_as_the_ticket_that_was_indexed() -> None:
-    """Payload trafienia → `ParsedTicket` ze wszystkimi polami: model ma dostać `cause`
-    i `solution` jako pola, a `cite()` id i datę samego zgłoszenia."""
-    tool   = _tool([_hit("90001", 0.71)])
-    result = await tool.search(QUERY)
+async def test_a_hit_comes_back_as_its_number_and_a_rounded_score() -> None:
+    """Trafienie → numer zgłoszenia z payloadu i podobieństwo zaokrąglone do trzech miejsc: dalsze
+    cyfry to szum, a treść karty model ma odczytać osobnym narzędziem."""
+    tool = _tool([_hit("90001", 0.71234567)])
 
-    assert result.items[0].ticket == ParsedTicket(**_payload("90001"))
-    assert [ref.item_id for ref in tool.cite(result)] == ["90001"]
-    assert "[90001] 2026-02-10 · podobieństwo 0.71" in tool.render_for_model(result)
+    result = await tool.find(QUERY)
+    text   = await tool.run(QUERY)
+
+    assert result.tickets[0].model_dump() == {"ticket_id": "90001", "score": 0.712}
+    assert json.loads(text) == {
+        "tickets":                 [{"ticket_id": "90001", "score": 0.712}],
+        "dropped_below_threshold": 0,
+    }
+    assert "kolejkę" not in text
 
 
 async def test_no_hits_is_an_empty_result_not_an_error() -> None:
     """Qdrant nic nie zwrócił → pusty wynik bez odciętych: „nowy typ problemu" to poprawna
     odpowiedź dla blisko połowy korpusu."""
-    result = await _tool([]).search(QUERY)
+    result = await _tool([]).find(QUERY)
 
-    assert result.items == []
+    assert result.tickets == []
     assert result.dropped_below_threshold == 0
 
 
-async def test_a_payload_outside_the_contract_is_a_config_error_without_content() -> None:
-    """Payload bez wymaganego pola → `DbQdrantConfigError` z id zgłoszenia i nazwą pola, ale bez
-    treści: indeks z innej wersji kontraktu naprawia przebudowa, a treść zgłoszenia nie trafia
-    do logów."""
+async def test_a_hit_without_a_ticket_number_is_a_config_error_without_content() -> None:
+    """Payload bez numeru zgłoszenia → `DbQdrantConfigError` z identyfikatorem punktu, ale bez
+    treści: indeks zbudowany inaczej naprawia przebudowa, a treść zgłoszenia nie trafia do logów."""
     broken = _payload("90001")
-    del broken["solution"]
+    del broken["ticket_id"]
 
     with pytest.raises(DbQdrantConfigError) as raised:
-        await _tool([_hit("90001", 0.71, payload=broken)]).search(QUERY)
+        await _tool([_hit("90001", 0.71, payload=broken)]).find(QUERY)
 
     message = str(raised.value)
 
-    assert "'90001'" in message
-    assert "solution" in message
+    assert "p-90001" in message
     assert "rag reindex" in message
     assert broken["problem"] not in message
-    assert raised.value.__cause__ is None
 
 
-async def test_a_dropped_hit_is_never_validated() -> None:
-    """Zepsuty payload poniżej progu → brak błędu: odcięte trafienie nie trafia do wyniku, więc
-    nie ma czego walidować."""
-    result = await _tool([_hit("90001", 0.20, payload={"ticket_id": "90001"})]).search(QUERY)
+async def test_the_search_does_not_check_the_rest_of_the_payload() -> None:
+    """Payload z samym numerem zgłoszenia → poprawne trafienie: wyszukiwanie oddaje numery,
+    a kontrakt karty sprawdza dopiero odczyt (`read_tickets_card`)."""
+    result = await _tool([_hit("90001", 0.71, payload={"ticket_id": "90001"})]).find(QUERY)
 
-    assert result.items == []
+    assert [found.ticket_id for found in result.tickets] == ["90001"]
+
+
+async def test_a_dropped_hit_is_never_looked_at() -> None:
+    """Trafienie bez numeru poniżej progu → brak błędu: odcięte trafienie nie trafia do wyniku,
+    więc nie ma czego sprawdzać."""
+    result = await _tool([_hit("90001", 0.20, payload={})]).find(QUERY)
+
+    assert result.tickets == []
     assert result.dropped_below_threshold == 1
 
 

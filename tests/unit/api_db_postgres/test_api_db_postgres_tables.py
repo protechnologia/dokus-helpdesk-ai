@@ -3,7 +3,7 @@ from datetime import date
 import pytest
 
 from app.agent_tools.docs.fake_docs import default_sections
-from app.agent_tools.tickets.find_tickets_text.fake import SIGNING_THREAD
+from app.agent_tools.tickets.fake_tickets import SIGNING_THREAD
 from app.db_postgres import DbPostgresConfigError, DocRow, DocsTable, TicketRow, TicketsTable
 
 # Tabele testowane bez bazy, na kliencie-atrapie zapisującym SQL i wartości: sprawdzamy, CO idzie

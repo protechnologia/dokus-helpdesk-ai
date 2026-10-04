@@ -7,7 +7,7 @@ from app.agent_graphs import GraphState, merge_sources
 from app.agent_nodes import Node
 from app.agent_nodes.agent import FakeAgentNode, tool_call_turn
 from app.agent_nodes.respond import FakeRespondNode
-from app.agent_nodes.run_tools import FakeRunToolsNode
+from app.agent_nodes.run_tools import FakeRunToolsNode, FakeToolAnswer
 from app.agent_tools import SourceRef
 from app.engine_llm import ChatMessage, LLMError
 
@@ -58,16 +58,38 @@ async def test_the_agent_plays_its_turns_in_order() -> None:
 async def test_run_tools_answers_every_call_by_its_id() -> None:
     """Tura z wywołaniem narzędzia → jedna wiadomość `tool` z tym samym `call_id` i źródła, jeśli
     je podano."""
-    ref   = SourceRef(source="tickets", item_id="90001", title="Brak przesyłek", score=0.91)
+    ref   = SourceRef(source="tickets", item_id="90001", title="Brak przesyłek")
     state = State(input_text="x", messages=[SEARCH])
 
-    node  = FakeRunToolsNode(result_text="Znalezione zgłoszenia: 1", sources=[ref])
+    node  = FakeRunToolsNode(result_text='{"cards": []}', sources=[ref])
 
     update = await node.run(state)
 
     assert [message.call_id for message in update["messages"]] == ["call_1"]
-    assert update["messages"][0].content == "Znalezione zgłoszenia: 1"
+    assert update["messages"][0].content == '{"cards": []}'
     assert update["sources"]             == [ref]
+
+
+async def test_run_tools_answers_each_tool_with_its_own_answer() -> None:
+    """Odpowiedzi na konkretne narzędzia → wyszukiwanie dostaje sam tekst, odczyt tekst i źródła:
+    tak atrapa odtwarza przebieg, w którym źródła dokłada dopiero odczyt."""
+    ref  = SourceRef(source="tickets", item_id="90001", title="Brak przesyłek")
+    read = tool_call_turn("read_tickets_card", {"ticket_ids": ["90001"]}, call_id="call_2")
+    node = FakeRunToolsNode(
+        answers = {
+            "find_tickets_vector": FakeToolAnswer(text='{"tickets": []}'),
+            "read_tickets_card":   FakeToolAnswer(text='{"cards": []}', sources=[ref]),
+        },
+    )
+
+    searched = await node.run(State(input_text="x", messages=[SEARCH]))
+    answered = await node.run(State(input_text="x", messages=[SEARCH, read]))
+
+    assert searched["messages"][0].content == '{"tickets": []}'
+    assert "sources" not in searched
+    assert answered["messages"][0].content == '{"cards": []}'
+    assert answered["sources"]             == [ref]
+    assert answered["log"][0].message      == "wywołania: read_tickets_card; źródła: 1"
 
 
 async def test_run_tools_without_sources_leaves_the_field_alone() -> None:

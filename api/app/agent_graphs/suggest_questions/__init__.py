@@ -4,8 +4,8 @@ Graf `suggest_questions` — wariant generacji „Jakie pytania zadać": lista p
 oparta na podobnych sprawach, które agent sam znajduje. Wynik to `Proposal`; źródła z `cite()`
 leżą w `sources`.
 
-Przebieg: anonymize → pętla agent ⇄ run_tools → respond. Narzędzia: `find_tickets_vector`,
-`find_docs_vector` (opisy dla modelu obok, jako `.md`); koniec wywołaniem
+Przebieg: anonymize → pętla agent ⇄ run_tools → respond. Narzędzia: wyszukiwania i spis oddają
+identyfikatory, odczyty treść (opisy dla modelu w katalogach narzędzi); koniec wywołaniem
 `respond_suggest_questions`. Działa przy pustym indeksie (`REQUIRES_HITS = False`).
 
 Status: na atrapach węzłów (`fake.py`); prompt przeniesiony z dawnego

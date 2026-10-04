@@ -4,8 +4,8 @@ Graf `suggest_solution` — wariant generacji „Gotowa odpowiedź": rozwiązani
 wyłącznie z podobnych spraw, które agent sam znajduje. Wynik to `Proposal`; źródła z `cite()`
 leżą w `sources`.
 
-Przebieg: anonymize → pętla agent ⇄ run_tools → respond. Narzędzia: `find_tickets_vector`,
-`find_docs_vector` (opisy dla modelu obok, jako `.md`); koniec wywołaniem
+Przebieg: anonymize → pętla agent ⇄ run_tools → respond. Narzędzia: wyszukiwania i spis oddają
+identyfikatory, odczyty treść (opisy dla modelu w katalogach narzędzi); koniec wywołaniem
 `respond_suggest_solution`. Bez trafień nie ma propozycji (`REQUIRES_HITS = True`, egzekwuje
 `respond` — p. 11).
 

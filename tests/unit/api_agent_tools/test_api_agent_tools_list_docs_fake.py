@@ -1,25 +1,24 @@
+import json
+
 from app.agent_tools.docs.fake_docs import default_sections
 from app.agent_tools.docs.list_docs import FakeListDocsTool, ListDocsArgs
 
 
-async def test_the_listing_has_a_row_for_every_section() -> None:
-    """Spis treści → wiersz na każdą sekcję, w kolejności dokumentów, z identyfikatorem do odczytu
-    i z liczbą sekcji i dokumentów w nagłówku."""
+async def test_the_listing_describes_every_section() -> None:
+    """Spis treści → JSON z opisem każdej sekcji, w kolejności dokumentów, z identyfikatorem do
+    odczytu w tym samym polu co w wyszukiwaniach."""
     tool = FakeListDocsTool()
+    body = json.loads(await tool.run(ListDocsArgs()))
 
-    text = await tool.run(ListDocsArgs())
-    rows = text.split("\n\n", 1)[1].splitlines()
-
-    assert text.startswith("Dokumentacja: sekcji 4, dokumentów 2")
-    assert [row.split("]")[0].lstrip("[") for row in rows] == [
+    assert [section["section_id"] for section in body["sections"]] == [
         section.section_id for section in default_sections()
     ]
+    assert body["sections"][0]["chapter_path"] == ["Uprawnienia", "Kancelaria"]
 
 
 async def test_the_listing_carries_no_content() -> None:
     """Spis treści → opisy sekcji, ale nie ich treść: spis mówi, gdzie co jest, nie co tam stoi."""
     tool = FakeListDocsTool()
-
     text = await tool.run(ListDocsArgs())
 
     assert "Kto i gdzie nadaje uprawnienie"  in text
@@ -36,11 +35,11 @@ async def test_every_call_is_counted() -> None:
     assert tool.calls == 2
 
 
-async def test_an_empty_documentation_is_just_the_header() -> None:
-    """Pusta dokumentacja → sam nagłówek z zerami, bez pustej listy wierszy."""
-    text = await FakeListDocsTool(sections=[]).run(ListDocsArgs())
+async def test_an_empty_documentation_is_an_empty_list() -> None:
+    """Pusta dokumentacja → pusta lista sekcji, a nie błąd."""
+    body = json.loads(await FakeListDocsTool(sections=[]).run(ListDocsArgs()))
 
-    assert text == "Dokumentacja: sekcji 0, dokumentów 0"
+    assert body == {"sections": []}
 
 
 def test_the_listing_cannot_be_cited() -> None:

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.agent_tools.tickets.find_tickets_text import FindTicketsTextQuery
+from app.agent_tools.tickets.find_tickets_text import FindTicketsTextQuery, MatchedTicket
 
 
 def test_a_query_with_nothing_to_search_is_refused() -> None:
@@ -32,3 +32,17 @@ def test_an_unknown_argument_is_refused() -> None:
     """Argument spoza schematu → ValidationError: o limicie trafień decyduje konfiguracja."""
     with pytest.raises(ValidationError):
         FindTicketsTextQuery(words="załącznik", limit=20)
+
+
+def test_a_matched_ticket_carries_no_content() -> None:
+    """Znalezione zgłoszenie → numer i sposób dopasowania, bez pola na wątek ani fragment: treść
+    daje wyłącznie odczyt, bo tylko on trafia na listę źródeł."""
+    with pytest.raises(ValidationError):
+        MatchedTicket(ticket_id="90011", matched_by="exact", thread="ZGŁOSZENIE 90011…")
+
+
+def test_a_match_kind_outside_the_query_fields_is_refused() -> None:
+    """Sposób dopasowania spoza `exact` i `words` → ValidationError: etykieta ma nosić nazwę
+    pola, którym agent pytał."""
+    with pytest.raises(ValidationError):
+        MatchedTicket(ticket_id="90011", matched_by="phrase")

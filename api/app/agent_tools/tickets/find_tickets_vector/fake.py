@@ -1,5 +1,4 @@
 from collections.abc import Sequence
-from datetime import date
 
 from app.agent_tools.tickets.find_tickets_vector.base import FindTicketsVectorToolBase
 from app.agent_tools.tickets.find_tickets_vector.models import (
@@ -7,76 +6,42 @@ from app.agent_tools.tickets.find_tickets_vector.models import (
     FindTicketsVectorResult,
     FoundTicket,
 )
-from app.core_model.ticket_parsed import ParsedTicket
 
 
-def default_tickets() -> list[FoundTicket]:
+def default_found() -> list[FoundTicket]:
     """
     Description:
-    Wbudowany zestaw atrapy: trzy zmyślone zgłoszenia o tym samym objawie („nie przychodzą
-    przesyłki z e-Doręczeń") i trzech różnych przyczynach — najczęstszy kształt trafień w tym
-    korpusie, na którym agent ma się nauczyć dopytywać zamiast zgadywać. Bez danych osobowych:
-    treść jest wymyślona, nie skopiowana z korpusu.
+    Wbudowany wynik atrapy: trzy zgłoszenia o tym samym objawie i trzech różnych przyczynach
+    (`agent_tools/tickets/fake_tickets.py`), z podobieństwami tak bliskimi, że nie da się po nich
+    wybrać jednego — agent ma przeczytać wszystkie karty.
 
     Example args:
         (brak)
 
     Example result:
-        [FoundTicket(score=0.91, ticket=ParsedTicket(ticket_id="90001", …)), …]
+        [FoundTicket(ticket_id="90001", score=0.91), FoundTicket(ticket_id="90002", …), …]
     """
-    common = {
-        "component":                     "e-Doręczenia",
-        "problem":                       "Nie przychodzą przesyłki z e-Doręczeń",
-        "symptoms":                      "Brak nowych przesyłek, choć nadawcy potwierdzają wysyłkę",
-        "error_codes":                   [],
-        "resolution_vocabulary_version": 1,
-    }
-
-    tickets = [
-        FoundTicket(score=0.91, ticket=ParsedTicket(
-            **common,
-            ticket_id         = "90001",
-            date              = date(2026, 2, 10),
-            cause             = "Zacięta kolejka pobierania po przerwanym połączeniu",
-            solution          = "Zrestartowano kolejkę; zaległe przesyłki pobrały się same.",
-            resolution        = "naprawione",
-            questions_summary = "pytano, od kiedy brak przesyłek i czy dotyczy wszystkich skrzynek",
-        )),
-        FoundTicket(score=0.89, ticket=ParsedTicket(
-            **common,
-            ticket_id         = "90002",
-            date              = date(2026, 4, 22),
-            cause             = "Plik blokady pozostawiony po aktualizacji blokował pobieranie",
-            solution          = "Usunięto plik blokady; po aktualizacji sprawdzić, czy nie wraca.",
-            resolution        = "naprawione",
-            questions_summary = "pytano, czy problem zaczął się po aktualizacji",
-        )),
-        FoundTicket(score=0.86, ticket=ParsedTicket(
-            **common,
-            ticket_id         = "90003",
-            date              = date(2026, 6, 3),
-            cause             = "Załącznik ponad limit operatora zatrzymał pobieranie skrzynki",
-            solution          = "Przesyłkę z dużym załącznikiem odebrano ręcznie u operatora.",
-            resolution        = "bez_zmian_w_systemie",
-            questions_summary = "pytano o rozmiar załączników w ostatnich przesyłkach",
-        )),
+    found = [
+        FoundTicket(ticket_id="90001", score=0.91),
+        FoundTicket(ticket_id="90002", score=0.89),
+        FoundTicket(ticket_id="90003", score=0.86),
     ]
 
-    return tickets
+    return found
 
 
 class FakeFindTicketsVectorTool(FindTicketsVectorToolBase):
     """
     Description:
-    Atrapa `find_tickets_vector`: zamiast embeddera i Qdranta zwraca ustalony zestaw zgłoszeń,
-    zawsze ten sam, ze stałymi id. Służy grafom na atrapach i testom, którym wystarczy wiedzieć, CO
-    agent dostał, a nie jak zostało znalezione.
+    Atrapa `find_tickets_vector`: zamiast embeddera i Qdranta zwraca ustalone numery zgłoszeń,
+    zawsze te same. Służy grafom na atrapach i testom, którym wystarczy wiedzieć, CO agent dostał,
+    a nie jak zostało znalezione.
 
     Flow:
-        1. Test (albo fabryka przy atrapach) tworzy ją z własnymi zgłoszeniami albo z zestawem
+        1. Test (albo fabryka przy atrapach) tworzy ją z własnymi numerami albo z zestawem
            wbudowanym; `dropped_below_threshold` pozwala odtworzyć wynik „próg wszystko wyciął".
-        2. Każde `search()` zapisuje zapytanie w `queries` i zwraca ten sam wynik.
-        3. `render_for_model()` i `cite()` pochodzą z klasy wspólnej z prawdziwym narzędziem.
+        2. Każde `find()` zapisuje zapytanie w `queries` i zwraca ten sam wynik.
+        3. `run()` pochodzi z klasy wspólnej z prawdziwym narzędziem.
     """
 
     def __init__(
@@ -93,17 +58,17 @@ class FakeFindTicketsVectorTool(FindTicketsVectorToolBase):
             dropped_below_threshold=0
 
         Example result:
-            FakeFindTicketsVectorTool zwracająca wbudowane trzy zgłoszenia przy każdym wyszukaniu
+            FakeFindTicketsVectorTool zwracająca wbudowane trzy numery przy każdym wyszukaniu
         """
         self._result = FindTicketsVectorResult(
-            items                   = list(tickets) if tickets is not None else default_tickets(),
+            tickets                 = list(tickets) if tickets is not None else default_found(),
             dropped_below_threshold = dropped_below_threshold,
         )
 
         # Publiczne celowo: testy sprawdzają, o co pytał agent.
         self.queries: list[FindTicketsVectorQuery] = []
 
-    async def search(
+    async def find(
         self,
         query: FindTicketsVectorQuery,  # np. FindTicketsVectorQuery(problem="Brak przesyłek", …)
     ) -> FindTicketsVectorResult:
@@ -116,7 +81,7 @@ class FakeFindTicketsVectorTool(FindTicketsVectorToolBase):
                                          symptoms="pusta skrzynka")
 
         Example result:
-            FindTicketsVectorResult(items=[FoundTicket(score=0.91, …), …],
+            FindTicketsVectorResult(tickets=[FoundTicket(ticket_id="90001", score=0.91), …],
                                     dropped_below_threshold=0)
         """
         self.queries.append(query)

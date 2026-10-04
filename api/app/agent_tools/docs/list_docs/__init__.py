@@ -1,7 +1,7 @@
 """
 Description:
-Narzędzie pomocnicze: spis treści dokumentacji produktu — po wierszu na sekcję, z identyfikatorem,
-dokumentem i wydaniem, rozdziałem i krótkim opisem. Agent wybiera z niego sekcje do odczytu
+Narzędzie pomocnicze: spis treści dokumentacji produktu — opis każdej sekcji: identyfikator,
+dokument i wydanie, rozdział, tytuł i krótki opis. Agent wybiera z niego sekcje do odczytu
 (`read_docs`) tak, jak człowiek zaczyna od spisu treści instrukcji.
 
 | plik             | co zawiera                                                 |

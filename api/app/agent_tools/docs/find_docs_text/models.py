@@ -1,14 +1,7 @@
-from typing import Annotated, Literal
-
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.agent_tools.models import ExactText, MatchKind
 from app.core_model.doc_section import DocSection
-
-# Dosłowny ciąg ma co najmniej trzy znaki — krótszy trafia w przypadkowe miejsca.
-ExactText = Annotated[str, Field(min_length=3)]
-
-# Czym sekcję znaleziono.
-MatchKind = Literal["exact", "words"]
 
 
 class FindDocsTextQuery(BaseModel):
@@ -52,17 +45,17 @@ class FindDocsTextQuery(BaseModel):
 class MatchedSection(BaseModel):
     """
     Description:
-    Jedna sekcja dokumentacji zwrócona przez `find_docs_text`: czym ją znaleziono, zdanie,
-    w którym padło dopasowanie, i opis sekcji z metryczki.
+    Jedna sekcja dokumentacji zwrócona przez `find_docs_text`: czym ją znaleziono i jej opis
+    z metryczki.
 
-    Fragment (`snippet`) pozwala agentowi zdecydować o odczycie bez czytania całej sekcji. Nie
-    zastępuje odczytu: źródłem odpowiedzi jest dopiero sekcja z `read_docs`.
+    Dopasowanego fragmentu treści celowo tu nie ma. Treść daje wyłącznie odczyt (`read_docs`),
+    bo tylko on trafia na listę źródeł — fragment w wyniku wyszukiwania mógłby modelowi wystarczyć
+    zamiast odczytu, a wtedy odpowiedź niosłaby treść bez źródła.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     matched_by: MatchKind = Field(examples=["exact"])
-    snippet:    str       = Field(min_length=1, examples=["…w Ustawienia → Uprawnienia…"])
     section:    DocSection
 
 
@@ -75,5 +68,5 @@ class FindDocsTextResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    items:              list[MatchedSection] = Field(default_factory=list)
+    sections:           list[MatchedSection] = Field(default_factory=list)
     omitted_over_limit: int                  = Field(default=0, ge=0, examples=[12])

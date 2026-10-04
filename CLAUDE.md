@@ -677,8 +677,11 @@ nowe zgłoszenie (surowy tekst)
       ├─ [anonimizacja] → AnonymizedText (stały węzeł, nie narzędzie agenta)
       ├─ [pętla agenta] ⇄ narzędzia z listy dozwolonych dla tej funkcji, np.:
       │        find_tickets_vector(problem, symptoms) → [embedder] → top-K z Qdranta → próg score
-      │        find_docs_vector(zagadnienie / słowa kluczowe) → [embedder] → kolekcja dokumentacji
-      └─ [odpowiedź] → propozycja + źródła z `cite()` (payload, nie surowe maile)
+      │                                               → numery zgłoszeń
+      │        read_tickets_card(numery) → karty z Qdranta        (odczyt cytuje)
+      │        find_docs_vector(zagadnienie) → [embedder] → opisy sekcji dokumentacji
+      │        read_docs(identyfikatory) → treść sekcji           (odczyt cytuje)
+      └─ [odpowiedź] → propozycja + źródła z `cite()` odczytów
 ```
 
 **Zapytanie do indeksu pisze agent, w kształcie korpusu (2026-10-02).** Surowy mail (powitanie,
@@ -825,8 +828,9 @@ Wspólne dla wszystkich wariantów:
   (`problem`, `cause`, `solution` + metadane: score, data, `ticket_id`) — **nie** surowe maile.
 - **Placeholdery zamiast danych** (`{IMIĘ}`, `{NR_URZĄDZENIA}`), nawiasy kwadratowe na
   instrukcje dla człowieka (`[dla serwisanta: sprawdź wersję firmware]`).
-- Propozycja **zawsze** wraca z listą źródeł (ID ticketów + score), **liczoną z wywołań narzędzi,
-  nie z deklaracji modelu** — wdrożeniowiec musi móc zweryfikować, skąd to się wzięło. Wariant
+- Propozycja **zawsze** wraca z listą źródeł (numery zgłoszeń i sekcji, które model odczytał,
+  z tytułami), **liczoną z wywołań narzędzi, nie z deklaracji modelu** — wdrożeniowiec musi móc
+  zweryfikować, skąd to się wzięło. Wariant
   nieoparty na trafieniach wraca z **pustą listą źródeł**, i to jest informacja, nie brak danych.
 
 #### Warianty generacji (guziki)
@@ -1126,7 +1130,7 @@ dokus-helpdesk-ai/
 │       ├── engine_llm/           # LLMClient + fabryka + FakeLLMClient + cenniki
 │       ├── engine_embedding/     # EmbeddingClient (HTTP do `embedder`) + prefiksy
 │       ├── engine_anonymization/ # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 19)
-│       ├── db_qdrant/            # Qdrant: client.py, collection/ (plik na kolekcję), point/, hit/
+│       ├── db_qdrant/            # Qdrant: client.py, collection/ point/, hit/
 │       ├── db_postgres/          # Postgres: client.py, table/<tabela>/ (klasa + .sql), row/
 │       │                         # --- agent: katalog na jednostkę, właściwa + fake.py ---
 │       ├── agent_tools/          # narzędzia agenta: base.py, folder na materiał, katalog na narzędzie
@@ -1375,10 +1379,13 @@ Wspólne:
 - **`POST /search` wymaga tylko `ticket_id` i `body`** — reszta opisuje zgłoszenie, ale nie steruje
   wyszukiwaniem, więc jej żądanie podnosiłoby koszt wpięcia bez zysku dla odpowiedzi. Brak daty
   znaczy „dziś": zgłoszenie w toku jest z definicji świeże, a data i tak nie wchodzi do wektora.
-- **Odpowiedź `/search` niesie odczyt zgłoszenia — dziś to zapytania agenta** (`queries`: narzędzie
-  i argumenty, bez wywołania `respond_search`), obok źródeł z `cite()`. Źle odczytany `component`
-  albo zgubiony kod błędu są niewidoczne w samej liście trafień; pełną kartę zgłoszenia daje
-  `/parse-ticket`.
+- **Odpowiedź `/search` niesie wywołania narzędzi agenta** (`queries`: narzędzie i argumenty,
+  wyszukiwania i odczyty, bez `respond_search`), obok źródeł z `cite()`. Źle odczytany
+  `component` albo zgubiony kod błędu są niewidoczne w samej liście źródeł; pełną kartę nowego
+  zgłoszenia daje `/parse-ticket`.
+- **Źródła w odpowiedzi to materiał, który agent ODCZYTAŁ, i nie mają `score` (2026-10-04).**
+  Odczyt po numerze nie zna podobieństwa; widzi je tylko model, w wyniku wyszukiwania. `/search`
+  oddaje więc karty przeczytane przez agenta, a nie wszystko, co wyszukiwanie znalazło.
 - **Wspólne żądanie `TicketRequest` dla `/search`, `/gate/close`, `/parse-ticket` i `/suggest`**;
   trasa robi z niego `RawTicket.as_thread()`, czyli ten sam tekst wątku, który widzi parser
   korpusu. `/gate/reply` i `/polish` biorą samą wiadomość albo notatki.
@@ -1484,7 +1491,11 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   jest regułą, nie wyjątkiem.
 - **`RAG_SCORE_MIN` = 0.48 stoi świadomie po stronie odsiewania śmieci** (pomiar na 171 rekordach,
   raport `data/docs/pomiar-progu-score.md`) — trafienie bez treści wygląda na odpowiedź, a przy
-  47% singletonów „nic nie znalazłem" jest normalną odpowiedzią. Trzy pułapki strojenia:
+  47% singletonów „nic nie znalazłem" jest normalną odpowiedzią. Próg zostaje także teraz, gdy
+  model widzi `score` i czyta karty sam (2026-10-04): to jedyne miejsce, w którym KOD mówi „nic
+  nie znaleziono" — bez niego wyszukiwanie zawsze oddaje komplet numerów, źródła zawsze są,
+  a `requires_hits` nic nie znaczy. Może za to stać niżej, bo ma odcinać tylko oczywiste śmieci
+  (do przeliczenia w p. 33). Trzy pułapki strojenia:
   - **Nie stroi się go liczbą „ile procent zachowanych"** — krótkie teksty mają niski score mimo
     idealnego dopasowania (0,455 przy niemal tym samym zdaniu), więc z pięciu traconych zapytań
     cztery stały na pierwszym miejscu. Zawsze `eval_threshold.py detail` przed zmianą wartości.
@@ -1543,10 +1554,9 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   buduje się go jawnie (`TicketRow.from_thread()`, `DocRow.from_section()` / `to_section()`).
 - **Qdrant trzyma karty zgłoszeń, Postgres oryginały po anonimizacji (2026-10-04).** Tabela
   zgłoszeń ma cztery kolumny: numer, datę, temat i cały wątek jako jeden tekst. Karty w niej nie
-  ma, więc tabela nie zależy od parsowania, a zmiana pól karty jej nie dotyka. Cena: trafienie
-  tekstowe wraca bez karty i model sam wyczytuje przyczynę z wątku. Gdyby pomiar (p. 23, p. 25)
-  pokazał, że to szkodzi, narzędzie dociągnie kartę z Qdranta po numerze zgłoszenia
-  (`TicketsCollection.read_by_id()`), bez zmiany tabeli.
+  ma, więc tabela nie zależy od parsowania, a zmiana pól karty jej nie dotyka. Model nie wie,
+  która baza co trzyma: po numerze zgłoszenia czyta kartę (`read_tickets_card`, Qdrant) albo
+  wątek (`read_tickets_thread`, Postgres), niezależnie od tego, którym wyszukiwaniem je znalazł.
 - **Wątek zostaje jednym tekstem, nie dzieli się na opis i komentarze.** Anonimizator przyjmuje
   i oddaje cały wątek, ten sam, który czyta parser, więc do bazy idzie on bez obróbki. Temat
   wycina się z linii „Temat:" tego tekstu (`RawTicket.subject_of_thread()`), bo temat ze źródła
@@ -1579,67 +1589,79 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   odpowiedzi grafu (`respond_<graf>`) tu nie trafia — nic go nie wykonuje, to kontrakt wyjścia
   grafu. Anonimizator i model też nie: anonimizacja to stały węzeł, którego agent nie może pominąć,
   a model jest wołającym, nie narzędziem. Tabela narzędzi stoi na górze `agent_tools/__init__.py`.
-- **Sześć narzędzi, dwa materiały (2026-10-03).** Zgłoszenia: `find_tickets_vector` (po znaczeniu)
-  i `find_tickets_text` (pola `exact` i `words`) — oba źródła wiedzy, każde oddaje to, co trzyma
-  jego baza: wektorowe karty, tekstowe oryginalne wątki po anonimizacji. Dokumentacja idzie
-  dwustopniowo: `list_docs`, `find_docs_vector` i `find_docs_text` to narzędzia pomocnicze
-  i oddają wiersze spisu treści, a treść daje `read_docs` — jedyne narzędzie dokumentacji, które
-  cytuje. Dzięki temu lista źródeł pokazuje to, co model przeczytał, a nie to, co zobaczył
-  w spisie. Właściwe jest dziś tylko `find_tickets_vector`; reszta to modele i atrapy.
+- **Osiem narzędzi, dwa materiały, oba dwustopniowo (2026-10-04).** Wyszukiwanie oddaje
+  identyfikatory, treść daje odczyt, i tylko odczyt cytuje — lista źródeł pokazuje to, co model
+  przeczytał, a nie to, co znalazł. Zgłoszenia: `find_tickets_vector` (po znaczeniu, numer
+  i `score`) i `find_tickets_text` (pola `exact` i `words`, numer i `matched_by`), a treść przez
+  `read_tickets_card` (karta) i `read_tickets_thread` (oryginalny wątek po anonimizacji).
+  Dokumentacja: `list_docs`, `find_docs_vector` i `find_docs_text` oddają opisy sekcji
+  z metryczki, treść `read_docs`. Model nie wie, która baza co trzyma, i wybiera kartę albo wątek
+  niezależnie od tego, jak zgłoszenie znalazł. Właściwe są dziś `find_tickets_vector`
+  i `read_tickets_card`; reszta to modele i atrapy. Cena: jedna tura modelu więcej na każde
+  wyszukanie.
+- **Wyszukiwanie zgłoszeń oddaje sam numer, bez `problem` karty.** Sprawy o tym samym objawie
+  mają różne przyczyny; wiersz z samym objawem zachęcałby do przeczytania jednej karty, a przy
+  gołych numerach model nie ma po czym wybierać i czyta wszystkie. `score` widzi tylko model
+  i służy do decyzji, czy szukać dalej — nie jest miarą trafności rozwiązania.
+- **Wynik wyszukiwania nie niesie żadnej treści, także dopasowanego fragmentu.** Fragment mógłby
+  modelowi wystarczyć zamiast odczytu, a wtedy odpowiedź niosłaby treść bez źródła. Opis sekcji
+  z metryczki zostaje: mówi, o czym sekcja jest, nie co w niej stoi.
+- **Wynik każdego narzędzia trafia do modelu jako JSON (`result_as_json()` w `base.py`)** — model
+  wyniku zapisany wprost, z polami pod nazwami ze schematu. Identyfikatory wracają w kształcie,
+  w jakim model poda je następnemu narzędziu, a treść pisana przez klienta siedzi w polu
+  tekstowym i nie może udawać końca wyniku. Czy długi tekst w JSON-ie czyta się modelowi gorzej
+  niż goły, pokażą pomiary grafów (p. 23–26).
+- **Brak karty nie jest błędem, brak wątku albo sekcji jest.** Wątek ma każde zgłoszenie, kartę
+  tylko to, które przeszło parsowanie i filtr jakości, więc `read_tickets_card` oddaje numery bez
+  karty w `without_card`. Nieznany numer w `read_tickets_thread` i nieznany identyfikator
+  w `read_docs` to błąd wracający do modelu, bez wyniku częściowego.
 - **Narzędzia leżą w folderze swojego materiału: `agent_tools/tickets/` i `agent_tools/docs/`
   (2026-10-03)**, nazwanym jak `SourceRef.source`; katalog narzędzia zachowuje pełną nazwę
-  narzędzia. `base.py` materiału trzyma tekst wspólny dla jego narzędzi: rekord zgłoszenia (ten sam
-  w obu wyszukiwaniach) oraz wiersz i nagłówek sekcji (spis, oba wyszukiwania, odczyt). Atrapy
-  narzędzi dokumentacji stoją na jednej zmyślonej dokumentacji (`docs/fake_docs.py`), żeby
-  identyfikator z atrapy wyszukiwania dało się odczytać atrapą odczytu.
+  narzędzia. Atrapy narzędzi jednego materiału stoją na jednym zmyślonym zestawie
+  (`tickets/fake_tickets.py`, `docs/fake_docs.py`), żeby identyfikator z atrapy wyszukiwania dało
+  się odczytać atrapą odczytu.
 - **Opis narzędzia dla modelu leży w katalogu narzędzia (`description.md`) i jest ten sam
   w każdym grafie (2026-10-03)** — mówi, jak pytać narzędzie i co ono oddaje; po co wyniki
   w danej funkcji, mówi prompt grafu. Wcześniej leżał w każdym grafie osobno: 18 plików, w których
   różniło się jedno zdanie, a i to prompty systemowe już mówiły. Cena: poprawka opisu zmienia
   wszystkie grafy naraz, więc po strojeniu jednego trzeba przemierzyć pozostałe.
-- **`SourceRef.score` trzeba podać, ale wolno podać `None`** — źródło znalezione dosłownie albo
-  odczytane po identyfikatorze nie ma podobieństwa. Pole bez wartości domyślnej, żeby jego brak
-  był decyzją narzędzia, a nie przeoczeniem; w odpowiedzi API to `null`.
 - **Na górze `agent_tools/` kontrakty (`base.py`) i jedyny wspólny model `SourceRef` (`models.py`);
   w katalogu narzędzia `tool.py`, `fake.py` i `models.py` z modelami TYLKO tego narzędzia** —
   zapytanie (`FindTicketsVectorQuery`), znaleziony element (`FoundTicket`), wynik
   (`FindTicketsVectorResult`), bez wspólnych baz. `errors.py` dochodzi, gdy narzędzie ma własne
-  błędy. `base.py` w katalogu narzędzia to część wspólna z atrapą (nazwa, `render_for_model()`,
-  `cite()`): różni je wyłącznie `search()`, więc test na atrapie sprawdza tekst, który model dostaje
-  na produkcji. **Bez typów generycznych i bez modeli bazowych — świadomie (2026-10-02):** kod
+  błędy. `base.py` w katalogu narzędzia to część wspólna z atrapą (nazwa, a w odczytach `cite()`):
+  różni je wyłącznie pobranie wyniku (`find()` albo `search()`), więc test na atrapie sprawdza
+  tekst, który model dostaje na produkcji. Obok `SourceRef` stoją dwa proste typy wspólne dla
+  wyszukiwań tekstowych (`ExactText`, `MatchKind`). **Bez typów generycznych i bez modeli
+  bazowych — świadomie (2026-10-02):** kod
   wspólny dla narzędzi potrzebuje wyłącznie zapisu cytowania, więc tylko on jest wspólny. Uboczny
   zysk: lista typowana klasą bazową serializuje **wyłącznie pola bazowe** — `model_dump()` gubi
   resztę bez błędu i bez ostrzeżenia (sprawdzone na Pydantic 2.10) — a konkretny `SourceRef` tej
   pułapki nie ma.
-- **Dwa rodzaje, rozdzielone kontraktem, nie konwencją.** `KnowledgeSource` zwraca materiał, który
-  odpowiedź może cytować, i sam mówi które (`cite()`). `AuxiliaryTool` zwraca **wyłącznie tekst**
-  i nie ma `cite()`, więc jego wynik (np. notatka agenta) **nie ma jak** trafić na listę źródeł.
-- **Wyszukiwanie jest semantyczne, id służy do cytowania.** Agent woła `search()` z zapytaniem
-  opisanym słowami — dopasowanie po znaczeniu. `item_id` w `SourceRef` identyfikuje znaleziony
-  element na liście źródeł; **klucz to `source:item_id`**, bo id są unikalne tylko w obrębie
-  materiału, a deduplikacja po samym id scaliłaby zgłoszenie z fragmentem dokumentacji.
-  **`source` nazywa materiał („tickets", „docs"), nie narzędzie (2026-10-03):** to samo zgłoszenie
-  znalezione wektorowo i tekstowo jest na liście raz, z tytułem z pierwszego trafienia (`problem`
-  karty albo temat wątku). Warunek: oba indeksy mają tę samą jednostkę
-  — przy dokumentacji plik z metryczki, także gdy wektor powstał z jego fragmentu.
-- **`SourceRef` niesie jednolinijkowy `title`, ale nie treść.** Tytuł (`problem` zgłoszenia,
-  nazwa i wersja dokumentu) pozwala człowiekowi rozpoznać źródło bez otwierania — samo id wystarcza
-  przy zgłoszeniu, które helpdesk ma u siebie, ale nie przy fragmencie dokumentacji. Treść model
-  dostał już jako tekst, a jej kopia w `SourceRef` niosłaby każde źródło dwa razy przez stan grafu.
-- **Bez odczytu po id — `retrieve()` usunięty (2026-10-02).** Po pętli nikt nie potrzebuje
-  znalezionego elementu ponownie. Wraca z HITL (p. 44), a wtedy **„wszystko albo nic"**: brakujące
-  id to błąd, nigdy krótsza lista — propozycja z czterech rekordów zamiast pięciu wygląda dokładnie
-  jak poprawna. Dokumentacja dostaje odczyt po id wcześniej, jako narzędzie agenta `read_docs`
-  (p. 52), z tą samą regułą.
-- **Ten sam wynik daje dwie rzeczy: tekst dla modelu (`render_for_model`) i listę źródeł (`cite`)**
-  — w węźle `run_tools` odpowiednio wiadomość `tool` i wpisy w `sources`. Tylko źródło wie, które
-  pola się liczą i jak je pokazać; lista źródeł powstaje z `cite()`, nigdy z deklaracji modelu.
-- **Tekst narzędzi zgłoszeń dla modelu: nagłówek z licznikami, pod nim karty albo wątki.** Karty
-  niosą pola pod nazwami ze schematu, bo prompty grafów odwołują się do nich po nazwie; `cause`
-  zostaje w brzmieniu parsera, także gdy mówi „brak". Wątek w `find_tickets_text` stoi między
-  liniami z numerem zgłoszenia, bo ma własne puste linie. Payload niezgodny z `ParsedTicket` to
-  `DbQdrantConfigError` bez treści zgłoszenia w komunikacie: indeks z innej wersji kontraktu
-  naprawia przebudowa, nie czekanie.
+- **Dwa rodzaje, rozdzielone kontraktem, nie konwencją.** `KnowledgeSource` to odczyt: zwraca
+  materiał, który odpowiedź może cytować, i sam mówi który (`cite()`). `AuxiliaryTool` to
+  wyszukiwanie i spis: zwraca **wyłącznie tekst** i nie ma `cite()`, więc jego wynik **nie ma jak**
+  trafić na listę źródeł. Dzięki temu `requires_hits` wymusza przeczytanie materiału przed
+  propozycją, a nie samo jego znalezienie.
+- **`item_id` w `SourceRef` identyfikuje odczytany element; klucz to `source:item_id`**, bo id są
+  unikalne tylko w obrębie materiału, a deduplikacja po samym id scaliłaby zgłoszenie z sekcją
+  dokumentacji. **`source` nazywa materiał („tickets", „docs"), nie narzędzie (2026-10-03):** to
+  samo zgłoszenie odczytane jako karta i jako wątek jest na liście raz, z tytułem z pierwszego
+  odczytu (`problem` karty albo temat wątku). Warunek: oba indeksy mają tę samą jednostkę — przy
+  dokumentacji plik z metryczki, także gdy wektor powstał z jego fragmentu.
+- **`SourceRef` niesie jednolinijkowy `title`, ale nie treść i nie podobieństwo.** Tytuł
+  (`problem` karty, temat wątku, nazwa i wersja dokumentu) pozwala człowiekowi rozpoznać źródło
+  bez otwierania — samo id wystarcza przy zgłoszeniu, które helpdesk ma u siebie, ale nie przy
+  sekcji dokumentacji. Treść model dostał już jako tekst, a jej kopia w `SourceRef` niosłaby każde
+  źródło dwa razy przez stan grafu. `score` usunięty 2026-10-04: odczyt po numerze go nie zna.
+- **Ten sam wynik odczytu daje dwie rzeczy: tekst dla modelu (`render_for_model`) i listę źródeł
+  (`cite`)** — w węźle `run_tools` odpowiednio wiadomość `tool` i wpisy w `sources`. Lista źródeł
+  powstaje z `cite()`, nigdy z deklaracji modelu.
+- **Karta dla modelu niesie pola pod nazwami ze schematu**, bo prompty grafów odwołują się do
+  nich po nazwie; `cause` zostaje w brzmieniu parsera, także gdy mówi „brak". Wersja słownika
+  rozstrzygnięć jest z tekstu wycinana — to metadane artefaktu. Payload niezgodny
+  z `ParsedTicket` to `DbQdrantConfigError` bez treści zgłoszenia w komunikacie: indeks z innej
+  wersji kontraktu naprawia przebudowa, nie czekanie.
 - **Zapytanie niesie wyłącznie to, czego szukać** — schemat to `query_model` narzędzia. Ile pobrać
   i gdzie uciąć to strojenie (`RAG_TOP_K`, `RAG_SCORE_MIN`), nie decyzja modelu; nieznany argument
   to błąd walidacji (`extra="forbid"` w każdym modelu zapytania). **Kształt zapytania dobiera się do
@@ -1648,17 +1670,19 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Kontrakty nie importują LangGrapha ani LangChaina** — definicję narzędzia dla modelu buduje
   graf z `name`, `description` i `query_model.model_json_schema()`. Wymiana orkiestratora ma nie
   dotykać narzędzi.
-- **Atrapa narzędzia zwraca przy każdym wyszukaniu ten sam wynik, ze stałymi id, i zapisuje
-  zapytania w publicznym `queries`** — test grafu sprawdza, o co pytał agent, a nie jak szukało
-  narzędzie. Konstruktor przyjmuje własne elementy i `dropped_below_threshold`, więc scenariusz
-  „próg wszystko wyciął" to jedna linia. Wbudowany zestaw `FakeFindTicketsVectorTool` to **jeden
-  objaw i trzy różne przyczyny** — najczęstszy kształt trafień w korpusie, na którym agent ma
-  dopytywać, a nie zgadywać. Dane atrap są zmyślone, nigdy kopiowane z korpusu (PII).
+- **Atrapa wyszukiwania zwraca zawsze ten sam wynik, atrapa odczytu odpowiada na to, o co
+  pytano; obie zapisują zapytania w publicznym `queries`** — test grafu sprawdza, o co pytał
+  agent, a nie jak szukało narzędzie. Konstruktor przyjmuje własne elementy
+  i `dropped_below_threshold`, więc scenariusz „próg wszystko wyciął" to jedna linia. Wbudowany
+  zestaw zgłoszeń to **jeden objaw i trzy różne przyczyny** — najczęstszy kształt trafień
+  w korpusie, na którym agent ma dopytywać, a nie zgadywać — oraz jedno zgłoszenie bez karty.
+  Dane atrap są zmyślone, nigdy kopiowane z korpusu (PII).
 - **Test kontraktu sam znajduje narzędzia** (`test_api_agent_tools_contract.py`: pakiety w
-  `app/agent_tools/` na każdej głębokości → podklasy `KnowledgeSource`) i sprawdza to, czego `ABC`
-  nie wymusza: `name`, `query_model` z `extra="forbid"` oraz jedną nazwę na pakiet. Nowe narzędzie
-  jest objęte testem bez dopisywania go do żadnej listy.
-- **Każde źródło wiedzy jest tylko do odczytu** — wstrzyknięcie przez treść zgłoszenia może co
+  `app/agent_tools/` na każdej głębokości → podklasy `KnowledgeSource` i `AuxiliaryTool`)
+  i sprawdza to, czego `ABC` nie wymusza: `name`, model zapytania z `extra="forbid"`, jedną nazwę
+  na pakiet i brak `cite()` w narzędziach pomocniczych. Nowe narzędzie jest objęte testem bez
+  dopisywania go do żadnej listy.
+- **Każde narzędzie jest tylko do odczytu** — wstrzyknięcie przez treść zgłoszenia może co
   najwyżej skierować agenta do nietrafionego materiału, nie zmienić indeksu.
 
 ## Warstwa węzłów (`agent_nodes/`)
@@ -2173,15 +2197,15 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 676 (0)            | 15 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 133 (51)           | 23 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 73 (9)             | 8 s  |
-| ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 5 (3)              | 39 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 727 (0)            | 17 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 138 (53)           | 41 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 74 (9)             | 9 s  |
+| ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 5 (3)              | 40 s |
 
 Liczby i czasy z 2026-10-04: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 9 s, a ewaluacyjne poniżej sekundy —
-całe 39 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
-(`pytest -m ""`): 887 testów, 76 s.
+całe 40 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
+(`pytest -m ""`): 944 testy, 73 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2581,13 +2605,13 @@ wyłącznie `search()`.
 **Rozszerzony 2026-10-03:** każdy materiał ma wyszukiwanie wektorowe (`_vector`, Qdrant)
 i tekstowe (`_text`, Postgres), a dokumentacja dodatkowo listing i odczyt po identyfikatorze.
 Nowe punkty mają numery spoza kolejności (47–56), żeby nie rozjechać odwołań „p. N". Modele,
-atrapy i opisy `.md` wszystkich sześciu narzędzi już są, wpięte w trzy grafy z narzędziami;
+atrapy i opisy `.md` wszystkich ośmiu narzędzi już są, wpięte w trzy grafy z narzędziami;
 punkty niżej to narzędzia właściwe.
 
 - [x] **7. `find_tickets`** — `FindTickets` na embedderze i Qdrancie, bez parsera; tekst do
   embeddingu z `build_embedding_text()`; reguły — „Warstwa
   narzędzi agenta". Do grafów wchodzi z właściwymi węzłami (p. 9–10). Od p. 47 nazywa się
-  `find_tickets_vector`.
+  `find_tickets_vector`, a od p. 57 oddaje numery zgłoszeń zamiast kart.
 - [x] **47. Nazwy i źródła** — `find_tickets_vector` i `find_docs_vector` (katalogi, klasy, opisy
   w grafach); `SourceRef.source` nazywa materiał („tickets", „docs"); reguły — „Warstwa narzędzi
   agenta".
@@ -2623,20 +2647,23 @@ punkty niżej to narzędzia właściwe.
   dokumentacji lepszy bywa listing w prompcie systemowym (cache'owany prefiks, bez tury) — do
   rozstrzygnięcia przy właściwej dokumentacji (p. 15).
 - [ ] **52. `read_docs`** — treść po liście identyfikatorów, z limitem; nieznany identyfikator to
-  błąd wracający do modelu, nigdy krótsza lista; jedyne narzędzie dokumentacji z `cite()`,
-  a `SourceRef.score` staje się opcjonalny. *Dlaczego:* lista źródeł ma pokazywać to, co model
-  przeczytał, a `requires_hits` wymusza wtedy odczyt przed rozwiązaniem.
+  błąd wracający do modelu, nigdy krótsza lista; jedyne narzędzie dokumentacji z `cite()`.
+  *Dlaczego:* lista źródeł ma pokazywać to, co model przeczytał, a `requires_hits` wymusza wtedy
+  odczyt przed rozwiązaniem.
 - [ ] **53. `find_tickets_text`** — te same pola `exact` i `words` po zanonimizowanym wątku
-  zgłoszenia; zwraca oryginalne wątki, bez kart; do ustalenia na prawdziwych danych: limit
-  długości wątku w wyniku, czy do tabeli idą wszystkie zgłoszenia, czy tylko te z kartą przyjętą
-  przez filtr jakości, i czy wątek niesie etykiety z `as_thread()` („KOMENTARZ", rola, data),
-  czy samą treść. *Dlaczego:* parser gubi około połowy dosłownych komunikatów (14 z 30 na
+  zgłoszenia; zwraca numery zgłoszeń z informacją, czym każde znaleziono; do ustalenia na
+  prawdziwych danych: czy do tabeli idą wszystkie zgłoszenia, czy tylko te z kartą przyjętą przez
+  filtr jakości. *Dlaczego:* parser gubi około połowy dosłownych komunikatów (14 z 30 na
   golden200), a `error_codes` jest niemal puste (9 z 200); w bloku A stoi na zmyślonych danych,
   bo do bazy trafia wyłącznie tekst po anonimizacji — prawdziwe wątki przychodzą z p. 19 i p. 31.
-- [ ] **56. `read_tickets`** — pełny tekst wątku po numerach zgłoszeń (`TicketsTable.read_by_id()`
-  już jest). *Dlaczego:* model, który dostał sparsowane zgłoszenie z wyszukiwania wektorowego, ma
-  móc doczytać dokładny tekst całości; parser gubi konkrety, a wątek je ma. Wyszukiwanie tekstowe
-  oddaje wątek od razu.
+- [x] **57. Zgłoszenia dwustopniowo i wyniki w JSON-ie** (2026-10-04) — oba wyszukiwania oddają
+  numery, `read_tickets_card` (właściwe i atrapa) i `read_tickets_thread` (atrapa) treść; tylko
+  odczyty cytują, `score` wyszedł z `SourceRef`; reguły — „Warstwa narzędzi agenta".
+- [ ] **56. `read_tickets_thread`** — narzędzie właściwe: oryginalne wątki po numerach zgłoszeń
+  z `TicketsTable.read_by_id()` (modele i atrapa już są); do ustalenia na prawdziwych danych:
+  limit długości wątku i czy wątek niesie etykiety z `as_thread()` („KOMENTARZ", rola, data), czy
+  samą treść. *Dlaczego:* parser gubi konkrety, a wątek je ma; model czyta go dla zgłoszeń, które
+  wybrał po kartach, i dla tych, które karty nie mają.
 
 ### B. Węzły — po jednym punkcie na węzeł
 
@@ -2740,7 +2767,8 @@ każdy mierzy się osobno.
   agenta wobec zapytań z parsera korpusu (golden set, `recall@1` i MRR; punkt odniesienia to pola
   `query_problem` + `query_symptoms` golden setu — 152 ze 162 na pierwszym miejscu); wkład
   narzędzi `_text` liczony osobno — czy znajdują coś, czego wektor nie znajduje, jest dziś
-  niezmierzone. *Dlaczego:*
+  niezmierzone; do tego czy model czyta karty WSZYSTKICH znalezionych numerów, czy tylko
+  pierwszego, i ile kosztuje dodatkowa tura odczytu. *Dlaczego:*
   najgroźniejszy błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach
   (e-Doręczenia: 6 zgłoszeń, 6 przyczyn), a zapytanie agenta nie powstaje już promptem korpusu.
 - [ ] **24. `parse_ticket`** — karta zgłoszenia promptem parsującym na modelu docelowym, porównana z
@@ -2749,8 +2777,9 @@ każdy mierzy się osobno.
   masowym imporcie (p. 31) i przy powrocie zamkniętych zgłoszeń (p. 30), więc jego jakość na modelu
   docelowym rozstrzyga o jakości indeksu.
 - [ ] **25. `suggest_questions`** — prompt z 6.3 przemierzony na modelu docelowym z placeholderami,
-  z regułą zgodności przyczyny z objawem i zdaniem o trafieniach tekstowych, które są wątkami bez
-  pól karty; ewaluacja wariantu; sentinele `questions_summary` rozpoznaje `no_questions()` dopisane
+  z regułą zgodności przyczyny z objawem; do sprawdzenia, czy długi tekst w JSON-ie (wątek, sekcja
+  instrukcji) czyta się modelowi gorzej niż goły;
+  ewaluacja wariantu; sentinele `questions_summary` rozpoznaje `no_questions()` dopisane
   do `normalizer_sentinel.py`, a pomiar rozstrzyga, czy model radzi sobie bez osobnego bloku
   przyczyn przed rekordami. *Dlaczego:* część zabiegów z 6.3 powstała pod 11B, a znana dziura
   (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
@@ -2826,8 +2855,8 @@ każdy mierzy się osobno.
 ### J. Później
 
 - [ ] **44. Notatki agenta i HITL w pętli** — notatki jako narzędzie pomocnicze w
-  `agent_tools/notes/` (sterują szukaniem, nigdy generacją), przerwanie pętli na decyzję człowieka —
-  z nim wraca `retrieve()`, odczyt znalezionego zgłoszenia po id (dokumentacja ma odczyt od p. 52).
+  `agent_tools/notes/` (sterują szukaniem, nigdy generacją), przerwanie pętli na decyzję człowieka
+  (odczyt zgłoszeń i sekcji po identyfikatorze jest już narzędziem agenta — p. 52, 56, 57).
   *Dlaczego:* odłożone świadomie; kontrakt narzędzia pomocniczego z p. 1 i magazyn z p. 29 mają je
   przyjąć bez zmian we wspólnych węzłach.
 - [ ] **45. Rozszerzenia** — reranker, frontend,

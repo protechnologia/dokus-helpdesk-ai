@@ -2,8 +2,8 @@
 Description:
 Narzędzie pomocnicze: sekcje dokumentacji znalezione po dosłownym brzmieniu — nazwie opcji,
 komunikacie, kodzie — albo po słowach kluczowych w dowolnej odmianie. Uzupełnia
-`find_docs_vector`, które szuka po znaczeniu. Zwraca wiersze spisu treści z dopasowanym
-fragmentem, nie treść; tę agent pobiera przez `read_docs`.
+`find_docs_vector`, które szuka po znaczeniu. Zwraca opisy sekcji z informacją, czym każdą
+znaleziono, nie treść; tę agent pobiera przez `read_docs`.
 
 | plik             | co zawiera                                                 |
 |------------------|------------------------------------------------------------|

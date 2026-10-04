@@ -187,8 +187,8 @@ async def _measure(
         target_returned = 0
 
         for target, query in _load_golden_queries():
-            result = await tool.search(query)
-            found  = [item.ticket.ticket_id for item in result.items]
+            result = await tool.find(query)
+            found  = [item.ticket_id for item in result.tickets]
 
             target_first    += found[:1] == [target]
             target_returned += target in found
@@ -197,9 +197,9 @@ async def _measure(
         distractors_with_hits = 0
 
         for query in _load_distractor_queries():
-            result = await tool.search(query)
+            result = await tool.find(query)
 
-            distractors_with_hits += bool(result.items)
+            distractors_with_hits += bool(result.tickets)
     finally:
         await tool.aclose()
 

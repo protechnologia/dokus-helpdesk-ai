@@ -1,7 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
+from app.agent_tools.docs.fake_docs import default_sections
 from app.agent_tools.docs.find_docs_text import FindDocsTextQuery
+from app.agent_tools.docs.find_docs_text.models import MatchedSection
 
 
 def test_a_query_with_nothing_to_search_is_refused() -> None:
@@ -31,3 +33,10 @@ def test_an_unknown_argument_is_refused() -> None:
     """Argument spoza schematu → ValidationError: o limicie trafień decyduje konfiguracja."""
     with pytest.raises(ValidationError):
         FindDocsTextQuery(words="uprawnienie", limit=20)
+
+
+def test_a_matched_section_carries_no_snippet() -> None:
+    """Znaleziona sekcja → sposób dopasowania i opis z metryczki, bez pola na fragment treści:
+    treść daje wyłącznie odczyt, bo tylko on trafia na listę źródeł."""
+    with pytest.raises(ValidationError):
+        MatchedSection(matched_by="exact", section=default_sections()[0], snippet="Uprawnienie…")

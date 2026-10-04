@@ -41,5 +41,5 @@ class FindDocsVectorResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    items:                   list[FoundSection] = Field(default_factory=list)
+    sections:                list[FoundSection] = Field(default_factory=list)
     dropped_below_threshold: int                = Field(default=0, ge=0, examples=[1])

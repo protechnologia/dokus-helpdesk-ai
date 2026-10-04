@@ -1,14 +1,6 @@
-from datetime import date as Date
-from typing import Annotated, Literal
-
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-# Dosłowny ciąg ma co najmniej trzy znaki: krótszy trafia w przypadkowe miejsca (numer telefonu,
-# data), a zgłoszenie znalezione po „50" wygląda na trafienie, choć nim nie jest.
-ExactText = Annotated[str, Field(min_length=3)]
-
-# Czym zgłoszenie znaleziono: dosłownym ciągiem albo słowami kluczowymi.
-MatchKind = Literal["exact", "words"]
+from app.agent_tools.models import ExactText, MatchKind
 
 
 class FindTicketsTextQuery(BaseModel):
@@ -52,33 +44,30 @@ class FindTicketsTextQuery(BaseModel):
 class MatchedTicket(BaseModel):
     """
     Description:
-    Jedno historyczne zgłoszenie zwrócone przez `find_tickets_text`: czym je znaleziono i jego
-    oryginalny wątek po anonimizacji. Karty tu nie ma — karty oddaje `find_tickets_vector`.
+    Jedno zgłoszenie zwrócone przez `find_tickets_text`: jego numer i to, czym je znaleziono.
+    Treści tu nie ma — wątek daje `read_tickets_thread`, kartę `read_tickets_card`.
 
     Podobieństwa tu nie ma: dopasowanie dosłowne nie ma stopnia, a etykieta mówi więcej niż
     liczba — trafienie po przepisanym komunikacie waży inaczej niż po słowach kluczowych.
+    Dopasowanego fragmentu też nie: treść daje wyłącznie odczyt, bo tylko on trafia na listę
+    źródeł.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    matched_by: MatchKind = Field(examples=["exact"])
     ticket_id:  str       = Field(min_length=1, examples=["90011"])
-    date:       Date      = Field(examples=["2026-03-02"])
-    # Temat zgłoszenia — tytuł na liście źródeł.
-    subject:    str       = Field(min_length=1, examples=["Błąd przy podpisie"])
-    # Wątek w oryginalnym brzmieniu, po anonimizacji.
-    thread:     str       = Field(min_length=1, examples=["ZGŁOSZENIE 90011 z 2026-03-02\n…"])
+    matched_by: MatchKind = Field(examples=["exact"])
 
 
 class FindTicketsTextResult(BaseModel):
     """
     Description:
-    Co dało jedno wyszukiwanie `find_tickets_text`: znalezione zgłoszenia i liczba pominiętych
-    ponad limit. Licznik idzie razem z elementami, bo „trafień jest pięć" i „pokazano pięć
-    z czterdziestu" to różne odpowiedzi — druga mówi agentowi, że zapytanie było zbyt ogólne.
+    Co dało jedno wyszukiwanie `find_tickets_text`: numery znalezionych zgłoszeń i liczba
+    pominiętych ponad limit. Licznik idzie razem z numerami, bo „trafień jest pięć" i „pokazano
+    pięć z czterdziestu" to różne odpowiedzi — druga mówi agentowi, że zapytanie było zbyt ogólne.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    items:              list[MatchedTicket] = Field(default_factory=list)
+    tickets:            list[MatchedTicket] = Field(default_factory=list)
     omitted_over_limit: int                 = Field(default=0, ge=0, examples=[35])

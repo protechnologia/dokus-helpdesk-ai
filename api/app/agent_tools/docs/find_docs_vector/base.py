@@ -6,7 +6,7 @@ dla modelu. Narzędzie i atrapa różnią się wyłącznie tym, skąd biorą wyn
 Przed — wynik wyszukiwania:
 
     FindDocsVectorResult(
-        items = [
+        sections = [
             FoundSection(score=0.74, section=DocSection(section_id="adm-kancelaria-…", …)),
         ],
         dropped_below_threshold = 1,
@@ -14,22 +14,36 @@ Przed — wynik wyszukiwania:
 
 Po — tekst dla modelu:
 
-    Znalezione sekcje dokumentacji: 1 (odcięte progiem: 1)
-
-    [adm-kancelaria-edoreczenia] Instrukcja administratora 4.12 · Uprawnienia › Kancelaria ›
-    Uprawnienie do kancelarii e-Doręczeń — Kto i gdzie nadaje uprawnienie… · podobieństwo 0.74
+    {
+      "sections": [
+        {
+          "score": 0.74,
+          "section": {
+            "section_id": "adm-kancelaria-edoreczenia",
+            "document": "Instrukcja administratora",
+            "version": "4.12",
+            "date": "2026-05-04",
+            "chapter_path": ["Uprawnienia", "Kancelaria"],
+            "title": "Uprawnienie do kancelarii e-Doręczeń",
+            "description": "Kto i gdzie nadaje uprawnienie do kancelarii e-Doręczeń i kiedy działa"
+          }
+        }
+      ],
+      "dropped_below_threshold": 1
+    }
 
 O czym pamiętać przy zmianach:
 
-- To narzędzie pomocnicze: zwraca wiersze spisu treści, nie treść, i niczego nie cytuje. Źródłem
+- To narzędzie pomocnicze: zwraca opisy sekcji, nie treść, i niczego nie cytuje. Źródłem
   odpowiedzi jest dopiero sekcja odczytana przez `read_docs`.
-- Wiersz sekcji jest wspólny z listingiem i wyszukiwaniem tekstowym (`agent_tools/docs/base.py`).
+- Opis sekcji (`DocSection`) jest ten sam w spisie treści i w wyszukiwaniu tekstowym, więc
+  identyfikator do odczytu stoi zawsze w tym samym polu.
+- Ten tekst jest częścią promptu — jego kształt stroi się pomiarem razem z promptami grafów.
 """
 
 from abc import abstractmethod
 
-from app.agent_tools.base import AuxiliaryTool, read_description
-from app.agent_tools.docs.base import render_section_row
+from app.agent_tools.base import AuxiliaryTool, read_description, result_as_json
 from app.agent_tools.docs.find_docs_vector.models import FindDocsVectorQuery, FindDocsVectorResult
 
 
@@ -45,7 +59,7 @@ class FindDocsVectorToolBase(AuxiliaryTool):
 
     Flow:
         1. `run()` woła `find()` podklasy i dostaje `FindDocsVectorResult`.
-        2. `render()` robi z niego tekst: nagłówek z licznikami i po wierszu na sekcję.
+        2. Wynik idzie do modelu jako JSON (`result_as_json()`).
     """
 
     name        = "find_docs_vector"
@@ -66,40 +80,9 @@ class FindDocsVectorToolBase(AuxiliaryTool):
             query=FindDocsVectorQuery(text="uprawnienia kancelaria e-Doręczenia")
 
         Example result:
-            FindDocsVectorResult(items=[FoundSection(score=0.74, section=DocSection(…))],
+            FindDocsVectorResult(sections=[FoundSection(score=0.74, section=DocSection(…))],
                                  dropped_below_threshold=0)
         """
-
-    def render(
-        self,
-        result: FindDocsVectorResult,  # np. FindDocsVectorResult(items=[…])
-    ) -> str:
-        """
-        Description:
-        Tekst, który model czyta jako odpowiedź narzędzia: nagłówek z licznikami i po wierszu na
-        sekcję, z podobieństwem na końcu. Bez trafień zostaje sam nagłówek.
-
-        Example args:
-            result=FindDocsVectorResult(items=[FoundSection(…)], dropped_below_threshold=0)
-
-        Example result:
-            Znalezione sekcje dokumentacji: 1 (odcięte progiem: 0)
-
-            [adm-kancelaria-edoreczenia] Instrukcja administratora 4.12 · … · podobieństwo 0.74
-        """
-        header = (
-            f"Znalezione sekcje dokumentacji: {len(result.items)} "
-            f"(odcięte progiem: {result.dropped_below_threshold})"
-        )
-
-        rows = [
-            f"{render_section_row(found.section)} · podobieństwo {found.score:.2f}"
-            for found in result.items
-        ]
-
-        text = "\n\n".join([header, *rows])
-
-        return text
 
     async def run(
         self,
@@ -107,19 +90,16 @@ class FindDocsVectorToolBase(AuxiliaryTool):
     ) -> str:
         """
         Description:
-        Wyszukuje i zwraca tekst dla modelu.
+        Wyszukuje i zwraca tekst dla modelu: JSON wyniku.
 
         Example args:
             args=FindDocsVectorQuery(text="uprawnienia kancelaria e-Doręczenia")
 
         Example result:
-            Znalezione sekcje dokumentacji: 2 (odcięte progiem: 0)
-
-            [adm-kancelaria-edoreczenia] Instrukcja administratora 4.12 · … · podobieństwo 0.74
-
-            [adm-kancelaria-epuap] Instrukcja administratora 4.12 · … · podobieństwo 0.68
+            {"sections": [{"score": 0.74, "section": {"section_id": "adm-kancelaria-…", …}}],
+             "dropped_below_threshold": 0}
         """
         result = await self.find(args)
-        text   = self.render(result)
+        text   = result_as_json(result)
 
         return text

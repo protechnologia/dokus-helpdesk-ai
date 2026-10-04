@@ -3,21 +3,6 @@ from pydantic import ValidationError
 
 from app.agent_tools.tickets.find_tickets_vector import FindTicketsVectorQuery, FoundTicket
 
-# Zgłoszenie z prawdziwą treścią — w kształcie, w jakim `TicketPoint.from_ticket` zapisuje payload.
-VALID_TICKET = {
-    "ticket_id":                     "33644",
-    "date":                          "2026-03-14",
-    "component":                     "ePUAP",
-    "problem":                       "Wysyłka przez ePUAP kończy się błędem komunikacji",
-    "symptoms":                      "Po kliknięciu Wyślij pojawia się komunikat o braku sieci",
-    "error_codes":                   ["ERR-4210"],
-    "cause":                         "Certyfikat bez uprawnienia AddDocumentToSign",
-    "solution":                      "Wygenerowano certyfikat z właściwym uprawnieniem.",
-    "resolution":                    "naprawione",
-    "resolution_vocabulary_version": 1,
-    "questions_summary":             "pytano o wersję przeglądarki",
-}
-
 
 @pytest.mark.parametrize("field", ["problem", "symptoms"])
 def test_an_empty_query_field_is_refused(field: str) -> None:
@@ -36,19 +21,14 @@ def test_a_query_with_an_invented_argument_is_refused() -> None:
         FindTicketsVectorQuery(problem="Błąd wysyłki", symptoms="nie dotyczy", limit=50)
 
 
-def test_the_ticket_is_validated_by_its_own_contract() -> None:
-    """Payload bez pola ParsedTicket → ValidationError: treść sprawdza ten sam kontrakt, który
-    wpuścił ją do indeksu, a nie dopiero prompt."""
-    incomplete = {key: value for key, value in VALID_TICKET.items() if key != "cause"}
-
+def test_a_found_ticket_carries_no_content() -> None:
+    """Znalezione zgłoszenie → numer i podobieństwo, bez pola na treść: kartę i wątek dają
+    odczyty, a tylko odczyt jest źródłem."""
     with pytest.raises(ValidationError):
-        FoundTicket(score=0.87, ticket=incomplete)
+        FoundTicket(ticket_id="33644", score=0.87, problem="Wysyłka ePUAP kończy się błędem")
 
 
-def test_a_valid_ticket_is_kept_whole() -> None:
-    """Kompletny payload → znalezione zgłoszenie, z którego `cite()` odczyta id i datę wprost,
-    bez kopii trzymanych obok."""
-    found = FoundTicket(score=0.87, ticket=VALID_TICKET)
-
-    assert found.ticket.ticket_id        == "33644"
-    assert found.ticket.date.isoformat() == "2026-03-14"
+def test_a_found_ticket_needs_its_number() -> None:
+    """Pusty numer zgłoszenia → ValidationError: bez numeru nie ma czego odczytać."""
+    with pytest.raises(ValidationError):
+        FoundTicket(ticket_id="", score=0.87)

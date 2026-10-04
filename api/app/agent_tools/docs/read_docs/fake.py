@@ -61,7 +61,7 @@ class FakeReadDocsTool(ReadDocsToolBase):
             query=ReadDocsQuery(section_ids=["adm-kancelaria-edoreczenia"])
 
         Example result:
-            ReadDocsResult(items=[ReadSection(section=DocSection(…), text="Uprawnienie…")])
+            ReadDocsResult(sections=[ReadSection(section=DocSection(…), text="Uprawnienie…")])
 
         Raises:
             UnknownSectionError: któregoś identyfikatora nie ma w dokumentacji
@@ -75,7 +75,7 @@ class FakeReadDocsTool(ReadDocsToolBase):
             raise UnknownSectionError(unknown)
 
         result = ReadDocsResult(
-            items = [self._items[section_id] for section_id in query.section_ids],
+            sections = [self._items[section_id] for section_id in query.section_ids],
         )
 
         return result

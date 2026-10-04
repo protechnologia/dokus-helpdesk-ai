@@ -32,8 +32,9 @@ def build_fake_graph() -> CompiledStateGraph:
     """
     Description:
     Ten sam graf co `build_graph`, złożony z atrap — do testów tras i CLI. Agent najpierw szuka
-    `find_tickets_vector` (trzy zgłoszenia o jednym objawie i trzech przyczynach), potem wywołuje
-    `respond_search`; w stanie zostają trzy źródła i jedno zapytanie agenta.
+    `find_tickets_vector`, potem czyta karty znalezionych zgłoszeń `read_tickets_card` (jeden
+    objaw, trzy przyczyny) i wywołuje `respond_search`; w stanie zostają trzy źródła z odczytu
+    i dwa wywołania narzędzi.
 
     Graf jest jednorazowy: `FakeAgentNode` ma zaplanowane tury. Na każde wywołanie buduj nowy.
 
@@ -41,7 +42,7 @@ def build_fake_graph() -> CompiledStateGraph:
         (brak)
 
     Example result:
-        CompiledStateGraph: anonymize → agent → run_tools → agent → respond
+        CompiledStateGraph: anonymize → agent ⇄ run_tools (szukaj, czytaj) → respond
     """
     agent, run_tools = fake_search_nodes(RESPOND_TOOL_NAME, SearchDone())
 

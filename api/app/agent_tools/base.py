@@ -32,25 +32,56 @@ def read_description(
     return read_document(Path(module_file).parent / DESCRIPTION_FILE).rstrip()
 
 
+def result_as_json(
+    result:  BaseModel,           # np. FindTicketsVectorResult(tickets=[FoundTicket(…)])
+    exclude: dict | None = None,  # np. {"cards": {"__all__": {"resolution_vocabulary_version"}}}
+) -> str:
+    """
+    Description:
+    Tekst, który model czyta jako odpowiedź narzędzia: wynik narzędzia zapisany jako JSON. Jedno
+    miejsce dla wszystkich narzędzi, więc każde odpowiada w tym samym formacie, a identyfikatory
+    wracają w kształcie, w jakim model poda je następnemu narzędziu.
+
+    Treść pisana przez klienta (wątek zgłoszenia) siedzi w polu tekstowym i z niego nie wyjdzie:
+    nie może udawać końca wyniku ani kolejnego pola. Polskie litery zostają bez zmian.
+    `exclude` wycina pola, które są w wyniku dla nas, a nie dla modelu.
+
+    Example args:
+        result=FindTicketsVectorResult(tickets=[FoundTicket(ticket_id="90001", score=0.91)])
+        exclude=None
+
+    Example result:
+        {
+          "tickets": [
+            {
+              "ticket_id": "90001",
+              "score": 0.91
+            }
+          ],
+          "dropped_below_threshold": 0
+        }
+    """
+    return result.model_dump_json(indent=2, exclude=exclude)
+
+
 class KnowledgeSource(ABC):
     """
     Description:
-    Narzędzie, które agent woła, żeby pobrać materiał, z którego może powstać odpowiedź.
+    Narzędzie, które agent woła, żeby przeczytać materiał, z którego może powstać odpowiedź.
 
     Do czego:
     Pierwszy z dwóch rodzajów narzędzi agenta (drugi to `AuxiliaryTool`). Wyróżnia go to, że jego
-    wyniki mogą stać się ŹRÓDŁAMI odpowiedzi — które, mówi `cite()`. Nowe źródło to nowy katalog
-    w folderze swojego materiału (`app/agent_tools/tickets/`, `app/agent_tools/docs/`):
-    implementacja, jej atrapa i `models.py` z własnym zapytaniem, znalezionym elementem
-    i wynikiem. Grafy sięgają po źródło przez własny adapter, więc ten plik nie wie nic
-    o LangGraphie ani LangChainie.
+    wyniki stają się ŹRÓDŁAMI odpowiedzi — które, mówi `cite()`. Źródłami są wyłącznie odczyty
+    (`read_tickets_card`, `read_tickets_thread`, `read_docs`): na listę źródeł trafia to, co model
+    przeczytał, a nie to, co tylko znalazł. Nowe źródło to nowy katalog w folderze swojego
+    materiału (`app/agent_tools/tickets/`, `app/agent_tools/docs/`): implementacja, jej atrapa
+    i `models.py` z własnym zapytaniem i wynikiem. Grafy sięgają po źródło przez własny adapter,
+    więc ten plik nie wie nic o LangGraphie ani LangChainie.
 
     Flow:
-        1. Agent woła `search()` z argumentami zgodnymi z `query_model`. Jak źródło szuka, to
-           jego sprawa: po znaczeniu (`find_tickets_vector`), po dosłownym brzmieniu
-           (`find_tickets_text`) albo po identyfikatorach (`read_docs`).
-        2. `render_for_model()` zamienia wynik na tekst, który czyta model — to własna
-           serializacja źródła, bo tylko ono wie, które jego pola się liczą i jak je pokazać.
+        1. Agent woła `search()` z argumentami zgodnymi z `query_model` — identyfikatorami, które
+           dostał od wyszukiwania albo ze spisu treści.
+        2. `render_for_model()` zamienia wynik na tekst, który czyta model: JSON wyniku.
         3. `cite()` zamienia ten sam wynik na źródła, które może wnieść do odpowiedzi. W adapterze
            grafu te dwie rzeczy stają się treścią i artefaktem narzędzia.
 
@@ -74,59 +105,54 @@ class KnowledgeSource(ABC):
     @abstractmethod
     async def search(
         self,
-        query: BaseModel,  # np. FindTicketsVectorQuery(problem="Wysyłka ePUAP z błędem", …)
+        query: BaseModel,  # np. ReadTicketsCardQuery(ticket_ids=["33644"])
     ) -> BaseModel:
         """
         Description:
-        Znajduje materiał odpowiadający zapytaniu, od najlepszego, już przycięty progiem albo
-        limitem źródła. Przyjmuje obiekt klasy `query_model` i zwraca własny wynik źródła.
+        Pobiera materiał wskazany w zapytaniu. Przyjmuje obiekt klasy `query_model` i zwraca
+        własny wynik źródła.
 
         Example args:
-            query=FindTicketsVectorQuery(problem="Wysyłka przez ePUAP kończy się błędem",
-                                         symptoms="Po kliknięciu Wyślij komunikat o braku sieci")
+            query=ReadTicketsCardQuery(ticket_ids=["33644"])
 
         Example result:
-            FindTicketsVectorResult(items=[FoundTicket(score=0.87, ticket=ParsedTicket(…))],
-                                    dropped_below_threshold=2)
+            ReadTicketsCardResult(cards=[ParsedTicket(ticket_id="33644", …)], without_card=[])
         """
 
-    @abstractmethod
     def render_for_model(
         self,
-        result: BaseModel,  # np. FindTicketsVectorResult(items=[…])
+        result: BaseModel,  # np. ReadTicketsCardResult(cards=[…])
     ) -> str:
         """
         Description:
-        Zamienia wynik wyszukiwania na tekst, który model czyta zamiast odpowiedzi narzędzia.
-        Strukturalny wynik nigdy nie trafia do modelu wprost — model widzi wyłącznie ten tekst.
+        Zamienia wynik na tekst, który model czyta jako odpowiedź narzędzia: JSON wyniku. Źródło
+        nadpisuje tę metodę tylko wtedy, gdy część wyniku nie jest dla modelu.
 
         Example args:
-            result=FindTicketsVectorResult(items=[FoundTicket(…)], dropped_below_threshold=2)
+            result=ReadTicketsCardResult(cards=[ParsedTicket(ticket_id="33644", …)])
 
         Example result:
-            Znalezione zgłoszenia: 1 (odcięte progiem: 2)
-
-            [33644] 2026-03-14 · podobieństwo 0.87
-            …
+            {"cards": [{"ticket_id": "33644", "problem": "…", …}], "without_card": []}
         """
+        return result_as_json(result)
 
     @abstractmethod
     def cite(
         self,
-        result: BaseModel,  # np. FindTicketsVectorResult(items=[…])
+        result: BaseModel,  # np. ReadTicketsCardResult(cards=[…])
     ) -> list[SourceRef]:
         """
         Description:
-        Wymienia, co z wyniku wyszukiwania odpowiedź może zacytować — jeden wpis na każdy element,
-        który model zobaczył w `render_for_model()`, z tytułem, po którym człowiek rozpozna
-        źródło. Lista źródeł powstaje stąd, nigdy z tego, co model deklaruje, że wykorzystał.
+        Wymienia, co z wyniku odpowiedź może zacytować — jeden wpis na każdy element, który
+        model zobaczył w `render_for_model()`, z tytułem, po którym człowiek rozpozna źródło.
+        Lista źródeł powstaje stąd, nigdy z tego, co model deklaruje, że wykorzystał.
 
         Example args:
-            result=FindTicketsVectorResult(items=[FoundTicket(score=0.87, ticket=ParsedTicket(…))])
+            result=ReadTicketsCardResult(cards=[ParsedTicket(ticket_id="33644", …)])
 
         Example result:
             [SourceRef(source="tickets", item_id="33644", title="Wysyłka przez ePUAP…",
-                       score=0.87, date=date(2026, 3, 14))]
+                       date=date(2026, 3, 14))]
         """
 
     async def aclose(self) -> None:
@@ -147,19 +173,21 @@ class KnowledgeSource(ABC):
 class AuxiliaryTool(ABC):
     """
     Description:
-    Narzędzie, które agent woła po coś innego niż materiał do cytowania: spis treści
-    dokumentacji i jej wyszukiwarki, a później notatki agenta.
+    Narzędzie, które agent woła po coś innego niż materiał do cytowania: wyszukiwarki zgłoszeń
+    i dokumentacji, spis treści dokumentacji, a później notatki agenta.
 
     Do czego:
     Drugi rodzaj narzędzia agenta, oddzielony od `KnowledgeSource` z samej konstrukcji: zwraca
-    zwykły tekst i nie ma `cite()`, więc jego wynik nigdy nie trafi na listę źródeł odpowiedzi.
-    Tylko po to ten rodzaj istnieje. Wiersz spisu treści mówi, GDZIE jest instrukcja, a nie co
-    w niej stoi — odpowiedź oparta na samym wierszu nie ma źródła, i kontrakt sprawia, że nie da
-    się go jej przypisać przez pomyłkę. Źródłem jest dopiero odczytana sekcja (`read_docs`).
+    sam tekst i nie ma `cite()`, więc jego wynik nigdy nie trafi na listę źródeł odpowiedzi.
+    Tylko po to ten rodzaj istnieje. Wyszukiwanie mówi, GDZIE jest materiał — numer zgłoszenia,
+    identyfikator sekcji — a nie co w nim stoi. Odpowiedź oparta na samym wyniku wyszukiwania
+    nie ma źródła, i kontrakt sprawia, że nie da się go jej przypisać przez pomyłkę. Źródłem
+    jest dopiero to, co model odczytał.
 
     Flow:
         1. Agent woła narzędzie z argumentami zgodnymi z `args_model`.
-        2. `run()` zwraca tekst, który model czyta zamiast odpowiedzi narzędzia.
+        2. `run()` zwraca tekst, który model czyta jako odpowiedź narzędzia — JSON wyniku
+           (`result_as_json()`).
     """
 
     # Nazwa narzędzia.
@@ -181,10 +209,10 @@ class AuxiliaryTool(ABC):
         Wykonuje działanie narzędzia i zwraca tekst, który czyta model.
 
         Example args:
-            args=args_model(…)
+            args=FindTicketsVectorQuery(problem="Wysyłka ePUAP z błędem", symptoms="…")
 
         Example result:
-            "Zapisano."
+            {"tickets": [{"ticket_id": "33644", "score": 0.87}], "dropped_below_threshold": 2}
         """
 
     async def aclose(self) -> None:

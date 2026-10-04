@@ -15,7 +15,7 @@ class FakeListDocsTool(ListDocsToolBase):
     Flow:
         1. Test tworzy ją z własnymi sekcjami albo z zestawem wbudowanym.
         2. Każde `load()` podbija licznik `calls` i zwraca ten sam spis.
-        3. `render()` i `run()` pochodzą z klasy wspólnej z prawdziwym narzędziem.
+        3. `run()` pochodzi z klasy wspólnej z prawdziwym narzędziem.
     """
 
     def __init__(

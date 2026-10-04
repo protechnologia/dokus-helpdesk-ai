@@ -1,8 +1,8 @@
 """
 Description:
 Narzędzie pomocnicze: sekcje dokumentacji produktu podobne znaczeniowo do zapytania. Zwraca
-wiersze spisu treści (identyfikator, dokument z wydaniem, rozdział, opis), nie treść — tę agent
-pobiera przez `read_docs`, i dopiero odczytana sekcja jest źródłem odpowiedzi.
+opisy sekcji (identyfikator, dokument z wydaniem, rozdział, tytuł, opis) z podobieństwem, nie
+treść — tę agent pobiera przez `read_docs`, i dopiero odczytana sekcja jest źródłem odpowiedzi.
 
 Do czego:
 Wnosi materiał, którego nie ma w korpusie zgłoszeń: jak funkcja ma działać, krok po kroku, a nie

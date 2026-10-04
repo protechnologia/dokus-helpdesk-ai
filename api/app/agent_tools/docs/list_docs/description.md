@@ -7,8 +7,8 @@
      przemierzyć pozostałe (p. 23, 25–26).
 
      Komentarze redakcyjne jak ten są wycinane przed wysłaniem. -->
-Zwraca spis treści dokumentacji aplikacji: po wierszu na sekcję — identyfikator
-w nawiasie kwadratowym, dokument z wersją, rozdział i krótki opis. Nie przyjmuje
+Zwraca spis treści dokumentacji aplikacji: opis każdej sekcji — identyfikator
+(`section_id`), dokument z wersją, rozdział, tytuł i krótki opis. Nie przyjmuje
 argumentów.
 
 Spis mówi, gdzie co jest, a nie co tam stoi. Treść wybranych sekcji odczytasz

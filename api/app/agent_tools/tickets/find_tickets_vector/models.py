@@ -1,7 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core_model.ticket_parsed import ParsedTicket
-
 
 class FindTicketsVectorQuery(BaseModel):
     """
@@ -22,30 +20,29 @@ class FindTicketsVectorQuery(BaseModel):
 class FoundTicket(BaseModel):
     """
     Description:
-    Jedno historyczne zgłoszenie zwrócone przez `find_tickets_vector`: podobieństwo, z jakim je
-    znaleziono, i sparsowane zgłoszenie z payloadu Qdranta.
+    Jedno zgłoszenie zwrócone przez `find_tickets_vector`: jego numer i podobieństwo, z jakim je
+    znaleziono. Treści tu nie ma — kartę daje `read_tickets_card`, wątek `read_tickets_thread`.
 
-    Całe `ParsedTicket`, a nie wybrany podzbiór pól: payload jest zapisywany z tego modelu
-    (`TicketPoint.from_ticket`), a druga klasa wypisująca te same klucze byłaby drugim miejscem,
-    w którym da się o jednym zapomnieć. Id i data należą do samego zgłoszenia — `cite()` czyta je
-    stamtąd, a nie z kopii trzymanej obok.
+    Sam numer, bez `problem` karty: te same objawy mają w tym korpusie różne przyczyny, a wiersz
+    z samym objawem zachęcałby do przeczytania jednej karty zamiast wszystkich.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    score:  float = Field(examples=[0.87])
-    ticket: ParsedTicket
+    ticket_id: str   = Field(min_length=1, examples=["33644"])
+    score:     float = Field(examples=[0.87])
 
 
 class FindTicketsVectorResult(BaseModel):
     """
     Description:
-    Co dało jedno wyszukiwanie `find_tickets_vector`: zgłoszenia, które przeszły `RAG_SCORE_MIN`,
-    i liczba odciętych. Licznik idzie razem z elementami, bo „nic nie było" i „próg to wyciął" to
-    różne odpowiedzi, a agent decydujący, czy ma dość materiału, musi je rozróżniać.
+    Co dało jedno wyszukiwanie `find_tickets_vector`: numery zgłoszeń, które przeszły
+    `RAG_SCORE_MIN`, od najbardziej podobnego, i liczba odciętych. Licznik idzie razem z numerami,
+    bo „nic nie było" i „próg to wyciął" to różne odpowiedzi, a agent decydujący, czy szukać
+    dalej, musi je rozróżniać.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    items:                   list[FoundTicket] = Field(default_factory=list)
+    tickets:                 list[FoundTicket] = Field(default_factory=list)
     dropped_below_threshold: int               = Field(default=0, ge=0, examples=[3])

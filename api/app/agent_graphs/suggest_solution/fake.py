@@ -38,8 +38,9 @@ def build_fake_graph(
     """
     Description:
     Ten sam graf co `build_graph`, złożony z atrap — do testów tras i CLI. Agent najpierw szuka
-    `find_tickets_vector` (trzy zgłoszenia o jednym objawie i trzech przyczynach), potem wywołuje
-    `respond_suggest_solution` z propozycją w argumentach; w stanie zostają trzy źródła.
+    `find_tickets_vector`, potem czyta karty znalezionych zgłoszeń `read_tickets_card` (jeden
+    objaw, trzy przyczyny) i wywołuje `respond_suggest_solution` z propozycją
+    w argumentach; w stanie zostają trzy źródła z odczytu.
 
     Graf jest jednorazowy: `FakeAgentNode` ma zaplanowane tury. Na każde wywołanie buduj nowy.
 

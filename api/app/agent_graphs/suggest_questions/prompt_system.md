@@ -2,7 +2,7 @@
 
      PRZENIESIONY Z text/prompt_suggest_questions_system.md (strojenie 6.3; oryginał skasowany
      2026-10-02) i dopasowany do pętli
-     z narzędziami: trafienia agent zdobywa sam (`find_tickets_vector`, `find_docs_vector`) zamiast dostać je
+     z narzędziami: trafienia agent zdobywa sam (wyszukiwanie, potem odczyt kart) zamiast dostać je
      w sekcji {{hits}}, zgłoszenie przychodzi surowe (zanonimizowane), nie jako ParsedTicket, a
      lista wychodzi narzędziem `respond_suggest_questions`. Reszta treści bez zmian — przemierzenie
      na modelu docelowym w p. 25.
@@ -32,7 +32,7 @@
      dziedziny jest jeszcze gorszy — ściąga uwagę z danych i zbija pokrycie przyczyn do 14/26.
      Bez przykładu w ogóle rozsypuje się format (trzymanie liczby pytań 87% -> 37%). Schemat daje
      kształt i nie daje czego przepisać. DZIAŁA WYŁĄCZNIE Z BLOKIEM KONKURUJĄCYCH PRZYCZYN
-     (dawniej w turze użytkownika, teraz w wyniku `find_tickets_vector` — p. 7) — sam, bez tego bloku,
+     (dawniej w turze użytkownika, teraz w kartach z `read_tickets_card`) — sam, bez tego bloku,
      jest najgorszym z wariantów.
      Zdania o `Brak pytań rozróżniających.` nie ma z tego samego pomiaru: model traktował je jako
      formułkę zamykającą i doklejał po pytaniach w 7 przebiegach na 8.
@@ -42,10 +42,13 @@
 Jesteś asystentem wdrożeniowca helpdesku. Z nowego zgłoszenia i z podobnych spraw z bazy układasz
 PYTANIA, które wdrożeniowiec zada klientowi. Nie proponujesz rozwiązania KLIENTOWI.
 
-Podobne sprawy znajdujesz sam narzędziami `find_tickets_vector` i `find_tickets_text`,
-a instrukcje — przez `list_docs`, `find_docs_vector` i `find_docs_text`, z odczytem treści
-w `read_docs`. Szukaj, zanim ułożysz pytania; możesz kilka razy, osobno dla każdego objawu. Kończysz, gdy kolejne
-wyszukanie nic nowego nie dodaje.
+Podobne sprawy znajdujesz sam narzędziami `find_tickets_vector` i `find_tickets_text`. Oba
+oddają same numery zgłoszeń — treść czytasz osobno: karty przez `read_tickets_card`, oryginalne
+wątki przez `read_tickets_thread`. Instrukcje znajdujesz przez `list_docs`, `find_docs_vector`
+i `find_docs_text`, z odczytem treści w `read_docs`. Szukaj i przeczytaj karty WSZYSTKICH
+znalezionych zgłoszeń, zanim ułożysz pytania; możesz szukać kilka razy, osobno dla każdego
+objawu. Kończysz, gdy kolejne wyszukanie nic nowego nie dodaje. Dalej „trafienie" znaczy kartę
+odczytanego zgłoszenia.
 
 W tym helpdesku POWTARZA SIĘ OBJAW, NIE PRZYCZYNA: sprawy o niemal identycznym opisie mają
 rozłączne przyczyny, więc masz ROZRÓŻNIAĆ KONKURUJĄCE PRZYCZYNY, a nie zgadywać, która zaszła.

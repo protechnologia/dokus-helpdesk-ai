@@ -1,10 +1,11 @@
 """
 Description:
 Prawdziwe narzędzie `find_tickets_vector`: na zapytanie agenta znajduje w Qdrancie historyczne
-zgłoszenia o podobnym problemie. Nie woła LLM-a ani parsera — tylko embedder i Qdranta.
+zgłoszenia o podobnym problemie i oddaje ich numery. Nie woła LLM-a ani parsera — tylko embedder
+i Qdranta.
 
     zapytanie agenta → tekst do embeddingu → wektor (tryb query) → Qdrant (wektory `problem`)
-                     → próg `RAG_SCORE_MIN` → zgłoszenia z payloadu
+                     → próg `RAG_SCORE_MIN` → numery zgłoszeń z podobieństwem
 
 Przed — zapytanie agenta:
 
@@ -13,12 +14,12 @@ Przed — zapytanie agenta:
         symptoms = "Brak nowych przesyłek w skrzynce, nadawcy potwierdzają wysyłkę",
     )
 
-Po — wynik `search()` (Qdrant oddał 5 trafień, próg 0.48 przeszły 2):
+Po — wynik `find()` (Qdrant oddał 5 trafień, próg 0.48 przeszły 2):
 
     FindTicketsVectorResult(
-        items = [
-            FoundTicket(score=0.71, ticket=ParsedTicket(ticket_id="90001", …)),
-            FoundTicket(score=0.52, ticket=ParsedTicket(ticket_id="90003", …)),
+        tickets = [
+            FoundTicket(ticket_id="90001", score=0.71),
+            FoundTicket(ticket_id="90003", score=0.52),
         ],
         dropped_below_threshold = 3,
     )
@@ -30,9 +31,7 @@ Co się dzieje po drodze:
 2. Embedder liczy z niego wektor w trybie query.
 3. Qdrant oddaje `RAG_TOP_K` najbliższych punktów, zawsze po wektorach `problem`.
 4. Trafienia poniżej `RAG_SCORE_MIN` odpadają, ale są policzone w `dropped_below_threshold`.
-5. Payload każdego trafienia staje się z powrotem `ParsedTicket`.
-
-Tekst dla modelu i listę źródeł robi z wyniku klasa wspólna z atrapą (`base.py`).
+5. Z każdego trafienia zostaje numer zgłoszenia i podobieństwo; kartę czyta `read_tickets_card`.
 
 O czym pamiętać przy zmianach:
 
@@ -40,13 +39,13 @@ O czym pamiętać przy zmianach:
   błędem, tylko daje trochę gorsze wyniki, więc nikt tego nie zauważy.
 - Ile pobrać i gdzie uciąć, ustawia konfiguracja, nie agent — zapytanie niesie tylko to, czego
   szukać.
-- Payload niezgodny z `ParsedTicket` znaczy, że indeks zbudowano inną wersją kontraktu. Czekanie
+- Próg jest jedynym miejscem, w którym KOD mówi „nic nie znaleziono": bez niego wyszukiwanie
+  zawsze oddawałoby komplet numerów, także dla zgłoszenia bez odpowiednika w bazie.
+- Trafienie bez numeru zgłoszenia w payloadzie znaczy, że indeks zbudowano inaczej. Czekanie
   tego nie naprawi, stąd `DbQdrantConfigError`, a nie błąd „spróbuj później".
 """
 
 import logging
-
-from pydantic import ValidationError
 
 from app.agent_tools.tickets.find_tickets_vector.base import FindTicketsVectorToolBase
 from app.agent_tools.tickets.find_tickets_vector.models import (
@@ -54,49 +53,42 @@ from app.agent_tools.tickets.find_tickets_vector.models import (
     FindTicketsVectorResult,
     FoundTicket,
 )
-from app.core_model.ticket_parsed import ParsedTicket
 from app.core_service.builder_embedding_text import build_embedding_text
 from app.db_qdrant import VECTOR_PROBLEM, DbQdrantConfigError, TicketHit, TicketsCollection
 from app.engine_embedding import EmbeddingClient
 
 logger = logging.getLogger(__name__)
 
+# Do ilu miejsc po przecinku model widzi podobieństwo. Dalsze cyfry to szum, a nie informacja.
+SCORE_DIGITS = 3
+
 
 def found_ticket_from_hit(
-    hit: TicketHit,  # np. TicketHit(point_id="df3b…", score=0.71, payload={…})
+    hit: TicketHit,  # np. TicketHit(point_id="df3b…", score=0.7134, payload={…})
 ) -> FoundTicket:
     """
     Description:
-    Zamienia trafienie z Qdranta na element wyniku: payload wraca do `ParsedTicket`, z którego
-    został zapisany przy indeksacji.
+    Zamienia trafienie z Qdranta na element wyniku: numer zgłoszenia z payloadu i zaokrąglone
+    podobieństwo.
 
     Example args:
-        hit=TicketHit(point_id="df3b…", score=0.71, payload={"ticket_id": "90001", …})
+        hit=TicketHit(point_id="df3b…", score=0.7134, payload={"ticket_id": "90001", …})
 
     Example result:
-        FoundTicket(score=0.71, ticket=ParsedTicket(ticket_id="90001", …))
+        FoundTicket(ticket_id="90001", score=0.713)
 
     Raises:
-        DbQdrantConfigError: payload nie spełnia kontraktu `ParsedTicket`
+        DbQdrantConfigError: payload trafienia nie ma numeru zgłoszenia
     """
-    try:
-        ticket = ParsedTicket.model_validate(hit.payload)
-    except ValidationError as exc:
-        fields = sorted({
-            ".".join(str(part) for part in error["loc"]) or "rekord"
-            for error in exc.errors()
-        })
-
-        # `from None`: błąd Pydantica cytuje wartości pól, czyli treść zgłoszenia — nie do logów.
+    if not hit.ticket_id:
         raise DbQdrantConfigError(
-            f"payload zgłoszenia {hit.ticket_id!r} nie spełnia kontraktu ParsedTicket "
-            f"(pola: {', '.join(fields)}) — indeks zbudowano inną wersją kontraktu, "
-            f"przebuduj go: helpdesk rag reindex"
-        ) from None
+            f"punkt {hit.point_id!r} nie ma `ticket_id` w payloadzie — indeks zbudowano inną "
+            f"wersją kontraktu, przebuduj go: helpdesk rag reindex"
+        )
 
     found = FoundTicket(
-        score  = hit.score,
-        ticket = ticket,
+        ticket_id = hit.ticket_id,
+        score     = round(hit.score, SCORE_DIGITS),
     )
 
     return found
@@ -109,14 +101,14 @@ class FindTicketsVectorTool(FindTicketsVectorToolBase):
     najbliższe zgłoszenia, próg odcina za słabe.
 
     Do czego:
-    Źródło wiedzy agenta w grafach `search`, `suggest_questions` i `suggest_solution`. Tylko do
-    odczytu: nic tu nie zapisuje do indeksu.
+    Wyszukiwanie zgłoszeń po znaczeniu w grafach `search`, `suggest_questions`
+    i `suggest_solution`. Tylko do odczytu: nic tu nie zapisuje do indeksu.
 
     Flow:
-        1. `search()` składa tekst zapytania i zamienia go na wektor w trybie query.
+        1. `find()` składa tekst zapytania i zamienia go na wektor w trybie query.
         2. Qdrant oddaje `top_k` najbliższych punktów po wektorach `problem`.
         3. Próg `score_min` dzieli je na zwrócone i policzone jako odcięte.
-        4. `render_for_model()` i `cite()` z klasy bazowej robią z wyniku tekst i źródła.
+        4. `run()` z klasy bazowej robi z wyniku JSON dla modelu.
     """
 
     def __init__(
@@ -145,7 +137,7 @@ class FindTicketsVectorTool(FindTicketsVectorToolBase):
         self._top_k     = top_k
         self._score_min = score_min
 
-    async def search(
+    async def find(
         self,
         query: FindTicketsVectorQuery,  # np. FindTicketsVectorQuery(problem="Brak przesyłek", …)
     ) -> FindTicketsVectorResult:
@@ -156,15 +148,16 @@ class FindTicketsVectorTool(FindTicketsVectorToolBase):
 
         Example args:
             query=FindTicketsVectorQuery(problem="Nie przychodzą przesyłki z e-Doręczeń",
-                                   symptoms="Brak nowych przesyłek w skrzynce")
+                                         symptoms="Brak nowych przesyłek w skrzynce")
 
         Example result:
-            FindTicketsVectorResult(items=[FoundTicket(score=0.71, …)], dropped_below_threshold=3)
+            FindTicketsVectorResult(tickets=[FoundTicket(ticket_id="90001", score=0.71)],
+                                    dropped_below_threshold=3)
 
         Raises:
             EmbeddingError: embedder jest nieosiągalny albo odpowiedział błędem
             DbQdrantError: Qdrant jest nieosiągalny albo odpowiedział błędem
-            DbQdrantConfigError: payload trafienia nie spełnia kontraktu `ParsedTicket`
+            DbQdrantConfigError: payload trafienia nie ma numeru zgłoszenia
         """
         # --- tekst i wektor zapytania ---
         text = build_embedding_text(
@@ -193,7 +186,7 @@ class FindTicketsVectorTool(FindTicketsVectorToolBase):
         )
 
         result = FindTicketsVectorResult(
-            items                   = [found_ticket_from_hit(hit) for hit in kept],
+            tickets                 = [found_ticket_from_hit(hit) for hit in kept],
             dropped_below_threshold = dropped,
         )
 

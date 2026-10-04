@@ -41,7 +41,7 @@ class FakeFindDocsVectorTool(FindDocsVectorToolBase):
     Flow:
         1. Test tworzy ją z własnymi sekcjami albo z zestawem wbudowanym.
         2. Każde `find()` zapisuje zapytanie w `queries` i zwraca ten sam wynik.
-        3. `render()` i `run()` pochodzą z klasy wspólnej z prawdziwym narzędziem.
+        3. `run()` pochodzi z klasy wspólnej z prawdziwym narzędziem.
     """
 
     def __init__(
@@ -61,7 +61,7 @@ class FakeFindDocsVectorTool(FindDocsVectorToolBase):
             FakeFindDocsVectorTool zwracająca wbudowane dwie sekcje przy każdym wyszukaniu
         """
         self._result = FindDocsVectorResult(
-            items                   = list(found) if found is not None else default_found(),
+            sections                = list(found) if found is not None else default_found(),
             dropped_below_threshold = dropped_below_threshold,
         )
 
@@ -80,7 +80,8 @@ class FakeFindDocsVectorTool(FindDocsVectorToolBase):
             query=FindDocsVectorQuery(text="uprawnienia kancelaria e-Doręczenia")
 
         Example result:
-            FindDocsVectorResult(items=[FoundSection(score=0.74, …), …], dropped_below_threshold=0)
+            FindDocsVectorResult(sections=[FoundSection(score=0.74, …), …],
+                                 dropped_below_threshold=0)
         """
         self.queries.append(query)
 

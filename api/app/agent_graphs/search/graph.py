@@ -24,12 +24,14 @@ STATE = SearchState
 
 # Narzędzia dozwolone w tym grafie; opis każdego dla modelu leży w katalogu narzędzia.
 TOOL_NAMES: tuple[str, ...] = (
-    "find_tickets_vector",  # zgłoszenia po znaczeniu
-    "find_tickets_text",    # zgłoszenia po dosłownym brzmieniu
+    "find_tickets_vector",  # numery zgłoszeń po znaczeniu
+    "find_tickets_text",    # numery zgłoszeń po dosłownym brzmieniu
+    "read_tickets_card",    # karty zgłoszeń po numerach — cytuje
+    "read_tickets_thread",  # oryginalne wątki po numerach — cytuje
     "list_docs",            # spis treści dokumentacji
     "find_docs_vector",     # sekcje dokumentacji po znaczeniu
     "find_docs_text",       # sekcje dokumentacji po dosłownym brzmieniu
-    "read_docs",            # treść sekcji — jedyne narzędzie dokumentacji, które cytuje
+    "read_docs",            # treść sekcji po identyfikatorach — cytuje
 )
 
 
@@ -84,7 +86,7 @@ def model_tools(
         tools=[FakeFindTicketsVectorTool(), FakeFindDocsVectorTool()]
 
     Example result:
-        [ToolDefinition(name="find_tickets_vector", …), ToolDefinition(name="find_docs_vector", …),
+        [ToolDefinition(name="find_tickets_vector", …), ToolDefinition(name="read_tickets_card", …),
          ToolDefinition(name="respond_search", …)]
 
     Raises:

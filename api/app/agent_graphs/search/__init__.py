@@ -1,12 +1,13 @@
 """
 Description:
 Graf `search` — podobne zgłoszenia i fragmenty instrukcji do nowego zgłoszenia. Agent sam pisze
-zapytania w kształcie korpusu i może szukać kilka razy; wynikiem są źródła z `cite()` (`sources`)
-i jego zapytania (wywołania narzędzi w `messages`). Kartę zgłoszenia daje graf `parse_ticket`.
+zapytania w kształcie korpusu i może szukać kilka razy; wynikiem są źródła z `cite()` (`sources`),
+czyli to, co agent odczytał, i jego wywołania narzędzi (`messages`). Kartę nowego zgłoszenia
+daje graf `parse_ticket`.
 
-Przebieg: anonymize → pętla agent ⇄ run_tools → respond. Narzędzia: `find_tickets_vector`,
-`find_docs_vector` (opisy dla modelu obok, jako `.md`); koniec wywołaniem `respond_search` bez
-argumentów.
+Przebieg: anonymize → pętla agent ⇄ run_tools → respond. Narzędzia: wyszukiwania i spis oddają
+identyfikatory, odczyty treść (opisy dla modelu w katalogach narzędzi); koniec wywołaniem
+`respond_search` bez argumentów.
 
 Status: na atrapach węzłów (`fake.py`); prompt pętli i pomiar w p. 23 (CLAUDE.md -> „Plan i TODO").
 """

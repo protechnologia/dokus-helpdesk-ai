@@ -50,4 +50,4 @@ class ReadDocsResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    items: list[ReadSection] = Field(default_factory=list)
+    sections: list[ReadSection] = Field(default_factory=list)

@@ -60,17 +60,16 @@ def to_source_items(
     Zamienia źródła ze stanu grafu na model API, pole po polu.
 
     Example args:
-        sources=[SourceRef(source="tickets", item_id="33644", title="…", score=0.87)]
+        sources=[SourceRef(source="tickets", item_id="33644", title="…")]
 
     Example result:
-        [SourceItem(source="tickets", item_id="33644", title="…", score=0.87, date=None)]
+        [SourceItem(source="tickets", item_id="33644", title="…", date=None)]
     """
     items = [
         SourceItem(
             source  = ref.source,
             item_id = ref.item_id,
             title   = ref.title,
-            score   = ref.score,
             date    = ref.date,
         )
         for ref in sources

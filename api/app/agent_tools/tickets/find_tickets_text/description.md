@@ -9,9 +9,10 @@
 
      Komentarze redakcyjne jak ten są wycinane przed wysłaniem. -->
 Szuka w bazie historycznych zgłoszeń po dosłownym brzmieniu, nie po znaczeniu —
-w oryginalnych wątkach, nie w kartach. Zwraca oryginalne wątki: temat, opis
-zgłaszającego i komentarze, z informacją, czym zgłoszenie zostało znalezione.
-Kart tu nie ma: przyczynę i rozwiązanie wyczytaj z komentarzy.
+w oryginalnych wątkach, nie w kartach. Zwraca same numery zgłoszeń z informacją,
+czym każde zostało znalezione (`matched_by`: `exact` albo `words`), bez treści.
+Treść odczytasz osobno: karty narzędziem `read_tickets_card`, oryginalne wątki
+narzędziem `read_tickets_thread`.
 
 Użyj, gdy zgłoszenie niesie coś, co da się znaleźć słowo w słowo:
 
@@ -21,4 +22,5 @@ Użyj, gdy zgłoszenie niesie coś, co da się znaleźć słowo w słowo:
   „załączników").
 
 Podaj co najmniej jedno pole. Ten sam komunikat miewa różne przyczyny: trafienie
-mówi, że taki objaw już był, a nie co go wywołało.
+mówi, że taki objaw już był, a nie co go wywołało. `omitted_over_limit` większe
+od zera znaczy, że zapytanie było zbyt ogólne.

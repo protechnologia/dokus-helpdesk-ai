@@ -1,7 +1,7 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.agent_nodes.base import Node
 from app.agent_tools import SourceRef
@@ -10,40 +10,58 @@ from app.engine_llm import ChatMessage
 DEFAULT_TOOL_RESULT = "fake-tool-result"
 
 
+class FakeToolAnswer(BaseModel):
+    """
+    Description:
+    Co atrapa `run_tools` odpowiada na wywołanie jednego narzędzia: tekst wyniku i źródła, które
+    to wywołanie dokłada. Wyszukiwanie odpowiada samym tekstem, odczyt — tekstem i źródłami.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    text:    str             = Field(examples=['{"tickets": [{"ticket_id": "90001", …}]}'])
+    sources: list[SourceRef] = Field(default_factory=list)
+
+
 class FakeRunToolsNode(Node):
     """
     Description:
     Atrapa węzła `run_tools`: nie woła narzędzi, tylko na każde wywołanie z ostatniej tury modelu
-    odpowiada tym samym tekstem i — jeśli je podano — dokłada ustalone źródła.
+    odpowiada ustalonym tekstem i — jeśli je podano — dokłada ustalone źródła.
 
     Flow:
-        1. Test tworzy ją z tekstem wyniku i opcjonalnymi źródłami.
+        1. Test tworzy ją z odpowiedzią domyślną (tekst i opcjonalne źródła) albo z odpowiedziami
+           na konkretne narzędzia (`answers`) — tak odtwarza się przebieg „szukaj, potem czytaj",
+           w którym źródła dokłada dopiero odczyt.
         2. `run()` zapisuje stan w `calls` i zwraca po jednej wiadomości `tool` na każde
            wywołanie, z jego `call_id`.
-        3. `sources` trafiają do aktualizacji tylko wtedy, gdy podano źródła — graf bez narzędzi
-           wiedzy nie ma tego pola w stanie.
+        3. `sources` trafiają do aktualizacji tylko wtedy, gdy wywołane narzędzia je dokładają —
+           graf bez narzędzi wiedzy nie ma tego pola w stanie.
     """
 
     name = "run_tools"
 
     def __init__(
         self,
-        result_text: str = DEFAULT_TOOL_RESULT,  # np. "Znalezione zgłoszenia: 3 …"
-        sources:     Sequence[SourceRef] = (),   # np. [SourceRef(source="tickets", …)]
+        result_text: str = DEFAULT_TOOL_RESULT,                   # np. '{"tickets": []}'
+        sources:     Sequence[SourceRef] = (),                    # np. [SourceRef(…)]
+        answers:     Mapping[str, FakeToolAnswer] | None = None,  # np. {"read_docs": …}
     ):
         """
         Description:
-        Ustala tekst wyniku i źródła, które atrapa odda.
+        Ustala, co atrapa odpowie: `answers` na wymienione narzędzia, a `result_text`
+        i `sources` na każde inne.
 
         Example args:
-            result_text="Znalezione zgłoszenia: 3"
-            sources=[SourceRef(source="tickets", item_id="90001", …)]
+            result_text='{"tickets": []}'
+            sources=[]
+            answers={"read_tickets_card": FakeToolAnswer(text="{…}", sources=[SourceRef(…)])}
 
         Example result:
-            FakeRunToolsNode odpowiadająca tym tekstem na każde wywołanie
+            FakeRunToolsNode odpowiadająca kartami na odczyt i pustym wynikiem na resztę
         """
-        self._result_text = result_text
-        self._sources     = list(sources)
+        self._default = FakeToolAnswer(text=result_text, sources=list(sources))
+        self._answers = dict(answers or {})
 
         # Publiczne celowo: testy sprawdzają, z jakim stanem węzeł był wołany.
         self.calls: list[BaseModel] = []
@@ -57,29 +75,32 @@ class FakeRunToolsNode(Node):
         Odpowiada na wywołania narzędzi z ostatniej tury modelu.
 
         Example args:
-            state=SuggestSolutionState(messages=[tool_call_turn("find_tickets_vector", {…})], …)
+            state=SuggestSolutionState(messages=[tool_call_turn("read_tickets_card", {…})], …)
 
         Example result:
             {"messages": [ChatMessage(role="tool", call_id="call_1", content="…")],
              "log": [LogEntry(node="run_tools",
-                              message="wywołania: find_tickets_vector; źródła: 1")],
+                              message="wywołania: read_tickets_card; źródła: 1")],
              "sources": [SourceRef(…)]}
         """
         self.calls.append(state)
 
         calls   = state.messages[-1].tool_calls if state.messages else []
         names   = ", ".join(call.name for call in calls) or "brak"
+        answers = [self._answers.get(call.name, self._default) for call in calls]
+
         results = [
-            ChatMessage(role="tool", call_id=call.call_id, content=self._result_text)
-            for call in calls
+            ChatMessage(role="tool", call_id=call.call_id, content=answer.text)
+            for call, answer in zip(calls, answers, strict=True)
         ]
+        sources = [ref for answer in answers for ref in answer.sources]
 
         update: dict[str, Any] = {
             "messages": results,
-            "log":      [self.log_entry(f"wywołania: {names}; źródła: {len(self._sources)}")],
+            "log":      [self.log_entry(f"wywołania: {names}; źródła: {len(sources)}")],
         }
 
-        if self._sources:
-            update["sources"] = list(self._sources)
+        if sources:
+            update["sources"] = sources
 
         return update

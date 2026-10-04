@@ -6,39 +6,43 @@ dla modelu. Narzędzie i atrapa różnią się wyłącznie tym, skąd biorą wyn
 Przed — wynik wyszukiwania:
 
     FindDocsTextResult(
-        items = [MatchedSection(
+        sections = [MatchedSection(
             matched_by = "exact",
-            snippet    = "Komunikat „Nie udało się skomunikować z serwerem” przy podpisie…",
             section    = DocSection(section_id="usr-komunikat-brak-serwera", …),
         )],
     )
 
 Po — tekst dla modelu:
 
-    Znalezione sekcje dokumentacji: 1 (pominięte ponad limit: 0)
-
-    [usr-komunikat-brak-serwera] Instrukcja użytkownika 4.12 · Komunikaty błędów › Komunikat „Nie
-    udało się skomunikować z serwerem” — Możliwe przyczyny komunikatu… · dopasowanie: dosłowny ciąg
-    fragment: Komunikat „Nie udało się skomunikować z serwerem” przy podpisie…
+    {
+      "sections": [
+        {
+          "matched_by": "exact",
+          "section": {
+            "section_id": "usr-komunikat-brak-serwera",
+            "document": "Instrukcja użytkownika",
+            "version": "4.12",
+            …
+          }
+        }
+      ],
+      "omitted_over_limit": 0
+    }
 
 O czym pamiętać przy zmianach:
 
-- To narzędzie pomocnicze: zwraca wiersze spisu treści z fragmentem, niczego nie cytuje. Źródłem
-  odpowiedzi jest dopiero sekcja odczytana przez `read_docs`.
-- Wiersz sekcji jest wspólny z listingiem i wyszukiwaniem wektorowym (`agent_tools/docs/base.py`).
+- To narzędzie pomocnicze: zwraca opisy sekcji, niczego nie cytuje. Źródłem odpowiedzi jest
+  dopiero sekcja odczytana przez `read_docs`.
+- Fragmentu treści w wyniku nie ma: treść daje wyłącznie odczyt, inaczej model mógłby oprzeć
+  się na czymś, co nie trafi na listę źródeł.
+- `matched_by` nosi nazwę pola, którym agent pytał: `exact` albo `words`.
+- Ten tekst jest częścią promptu — jego kształt stroi się pomiarem razem z promptami grafów.
 """
 
 from abc import abstractmethod
 
-from app.agent_tools.base import AuxiliaryTool, read_description
-from app.agent_tools.docs.base import render_section_row
+from app.agent_tools.base import AuxiliaryTool, read_description, result_as_json
 from app.agent_tools.docs.find_docs_text.models import FindDocsTextQuery, FindDocsTextResult
-
-# Etykiety dopasowania w tekście dla modelu.
-MATCH_LABELS = {
-    "exact": "dosłowny ciąg",
-    "words": "słowa",
-}
 
 
 class FindDocsTextToolBase(AuxiliaryTool):
@@ -53,8 +57,7 @@ class FindDocsTextToolBase(AuxiliaryTool):
 
     Flow:
         1. `run()` woła `find()` podklasy i dostaje `FindDocsTextResult`.
-        2. `render()` robi z niego tekst: nagłówek z licznikami, a na sekcję wiersz spisu treści
-           i dopasowany fragment.
+        2. Wynik idzie do modelu jako JSON (`result_as_json()`).
     """
 
     name        = "find_docs_text"
@@ -75,43 +78,9 @@ class FindDocsTextToolBase(AuxiliaryTool):
             query=FindDocsTextQuery(exact=["Nie udało się skomunikować z serwerem"])
 
         Example result:
-            FindDocsTextResult(items=[MatchedSection(matched_by="exact", …)], omitted_over_limit=0)
+            FindDocsTextResult(sections=[MatchedSection(matched_by="exact", …)],
+                               omitted_over_limit=0)
         """
-
-    def render(
-        self,
-        result: FindDocsTextResult,  # np. FindDocsTextResult(items=[…])
-    ) -> str:
-        """
-        Description:
-        Tekst, który model czyta jako odpowiedź narzędzia: nagłówek z licznikami, a na sekcję
-        wiersz spisu treści z etykietą dopasowania i linia z fragmentem. Bez trafień zostaje sam
-        nagłówek.
-
-        Example args:
-            result=FindDocsTextResult(items=[MatchedSection(…)], omitted_over_limit=0)
-
-        Example result:
-            Znalezione sekcje dokumentacji: 1 (pominięte ponad limit: 0)
-
-            [usr-komunikat-brak-serwera] Instrukcja użytkownika … · dopasowanie: dosłowny ciąg
-            fragment: Komunikat „Nie udało się skomunikować z serwerem” przy podpisie…
-        """
-        header = (
-            f"Znalezione sekcje dokumentacji: {len(result.items)} "
-            f"(pominięte ponad limit: {result.omitted_over_limit})"
-        )
-
-        rows = [
-            f"{render_section_row(matched.section)} · "
-            f"dopasowanie: {MATCH_LABELS[matched.matched_by]}\n"
-            f"fragment: {matched.snippet}"
-            for matched in result.items
-        ]
-
-        text = "\n\n".join([header, *rows])
-
-        return text
 
     async def run(
         self,
@@ -119,21 +88,17 @@ class FindDocsTextToolBase(AuxiliaryTool):
     ) -> str:
         """
         Description:
-        Wyszukuje i zwraca tekst dla modelu.
+        Wyszukuje i zwraca tekst dla modelu: JSON wyniku.
 
         Example args:
             args=FindDocsTextQuery(words="uprawnienie kancelaria")
 
         Example result:
-            Znalezione sekcje dokumentacji: 2 (pominięte ponad limit: 0)
-
-            [usr-komunikat-brak-serwera] Instrukcja użytkownika … · dopasowanie: dosłowny ciąg
-            fragment: Komunikat „Nie udało się skomunikować z serwerem” przy podpisie…
-
-            [adm-kancelaria-edoreczenia] Instrukcja administratora 4.12 · … · dopasowanie: słowa
-            fragment: Uprawnienie do kancelarii e-Doręczeń nadaje administrator…
+            {"sections": [{"matched_by": "words",
+                           "section": {"section_id": "adm-kancelaria-edoreczenia", …}}],
+             "omitted_over_limit": 0}
         """
         result = await self.find(args)
-        text   = self.render(result)
+        text   = result_as_json(result)
 
         return text

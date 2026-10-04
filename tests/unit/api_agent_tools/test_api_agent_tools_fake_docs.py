@@ -21,8 +21,8 @@ async def test_whatever_a_search_fake_finds_the_read_fake_can_read() -> None:
     graf na atrapach może przejść całą drogę od wyszukania do źródła."""
     vector = await FakeFindDocsVectorTool().find(FindDocsVectorQuery(text="uprawnienia"))
     text   = await FakeFindDocsTextTool().find(FindDocsTextQuery(words="uprawnienia"))
-    found  = sorted({item.section.section_id for item in [*vector.items, *text.items]})
+    found  = sorted({item.section.section_id for item in [*vector.sections, *text.sections]})
 
     result = await FakeReadDocsTool().search(ReadDocsQuery(section_ids=found))
 
-    assert [item.section.section_id for item in result.items] == found
+    assert [item.section.section_id for item in result.sections] == found

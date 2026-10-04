@@ -12,7 +12,7 @@ wyszukiwania. Tylko odczytane sekcje trafiają na listę źródeł odpowiedzi: z
 oprzesz się na instrukcji, przeczytaj ją.
 
 - `section_ids` — od jednego do pięciu identyfikatorów, dokładnie w brzmieniu z
-  nawiasu kwadratowego. Nieznany identyfikator kończy się błędem, bez wyniku
+  pola `section_id`. Nieznany identyfikator kończy się błędem, bez wyniku
   częściowego.
 
 Każda sekcja niesie wersję i datę wydania dokumentu — instrukcja do starszej

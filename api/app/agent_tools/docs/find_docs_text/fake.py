@@ -19,21 +19,13 @@ def default_matched() -> list[MatchedSection]:
         (brak)
 
     Example result:
-        [MatchedSection(matched_by="exact", snippet="Komunikat „Nie udało się…", …), …]
+        [MatchedSection(matched_by="exact", section=DocSection(…)), MatchedSection(…)]
     """
     edoreczenia, _, _, brak_serwera = default_sections()
 
     matched = [
-        MatchedSection(
-            matched_by = "exact",
-            snippet    = "Komunikat „Nie udało się skomunikować z serwerem” przy podpisie…",
-            section    = brak_serwera,
-        ),
-        MatchedSection(
-            matched_by = "words",
-            snippet    = "Uprawnienie do kancelarii e-Doręczeń nadaje administrator…",
-            section    = edoreczenia,
-        ),
+        MatchedSection(matched_by="exact", section=brak_serwera),
+        MatchedSection(matched_by="words", section=edoreczenia),
     ]
 
     return matched
@@ -48,7 +40,7 @@ class FakeFindDocsTextTool(FindDocsTextToolBase):
     Flow:
         1. Test tworzy ją z własnymi sekcjami albo z zestawem wbudowanym.
         2. Każde `find()` zapisuje zapytanie w `queries` i zwraca ten sam wynik.
-        3. `render()` i `run()` pochodzą z klasy wspólnej z prawdziwym narzędziem.
+        3. `run()` pochodzi z klasy wspólnej z prawdziwym narzędziem.
     """
 
     def __init__(
@@ -68,7 +60,7 @@ class FakeFindDocsTextTool(FindDocsTextToolBase):
             FakeFindDocsTextTool zwracająca wbudowane dwie sekcje przy każdym wyszukaniu
         """
         self._result = FindDocsTextResult(
-            items              = list(matched) if matched is not None else default_matched(),
+            sections           = list(matched) if matched is not None else default_matched(),
             omitted_over_limit = omitted_over_limit,
         )
 
@@ -87,7 +79,7 @@ class FakeFindDocsTextTool(FindDocsTextToolBase):
             query=FindDocsTextQuery(exact=["Nie udało się skomunikować z serwerem"])
 
         Example result:
-            FindDocsTextResult(items=[MatchedSection(matched_by="exact", …), …],
+            FindDocsTextResult(sections=[MatchedSection(matched_by="exact", …), …],
                                omitted_over_limit=0)
         """
         self.queries.append(query)

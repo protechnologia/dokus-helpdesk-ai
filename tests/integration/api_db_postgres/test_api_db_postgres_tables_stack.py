@@ -28,18 +28,15 @@ from collections.abc import AsyncIterator
 import pytest
 
 from app.agent_tools.docs.fake_docs import default_sections, default_texts
-from app.agent_tools.tickets.find_tickets_text.fake import default_tickets
-from app.db_postgres import DocRow, DocsTable, PostgresClient, TicketRow, TicketsTable
+from app.agent_tools.tickets.fake_tickets import default_threads
+from app.db_postgres import DocRow, DocsTable, PostgresClient, TicketsTable
 from tests.conftest import build_postgres_client
 
 pytestmark = [pytest.mark.stack, pytest.mark.stack_postgres]
 
-# Dwa zmyślone zgłoszenia z atrapy narzędzia. „Załącznik" jest tylko w wątku pierwszego,
-# komunikat błędu w obu.
-ROWS = [
-    TicketRow.from_thread(matched.ticket_id, matched.date, matched.thread)
-    for matched in default_tickets()
-]
+# Dwa zmyślone zgłoszenia ze wspólnego zestawu atrap narzędzi. „Załącznik" jest tylko w wątku
+# pierwszego, komunikat błędu w obu.
+ROWS = [row for row in default_threads() if row.ticket_id in ("90011", "90012")]
 
 # Cztery zmyślone sekcje z dwóch dokumentów, z miejscem każdej w jej dokumencie.
 SECTIONS = default_sections()

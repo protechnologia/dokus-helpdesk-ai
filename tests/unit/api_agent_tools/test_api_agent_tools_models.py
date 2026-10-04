@@ -21,13 +21,12 @@ def make_ref(
         title="Wysyłka przez ePUAP kończy się błędem"
 
     Example result:
-        SourceRef(source="tickets", item_id="33644", title="Wysyłka…", score=0.87, …)
+        SourceRef(source="tickets", item_id="33644", title="Wysyłka…", date=date(2026, 3, 14))
     """
     return SourceRef(
         source  = source,
         item_id = item_id,
         title   = title,
-        score   = 0.87,
         date    = date(2026, 3, 14),
     )
 
@@ -42,19 +41,19 @@ def test_key_tells_sources_apart() -> None:
     assert ticket.key   != fragment.key
 
 
-def test_a_ref_without_a_score_is_refused() -> None:
-    """A reference with the score left out → ValidationError: a default would let a tool forget
-    the score of a ranked source without anyone noticing."""
+def test_a_ref_carries_no_score() -> None:
+    """A reference with a score → ValidationError: sources are what the model read by id, and a
+    read has no similarity. The score is shown to the model by the search, never to the reader."""
     with pytest.raises(ValidationError):
-        SourceRef(source="docs", item_id="doc-7", title="Instrukcja administratora 4.12")
+        SourceRef(source="docs", item_id="doc-7", title="Instrukcja administratora", score=0.87)
 
 
-def test_a_ref_may_state_that_it_has_no_score() -> None:
-    """An explicit `score=None` → accepted: a source found literally or read by its id has no
-    similarity, and saying so is the tool's decision."""
-    ref = SourceRef(source="docs", item_id="doc-7", title="Instrukcja administratora", score=None)
+def test_a_ref_may_have_no_date() -> None:
+    """A reference without a date → accepted: a documentation section may come from a release
+    with no date stated."""
+    ref = SourceRef(source="docs", item_id="doc-7", title="Instrukcja administratora 4.12")
 
-    assert ref.score is None
+    assert ref.date is None
 
 
 @pytest.mark.parametrize("field", ["source", "item_id", "title"])
@@ -69,4 +68,4 @@ def test_an_unknown_field_is_refused() -> None:
     """A key outside the contract → ValidationError, the same reasoning as on ParsedTicket: drift
     is a mistake to surface, not an extension to absorb."""
     with pytest.raises(ValidationError):
-        SourceRef(source="tickets", item_id="33644", title="x", score=0.87, rank=1)
+        SourceRef(source="tickets", item_id="33644", title="x", rank=1)

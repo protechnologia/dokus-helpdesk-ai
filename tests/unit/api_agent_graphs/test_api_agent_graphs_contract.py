@@ -15,6 +15,8 @@ from app.agent_tools.docs.list_docs.fake import FakeListDocsTool
 from app.agent_tools.docs.read_docs.fake import FakeReadDocsTool
 from app.agent_tools.tickets.find_tickets_text.fake import FakeFindTicketsTextTool
 from app.agent_tools.tickets.find_tickets_vector.fake import FakeFindTicketsVectorTool
+from app.agent_tools.tickets.read_tickets_card.fake import FakeReadTicketsCardTool
+from app.agent_tools.tickets.read_tickets_thread.fake import FakeReadTicketsThreadTool
 from app.engine_anonymization import AnonymizedText
 
 
@@ -47,6 +49,8 @@ RESPOND_GRAPHS = [graph for graph in GRAPHS if hasattr(graph, "RESPOND_TOOL_NAME
 AGENT_TOOLS = [
     FakeFindTicketsVectorTool(),
     FakeFindTicketsTextTool(),
+    FakeReadTicketsCardTool(),
+    FakeReadTicketsThreadTool(),
     FakeListDocsTool(),
     FakeFindDocsVectorTool(),
     FakeFindDocsTextTool(),
