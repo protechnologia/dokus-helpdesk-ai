@@ -1262,6 +1262,9 @@ dokus-helpdesk-ai/
 - Type hints obowiązkowe w sygnaturach; zamiast nieotypowanego `dict` — model Pydantic
   lub `TypedDict`.
 - **Nazwy opisują intencję** — `fetch_invoice_summary`, nie `get_data`.
+- **Kilka liczb w wywołaniu podajemy z nazwami, także w tabelach danych** (cennik:
+  `price(input_usd=2.00, output_usd=8.00, cache_read=0.25)`). Same liczby w nawiasie nie mówią,
+  która jest która; gdy nazwy pól są za długie na jedną linię, pomocnik dostaje krótsze.
 - **Casing:** `snake_case` funkcje/zmienne, `PascalCase` klasy, `UPPER_CASE` stałe.
 - **f-stringi** do formatowania, nie `%` ani `.format()`.
 - **Wczesne wyjścia** (guard clauses) zamiast zagnieżdżonych `if/else`.
@@ -1838,8 +1841,8 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   Warunek: początek identyczny co do znaku — stąd instrukcja w turze systemowej i stała kolejność
   narzędzi.
 - **Cenniki sprawdzone z opublikowanymi 2026-10-04; każdy model to jedna linia z trzema
-  liczbami: wejście, wyjście i mnożnik odczytu z cache** (od 0,025 do 0,25 stawki wejścia, bez
-  wartości domyślnej), żeby tabelę dało się porównać z cennikiem na oko. Cennik OpenAI nie
+  nazwanymi liczbami: wejście, wyjście i mnożnik odczytu z cache** (od 0,025 do 0,25 stawki
+  wejścia, bez wartości domyślnej), żeby tabelę dało się porównać z cennikiem na oko. Cennik OpenAI nie
   liczy stawki ZAPISU do cache, którą nowe rodziny już mają (1,25 stawki) — klient nie odczytuje
   tego licznika, więc pierwsza tura jest lekko zaniżona; do domknięcia w p. 17.
 - **Pierwszy przebieg pętli na żywym modelu (2026-10-04, sonda poza repo: `gpt-5.4-mini`,

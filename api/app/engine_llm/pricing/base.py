@@ -23,27 +23,29 @@ class ModelPrice(BaseModel):
 
 
 def price(
-    input_per_million:     float,  # np. 1.00 — USD za milion tokenów wejścia
-    output_per_million:    float,  # np. 5.00 — USD za milion tokenów wyjścia
-    cache_read_multiplier: float,  # np. 0.10 — ułamek stawki wejścia za odczyt z cache
+    *,
+    input_usd:  float,  # np. 1.00 — USD za milion tokenów wejścia
+    output_usd: float,  # np. 5.00 — USD za milion tokenów wyjścia
+    cache_read: float,  # np. 0.10 — ułamek stawki wejścia za token odczytany z cache
 ) -> ModelPrice:
     """
     Description:
-    Buduje wiersz cennika z trzech liczb podanych po kolei. Istnieje po to, żeby tabela cen
-    czytała się jak opublikowany cennik: model w wierszu, liczby w kolumnach.
+    Buduje wiersz cennika z trzech nazwanych liczb. Istnieje po to, żeby tabela cen czytała się
+    jak opublikowany cennik: model w wierszu, w jednej linii, każda liczba podpisana. Nazwy są
+    wymagane — same liczby w nawiasie nie mówią, która jest która.
 
     Example args:
-        input_per_million=1.00
-        output_per_million=5.00
-        cache_read_multiplier=0.10
+        input_usd=1.00
+        output_usd=5.00
+        cache_read=0.10
 
     Example result:
         ModelPrice(input_per_million=1.00, output_per_million=5.00, cache_read_multiplier=0.10)
     """
     row = ModelPrice(
-        input_per_million     = input_per_million,
-        output_per_million    = output_per_million,
-        cache_read_multiplier = cache_read_multiplier,
+        input_per_million     = input_usd,
+        output_per_million    = output_usd,
+        cache_read_multiplier = cache_read,
     )
 
     return row

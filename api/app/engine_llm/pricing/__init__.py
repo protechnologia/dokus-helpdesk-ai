@@ -16,6 +16,7 @@ O czym pamiętać przy zmianach:
   stawek zmienia się datę razem z liczbami.
 - Model spoza tabeli to błąd przy budowie klienta, a nie cena zero: koszt 0,00 USD wygląda jak
   odpowiedź.
-- Każdy wiersz to jedna linia z trzema liczbami w kolumnach, także mnożnikiem odczytu
-  z cache — bez wartości domyślnej, żeby tabelę dało się porównać z cennikiem na oko.
+- Każdy wiersz to jedna linia z trzema NAZWANYMI liczbami, także mnożnikiem odczytu z cache —
+  bez wartości domyślnej i bez zapisu pozycyjnego, żeby tabelę dało się porównać z cennikiem
+  na oko.
 """

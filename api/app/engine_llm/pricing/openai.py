@@ -18,29 +18,30 @@ _DATE_SUFFIX = re.compile(r"-\d{4}-\d{2}-\d{2}$")
 #   Klient odczytuje dziś tylko licznik odczytów z cache, więc zapis jest liczony jak zwykłe
 #   wejście — koszt pierwszej tury z nowym początkiem promptu jest zaniżony o 25% tej części.
 #
-# Kolumny: USD za milion tokenów wejścia · wyjścia · ułamek stawki wejścia za odczyt z cache.
+# `input_usd` i `output_usd` to USD za milion tokenów; `cache_read` to ułamek stawki wejścia
+# za token odczytany z cache.
 PRICES: dict[str, ModelPrice] = {
     # --- rodzina gpt-6; pierwszy jest najmocniejszy w cenniku ---
-    "gpt-6-astra":   price(10.00, 50.00, 0.10),
-    "gpt-6.1-sol":   price( 2.00, 10.00, 0.05),
-    "gpt-6-sol":     price( 2.00, 10.00, 0.10),
-    "gpt-6-luna":    price( 0.10,  0.50, 0.10),
+    "gpt-6-astra":   price(input_usd=10.00, output_usd=50.00, cache_read=0.10),
+    "gpt-6.1-sol":   price(input_usd= 2.00, output_usd=10.00, cache_read=0.05),
+    "gpt-6-sol":     price(input_usd= 2.00, output_usd=10.00, cache_read=0.10),
+    "gpt-6-luna":    price(input_usd= 0.10, output_usd= 0.50, cache_read=0.10),
 
     # --- rodzina gpt-5.6 ---
-    "gpt-5.6-sol":   price( 4.00, 20.00, 0.10),
-    "gpt-5.6-terra": price( 2.00, 12.00, 0.10),
-    "gpt-5.6-luna":  price( 0.20,  1.20, 0.10),
+    "gpt-5.6-sol":   price(input_usd= 4.00, output_usd=20.00, cache_read=0.10),
+    "gpt-5.6-terra": price(input_usd= 2.00, output_usd=12.00, cache_read=0.10),
+    "gpt-5.6-luna":  price(input_usd= 0.20, output_usd= 1.20, cache_read=0.10),
 
     # --- gpt-5.5 i gpt-5.4 ---
-    "gpt-5.5":       price( 5.00, 30.00, 0.10),
-    "gpt-5.4":       price( 2.50, 15.00, 0.10),
-    "gpt-5.4-mini":  price( 0.75,  4.50, 0.10),
-    "gpt-5.4-nano":  price( 0.20,  1.25, 0.10),
+    "gpt-5.5":       price(input_usd= 5.00, output_usd=30.00, cache_read=0.10),
+    "gpt-5.4":       price(input_usd= 2.50, output_usd=15.00, cache_read=0.10),
+    "gpt-5.4-mini":  price(input_usd= 0.75, output_usd= 4.50, cache_read=0.10),
+    "gpt-5.4-nano":  price(input_usd= 0.20, output_usd= 1.25, cache_read=0.10),
 
     # --- starsze, użyte w porównaniu modeli parsowania ---
-    "gpt-4.1":       price( 2.00,  8.00, 0.25),
-    "gpt-4.1-mini":  price( 0.40,  1.60, 0.25),
-    "o4-mini":       price( 1.10,  4.40, 0.25),
+    "gpt-4.1":       price(input_usd= 2.00, output_usd= 8.00, cache_read=0.25),
+    "gpt-4.1-mini":  price(input_usd= 0.40, output_usd= 1.60, cache_read=0.25),
+    "o4-mini":       price(input_usd= 1.10, output_usd= 4.40, cache_read=0.25),
 }
 
 

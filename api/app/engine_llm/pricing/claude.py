@@ -17,18 +17,19 @@ CACHE_WRITE_MULTIPLIER = 1.25
 # Nieznany identyfikator kończy się głośnym błędem w `price_of()`, a nie ceną zero: przebieg
 # raportujący 0,00 USD jest gorszy niż taki, który odmawia startu, bo liczba wygląda jak odpowiedź.
 # Identyfikatory bez daty — to stabilne aliasy.
-# Kolumny: USD za milion tokenów wejścia · wyjścia · ułamek stawki wejścia za odczyt z cache.
+# `input_usd` i `output_usd` to USD za milion tokenów; `cache_read` to ułamek stawki wejścia
+# za token odczytany z cache.
 PRICES: dict[str, ModelPrice] = {
     # --- obecna linia; pierwszy jest najmocniejszy ---
-    "claude-fable-5-1":  price(10.00, 50.00, 0.025),
-    "claude-opus-5-5":   price( 4.00, 20.00, 0.05),
-    "claude-sonnet-5-5": price( 2.00, 10.00, 0.10),
-    "claude-haiku-4-5":  price( 1.00,  5.00, 0.10),
+    "claude-fable-5-1":  price(input_usd=10.00, output_usd=50.00, cache_read=0.025),
+    "claude-opus-5-5":   price(input_usd= 4.00, output_usd=20.00, cache_read=0.05),
+    "claude-sonnet-5-5": price(input_usd= 2.00, output_usd=10.00, cache_read=0.10),
+    "claude-haiku-4-5":  price(input_usd= 1.00, output_usd= 5.00, cache_read=0.10),
 
     # --- starsze, nadal dostępne ---
-    "claude-opus-5":     price( 5.00, 25.00, 0.10),
+    "claude-opus-5":     price(input_usd= 5.00, output_usd=25.00, cache_read=0.10),
     # Cena wprowadzająca 2/10 została ceną stałą; zapowiadana podwyżka do 3/15 nie weszła.
-    "claude-sonnet-5":   price( 2.00, 10.00, 0.10),
+    "claude-sonnet-5":   price(input_usd= 2.00, output_usd=10.00, cache_read=0.10),
 }
 
 
