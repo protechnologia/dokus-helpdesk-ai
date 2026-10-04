@@ -5,7 +5,9 @@ import pytest
 from pydantic import BaseModel
 
 import app.agent_tools
+from app.agent_graphs.base import MAX_CALLS_PLACEHOLDER
 from app.agent_tools import AuxiliaryTool, KnowledgeSource
+from app.config import Settings
 
 
 def tool_packages() -> list[str]:
@@ -175,3 +177,19 @@ def test_real_and_fake_of_one_tool_share_a_name_and_no_two_tools_do() -> None:
 
     all_names = [next(iter(names)) for names in names_per_package.values()]
     assert len(all_names) == len(set(all_names))
+
+
+@pytest.mark.parametrize("tool", TOOLS, ids=lambda cls: cls.__name__)
+def test_every_description_has_one_place_for_the_call_limit(tool: type) -> None:
+    """Każdy opis narzędzia → dokładnie jedno miejsce na limit wywołań: graf wpisuje w nie
+    wartość z konfiguracji, więc model zna limit z góry."""
+    assert tool.description.count(MAX_CALLS_PLACEHOLDER) == 1
+
+
+def test_every_tool_has_a_call_limit_in_the_configuration() -> None:
+    """Nazwy narzędzi → te same co klucze limitów w `Settings`: nowe narzędzie bez pola
+    `agent_max_calls_<narzędzie>` nie złożyłoby definicji dla modelu, a pole bez narzędzia byłoby
+    martwą zmienną w `.env`."""
+    limits = Settings(_env_file=None).tool_call_limits()
+
+    assert set(limits) == {tool.name for tool in TOOLS}

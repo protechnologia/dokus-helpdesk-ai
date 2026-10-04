@@ -17,3 +17,6 @@ oprzesz się na instrukcji, przeczytaj ją.
 
 Każda sekcja niesie wersję i datę wydania dokumentu — instrukcja do starszej
 wersji może już nie obowiązywać.
+
+Limit wywołań w jednej sprawie: {{max_calls}}. Po jego wyczerpaniu narzędzie
+zwraca błąd zamiast wyniku.

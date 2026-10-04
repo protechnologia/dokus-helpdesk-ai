@@ -19,3 +19,6 @@ albo `words`), bez treści. Treść wybranych sekcji odczytasz narzędziem
 - `words` — słowa kluczowe; odmiana nie ma znaczenia.
 
 Podaj co najmniej jedno pole.
+
+Limit wywołań w jednej sprawie: {{max_calls}}. Po jego wyczerpaniu narzędzie
+zwraca błąd zamiast wyniku.

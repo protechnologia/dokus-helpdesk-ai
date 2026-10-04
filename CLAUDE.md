@@ -1705,6 +1705,14 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   `agent_nodes/models.py`, budowany przez `Node.log_entry()`) — przebieg grafu do odczytania bez
   zewnętrznego tracingu. W `message` wyłącznie nazwy, liczby i identyfikatory, nigdy treść
   zgłoszenia ani odpowiedzi modelu: log wraca w stanie razem z wynikiem.
+- **Limity wywołań narzędzi w jednym przebiegu grafu (2026-10-04): `AGENT_MAX_CALLS_<NARZĘDZIE>`
+  w ENV, pole na narzędzie.** Wywołanie ponad limit dostaje błąd jako wynik narzędzia
+  (`{"error": …}`), bez źródeł, a przebieg idzie dalej — model ma odpowiedzieć z tego, co ma.
+  Liczy wspólna funkcja z `agent_nodes/run_tools/limits.py`, z wiadomości w stanie, bez osobnego
+  licznika; używa jej już atrapa `run_tools`, a fabryka podaje limity grafom z narzędziami. Ten
+  sam limit stoi w opisie narzędzia dla modelu: miejsce `{{max_calls}}` w `description.md`
+  wypełnia `tool_definitions()`, więc narzędzie bez limitu to błąd składania. Ile jedno
+  wywołanie może pobrać (20 kart, 5 wątków, 5 sekcji), zostaje stałą w modelu zapytania.
 - **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `engine_llm/messages.py`), żadnych typów
   LangChaina (2026-10-02).** Pętla rozmawia z modelem przez `LLMClient`, a format wiadomości
   u dostawcy tłumaczy jego klient (p. 17). Skoro i model, i narzędzia idą przez nasze kontrakty,
@@ -1758,7 +1766,7 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Atrapa grafu (`build_fake_graph()`) jest jednorazowa** — `FakeAgentNode` ma zaplanowane tury,
   więc trasa i CLI budują ją na każde wywołanie. `ainvoke` zwraca słownik, nie model stanu.
 - **Każdy graf wystawia to samo API** — `STATE`, `TOOL_NAMES`, `system_prompt()`,
-  `user_prompt(state)`, `model_tools(tools)`, `build_graph(…)`, `build_fake_graph()`,
+  `user_prompt(state)`, `model_tools(tools, limits)`, `build_graph(…)`, `build_fake_graph()`,
   `example_state()` (oraz `respond_tool()`, a w `suggest_*` `LABEL` i `REQUIRES_HITS`).
   `test_api_agent_graphs_contract.py` sam znajduje grafy w `app/agent_graphs/` i sprawdza je
   wszystkie, więc nowy graf jest objęty bez dopisywania.
@@ -2026,7 +2034,7 @@ Raises:                      # only when the method raises
 **Konfiguracja (ENV):**
 - Cała konfiguracja przez ENV (pydantic-settings) — żadnych sekretów/endpointów na sztywno.
 - **Jeden `.env` w korzeniu** (nie per usługa; wartości rozdzielamy prefiksami `LLM_*`,
-  `EMBEDDING_*`, `QDRANT_*`, `RAG_*`). `.env` w `.gitignore`, **`.env.example` w repo =
+  `EMBEDDING_*`, `QDRANT_*`, `POSTGRES_*`, `RAG_*`, `AGENT_*`). `.env` w `.gitignore`, **`.env.example` w repo =
   kontrakt** — każda zmienna z compose i `Settings` musi tam być. Bez `.env.prod`/`.env.dev` —
   różnice środowisk przez warstwy compose i ENV na maszynie docelowej.
 - **Progi i parametry retrievalu (`RAG_TOP_K`, `RAG_SCORE_MIN`…) idą do ENV** — to strojenie,
@@ -2197,15 +2205,15 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 727 (0)            | 17 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 138 (53)           | 41 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 764 (0)            | 17 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 140 (53)           | 41 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 74 (9)             | 9 s  |
 | ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 5 (3)              | 40 s |
 
 Liczby i czasy z 2026-10-04: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 9 s, a ewaluacyjne poniżej sekundy —
 całe 40 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
-(`pytest -m ""`): 944 testy, 73 s.
+(`pytest -m ""`): 983 testy, 75 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2682,8 +2690,9 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
   z `render_for_model()` do `messages`, źródła z `cite()` do `sources`; licznik
   `dropped_below_threshold` ma wrócić do odpowiedzi `/search` (zgubiony przy przejściu na graf —
   „nic nie było" i „próg wyciął" to różne odpowiedzi); awaria embeddera albo Qdranta w narzędziu
-  ma dostać handler 503 (dziś `api` ma je tylko dla LLM i anonimizatora). *Dlaczego:* lista źródeł
-  powstaje z wywołań narzędzi, nigdy z deklaracji modelu (zasada 9).
+  ma dostać handler 503 (dziś `api` ma je tylko dla LLM i anonimizatora); limity wywołań narzędzi
+  (`AGENT_MAX_CALLS_*`) egzekwowane funkcją z `limits.py`, której używa już atrapa. *Dlaczego:*
+  lista źródeł powstaje z wywołań narzędzi, nigdy z deklaracji modelu (zasada 9).
 - [ ] **11. `respond`** — walidacja argumentów `respond_<graf>` do typu wyniku grafu; błąd wraca
   do modelu jako wiadomość `tool` (jak w p. 10), z jednym retry; `requires_hits`: graf wymagający
   źródeł bez źródeł nie oddaje propozycji. *Dlaczego:*
@@ -2834,9 +2843,10 @@ każdy mierzy się osobno.
 
 - [ ] **36. Uwierzytelnianie API i własne hasło Postgresa.** *Dlaczego:* endpointy są otwarte,
   reguły bramek będą edytowalne, a compose ma dla bazy hasło dev-owe.
-- [ ] **37. Budżet i limity wywołań zewnętrznych** — z cache'owaniem promptu. *Dlaczego:* bramki
-  dają ruch proporcjonalny do całej pracy helpdesku, pętla mnoży wywołania, a model zewnętrzny to
-  koszt per wywołanie.
+- [ ] **37. Budżet i limity wywołań zewnętrznych** — z cache'owaniem promptu; limity wywołań
+  narzędzi na przebieg już są (`AGENT_MAX_CALLS_*`), do rozważenia wyniesienie do ENV także tego,
+  ile jedno wywołanie może pobrać. *Dlaczego:* bramki dają ruch proporcjonalny do całej pracy
+  helpdesku, pętla mnoży wywołania, a model zewnętrzny to koszt per wywołanie.
 - [ ] **38. Punkt wpięcia i zachowanie przy 503 uzgodnione z helpdeskiem.** *Dlaczego:* bez
   hooka bramek nikt nie woła, a o fail-open decyduje tamta strona.
 - [ ] **39. Sprawy do klienta** — hasła w zrzucie jako niesolone MD5 (zrzut trzymać krótko i nie

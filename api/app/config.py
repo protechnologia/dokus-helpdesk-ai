@@ -1,6 +1,6 @@
-from typing import Any
+from typing import Any, ClassVar
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,9 +19,12 @@ class Settings(BaseSettings):
         3. Field types and defaults apply; a missing required value fails fast at construction.
 
     Field names map to ENV names by upper-casing: `qdrant_url` <- `QDRANT_URL`. The prefixes
-    (`LLM_`, `EMBEDDING_`, `QDRANT_`, `POSTGRES_`) are the only namespacing — there is one `.env`
-    for the whole compose project, not one per service.
+    (`LLM_`, `EMBEDDING_`, `QDRANT_`, `POSTGRES_`, `RAG_`, `AGENT_`) are the only namespacing —
+    there is one `.env` for the whole compose project, not one per service.
     """
+
+    # Przedrostek pól z limitami wywołań narzędzi; reszta nazwy pola to nazwa narzędzia.
+    TOOL_CALL_LIMIT_PREFIX: ClassVar[str] = "agent_max_calls_"
 
     model_config = SettingsConfigDict(
         env_file       = ".env",  # host convenience only; resolved relative to the CWD
@@ -86,6 +89,22 @@ class Settings(BaseSettings):
     # shortest records. Do NOT raise without re-measuring: 0.50 takes four more.
     rag_score_min: float = 0.48                         # cosine similarity, range -1.0 .. 1.0
 
+    # --- agent: limity wywołań narzędzi w jednym przebiegu grafu ---
+    # Ile razy model może wywołać dane narzędzie przy jednej sprawie. Chroni przed pętlą, która
+    # zużywa tokeny bez końca: wywołanie ponad limit dostaje błąd zamiast wyniku, a model ma
+    # odpowiedzieć na podstawie tego, co już ma. Ten sam limit stoi w opisie narzędzia dla modelu.
+    # Wartości ostrożne: wyszukiwanie oddaje kilkadziesiąt tokenów, odczyt wątków i sekcji tysiące.
+    # Pole na narzędzie, o nazwie `agent_max_calls_<narzędzie>` — z niej składa się
+    # `tool_call_limits()`, więc nowe narzędzie to nowe pole tutaj.
+    agent_max_calls_find_tickets_vector: int = Field(default=3, ge=1)
+    agent_max_calls_find_tickets_text:   int = Field(default=3, ge=1)
+    agent_max_calls_read_tickets_card:   int = Field(default=3, ge=1)
+    agent_max_calls_read_tickets_thread: int = Field(default=2, ge=1)
+    agent_max_calls_list_docs:           int = Field(default=1, ge=1)
+    agent_max_calls_find_docs_vector:    int = Field(default=3, ge=1)
+    agent_max_calls_find_docs_text:      int = Field(default=3, ge=1)
+    agent_max_calls_read_docs:           int = Field(default=2, ge=1)
+
     @model_validator(mode="before")
     @classmethod
     def _drop_blank_values(cls, values: Any) -> Any:    # e.g. {"llm_model": "  "}
@@ -111,3 +130,26 @@ class Settings(BaseSettings):
             for key, value in values.items()
             if not (isinstance(value, str) and value.strip() == "")
         }
+
+    def tool_call_limits(self) -> dict[str, int]:
+        """
+        Description:
+        Limity wywołań narzędzi agenta jako mapa nazwa narzędzia → limit, złożona z pól
+        `agent_max_calls_<narzędzie>`. Z niej korzysta węzeł `run_tools` (egzekwuje) i opis
+        narzędzia dla modelu (mówi, ile wywołań ma do dyspozycji).
+
+        Example args:
+            (brak)
+
+        Example result:
+            {"find_tickets_vector": 3, "find_tickets_text": 3, "read_tickets_card": 3, …}
+        """
+        prefix = self.TOOL_CALL_LIMIT_PREFIX
+
+        limits = {
+            name.removeprefix(prefix): getattr(self, name)
+            for name in type(self).model_fields
+            if name.startswith(prefix)
+        }
+
+        return limits

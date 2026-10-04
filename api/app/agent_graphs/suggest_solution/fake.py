@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from langgraph.graph.state import CompiledStateGraph
 
 from app.agent_graphs.fake import fake_search_nodes
@@ -33,7 +35,8 @@ def example_state() -> SuggestSolutionState:
 
 
 def build_fake_graph(
-    proposal: Proposal = DEFAULT_PROPOSAL,  # np. Proposal(text="…")
+    proposal: Proposal = DEFAULT_PROPOSAL,      # np. Proposal(text="…")
+    limits:   Mapping[str, int] | None = None,  # np. {"read_tickets_card": 3}
 ) -> CompiledStateGraph:
     """
     Description:
@@ -43,14 +46,16 @@ def build_fake_graph(
     w argumentach; w stanie zostają trzy źródła z odczytu.
 
     Graf jest jednorazowy: `FakeAgentNode` ma zaplanowane tury. Na każde wywołanie buduj nowy.
+    `limits` to limity wywołań narzędzi; bez nich atrapa niczego nie odmawia.
 
     Example args:
         proposal=Proposal(text="…")
+        limits={"find_tickets_vector": 3, "read_tickets_card": 3}
 
     Example result:
         CompiledStateGraph, który na dowolne zgłoszenie oddaje `output` = podaną propozycję
     """
-    agent, run_tools = fake_search_nodes(RESPOND_TOOL_NAME, proposal)
+    agent, run_tools = fake_search_nodes(RESPOND_TOOL_NAME, proposal, limits)
 
     graph = build_graph(
         anonymize = AnonymizeNode(FakeAnonymizer()),

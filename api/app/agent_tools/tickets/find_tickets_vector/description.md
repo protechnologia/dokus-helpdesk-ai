@@ -24,3 +24,6 @@ podpisów i historii wątku:
 - `symptoms` — co widzi użytkownik, z komunikatem błędu, jeśli jest.
 
 Gdy zgłoszenie opisuje kilka różnych objawów, szukaj osobno dla każdego.
+
+Limit wywołań w jednej sprawie: {{max_calls}}. Po jego wyczerpaniu narzędzie
+zwraca błąd zamiast wyniku.

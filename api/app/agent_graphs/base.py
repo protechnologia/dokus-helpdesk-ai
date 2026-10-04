@@ -1,5 +1,5 @@
 import operator
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Annotated, Literal
 
 from langgraph.graph.state import CompiledStateGraph
@@ -92,36 +92,49 @@ def route_after_agent(
     return "run_tools"
 
 
+# Miejsce w opisie narzędzia (`description.md`), w które wchodzi jego limit wywołań.
+MAX_CALLS_PLACEHOLDER = "{{max_calls}}"
+
+
 def tool_definitions(
     tools:   Sequence[AgentTool],  # np. [FakeFindTicketsVectorTool(), FakeListDocsTool()]
     allowed: Sequence[str],        # np. ("find_tickets_vector", "list_docs")
+    limits:  Mapping[str, int],    # np. {"find_tickets_vector": 3, "list_docs": 1}
 ) -> list[ToolDefinition]:
     """
     Description:
     Definicje narzędzi dla modelu w danym grafie: nazwa narzędzia, jego opis i schemat argumentów
     bez dokumentacji — `query_model` źródła wiedzy albo `args_model` narzędzia pomocniczego. Opis
     należy do narzędzia (`description.md` w jego katalogu) i jest ten sam w każdym grafie; graf
-    decyduje tylko, które narzędzia model widzi.
+    decyduje tylko, które narzędzia model widzi. W opis wchodzi limit wywołań narzędzia z
+    konfiguracji — ten sam, który egzekwuje `run_tools` — więc model wie z góry, ile wywołań ma.
 
     Example args:
         tools=[FakeFindTicketsVectorTool()]
         allowed=("find_tickets_vector", "find_docs_vector")
+        limits={"find_tickets_vector": 3}
 
     Example result:
         [ToolDefinition(name="find_tickets_vector", description="Szuka historycznych zgłoszeń…", …)]
 
     Raises:
-        ValueError: narzędzie spoza listy dozwolonych dla tego grafu
+        ValueError: narzędzie spoza listy dozwolonych dla tego grafu albo bez limitu wywołań
     """
     forbidden = [tool.name for tool in tools if tool.name not in allowed]
 
     if forbidden:
         raise ValueError(f"narzędzia spoza listy dozwolonych dla grafu: {forbidden}")
 
+    # Bez limitu opis poszedłby do modelu z niewypełnionym miejscem.
+    unlimited = [tool.name for tool in tools if tool.name not in limits]
+
+    if unlimited:
+        raise ValueError(f"narzędzia bez limitu wywołań (AGENT_MAX_CALLS_*): {unlimited}")
+
     definitions = [
         ToolDefinition(
             name        = tool.name,
-            description = tool.description,
+            description = tool.description.replace(MAX_CALLS_PLACEHOLDER, str(limits[tool.name])),
             parameters  = json_schema_without_docs(
                 # oba rodzaje trzymają model argumentów pod inną nazwą
                 tool.query_model if isinstance(tool, KnowledgeSource) else tool.args_model

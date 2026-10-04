@@ -17,6 +17,7 @@ from app.agent_tools.tickets.find_tickets_text.fake import FakeFindTicketsTextTo
 from app.agent_tools.tickets.find_tickets_vector.fake import FakeFindTicketsVectorTool
 from app.agent_tools.tickets.read_tickets_card.fake import FakeReadTicketsCardTool
 from app.agent_tools.tickets.read_tickets_thread.fake import FakeReadTicketsThreadTool
+from app.config import Settings
 from app.engine_anonymization import AnonymizedText
 
 
@@ -56,6 +57,9 @@ AGENT_TOOLS = [
     FakeFindDocsTextTool(),
     FakeReadDocsTool(),
 ]
+
+# Limity wywołań narzędzi, jakie daje konfiguracja domyślna.
+LIMITS = Settings(_env_file=None).tool_call_limits()
 
 # Znacznik zamiast tekstu po anonimizacji — gdy jest w prompcie, a tekstu surowego nie ma, prompt
 # wziął treść z `anonymized`.
@@ -250,12 +254,31 @@ def test_the_user_turn_carries_no_instructions(graph: ModuleType) -> None:
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
 def test_the_model_sees_exactly_the_allowed_tools(graph: ModuleType) -> None:
     """Narzędzia wiedzy z listy dozwolonych → po definicji na każde (opis z katalogu narzędzia,
-    bez komentarzy redakcyjnych), a na końcu narzędzie odpowiedzi, jeśli graf je ma."""
+    bez komentarzy redakcyjnych i bez niewypełnionych miejsc), a na końcu narzędzie odpowiedzi,
+    jeśli graf je ma."""
     respond     = [graph.RESPOND_TOOL_NAME] if graph in RESPOND_GRAPHS else []
-    definitions = graph.model_tools(allowed_tools(graph))
+    definitions = graph.model_tools(allowed_tools(graph), LIMITS)
 
     assert [definition.name for definition in definitions] == [*graph.TOOL_NAMES, *respond]
     assert all("<!--" not in definition.description for definition in definitions)
+    assert all("{{" not in definition.description for definition in definitions)
+
+
+@pytest.mark.parametrize(
+    "graph",
+    [graph for graph in GRAPHS if graph.TOOL_NAMES],
+    ids=name_of,
+)
+def test_every_tool_of_the_graph_tells_the_model_its_call_limit(graph: ModuleType) -> None:
+    """Każde narzędzie grafu → w opisie dla modelu jego limit wywołań z konfiguracji: ten sam,
+    który egzekwuje `run_tools`."""
+    definitions = graph.model_tools(allowed_tools(graph), LIMITS)
+
+    for definition in definitions:
+        if definition.name in graph.TOOL_NAMES:
+            expected = f"Limit wywołań w jednej sprawie: {LIMITS[definition.name]}."
+
+            assert expected in definition.description, definition.name
 
 
 @pytest.mark.parametrize(
@@ -267,7 +290,7 @@ def test_a_tool_outside_the_list_is_refused(graph: ModuleType) -> None:
     """Graf bez `find_tickets_vector` na liście dozwolonych → podanie go to błąd składania, nie
     cichy dostęp do indeksu (bramki i „Popraw" mają działać przy pustym indeksie)."""
     with pytest.raises(ValueError):
-        graph.model_tools([FakeFindTicketsVectorTool()])
+        graph.model_tools([FakeFindTicketsVectorTool()], LIMITS)
 
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)

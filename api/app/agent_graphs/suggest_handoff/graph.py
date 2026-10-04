@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from langgraph.graph import END, START, StateGraph
@@ -71,7 +71,8 @@ def user_prompt(
 
 
 def model_tools(
-    tools: Sequence[KnowledgeSource],  # np. []
+    tools:  Sequence[KnowledgeSource],  # np. []
+    limits: Mapping[str, int],          # np. {"find_tickets_vector": 3}
 ) -> list[ToolDefinition]:
     """
     Description:
@@ -79,6 +80,7 @@ def model_tools(
 
     Example args:
         tools=[]
+        limits={}
 
     Example result:
         [ToolDefinition(name="respond_suggest_handoff", …)]
@@ -86,7 +88,7 @@ def model_tools(
     Raises:
         ValueError: podano jakiekolwiek narzędzie wiedzy
     """
-    definitions = tool_definitions(tools, TOOL_NAMES) + [respond_tool()]
+    definitions = tool_definitions(tools, TOOL_NAMES, limits) + [respond_tool()]
 
     return definitions
 

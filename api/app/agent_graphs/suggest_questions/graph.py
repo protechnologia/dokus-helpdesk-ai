@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from functools import partial
 from pathlib import Path
 
@@ -82,7 +82,8 @@ def user_prompt(
 
 
 def model_tools(
-    tools: Sequence[AgentTool],  # np. [FakeFindTicketsVectorTool(), FakeReadDocsTool()]
+    tools:  Sequence[AgentTool],  # np. [FakeFindTicketsVectorTool(), FakeReadDocsTool()]
+    limits: Mapping[str, int],    # np. {"find_tickets_vector": 3}
 ) -> list[ToolDefinition]:
     """
     Description: Narzędzia, które model widzi w tym grafie: podane narzędzia (z listy dozwolonych)
@@ -91,15 +92,16 @@ def model_tools(
 
     Example args:
         tools=[FakeFindTicketsVectorTool(), FakeFindDocsVectorTool()]
+        limits={"find_tickets_vector": 3, "find_docs_vector": 3}
 
     Example result:
         [ToolDefinition(name="find_tickets_vector", …), ToolDefinition(name="read_tickets_card", …),
          ToolDefinition(name="respond_suggest_questions", …)]
 
     Raises:
-        ValueError: narzędzie spoza listy dozwolonych
+        ValueError: narzędzie spoza listy dozwolonych albo bez limitu wywołań
     """
-    definitions = tool_definitions(tools, TOOL_NAMES) + [respond_tool()]
+    definitions = tool_definitions(tools, TOOL_NAMES, limits) + [respond_tool()]
 
     return definitions
 

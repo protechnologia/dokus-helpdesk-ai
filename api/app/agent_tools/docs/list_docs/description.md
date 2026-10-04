@@ -13,3 +13,6 @@ argumentów.
 
 Spis mówi, gdzie co jest, a nie co tam stoi. Treść wybranych sekcji odczytasz
 narzędziem `read_docs`, podając ich identyfikatory.
+
+Limit wywołań w jednej sprawie: {{max_calls}}. Po jego wyczerpaniu narzędzie
+zwraca błąd zamiast wyniku.

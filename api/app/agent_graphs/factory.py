@@ -3,6 +3,8 @@ from types import ModuleType
 
 from langgraph.graph.state import CompiledStateGraph
 
+from app.config import Settings
+
 # Budowa grafu funkcji z jego modułu (np. `app.agent_graphs.gate_close`) — to, o co trasy proszą
 # fabrykę.
 GraphBuilder = Callable[[ModuleType], CompiledStateGraph]
@@ -21,13 +23,23 @@ def build_function_graph(
     Atrapa jest jednorazowa (`FakeAgentNode` ma zaplanowane tury), dlatego graf powstaje na każde
     żądanie, a nie raz na proces.
 
+    Graf z narzędziami dostaje limity ich wywołań z konfiguracji (`AGENT_MAX_CALLS_*`) — atrapa
+    `run_tools` egzekwuje je tak samo, jak będzie to robił węzeł właściwy.
+
     Example args:
         graph=app.agent_graphs.gate_close
 
     Example result:
         CompiledStateGraph złożony z atrap węzłów
     """
-    return graph.build_fake_graph()
+    # --- graf bez narzędzi wiedzy: nie ma czego limitować ---
+    if not graph.TOOL_NAMES:
+        return graph.build_fake_graph()
+
+    # --- graf z narzędziami: limity wywołań z konfiguracji ---
+    limits = Settings().tool_call_limits()
+
+    return graph.build_fake_graph(limits=limits)
 
 
 def get_graph_builder() -> GraphBuilder:

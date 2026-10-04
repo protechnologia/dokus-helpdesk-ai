@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from pydantic import BaseModel
 
 from app.agent_nodes.agent import FakeAgentNode, tool_call_turn
@@ -22,8 +24,9 @@ FAKE_READ_ARGUMENTS = {
 
 
 def fake_search_nodes(
-    respond_tool_name: str,        # np. "respond_search"
-    output:            BaseModel,  # np. Proposal(text="1. Od kiedy…")
+    respond_tool_name: str,                              # np. "respond_search"
+    output:            BaseModel,                        # np. Proposal(text="1. Od kiedy…")
+    limits:            Mapping[str, int] | None = None,  # np. {"read_tickets_card": 3}
 ) -> tuple[FakeAgentNode, FakeRunToolsNode]:
     """
     Description: Atrapy agenta i narzędzi dla grafu z narzędziami wiedzy, w przebiegu „szukaj,
@@ -31,11 +34,13 @@ def fake_search_nodes(
     numerów przez `read_tickets_card`, a potem wywołuje narzędzie odpowiedzi z `output`
     w argumentach. `run_tools` odpowiada na wyszukiwanie samymi numerami, a na odczyt kartami
     (jeden objaw, trzy przyczyny) i ich źródłami — tym samym JSON-em i tym samym `cite()`, co
-    atrapy narzędzi. Źródła pojawiają się więc dopiero po odczycie.
+    atrapy narzędzi. Źródła pojawiają się więc dopiero po odczycie. `limits` to limity wywołań
+    narzędzi z konfiguracji: atrapa `run_tools` egzekwuje je tak samo jak węzeł właściwy.
 
     Example args:
         respond_tool_name="respond_suggest_questions"
         output=Proposal(text="1. Od kiedy…")
+        limits={"find_tickets_vector": 3, "read_tickets_card": 3}
 
     Example result:
         (FakeAgentNode z trzema turami, FakeRunToolsNode z trzema źródłami z odczytu kart)
@@ -63,6 +68,7 @@ def fake_search_nodes(
                 sources = reader.cite(read),
             ),
         },
+        limits  = limits,
     )
 
     return agent, run_tools

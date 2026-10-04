@@ -65,6 +65,15 @@ services:
       POSTGRES_USER:             ${POSTGRES_USER:-helpdesk}
       POSTGRES_PASSWORD:         ${POSTGRES_PASSWORD:-helpdesk}
       POSTGRES_TIMEOUT_SECONDS:  ${POSTGRES_TIMEOUT_SECONDS:-30}
+      # Limity wywołań narzędzi agenta w jednym przebiegu grafu — opis w .env.example.
+      AGENT_MAX_CALLS_FIND_TICKETS_VECTOR: ${AGENT_MAX_CALLS_FIND_TICKETS_VECTOR:-3}
+      AGENT_MAX_CALLS_FIND_TICKETS_TEXT:   ${AGENT_MAX_CALLS_FIND_TICKETS_TEXT:-3}
+      AGENT_MAX_CALLS_READ_TICKETS_CARD:   ${AGENT_MAX_CALLS_READ_TICKETS_CARD:-3}
+      AGENT_MAX_CALLS_READ_TICKETS_THREAD: ${AGENT_MAX_CALLS_READ_TICKETS_THREAD:-2}
+      AGENT_MAX_CALLS_LIST_DOCS:           ${AGENT_MAX_CALLS_LIST_DOCS:-1}
+      AGENT_MAX_CALLS_FIND_DOCS_VECTOR:    ${AGENT_MAX_CALLS_FIND_DOCS_VECTOR:-3}
+      AGENT_MAX_CALLS_FIND_DOCS_TEXT:      ${AGENT_MAX_CALLS_FIND_DOCS_TEXT:-3}
+      AGENT_MAX_CALLS_READ_DOCS:           ${AGENT_MAX_CALLS_READ_DOCS:-2}
     # --reload belongs to the dev layer, not to the image: the shipped CMD has no reloader.
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     healthcheck:

@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from langgraph.graph.state import CompiledStateGraph
 
 from app.agent_graphs.fake import fake_search_nodes
@@ -28,7 +30,9 @@ def example_state() -> SearchState:
     return state
 
 
-def build_fake_graph() -> CompiledStateGraph:
+def build_fake_graph(
+    limits: Mapping[str, int] | None = None,  # np. {"read_tickets_card": 3}
+) -> CompiledStateGraph:
     """
     Description:
     Ten sam graf co `build_graph`, złożony z atrap — do testów tras i CLI. Agent najpierw szuka
@@ -37,14 +41,15 @@ def build_fake_graph() -> CompiledStateGraph:
     i dwa wywołania narzędzi.
 
     Graf jest jednorazowy: `FakeAgentNode` ma zaplanowane tury. Na każde wywołanie buduj nowy.
+    `limits` to limity wywołań narzędzi; bez nich atrapa niczego nie odmawia.
 
     Example args:
-        (brak)
+        limits={"find_tickets_vector": 3, "read_tickets_card": 3}
 
     Example result:
         CompiledStateGraph: anonymize → agent ⇄ run_tools (szukaj, czytaj) → respond
     """
-    agent, run_tools = fake_search_nodes(RESPOND_TOOL_NAME, SearchDone())
+    agent, run_tools = fake_search_nodes(RESPOND_TOOL_NAME, SearchDone(), limits)
 
     graph = build_graph(
         anonymize = AnonymizeNode(FakeAnonymizer()),

@@ -1,6 +1,7 @@
 import pytest
 
 from app.agent_graphs import GraphState, merge_sources, route_after_agent, tool_definitions
+from app.agent_graphs.base import MAX_CALLS_PLACEHOLDER
 from app.agent_nodes.agent import tool_call_turn
 from app.agent_tools import SourceRef
 from app.agent_tools.tickets.find_tickets_vector.fake import FakeFindTicketsVectorTool
@@ -79,18 +80,36 @@ def test_the_route_follows_what_the_model_called(turn: ChatMessage, target: str)
 
 
 def test_tool_definitions_take_the_description_from_the_tool() -> None:
-    """Narzędzie z listy dozwolonych → opis niesiony przez narzędzie, schemat zapytania bez
-    docstringów."""
+    """Narzędzie z listy dozwolonych → opis niesiony przez narzędzie, z limitem wywołań
+    w miejscu do wypełnienia, i schemat zapytania bez docstringów."""
     tool = FakeFindTicketsVectorTool()
 
-    [definition] = tool_definitions([tool], ("find_tickets_vector",))
+    [definition] = tool_definitions([tool], ("find_tickets_vector",), {"find_tickets_vector": 3})
 
-    assert definition.description                   == tool.description
+    assert definition.description == tool.description.replace(MAX_CALLS_PLACEHOLDER, "3")
     assert set(definition.parameters["properties"]) == {"problem", "symptoms"}
     assert "description" not in definition.parameters
 
 
+def test_tool_definitions_put_the_call_limit_into_the_description() -> None:
+    """Limit wywołań z konfiguracji → wpisany w opis, który czyta model, i żadne miejsce do
+    wypełnienia nie zostaje: model ma znać limit z góry, a nie dowiedzieć się o nim z błędu."""
+    tool = FakeFindTicketsVectorTool()
+
+    [definition] = tool_definitions([tool], ("find_tickets_vector",), {"find_tickets_vector": 7})
+
+    assert "Limit wywołań w jednej sprawie: 7." in definition.description
+    assert "{{" not in definition.description
+
+
 def test_tool_definitions_refuse_a_tool_outside_the_list() -> None:
     """Narzędzie spoza listy dozwolonych grafu → błąd składania, nie definicja dla modelu."""
-    with pytest.raises(ValueError):
-        tool_definitions([FakeFindTicketsVectorTool()], ())
+    with pytest.raises(ValueError, match="spoza listy"):
+        tool_definitions([FakeFindTicketsVectorTool()], (), {"find_tickets_vector": 3})
+
+
+def test_tool_definitions_refuse_a_tool_without_a_call_limit() -> None:
+    """Narzędzie bez limitu wywołań → błąd składania: opis poszedłby do modelu z niewypełnionym
+    miejscem, a `run_tools` nie miałby czego egzekwować."""
+    with pytest.raises(ValueError, match="AGENT_MAX_CALLS"):
+        tool_definitions([FakeFindTicketsVectorTool()], ("find_tickets_vector",), {})

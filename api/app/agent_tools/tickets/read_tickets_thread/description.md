@@ -18,3 +18,6 @@ kolejności zdarzeń, tego, kto co zrobił — albo gdy zgłoszenie nie ma karty
 
 Wątki są długie: czytaj te, które wybrałeś po kartach, nie wszystkie znalezione.
 Odczytany wątek trafia na listę źródeł odpowiedzi.
+
+Limit wywołań w jednej sprawie: {{max_calls}}. Po jego wyczerpaniu narzędzie
+zwraca błąd zamiast wyniku.

@@ -20,3 +20,6 @@ o tym samym objawie mają tu różne przyczyny, a widać to dopiero w kartach.
 
 Numery w `without_card` to zgłoszenia bez karty — ich treść da tylko
 `read_tickets_thread`. Odczytana karta trafia na listę źródeł odpowiedzi.
+
+Limit wywołań w jednej sprawie: {{max_calls}}. Po jego wyczerpaniu narzędzie
+zwraca błąd zamiast wyniku.

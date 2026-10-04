@@ -24,3 +24,6 @@ Użyj, gdy zgłoszenie niesie coś, co da się znaleźć słowo w słowo:
 Podaj co najmniej jedno pole. Ten sam komunikat miewa różne przyczyny: trafienie
 mówi, że taki objaw już był, a nie co go wywołało. `omitted_over_limit` większe
 od zera znaczy, że zapytanie było zbyt ogólne.
+
+Limit wywołań w jednej sprawie: {{max_calls}}. Po jego wyczerpaniu narzędzie
+zwraca błąd zamiast wyniku.

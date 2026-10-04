@@ -1,3 +1,4 @@
+import json
 from typing import Annotated
 
 import pytest
@@ -90,6 +91,25 @@ async def test_run_tools_answers_each_tool_with_its_own_answer() -> None:
     assert answered["messages"][0].content == '{"cards": []}'
     assert answered["sources"]             == [ref]
     assert answered["log"][0].message      == "wywołania: read_tickets_card; źródła: 1"
+
+
+async def test_run_tools_refuses_a_call_over_the_limit() -> None:
+    """Drugie wywołanie narzędzia przy limicie 1 → błąd zamiast odpowiedzi i żadnych źródeł:
+    atrapa egzekwuje limit tą samą regułą co węzeł właściwy, a model dostaje to jako wynik
+    narzędzia, nie jako wywalone żądanie."""
+    ref    = SourceRef(source="tickets", item_id="90001", title="Brak przesyłek")
+    first  = ChatMessage(role="tool", call_id="call_1", content="{}")
+    second = tool_call_turn("find_tickets_vector", {"problem": "x", "symptoms": "y"}, "call_2")
+    node   = FakeRunToolsNode(sources=[ref], limits={"find_tickets_vector": 1})
+
+    allowed = await node.run(State(input_text="x", messages=[SEARCH]))
+    refused = await node.run(State(input_text="x", messages=[SEARCH, first, second]))
+
+    assert allowed["sources"] == [ref]
+    assert json.loads(refused["messages"][0].content).keys() == {"error"}
+    assert refused["messages"][0].call_id == "call_2"
+    assert "sources" not in refused
+    assert refused["log"][0].message.endswith("ponad limit: 1")
 
 
 async def test_run_tools_without_sources_leaves_the_field_alone() -> None:

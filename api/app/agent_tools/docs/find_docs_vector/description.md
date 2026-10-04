@@ -15,3 +15,6 @@ odczytasz narzędziem `read_docs`.
 
 - `text` — zagadnienie albo słowa kluczowe: nazwa funkcji, ustawienia lub
   komunikatu.
+
+Limit wywołań w jednej sprawie: {{max_calls}}. Po jego wyczerpaniu narzędzie
+zwraca błąd zamiast wyniku.
