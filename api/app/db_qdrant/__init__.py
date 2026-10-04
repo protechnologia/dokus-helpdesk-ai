@@ -1,38 +1,62 @@
 """
 Description:
-How `api` reaches the Qdrant index. Import from here (`from app.db_qdrant import QdrantClient`)
-rather than from the submodules — the split between client, errors and the transport model is an
-internal detail, while this surface is what domain code may know about storing and finding
-records.
+Sposób, w jaki `api` sięga do usługi `qdrant`. Reszta aplikacji używa stąd wyłącznie klas
+kolekcji (`from app.db_qdrant import TicketsCollection, DocsCollection`) — buduje klienta,
+podaje go kolekcji i woła jej metody.
 
-No factory here, like `app.engine_embedding` and unlike `app.engine_llm`: there is one way to reach
-the index (HTTP to one service), so what varies is a URL, and a URL is an argument. The day another
-vector database becomes a real option, a factory belongs in this package — and nothing outside it
-should have to change.
+Do czego:
+Jeden pakiet na usługę, jak `engine_llm/`, `engine_embedding/` i `db_postgres/` — wymiana bazy
+wektorowej ma dotknąć tylko tego katalogu. Qdrant jest indeksem, nigdy źródłem prawdy (zasada 8):
+każda kolekcja odbudowuje się z plików jedną komendą, więc jej skasowanie to zwykła operacja.
 
-`TicketPoint` and `TicketHit` — the write side and the read side — live here rather than in
-`core_model/` on purpose: they describe what crosses the wire to one particular service, so swapping
-that service touches this directory alone (CLAUDE.md -> "Warstwy kodu": what talks to an external
-service gets its own package, transport models included).
+Każdy plik to jedna odpowiedzialność:
+
+| plik          | co zawiera                                                | kto używa        |
+|---------------|-----------------------------------------------------------|------------------|
+| `collection/` | klasa na kolekcję (`TicketsCollection`, `DocsCollection`) | reszta aplikacji |
+| `point/`      | punkty — to, co zapisujemy: `TicketPoint`, `DocPoint`     | reszta aplikacji |
+| `hit/`        | trafienia — wynik szukania: `TicketHit`, `DocHit`         | reszta aplikacji |
+| `client.py`   | `QdrantClient` — żądanie HTTP i tłumaczenie błędów        | tylko ten pakiet |
+| `errors.py`   | `DbQdrantError`, `DbQdrantConfigError`                    | reszta aplikacji |
+
+O czym pamiętać przy zmianach:
+
+- Kształt żądań i odpowiedzi Qdranta zna wyłącznie ten pakiet: ścieżki w `collection/base.py`,
+  kształt punktu w `point/`, trafienia w `hit/`. Metod żądań klienta nie woła nikt spoza pakietu.
+- `httpx` importuje wyłącznie `client.py` (zasada 4).
+- Nowa kolekcja to nowy plik w `collection/`, model punktu w `point/` i trafienia w `hit/`.
+- Modele punktów i trafień leżą tutaj, a nie w `core_model/`: opisują to, co idzie po drucie
+  do jednej usługi (CLAUDE.md -> „Warstwy kodu").
+
+Bez fabryki, jak `app.db_postgres` i inaczej niż `app.engine_llm`: droga do bazy jest jedna, więc
+zmienia się adres, a adres to argument.
 """
 
 from app.db_qdrant.client import QdrantClient
+from app.db_qdrant.collection import DocsCollection, TicketsCollection
 from app.db_qdrant.errors import DbQdrantConfigError, DbQdrantError
-from app.db_qdrant.model_hit import TicketHit
-from app.db_qdrant.model_point import (
+from app.db_qdrant.hit import DocHit, TicketHit
+from app.db_qdrant.point import (
     VECTOR_PROBLEM,
+    VECTOR_SECTION,
     VECTOR_STS,
+    DocPoint,
     TicketPoint,
     point_id_for,
 )
 
 __all__ = [
     "VECTOR_PROBLEM",
+    "VECTOR_SECTION",
     "VECTOR_STS",
-    "QdrantClient",
     "DbQdrantConfigError",
     "DbQdrantError",
+    "DocHit",
+    "DocPoint",
+    "DocsCollection",
+    "QdrantClient",
     "TicketHit",
     "TicketPoint",
+    "TicketsCollection",
     "point_id_for",
 ]

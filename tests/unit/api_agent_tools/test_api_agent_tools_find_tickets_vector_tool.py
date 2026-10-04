@@ -6,7 +6,7 @@ from app.agent_tools.tickets.find_tickets_vector import (
     FindTicketsVectorTool,
 )
 from app.core_model.ticket_parsed import ParsedTicket
-from app.db_qdrant import VECTOR_PROBLEM, DbQdrantConfigError, QdrantClient
+from app.db_qdrant import VECTOR_PROBLEM, DbQdrantConfigError, QdrantClient, TicketsCollection
 from app.engine_embedding import EmbeddingClient
 from tests.helpers_transport import capturing, with_transport
 
@@ -102,7 +102,7 @@ def _tool(
         ),
     )
     qdrant = with_transport(
-        QdrantClient(base_url="http://qdrant:6333", collection="tickets"),
+        QdrantClient(base_url="http://qdrant:6333"),
         capturing(
             qdrant_seen if qdrant_seen is not None else [],
             {
@@ -112,7 +112,12 @@ def _tool(
         ),
     )
 
-    tool = FindTicketsVectorTool(embedder=embedder, qdrant=qdrant, top_k=top_k, score_min=score_min)
+    tool = FindTicketsVectorTool(
+        embedder  = embedder,
+        tickets   = TicketsCollection(qdrant, "tickets", len(QUERY_VECTOR)),
+        top_k     = top_k,
+        score_min = score_min,
+    )
 
     return tool
 
@@ -216,4 +221,4 @@ async def test_aclose_closes_both_clients() -> None:
     await tool.aclose()
 
     assert tool._embedder._client.is_closed
-    assert tool._qdrant._client.is_closed
+    assert tool._tickets._client._client.is_closed

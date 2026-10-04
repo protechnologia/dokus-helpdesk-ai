@@ -37,7 +37,7 @@ from app.agent_tools.tickets.find_tickets_vector import (
 from app.config import Settings
 from app.core_model.ticket_parsed import ParsedTicket
 from app.core_service.rag_indexer import TicketIndexer
-from app.db_qdrant import QdrantClient
+from app.db_qdrant import QdrantClient, TicketsCollection
 from app.engine_embedding import EmbeddingClient
 
 pytestmark = [
@@ -118,60 +118,61 @@ TICKETS = [
 async def clients(
     host_settings: Settings,
     tmp_path:      Path,
-) -> AsyncIterator[tuple[EmbeddingClient, QdrantClient]]:
+) -> AsyncIterator[tuple[EmbeddingClient, TicketsCollection]]:
     """
     Description:
-    Oddaje klientów działających usług z kolekcją testową zaindeksowaną produkcyjną ścieżką
-    (`TicketIndexer`) — narzędzie ma znaleźć to, co naprawdę zapisuje indeksacja. Kolekcja jest
-    kasowana przed testem i po nim: przerwany przebieg nie zostawi starego stanu następnemu.
+    Oddaje klienta embeddera i kolekcję testową w działającym Qdrancie, zaindeksowaną
+    produkcyjną ścieżką (`TicketIndexer`) — narzędzie ma znaleźć to, co naprawdę zapisuje
+    indeksacja. Kolekcja jest kasowana przed testem i po nim: przerwany przebieg nie zostawi
+    starego stanu następnemu.
 
     Example args:
         host_settings=Settings(embedding_base_url="http://localhost:8001", …)
         tmp_path=Path("/tmp/pytest-0")
 
     Example result:
-        (EmbeddingClient(…), QdrantClient(collection="find_tickets_vector_integration_test"))
+        (EmbeddingClient(…), TicketsCollection „find_tickets_vector_integration_test")
     """
     embedder = EmbeddingClient(
         base_url = host_settings.embedding_base_url,
         timeout  = host_settings.embedding_timeout_seconds,
     )
     qdrant = QdrantClient(
-        base_url   = host_settings.qdrant_url,
-        collection = TEST_COLLECTION,
-        timeout    = host_settings.qdrant_timeout_seconds,
+        base_url = host_settings.qdrant_url,
+        timeout  = host_settings.qdrant_timeout_seconds,
+    )
+    tickets = TicketsCollection(
+        client      = qdrant,
+        name        = TEST_COLLECTION,
+        vector_size = host_settings.embedding_vector_size,
     )
 
-    await qdrant.delete_collection()
+    await tickets.drop()
 
     for ticket in TICKETS:
         artifact = tmp_path / f"{ticket.ticket_id}.json"
         artifact.write_text(ticket.model_dump_json(), encoding="utf-8")
 
-    indexer = TicketIndexer(
-        embedder    = embedder,
-        qdrant      = qdrant,
-        vector_size = host_settings.embedding_vector_size,
-    )
+    indexer = TicketIndexer(embedder=embedder, tickets=tickets)
     await indexer.build(tmp_path)
 
-    yield embedder, qdrant
+    yield embedder, tickets
 
-    await qdrant.delete_collection()
+    await tickets.drop()
     await embedder.aclose()
     await qdrant.aclose()
 
 
 @pytest.mark.parametrize("ticket", TICKETS, ids=lambda ticket: ticket.ticket_id)
 async def test_a_ticket_asked_by_its_own_fields_comes_back_first_and_whole(
-    clients: tuple[EmbeddingClient, QdrantClient],
+    clients: tuple[EmbeddingClient, TicketsCollection],
     ticket:  ParsedTicket,
 ) -> None:
     """Zapytanie polami zaindeksowanego zgłoszenia → to zgłoszenie na pierwszym miejscu, równe
     zapisanemu: payload z Qdranta wraca do `ParsedTicket` bez strat. Asercja na ranking, nie na
     wysokość score."""
-    embedder, qdrant = clients
-    tool   = FindTicketsVectorTool(embedder=embedder, qdrant=qdrant, top_k=5, score_min=-1.0)
+    embedder, tickets = clients
+    tool   = FindTicketsVectorTool(embedder=embedder, tickets=tickets, top_k=5, score_min=-1.0)
     query  = FindTicketsVectorQuery(problem=ticket.problem, symptoms=ticket.symptoms)
     result = await tool.search(query)
 
@@ -181,12 +182,12 @@ async def test_a_ticket_asked_by_its_own_fields_comes_back_first_and_whole(
 
 
 async def test_a_threshold_nothing_passes_counts_everything_as_dropped(
-    clients: tuple[EmbeddingClient, QdrantClient],
+    clients: tuple[EmbeddingClient, TicketsCollection],
 ) -> None:
     """Próg powyżej każdego możliwego podobieństwa → pusty wynik i komplet policzony jako odcięty:
     ostry próg nie może wyglądać jak pusty indeks."""
-    embedder, qdrant = clients
-    tool   = FindTicketsVectorTool(embedder=embedder, qdrant=qdrant, top_k=5, score_min=1.1)
+    embedder, tickets = clients
+    tool   = FindTicketsVectorTool(embedder=embedder, tickets=tickets, top_k=5, score_min=1.1)
     result = await tool.search(
         FindTicketsVectorQuery(problem=TICKETS[0].problem, symptoms=TICKETS[0].symptoms)
     )

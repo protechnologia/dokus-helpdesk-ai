@@ -1126,7 +1126,7 @@ dokus-helpdesk-ai/
 │       ├── engine_llm/           # LLMClient + fabryka + FakeLLMClient + cenniki
 │       ├── engine_embedding/     # EmbeddingClient (HTTP do `embedder`) + prefiksy
 │       ├── engine_anonymization/ # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 19)
-│       ├── db_qdrant/            # klient Qdranta: indeksacja, wyszukiwanie (etap 4)
+│       ├── db_qdrant/            # Qdrant: client.py, collection/ (plik na kolekcję), point/, hit/
 │       ├── db_postgres/          # Postgres: client.py, table/<tabela>/ (klasa + .sql), row/
 │       │                         # --- agent: katalog na jednostkę, właściwa + fake.py ---
 │       ├── agent_tools/          # narzędzia agenta: base.py, folder na materiał, katalog na narzędzie
@@ -1438,14 +1438,35 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
 
 ## Warstwa bazy wektorowej (Qdrant)
 
-Pakiet `api/app/db_qdrant/`.
-
+- **Pakiet `api/app/db_qdrant/`: klient, kolekcje, punkty, trafienia — a reszta aplikacji używa
+  tylko kolekcji (2026-10-04).** `client.py` to samo połączenie (żądanie HTTP, tłumaczenie błędów)
+  i nie zna żadnej kolekcji; jeden klient obsługuje wszystkie. `collection/` ma plik na kolekcję
+  (`TicketsCollection`, `DocsCollection`), a wspólna mechanika stoi w `collection/base.py`.
+  `point/` trzyma to, co zapisujemy, `hit/` to, co oddaje wyszukiwanie; w każdym plik na materiał.
+  Kod spoza pakietu buduje klienta, podaje go kolekcji i woła jej metody. Kolekcja to plik, nie
+  katalog jak tabela w Postgresie, bo nie ma obok `.sql`.
+- **Schemat kolekcji to nazwy wektorów z klasy (`VECTORS`) i wymiar podany w konstruktorze.**
+  Wymiar jest cechą modelu embeddingowego, nie kolekcji, więc przychodzi z konfiguracji
+  (`EMBEDDING_VECTOR_SIZE`) raz, przy budowie obiektu; `ensure()` nie ma argumentów, jak
+  `create()` tabeli. Cena: wymiar podaje też ten, kto kolekcję tylko czyta.
+- **Punkt wchodzi do kolekcji i wraca w tym samym kształcie; trafienie to osobny model.**
+  `read_by_id()` bierze numery zgłoszeń albo identyfikatory sekcji i oddaje całe punkty
+  (`TicketPoint`, `DocPoint`) — w kolejności zapytania, bez tych, których w kolekcji nie ma.
+  Trafienie (`TicketHit`, `DocHit`) nie ma wektorów, a ma podobieństwo, więc `score` jest w nim
+  zawsze. Cena: z odczytem wracają wektory, których wołający zwykle nie potrzebuje.
+- **Kolekcja dokumentacji: jeden nazwany wektor `section`, w payloadzie opis sekcji z metryczki
+  bez treści** — treść leży w Postgresie. Nazwę kolekcji podaje wołający; zmienna ENV dojdzie
+  z importem (p. 49). Co embedować i czy dzielić sekcję na fragmenty, rozstrzyga pomiar (p. 8).
+- **Kolekcja ma `aclose()`, które zamyka jej klienta** — narzędzie dostaje kolekcję, nie klienta,
+  a ma po sobie sprzątać jednym wywołaniem. Klient wspólny dla kilku kolekcji zamyka się wtedy
+  kilka razy; powtórne zamknięcie nic nie robi.
 - **Piszemy wprost na REST Qdranta, bez `qdrant-client`** — użytych endpointów jest kilka, `httpx`
   i tak jest zależnością, a warstwa pośrednia ukryłaby dokładnie to, co tu kontrolujemy ręcznie
   (named vectory, metryka). Ta sama przesłanka, która wykluczyła LangChain/LlamaIndex.
-- **`point_id` = UUID5 z `ticket_id`, namespace ZAMROŻONY** (pod testem złotej wartości). Qdrant
-  przyjmuje tylko `uint` albo UUID, a nasze id to stringi; odwzorowanie musi być **funkcją** id,
-  inaczej `helpdesk rag reindex` duplikuje korpus zamiast go nadpisać. Zmiana namespace’u rozsypuje
+- **`point_id` = UUID5 z identyfikatora źródłowego (`ticket_id`, `section_id`), namespace
+  ZAMROŻONY** (pod testem złotej wartości) i wspólny dla obu kolekcji. Qdrant przyjmuje tylko
+  `uint` albo UUID, a nasze id to stringi; odwzorowanie musi być **funkcją** id, inaczej
+  `helpdesk rag reindex` duplikuje korpus zamiast go nadpisać. Zmiana namespace’u rozsypuje
   wszystkie id naraz — nic poza tym testem by tego nie złapało.
 - **Kolekcja przy rozjeździe NIE jest naprawiana** — inny wymiar albo brak named vectora to
   `DbQdrantConfigError` z **obiema liczbami** w komunikacie. Bez tego rozjazd wychodzi jako
@@ -1525,7 +1546,7 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   ma, więc tabela nie zależy od parsowania, a zmiana pól karty jej nie dotyka. Cena: trafienie
   tekstowe wraca bez karty i model sam wyczytuje przyczynę z wątku. Gdyby pomiar (p. 23, p. 25)
   pokazał, że to szkodzi, narzędzie dociągnie kartę z Qdranta po numerze zgłoszenia
-  (`point_id_for()`), bez zmiany tabeli.
+  (`TicketsCollection.read_by_id()`), bez zmiany tabeli.
 - **Wątek zostaje jednym tekstem, nie dzieli się na opis i komentarze.** Anonimizator przyjmuje
   i oddaje cały wątek, ten sam, który czyta parser, więc do bazy idzie on bez obróbki. Temat
   wycina się z linii „Temat:" tego tekstu (`RawTicket.subject_of_thread()`), bo temat ze źródła
@@ -2152,15 +2173,15 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 613 (0)            | 16 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 127 (45)           | 24 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 73 (9)             | 10 s |
-| ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 5 (3)              | 49 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 676 (0)            | 15 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 133 (51)           | 23 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 73 (9)             | 8 s  |
+| ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 5 (3)              | 39 s |
 
 Liczby i czasy z 2026-10-04: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 9 s, a ewaluacyjne poniżej sekundy —
-całe 49 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
-(`pytest -m ""`): 818 testów, 67 s.
+całe 39 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
+(`pytest -m ""`): 887 testów, 76 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2582,9 +2603,10 @@ punkty niżej to narzędzia właściwe.
   sekcje i zapytania pisze ten sam autor.
 - [ ] **49. Import dokumentacji** — `helpdesk docs validate|import <katalog>`: katalog na
   dokument, metryczka JSON (tytuł, wersja, data i wiersz na plik: stały identyfikator, tytuł,
-  ścieżka rozdziału, krótki opis) oraz pliki `.md` z samą treścią; zapis do kolekcji dokumentacji
-  w Qdrancie i do `DocsTable` w Postgresie; zgodność metryczki z katalogiem
-  w obie strony, limit 8192 tokenów, odmowa dokumentu syntetycznego we właściwym indeksie;
+  ścieżka rozdziału, krótki opis) oraz pliki `.md` z samą treścią; zapis do `DocsCollection`
+  w Qdrancie (jej nazwa jako nowa zmienna ENV) i do `DocsTable` w Postgresie; zgodność metryczki
+  z katalogiem w obie strony, limit 8192 tokenów, odmowa dokumentu syntetycznego we właściwym
+  indeksie;
   sprawdzany na paczce z p. 54. *Dlaczego:* podział robi człowiek z modelem przed wgraniem,
   więc aplikacja nie chunkuje, ale musi odrzucić paczkę, w której sekcja po cichu wypada albo
   embedder ją ucina.

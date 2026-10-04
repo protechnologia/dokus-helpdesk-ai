@@ -56,7 +56,7 @@ from app.agent_tools.tickets.find_tickets_vector.models import (
 )
 from app.core_model.ticket_parsed import ParsedTicket
 from app.core_service.builder_embedding_text import build_embedding_text
-from app.db_qdrant import VECTOR_PROBLEM, DbQdrantConfigError, QdrantClient, TicketHit
+from app.db_qdrant import VECTOR_PROBLEM, DbQdrantConfigError, TicketHit, TicketsCollection
 from app.engine_embedding import EmbeddingClient
 
 logger = logging.getLogger(__name__)
@@ -121,19 +121,19 @@ class FindTicketsVectorTool(FindTicketsVectorToolBase):
 
     def __init__(
         self,
-        embedder:  EmbeddingClient,  # np. EmbeddingClient(base_url="http://embedder:8000")
-        qdrant:    QdrantClient,     # np. QdrantClient(base_url="http://qdrant:6333", …)
-        top_k:     int,              # np. 5 — RAG_TOP_K
-        score_min: float,            # np. 0.48 — RAG_SCORE_MIN, podobieństwo cosinusowe
+        embedder:  EmbeddingClient,    # np. EmbeddingClient(base_url="http://embedder:8000")
+        tickets:   TicketsCollection,  # np. TicketsCollection(QdrantClient(…), "tickets", 768)
+        top_k:     int,                # np. 5 — RAG_TOP_K
+        score_min: float,              # np. 0.48 — RAG_SCORE_MIN, podobieństwo cosinusowe
     ):
         """
         Description:
-        Spina narzędzie z embedderem i Qdrantem oraz z dwoma parametrami strojenia. Klienty są
-        wstrzykiwane, nie budowane tutaj (zasada 4).
+        Spina narzędzie z embedderem i kolekcją zgłoszeń oraz z dwoma parametrami strojenia.
+        Oba są wstrzykiwane, nie budowane tutaj (zasada 4).
 
         Example args:
             embedder=EmbeddingClient(base_url="http://embedder:8000")
-            qdrant=QdrantClient(base_url="http://qdrant:6333", collection="tickets")
+            tickets=TicketsCollection(QdrantClient(base_url="http://qdrant:6333"), "tickets", 768)
             top_k=5
             score_min=0.48
 
@@ -141,7 +141,7 @@ class FindTicketsVectorTool(FindTicketsVectorToolBase):
             FindTicketsVectorTool gotowe do wyszukiwania w kolekcji `tickets`
         """
         self._embedder  = embedder
-        self._qdrant    = qdrant
+        self._tickets   = tickets
         self._top_k     = top_k
         self._score_min = score_min
 
@@ -174,7 +174,7 @@ class FindTicketsVectorTool(FindTicketsVectorToolBase):
         vectors = await self._embedder.embed_query([text])
 
         # --- wyszukanie: zawsze po wektorach `problem`, nigdy `sts` ---
-        hits = await self._qdrant.search(
+        hits = await self._tickets.search(
             vector      = vectors[0],
             vector_name = VECTOR_PROBLEM,
             limit       = self._top_k,
@@ -202,8 +202,8 @@ class FindTicketsVectorTool(FindTicketsVectorToolBase):
     async def aclose(self) -> None:
         """
         Description:
-        Zamyka połączenia obu klientów. Sprzątający woła tylko to i nie musi wiedzieć, z czego
-        narzędzie jest zbudowane.
+        Zamyka połączenia embeddera i Qdranta. Sprzątający woła tylko to i nie musi wiedzieć,
+        z czego narzędzie jest zbudowane.
 
         Example args:
             (brak)
@@ -212,4 +212,4 @@ class FindTicketsVectorTool(FindTicketsVectorToolBase):
             None
         """
         await self._embedder.aclose()
-        await self._qdrant.aclose()
+        await self._tickets.aclose()

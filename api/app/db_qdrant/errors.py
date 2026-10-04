@@ -1,25 +1,25 @@
 class DbQdrantError(Exception):
     """
     Description:
-    Base class for every failure of the retrieval layer. Callers catch this one when all they
-    need to know is "the index did not answer" — never `httpx` exception types, which would leak
-    the transport into the domain (CLAUDE.md -> rule 4).
+    Wspólna klasa każdej awarii warstwy bazy wektorowej. Wołający łapie ją, gdy wystarczy mu
+    wiedzieć „indeks nie odpowiedział" — nigdy typów `httpx`, które wyniosłyby transport do
+    domeny (CLAUDE.md -> zasada 4).
 
-    Deliberately separate from `EmbeddingError`: the two cross DIFFERENT process boundaries and
-    fail for different reasons. An unreachable embedder means no vectors were computed; an
-    unreachable Qdrant means vectors exist but have nowhere to go. During an indexing run those
-    demand different reactions, and one shared class would erase the difference.
+    Osobna od `EmbeddingError`: to dwie różne granice procesu i dwie różne awarie. Niedostępny
+    embedder znaczy, że wektory nie powstały; niedostępny Qdrant — że powstały, ale nie mają
+    dokąd trafić. Przebieg indeksacji reaguje na nie inaczej.
     """
 
 
 class DbQdrantConfigError(DbQdrantError):
     """
     Description:
-    Raised while BUILDING a client, or when the existing collection contradicts the configuration
-    it is supposed to match (a different vector size, a missing named vector).
+    Zgłaszany przy BUDOWIE klienta albo kolekcji oraz wtedy, gdy to, co jest w Qdrancie, przeczy
+    konfiguracji, z którą ma działać: inny wymiar wektora, brak nazwanego wektora, payload
+    z innej wersji kontraktu.
 
-    Build-time failure on purpose. Both cases are unfixable by waiting, so they must not reach the
-    503 handler that means "retry later" (CLAUDE.md -> "Logi i obserwowalność"). The dimension
-    check matters most: without it a mismatch surfaces as points rejected by Qdrant an hour into
-    an indexing run — after the expensive LLM parsing has already been paid for.
+    Żadnego z tych przypadków nie naprawi czekanie, więc nie mogą trafić do handlera 503, który
+    znaczy „spróbuj za chwilę" (CLAUDE.md -> „Logi i obserwowalność"). Najważniejsze jest
+    sprawdzenie wymiaru: bez niego rozjazd wychodzi jako odrzucone punkty godzinę w przebieg
+    indeksacji, już po zapłaceniu za parsowanie LLM-em.
     """

@@ -6,7 +6,7 @@ import typer
 from app.config import Settings
 from app.core_model.rag_index_report import IndexBuildReport
 from app.core_service.rag_indexer import TicketIndexer
-from app.db_qdrant import DbQdrantError, QdrantClient
+from app.db_qdrant import DbQdrantError, QdrantClient, TicketsCollection
 from app.engine_embedding import EmbeddingClient, EmbeddingError
 
 # Wspólne dla `rag index` i `rag reindex` — różni je wyłącznie to, czy kolekcja jest najpierw
@@ -68,7 +68,7 @@ async def _run(
 ) -> IndexBuildReport:
     """
     Description:
-    Buduje klientów z `Settings`, uruchamia indeksację i zamyka połączenia.
+    Buduje klientów i kolekcję zgłoszeń z `Settings`, uruchamia indeksację i zamyka połączenia.
 
     Obaj klienci zamykani w `finally`: przebieg, który padnie w połowie, zostawiłby otwarte
     gniazda, a testy ostrzegałyby o niezamkniętych transportach.
@@ -91,15 +91,15 @@ async def _run(
         timeout  = settings.embedding_timeout_seconds,
     )
     qdrant = QdrantClient(
-        base_url   = settings.qdrant_url,
-        collection = settings.qdrant_collection,
-        timeout    = settings.qdrant_timeout_seconds,
+        base_url = settings.qdrant_url,
+        timeout  = settings.qdrant_timeout_seconds,
     )
-    indexer = TicketIndexer(
-        embedder    = embedder,
-        qdrant      = qdrant,
+    tickets = TicketsCollection(
+        client      = qdrant,
+        name        = settings.qdrant_collection,
         vector_size = settings.embedding_vector_size,
     )
+    indexer = TicketIndexer(embedder=embedder, tickets=tickets)
 
     try:
         if drop_first:

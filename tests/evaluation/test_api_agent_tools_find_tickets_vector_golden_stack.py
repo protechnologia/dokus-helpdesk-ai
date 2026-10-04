@@ -51,7 +51,7 @@ from app.agent_tools.tickets.find_tickets_vector import (
     FindTicketsVectorTool,
 )
 from app.config import Settings
-from app.db_qdrant import QdrantClient
+from app.db_qdrant import QdrantClient, TicketsCollection
 from app.engine_embedding import EmbeddingClient
 from tests.conftest import build_host_settings
 
@@ -158,20 +158,24 @@ async def _measure(
         timeout  = settings.embedding_timeout_seconds,
     )
     qdrant = QdrantClient(
-        base_url   = settings.qdrant_url,
-        collection = settings.qdrant_collection,
-        timeout    = settings.qdrant_timeout_seconds,
+        base_url = settings.qdrant_url,
+        timeout  = settings.qdrant_timeout_seconds,
+    )
+    tickets = TicketsCollection(
+        client      = qdrant,
+        name        = settings.qdrant_collection,
+        vector_size = settings.embedding_vector_size,
     )
     tool = FindTicketsVectorTool(
         embedder  = embedder,
-        qdrant    = qdrant,
+        tickets   = tickets,
         top_k     = settings.rag_top_k,
         score_min = settings.rag_score_min,
     )
 
     try:
         # --- warunek wstępny: jest w czym szukać ---
-        indexed = await qdrant.count_points()
+        indexed = await tickets.count()
 
         assert indexed > 0, (
             f"kolekcja `{settings.qdrant_collection}` jest pusta — zbuduj indeks: "

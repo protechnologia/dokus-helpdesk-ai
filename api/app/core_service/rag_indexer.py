@@ -58,7 +58,7 @@ from app.core_model.filter_quality_report import QualityReport
 from app.core_model.rag_index_report import IndexBuildReport
 from app.core_model.ticket_parsed import ParsedTicket
 from app.core_service.filter_ticket_quality import drop_rate_warning, filter_tickets
-from app.db_qdrant import QdrantClient, TicketPoint
+from app.db_qdrant import TicketPoint, TicketsCollection
 from app.engine_embedding import EmbeddingClient
 
 logger = logging.getLogger(__name__)
@@ -95,26 +95,24 @@ class TicketIndexer:
 
     def __init__(
         self,
-        embedder:    EmbeddingClient,  # np. EmbeddingClient(base_url="http://embedder:8000")
-        qdrant:      QdrantClient,     # np. QdrantClient(base_url="http://qdrant:6333", …)
-        vector_size: int,              # np. 768 — musi zgadzać się z EMBEDDING_VECTOR_SIZE
+        embedder: EmbeddingClient,    # np. EmbeddingClient(base_url="http://embedder:8000")
+        tickets:  TicketsCollection,  # np. TicketsCollection(QdrantClient(…), "tickets", 768)
     ):
         """
         Description:
-        Spina indekser z dwiema usługami, których potrzebuje. Oba klienty są wstrzykiwane, a nie
-        budowane tutaj: domena nigdy nie sięga po własne SDK ani URL (zasada 4).
+        Spina indekser z embedderem i kolekcją zgłoszeń. Oba są wstrzykiwane, a nie budowane
+        tutaj: domena nigdy nie sięga po własne SDK ani URL (zasada 4). Wymiar wektorów zna
+        kolekcja.
 
         Example args:
             embedder=EmbeddingClient(base_url="http://embedder:8000")
-            qdrant=QdrantClient(base_url="http://qdrant:6333", collection="tickets")
-            vector_size=768
+            tickets=TicketsCollection(QdrantClient(base_url="http://qdrant:6333"), "tickets", 768)
 
         Example result:
             TicketIndexer gotowy do zbudowania kolekcji `tickets`
         """
-        self._embedder    = embedder
-        self._qdrant      = qdrant
-        self._vector_size = vector_size
+        self._embedder = embedder
+        self._tickets  = tickets
 
     async def build(
         self,
@@ -140,14 +138,14 @@ class TicketIndexer:
         report  = filter_tickets(tickets)
         kept    = self._kept_tickets(tickets, report)
 
-        await self._qdrant.ensure_collection(vector_size=self._vector_size)
+        await self._tickets.ensure()
         indexed = await self._upsert(kept)
 
         # Same liczby: payloady niosą treść zgłoszeń, czyli dane klienta, którym miejsce najwyżej
         # na DEBUG (CLAUDE.md -> „Logi i obserwowalność").
         logger.info(
             "index build collection=%s read=%d indexed=%d dropped=%d",
-            self._qdrant.collection,
+            self._tickets.name,
             len(tickets),
             indexed,
             len(report.dropped),
@@ -187,7 +185,7 @@ class TicketIndexer:
             NotADirectoryError: ścieżka nie istnieje albo nie jest katalogiem
             DbQdrantError: Qdrant jest nieosiągalny albo odrzucił zapis
         """
-        await self._qdrant.delete_collection()
+        await self._tickets.drop()
 
         return await self.build(directory)
 
@@ -293,6 +291,6 @@ class TicketIndexer:
                 )
             ]
 
-            written += await self._qdrant.upsert_points(points)
+            written += await self._tickets.upsert(points)
 
         return written

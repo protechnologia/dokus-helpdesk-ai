@@ -97,8 +97,8 @@ def routed(
     """
     Description:
     Builds a transport answering per (method, path). For clients whose operations are a
-    conversation rather than a single call — Qdrant's `ensure_collection` reads before it writes,
-    `delete_collection` reads before it deletes, and a single canned answer cannot express that.
+    conversation rather than a single call — a Qdrant collection's `ensure()` reads before it
+    writes, `drop()` reads before it deletes, and a single canned answer cannot express that.
 
     Unrouted requests get `DEFAULT_RESPONSE_BODY` with a 200, so each test names only the calls it
     reasons about.
