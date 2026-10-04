@@ -52,7 +52,7 @@ from app.agent_tools.tickets.find_tickets_vector import (
 )
 from app.config import Settings
 from app.db_qdrant import QdrantClient
-from app.embedding import EmbeddingClient
+from app.engine_embedding import EmbeddingClient
 from tests.conftest import build_host_settings
 
 pytestmark = [

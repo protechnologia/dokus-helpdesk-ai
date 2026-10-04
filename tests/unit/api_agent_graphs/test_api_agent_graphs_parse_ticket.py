@@ -1,6 +1,6 @@
 from app.agent_graphs.parse_ticket import FILLED_BY_GRAPH, example_state, respond_tool, user_prompt
 from app.agent_graphs.parse_ticket.graph import build_parse_prompt
-from app.anonymization import AnonymizedText
+from app.engine_anonymization import AnonymizedText
 
 
 def test_the_graph_prompt_is_the_parsing_prompt_with_the_anonymized_thread() -> None:

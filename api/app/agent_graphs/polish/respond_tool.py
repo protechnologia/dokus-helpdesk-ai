@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from app.agent_graphs.polish.models import PolishedText
-from app.llm import ToolDefinition
+from app.engine_llm import ToolDefinition
 from app.util.json_schema import json_schema_without_docs
 from app.util.markdown import read_document
 

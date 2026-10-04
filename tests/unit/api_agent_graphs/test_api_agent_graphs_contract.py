@@ -15,7 +15,7 @@ from app.agent_tools.docs.list_docs.fake import FakeListDocsTool
 from app.agent_tools.docs.read_docs.fake import FakeReadDocsTool
 from app.agent_tools.tickets.find_tickets_text.fake import FakeFindTicketsTextTool
 from app.agent_tools.tickets.find_tickets_vector.fake import FakeFindTicketsVectorTool
-from app.anonymization import AnonymizedText
+from app.engine_anonymization import AnonymizedText
 
 
 def all_graphs() -> list[ModuleType]:

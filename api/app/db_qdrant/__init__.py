@@ -5,10 +5,10 @@ rather than from the submodules — the split between client, errors and the tra
 internal detail, while this surface is what domain code may know about storing and finding
 records.
 
-No factory here, like `app.embedding` and unlike `app.llm`: there is one way to reach the index
-(HTTP to one service), so what varies is a URL, and a URL is an argument. The day another vector
-database becomes a real option, a factory belongs in this package — and nothing outside it should
-have to change.
+No factory here, like `app.engine_embedding` and unlike `app.engine_llm`: there is one way to reach
+the index (HTTP to one service), so what varies is a URL, and a URL is an argument. The day another
+vector database becomes a real option, a factory belongs in this package — and nothing outside it
+should have to change.
 
 `TicketPoint` and `TicketHit` — the write side and the read side — live here rather than in
 `model/` on purpose: they describe what crosses the wire to one particular service, so swapping

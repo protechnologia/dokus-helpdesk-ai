@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from app.agent_nodes.base import Node
 from app.agent_tools import SourceRef
-from app.llm import ChatMessage
+from app.engine_llm import ChatMessage
 
 DEFAULT_TOOL_RESULT = "fake-tool-result"
 

@@ -4,7 +4,7 @@ from app.agent_graphs import GraphState, merge_sources, route_after_agent, tool_
 from app.agent_nodes.agent import tool_call_turn
 from app.agent_tools import SourceRef
 from app.agent_tools.tickets.find_tickets_vector.fake import FakeFindTicketsVectorTool
-from app.llm import ChatMessage
+from app.engine_llm import ChatMessage
 
 
 def make_ref(

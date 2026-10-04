@@ -9,7 +9,7 @@ from app.agent_graphs.gate_close.respond_tool import respond_tool
 from app.agent_graphs.gate_close.state import GateCloseState
 from app.agent_nodes import Node
 from app.agent_tools import KnowledgeSource
-from app.llm import ToolDefinition
+from app.engine_llm import ToolDefinition
 from app.util.markdown import read_document
 
 GRAPH_DIR   = Path(__file__).parent

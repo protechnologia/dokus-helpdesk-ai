@@ -4,7 +4,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.agent_nodes.base import Node
-from app.llm import ChatMessage, LLMError, ToolCall
+from app.engine_llm import ChatMessage, LLMError, ToolCall
 
 # Odpowiedź atrapy, gdy nikt nie zaplanował tur — stała, a nie echo wejścia, żeby test, który
 # przypadkiem na niej polega, padł głośno.

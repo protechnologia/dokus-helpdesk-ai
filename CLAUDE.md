@@ -1123,11 +1123,11 @@ dokus-helpdesk-ai/
 │       ├── text/                 # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
 │       ├── util/                 # html, validation_text, time
 │       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
-│       ├── llm/                  # LLMClient + fabryka + FakeLLMClient + cenniki
-│       ├── embedding/            # EmbeddingClient (HTTP do `embedder`) + prefiksy
+│       ├── engine_llm/           # LLMClient + fabryka + FakeLLMClient + cenniki
+│       ├── engine_embedding/     # EmbeddingClient (HTTP do `embedder`) + prefiksy
 │       ├── db_qdrant/            # klient Qdranta: indeksacja, wyszukiwanie (etap 4)
 │       ├── db_postgres/          # Postgres: client.py, table/<tabela>/ (klasa + .sql), row/
-│       ├── anonymization/        # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 19)
+│       ├── engine_anonymization/ # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 19)
 │       │                         # --- agent: katalog na jednostkę, właściwa + fake.py ---
 │       ├── agent_tools/          # narzędzia agenta: base.py, folder na materiał, katalog na narzędzie
 │       ├── agent_nodes/          # węzły grafów: kontrakt Node, katalog na węzeł
@@ -1164,19 +1164,23 @@ dokus-helpdesk-ai/
 ## Warstwy kodu
 
 - **Dwie osie podziału, granicą jest przekroczenie granicy procesu.** Co rozmawia z usługą
-  zewnętrzną, dostaje **własny pakiet** (`llm/`, `embedding/`): interfejs, implementacje, fabryka,
-  wyjątki i modele transportu razem, żeby podmiana dostawcy była zmianą jednego katalogu — dlatego
-  te modele **nie wychodzą** do `model/`. Reszta idzie osią techniczną (`model` / `service` /
-  `text` / `util`).
+  zewnętrzną, dostaje **własny pakiet** (`engine_llm/`, `engine_embedding/`): interfejs,
+  implementacje, fabryka, wyjątki i modele transportu razem, żeby podmiana dostawcy była zmianą
+  jednego katalogu — dlatego te modele **nie wychodzą** do `model/`. Reszta idzie osią techniczną
+  (`model` / `service` / `text` / `util`).
 - **Pakiety agenta mają wspólny przedrostek od roli: `agent_graphs/`, `agent_nodes/`,
   `agent_tools/` (2026-10-04, wcześniej `graph/`, `nodes/`, `tools/`).** Nie `langgraph_`:
   LangGrapha importuje tylko `agent_graphs/`, a narzędzia mają od niego nie zależeć.
+- **Klienci usług liczących mają przedrostek `engine_`: `engine_llm/`, `engine_embedding/`,
+  `engine_anonymization/` (2026-10-04, wcześniej bez przedrostka).** Razem z `agent_` i `db_` daje
+  to trzy grupy; bez przedrostka zostaje nasza strona (`model/`, `service/`, `text/`, `util/`)
+  i wejścia (`routers/`, `cli/`).
 - **Pakiety baz nazywają się od bazy: `db_qdrant/` i `db_postgres/` (2026-10-04, wcześniej
   `retrieval/` i `db/`).** Odkąd Postgres też wyszukuje, „retrieval" pasowało do obu, a „db" nie
-  mówiło, o którą bazę chodzi. `llm/` zostaje nazwą roli, bo ma interfejs i wymiennych dostawców;
-  te dwa pakiety mają po jednej implementacji i piszą w języku swojej bazy. Błędy: `DbQdrantError`
-  i `DbPostgresError` z wariantami `…ConfigError`; nie `PostgresError`, bo tak nazywa się klasa
-  sterownika `asyncpg`.
+  mówiło, o którą bazę chodzi. `engine_llm/` zostaje nazwą roli, bo ma interfejs i wymiennych
+  dostawców; te dwa pakiety mają po jednej implementacji i piszą w języku swojej bazy. Błędy:
+  `DbQdrantError` i `DbPostgresError` z wariantami `…ConfigError`; nie `PostgresError`, bo tak
+  nazywa się klasa sterownika `asyncpg`.
 - **Transport vs domena.** Transport = rozmowa z usługą zewnętrzną (LLM, embedder, Qdrant); domena =
   logika, nieświadoma tego, co pod spodem. Domena dostaje klienta transportowego przez
   konstruktor, nigdy nie sięga po SDK.
@@ -1226,8 +1230,8 @@ dokus-helpdesk-ai/
 
 **Gdzie to położyć — cztery pytania, po kolei:**
 
-1. **Rozmawia z usługą zewnętrzną?** → pakiet tej usługi (`llm/`, `embedding/`), razem z jej
-   modelami transportu.
+1. **Rozmawia z usługą zewnętrzną?** → pakiet tej usługi (`engine_llm/`, `engine_embedding/`), razem
+   z jej modelami transportu.
 2. **Da się to opisać i przetestować, ani razu nie nazywając dziedziny?** → `util/`.
 3. **Model danych czy operacja na nich?** → `model/` albo `service/`.
 4. **Dane klienta, które klient zmienia bez deployu** (słownik, zestaw reguł)? → `text/`.
@@ -1247,9 +1251,9 @@ dokus-helpdesk-ai/
 - **Importy zawsze na górze modułu.** Lazy import tylko przy realnym problemie (cykl albo
   faktycznie opcjonalna zależność) — nie „na wszelki wypadek". Konsekwencja przyjęta świadomie:
   import modułu pociąga jego zależności; przy zależnościach twardych to OK.
-  - **Jedyny dziś wyjątek: SDK dostawców LLM w `llm/factory.py`** — importowane wewnątrz builderów,
-    bo problem został **zmierzony, nie przeczuty** (patrz „Warstwa LLM"). Wzorzec do naśladowania
-    przy kolejnych wyjątkach: liczba przed decyzją, powód w komentarzu przy imporcie.
+  - **Jedyny dziś wyjątek: SDK dostawców LLM w `engine_llm/factory.py`** — importowane wewnątrz
+    builderów, bo problem został **zmierzony, nie przeczuty** (patrz „Warstwa LLM"). Wzorzec do
+    naśladowania przy kolejnych wyjątkach: liczba przed decyzją, powód w komentarzu przy imporcie.
 - Type hints obowiązkowe w sygnaturach; zamiast nieotypowanego `dict` — model Pydantic
   lub `TypedDict`.
 - **Nazwy opisują intencję** — `fetch_invoice_summary`, nie `get_data`.
@@ -1655,14 +1659,14 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   `agent_nodes/models.py`, budowany przez `Node.log_entry()`) — przebieg grafu do odczytania bez
   zewnętrznego tracingu. W `message` wyłącznie nazwy, liczby i identyfikatory, nigdy treść
   zgłoszenia ani odpowiedzi modelu: log wraca w stanie razem z wynikiem.
-- **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `llm/messages.py`), żadnych typów
+- **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `engine_llm/messages.py`), żadnych typów
   LangChaina (2026-10-02).** Pętla rozmawia z modelem przez `LLMClient`, a format wiadomości
   u dostawcy tłumaczy jego klient (p. 17). Skoro i model, i narzędzia idą przez nasze kontrakty,
   LangGraph jest **wyłącznie maszyną stanów** — `StructuredTool` z wcześniejszego planu okazał się
   zbędny. Prompt systemowy nie jest wiadomością; dokłada go węzeł `agent` przy każdej turze.
-- **`AnonymizedText` mieszka w `anonymization/`** — pakiecie na usługę anonimizatora, jak
-  `embedding/` (kontrakt `Anonymizer`, `FakeAnonymizer`, fabryka `build_anonymizer`). Osobny typ
-  zamiast `str`, żeby granica była widoczna w sygnaturach: kod przyjmujący `AnonymizedText` nie
+- **`AnonymizedText` mieszka w `engine_anonymization/`** — pakiecie na usługę anonimizatora, jak
+  `engine_embedding/` (kontrakt `Anonymizer`, `FakeAnonymizer`, fabryka `build_anonymizer`). Osobny
+  typ zamiast `str`, żeby granica była widoczna w sygnaturach: kod przyjmujący `AnonymizedText` nie
   przyjmie surowego tekstu przez pomyłkę.
 - **`FakeAnonymizer` oddaje tekst BEZ ZMIAN, więc `build_anonymizer` odmawia go przy każdym
   `LLM_PROVIDER` innym niż `fake`** (`AnonymizationConfigError` przy starcie). Do czasu prawdziwego
@@ -2163,8 +2167,8 @@ tylko test, który potrzebuje działającej usługi albo płatnego modelu: jedno
 w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/conftest.py`.
 
 - **Dzielić wg odpowiedzialności na osobne pliki** — jeden plik = jedna jednostka/aspekt
-  (`test_api_llm_fake.py` + `test_api_llm_factory.py` + `test_api_llm_openai.py` +
-  `test_api_llm_openai_errors.py`), nie jeden zbiorczy.
+  (`test_api_engine_llm_fake.py` + `test_api_engine_llm_factory.py` +
+  `test_api_engine_llm_openai.py` + `test_api_engine_llm_openai_errors.py`), nie jeden zbiorczy.
 - **Nazwa pliku zaczyna się od usługi, której test dotyczy** (`test_api_*`, `test_embedder_*`) —
   przy kilku usługach sama nazwa mówi, co się psuje. **Bez prefiksu zostają testy ponadusługowe**
   (`test_config_plumbing.py` sprawdza `.env.example` wobec `Settings` wszystkich usług) — doklejenie
@@ -2531,7 +2535,8 @@ generacji.
 - [x] **3. Struktura `api/app/agent_nodes/` z listą węzłów** — kontrakt `Node` (`base.py`), katalogi
   `anonymize/`, `agent/`, `run_tools/`, `respond/`; reduktor `merge_sources` w
   `agent_graphs/base.py` (stan ma każdy graf własny, w `state.py`); do tego `ChatMessage`/`ToolCall`
-  (`llm/messages.py`) i `AnonymizedText` (`anonymization/`); reguły — „Warstwa węzłów".
+  (`engine_llm/messages.py`) i `AnonymizedText` (`engine_anonymization/`); reguły — „Warstwa
+  węzłów".
 - [x] **4. Atrapy wszystkich węzłów** — `FakeAgentNode`, `FakeRunToolsNode`, `FakeRespondNode`;
   `anonymize` od razu właściwy (`AnonymizeNode`) na `FakeAnonymizer` z fabryką odmawiającą przy
   prawdziwym LLM; test kontraktu węzłów; reguły — „Warstwa węzłów".

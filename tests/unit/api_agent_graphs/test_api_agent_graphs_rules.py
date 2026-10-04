@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.agent_graphs import gate_close, gate_reply, polish
-from app.anonymization import AnonymizedText
+from app.engine_anonymization import AnonymizedText
 
 # Grafy, w których reguły klienta wchodzą do promptu jako dane, i tytuł ich sekcji.
 RULE_GRAPHS = [

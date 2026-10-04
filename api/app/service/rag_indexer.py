@@ -55,7 +55,7 @@ import logging
 from pathlib import Path
 
 from app.db_qdrant import QdrantClient, TicketPoint
-from app.embedding import EmbeddingClient
+from app.engine_embedding import EmbeddingClient
 from app.model.filter_quality_report import QualityReport
 from app.model.rag_index_report import IndexBuildReport
 from app.model.ticket_parsed import ParsedTicket

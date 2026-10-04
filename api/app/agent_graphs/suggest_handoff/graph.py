@@ -9,7 +9,7 @@ from app.agent_graphs.suggest_handoff.respond_tool import respond_tool
 from app.agent_graphs.suggest_handoff.state import SuggestHandoffState
 from app.agent_nodes import Node
 from app.agent_tools import KnowledgeSource
-from app.llm import ToolDefinition
+from app.engine_llm import ToolDefinition
 from app.util.markdown import read_document
 
 GRAPH_DIR   = Path(__file__).parent

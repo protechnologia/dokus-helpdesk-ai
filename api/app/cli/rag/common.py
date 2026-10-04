@@ -5,7 +5,7 @@ import typer
 
 from app.config import Settings
 from app.db_qdrant import DbQdrantError, QdrantClient
-from app.embedding import EmbeddingClient, EmbeddingError
+from app.engine_embedding import EmbeddingClient, EmbeddingError
 from app.model.rag_index_report import IndexBuildReport
 from app.service.rag_indexer import TicketIndexer
 

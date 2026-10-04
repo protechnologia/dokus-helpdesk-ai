@@ -8,7 +8,7 @@ from app.agent_graphs.parse_ticket.state import ParseTicketState
 from app.agent_nodes.agent import FakeAgentNode, tool_call_turn
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
-from app.anonymization import FakeAnonymizer
+from app.engine_anonymization import FakeAnonymizer
 from app.model.ticket_parsed import ParsedTicket
 from app.service.loader_dict_resolution import get_resolution_classes
 

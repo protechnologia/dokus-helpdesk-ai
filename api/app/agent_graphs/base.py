@@ -7,8 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.agent_nodes import LogEntry
 from app.agent_tools import AgentTool, KnowledgeSource, SourceRef
-from app.anonymization import AnonymizedText
-from app.llm import ChatMessage, ToolDefinition
+from app.engine_anonymization import AnonymizedText
+from app.engine_llm import ChatMessage, ToolDefinition
 from app.util.json_schema import json_schema_without_docs
 
 

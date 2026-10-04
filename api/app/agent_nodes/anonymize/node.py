@@ -3,7 +3,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.agent_nodes.base import Node
-from app.anonymization import Anonymizer
+from app.engine_anonymization import Anonymizer
 
 
 class AnonymizeNode(Node):

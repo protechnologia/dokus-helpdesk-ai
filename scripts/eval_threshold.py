@@ -557,7 +557,7 @@ def plot(
     """
     # Matplotlib importowany LENIWIE, wewnątrz komendy: `table` i `detail` go nie wołają, a jest to
     # najcięższa zależność tego skryptu (~1 s importu wraz z backendem). Ten sam powód co przy SDK
-    # dostawców LLM w `llm/factory.py` (CLAUDE.md -> "Styl kodu").
+    # dostawców LLM w `engine_llm/factory.py` (CLAUDE.md -> "Styl kodu").
     import matplotlib
 
     # Bez interaktywnego backendu: skrypt tylko zapisuje plik, a domyślny backend na maszynie bez

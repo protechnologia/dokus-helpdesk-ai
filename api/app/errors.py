@@ -4,8 +4,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.anonymization import AnonymizationConfigError, AnonymizationError
-from app.llm import LLMConfigError, LLMError
+from app.engine_anonymization import AnonymizationConfigError, AnonymizationError
+from app.engine_llm import LLMConfigError, LLMError
 from app.routers.models import ErrorResponse
 
 logger = logging.getLogger(__name__)

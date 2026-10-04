@@ -3,7 +3,7 @@ import pytest
 from app.agent_graphs import GraphState
 from app.agent_nodes import LogEntry
 from app.agent_nodes.anonymize.node import AnonymizeNode
-from app.anonymization import AnonymizationError, AnonymizedText, Anonymizer, FakeAnonymizer
+from app.engine_anonymization import AnonymizationError, AnonymizedText, Anonymizer, FakeAnonymizer
 
 
 class FailingAnonymizer(Anonymizer):

@@ -7,7 +7,7 @@ from app.agent_graphs.search.respond_tool import RESPOND_TOOL_NAME
 from app.agent_graphs.search.state import SearchState
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
-from app.anonymization import FakeAnonymizer
+from app.engine_anonymization import FakeAnonymizer
 
 
 def example_state() -> SearchState:

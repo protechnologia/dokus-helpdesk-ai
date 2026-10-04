@@ -5,9 +5,9 @@ tabel (`from app.db_postgres import TicketsTable, DocsTable`) — buduje klienta
 tabeli i woła jej metody.
 
 Do czego:
-Jeden pakiet na usługę, jak `llm/`, `embedding/` i `db_qdrant/` — wymiana bazy albo sterownika
-ma dotknąć tylko tego katalogu. Postgres trzyma indeks wyszukiwania tekstowego z polskim
-słownikiem, a od p. 29 — w osobnym schemacie i pod osobną rolą — także reguły bramek.
+Jeden pakiet na usługę, jak `engine_llm/`, `engine_embedding/` i `db_qdrant/` — wymiana bazy
+albo sterownika ma dotknąć tylko tego katalogu. Postgres trzyma indeks wyszukiwania tekstowego
+z polskim słownikiem, a od p. 29 — w osobnym schemacie i pod osobną rolą — także reguły bramek.
 
 Każdy plik to jedna odpowiedzialność:
 
@@ -25,8 +25,8 @@ O czym pamiętać przy zmianach:
 - Sterownik importuje wyłącznie `client.py` (zasada 4).
 - Nowa tabela to nowy katalog w `table/` (klasa i jej pliki `.sql`) oraz model wiersza w `row/`.
 
-Bez fabryki, jak `app.db_qdrant` i inaczej niż `app.llm`: droga do bazy jest jedna, więc zmienia
-się adres, a adres to argument.
+Bez fabryki, jak `app.db_qdrant` i inaczej niż `app.engine_llm`: droga do bazy jest jedna, więc
+zmienia się adres, a adres to argument.
 
 Błędy nazywają się `DbPostgres…`, nie `Postgres…`: `PostgresError` to klasa sterownika `asyncpg`
 i dwie klasy o tej samej nazwie w jednym pliku łatwo pomylić.

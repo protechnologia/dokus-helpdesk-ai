@@ -2,9 +2,9 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from app.anonymization import AnonymizationConfigError, AnonymizationError
+from app.engine_anonymization import AnonymizationConfigError, AnonymizationError
+from app.engine_llm import LLMConfigError, LLMError
 from app.errors import register_exception_handlers
-from app.llm import LLMConfigError, LLMError
 
 
 @pytest.fixture
