@@ -1,9 +1,9 @@
 import httpx
 import pytest
 
+from app.db_qdrant import VECTOR_PROBLEM, DbQdrantConfigError, QdrantClient
 from app.embedding import EmbeddingClient
 from app.model.ticket_parsed import ParsedTicket
-from app.retrieval import VECTOR_PROBLEM, QdrantClient, RetrievalConfigError
 from app.tools.tickets.find_tickets_vector import FindTicketsVectorQuery, FindTicketsVectorTool
 from tests.helpers_transport import capturing, with_transport
 
@@ -178,13 +178,13 @@ async def test_no_hits_is_an_empty_result_not_an_error() -> None:
 
 
 async def test_a_payload_outside_the_contract_is_a_config_error_without_content() -> None:
-    """Payload bez wymaganego pola → `RetrievalConfigError` z id zgłoszenia i nazwą pola, ale bez
+    """Payload bez wymaganego pola → `DbQdrantConfigError` z id zgłoszenia i nazwą pola, ale bez
     treści: indeks z innej wersji kontraktu naprawia przebudowa, a treść zgłoszenia nie trafia
     do logów."""
     broken = _payload("90001")
     del broken["solution"]
 
-    with pytest.raises(RetrievalConfigError) as raised:
+    with pytest.raises(DbQdrantConfigError) as raised:
         await _tool([_hit("90001", 0.71, payload=broken)]).search(QUERY)
 
     message = str(raised.value)

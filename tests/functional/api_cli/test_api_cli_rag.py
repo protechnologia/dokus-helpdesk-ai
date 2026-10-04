@@ -5,10 +5,10 @@ import pytest
 from typer.testing import CliRunner
 
 from app.cli.cli import cli
+from app.db_qdrant import DbQdrantError
 from app.model.filter_quality_report import QualityReport
 from app.model.filter_quality_verdict import QualityVerdict, RuleHit
 from app.model.rag_index_report import IndexBuildReport
-from app.retrieval import RetrievalError
 
 runner = CliRunner()
 
@@ -192,7 +192,7 @@ def test_missing_directory_exits_two(tmp_path: Path, stub_run: StubRun) -> None:
 def test_unreachable_service_exits_two(tmp_path: Path, stub_run: StubRun) -> None:
     """Qdrant down → exit 2, because retrying the same command may well work — unlike an empty
     corpus, which will not fix itself."""
-    stub_run.error = RetrievalError("Could not reach Qdrant")
+    stub_run.error = DbQdrantError("Could not reach Qdrant")
 
     result = runner.invoke(cli, ["rag", "index", str(_corpus(tmp_path))])
 

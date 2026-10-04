@@ -54,11 +54,11 @@ Co się dzieje po drodze:
 import logging
 from pathlib import Path
 
+from app.db_qdrant import QdrantClient, TicketPoint
 from app.embedding import EmbeddingClient
 from app.model.filter_quality_report import QualityReport
 from app.model.rag_index_report import IndexBuildReport
 from app.model.ticket_parsed import ParsedTicket
-from app.retrieval import QdrantClient, TicketPoint
 from app.service.filter_ticket_quality import drop_rate_warning, filter_tickets
 
 logger = logging.getLogger(__name__)
@@ -133,7 +133,7 @@ class TicketIndexer:
 
         Raises:
             NotADirectoryError: ścieżka nie istnieje albo nie jest katalogiem
-            RetrievalError: Qdrant jest nieosiągalny albo odrzucił zapis
+            DbQdrantError: Qdrant jest nieosiągalny albo odrzucił zapis
             EmbeddingError: embedder jest nieosiągalny albo odpowiedział błędem
         """
         tickets = self._read(directory)
@@ -185,7 +185,7 @@ class TicketIndexer:
 
         Raises:
             NotADirectoryError: ścieżka nie istnieje albo nie jest katalogiem
-            RetrievalError: Qdrant jest nieosiągalny albo odrzucił zapis
+            DbQdrantError: Qdrant jest nieosiągalny albo odrzucił zapis
         """
         await self._qdrant.delete_collection()
 
@@ -269,7 +269,7 @@ class TicketIndexer:
 
         Raises:
             EmbeddingError: embedder jest nieosiągalny albo zwrócił inną liczbę wektorów
-            RetrievalError: Qdrant jest nieosiągalny albo odrzucił zapis
+            DbQdrantError: Qdrant jest nieosiągalny albo odrzucił zapis
         """
         written = 0
 

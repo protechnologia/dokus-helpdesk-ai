@@ -41,16 +41,16 @@ O czym pamiętać przy zmianach:
 - Ile pobrać i gdzie uciąć, ustawia konfiguracja, nie agent — zapytanie niesie tylko to, czego
   szukać.
 - Payload niezgodny z `ParsedTicket` znaczy, że indeks zbudowano inną wersją kontraktu. Czekanie
-  tego nie naprawi, stąd `RetrievalConfigError`, a nie błąd „spróbuj później".
+  tego nie naprawi, stąd `DbQdrantConfigError`, a nie błąd „spróbuj później".
 """
 
 import logging
 
 from pydantic import ValidationError
 
+from app.db_qdrant import VECTOR_PROBLEM, DbQdrantConfigError, QdrantClient, TicketHit
 from app.embedding import EmbeddingClient
 from app.model.ticket_parsed import ParsedTicket
-from app.retrieval import VECTOR_PROBLEM, QdrantClient, RetrievalConfigError, TicketHit
 from app.service.builder_embedding_text import build_embedding_text
 from app.tools.tickets.find_tickets_vector.base import FindTicketsVectorToolBase
 from app.tools.tickets.find_tickets_vector.models import (
@@ -77,7 +77,7 @@ def found_ticket_from_hit(
         FoundTicket(score=0.71, ticket=ParsedTicket(ticket_id="90001", …))
 
     Raises:
-        RetrievalConfigError: payload nie spełnia kontraktu `ParsedTicket`
+        DbQdrantConfigError: payload nie spełnia kontraktu `ParsedTicket`
     """
     try:
         ticket = ParsedTicket.model_validate(hit.payload)
@@ -88,7 +88,7 @@ def found_ticket_from_hit(
         })
 
         # `from None`: błąd Pydantica cytuje wartości pól, czyli treść zgłoszenia — nie do logów.
-        raise RetrievalConfigError(
+        raise DbQdrantConfigError(
             f"payload zgłoszenia {hit.ticket_id!r} nie spełnia kontraktu ParsedTicket "
             f"(pola: {', '.join(fields)}) — indeks zbudowano inną wersją kontraktu, "
             f"przebuduj go: helpdesk rag reindex"
@@ -163,8 +163,8 @@ class FindTicketsVectorTool(FindTicketsVectorToolBase):
 
         Raises:
             EmbeddingError: embedder jest nieosiągalny albo odpowiedział błędem
-            RetrievalError: Qdrant jest nieosiągalny albo odpowiedział błędem
-            RetrievalConfigError: payload trafienia nie spełnia kontraktu `ParsedTicket`
+            DbQdrantError: Qdrant jest nieosiągalny albo odpowiedział błędem
+            DbQdrantConfigError: payload trafienia nie spełnia kontraktu `ParsedTicket`
         """
         # --- tekst i wektor zapytania ---
         text = build_embedding_text(

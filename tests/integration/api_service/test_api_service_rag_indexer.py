@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from app.retrieval import VECTOR_PROBLEM, VECTOR_STS, QdrantClient, TicketPoint
+from app.db_qdrant import VECTOR_PROBLEM, VECTOR_STS, QdrantClient, TicketPoint
 from app.service.rag_indexer import EMBED_BATCH_SIZE, TicketIndexer
 
 VECTOR_SIZE = 4

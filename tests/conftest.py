@@ -41,7 +41,7 @@ from urllib.parse import urlsplit
 import pytest
 
 from app.config import Settings
-from app.db import PostgresClient
+from app.db_postgres import PostgresClient
 
 EMBEDDER_URL_ENV     = "EMBEDDER_TEST_URL"
 EMBEDDER_URL_DEFAULT = "http://localhost:8001"

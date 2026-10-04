@@ -52,7 +52,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 # `app` mieszka w api/ i nie jest na ścieżce przy uruchomieniu `python scripts/...`.
 sys.path.insert(0, str(REPO_ROOT / "api"))
 
-from app.retrieval.model_point import VECTOR_PROBLEM  # noqa: E402  (po sys.path)
+from app.db_qdrant.model_point import VECTOR_PROBLEM  # noqa: E402  (po sys.path)
 
 DEFAULT_GOLDEN      = REPO_ROOT / "data" / "golden" / "golden200.json"
 DEFAULT_DISTRACTORS = REPO_ROOT / "data" / "golden" / "distractors.json"

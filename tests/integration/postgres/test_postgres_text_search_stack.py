@@ -29,7 +29,7 @@ O czym pamiętać przy zmianach:
 - Przypadek z oczekiwaniem `False` jest tak samo ważny jak z `True`: „widoczne" nie może znaleźć
   „niewidoczne", a fragment kodu sklejonego z kropkami nie znajduje się słowami — dlatego
   istnieje droga przez podciąg.
-- SQL-a tu nie ma. Szuka `DocsTable` z `app/db/` — tymi samymi metodami, których użyją
+- SQL-a tu nie ma. Szuka `DocsTable` z `app/db_postgres/` — tymi samymi metodami, których użyją
   narzędzia `find_*_text`.
 - Zmiana słownika wymaga przebudowy obrazu, a zmiana mapowania w `initdb/` — także odtworzenia
   wolumenu, bo skrypty startowe działają tylko na pustej bazie.
@@ -40,7 +40,7 @@ from typing import NamedTuple
 
 import pytest
 
-from app.db import DocRow, DocsTable
+from app.db_postgres import DocRow, DocsTable
 from tests.conftest import build_postgres_client
 
 pytestmark = [pytest.mark.stack, pytest.mark.stack_postgres]
@@ -148,7 +148,7 @@ async def _run_cases() -> dict[str, bool]:
         {"odmiana: narzędnik": True, "nie-: twierdzenie ≠ zaprzeczenie": False, …}
 
     Raises:
-        DbConfigError: w bazie nie ma konfiguracji wyszukiwania
+        DbPostgresConfigError: w bazie nie ma konfiguracji wyszukiwania
     """
     client = build_postgres_client()
     table  = DocsTable(client, name=TEST_TABLE)

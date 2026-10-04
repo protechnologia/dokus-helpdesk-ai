@@ -4,9 +4,9 @@ from pathlib import Path
 import typer
 
 from app.config import Settings
+from app.db_qdrant import DbQdrantError, QdrantClient
 from app.embedding import EmbeddingClient, EmbeddingError
 from app.model.rag_index_report import IndexBuildReport
-from app.retrieval import QdrantClient, RetrievalError
 from app.service.rag_indexer import TicketIndexer
 
 # Wspólne dla `rag index` i `rag reindex` — różni je wyłącznie to, czy kolekcja jest najpierw
@@ -83,7 +83,7 @@ async def _run(
     Raises:
         NotADirectoryError: katalog z artefaktami nie istnieje
         EmbeddingError: embedder nieosiągalny albo odpowiedział błędem
-        RetrievalError: Qdrant nieosiągalny albo odrzucił zapis
+        DbQdrantError: Qdrant nieosiągalny albo odrzucił zapis
     """
     settings = Settings()
     embedder = EmbeddingClient(
@@ -140,7 +140,7 @@ def execute_index_build(
         # konfigurację od rzeczywiście pustego wyniku.
         typer.echo(f"BŁĄD: {exc}", err=True)
         raise typer.Exit(code=2) from exc
-    except (EmbeddingError, RetrievalError) as exc:
+    except (EmbeddingError, DbQdrantError) as exc:
         # Leżąca zależność to też 2: ponowienie tej samej komendy może zadziałać, pusty korpus
         # sam się nie naprawi.
         typer.echo(f"BŁĄD: {exc}", err=True)

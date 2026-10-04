@@ -19,7 +19,7 @@
 - [Warstwa CLI](#warstwa-cli)
 - [Warstwa API](#warstwa-api)
 - [Warstwa embeddera](#warstwa-embeddera)
-- [Warstwa retrievalu (Qdrant)](#warstwa-retrievalu-qdrant)
+- [Warstwa bazy wektorowej (Qdrant)](#warstwa-bazy-wektorowej-qdrant)
 - [Warstwa wyszukiwania tekstowego (Postgres)](#warstwa-wyszukiwania-tekstowego-postgres)
 - [Warstwa narzędzi agenta (`tools/`)](#warstwa-narzędzi-agenta-tools)
 - [Warstwa węzłów (`nodes/`)](#warstwa-węzłów-nodes)
@@ -1120,8 +1120,8 @@ dokus-helpdesk-ai/
 │       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
 │       ├── llm/                  # LLMClient + fabryka + FakeLLMClient + cenniki
 │       ├── embedding/            # EmbeddingClient (HTTP do `embedder`) + prefiksy
-│       ├── retrieval/            # klient Qdranta: indeksacja, wyszukiwanie (etap 4)
-│       ├── db/                   # Postgres: client.py, table/<tabela>/ (klasa + .sql), row/
+│       ├── db_qdrant/            # klient Qdranta: indeksacja, wyszukiwanie (etap 4)
+│       ├── db_postgres/          # Postgres: client.py, table/<tabela>/ (klasa + .sql), row/
 │       ├── anonymization/        # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 19)
 │       │                         # --- agent: katalog na jednostkę, właściwa + fake.py ---
 │       ├── tools/                # narzędzia agenta: base.py, folder na materiał, katalog na narzędzie
@@ -1163,6 +1163,12 @@ dokus-helpdesk-ai/
   wyjątki i modele transportu razem, żeby podmiana dostawcy była zmianą jednego katalogu — dlatego
   te modele **nie wychodzą** do `model/`. Reszta idzie osią techniczną (`model` / `service` /
   `text` / `util`).
+- **Pakiety baz nazywają się od bazy: `db_qdrant/` i `db_postgres/` (2026-10-04, wcześniej
+  `retrieval/` i `db/`).** Odkąd Postgres też wyszukuje, „retrieval" pasowało do obu, a „db" nie
+  mówiło, o którą bazę chodzi. `llm/` zostaje nazwą roli, bo ma interfejs i wymiennych dostawców;
+  te dwa pakiety mają po jednej implementacji i piszą w języku swojej bazy. Błędy: `DbQdrantError`
+  i `DbPostgresError` z wariantami `…ConfigError`; nie `PostgresError`, bo tak nazywa się klasa
+  sterownika `asyncpg`.
 - **Transport vs domena.** Transport = rozmowa z usługą zewnętrzną (LLM, embedder, Qdrant); domena =
   logika, nieświadoma tego, co pod spodem. Domena dostaje klienta transportowego przez
   konstruktor, nigdy nie sięga po SDK.
@@ -1416,7 +1422,9 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   „Embedder timed out". Stąd domyślne **120 s**. Uwaga przy strojeniu: `/health` odpowiada, zanim
   model policzy pierwszy wektor, więc **healthcheck nie chroni przed tym timeoutem**.
 
-## Warstwa retrievalu (Qdrant)
+## Warstwa bazy wektorowej (Qdrant)
+
+Pakiet `api/app/db_qdrant/`.
 
 - **Piszemy wprost na REST Qdranta, bez `qdrant-client`** — użytych endpointów jest kilka, `httpx`
   i tak jest zależnością, a warstwa pośrednia ukryłaby dokładnie to, co tu kontrolujemy ręcznie
@@ -1426,7 +1434,7 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
   inaczej `helpdesk rag reindex` duplikuje korpus zamiast go nadpisać. Zmiana namespace’u rozsypuje
   wszystkie id naraz — nic poza tym testem by tego nie złapało.
 - **Kolekcja przy rozjeździe NIE jest naprawiana** — inny wymiar albo brak named vectora to
-  `RetrievalConfigError` z **obiema liczbami** w komunikacie. Bez tego rozjazd wychodzi jako
+  `DbQdrantConfigError` z **obiema liczbami** w komunikacie. Bez tego rozjazd wychodzi jako
   odrzucenie punktów w środku przebiegu, już po zapłaceniu za parsowanie LLM-em.
 - **Qdrant normalizuje wektory przy zapisie w kolekcji `Cosine`** — zapisane `[0.1]*4` wraca jako
   `[0.5]*4` (zmierzone 2026-08-13). Nas to nie kosztuje nic (embedder oddaje wektory jednostkowe,
@@ -1458,7 +1466,7 @@ dwie różne rzeczy, stąd rozłączne nazwy (patrz „Warstwy kodu").
 ## Warstwa wyszukiwania tekstowego (Postgres)
 
 Usługa `postgres` to drugi indeks obok Qdranta: szuka po słowach w odmianie i po dosłownych
-ciągach, czego wektor nie robi. Po stronie `api` stoi pakiet `app/db/` z tabelami zgłoszeń
+ciągach, czego wektor nie robi. Po stronie `api` stoi pakiet `app/db_postgres/` z tabelami zgłoszeń
 i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czytać będą narzędzia
 `find_*_text`, `list_docs` i `read_docs` (p. 49–53).
 
@@ -1488,7 +1496,8 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   odtworzyć wolumen `postgres_data`, bo tabele wyszukiwania odbudowują się z plików (zasada 8).
 - **Do bazy trafia wyłącznie tekst po anonimizacji** — surowy wątek zostaje w `data/raw/`. Dzięki
   temu narzędzie może pokazać modelowi dopasowany fragment.
-- **Pakiet `api/app/db/`: klient, tabele, wiersze — a reszta aplikacji używa tylko tabel.**
+- **Pakiet `api/app/db_postgres/`: klient, tabele, wiersze — a reszta aplikacji używa tylko
+  tabel.**
   `client.py` to samo połączenie (pula, wykonanie SQL-a, tłumaczenie błędów sterownika).
   `table/` ma katalog na tabelę (`tickets/`, `docs/`): klasę w `table.py` i jej SQL obok,
   w `_create.sql` i `_upsert.sql`. Wspólna mechanika — szukanie, odczyt po identyfikatorach,
@@ -1594,7 +1603,7 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   niosą pola pod nazwami ze schematu, bo prompty grafów odwołują się do nich po nazwie; `cause`
   zostaje w brzmieniu parsera, także gdy mówi „brak". Wątek w `find_tickets_text` stoi między
   liniami z numerem zgłoszenia, bo ma własne puste linie. Payload niezgodny z `ParsedTicket` to
-  `RetrievalConfigError` bez treści zgłoszenia w komunikacie: indeks z innej wersji kontraktu
+  `DbQdrantConfigError` bez treści zgłoszenia w komunikacie: indeks z innej wersji kontraktu
   naprawia przebudowa, nie czekanie.
 - **Zapytanie niesie wyłącznie to, czego szukać** — schemat to `query_model` narzędzia. Ile pobrać
   i gdzie uciąć to strojenie (`RAG_TOP_K`, `RAG_SCORE_MIN`), nie decyzja modelu; nieznany argument

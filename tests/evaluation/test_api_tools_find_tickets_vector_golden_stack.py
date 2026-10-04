@@ -47,8 +47,8 @@ from typing import NamedTuple
 import pytest
 
 from app.config import Settings
+from app.db_qdrant import QdrantClient
 from app.embedding import EmbeddingClient
-from app.retrieval import QdrantClient
 from app.tools.tickets.find_tickets_vector import FindTicketsVectorQuery, FindTicketsVectorTool
 from tests.conftest import build_host_settings
 
@@ -148,7 +148,7 @@ async def _measure(
     Raises:
         AssertionError: skonfigurowana kolekcja jest pusta
         EmbeddingError: embedder jest nieosiągalny albo odpowiedział błędem
-        RetrievalError: Qdrant jest nieosiągalny albo kolekcja nie istnieje
+        DbQdrantError: Qdrant jest nieosiągalny albo kolekcja nie istnieje
     """
     embedder = EmbeddingClient(
         base_url = settings.embedding_base_url,
