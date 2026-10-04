@@ -129,7 +129,7 @@ services:
       - "${DOCKER_BIND_ADDR:-127.0.0.1}:${DOCKER_QDRANT_PORT:-6333}:6333"
     volumes:
       # A named volume is convenience, not a backup: the collection is rebuilt from
-      # data/parsed/ with one command, so the backup target is that directory (rule 8).
+      # data/unsafe/parsed/ with one command, so the backup target is that directory (rule 8).
       - qdrant_storage:/qdrant/storage
     # No healthcheck: the image carries no shell and no python, so a probe would need a helper
     # binary we would have to add ourselves. Qdrant is not gated on by anything here anyway.

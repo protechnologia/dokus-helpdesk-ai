@@ -27,7 +27,7 @@ class ValidationReport(BaseModel):
             (none)
 
         Example result:
-            [FileVerdict(path=Path("data/parsed/33644.json"), errors=["resolution: …"])]
+            [FileVerdict(path=Path("data/unsafe/parsed/33644.json"), errors=["resolution: …"])]
         """
         return [verdict for verdict in self.verdicts if not verdict.ok]
 

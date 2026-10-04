@@ -1,7 +1,7 @@
 """
 Description:
-Kontrakt sparsowanego zgłoszenia. Jeden `ParsedTicket` to jeden plik JSON w `data/parsed/`, a ten
-model rozstrzyga, czy plik jest poprawnym artefaktem. Do indeksu nie trafiają surowe zgłoszenia,
+Kontrakt sparsowanego zgłoszenia. Jeden `ParsedTicket` to jeden plik JSON w `data/unsafe/parsed/`, a
+ten model rozstrzyga, czy plik jest poprawnym artefaktem. Do indeksu nie trafiają surowe zgłoszenia,
 tylko ta struktura: z dwóch pól powstaje wektor, wszystkie jadą w payloadzie Qdranta.
 
 | pole                            | kto wypełnia                    | w wektorze |
@@ -15,7 +15,7 @@ tylko ta struktura: z dwóch pól powstaje wektor, wszystkie jadą w payloadzie 
 | `resolution_vocabulary_version` | graf `parse_ticket`             | nie        |
 | `questions_summary`             | model                           | nie        |
 
-Przykład — artefakt `data/parsed/33644.json`:
+Przykład — artefakt `data/unsafe/parsed/33644.json`:
 
     {
       "ticket_id":         "33644",
@@ -58,7 +58,7 @@ class ParsedTicket(BaseModel):
     """
     Description:
     Sparsowane zgłoszenie — trwały artefakt projektu. Jedna instancja to jeden plik JSON
-    w `data/parsed/`.
+    w `data/unsafe/parsed/`.
 
     Do czego:
     Przebieg LLM jest drogi i jednorazowy, więc artefakt jest trwały, a embeddingi i kolekcje

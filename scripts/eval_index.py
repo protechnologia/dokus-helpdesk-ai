@@ -3,7 +3,7 @@
 OBIE KOMENDY WYMAGAJĄ ZBUDOWANEGO INDEKSU I CHODZĄCEGO STACKU:
 
     docker compose up -d                          # embedder + qdrant
-    helpdesk rag index data/parsed/<zestaw>       # napełnij kolekcję
+    helpdesk rag index data/unsafe/parsed/<zestaw>       # napełnij kolekcję
     python scripts/eval_index.py recall           # recall@K jednego trybu
     python scripts/eval_index.py modes            # porównanie query→passage z sts→sts
 
@@ -51,7 +51,7 @@ sys.path.insert(0, str(REPO_ROOT / "api"))
 
 from app.db_qdrant.point.tickets import VECTOR_PROBLEM, VECTOR_STS  # noqa: E402  (po sys.path)
 
-DEFAULT_GOLDEN = REPO_ROOT / "data" / "golden" / "golden200.json"
+DEFAULT_GOLDEN = REPO_ROOT / "data" / "unsafe" / "golden" / "golden200.json"
 
 # Adresy z HOSTA, nie z sieci compose: skrypt jest repo-level i chodzi obok stacku, więc widzi
 # usługi przez opublikowane porty, a nie po nazwach kontenerów.
@@ -73,7 +73,7 @@ HELP_MODES   = "Porównuje query→passage z sts→sts na zapytaniach surowych i
 
 
 def _load_queries(
-    golden_path: pathlib.Path,  # e.g. Path("data/golden/golden200.json")
+    golden_path: pathlib.Path,  # e.g. Path("data/unsafe/golden/golden200.json")
 ) -> list[dict]:
     """
     Description:
@@ -81,7 +81,7 @@ def _load_queries(
     left in the index as distractors, so they need no entry of their own.
 
     Example args:
-        golden_path=Path("data/golden/golden200.json")
+        golden_path=Path("data/unsafe/golden/golden200.json")
 
     Example result:
         [{"expected_ticket_id": 5641, "query_raw": "Dzień dobry, nie mogę…", …}]

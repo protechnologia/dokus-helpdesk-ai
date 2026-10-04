@@ -17,8 +17,8 @@ a testy jednostkowe i integracyjne na trzech zmyślonych zgłoszeniach tego nie 
 
 Co się dzieje po drodze:
 
-1. Czyta zapytania z `data/golden/golden200.json` (162, każde ze wskazanym rekordem-celem)
-   i z `data/golden/distractors.json` (16, bez odpowiednika w indeksie).
+1. Czyta zapytania z `data/unsafe/golden/golden200.json` (162, każde ze wskazanym rekordem-celem)
+   i z `data/unsafe/golden/distractors.json` (16, bez odpowiednika w indeksie).
 2. Każde wysyła do `FindTicketsVectorTool` polami `query_problem` i `query_symptoms`, na
    skonfigurowanej kolekcji, z `RAG_TOP_K` i `RAG_SCORE_MIN` z konfiguracji.
 3. Liczy, ile razy rekord-cel wrócił jako pierwszy, ile razy wrócił w ogóle i ile dystraktorów
@@ -31,7 +31,7 @@ O czym pamiętać przy zmianach:
   (p. 23).
 - Indeksem jest skonfigurowana kolekcja, a nie własna, bo zbudowanie własnej z 200 artefaktów trwa
   na CPU ponad dwie i pół minuty. Pusta kolekcja wywala test; buduje ją
-  `helpdesk rag index data/parsed/bielik-11b-golden200`.
+  `helpdesk rag index data/unsafe/parsed/bielik-11b-golden200`.
 - Indeks i golden set to te same rekordy, więc liczby pilnują, że ścieżka się nie zepsuła,
   a skutecznością produktu nie są.
 - Zmiana `RAG_SCORE_MIN` albo `RAG_TOP_K` przesuwa wszystkie trzy liczby. Co próg robi z każdym
@@ -62,8 +62,8 @@ pytestmark = [
 ]
 
 # Zapytania z rekordem-celem i zapytania bez odpowiednika w indeksie.
-GOLDEN_FILE      = Path("data/golden/golden200.json")
-DISTRACTORS_FILE = Path("data/golden/distractors.json")
+GOLDEN_FILE      = Path("data/unsafe/golden/golden200.json")
+DISTRACTORS_FILE = Path("data/unsafe/golden/distractors.json")
 
 # Zmierzone 152 ze 162; próg niżej, żeby wyłapać zepsutą ścieżkę, a nie zwykły dryf.
 MIN_TARGET_FIRST = 145
@@ -179,7 +179,7 @@ async def _measure(
 
         assert indexed > 0, (
             f"kolekcja `{settings.qdrant_collection}` jest pusta — zbuduj indeks: "
-            f"helpdesk rag index data/parsed/bielik-11b-golden200"
+            f"helpdesk rag index data/unsafe/parsed/bielik-11b-golden200"
         )
 
         # --- zapytania z rekordem-celem ---

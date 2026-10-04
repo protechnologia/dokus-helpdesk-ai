@@ -14,9 +14,9 @@ przechodzi, indeks zapełnia się pustymi wpisami, a żaden inny test tego nie z
 
 Co się dzieje po drodze:
 
-1. Czyta 200 artefaktów z `data/parsed/bielik-11b-golden200/`.
+1. Czyta 200 artefaktów z `data/unsafe/parsed/bielik-11b-golden200/`.
 2. Czyta id rekordów oznaczonych w przeglądzie jako niosące zero wiedzy (`rejected`
-   w `data/golden/golden200.json`).
+   w `data/unsafe/golden/golden200.json`).
 3. Uruchamia `filter_tickets()` i liczy, ile odrzuceń trafia w oznaczone, a ile poza nie.
 
 O czym pamiętać przy zmianach:
@@ -38,8 +38,8 @@ from app.core_model.ticket_parsed import ParsedTicket
 from app.core_service.filter_ticket_quality import filter_tickets
 
 # Korpus odniesienia i etykiety z jego przeglądu; oba mają przetrwać masowy import (p. 31).
-CORPUS_DIR  = Path("data/parsed/bielik-11b-golden200")
-LABELS_FILE = Path("data/golden/golden200.json")
+CORPUS_DIR  = Path("data/unsafe/parsed/bielik-11b-golden200")
+LABELS_FILE = Path("data/unsafe/golden/golden200.json")
 
 # Zmierzone 29 z 38; próg niżej, żeby wyłapać filtr, który zamilkł, a nie zwykły dryf.
 MIN_LABELLED_DROPS = 25

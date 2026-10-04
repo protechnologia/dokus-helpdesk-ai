@@ -10,8 +10,8 @@ class ResolutionVocabulary(BaseModel):
 
     Why versioned: this vocabulary is interpolated into the PARSING prompt, so editing it changes
     what future artifacts mean. Every `ParsedTicket` records the version it was produced with, so
-    a later edit does not silently invalidate `data/parsed/` (CLAUDE.md -> rule 7) and re-parsing
-    can be selective instead of total.
+    a later edit does not silently invalidate `data/unsafe/parsed/` (CLAUDE.md -> rule 7) and
+    re-parsing can be selective instead of total.
 
     Deliberately NOT an Enum in code: where one helpdesk draws the line between "we changed the
     system" and "the customer acts on their side" reflects how that organisation works, and means

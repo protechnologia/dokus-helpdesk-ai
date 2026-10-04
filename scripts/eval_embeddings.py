@@ -11,7 +11,7 @@ Do czego:
     dałoby wynik opisujący coś innego niż produkt.
 
 Flow:
-    1. Wczytuje golden set (`data/golden/<zestaw>.json`) i artefakty korpusu.
+    1. Wczytuje golden set (`data/unsafe/golden/<zestaw>.json`) i artefakty korpusu.
     2. Dla każdego modelu ładuje wagi raz, po czym dla każdego trybu:
        - embeduje CAŁY korpus jako dokumenty (także rekordy odrzucone — są dystraktorami),
        - embeduje zapytania,
@@ -47,7 +47,7 @@ sys.path.insert(0, str(REPO_ROOT / "api"))
 
 from app.core_model.ticket_parsed import ParsedTicket  # noqa: E402  (import po ustawieniu sys.path)
 
-DEFAULT_GOLDEN = REPO_ROOT / "data" / "golden" / "golden200.json"
+DEFAULT_GOLDEN = REPO_ROOT / "data" / "unsafe" / "golden" / "golden200.json"
 
 # Tryby prefiksów PER MODEL. Klucz to nazwa modelu na HF, wartość to mapowanie
 # rola -> prefiks. `document` jest tym, co w naszym kontrakcie nazywa się `passage`.
@@ -101,7 +101,7 @@ HELP_BATCH   = "Rozmiar partii przy embedowaniu."
 
 
 def _load_corpus(
-    corpus_dir: pathlib.Path,  # e.g. Path("data/parsed/bielik-11b-golden200")
+    corpus_dir: pathlib.Path,  # e.g. Path("data/unsafe/parsed/bielik-11b-golden200")
 ) -> tuple[list[int], list[str]]:
     """
     Description:
@@ -110,7 +110,7 @@ def _load_corpus(
     text is byte-for-byte what indexing will embed.
 
     Example args:
-        corpus_dir=Path("data/parsed/bielik-11b-golden200")
+        corpus_dir=Path("data/unsafe/parsed/bielik-11b-golden200")
 
     Example result:
         ([5612, 5641], ["Brak dostępności Menu…\\nPo zalogowaniu…", "Brak możliwości…\\n…"])
@@ -299,7 +299,7 @@ def recall(
     which of them wins is genuinely open (CLAUDE.md -> „Embeddingi").
 
     Example args:
-        golden=Path("data/golden/golden200.json")
+        golden=Path("data/unsafe/golden/golden200.json")
         models=["OPI-PIB/PolDense-150M"]
         k=5
         batch=32

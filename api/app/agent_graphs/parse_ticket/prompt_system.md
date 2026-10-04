@@ -1,7 +1,7 @@
 <!-- Prompt parsujący — strona systemowa.
 
      To jest KONTRAKT ARTEFAKTU razem z respond_tool.md i prompt_user.md: każda zmiana tych trzech
-     plików zmienia znaczenie wszystkich przyszłych plików w data/parsed/, więc żyją w gicie pod
+     plików zmienia znaczenie wszystkich przyszłych plików w data/unsafe/parsed/, więc żyją w gicie pod
      testem-strażnikiem (tests/unit/api_agent_graphs/test_api_agent_graphs_parse_ticket_prompt.py) i nigdy w konfiguracji
      klienta (CLAUDE.md → zasada 7, „Prompty"). Zmiana = pokaż przed/po i oczekiwany wpływ.
 

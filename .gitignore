@@ -6,7 +6,10 @@
 !.env.example
 
 # --- artefakty i dane wejściowe: zawierają dane klientów (PII) ---
-data/
+# Ignorowane jest wszystko w data/ poza data/safe/ — także katalog założony tam przez pomyłkę.
+# W data/safe/ leżą wyłącznie dane zmyślone; dane klientów trzymamy w data/unsafe/.
+data/*
+!data/safe/
 
 # --- Python ---
 .venv/

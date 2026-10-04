@@ -1,0 +1,119 @@
+{
+  "document": "Instrukcja administratora",
+  "version": "4.12",
+  "date": "2026-05-04",
+  "synthetic": true,
+  "sections": [
+    {
+      "section_id": "adm-kancelaria-edoreczenia",
+      "chapter_path": [
+        "Uprawnienia",
+        "Kancelaria"
+      ],
+      "title": "Uprawnienie do kancelarii e-Doręczeń",
+      "description": "Kto i gdzie nadaje uprawnienie do kancelarii e-Doręczeń i kiedy zaczyna działać"
+    },
+    {
+      "section_id": "adm-kancelaria-epuap",
+      "chapter_path": [
+        "Uprawnienia",
+        "Kancelaria"
+      ],
+      "title": "Uprawnienie do skrzynki ePUAP",
+      "description": "Kto nadaje uprawnienie do skrzynki ePUAP i jak je odebrać"
+    },
+    {
+      "section_id": "adm-role-i-profile",
+      "chapter_path": [
+        "Uprawnienia"
+      ],
+      "title": "Role i profile uprawnień",
+      "description": "Czym różni się rola od profilu i w jakiej kolejności składają się uprawnienia użytkownika"
+    },
+    {
+      "section_id": "adm-widocznosc-spraw",
+      "chapter_path": [
+        "Uprawnienia",
+        "Sprawy"
+      ],
+      "title": "Widoczność spraw w komórce organizacyjnej",
+      "description": "Które sprawy współpracowników może przeglądać pracownik komórki i jak to zmienić"
+    },
+    {
+      "section_id": "adm-okres-waznosci-struktury",
+      "chapter_path": [
+        "Struktura organizacyjna"
+      ],
+      "title": "Okres ważności elementu struktury",
+      "description": "Co się dzieje, gdy stanowisko albo komórka ma ustawioną datę „Ważny do”"
+    },
+    {
+      "section_id": "adm-edoreczenia-konfiguracja",
+      "chapter_path": [
+        "Integracje",
+        "e-Doręczenia"
+      ],
+      "title": "Konfiguracja skrzynki e-Doręczeń",
+      "description": "Parametry połączenia ze skrzynką e-Doręczeń, częstotliwość pobierania i typowe przyczyny braku korespondencji"
+    },
+    {
+      "section_id": "adm-epuap-konfiguracja",
+      "chapter_path": [
+        "Integracje",
+        "ePUAP"
+      ],
+      "title": "Konfiguracja skrytki ePUAP",
+      "description": "Parametry połączenia ze skrytką ePUAP, wymiana certyfikatu i pobieranie poświadczeń"
+    },
+    {
+      "section_id": "adm-enadawca-konfiguracja",
+      "chapter_path": [
+        "Integracje",
+        "eNadawca"
+      ],
+      "title": "Konfiguracja usługi eNadawca",
+      "description": "Dane konta eNadawcy, karta umowy, urząd nadania i automatyczne przekazywanie bufora"
+    },
+    {
+      "section_id": "adm-podpis-weryfikacja",
+      "chapter_path": [
+        "Integracje",
+        "Podpis elektroniczny"
+      ],
+      "title": "Weryfikacja podpisu i status certyfikatu",
+      "description": "Jak sprawdzana jest ważność podpisu i czego weryfikacja wymaga od sieci urzędu"
+    },
+    {
+      "section_id": "adm-limity-serwera",
+      "chapter_path": [
+        "Utrzymanie"
+      ],
+      "title": "Limity zasobów serwera aplikacji",
+      "description": "Parametry limitów sesji, pamięci i czasu odpowiedzi oraz błędy, które je sygnalizują"
+    },
+    {
+      "section_id": "adm-numeracja-roczna",
+      "chapter_path": [
+        "Utrzymanie"
+      ],
+      "title": "Sekwencje numeracji na nowy rok",
+      "description": "Jak przygotować numerację rejestrów i spraw przed zmianą roku i co się dzieje, gdy jej zabraknie"
+    },
+    {
+      "section_id": "adm-kopie-zapasowe",
+      "chapter_path": [
+        "Utrzymanie"
+      ],
+      "title": "Harmonogram kopii zapasowych",
+      "description": "Jak ustawić harmonogram i sprawdzić, czy nocna archiwizacja bazy się wykonała"
+    },
+    {
+      "section_id": "adm-wykaz-uprawnien",
+      "chapter_path": [
+        "Załączniki"
+      ],
+      "title": "Wykaz uprawnień",
+      "description": "Pełna lista kodów uprawnień z opisem i profilami domyślnymi, pogrupowana według obszarów aplikacji"
+    }
+  ]
+}

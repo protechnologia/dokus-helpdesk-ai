@@ -12,7 +12,7 @@ Przykłady:
     no_solution("Brak możliwości wygenerowania ZPO w tej
                  sytuacji. Klient musi zaakceptować…")            -> False, odmowa to treść
 
-Moduł niczego nie zapisuje: artefakty w `data/parsed/` i payload Qdranta zostają w brzmieniu
+Moduł niczego nie zapisuje: artefakty w `data/unsafe/parsed/` i payload Qdranta zostają w brzmieniu
 parsera, a wołający sam decyduje, co zrobić z odpowiedzią.
 
 O czym pamiętać przy zmianach:

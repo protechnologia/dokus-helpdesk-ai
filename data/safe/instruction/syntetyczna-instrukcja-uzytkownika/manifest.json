@@ -1,0 +1,123 @@
+{
+  "document": "Instrukcja użytkownika",
+  "version": "4.12",
+  "date": "2026-05-04",
+  "synthetic": true,
+  "sections": [
+    {
+      "section_id": "usr-wysylka-status-w-toku",
+      "chapter_path": [
+        "Wysyłka",
+        "ePUAP"
+      ],
+      "title": "Status „W toku” przy wysyłce ePUAP",
+      "description": "Co znaczy status „W toku” i dlaczego nie wolno ponawiać wysyłki"
+    },
+    {
+      "section_id": "usr-wysylka-enadawca-w-toku",
+      "chapter_path": [
+        "Wysyłka",
+        "eNadawca"
+      ],
+      "title": "Status „W toku” przy wysyłce przez eNadawcę",
+      "description": "Co znaczy status „W toku” dla przesyłki listowej i jak przekazać ją operatorowi"
+    },
+    {
+      "section_id": "usr-wysylka-edoreczenia",
+      "chapter_path": [
+        "Wysyłka",
+        "e-Doręczenia"
+      ],
+      "title": "Wysyłka pisma przez e-Doręczenia",
+      "description": "Jak nadać pismo e-Doręczeniami i skąd wziąć dowód wysłania"
+    },
+    {
+      "section_id": "usr-wysylka-limit-zalacznika",
+      "chapter_path": [
+        "Wysyłka"
+      ],
+      "title": "Limit rozmiaru załączników",
+      "description": "Skąd bierze się limit rozmiaru załączników przy wysyłce i co zrobić po jego przekroczeniu"
+    },
+    {
+      "section_id": "usr-odbior-edoreczenia",
+      "chapter_path": [
+        "Odbiór"
+      ],
+      "title": "Odbiór korespondencji z e-Doręczeń",
+      "description": "Gdzie trafia korespondencja z e-Doręczeń i jak ją zarejestrować"
+    },
+    {
+      "section_id": "usr-odbior-epuap",
+      "chapter_path": [
+        "Odbiór"
+      ],
+      "title": "Odbiór korespondencji z ePUAP",
+      "description": "Gdzie trafia korespondencja z ePUAP i co oznaczają jej statusy"
+    },
+    {
+      "section_id": "usr-sprawy-niewidoczne",
+      "chapter_path": [
+        "Sprawy"
+      ],
+      "title": "Niewidoczne sprawy na liście",
+      "description": "Dlaczego sprawa nie pokazuje się na liście i co sprawdzić po kolei"
+    },
+    {
+      "section_id": "usr-sprawy-akceptacja",
+      "chapter_path": [
+        "Sprawy"
+      ],
+      "title": "Akceptacja dokumentu",
+      "description": "Jak przekazać dokument do akceptacji i co zrobić, gdy na liście brakuje akceptującego"
+    },
+    {
+      "section_id": "usr-dokumenty-skanowanie",
+      "chapter_path": [
+        "Dokumenty"
+      ],
+      "title": "Skanowanie dokumentów",
+      "description": "Ustawienia skanowania zalecane dla pism i najczęstsze przyczyny nieczytelnych skanów"
+    },
+    {
+      "section_id": "usr-dokumenty-podpis",
+      "chapter_path": [
+        "Dokumenty"
+      ],
+      "title": "Podpisywanie dokumentów",
+      "description": "Rodzaje podpisu dostępne w aplikacji i co zrobić, gdy podpis się nie udaje"
+    },
+    {
+      "section_id": "usr-dokumenty-szablony",
+      "chapter_path": [
+        "Dokumenty"
+      ],
+      "title": "Szablony pism i pola automatyczne",
+      "description": "Jak tworzyć pisma z szablonów i które pola wypełniają się same"
+    },
+    {
+      "section_id": "usr-komunikat-brak-serwera",
+      "chapter_path": [
+        "Komunikaty błędów"
+      ],
+      "title": "Komunikat „Nie udało się skomunikować z serwerem”",
+      "description": "Możliwe przyczyny komunikatu zależnie od czynności"
+    },
+    {
+      "section_id": "usr-komunikat-sesja-wygasla",
+      "chapter_path": [
+        "Komunikaty błędów"
+      ],
+      "title": "Komunikat o wygaśnięciu sesji",
+      "description": "Kiedy sesja się kończy i jak nie stracić niezapisanej pracy"
+    },
+    {
+      "section_id": "usr-odswiezanie",
+      "chapter_path": [
+        "Ustawienia użytkownika"
+      ],
+      "title": "Odświeżanie strony, sesji i ustawień",
+      "description": "Który rodzaj odświeżenia pomaga na co: strona, sesja, układ tabeli, ustawienia osobiste"
+    }
+  ]
+}

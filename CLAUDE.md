@@ -116,9 +116,9 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
    Embeddingi i kolekcje Qdranta są wymienne i odtwarzalne — przebieg LLM jest drogi
    i jednorazowy. Re-index **nigdy** nie wymaga ponownego wołania LLM.
    - **Zasada zaczyna obowiązywać dla artefaktu z masowego importu (p. 31)** — jednego przebiegu
-     całego korpusu zamrożoną wersją promptu. Dziś w `data/parsed/` leży `bielik-11b-golden200/`
-     (200 artefaktów, podstawa golden setu — ma przetrwać import) i próbki porównawcze parserów,
-     które import nadpisze albo skasuje.
+     całego korpusu zamrożoną wersją promptu. Dziś w `data/unsafe/parsed/` leży
+     `bielik-11b-golden200/` (200 artefaktów, podstawa golden setu — ma przetrwać import) i próbki
+     porównawcze parserów, które import nadpisze albo skasuje.
    - Pomiary „na 661 rekordach" pochodzą z wcześniejszej próbki, skasowanej 2026-07-31. Zniknęły
      pliki, nie wiedza — liczby pozostają wiążące.
 8. **Qdrant jest indeksem, nie źródłem prawdy.** Musi dać się skasować i odbudować z katalogu
@@ -148,7 +148,8 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
 - **Nie wrzucaj pola `solution` do embeddingu** — rozwiązanie żyje w payloadzie, nie w wektorze
 - **Nie indeksuj surowej treści maila** — indeksujemy wyłącznie sparsowane pola; jedyny wyjątek
   to zanonimizowany wątek w indeksie tekstowym (p. 53), nigdy w wektorze
-- **Nie kasuj i nie nadpisuj plików w `data/parsed/`** — to niepowtarzalny wynik przebiegu LLM
+- **Nie kasuj i nie nadpisuj plików w `data/unsafe/parsed/`** — to niepowtarzalny wynik przebiegu
+  LLM
 - **Nie filtruj korpusu po `status = 'zamkniety'`** — Dokus kończy zgłoszenia na `rozwiazany`,
   `zamkniety` ma 5 sztuk na 1825
 - **Nie szukaj rozwiązań w tabeli `rozwiazanie`** — jest martwa; rozwiązanie to `komentarz`
@@ -217,12 +218,12 @@ od p. 19 `anonymizer`. LLM jest **zewnętrznym endpointem**, nie usługą w bazo
   żeby dało się ją przenieść albo przepisać bez poprawiania pozostałych (2026-10-04). Wyjątkiem są
   numery punktów planu („p. N"), bo są stałe. Starsze odwołania usuwamy przy zmianach w sekcji,
   nie hurtem.
-- **`data/docs/` — raporty z pomiarów i dokumenty projektu, POZA repo.** Katalog jest w `data/`,
-  więc obejmuje go `.gitignore` (2026-08-20). Powód: **raport cytujący korpus niesie PII**, choćby
+- **`data/unsafe/docs/` — raporty z pomiarów i dokumenty projektu, POZA repo** (2026-08-20).
+  Powód: **raport cytujący korpus niesie PII**, choćby
   autor tego nie zamierzał — wystarczy wkleić zrzut z konsoli operującej na zgłoszeniach, żeby
   trafiły tam nazwiska użytkowników. Zdarzyło się przy pomiarze progu: trzy nazwiska w wyjściu
   `eval_threshold.py detail`, wyłapane dopiero przy commicie. Wnioski trwałe przenoś **do
-  CLAUDE.md** (bez cytatów), a plik z pomiarem zostaw w `data/docs/`.
+  CLAUDE.md** (bez cytatów), a plik z pomiarem zostaw w `data/unsafe/docs/`.
 - **README** — „jak": uruchomienie i kontrakt dla użytkownika. Proponowany podział na sekcje:
   1. **Stack** — technologie i ich role.
   2. **Flow działania** — ogólny algorytm (wejście → etapy → wyjście).
@@ -256,12 +257,17 @@ dokus-helpdesk-ai/
 ├── requirements-dev.txt          # zależności testów/lintera (poza obrazem)
 ├── CLAUDE.md / README.md
 ├── scripts/                      # narzędzia repo niezwiązane z usługą
-├── data/                         # artefakty — NIE w repo (PII)
-│   ├── raw/                      # zgłoszenia źródłowe jak przyszły
-│   ├── parsed/                   # sparsowane JSON-y (trwały artefakt, zasada 7)
-│   ├── golden/                   # zestawy do ewaluacji: zgłoszenia, dystraktory, dokumentacja
-│   ├── instruction/              # dokumentacja: katalog na dokument, manifest.json + pliki .md
-│   └── docs/                     # raporty z pomiarów i dokumenty projektu
+├── data/
+│   ├── safe/                     # dane zmyślone — W repo
+│   │   ├── instruction/          # syntetyczna dokumentacja: manifest.json + pliki .md
+│   │   └── golden/               # zestaw zapytań do niej
+│   └── unsafe/                   # dane klientów (PII) — NIE w repo
+│       ├── db/                   # zrzuty bazy źródłowej
+│       ├── raw/                  # zgłoszenia źródłowe jak przyszły
+│       ├── parsed/               # sparsowane JSON-y (trwały artefakt, zasada 7)
+│       ├── golden/               # zestawy do ewaluacji: zgłoszenia, dystraktory
+│       ├── instruction/          # właściwa dokumentacja (p. 49, p. 55)
+│       └── docs/                 # raporty z pomiarów i dokumenty projektu
 ├── api/                          # folder = usługa z compose, nazwany tak samo
 │   ├── Dockerfile
 │   ├── .dockerignore
@@ -306,8 +312,7 @@ dokus-helpdesk-ai/
 │   ├── integration/              # jednostka + prawdziwa zależność: pliki, FastAPI, LangGraph, Qdrant
 │   ├── functional/               # cała aplikacja przez HTTP albo komendę
 │   └── evaluation/               # golden sety
-├── integrations/<język>/         # klienci dla konsumentów API
-└── samples/                      # zanonimizowane dane do testów i ewaluacji
+└── integrations/<język>/         # klienci dla konsumentów API
 ```
 
 - **Folder = usługa z compose**; wszystko do zbudowania obrazu leży w nim, nie w korzeniu.
@@ -530,7 +535,7 @@ MariaDB 10.3, aplikacja na Doctrine/Symfony, 21 tabel). Nie jest to eksport plik
 mailowa — **źródłem jest relacyjna baza produkcyjna**, więc adapter w `core_service/` czyta SQL,
 nie CSV.
 
-**`data/raw/` jest zdejmowane ze zrzutu skryptem `scripts/export_raw_tickets.py`** — wiernie,
+**`data/unsafe/raw/` jest zdejmowane ze zrzutu skryptem `scripts/export_raw_tickets.py`** — wiernie,
 bez stripowania HTML-u i bez filtra jakości (filtr to decyzja etapu 4, zabetonowany w artefakcie
 przestałby być widoczny). Eksport jest odtwarzalny i nie woła LLM-a, więc **nie podlega zasadzie
 7** — w razie potrzeby wolno go powtórzyć albo zmienić jego kształt. Kolumny z hasłami nie są
@@ -541,7 +546,7 @@ czytane przez żadne zapytanie tego skryptu.
 ```
 zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedTicket (JSON na dysku)
                                                                     │
-                              data/parsed/*.json ──────────────────┘
+                              data/unsafe/parsed/*.json ──────────────────┘
                                      │
                                      ├─ filtr jakości (raportuje, co odrzuca)
                                      ├─ [embedder] problem+symptoms → wektory
@@ -556,8 +561,12 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
 - **Nie zaszywamy założeń o źródle w domenie.** Nazwy pól, kodowanie, sposób sklejania wątku
   w konwersację żyją w adapterze.
 - **Dane zawierają PII** (nazwiska, adresy, telefony klientów). Traktujemy je jak wrażliwe:
-  nigdy w logach na INFO, nigdy w commicie; `data/` w `.gitignore`, w repo tylko zanonimizowane
-  przykłady.
+  nigdy w logach na INFO, nigdy w commicie.
+- **`data/` dzieli się na `unsafe/` i `safe/` (2026-10-04).** W `data/unsafe/` leży wszystko, co
+  pochodzi od klienta albo go cytuje: zrzuty, zgłoszenia, artefakty, zestawy zapytań pisane
+  z korpusu, raporty. W `data/safe/` — wyłącznie dane zmyślone, i tylko ono jest w repo.
+  `.gitignore` wycina całe `data/` poza `safe/`, więc katalog założony obok przez pomyłkę też
+  nie trafi do commita.
 
 #### Zakres korpusu: wyłącznie moduł Dokus
 
@@ -593,8 +602,9 @@ więc przy etapie 4 nie należy szukać „zgubionych" 88 rekordów.
 
 #### Ile z tego naprawdę wejdzie do indeksu
 
-Liczby niżej pochodzą z **ręcznego sparsowania 661 zgłoszeń** (36% modułu, 44% korpusu po
-filtrze długościowym), nie z szacunku. Materiał źródłowy: `data/docs/synteza-korpusu-i-pojemnosc-rag.md`.
+Liczby niżej pochodzą z **ręcznego sparsowania 661 zgłoszeń** (36% modułu, 44% korpusu po filtrze
+długościowym), nie z szacunku. Materiał źródłowy:
+`data/unsafe/docs/synteza-korpusu-i-pojemnosc-rag.md`.
 
 | etap lejka | liczba | uwaga |
 |---|---|---|
@@ -708,8 +718,9 @@ wymagające czyszczenia cytowanej historii przed parsowaniem.
   trafiają się zgłoszenia o Portalu Mieszkańca czy login.gov.pl. Stąd `component` wyprowadza LLM
   z treści, nigdy z `modul_zgloszenia.nazwa`, i jest polem swobodnym.
 - **Kanał „Automat mailowy" jest w tym korpusie osobną klasą szkody — ZMIERZONE 2026-09-02 na 108
-  wątkach** (raport: `data/docs/jakosc-zgloszen/`). Wchodzi 2026-06-12 i od razu dominuje: w lipcu
-  **77 ze 123** nowych zgłoszeń modułu. Pięć wad, każda osobno rozstrzygająca dla masowego importu:
+  wątkach** (raport: `data/unsafe/docs/jakosc-zgloszen/`). Wchodzi 2026-06-12 i od razu dominuje: w
+  lipcu **77 ze 123** nowych zgłoszeń modułu. Pięć wad, każda osobno rozstrzygająca dla masowego
+  importu:
   - **Role są zepsute w 96% wątków, nie „bywają odwrócone".** System zapisuje nadawcę maila, a nie
     autora cytowanej wypowiedzi, więc odpowiedzi konsultantów figurują jako wypowiedzi klienta.
     **Flaga autora w bazie jest tu bezużyteczna — rozstrzyga wyłącznie podpis w treści.**
@@ -837,9 +848,10 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — import i narzędzia powstają na 
 
 - **Jednostką jest podrozdział, w całości.** Na podrozdziały dzieli człowiek z modelem przed
   wgraniem; agent wyszukuje podrozdziały i czyta je w całości.
-- **Paczka to katalog na dokument w `data/instruction/`:** `manifest.json` (`document`, `version`,
-  `date`, `synthetic` i `sections` w kolejności dokumentu: `section_id`, `chapter_path`, `title`,
-  `description`) oraz plik `<section_id>.md` z samą treścią na sekcję.
+- **Paczka to katalog na dokument:** `manifest.json` (`document`, `version`, `date`, `synthetic`
+  i `sections` w kolejności dokumentu: `section_id`, `chapter_path`, `title`, `description`) oraz
+  plik `<section_id>.md` z samą treścią na sekcję. Właściwa dokumentacja trafi do
+  `data/unsafe/instruction/`, paczka syntetyczna leży w `data/safe/instruction/`.
 - **Wydanie (`version`) jest wymagane** — instrukcja do starszej wersji wprowadza w błąd tak samo
   jak odmowa obalona później nowszym zgłoszeniem.
 - **Opis sekcji (`description`) pisze model, treść jest dosłowna.** Dlatego przeszukiwany jest
@@ -847,7 +859,7 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — import i narzędzia powstają na 
 - **Podrozdział bywa dłuższy niż jeden wektor:** limit embeddera, 8192 tokeny, to ok. 18 tys.
   znaków. Stąd cała treść leży w Postgresie, a do Qdranta idzie pocięta na fragmenty (p. 49).
 - **Paczka syntetyczna (2026-10-04):** dwa zmyślone dokumenty, 27 sekcji, `synthetic: true`,
-  z zestawem 66 zapytań w `data/golden/docs-synthetic.json`. Mierzy okablowanie narzędzi, nie
+  z zestawem 66 zapytań w `data/safe/golden/docs-synthetic.json`. Mierzy okablowanie narzędzi, nie
   skuteczność, i nie może trafić do właściwego indeksu.
 
 ## Architektura
@@ -1094,8 +1106,8 @@ Trzy kategorie, których nie mieszamy:
    subkomend.
 
 **Kryterium podziału 1 vs 2: czy skrypt dotyka konkretnej usługi.** Eksport zrzutu bazy do
-`data/raw/` nie importuje `api.app` i nie odpytuje żadnego endpointu — jest repo-level. Sonda po
-`Settings` albo po `/embed` należy do usługi. Ta sama logika co przy nazwach testów: prefiks
+`data/unsafe/raw/` nie importuje `api.app` i nie odpytuje żadnego endpointu — jest repo-level. Sonda
+po `Settings` albo po `/embed` należy do usługi. Ta sama logika co przy nazwach testów: prefiks
 usługi dostaje to, co jej dotyczy, a rzeczy ponadusługowe zostają bez niego.
 
 **Skrypty z `scripts/` nie mają własnego `requirements.txt`** — nie trafiają do żadnego obrazu.
@@ -1236,7 +1248,7 @@ Embedder to `OPI-PIB/PolDense-150M`: ModernBERT, wymiar 768, liczony na CPU. Wyb
 razem z trybem wyszukiwania `query→passage`. Na 200 rekordach daje `recall@1` 98% — to sufit
 zadania, nie dowód przewagi modelu (anglojęzyczny model kontrolny miał 88%), więc porównanie
 z innymi modelami wraca na pełnym korpusie (p. 33). Wąskim gardłem nie jest model, tylko jakość
-i kompletność zgłoszeń. Raport: `data/docs/pomiar-embedderow.md`.
+i kompletność zgłoszeń. Raport: `data/unsafe/docs/pomiar-embedderow.md`.
 
 PolDense rozróżnia tryby prefiksem doklejanym do tekstu. Ten sam tekst z innym prefiksem daje inny
 wektor:
@@ -1316,12 +1328,12 @@ wektor:
   dokładnie tak samo jak pusty indeks, a to dwie różne awarie. Przy `RAG_SCORE_MIN` = 0.48 odcinanie
   jest regułą, nie wyjątkiem.
 - **`RAG_SCORE_MIN` = 0.48 stoi świadomie po stronie odsiewania śmieci** (pomiar na 171 rekordach,
-  raport `data/docs/pomiar-progu-score.md`) — trafienie bez treści wygląda na odpowiedź, a przy
-  47% singletonów „nic nie znalazłem" jest normalną odpowiedzią. Próg zostaje także teraz, gdy
-  model widzi `score` i czyta karty sam (2026-10-04): to jedyne miejsce, w którym KOD mówi „nic
-  nie znaleziono" — bez niego wyszukiwanie zawsze oddaje komplet numerów, źródła zawsze są,
-  a `requires_hits` nic nie znaczy. Może za to stać niżej, bo ma odcinać tylko oczywiste śmieci
-  (do przeliczenia w p. 33). Trzy pułapki strojenia:
+  raport `data/unsafe/docs/pomiar-progu-score.md`) — trafienie bez treści wygląda na odpowiedź, a
+  przy 47% singletonów „nic nie znalazłem" jest normalną odpowiedzią. Próg zostaje także teraz, gdy
+  model widzi `score` i czyta karty sam (2026-10-04): to jedyne miejsce, w którym KOD mówi „nic nie
+  znaleziono" — bez niego wyszukiwanie zawsze oddaje komplet numerów, źródła zawsze są, a
+  `requires_hits` nic nie znaczy. Może za to stać niżej, bo ma odcinać tylko oczywiste śmieci (do
+  przeliczenia w p. 33). Trzy pułapki strojenia:
   - **Nie stroi się go liczbą „ile procent zachowanych"** — krótkie teksty mają niski score mimo
     idealnego dopasowania (0,455 przy niemal tym samym zdaniu), więc z pięciu traconych zapytań
     cztery stały na pierwszym miejscu. Zawsze `eval_threshold.py detail` przed zmianą wartości.
@@ -1364,8 +1376,8 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Skrypty z `initdb/` i zmienne `POSTGRES_DB/USER/PASSWORD` działają tylko na pustym
   wolumenie.** Zmiana mapowania albo hasła nie dociera do istniejącej bazy. Do p. 29 wolno
   odtworzyć wolumen `postgres_data`, bo tabele wyszukiwania odbudowują się z plików (zasada 8).
-- **Do bazy trafia wyłącznie tekst po anonimizacji** — surowy wątek zostaje w `data/raw/`. Dzięki
-  temu narzędzie może pokazać modelowi dopasowany fragment.
+- **Do bazy trafia wyłącznie tekst po anonimizacji** — surowy wątek zostaje w `data/unsafe/raw/`.
+  Dzięki temu narzędzie może pokazać modelowi dopasowany fragment.
 - **Pakiet `api/app/db_postgres/`: klient, tabele, wiersze — a reszta aplikacji używa tylko
   tabel.**
   `client.py` to samo połączenie (pula, wykonanie SQL-a, tłumaczenie błędów sterownika).
@@ -1730,7 +1742,7 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   Model czyta wątki wszystkich znalezionych zgłoszeń, także wbrew promptowi — na prawdziwych
   wątkach to będzie główny koszt sprawy (p. 23–26). Reguła „instrukcje sprawdzasz zawsze" musi iść
   w parze z regułą, że fakty wolno brać także z instrukcji: inaczej trop z instrukcji ląduje tylko
-  w uwagach. Zapisy rozmów: `data/docs/przebieg-*.md`.
+  w uwagach. Zapisy rozmów: `data/unsafe/docs/przebieg-*.md`.
 
 #### Prompty
 
@@ -1760,7 +1772,7 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
     Wyjątek dotyczy **treści**, nie szkieletu: rama promptu zostaje w repo pod
     testem-strażnikiem, a z magazynu reguł wchodzą dane wstawiane w wyznaczone miejsce.
   - **Prompt parsujący zgłoszenie NIE jest konfigurowalny** — jest kontraktem artefaktu
-    (zasada 7). Jego zmiana unieważnia `data/parsed/`, więc należy do kodu i do gita, nie do
+    (zasada 7). Jego zmiana unieważnia `data/unsafe/parsed/`, więc należy do kodu i do gita, nie do
     ustawień klienta.
   - **Wyjątek w wyjątku: słowniki wstawiane do promptu parsującego** (`resolution`, podpowiedź
     dla `component`) **są danymi klienta** — inny helpdesk ma inne rodzaje rozstrzygnięć
@@ -1778,10 +1790,10 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 - **Każdy prompt ma test-strażnik** — unit test na niezmienniki (wymagane pola są, zakazanych
   konstrukcji nie ma). Bez tego prompt dryfuje przy każdej edycji.
   - **Siła strażnika ma odpowiadać kosztowi cichego dryfu.** Przy prompcie parsującym zamrożenie
-    fraz jest uzasadnione (dryf = ~1500 wywołań LLM do powtórzenia); przy promptach generacji
-    zmiana nie unieważnia `data/parsed/`, więc strażnik pilnuje **wyłącznie rzeczy niewidocznych
-    w diffie** — placeholderów, braku instrukcji w turze użytkownika, wyciętych komentarzy. Fraz
-    nie zamraża: o jakości treści rozstrzyga pomiar.
+    fraz jest uzasadnione (dryf = ~1500 wywołań LLM do powtórzenia); przy promptach generacji zmiana
+    nie unieważnia `data/unsafe/parsed/`, więc strażnik pilnuje **wyłącznie rzeczy niewidocznych w
+    diffie** — placeholderów, braku instrukcji w turze użytkownika, wyciętych komentarzy. Fraz nie
+    zamraża: o jakości treści rozstrzyga pomiar.
 - **Zmiana promptu = pokaż przed/po + oczekiwany wpływ.** Nie przepisujemy promptów po cichu
   przy okazji innej zmiany.
   
@@ -1808,8 +1820,8 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 
 Prompty `questions` i `solution` były strojone w 2026-08 na słabszym modelu lokalnym; na modelu
 docelowym mierzymy je od nowa (p. 25–27). Z tamtych pomiarów zostaje to, co nie zależy od modelu.
-Raporty: `data/docs/pomiar-wariantow-promptu-questions-2026-08-26.md`,
-`data/docs/pomiar-promptu-solution-2026-08-28.md`.
+Raporty: `data/unsafe/docs/pomiar-wariantow-promptu-questions-2026-08-26.md`,
+`data/unsafe/docs/pomiar-promptu-solution-2026-08-28.md`.
 
 - **Limit liczby kroków i uwag to decyzja o treści** — model sam wybiera, co poświęci, a reguła
   rozbijająca bez limitu puchnie.
@@ -1860,9 +1872,9 @@ dobre rozwiązanie: pierwsze mają trafiać w niewiadome, drugie w sprawdzony kr
 Zestaw to **syntetyczne zapytania**, nie pary historycznych zgłoszeń: produkt bierze nowe
 zgłoszenie i szuka podobnych, więc para `ticket ↔ ticket` mierzyłaby coś, czego produkt nie robi.
 Uboczny zysk: znika problem singletonów (47% rekordów nie ma bliskiego sąsiada), bo **zapytanie
-dostaje każdy rekord**. Pliki: `data/golden/golden200.json` (162 zapytania + 38 odrzuceń
-z powodem), korpus `data/parsed/bielik-11b-golden200/` (200 artefaktów) i dystraktory
-`data/golden/distractors.json` — materiał wielokrotnego użytku przy każdej zmianie modelu.
+dostaje każdy rekord**. Pliki: `data/unsafe/golden/golden200.json` (162 zapytania + 38 odrzuceń
+z powodem), korpus `data/unsafe/parsed/bielik-11b-golden200/` (200 artefaktów) i dystraktory
+`data/unsafe/golden/distractors.json` — materiał wielokrotnego użytku przy każdej zmianie modelu.
 
 - **Każde zapytanie ma dwa kształty: `query_raw` i `query_problem` + `query_symptoms`** (dopisane
   2026-10-03, także w dystraktorach). Drugi to kształt narzędzia `find_tickets_vector`, napisany
@@ -1932,14 +1944,14 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 - Weryfikacja realnej konfiguracji: `docker compose config` (nie zawartość `.env`)
 
 **Przygotowanie danych (skrypty repo)**
-- Eksport zgłoszeń ze zrzutu do `data/raw/`: `python scripts/export_raw_tickets.py export
+- Eksport zgłoszeń ze zrzutu do `data/unsafe/raw/`: `python scripts/export_raw_tickets.py export
   --module-id 116` (wymaga kontenera z zaimportowanym zrzutem; kontrola liczb wobec bazy na końcu
   przebiegu)
 
 **Pipeline danych (CLI `helpdesk`)**
-- Walidacja artefaktów: `helpdesk tickets validate data/parsed/`
+- Walidacja artefaktów: `helpdesk tickets validate data/unsafe/parsed/`
 - Indeksacja do Qdranta: `helpdesk rag index <katalog>`
-- Pełna odbudowa indeksu: `helpdesk rag reindex` (kasuje kolekcję, wstaje z `data/parsed/`)
+- Pełna odbudowa indeksu: `helpdesk rag reindex` (kasuje kolekcję, wstaje z `data/unsafe/parsed/`)
 - Ewaluacja embeddera: `python scripts/eval_embeddings.py recall --model <nazwa>`
   (repo-level, nie CLI usługi — ładuje modele wprost, bez stawiania stacku)
 - Ewaluacja zbudowanego indeksu: `python scripts/eval_index.py recall --collection tickets`
@@ -1951,8 +1963,8 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 - Pomiar progu odcięcia: `python scripts/eval_threshold.py table` (rozkłady + tabela koszt/zysk
   per kandydat na próg), `... detail --threshold 0.48` (co ten próg robi z każdym dystraktorem
   i które trafienia poprawne kosztuje) oraz `... plot` (wykres obu rozkładów z linią progu do
-  `data/docs/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz
-  `data/golden/distractors.json`; sam golden set mierzy tylko połowę rozkładu
+  `data/unsafe/docs/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz
+  `data/unsafe/golden/distractors.json`; sam golden set mierzy tylko połowę rozkładu
 
 **Komendy na grafach** (bramki, propozycje, „Popraw", wyszukiwanie, karta zgłoszenia) dojdą
 w p. 46.
@@ -2020,7 +2032,7 @@ w p. 46.
   (uruchamiamy kod z obrazu, nie z hosta).
 
 **Trwałość danych:**
-- **Wolumen Qdranta to wygoda, nie kopia zapasowa** — źródłem prawdy jest `data/parsed/`
+- **Wolumen Qdranta to wygoda, nie kopia zapasowa** — źródłem prawdy jest `data/unsafe/parsed/`
   (zasada 8). Backup dotyczy katalogu JSON-ów, nie kolekcji.
 
 **Pułapki:**
@@ -2450,8 +2462,8 @@ punkty niżej to narzędzia właściwe.
   sjp.pl z trzema poprawkami, konfiguracja `pl_search`), zmienne `POSTGRES_*`, marker
   `stack_postgres` i test na stacku; reguły — „Warstwa wyszukiwania tekstowego (Postgres)".
 - [x] **54. Syntetyczna dokumentacja i golden set** (2026-10-04) — dwa dokumenty, 27 sekcji
-  w `data/instruction/syntetyczna-instrukcja-*` i 66 zapytań w kształcie czterech narzędzi
-  w `data/golden/docs-synthetic.json`; mierzy okablowanie, nie skuteczność. Trzy oczekiwania
+  w `data/safe/instruction/syntetyczna-instrukcja-*` i 66 zapytań w kształcie czterech narzędzi
+  w `data/safe/golden/docs-synthetic.json`; mierzy okablowanie, nie skuteczność. Trzy oczekiwania
   zestawu czekają na p. 8 i p. 50.
 - [ ] **49. Import dokumentacji** — `helpdesk docs validate|import <katalog>`: katalog na
   dokument, w nim `manifest.json` (`document`, `version`, `date`, `synthetic` i `sections`
@@ -2646,11 +2658,11 @@ każdy mierzy się osobno.
 #### H. Korpus
 
 - [ ] **31. Masowy import z nowszego zrzutu** — przez graf `parse_ticket` (zapis artefaktu po KAŻDYM
-  zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed parsowaniem, model parsujący
-  wybrany na podstawie `porownanie-modeli-parsowania.md`, prompt dostosowany do placeholderów,
-  czytnik SQL, wznawianie, raport, porządek w `data/parsed/` (golden200 zostaje); zanonimizowany
-  wątek idzie do tabeli wyszukiwania (p. 53). *Dlaczego:* to
-  jedyny drogi przebieg (zasada 7), więc anonimizator i prompt muszą być gotowe przed nim.
+      zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed parsowaniem, model
+      parsujący wybrany na podstawie `porownanie-modeli-parsowania.md`, prompt dostosowany do
+      placeholderów, czytnik SQL, wznawianie, raport, porządek w `data/unsafe/parsed/` (golden200
+      zostaje); zanonimizowany wątek idzie do tabeli wyszukiwania (p. 53). *Dlaczego:* to jedyny
+      drogi przebieg (zasada 7), więc anonimizator i prompt muszą być gotowe przed nim.
 - [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
   „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy. *Dlaczego:* 77 ze 123 zgłoszeń
   w lipcu, a żadna heurystyka nie odróżni broadcastu od sprawy.
@@ -2659,8 +2671,8 @@ każdy mierzy się osobno.
   *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na zapytaniach surowych.
 - [ ] **34. Tryb odświeżania korpusu** — kolejne zrzuty czy dostęp tylko do odczytu.
   *Dlaczego:* +130 zgłoszeń w miesiąc, więc jednorazowy zrzut szybko się starzeje.
-- [ ] **35. Backup `data/parsed/`.** *Dlaczego:* jedyny artefakt, którego odtworzenie kosztuje
-  ponowny przebieg LLM.
+- [ ] **35. Backup `data/unsafe/parsed/`.** *Dlaczego:* jedyny artefakt, którego odtworzenie
+      kosztuje ponowny przebieg LLM.
 - [ ] **55. Przygotowanie właściwej dokumentacji** (dopisany 2026-10-03) — podział mocnym modelem
   na pliki `.md` i metryczkę, skrypt sprawdzający, że każda sekcja jest dosłownym podciągiem
   źródła i że sekcje pokrywają całość, przegląd opisów przez człowieka. *Dlaczego:* dokumentacja

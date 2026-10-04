@@ -63,7 +63,7 @@ def _print_report(
 
 
 async def _run(
-    directory:  Path,  # np. Path("data/parsed")
+    directory:  Path,  # np. Path("data/unsafe/parsed")
     drop_first: bool,  # np. True — przebudowa zamiast budowy
 ) -> IndexBuildReport:
     """
@@ -74,7 +74,7 @@ async def _run(
     gniazda, a testy ostrzegałyby o niezamkniętych transportach.
 
     Example args:
-        directory=Path("data/parsed")
+        directory=Path("data/unsafe/parsed")
         drop_first=False
 
     Example result:
@@ -112,7 +112,7 @@ async def _run(
 
 
 def execute_index_build(
-    directory:  Path,  # np. Path("data/parsed")
+    directory:  Path,  # np. Path("data/unsafe/parsed")
     drop_first: bool,  # np. False
     verbose:    bool,  # np. False
 ) -> None:
@@ -122,7 +122,7 @@ def execute_index_build(
     Wspólne dla `rag index` i `rag reindex`.
 
     Example args:
-        directory=Path("data/parsed")
+        directory=Path("data/unsafe/parsed")
         drop_first=False
         verbose=False
 

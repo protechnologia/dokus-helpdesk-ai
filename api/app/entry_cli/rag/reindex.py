@@ -9,7 +9,7 @@ HELP = "Skasuj kolekcję i zbuduj ją od zera."
 
 
 def reindex_artifacts(
-    directory: Path = typer.Argument(Path("data/parsed"), help="Katalog z artefaktami."),
+    directory: Path = typer.Argument(Path("data/unsafe/parsed"), help="Katalog z artefaktami."),
     yes:       bool = typer.Option(False, "--yes", help="Nie pytaj o potwierdzenie."),
     verbose:   bool = typer.Option(False, "--verbose", "-v", help="Wypisz wszystkie odrzucone."),
 ) -> None:
@@ -18,11 +18,11 @@ def reindex_artifacts(
     `helpdesk rag reindex` — kasuje kolekcję i buduje ją od zera z artefaktów.
 
     Pyta przed zniszczeniem czegokolwiek, chyba że podano `--yes`. Indeks da się odbudować
-    z `data/parsed/` tą samą komendą (zasada 8), więc ryzykiem jest przestój, nie utrata danych —
-    ale przypadkowy przebieg na pustym albo złym katalogu nie zostawi nic do przeszukania.
+    z `data/unsafe/parsed/` tą samą komendą (zasada 8), więc ryzykiem jest przestój, nie utrata
+    danych — ale przypadkowy przebieg na pustym albo złym katalogu nie zostawi nic do przeszukania.
 
     Example args:
-        directory=Path("data/parsed")
+        directory=Path("data/unsafe/parsed")
         yes=False
         verbose=False
 

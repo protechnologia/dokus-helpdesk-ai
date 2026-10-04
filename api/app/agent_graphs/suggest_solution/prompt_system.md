@@ -18,7 +18,7 @@
      należą do tego komentarza, nie do treści.
 
      TA WERSJA POWSTAŁA ZE STROJENIA NA ŻYWYCH MODELACH (2026-08-28, raport
-     `data/docs/pomiar-promptu-solution-2026-08-28.md`): 7 prób jedną zmianą na raz na jednym
+     `data/unsafe/docs/pomiar-promptu-solution-2026-08-28.md`): 7 prób jedną zmianą na raz na jednym
      zgłoszeniu, 7 prób weryfikacyjnych na pozostałych, po dwa przebiegi Bielika przed i po.
      Cztery rzeczy do zapamiętania, zanim ktoś tu cokolwiek zmieni:
 
@@ -68,7 +68,7 @@
      SCORE: dawniej nie było go w danych; wynik `find_tickets_vector` go niesie, ale reguły na nim nie
      stoją.
 
-     REŻIM ZMIANY: nasz kod, ale strojenie jest tanie — zmiana nie unieważnia data/parsed/.
+     REŻIM ZMIANY: nasz kod, ale strojenie jest tanie — zmiana nie unieważnia data/unsafe/parsed/.
      Strażnik pilnuje rzeczy niewidocznych w diffie, nie brzmienia.
 
      OSTRZEŻENIE O KROKU NIEODWRACALNYM NIE DZIAŁA — zmierzone czterokrotnie, u obu modeli, w obu

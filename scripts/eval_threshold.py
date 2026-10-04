@@ -3,7 +3,7 @@
 WYMAGA ZBUDOWANEGO INDEKSU I CHODZĄCEGO STACKU:
 
     docker compose up -d                          # embedder + qdrant
-    helpdesk rag index data/parsed/<zestaw>       # napełnij kolekcję
+    helpdesk rag index data/unsafe/parsed/<zestaw>       # napełnij kolekcję
     python scripts/eval_threshold.py table        # tabela koszt/zysk per próg
     python scripts/eval_threshold.py detail       # rozbicie per dystraktor i lista strat
     python scripts/eval_threshold.py plot         # wykres obu rozkładów z linią progu (PNG)
@@ -54,14 +54,14 @@ sys.path.insert(0, str(REPO_ROOT / "api"))
 
 from app.db_qdrant.point.tickets import VECTOR_PROBLEM  # noqa: E402  (po sys.path)
 
-DEFAULT_GOLDEN      = REPO_ROOT / "data" / "golden" / "golden200.json"
-DEFAULT_DISTRACTORS = REPO_ROOT / "data" / "golden" / "distractors.json"
+DEFAULT_GOLDEN      = REPO_ROOT / "data" / "unsafe" / "golden" / "golden200.json"
+DEFAULT_DISTRACTORS = REPO_ROOT / "data" / "unsafe" / "golden" / "distractors.json"
 
 # Adresy z HOSTA, nie z sieci compose — jak w eval_index.py.
 DEFAULT_EMBEDDER = "http://localhost:8001"
 DEFAULT_QDRANT   = "http://localhost:6333"
 
-DEFAULT_PLOT_OUT = REPO_ROOT / "data" / "docs" / "pomiar-progu-score.png"
+DEFAULT_PLOT_OUT = REPO_ROOT / "data" / "unsafe" / "docs" / "pomiar-progu-score.png"
 
 EMBED_BATCH_SIZE = 32
 
@@ -91,14 +91,14 @@ HELP_PLOT   = "Wykres obu rozkładów score z zaznaczoną linią progu — zapis
 
 
 def _load_queries(
-    golden_path: pathlib.Path,  # e.g. Path("data/golden/golden200.json")
+    golden_path: pathlib.Path,  # e.g. Path("data/unsafe/golden/golden200.json")
 ) -> list[dict]:
     """
     Description:
     Reads golden-set queries — the ones that DO have a target in the index.
 
     Example args:
-        golden_path=Path("data/golden/golden200.json")
+        golden_path=Path("data/unsafe/golden/golden200.json")
 
     Example result:
         [{"expected_ticket_id": 5641, "query_raw": "Dzień dobry, nie mogę…", …}]
@@ -107,14 +107,14 @@ def _load_queries(
 
 
 def _load_distractors(
-    distractors_path: pathlib.Path,  # e.g. Path("data/golden/distractors.json")
+    distractors_path: pathlib.Path,  # e.g. Path("data/unsafe/golden/distractors.json")
 ) -> list[dict]:
     """
     Description:
     Reads distractor queries — the ones whose correct answer is NO hit at all.
 
     Example args:
-        distractors_path=Path("data/golden/distractors.json")
+        distractors_path=Path("data/unsafe/golden/distractors.json")
 
     Example result:
         [{"id": "D01", "class": "spoza_modulu", "query_raw": "Dzień dobry, w Kartach…"}]
@@ -344,8 +344,8 @@ def main() -> None:
 
 def _measure(
     collection:  str,           # e.g. "tickets"
-    golden:      pathlib.Path,  # e.g. Path("data/golden/golden200.json")
-    distractors: pathlib.Path,  # e.g. Path("data/golden/distractors.json")
+    golden:      pathlib.Path,  # e.g. Path("data/unsafe/golden/golden200.json")
+    distractors: pathlib.Path,  # e.g. Path("data/unsafe/golden/distractors.json")
     embedder:    str,           # e.g. "http://localhost:8001"
     qdrant:      str,           # e.g. "http://localhost:6333"
     top_k:       int,           # e.g. 5
@@ -360,8 +360,8 @@ def _measure(
 
     Example args:
         collection="tickets"
-        golden=Path("data/golden/golden200.json")
-        distractors=Path("data/golden/distractors.json")
+        golden=Path("data/unsafe/golden/golden200.json")
+        distractors=Path("data/unsafe/golden/distractors.json")
         top_k=5
 
     Example result:
@@ -546,7 +546,7 @@ def plot(
     otherwise, and that difference decided this measurement.
 
     Example args:
-        out=Path("data/docs/pomiar-progu-score.png")
+        out=Path("data/unsafe/docs/pomiar-progu-score.png")
         threshold=0.48
 
     Example result:

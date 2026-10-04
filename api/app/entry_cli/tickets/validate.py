@@ -43,7 +43,7 @@ def _print_report(
 
 
 def validate_artifacts(
-    directory: Path = typer.Argument(Path("data/parsed"), help="Katalog z artefaktami."),
+    directory: Path = typer.Argument(Path("data/unsafe/parsed"), help="Katalog z artefaktami."),
     verbose:   bool = typer.Option(False, "--verbose", "-v", help="Wypisz też poprawne pliki."),
 ) -> None:
     """
@@ -55,7 +55,7 @@ def validate_artifacts(
     import (p. 31) użyje tego samego sprawdzenia bez przechodzenia przez CLI.
 
     Example args:
-        directory=Path("data/parsed")
+        directory=Path("data/unsafe/parsed")
         verbose=False
 
     Example result:

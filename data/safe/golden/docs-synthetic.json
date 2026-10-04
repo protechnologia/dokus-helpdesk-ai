@@ -1,0 +1,581 @@
+{
+  "meta": {
+    "name": "docs-synthetic-v1",
+    "created": "2026-10-04",
+    "purpose": "Okablowanie narzędzi dokumentacji (list_docs, find_docs_vector, find_docs_text, read_docs) na syntetycznej paczce — NIE mierzy skuteczności: sekcje i zapytania pisał ten sam autor.",
+    "docs_dir": "data/safe/instruction",
+    "documents": [
+      "syntetyczna-instrukcja-administratora",
+      "syntetyczna-instrukcja-uzytkownika"
+    ],
+    "sections": 27,
+    "rules": [
+      "Dokumentacja jest ZMYŚLONA (manifest ma `synthetic: true`) — nazwy opcji, kody i liczby nie opisują prawdziwej aplikacji i nie mogą trafić do właściwego indeksu.",
+      "`query` każdego wpisu to dokładnie argumenty narzędzia: przechodzi przez jego model zapytania bez zmian (FindDocsVectorQuery, FindDocsTextQuery, ReadDocsQuery).",
+      "find_docs_vector: `expected` — sekcje odpowiadające na zapytanie, pierwsze trafienie ma być jedną z nich; `distractors` — sekcje bliskie tematem, które mają stać niżej niż najlepsza z `expected`; puste `expected` — poprawną odpowiedzią jest brak trafienia.",
+      "find_docs_text: `expected` — sekcje, które muszą wrócić, z `matched_by`; `not_expected` — sekcje, które wrócić nie mogą; pozostałe wolno zwrócić (wykaz uprawnień zawiera większość słów kluczowych paczki). Puste `expected` z `expected_total: 0` — nie wraca nic.",
+      "`expected_total` — ile sekcji paczki pasuje do zapytania; narzędzie ma oddać tyle w sumie: zwrócone + `omitted_over_limit`.",
+      "read_docs: treść porównuje się z plikiem `<section_id>.md`; `expected_error` — odczyt kończy się błędem bez wyniku częściowego.",
+      "Zapytania pisane tak, jak opis narzędzia każe pytać agentowi — NIE poprawiać ich pod wynik.",
+      "Sprawdzone sondą 2026-10-04 na DocsTable (pl_search) i DocsCollection (jeden wektor na sekcję: tytuł + treść, query→passage): oczekiwania spełnione poza t25 (czeka na spacje w kolumnie szukania, p. 50) oraz v23 i v24 (czekają na wektory z fragmentów, p. 8 i p. 49)."
+    ],
+    "phenomena": {
+      "dystraktor": "Dwie sekcje o tym samym zagadnieniu w różnych kanałach albo po dwóch stronach (wysyłka/odbiór); zapytanie nazywa jedną.",
+      "parafraza": "Zapytanie innymi słowami niż sekcja, w tym słowotwórstwo, którego słownik nie zna (komunikacja / skomunikować).",
+      "nazwa-funkcji": "Krótkie zapytanie: nazwa funkcji, ustawienia albo komunikatu.",
+      "brak-w-dokumentacji": "Wiarygodne zagadnienie, którego paczka nie opisuje.",
+      "dluga-sekcja": "Sekcja dłuższa niż limit tokenów embeddera (9050 wobec 8192): jeden wektor na całą sekcję ucina jej koniec bez błędu, więc szczegół z ostatnich linii wymaga wektorów z fragmentów.",
+      "odmiana": "Słowa kluczowe w innej formie niż w treści.",
+      "nie": "Słowo zaprzeczone i niezaprzeczone to dwa różne słowa (niewidoczne / widoczne).",
+      "nazwa-produktu": "Nazwa własna w odmianie: eNadawcę, Dokusie, ePUAPie, ePUAP-u.",
+      "lacznik": "Wyraz z łącznikiem w odmianie: e-Doręczenia / e-Doręczeń.",
+      "kod": "Kod błędu albo jego fragment, także sklejony z kropkami, ukośnikiem, nawiasami.",
+      "nazwa-opcji": "Dosłowna nazwa opcji, przycisku, ścieżki w menu albo komunikatu.",
+      "znaki-wzorca": "Znaki `%` i `_` w dosłownym ciągu nie są wieloznacznikami.",
+      "zlamanie-linii": "Komunikat w pliku zawiniętym na stałą szerokość: cały w jednej linii albo złamany między liniami.",
+      "zakres-szukania": "Przeszukiwany jest tytuł i treść sekcji, opis z manifestu — nie.",
+      "oba-pola": "`exact` i `words` w jednym zapytaniu, każde trafia w inną sekcję.",
+      "ponad-limit": "Zapytanie pasujące do większej liczby sekcji, niż narzędzie zwraca.",
+      "kolejnosc": "Odczyt oddaje sekcje w kolejności żądania, nie spisu treści.",
+      "nieznany-identyfikator": "Identyfikator spoza paczki obok poprawnego."
+    }
+  },
+
+  "list_docs": {
+    "note": "Spis treści: dokument po dokumencie (alfabetycznie po tytule), sekcje w kolejności manifestu.",
+    "expected_section_ids": [
+      "adm-kancelaria-edoreczenia",
+      "adm-kancelaria-epuap",
+      "adm-role-i-profile",
+      "adm-widocznosc-spraw",
+      "adm-okres-waznosci-struktury",
+      "adm-edoreczenia-konfiguracja",
+      "adm-epuap-konfiguracja",
+      "adm-enadawca-konfiguracja",
+      "adm-podpis-weryfikacja",
+      "adm-limity-serwera",
+      "adm-numeracja-roczna",
+      "adm-kopie-zapasowe",
+      "adm-wykaz-uprawnien",
+      "usr-wysylka-status-w-toku",
+      "usr-wysylka-enadawca-w-toku",
+      "usr-wysylka-edoreczenia",
+      "usr-wysylka-limit-zalacznika",
+      "usr-odbior-edoreczenia",
+      "usr-odbior-epuap",
+      "usr-sprawy-niewidoczne",
+      "usr-sprawy-akceptacja",
+      "usr-dokumenty-skanowanie",
+      "usr-dokumenty-podpis",
+      "usr-dokumenty-szablony",
+      "usr-komunikat-brak-serwera",
+      "usr-komunikat-sesja-wygasla",
+      "usr-odswiezanie"
+    ]
+  },
+
+  "find_docs_vector": [
+    {
+      "id": "v01",
+      "phenomenon": "dystraktor",
+      "query": {"text": "nadanie uprawnienia do kancelarii e-Doręczeń"},
+      "expected": ["adm-kancelaria-edoreczenia"],
+      "distractors": ["adm-kancelaria-epuap"]
+    },
+    {
+      "id": "v02",
+      "phenomenon": "dystraktor",
+      "query": {"text": "uprawnienie do skrzynki ePUAP dla stanowiska"},
+      "expected": ["adm-kancelaria-epuap"],
+      "distractors": ["adm-kancelaria-edoreczenia"]
+    },
+    {
+      "id": "v03",
+      "phenomenon": "dystraktor",
+      "query": {"text": "status W toku po wysyłce pisma przez ePUAP, brak poświadczenia"},
+      "expected": ["usr-wysylka-status-w-toku"],
+      "distractors": ["usr-wysylka-enadawca-w-toku"],
+      "note": "Ten sam status znaczy co innego w dwóch kanałach — pomyłka sekcji odwraca radę."
+    },
+    {
+      "id": "v04",
+      "phenomenon": "dystraktor",
+      "query": {"text": "przesyłka listowa w statusie W toku, eNadawca"},
+      "expected": ["usr-wysylka-enadawca-w-toku"],
+      "distractors": ["usr-wysylka-status-w-toku"]
+    },
+    {
+      "id": "v05",
+      "phenomenon": "dystraktor",
+      "query": {"text": "nie przychodzi korespondencja z e-Doręczeń"},
+      "expected": ["adm-edoreczenia-konfiguracja", "usr-odbior-edoreczenia"],
+      "distractors": ["usr-odbior-epuap", "adm-epuap-konfiguracja"]
+    },
+    {
+      "id": "v06",
+      "phenomenon": "dystraktor",
+      "query": {"text": "odbiór dokumentów ze skrytki ePUAP w kancelarii"},
+      "expected": ["usr-odbior-epuap"],
+      "distractors": ["usr-odbior-edoreczenia"]
+    },
+    {
+      "id": "v07",
+      "phenomenon": "dystraktor",
+      "query": {"text": "dowód wysłania pisma e-Doręczeniami"},
+      "expected": ["usr-wysylka-edoreczenia"],
+      "distractors": ["usr-odbior-edoreczenia"]
+    },
+    {
+      "id": "v08",
+      "phenomenon": "dystraktor",
+      "query": {"text": "częstotliwość pobierania korespondencji e-Doręczenia"},
+      "expected": ["adm-edoreczenia-konfiguracja"],
+      "distractors": ["adm-epuap-konfiguracja"]
+    },
+    {
+      "id": "v09",
+      "phenomenon": "parafraza",
+      "query": {"text": "błąd komunikacji z serwerem"},
+      "expected": ["usr-komunikat-brak-serwera"],
+      "note": "Tytuł sekcji mówi „skomunikować”; wspominają o tym też adm-limity-serwera i adm-numeracja-roczna."
+    },
+    {
+      "id": "v10",
+      "phenomenon": "parafraza",
+      "query": {"text": "pracownik nie pojawia się na liście osób akceptujących dokument"},
+      "expected": ["usr-sprawy-akceptacja", "adm-okres-waznosci-struktury"]
+    },
+    {
+      "id": "v11",
+      "phenomenon": "parafraza",
+      "query": {"text": "sprawa zniknęła z listy spraw"},
+      "expected": ["usr-sprawy-niewidoczne"]
+    },
+    {
+      "id": "v12",
+      "phenomenon": "parafraza",
+      "query": {"text": "kto może przeglądać sprawy innych pracowników komórki"},
+      "expected": ["adm-widocznosc-spraw"]
+    },
+    {
+      "id": "v13",
+      "phenomenon": "parafraza",
+      "query": {"text": "rejestracja pism nie działa po zmianie roku"},
+      "expected": ["adm-numeracja-roczna"]
+    },
+    {
+      "id": "v14",
+      "phenomenon": "parafraza",
+      "query": {"text": "kopia zapasowa bazy nie wykonała się w nocy"},
+      "expected": ["adm-kopie-zapasowe"]
+    },
+    {
+      "id": "v15",
+      "phenomenon": "parafraza",
+      "query": {"text": "po aktualizacji aplikacji brakuje przycisków"},
+      "expected": ["usr-odswiezanie"]
+    },
+    {
+      "id": "v16",
+      "phenomenon": "parafraza",
+      "query": {"text": "zmienione hasło do konta eNadawcy, przesyłki nie wychodzą"},
+      "expected": ["adm-enadawca-konfiguracja"]
+    },
+    {
+      "id": "v17",
+      "phenomenon": "nazwa-funkcji",
+      "query": {"text": "profil skanowania rozdzielczość"},
+      "expected": ["usr-dokumenty-skanowanie"]
+    },
+    {
+      "id": "v18",
+      "phenomenon": "nazwa-funkcji",
+      "query": {"text": "Nie można ustalić statusu certyfikatu"},
+      "expected": ["adm-podpis-weryfikacja", "usr-dokumenty-podpis"]
+    },
+    {
+      "id": "v19",
+      "phenomenon": "nazwa-funkcji",
+      "query": {"text": "pola automatyczne w szablonie pisma"},
+      "expected": ["usr-dokumenty-szablony"]
+    },
+    {
+      "id": "v20",
+      "phenomenon": "nazwa-funkcji",
+      "query": {"text": "limit rozmiaru załączników przy wysyłce"},
+      "expected": ["usr-wysylka-limit-zalacznika"]
+    },
+    {
+      "id": "v21",
+      "phenomenon": "nazwa-funkcji",
+      "query": {"text": "różnica między rolą a profilem uprawnień"},
+      "expected": ["adm-role-i-profile"]
+    },
+    {
+      "id": "v22",
+      "phenomenon": "nazwa-funkcji",
+      "query": {"text": "sesja wygasła, niezapisane zmiany"},
+      "expected": ["usr-komunikat-sesja-wygasla"]
+    },
+    {
+      "id": "v23",
+      "phenomenon": "dluga-sekcja",
+      "query": {"text": "lista kodów uprawnień"},
+      "expected": ["adm-wykaz-uprawnien"],
+      "note": "Przy jednym wektorze na sekcję cel jest drugi, 0,007 za adm-role-i-profile."
+    },
+    {
+      "id": "v24",
+      "phenomenon": "dluga-sekcja",
+      "query": {"text": "kto może opatrzyć dokument pieczęcią elektroniczną urzędu"},
+      "expected": ["adm-wykaz-uprawnien"],
+      "note": "Odpowiedź stoi w dwóch ostatnich liniach sekcji; nigdzie indziej w paczce pieczęci nie ma. Przy jednym wektorze na sekcję celu nie ma w pierwszej piątce."
+    },
+    {
+      "id": "v25",
+      "phenomenon": "brak-w-dokumentacji",
+      "query": {"text": "integracja z KSeF, faktury ustrukturyzowane"},
+      "expected": []
+    },
+    {
+      "id": "v26",
+      "phenomenon": "brak-w-dokumentacji",
+      "query": {"text": "naliczanie wynagrodzeń i lista płac"},
+      "expected": []
+    },
+    {
+      "id": "v27",
+      "phenomenon": "brak-w-dokumentacji",
+      "query": {"text": "przywracanie dokumentów usuniętych do kosza"},
+      "expected": []
+    },
+    {
+      "id": "v28",
+      "phenomenon": "brak-w-dokumentacji",
+      "query": {"text": "powiadomienia SMS dla interesantów"},
+      "expected": []
+    },
+    {
+      "id": "v29",
+      "phenomenon": "brak-w-dokumentacji",
+      "query": {"text": "kody kreskowe na kopertach"},
+      "expected": []
+    }
+  ],
+
+  "find_docs_text": [
+    {
+      "id": "t01",
+      "phenomenon": "odmiana",
+      "query": {"words": "limit załącznik"},
+      "expected": [{"section_id": "usr-wysylka-limit-zalacznika", "matched_by": "words"}]
+    },
+    {
+      "id": "t02",
+      "phenomenon": "odmiana",
+      "query": {"words": "zapora certyfikat"},
+      "expected": [{"section_id": "adm-podpis-weryfikacja", "matched_by": "words"}],
+      "note": "W treści: „na zaporze”, „certyfikatów”."
+    },
+    {
+      "id": "t03",
+      "phenomenon": "nie",
+      "query": {"words": "niewidoczne sprawy"},
+      "expected": [{"section_id": "usr-sprawy-niewidoczne", "matched_by": "words"}],
+      "not_expected": ["adm-widocznosc-spraw"]
+    },
+    {
+      "id": "t04",
+      "phenomenon": "nie",
+      "query": {"words": "widoczne sprawy"},
+      "expected": [{"section_id": "adm-widocznosc-spraw", "matched_by": "words"}],
+      "not_expected": ["usr-sprawy-niewidoczne"]
+    },
+    {
+      "id": "t05",
+      "phenomenon": "nazwa-produktu",
+      "query": {"words": "eNadawca bufor"},
+      "expected": [
+        {"section_id": "usr-wysylka-enadawca-w-toku", "matched_by": "words"},
+        {"section_id": "adm-enadawca-konfiguracja", "matched_by": "words"}
+      ],
+      "note": "usr-wysylka-enadawca-w-toku ma w tytule i treści wyłącznie formy odmienione: eNadawcę, eNadawcy."
+    },
+    {
+      "id": "t06",
+      "phenomenon": "nazwa-produktu",
+      "query": {"words": "Dokus odświeżenie"},
+      "expected": [{"section_id": "usr-odswiezanie", "matched_by": "words"}],
+      "note": "W sekcji nazwa stoi tylko raz, w miejscowniku: „W Dokusie”."
+    },
+    {
+      "id": "t07",
+      "phenomenon": "nazwa-produktu",
+      "query": {"words": "ePUAP bufor"},
+      "expected": [{"section_id": "usr-wysylka-enadawca-w-toku", "matched_by": "words"}],
+      "note": "Jedyne wystąpienie w sekcji to „w ePUAPie”, bez łącznika — odmiana z listy nazw własnych słownika."
+    },
+    {
+      "id": "t08",
+      "phenomenon": "nazwa-produktu",
+      "query": {"words": "ePUAP poświadczenie"},
+      "expected": [
+        {"section_id": "usr-wysylka-status-w-toku", "matched_by": "words"},
+        {"section_id": "adm-epuap-konfiguracja", "matched_by": "words"},
+        {"section_id": "usr-odbior-epuap", "matched_by": "words"},
+        {"section_id": "adm-kancelaria-epuap", "matched_by": "words"}
+      ],
+      "note": "W treści także formy z łącznikiem: ePUAP-u, ePUAP-ie."
+    },
+    {
+      "id": "t09",
+      "phenomenon": "lacznik",
+      "query": {"words": "e-Doręczenia limit"},
+      "expected": [{"section_id": "usr-wysylka-limit-zalacznika", "matched_by": "words"}],
+      "note": "W sekcji stoi wyłącznie dopełniacz: „dla e-Doręczeń”."
+    },
+    {
+      "id": "t10",
+      "phenomenon": "lacznik",
+      "query": {"words": "e-Doręczenia dowód"},
+      "expected": [
+        {"section_id": "usr-wysylka-edoreczenia", "matched_by": "words"},
+        {"section_id": "usr-odbior-edoreczenia", "matched_by": "words"}
+      ]
+    },
+    {
+      "id": "t11",
+      "phenomenon": "kod",
+      "query": {"exact": ["EDR-0417"]},
+      "expected": [{"section_id": "adm-edoreczenia-konfiguracja", "matched_by": "exact"}],
+      "expected_total": 1
+    },
+    {
+      "id": "t12",
+      "phenomenon": "kod",
+      "query": {"exact": ["0417"]},
+      "expected": [{"section_id": "adm-edoreczenia-konfiguracja", "matched_by": "exact"}],
+      "expected_total": 1,
+      "note": "Fragment kodu: sam numer bez przedrostka."
+    },
+    {
+      "id": "t13",
+      "phenomenon": "kod",
+      "query": {"exact": ["SocketTimeoutException"]},
+      "expected": [{"section_id": "adm-limity-serwera", "matched_by": "exact"}],
+      "expected_total": 1,
+      "note": "Fragment nazwy sklejonej kropkami: java.net.SocketTimeoutException."
+    },
+    {
+      "id": "t14",
+      "phenomenon": "kod",
+      "query": {"exact": ["OCSP/CRL"]},
+      "expected": [
+        {"section_id": "adm-podpis-weryfikacja", "matched_by": "exact"},
+        {"section_id": "usr-dokumenty-podpis", "matched_by": "exact"}
+      ],
+      "expected_total": 2
+    },
+    {
+      "id": "t15",
+      "phenomenon": "kod",
+      "query": {"exact": ["SQLSTATE[23505]"]},
+      "expected": [{"section_id": "adm-numeracja-roczna", "matched_by": "exact"}],
+      "expected_total": 1
+    },
+    {
+      "id": "t16",
+      "phenomenon": "kod",
+      "query": {"exact": ["wys-413"]},
+      "expected": [{"section_id": "usr-wysylka-limit-zalacznika", "matched_by": "exact"}],
+      "expected_total": 1,
+      "note": "W treści wielkimi literami: WYS-413."
+    },
+    {
+      "id": "t17",
+      "phenomenon": "nazwa-opcji",
+      "query": {"exact": ["Ustawienia → Uprawnienia → Kancelaria"]},
+      "expected": [
+        {"section_id": "adm-kancelaria-edoreczenia", "matched_by": "exact"},
+        {"section_id": "adm-kancelaria-epuap", "matched_by": "exact"}
+      ],
+      "expected_total": 2
+    },
+    {
+      "id": "t18",
+      "phenomenon": "nazwa-opcji",
+      "query": {"exact": ["Przekaż bufor"]},
+      "expected": [{"section_id": "usr-wysylka-enadawca-w-toku", "matched_by": "exact"}],
+      "not_expected": ["adm-enadawca-konfiguracja"],
+      "expected_total": 1,
+      "note": "adm-enadawca-konfiguracja ma opcję „Przekazuj bufor automatycznie” — inne brzmienie, te same słowa."
+    },
+    {
+      "id": "t19",
+      "phenomenon": "nazwa-opcji",
+      "query": {"exact": ["Przywróć domyślny układ tabeli"]},
+      "expected": [
+        {"section_id": "usr-sprawy-niewidoczne", "matched_by": "exact"},
+        {"section_id": "usr-odswiezanie", "matched_by": "exact"}
+      ],
+      "expected_total": 2
+    },
+    {
+      "id": "t20",
+      "phenomenon": "nazwa-opcji",
+      "query": {"exact": ["Nie udało się skomunikować z serwerem"]},
+      "expected": [{"section_id": "usr-komunikat-brak-serwera", "matched_by": "exact"}],
+      "expected_total": 1
+    },
+    {
+      "id": "t21",
+      "phenomenon": "nazwa-opcji",
+      "query": {"exact": ["{{ZNAK_SPRAWY}}"]},
+      "expected": [{"section_id": "usr-dokumenty-szablony", "matched_by": "exact"}],
+      "expected_total": 1
+    },
+    {
+      "id": "t22",
+      "phenomenon": "znaki-wzorca",
+      "query": {"exact": ["100%"]},
+      "expected": [{"section_id": "usr-dokumenty-skanowanie", "matched_by": "exact"}],
+      "not_expected": ["adm-limity-serwera"],
+      "expected_total": 1,
+      "note": "adm-limity-serwera ma samo „100”, bez znaku procenta."
+    },
+    {
+      "id": "t23",
+      "phenomenon": "znaki-wzorca",
+      "query": {"exact": ["w_toku"]},
+      "expected": [{"section_id": "adm-limity-serwera", "matched_by": "exact"}],
+      "not_expected": ["usr-wysylka-status-w-toku", "usr-wysylka-enadawca-w-toku"],
+      "expected_total": 1,
+      "note": "Parametr `w_toku_alert_min`; sekcje o statusie mają „W toku” ze spacją."
+    },
+    {
+      "id": "t24",
+      "phenomenon": "zlamanie-linii",
+      "query": {"exact": ["Sesja wygasła z powodu braku aktywności"]},
+      "expected": [{"section_id": "usr-komunikat-sesja-wygasla", "matched_by": "exact"}],
+      "expected_total": 1,
+      "note": "Ten fragment komunikatu mieści się w jednej linii pliku."
+    },
+    {
+      "id": "t25",
+      "phenomenon": "zlamanie-linii",
+      "query": {"exact": ["Zaloguj się ponownie, aby kontynuować pracę"]},
+      "expected": [{"section_id": "usr-komunikat-sesja-wygasla", "matched_by": "exact"}],
+      "expected_total": 1,
+      "note": "Ten fragment jest w pliku złamany po „Zaloguj się”. Podciąg go dziś nie znajduje, fraza przez słownik — tak."
+    },
+    {
+      "id": "t26",
+      "phenomenon": "zakres-szukania",
+      "query": {"words": "archiwizacja"},
+      "expected": [],
+      "not_expected": ["adm-kopie-zapasowe"],
+      "expected_total": 0,
+      "note": "Słowo stoi wyłącznie w opisie sekcji adm-kopie-zapasowe w manifeście."
+    },
+    {
+      "id": "t27",
+      "phenomenon": "zakres-szukania",
+      "query": {"words": "wygaśnięcie sesji"},
+      "expected": [{"section_id": "usr-komunikat-sesja-wygasla", "matched_by": "words"}],
+      "note": "„Wygaśnięcie” stoi wyłącznie w tytule tej sekcji."
+    },
+    {
+      "id": "t28",
+      "phenomenon": "oba-pola",
+      "query": {"exact": ["PDP-203"], "words": "sekwencja numeracja"},
+      "expected": [
+        {"section_id": "adm-podpis-weryfikacja", "matched_by": "exact"},
+        {"section_id": "adm-numeracja-roczna", "matched_by": "words"}
+      ]
+    },
+    {
+      "id": "t29",
+      "phenomenon": "ponad-limit",
+      "query": {"words": "uprawnienie"},
+      "expected": [
+        {"section_id": "adm-kancelaria-edoreczenia", "matched_by": "words"},
+        {"section_id": "adm-role-i-profile", "matched_by": "words"}
+      ],
+      "expected_total": 6
+    },
+    {
+      "id": "t30",
+      "phenomenon": "dluga-sekcja",
+      "query": {"exact": ["PIECZEC_UZYCIE"]},
+      "expected": [{"section_id": "adm-wykaz-uprawnien", "matched_by": "exact"}],
+      "expected_total": 1,
+      "note": "Ostatnia linia sekcji."
+    },
+    {
+      "id": "t31",
+      "phenomenon": "dluga-sekcja",
+      "query": {"words": "pieczęć elektroniczna"},
+      "expected": [{"section_id": "adm-wykaz-uprawnien", "matched_by": "words"}],
+      "expected_total": 1
+    },
+    {
+      "id": "t32",
+      "phenomenon": "brak-w-dokumentacji",
+      "query": {"exact": ["KSeF"], "words": "faktura ustrukturyzowana"},
+      "expected": [],
+      "expected_total": 0
+    }
+  ],
+
+  "read_docs": [
+    {
+      "id": "r01",
+      "phenomenon": "kolejnosc",
+      "query": {"section_ids": ["usr-wysylka-status-w-toku", "adm-kancelaria-edoreczenia"]},
+      "expected_section_ids": ["usr-wysylka-status-w-toku", "adm-kancelaria-edoreczenia"],
+      "note": "Dwa dokumenty, kolejność odwrotna niż w spisie treści."
+    },
+    {
+      "id": "r02",
+      "phenomenon": "kolejnosc",
+      "query": {
+        "section_ids": [
+          "usr-odswiezanie",
+          "adm-numeracja-roczna",
+          "usr-sprawy-niewidoczne",
+          "adm-role-i-profile",
+          "usr-dokumenty-szablony"
+        ]
+      },
+      "expected_section_ids": [
+        "usr-odswiezanie",
+        "adm-numeracja-roczna",
+        "usr-sprawy-niewidoczne",
+        "adm-role-i-profile",
+        "usr-dokumenty-szablony"
+      ],
+      "note": "Pięć sekcji — tyle, ile wolno jednym wywołaniem."
+    },
+    {
+      "id": "r03",
+      "phenomenon": "dluga-sekcja",
+      "query": {"section_ids": ["adm-wykaz-uprawnien"]},
+      "expected_section_ids": ["adm-wykaz-uprawnien"],
+      "note": "Treść ma wrócić w całości, z ostatnią linią (`PIECZEC_UZYCIE`)."
+    },
+    {
+      "id": "r04",
+      "phenomenon": "zlamanie-linii",
+      "query": {"section_ids": ["usr-komunikat-sesja-wygasla"]},
+      "expected_section_ids": ["usr-komunikat-sesja-wygasla"],
+      "note": "Treść dosłownie jak w pliku, ze złamaniami linii."
+    },
+    {
+      "id": "r05",
+      "phenomenon": "nieznany-identyfikator",
+      "query": {"section_ids": ["adm-kancelaria-edoreczenia", "adm-nie-ma-takiej-sekcji"]},
+      "expected_error": "unknown_section",
+      "unknown_section_ids": ["adm-nie-ma-takiej-sekcji"]
+    }
+  ]
+}

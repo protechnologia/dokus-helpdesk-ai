@@ -8,7 +8,7 @@ HELP = "Zbuduj indeks z artefaktów, nie kasując istniejącej kolekcji."
 
 
 def index_artifacts(
-    directory: Path = typer.Argument(Path("data/parsed"), help="Katalog z artefaktami."),
+    directory: Path = typer.Argument(Path("data/unsafe/parsed"), help="Katalog z artefaktami."),
     verbose:   bool = typer.Option(False, "--verbose", "-v", help="Wypisz wszystkie odrzucone."),
 ) -> None:
     """
@@ -18,7 +18,7 @@ def index_artifacts(
     z `ticket_id`, więc to samo zgłoszenie trafia w ten sam punkt, zamiast się dublować.
 
     Example args:
-        directory=Path("data/parsed")
+        directory=Path("data/unsafe/parsed")
         verbose=False
 
     Example result:

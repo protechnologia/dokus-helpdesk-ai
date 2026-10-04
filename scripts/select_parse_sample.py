@@ -1,4 +1,4 @@
-"""Select a stratified, reproducible sample of ticket ids from data/raw/.
+"""Select a stratified, reproducible sample of ticket ids from data/unsafe/raw/.
 
 Do czego:
     Wybiera próbkę zgłoszeń do sparsowania i zapisuje ich identyfikatory — nic więcej.
@@ -9,7 +9,7 @@ Do czego:
     nie importuje `api.app` i nie odpytuje żadnego endpointu.
 
 Flow:
-    1. `select` wczytuje `data/raw/`, odsiewa zgłoszenia już sparsowane (katalog zestawu)
+    1. `select` wczytuje `data/unsafe/raw/`, odsiewa zgłoszenia już sparsowane (katalog zestawu)
        i te bez treści (`_passes_quality`).
     2. Grupuje pozostałe po kategorii i dobiera próbkę proporcjonalnie (`_pick_stratified`).
     3. Szacuje długość wątku każdego wybranego zgłoszenia i ostrzega o tych, które nie zmieszczą
@@ -41,14 +41,14 @@ from collections import defaultdict
 import typer
 
 REPO_ROOT   = pathlib.Path(__file__).resolve().parent.parent
-DEFAULT_RAW = REPO_ROOT / "data" / "raw"
+DEFAULT_RAW = REPO_ROOT / "data" / "unsafe" / "raw"
 # Artefakty i zestawy ewaluacyjne stoją w DWÓCH miejscach, ale pod JEDNĄ nazwą (`--name`):
 # artefakt jest jednorazowy i drogi (przebieg LLM), a golden set edytowalny i poprawiany przy
 # przeglądzie, więc mieszanie ich w jednym drzewie kłóciłoby się z zasadą 7. Jedna nazwa dla
 # obu, bo dwie osobne opcje rozjechałyby się przy drugim zestawie — i wtedy nie wiadomo, która
 # lista identyfikatorów opisuje który katalog.
-PARSED_ROOT = REPO_ROOT / "data" / "parsed"
-GOLDEN_ROOT = REPO_ROOT / "data" / "golden"
+PARSED_ROOT = REPO_ROOT / "data" / "unsafe" / "parsed"
+GOLDEN_ROOT = REPO_ROOT / "data" / "unsafe" / "golden"
 
 # Domyślna nazwa zestawu. Zawiera model parsujący, choć TEN skrypt go nie zna — parsowanie to
 # osobny krok, więc nazwa jest deklaracją intencji, nie zapisem faktu. Świadomie: tak działa już
@@ -205,11 +205,11 @@ def select(
     Example args:
         name="bielik-11b-golden200"
         count=200
-        raw_dir=Path("data/raw")
+        raw_dir=Path("data/unsafe/raw")
         num_ctx=16384
 
     Example result:
-        None (podsumowanie na stdout, identyfikatory w data/golden/<name>.txt)
+        None (podsumowanie na stdout, identyfikatory w data/unsafe/golden/<name>.txt)
 
     Raises:
         typer.Exit: when nothing is left to parse

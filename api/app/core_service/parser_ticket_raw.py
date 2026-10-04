@@ -1,11 +1,11 @@
 """
 Description:
-Czytnik plików eksportu z `data/raw/` (wytwarza je `scripts/export_raw_tickets.py`). Z jednego
-pliku JSON robi znormalizowany `RawTicket` — jedyny kształt zgłoszenia źródłowego, jaki widzi
-reszta systemu. Jeden czytnik na format źródła: przy masowym imporcie (p. 31) dojdzie obok
+Czytnik plików eksportu z `data/unsafe/raw/` (wytwarza je `scripts/export_raw_tickets.py`). Z
+jednego pliku JSON robi znormalizowany `RawTicket` — jedyny kształt zgłoszenia źródłowego, jaki
+widzi reszta systemu. Jeden czytnik na format źródła: przy masowym imporcie (p. 31) dojdzie obok
 wariant SQL.
 
-Przed — plik `data/raw/zgloszenie-33644.json`:
+Przed — plik `data/unsafe/raw/zgloszenie-33644.json`:
 
     {
       "zrodlo": "mysql_helpdesk_20260724-141140.sql",
@@ -69,14 +69,14 @@ from app.core_util.html import strip_html
 SOURCE_DATETIME_LENGTH = len("2026-06-23")
 
 
-def load_raw_ticket(path: Path) -> RawTicket:   # np. Path("data/raw/zgloszenie-33644.json")
+def load_raw_ticket(path: Path) -> RawTicket:   # np. Path("data/unsafe/raw/zgloszenie-33644.json")
     """
     Description:
-    Czyta jeden plik eksportu z `data/raw/` i go normalizuje. Każde pole HTML jest strippowane
-    tutaj, więc nic dalej nie musi wiedzieć, że źródło trzyma znaczniki.
+    Czyta jeden plik eksportu z `data/unsafe/raw/` i go normalizuje. Każde pole HTML jest
+    strippowane tutaj, więc nic dalej nie musi wiedzieć, że źródło trzyma znaczniki.
 
     Example args:
-        path=Path("data/raw/zgloszenie-33644.json")
+        path=Path("data/unsafe/raw/zgloszenie-33644.json")
 
     Example result:
         RawTicket(ticket_id="33644", date=date(2026, 6, 23), subject="Błąd wysyłki", …)

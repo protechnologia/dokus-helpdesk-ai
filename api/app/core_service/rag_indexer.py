@@ -1,17 +1,17 @@
 """
 Description:
-Indeksacja: z katalogu sparsowanych zgłoszeń (`data/parsed/`) buduje kolekcję Qdranta, po której
-w runtime szuka się podobnych zgłoszeń. Nie woła LLM-a — tylko embedder i Qdranta — więc indeks
-da się skasować i odbudować jedną komendą.
+Indeksacja: z katalogu sparsowanych zgłoszeń (`data/unsafe/parsed/`) buduje kolekcję Qdranta, po
+której w runtime szuka się podobnych zgłoszeń. Nie woła LLM-a — tylko embedder i Qdranta — więc
+indeks da się skasować i odbudować jedną komendą.
 
-    data/parsed/*.json → filtr jakości → embedder (`problem` + `symptoms`) → Qdrant
+    data/unsafe/parsed/*.json → filtr jakości → embedder (`problem` + `symptoms`) → Qdrant
 
 | metoda      | komenda                 | co robi                                          |
 |-------------|-------------------------|--------------------------------------------------|
 | `build()`   | `rag index <katalog>`   | dokłada artefakty, nadpisując punkty tych samych |
 | `rebuild()` | `rag reindex <katalog>` | kasuje kolekcję i buduje od zera                 |
 
-Przed — artefakt `data/parsed/33644.json`:
+Przed — artefakt `data/unsafe/parsed/33644.json`:
 
     {
       "ticket_id":         "33644",
@@ -76,7 +76,7 @@ class TicketIndexer:
 
     Do czego:
     Indeks jest pochodną, nigdy źródłem prawdy (zasada 8) — wszystko tutaj musi dać się odtworzyć
-    z `data/parsed/` jedną komendą i BEZ wołania LLM-a (zasada 7). Dlatego ten serwis czyta
+    z `data/unsafe/parsed/` jedną komendą i BEZ wołania LLM-a (zasada 7). Dlatego ten serwis czyta
     artefakty z dysku i rozmawia wyłącznie z embedderem i Qdrantem.
 
     Flow:
@@ -116,7 +116,7 @@ class TicketIndexer:
 
     async def build(
         self,
-        directory: Path,  # np. Path("data/parsed")
+        directory: Path,  # np. Path("data/unsafe/parsed")
     ) -> IndexBuildReport:
         """
         Description:
@@ -124,7 +124,7 @@ class TicketIndexer:
         szczegóły siedzą w prywatnych helperach niżej.
 
         Example args:
-            directory=Path("data/parsed")
+            directory=Path("data/unsafe/parsed")
 
         Example result:
             IndexBuildReport(read=200, indexed=171, filtered=QualityReport(…), warnings=[])
@@ -164,19 +164,19 @@ class TicketIndexer:
 
     async def rebuild(
         self,
-        directory: Path,  # np. Path("data/parsed")
+        directory: Path,  # np. Path("data/unsafe/parsed")
     ) -> IndexBuildReport:
         """
         Description:
         Kasuje kolekcję i buduje ją od zera. Bezpieczne z konstrukcji, a nie dzięki ostrożności:
-        indeks da się odbudować z `data/parsed/` tą samą komendą (zasada 8), więc niszczona jest
-        pochodna.
+        indeks da się odbudować z `data/unsafe/parsed/` tą samą komendą (zasada 8), więc niszczona
+        jest pochodna.
 
         Osobna metoda zamiast flagi w `build()`, bo obie różnią się tym, czym RYZYKUJĄ, a nie tym,
         jak działają — a CLI jedną z nich musi osłonić potwierdzeniem.
 
         Example args:
-            directory=Path("data/parsed")
+            directory=Path("data/unsafe/parsed")
 
         Example result:
             IndexBuildReport(read=200, indexed=171, …)
@@ -191,7 +191,7 @@ class TicketIndexer:
 
     def _read(
         self,
-        directory: Path,  # np. Path("data/parsed")
+        directory: Path,  # np. Path("data/unsafe/parsed")
     ) -> list[ParsedTicket]:
         """
         Description:
@@ -203,7 +203,7 @@ class TicketIndexer:
         zostawiłoby lukę, której potem nikt nie zobaczy.
 
         Example args:
-            directory=Path("data/parsed")
+            directory=Path("data/unsafe/parsed")
 
         Example result:
             [ParsedTicket(ticket_id="10012", …), …]

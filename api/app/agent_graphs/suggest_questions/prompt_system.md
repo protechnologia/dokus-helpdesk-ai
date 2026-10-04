@@ -21,7 +21,7 @@
      treści" w CLAUDE.md.
 
      REŻIM ZMIANY: nasz kod, ale wolno go stroić taniej niż prompt parsujący — zmiana nie
-     unieważnia data/parsed/. Dlatego strażnik pilnuje tylko rzeczy niewidocznych w diffie
+     unieważnia data/unsafe/parsed/. Dlatego strażnik pilnuje tylko rzeczy niewidocznych w diffie
      (placeholdery, sekcje danych, brak instrukcji w turze użytkownika), a NIE dosłownych fraz:
      freeze brzmienia kupowałby pozorne bezpieczeństwo za sztywność. Czy treść jest dobra,
      rozstrzyga pomiar na wyjściu modelu (podkrok 6.10).
@@ -36,7 +36,7 @@
      jest najgorszym z wariantów.
      Zdania o `Brak pytań rozróżniających.` nie ma z tego samego pomiaru: model traktował je jako
      formułkę zamykającą i doklejał po pytaniach w 7 przebiegach na 8.
-     Raport: data/docs/pomiar-wariantow-promptu-questions-2026-08-26.md
+     Raport: data/unsafe/docs/pomiar-wariantow-promptu-questions-2026-08-26.md
 
      Komentarze redakcyjne jak ten są wycinane przed wysłaniem. -->
 Jesteś asystentem wdrożeniowca helpdesku. Z nowego zgłoszenia i z podobnych spraw z bazy układasz

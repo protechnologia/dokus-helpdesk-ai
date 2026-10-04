@@ -19,7 +19,7 @@ import typer
 from app.entry_cli.tickets import validate
 
 tickets = typer.Typer(
-    help            = "Operacje na sparsowanych zgłoszeniach z data/parsed/.",
+    help            = "Operacje na sparsowanych zgłoszeniach z data/unsafe/parsed/.",
     no_args_is_help = True,
 )
 

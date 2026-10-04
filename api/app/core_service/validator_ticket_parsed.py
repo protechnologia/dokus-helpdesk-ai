@@ -8,7 +8,7 @@ from app.core_model.validation_parsed_report import ValidationReport
 from app.core_util.validation_text import describe_validation_error
 
 
-def validate_file(path: Path) -> FileVerdict:         # np. Path("data/parsed/33644.json")
+def validate_file(path: Path) -> FileVerdict:         # np. Path("data/unsafe/parsed/33644.json")
     """
     Description:
     Waliduje jeden plik artefaktu wobec `ParsedTicket`.
@@ -18,10 +18,10 @@ def validate_file(path: Path) -> FileVerdict:         # np. Path("data/parsed/33
     problemy naraz.
 
     Example args:
-        path=Path("data/parsed/33644.json")
+        path=Path("data/unsafe/parsed/33644.json")
 
     Example result:
-        FileVerdict(path=Path("data/parsed/33644.json"), errors=[])
+        FileVerdict(path=Path("data/unsafe/parsed/33644.json"), errors=[])
     """
     try:
         ParsedTicket.model_validate_json(path.read_text(encoding="utf-8"))
@@ -36,17 +36,17 @@ def validate_file(path: Path) -> FileVerdict:         # np. Path("data/parsed/33
     return FileVerdict(path=path, errors=[])
 
 
-def validate_directory(directory: Path) -> ValidationReport:   # np. Path("data/parsed")
+def validate_directory(directory: Path) -> ValidationReport:   # np. Path("data/unsafe/parsed")
     """
     Description:
     Waliduje każdy plik `*.json` w katalogu, w kolejności posortowanej, żeby dwa przebiegi po tym
     samym korpusie dawały porównywalne raporty.
 
-    Pusty katalog daje pusty, zaliczony raport — `data/parsed/` jest legalnie pusty aż do
+    Pusty katalog daje pusty, zaliczony raport — `data/unsafe/parsed/` jest legalnie pusty aż do
     masowego importu (p. 31), i to nie jest błąd.
 
     Example args:
-        directory=Path("data/parsed")
+        directory=Path("data/unsafe/parsed")
 
     Example result:
         ValidationReport(verdicts=[FileVerdict(path=…, errors=[]), …])
