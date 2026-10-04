@@ -19,10 +19,11 @@ def test_unknown_model_does_not_fail():
 def test_cost_is_zero_regardless_of_volume():
     """Milion tokenów w każdej klasie → nadal zero; to nie zaokrąglenie, tylko brak rachunku."""
     cost = calculate_cost_usd(
-        model             = "SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0",
-        prompt_tokens     = 1_000_000,
-        completion_tokens = 1_000_000,
-        cache_read_tokens = 1_000_000,
+        model              = "SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0",
+        prompt_tokens      = 1_000_000,
+        completion_tokens  = 1_000_000,
+        cache_write_tokens = 1_000_000,
+        cache_read_tokens  = 1_000_000,
     )
 
     assert cost == 0.0

@@ -79,6 +79,15 @@ def test_cache_read_rate_follows_the_model():
     assert cached_million("claude-sonnet-5-5") == pytest.approx( 2.00 * 0.10)
 
 
+def test_cache_write_rate_comes_from_the_row():
+    """Zapis do cache → mnożnik z wiersza modelu (1,25 stawki wejścia), nie stała w kodzie."""
+    for model, price in PRICES.items():
+        cost = calculate_cost_usd(model, 0, 0, cache_write_tokens=1_000_000)
+
+        assert price.cache_write_multiplier == 1.25, model
+        assert cost == pytest.approx(price.input_per_million * 1.25), model
+
+
 def test_the_strongest_model_is_priced():
     """Najmocniejszy model z cennika → 10 USD za milion wejścia i 50 za milion wyjścia; bez
     wiersza klient odmówiłby startu."""

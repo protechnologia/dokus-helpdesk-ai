@@ -49,8 +49,9 @@ class OpenAILLMClient(LLMClient):
     Flow:
         1. `get_llm_client()` builds it from `Settings`, failing fast when key or model is missing.
         2. `complete()` sends one prompt, prepending the system prompt as the first message.
-        3. The answer text is read, usage is mapped onto our four token classes, and the call is
-           priced here — the price list is provider knowledge and stays on this side.
+        3. The answer text is read, usage is split into our four DISJOINT token classes (the API
+           reports cached input inside the prompt count), and the call is priced here — the price
+           list is provider knowledge and stays on this side.
     """
 
     def __init__(
@@ -189,27 +190,34 @@ class OpenAILLMClient(LLMClient):
         text  = self._extract_text(response)
         usage = response.usage
 
-        # Cached input is reported nested, and the whole branch is absent on a call that used no
-        # caching; treat every missing level as zero rather than let `None` reach the arithmetic.
-        details           = getattr(usage, "prompt_tokens_details", None)
-        cache_read_tokens = getattr(details, "cached_tokens", 0) or 0
+        # Liczniki cache przychodzą zagnieżdżone, a przy wywołaniu bez cache nie ma całej gałęzi;
+        # każdy brakujący poziom to zero, żeby `None` nie doszło do rachunku.
+        details            = getattr(usage, "prompt_tokens_details", None)
+        cache_read_tokens  = getattr(details, "cached_tokens", 0) or 0
+        cache_write_tokens = getattr(details, "cache_write_tokens", 0) or 0
 
-        # Priced against the model the response REPORTS, not the one we asked for. The two normally
-        # match, but when they do not, the bill follows what actually ran.
+        # W tym API obie klasy cache siedzą WEWNĄTRZ `prompt_tokens`. Odejmujemy je, żeby cztery
+        # klasy tokenów były rozłączne jak u Claude'a: cennik liczy każdą po swojej stawce,
+        # a suma w `LLMUsage` znaczy to samo u każdego dostawcy. Dolna granica zero, bo rachunek
+        # nie może wyjść ujemny, gdyby liczniki się nie zgadzały.
+        fresh_tokens = max(usage.prompt_tokens - cache_read_tokens - cache_write_tokens, 0)
+
+        # Cena modelu, który odpowiedź PODAJE, nie tego, o który prosiliśmy. Zwykle to ten sam,
+        # a gdy nie — rachunek idzie za tym, co faktycznie policzyło.
         return LLMCompletion(
-            text              = text,
-            model             = response.model,
-            prompt_tokens     = usage.prompt_tokens,
-            completion_tokens = usage.completion_tokens,
-            # No cache-WRITE class on this provider: caching is automatic and only reads are
-            # discounted, so the field stays at its zero default rather than carrying a fake number.
-            cache_read_tokens = cache_read_tokens,
-            latency_ms        = elapsed_ms,
-            cost_usd          = calculate_cost_usd(
-                model             = response.model,
-                prompt_tokens     = usage.prompt_tokens,
-                completion_tokens = usage.completion_tokens,
-                cache_read_tokens = cache_read_tokens,
+            text               = text,
+            model              = response.model,
+            prompt_tokens      = fresh_tokens,
+            completion_tokens  = usage.completion_tokens,
+            cache_write_tokens = cache_write_tokens,
+            cache_read_tokens  = cache_read_tokens,
+            latency_ms         = elapsed_ms,
+            cost_usd           = calculate_cost_usd(
+                model              = response.model,
+                prompt_tokens      = fresh_tokens,
+                completion_tokens  = usage.completion_tokens,
+                cache_write_tokens = cache_write_tokens,
+                cache_read_tokens  = cache_read_tokens,
             ),
         )
 

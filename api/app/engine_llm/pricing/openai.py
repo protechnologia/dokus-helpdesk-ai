@@ -1,7 +1,7 @@
 import re
 
 from app.engine_llm.errors import LLMConfigError
-from app.engine_llm.pricing.base import TOKENS_PER_UNIT, ModelPrice, price
+from app.engine_llm.pricing.base import ModelPrice, cost_usd, price
 
 # Odpowiedź podaje SNAPSHOT, który odpowiedział, z datą wydania, o którą nie prosiliśmy:
 # `gpt-5.4-mini` wraca jako `gpt-5.4-mini-2026-03-17` (sprawdzone na żywym API 2026-08-02). Cennik
@@ -12,36 +12,35 @@ _DATE_SUFFIX = re.compile(r"-\d{4}-\d{2}-\d{2}$")
 # „Standard", kontekst krótki). Nieznany identyfikator kończy się głośnym błędem w `price_of()`,
 # a nie ceną zero: przebieg raportujący 0,00 USD jest gorszy niż taki, który odmawia startu.
 #
-# Czego ta tabela NIE obejmuje:
-# - stawek „long context" (powyżej 272 tys. tokenów wejścia) — nasze prompty są o rzędy krótsze;
-# - stawki ZAPISU do cache, którą cennik podaje dla rodzin gpt-6 i gpt-5.6 (1,25 stawki wejścia).
-#   Klient odczytuje dziś tylko licznik odczytów z cache, więc zapis jest liczony jak zwykłe
-#   wejście — koszt pierwszej tury z nowym początkiem promptu jest zaniżony o 25% tej części.
+# Czego ta tabela NIE obejmuje: stawek „long context" (powyżej 272 tys. tokenów wejścia) — nasze
+# prompty są o rzędy krótsze.
 #
-# `input_usd` i `output_usd` to USD za milion tokenów; `cache_read` to ułamek stawki wejścia
-# za token odczytany z cache.
+# `input` i `output` to USD za milion tokenów; `cache_read` i `cache_write` to krotności stawki
+# wejścia za token odczytany z cache promptu i zapisany do niego. Zapis kosztuje 1,25 stawki
+# wejścia w rodzinach gpt-6 i gpt-5.6; starsze modele nie mają osobnej stawki zapisu, więc
+# dostają 1,00 — zapis jest tam zwykłym wejściem.
 PRICES: dict[str, ModelPrice] = {
     # --- rodzina gpt-6; pierwszy jest najmocniejszy w cenniku ---
-    "gpt-6-astra":   price(input_usd=10.00, output_usd=50.00, cache_read=0.10),
-    "gpt-6.1-sol":   price(input_usd= 2.00, output_usd=10.00, cache_read=0.05),
-    "gpt-6-sol":     price(input_usd= 2.00, output_usd=10.00, cache_read=0.10),
-    "gpt-6-luna":    price(input_usd= 0.10, output_usd= 0.50, cache_read=0.10),
+    "gpt-6-astra":   price(input=10.00, output=50.00, cache_read=0.10, cache_write=1.25),
+    "gpt-6.1-sol":   price(input= 2.00, output=10.00, cache_read=0.05, cache_write=1.25),
+    "gpt-6-sol":     price(input= 2.00, output=10.00, cache_read=0.10, cache_write=1.25),
+    "gpt-6-luna":    price(input= 0.10, output= 0.50, cache_read=0.10, cache_write=1.25),
 
     # --- rodzina gpt-5.6 ---
-    "gpt-5.6-sol":   price(input_usd= 4.00, output_usd=20.00, cache_read=0.10),
-    "gpt-5.6-terra": price(input_usd= 2.00, output_usd=12.00, cache_read=0.10),
-    "gpt-5.6-luna":  price(input_usd= 0.20, output_usd= 1.20, cache_read=0.10),
+    "gpt-5.6-sol":   price(input= 4.00, output=20.00, cache_read=0.10, cache_write=1.25),
+    "gpt-5.6-terra": price(input= 2.00, output=12.00, cache_read=0.10, cache_write=1.25),
+    "gpt-5.6-luna":  price(input= 0.20, output= 1.20, cache_read=0.10, cache_write=1.25),
 
     # --- gpt-5.5 i gpt-5.4 ---
-    "gpt-5.5":       price(input_usd= 5.00, output_usd=30.00, cache_read=0.10),
-    "gpt-5.4":       price(input_usd= 2.50, output_usd=15.00, cache_read=0.10),
-    "gpt-5.4-mini":  price(input_usd= 0.75, output_usd= 4.50, cache_read=0.10),
-    "gpt-5.4-nano":  price(input_usd= 0.20, output_usd= 1.25, cache_read=0.10),
+    "gpt-5.5":       price(input= 5.00, output=30.00, cache_read=0.10, cache_write=1.00),
+    "gpt-5.4":       price(input= 2.50, output=15.00, cache_read=0.10, cache_write=1.00),
+    "gpt-5.4-mini":  price(input= 0.75, output= 4.50, cache_read=0.10, cache_write=1.00),
+    "gpt-5.4-nano":  price(input= 0.20, output= 1.25, cache_read=0.10, cache_write=1.00),
 
     # --- starsze, użyte w porównaniu modeli parsowania ---
-    "gpt-4.1":       price(input_usd= 2.00, output_usd= 8.00, cache_read=0.25),
-    "gpt-4.1-mini":  price(input_usd= 0.40, output_usd= 1.60, cache_read=0.25),
-    "o4-mini":       price(input_usd= 1.10, output_usd= 4.40, cache_read=0.25),
+    "gpt-4.1":       price(input= 2.00, output= 8.00, cache_read=0.25, cache_write=1.00),
+    "gpt-4.1-mini":  price(input= 0.40, output= 1.60, cache_read=0.25, cache_write=1.00),
+    "o4-mini":       price(input= 1.10, output= 4.40, cache_read=0.25, cache_write=1.00),
 }
 
 
@@ -57,7 +56,8 @@ def price_of(
         model="gpt-5.4-mini-2026-03-17"
 
     Example result:
-        ModelPrice(input_per_million=0.75, output_per_million=4.50, cache_read_multiplier=0.10)
+        ModelPrice(input_per_million=0.75, output_per_million=4.50, cache_read_multiplier=0.10,
+                   cache_write_multiplier=1.00)
 
     Raises:
         LLMConfigError: modelu nie ma w cenniku — dopisz jego opublikowane stawki wyżej
@@ -77,22 +77,26 @@ def price_of(
 
 def calculate_cost_usd(
     model:              str,      # np. "gpt-5.4-mini"
-    prompt_tokens:      int,      # np. 4820 — całe wejście, razem z częścią odczytaną z cache
+    prompt_tokens:      int,      # np. 4820 — świeże wejście, po pełnej stawce
     completion_tokens:  int,      # np. 640 — w modelach rozumujących także tokeny rozumowania
-    cache_read_tokens:  int = 0,  # np. 1830 — po ułamku stawki wejścia, zależnym od modelu
+    cache_write_tokens: int = 0,  # np. 1830 — po krotności stawki wejścia z wiersza modelu
+    cache_read_tokens:  int = 0,  # np. 1830 — po ułamku stawki wejścia z wiersza modelu
 ) -> float:
     """
     Description:
-    Wycenia jedno wywołanie. Wejście odczytane z cache jest liczone osobno, bo jego stawka jest
-    kilkukrotnie niższa. Klasy zapisu do cache tu nie ma — klient jej nie odczytuje.
+    Wycenia jedno wywołanie. Wejście ma trzy rozłączne klasy — świeże, zapisane do cache
+    i odczytane z cache — każdą po swojej stawce; zapis nie jest dopłatą do wejścia, tylko
+    inną stawką za te same tokeny. API podaje obie klasy cache WEWNĄTRZ `prompt_tokens`,
+    a rozdziela je klient (`client/openai.py`), więc tutaj przychodzą już osobno.
 
-    W modelach rozumujących (o4-mini) `completion_tokens` obejmuje tokeny, których wołający nie
-    widzi: za myślenie się płaci, po stawce wyjścia.
+    W modelach rozumujących `completion_tokens` obejmuje tokeny, których wołający nie widzi:
+    za myślenie się płaci, po stawce wyjścia.
 
     Example args:
         model="gpt-5.4-mini"
-        prompt_tokens=4820
+        prompt_tokens=2990
         completion_tokens=640
+        cache_write_tokens=0
         cache_read_tokens=1830
 
     Example result:
@@ -101,15 +105,12 @@ def calculate_cost_usd(
     Raises:
         LLMConfigError: modelu nie ma w cenniku
     """
-    row = price_of(model)
+    cost = cost_usd(
+        row                = price_of(model),
+        prompt_tokens      = prompt_tokens,
+        completion_tokens  = completion_tokens,
+        cache_write_tokens = cache_write_tokens,
+        cache_read_tokens  = cache_read_tokens,
+    )
 
-    # W tym API tokeny z cache siedzą WEWNĄTRZ `prompt_tokens`, więc dostają zniżkę, a nie są
-    # doliczane: policzenie ich drugi raz zawyżyłoby koszt początku promptu.
-    fresh_input = max(prompt_tokens - cache_read_tokens, 0)
-
-    billable_input = fresh_input + cache_read_tokens * row.cache_read_multiplier
-
-    input_cost  = billable_input    * row.input_per_million  / TOKENS_PER_UNIT
-    output_cost = completion_tokens * row.output_per_million / TOKENS_PER_UNIT
-
-    return input_cost + output_cost
+    return cost

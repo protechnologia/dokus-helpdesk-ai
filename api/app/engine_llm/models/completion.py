@@ -15,10 +15,11 @@ class LLMCompletion(BaseModel):
     completion_tokens: int   = Field(examples=[96])
     latency_ms:        float = Field(examples=[1240.5])
 
-    # Cache accounting. Providers that bill cached input separately report it here; the rest leave
-    # both at zero. Kept apart from `prompt_tokens` because the rates differ by an order of
-    # magnitude (a cache read costs ~0.1x a fresh token, a write ~1.25x) — folding them into one
-    # number would make the cost report wrong in whichever direction the caching went.
+    # Rozliczenie cache promptu. Klasy są ROZŁĄCZNE u każdego dostawcy: `prompt_tokens` to samo
+    # świeże wejście, a zapis do cache i odczyt z niego mają własne pola — dostawcę, który podaje
+    # je wewnątrz licznika wejścia, rozdziela jego klient. Osobno, bo stawki różnią się o rząd
+    # wielkości (odczyt ~0,1 stawki wejścia, zapis do 1,25): jedna liczba fałszowałaby koszt
+    # w tę stronę, w którą poszło cache. Dostawca bez cache zostawia oba pola na zerze.
     cache_write_tokens: int = Field(default=0, examples=[1830])
     cache_read_tokens:  int = Field(default=0, examples=[1830])
 

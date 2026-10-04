@@ -1263,8 +1263,9 @@ dokus-helpdesk-ai/
   lub `TypedDict`.
 - **Nazwy opisują intencję** — `fetch_invoice_summary`, nie `get_data`.
 - **Kilka liczb w wywołaniu podajemy z nazwami, także w tabelach danych** (cennik:
-  `price(input_usd=2.00, output_usd=8.00, cache_read=0.25)`). Same liczby w nawiasie nie mówią,
-  która jest która; gdy nazwy pól są za długie na jedną linię, pomocnik dostaje krótsze.
+  `price(input=2.00, output=8.00, cache_read=0.25, cache_write=1.00)`). Same liczby w nawiasie
+  nie mówią, która jest która; gdy nazwy pól są za długie na jedną linię, pomocnik dostaje
+  krótsze.
 - **Casing:** `snake_case` funkcje/zmienne, `PascalCase` klasy, `UPPER_CASE` stałe.
 - **f-stringi** do formatowania, nie `%` ani `.format()`.
 - **Wczesne wyjścia** (guard clauses) zamiast zagnieżdżonych `if/else`.
@@ -1840,11 +1841,16 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   odczytem za ułamek stawki. Cena u Claude'a: pierwszy zapis kosztuje 1,25 stawki wejścia.
   Warunek: początek identyczny co do znaku — stąd instrukcja w turze systemowej i stała kolejność
   narzędzi.
-- **Cenniki sprawdzone z opublikowanymi 2026-10-04; każdy model to jedna linia z trzema
-  nazwanymi liczbami: wejście, wyjście i mnożnik odczytu z cache** (od 0,025 do 0,25 stawki
-  wejścia, bez wartości domyślnej), żeby tabelę dało się porównać z cennikiem na oko. Cennik OpenAI nie
-  liczy stawki ZAPISU do cache, którą nowe rodziny już mają (1,25 stawki) — klient nie odczytuje
-  tego licznika, więc pierwsza tura jest lekko zaniżona; do domknięcia w p. 17.
+- **Cenniki sprawdzone z opublikowanymi 2026-10-04; każdy model to jedna linia z czterema
+  nazwanymi liczbami: wejście, wyjście, mnożnik odczytu z cache i mnożnik zapisu do cache**
+  (odczyt od 0,025 do 0,25 stawki wejścia; zapis 1,25 u Claude'a i w rodzinach gpt-6 i gpt-5.6,
+  1,00 w starszych modelach OpenAI; bez wartości domyślnych), żeby tabelę dało się porównać
+  z cennikiem na oko. Rachunek jest jeden dla wszystkich dostawców (`pricing/base.py`).
+- **Cztery klasy tokenów są rozłączne u każdego dostawcy:** `prompt_tokens` to samo świeże
+  wejście, obok zapis do cache, odczyt z cache i wyjście. OpenAI podaje obie klasy cache wewnątrz
+  licznika wejścia, więc rozdziela je klient; zapis jest tam inną stawką za te same tokeny, nie
+  dopłatą. Licznik zapisu u OpenAI znamy z SDK i dokumentacji, nie z żywej odpowiedzi — do
+  sprawdzenia przy p. 17.
 - **Pierwszy przebieg pętli na żywym modelu (2026-10-04, sonda poza repo: `gpt-5.4-mini`,
   zmyślone zgłoszenie, atrapy narzędzi):** cztery tury — oba wyszukiwania naraz, odczyt kart
   WSZYSTKICH znalezionych numerów, odczyt wątku zgłoszenia bez karty, odpowiedź; 0,0075 USD
@@ -2235,7 +2241,7 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 779 (0)            | 17 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 787 (0)            | 17 s |
 | integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 144 (53)           | 41 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 76 (9)             | 9 s  |
 | ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 5 (3)              | 40 s |
@@ -2243,7 +2249,7 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 Liczby i czasy z 2026-10-04: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 9 s, a ewaluacyjne poniżej sekundy —
 całe 40 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
-(`pytest -m ""`): 1004 testy, 79 s.
+(`pytest -m ""`): 1012 testów, 79 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2769,8 +2775,8 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
   w klientach Claude / OpenAI / Ollama; pętla zostaje w grafie. `tool_choice` zostaje `auto` —
   sprawdzić, czy wymuszony u Claude wyklucza extended thinking; tryb strict u OpenAI wymaga
   przetłumaczenia schematu (wszystkie pola wymagane); tura z narzędziami ma prosić o cache
-  promptu tak jak `complete()` u Claude'a, zwracać zużycie do `LLMUsage`, a klient OpenAI
-  odczytywać także licznik zapisu do cache. *Dlaczego:* format wywołań narzędzi to wiedza
+  promptu tak jak `complete()` u Claude'a i zwracać zużycie do `LLMUsage`; licznik zapisu do
+  cache u OpenAI sprawdzić na żywej odpowiedzi. *Dlaczego:* format wywołań narzędzi to wiedza
   dostawcy (zasada 4).
 - [ ] **18. Dwie role LLM w konfiguracji** — zaufana i generująca, z flagą per endpoint „może
   widzieć surowe dane", domyślnie wyłączoną. *Dlaczego:* pomyłka tej flagi to przeciek, więc

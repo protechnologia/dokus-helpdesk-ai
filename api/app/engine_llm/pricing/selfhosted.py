@@ -1,61 +1,65 @@
 from app.engine_llm.pricing.base import ModelPrice
 
-# A model running on our own hardware bills no tokens, whoever serves it — Ollama today, vLLM or
-# Bielik on a rented GPU later. The rate is a genuine, measured zero, not the missing price row the
-# hosted tables fail loudly on.
+# Model na własnym sprzęcie nie rozlicza tokenów, czymkolwiek jest serwowany — dziś Ollama, jutro
+# vLLM albo Bielik na wynajętej karcie. Stawka to prawdziwe, zmierzone zero, a nie brakujący wiersz
+# cennika, na którym cenniki dostawców głośno się wywalają.
 #
-# Named after the way the model is HOSTED rather than after the tool serving it: `client/ollama.py`
-# is one consumer of this table, and the next runner will be another. Keeping it out of
-# `pricing/openai.py` keeps the distinction visible — that table is a copy of a published price
-# list and gets re-verified against it, this one states a property of where the model runs.
+# Nazwa pochodzi od tego, GDZIE model stoi, nie od narzędzia, które go serwuje: `client/ollama.py`
+# jest jednym odbiorcą tej tabeli, a następny runner będzie kolejnym. Osobny plik zamiast wiersza
+# w `pricing/openai.py`, bo tamta tabela to kopia opublikowanego cennika, którą się z nim
+# sprawdza, a ta mówi coś o miejscu, w którym model działa.
+#
 # Budowane z pominięciem walidacji: wiersz cennika wymaga stawek dodatnich, a tu zero jest
 # prawdziwą ceną, nie pomyłką.
 FREE = ModelPrice.model_construct(
-    input_per_million     = 0.0,
-    output_per_million    = 0.0,
-    cache_read_multiplier = 1.0,
+    input_per_million      = 0.0,
+    output_per_million     = 0.0,
+    cache_read_multiplier  = 1.0,
+    cache_write_multiplier = 1.0,
 )
 
 
-def price_of(model: str) -> ModelPrice:   # e.g. "SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0"
+def price_of(model: str) -> ModelPrice:   # np. "SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0"
     """
     Description:
-    Prices any self-hosted model at zero. Accepts every id on purpose: a local tag names a
-    publisher, a parameter count and a quantisation, and pulling a new one costs nothing — a
-    whitelist would block a run for no reason, while the risk it guards against on hosted providers
-    (silently reporting a real bill as $0.00) does not exist here.
+    Wycenia każdy model na własnym sprzęcie na zero. Przyjmuje dowolny identyfikator celowo:
+    lokalny tag nazywa wydawcę, liczbę parametrów i kwantyzację, a pobranie nowego nic nie
+    kosztuje — lista dozwolonych blokowałaby przebieg bez powodu, a ryzyka, przed którym chroni
+    u dostawców (prawdziwy rachunek pokazany jako 0,00 USD), tutaj nie ma.
 
     Example args:
         model="SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0"
 
     Example result:
-        ModelPrice(input_per_million=0.0, output_per_million=0.0)
+        ModelPrice(input_per_million=0.0, output_per_million=0.0, cache_read_multiplier=1.0,
+                   cache_write_multiplier=1.0)
     """
     return FREE
 
 
 def calculate_cost_usd(
-    model:             str,      # e.g. "SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0"
-    prompt_tokens:     int,      # e.g. 4820
-    completion_tokens: int,      # e.g. 640
-    cache_read_tokens: int = 0,  # e.g. 0 — self-hosted runners report no cache counters
+    model:              str,      # np. "SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0"
+    prompt_tokens:      int,      # np. 4820
+    completion_tokens:  int,      # np. 640
+    cache_write_tokens: int = 0,  # np. 0 — lokalne runnery nie podają liczników cache
+    cache_read_tokens:  int = 0,  # np. 0
 ) -> float:
     """
     Description:
-    Reports the cost of one self-hosted call: always zero. The signature mirrors the hosted tables
-    so a client can call either without knowing which one it holds.
+    Podaje koszt jednego wywołania modelu na własnym sprzęcie: zawsze zero. Sygnatura jest taka
+    sama jak w cennikach dostawców, żeby klient mógł wołać dowolny, nie wiedząc, który trzyma.
 
-    The real cost of a local run is TIME, not money — a 4.5B model on CPU answers in minutes rather
-    than seconds. The money column is uninformative here by construction; the elapsed time the CLI
-    prints beside it is the one that matters.
+    Prawdziwym kosztem lokalnego przebiegu jest CZAS, nie pieniądze — model 4,5B na CPU odpowiada
+    w minutach, nie sekundach. Kolumna z kwotą nic tu nie mówi; liczy się czas wypisany obok.
 
     Example args:
         model="SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0"
         prompt_tokens=4820
         completion_tokens=640
+        cache_write_tokens=0
         cache_read_tokens=0
 
     Example result:
-        0.0  # USD — our own hardware bills no tokens
+        0.0  # USD — własny sprzęt nie rozlicza tokenów
     """
     return 0.0

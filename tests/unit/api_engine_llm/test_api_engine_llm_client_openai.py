@@ -39,19 +39,22 @@ class StubChoice:
 class StubUsage:
     """
     Description:
-    The usage counters of a stubbed answer. Cached input is reported nested under
+    The usage counters of a stubbed answer. Cache counters are reported nested under
     `prompt_tokens_details`, so the stub mirrors that shape rather than flattening it.
     """
 
     def __init__(
         self,
-        prompt_tokens:     int,      # e.g. 4820
-        completion_tokens: int,      # e.g. 640
-        cached_tokens:     int = 0,  # e.g. 1830
+        prompt_tokens:      int,      # e.g. 4820 — the whole input, cache counters included
+        completion_tokens:  int,      # e.g. 640
+        cached_tokens:      int = 0,  # e.g. 1830
+        cache_write_tokens: int = 0,  # e.g. 1024
     ):
+        details = {"cached_tokens": cached_tokens, "cache_write_tokens": cache_write_tokens}
+
         self.prompt_tokens         = prompt_tokens
         self.completion_tokens     = completion_tokens
-        self.prompt_tokens_details = type("Details", (), {"cached_tokens": cached_tokens})()
+        self.prompt_tokens_details = type("Details", (), details)()
 
 
 class StubResponse:
@@ -138,8 +141,9 @@ def test_reports_cost_for_the_call():
     assert completion.cost_usd == pytest.approx(5.25)
 
 
-def test_cached_tokens_land_in_their_own_field():
-    """Tokeny z cache → własne pole LLMCompletion, mimo że w API siedzą w prompt_tokens."""
+def test_cached_tokens_are_split_out_of_the_prompt_count():
+    """Tokeny z cache siedzą w API wewnątrz prompt_tokens → własne pole, a prompt_tokens to
+    samo świeże wejście; klasy rozłączne jak u Claude'a."""
     response = StubResponse(
         choices = [StubChoice("ok")],
         usage   = StubUsage(prompt_tokens=5000, completion_tokens=50, cached_tokens=4000),
@@ -147,14 +151,78 @@ def test_cached_tokens_land_in_their_own_field():
 
     completion = make_client()._to_completion(response, elapsed_ms=1.0)
 
-    assert completion.prompt_tokens     == 5000
-    assert completion.cache_read_tokens == 4000
-    # Ten dostawca nie ma klasy zapisu do cache — pole zostaje na zerze, nie na zmyślonej liczbie.
+    assert completion.prompt_tokens      == 1000
+    assert completion.cache_read_tokens  == 4000
     assert completion.cache_write_tokens == 0
 
 
+def test_cache_write_tokens_land_in_their_own_field():
+    """Licznik zapisu do cache → własne pole, odjęty od świeżego wejścia: trzy klasy wejścia
+    sumują się do tego, co podało API."""
+    usage = StubUsage(
+        prompt_tokens      = 5000,
+        completion_tokens  = 50,
+        cached_tokens      = 3000,
+        cache_write_tokens = 1500,
+    )
+
+    completion = make_client()._to_completion(
+        StubResponse(choices=[StubChoice("ok")], usage=usage), elapsed_ms=1.0
+    )
+
+    assert completion.prompt_tokens      == 500
+    assert completion.cache_read_tokens  == 3000
+    assert completion.cache_write_tokens == 1500
+
+
+def test_cached_tokens_are_discounted_not_added():
+    """Całe wejście odczytane z cache → 10% stawki wejścia; odczyt nie jest doliczany do pełnej
+    ceny tych samych tokenów."""
+    response = StubResponse(
+        choices = [StubChoice("ok")],
+        usage   = StubUsage(prompt_tokens=1_000_000, completion_tokens=0, cached_tokens=1_000_000),
+    )
+
+    completion = make_client()._to_completion(response, elapsed_ms=1.0)
+
+    # gpt-5.4-mini: 0,75 USD za milion wejścia, odczyt z cache za 0,10 tej stawki.
+    assert completion.cost_usd == pytest.approx(0.75 * 0.10)
+
+
+def test_cache_write_is_billed_at_its_own_rate():
+    """Zapis do cache w rodzinie gpt-6 → 1,25 stawki wejścia zamiast zwykłej, nie obok niej."""
+    # gpt-6.1-sol: wejście 2,00 USD za milion, zapis do cache 2,50.
+    response = StubResponse(
+        choices = [StubChoice("ok")],
+        usage   = StubUsage(
+            prompt_tokens      = 1_000_000,
+            completion_tokens  = 0,
+            cache_write_tokens = 1_000_000,
+        ),
+        model   = "gpt-6.1-sol",
+    )
+
+    completion = make_client()._to_completion(response, elapsed_ms=1.0)
+
+    assert completion.cost_usd == pytest.approx(2.50)
+
+
+def test_cache_larger_than_prompt_does_not_go_negative():
+    """Liczniki cache większe niż prompt → świeże wejście zero, nie ujemne; rachunek nie może
+    wyjść poniżej zera, gdy liczniki się nie zgadzają."""
+    response = StubResponse(
+        choices = [StubChoice("ok")],
+        usage   = StubUsage(prompt_tokens=100, completion_tokens=0, cached_tokens=5000),
+    )
+
+    completion = make_client()._to_completion(response, elapsed_ms=1.0)
+
+    assert completion.prompt_tokens == 0
+    assert completion.cost_usd      >= 0
+
+
 def test_missing_cache_details_default_to_zero():
-    """Usage bez sekcji cache → zero, nie None w arytmetyce kosztu."""
+    """Usage bez sekcji cache → zera, nie None w arytmetyce kosztu; całe wejście jest świeże."""
     class UsageWithoutDetails:
         prompt_tokens     = 100
         completion_tokens = 50
@@ -163,7 +231,9 @@ def test_missing_cache_details_default_to_zero():
 
     completion = make_client()._to_completion(response, elapsed_ms=1.0)
 
-    assert completion.cache_read_tokens == 0
+    assert completion.prompt_tokens      == 100
+    assert completion.cache_read_tokens  == 0
+    assert completion.cache_write_tokens == 0
 
 
 def test_temperature_is_sent_to_models_that_accept_it():
