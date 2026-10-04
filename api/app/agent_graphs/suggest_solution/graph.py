@@ -10,8 +10,8 @@ from app.agent_graphs.suggest_solution.respond_tool import RESPOND_TOOL_NAME, re
 from app.agent_graphs.suggest_solution.state import SuggestSolutionState
 from app.agent_nodes import Node
 from app.agent_tools import AgentTool
+from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition
-from app.util.markdown import read_document
 
 GRAPH_DIR   = Path(__file__).parent
 SYSTEM_FILE = GRAPH_DIR / "prompt_system.md"

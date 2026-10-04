@@ -16,7 +16,7 @@ O czym pamiętać przy zmianach:
   a tylko odczyt trafia na listę źródeł.
 """
 
-from app.model.doc_section import DocSection
+from app.core_model.doc_section import DocSection
 
 PATH_SEPARATOR = " › "
 

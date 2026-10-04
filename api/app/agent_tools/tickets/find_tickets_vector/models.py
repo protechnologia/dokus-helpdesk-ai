@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.model.ticket_parsed import ParsedTicket
+from app.core_model.ticket_parsed import ParsedTicket
 
 
 class FindTicketsVectorQuery(BaseModel):

@@ -4,7 +4,7 @@ from pydantic import Field
 
 from app.agent_graphs.base import GraphState, merge_sources
 from app.agent_tools import SourceRef
-from app.model.suggest_proposal import Proposal
+from app.core_model.suggest_proposal import Proposal
 
 
 class SuggestSolutionState(GraphState):

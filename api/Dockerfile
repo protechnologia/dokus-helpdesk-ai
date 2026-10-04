@@ -31,7 +31,7 @@ COPY app/ ./app/
 # host, and `docker compose run api helpdesk …` must simply work.
 # PYTHONPATH rather than a bare import: the launcher may be invoked from any working directory,
 # and /code lands on sys.path only when it happens to be the current one.
-RUN printf '#!/bin/sh\nexec env PYTHONPATH=/code python -c "from app.cli.cli import cli; cli()" "$@"\n' \
+RUN printf '#!/bin/sh\nexec env PYTHONPATH=/code python -c "from app.entry_cli.cli import cli; cli()" "$@"\n' \
       > /usr/local/bin/helpdesk \
  && chmod +x /usr/local/bin/helpdesk
 

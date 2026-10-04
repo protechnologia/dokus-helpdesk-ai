@@ -3,8 +3,8 @@ from datetime import date as Date
 from pydantic import Field
 
 from app.agent_graphs.base import GraphState
-from app.model.dict_resolution_vocabulary import ResolutionVocabulary
-from app.model.ticket_parsed import ParsedTicket
+from app.core_model.dict_resolution_vocabulary import ResolutionVocabulary
+from app.core_model.ticket_parsed import ParsedTicket
 
 
 class ParseTicketState(GraphState):

@@ -9,9 +9,9 @@ from app.agent_graphs.parse_ticket.respond_tool import respond_tool
 from app.agent_graphs.parse_ticket.state import ParseTicketState
 from app.agent_nodes import Node
 from app.agent_tools import KnowledgeSource
+from app.core_model.dict_resolution_vocabulary import ResolutionVocabulary
+from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition
-from app.model.dict_resolution_vocabulary import ResolutionVocabulary
-from app.util.markdown import read_document
 
 # Prompt parsujący to KONTRAKT ARTEFAKTU (zasada 7): ten graf buduje kartę w runtime i ten sam
 # będzie budował korpus przy masowym imporcie (p. 31) — jeden tekst, jedna droga do niego.

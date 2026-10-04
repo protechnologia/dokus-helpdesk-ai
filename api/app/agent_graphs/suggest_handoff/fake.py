@@ -6,8 +6,8 @@ from app.agent_graphs.suggest_handoff.state import SuggestHandoffState
 from app.agent_nodes.agent import FakeAgentNode, tool_call_turn
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
+from app.core_model.suggest_proposal import Proposal
 from app.engine_anonymization import FakeAnonymizer
-from app.model.suggest_proposal import Proposal
 
 # Propozycja atrapy, gdy nikt nie podał własnej — stała, żeby test, który przypadkiem na niej
 # polega, padł głośno.

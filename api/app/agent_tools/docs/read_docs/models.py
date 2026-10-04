@@ -2,7 +2,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.model.doc_section import DocSection
+from app.core_model.doc_section import DocSection
 
 # Ile sekcji da się odczytać jednym wywołaniem: dość na sprawę z kilkoma wątkami, a za mało, żeby
 # model wciągnął do kontekstu całą instrukcję zamiast ją przeszukać.

@@ -221,7 +221,7 @@ od p. 19 `anonymizer`. LLM jest **zewnętrznym endpointem**, nie usługą w bazo
 
 Dostaliśmy **zrzut MySQL/MariaDB bazy `helpdesk`** (`mysql_helpdesk_20260724-141140.sql`, 37 MB,
 MariaDB 10.3, aplikacja na Doctrine/Symfony, 21 tabel). Nie jest to eksport plikowy ani skrzynka
-mailowa — **źródłem jest relacyjna baza produkcyjna**, więc adapter w `service/` czyta SQL,
+mailowa — **źródłem jest relacyjna baza produkcyjna**, więc adapter w `core_service/` czyta SQL,
 nie CSV.
 
 **`data/raw/` jest zdejmowane ze zrzutu skryptem `scripts/export_raw_tickets.py`** — wiernie,
@@ -231,10 +231,10 @@ przestałby być widoczny). Eksport jest odtwarzalny i nie woła LLM-a, więc **
 czytane przez żadne zapytanie tego skryptu.
 
 - **Import to cienka warstwa adapterów** — jeden czytnik na format źródłowy
-  (`service/parser_ticket_raw.py`, przy masowym imporcie obok wariantu SQL); reszta systemu widzi
-  wyłącznie znormalizowany `RawTicket`. **Model `RawTicket` mieszka w `model/`, czytnik w
-  `service/`** — jest wejściową połową kontraktu, którego wyjściem jest `ParsedTicket`, więc nie
-  należy do żadnego z czytników (patrz „Warstwy kodu").
+  (`core_service/parser_ticket_raw.py`, przy masowym imporcie obok wariantu SQL); reszta systemu
+  widzi wyłącznie znormalizowany `RawTicket`. **Model `RawTicket` mieszka w `core_model/`, czytnik w
+  `core_service/`** — jest wejściową połową kontraktu, którego wyjściem jest `ParsedTicket`, więc
+  nie należy do żadnego z czytników (patrz „Warstwy kodu").
 - **Nie zaszywamy założeń o źródle w domenie.** Nazwy pól, kodowanie, sposób sklejania wątku
   w konwersację żyją w adapterze.
 - **Dane zawierają PII** (nazwiska, adresy, telefony klientów). Traktujemy je jak wrażliwe:
@@ -516,7 +516,7 @@ Odwrotna strona powyższych ryzyk — to działa zawsze i jest najtańszym zyski
 ## Domena: kontrakt sparsowanego zgłoszenia
 
 Serce projektu. **Ten schemat jest kontraktem** — trzyma go model Pydantic w
-`api/app/model/ticket_parsed.py` i to on rozstrzyga, co jest poprawnym artefaktem.
+`api/app/core_model/ticket_parsed.py` i to on rozstrzyga, co jest poprawnym artefaktem.
 
 **Rdzeń: 10 pól** (ustalone 2026-07-31, po przeglądzie pod kątem uniwersalności produktu —
 schemat pierwotny miał 17 i był projektowany pod ten jeden korpus, nie pod produkt):
@@ -557,7 +557,7 @@ Zasady schematu (rozwinięcie „Jak projektować schemat odpowiedzi" niżej):
 - **Embedujemy wyłącznie `problem` + `symptoms`.** `solution` i metadane idą do payloadu
   Qdranta. Powód: szukamy po *podobieństwie problemu*, nie rozwiązania — wektor zanieczyszczony
   rozwiązaniem miesza oba sygnały.
-  - **Tekst do embeddingu skleja jedna funkcja (`build_embedding_text()` w `service/`), nie
+  - **Tekst do embeddingu skleja jedna funkcja (`build_embedding_text()` w `core_service/`), nie
     wywołania.** Woła ją indeksacja (`ParsedTicket.embedding_text()`) i zapytanie
     (`find_tickets_vector`); dwa miejsca robiące to ręcznie rozjechałyby się **bezgłośnie**, dając
     wektory nieporównywalne.
@@ -953,7 +953,7 @@ przycisk. Stąd trzy wymagania na kontrakt:
 
 - **Werdykt jest danymi, nie prozą** — `{verdict, reasons[], missing[], hint}`. Wołający musi móc
   pokazać listę braków w swoim UI, a nie wklejać akapit od modelu. Model `Verdict`
-  (`model/gate_verdict.py`) odrzuca `block` bez `reasons` albo bez `hint`, więc zasadę 10
+  (`core_model/gate_verdict.py`) odrzuca `block` bez `reasons` albo bez `hint`, więc zasadę 10
   egzekwuje walidacja (i retry w `respond`), nie posłuszeństwo modelu.
 - **Awaria LLM-a nie może zablokować helpdesku.** Padnięty model = werdykt niedostępny,
   a wtedy **decyduje helpdesk** (`fail-open` po jego stronie — my zwracamy 503, patrz „Logi
@@ -999,7 +999,7 @@ rozmyć:
   zakaz zmyślania, sposób wstawienia reguł. To jest logika i tak zostaje.
 - **W bazie (edytowalne w runtime):** **treść reguł** — lista wymagań/zakazów i zasad stylu.
   To są dane klienta o jego procesie, nie nasza logika. Do p. 29 źródłem są zestawy domyślne
-  `text/dict_rules_<graf>.json` (wersjonowane polem) czytane przez `get_rule_set()` — to jest
+  `core_text/dict_rules_<graf>.json` (wersjonowane polem) czytane przez `get_rule_set()` — to jest
   szew, który p. 29 podmienia na SQL.
 
 Konsekwencje, których nie pomijamy:
@@ -1112,22 +1112,22 @@ dokus-helpdesk-ai/
 │   ├── requirements.txt          # zależności RUNTIME tej usługi (do obrazu)
 │   ├── scripts/                  # skrypty deweloperskie (python api/scripts/…)
 │   └── app/                      # kod aplikacji
-│       ├── cli/                  # CLI (Typer): pakiet na obszar, plik na komendę — cienkie adaptery
+│       ├── entry_cli/            # CLI (Typer): pakiet na obszar, plik na komendę — cienkie adaptery
 │       ├── main.py               # montaż aplikacji, middleware, handlery wyjątków
 │       ├── config.py             # Settings (pydantic-settings)
-│       ├── routers/              # trasy: katalog na zasób (router.py + models.py z modelami API);
+│       ├── entry_routers/        # trasy: katalog na zasób (router.py + models.py z modelami API);
 │       │                         #   wspólne modele API i mapowanie na górze pakietu
 │       │                         # --- nasza strona: podział po RODZAJU obiektu ---
-│       ├── model/                # ticket_*, validation_parsed_*, dict_resolution_*
-│       ├── service/              # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, rag_indexer
-│       ├── text/                 # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
-│       ├── util/                 # html, validation_text, time
+│       ├── core_model/           # ticket_*, validation_parsed_*, dict_resolution_*
+│       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, rag_indexer
+│       ├── core_text/            # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
+│       ├── core_util/            # html, validation_text, time
 │       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
 │       ├── engine_llm/           # LLMClient + fabryka + FakeLLMClient + cenniki
 │       ├── engine_embedding/     # EmbeddingClient (HTTP do `embedder`) + prefiksy
+│       ├── engine_anonymization/ # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 19)
 │       ├── db_qdrant/            # klient Qdranta: indeksacja, wyszukiwanie (etap 4)
 │       ├── db_postgres/          # Postgres: client.py, table/<tabela>/ (klasa + .sql), row/
-│       ├── engine_anonymization/ # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 19)
 │       │                         # --- agent: katalog na jednostkę, właściwa + fake.py ---
 │       ├── agent_tools/          # narzędzia agenta: base.py, folder na materiał, katalog na narzędzie
 │       ├── agent_nodes/          # węzły grafów: kontrakt Node, katalog na węzeł
@@ -1140,13 +1140,13 @@ dokus-helpdesk-ai/
 │       ├── config.py             # Settings tej usługi (własne, kodu nie dzielimy)
 │       ├── models.py             # kontrakt HTTP: EmbedRequest/EmbedResponse, tryby prefiksów
 │       ├── encoding/             # Encoder + fabryka + FakeEncoder — tu wchodzi PolDense
-│       └── routers/              # /health, /embed
+│       └── entry_routers/              # /health, /embed
 ├── postgres/                     # kolejna usługa: Postgres z polskim słownikiem
 │   ├── Dockerfile                # pobiera słownik sjp.pl (commit + suma kontrolna)
 │   ├── dictionary/               # build.sh z poprawkami słownika, custom_words.txt z nazwami własnymi
 │   └── initdb/                   # konfiguracja wyszukiwania `pl_search` (tylko pusty wolumen)
 ├── tests/
-│   ├── unit/                     # podfoldery <usługa>_<pakiet>: api_agent_tools/, api_service/, embedder/…
+│   ├── unit/                     # podfoldery <usługa>_<pakiet>: api_agent_tools/, api_core_service/, embedder/…
 │   ├── integration/              # jednostka + prawdziwa zależność: pliki, FastAPI, LangGraph, Qdrant
 │   ├── functional/               # cała aplikacja przez HTTP albo komendę
 │   └── evaluation/               # golden sety
@@ -1166,15 +1166,15 @@ dokus-helpdesk-ai/
 - **Dwie osie podziału, granicą jest przekroczenie granicy procesu.** Co rozmawia z usługą
   zewnętrzną, dostaje **własny pakiet** (`engine_llm/`, `engine_embedding/`): interfejs,
   implementacje, fabryka, wyjątki i modele transportu razem, żeby podmiana dostawcy była zmianą
-  jednego katalogu — dlatego te modele **nie wychodzą** do `model/`. Reszta idzie osią techniczną
-  (`model` / `service` / `text` / `util`).
-- **Pakiety agenta mają wspólny przedrostek od roli: `agent_graphs/`, `agent_nodes/`,
-  `agent_tools/` (2026-10-04, wcześniej `graph/`, `nodes/`, `tools/`).** Nie `langgraph_`:
-  LangGrapha importuje tylko `agent_graphs/`, a narzędzia mają od niego nie zależeć.
-- **Klienci usług liczących mają przedrostek `engine_`: `engine_llm/`, `engine_embedding/`,
-  `engine_anonymization/` (2026-10-04, wcześniej bez przedrostka).** Razem z `agent_` i `db_` daje
-  to trzy grupy; bez przedrostka zostaje nasza strona (`model/`, `service/`, `text/`, `util/`)
-  i wejścia (`routers/`, `cli/`).
+  jednego katalogu — dlatego te modele **nie wychodzą** do `core_model/`. Reszta idzie osią
+  techniczną (`core_model` / `core_service` / `core_text` / `core_util`).
+- **Każdy pakiet w `app/` ma przedrostek swojej grupy (2026-10-04):** `agent_` to przebieg
+  (grafy, węzły, narzędzia), `core_` nasza strona (`core_model/`, `core_service/`, `core_text/`,
+  `core_util/`), `db_` magazyny, `engine_` klienci usług liczących (`engine_llm/`,
+  `engine_embedding/`, `engine_anonymization/`), a `entry_` wejścia (`entry_routers/`,
+  `entry_cli/`). Bez przedrostka zostają pliki spinające całość: `main.py`, `config.py`,
+  `errors.py`. Przedrostek nazywa rolę, nie bibliotekę: nie `langgraph_`, bo LangGrapha importuje
+  tylko `agent_graphs/`, a narzędzia mają od niego nie zależeć.
 - **Pakiety baz nazywają się od bazy: `db_qdrant/` i `db_postgres/` (2026-10-04, wcześniej
   `retrieval/` i `db/`).** Odkąd Postgres też wyszukuje, „retrieval" pasowało do obu, a „db" nie
   mówiło, o którą bazę chodzi. `engine_llm/` zostaje nazwą roli, bo ma interfejs i wymiennych
@@ -1191,15 +1191,16 @@ dokus-helpdesk-ai/
   nie nazywa (`Encoder`, `FakeEncoder`) — inaczej ta sama nazwa znaczyłaby dwie różne rzeczy
   w dwóch usługach. Wzorzec za to jest ten sam po obu stronach: interfejs + implementacja
   offline (`Fake…`) + fabryka po ENV z fail-fast.
-- **Granica `model` / `service` działa w OBIE strony:** w `model/` wyłącznie modele, jeden na plik;
-  w `service/` ani jednego modelu Pydantic. Model wychodzi z serwisu nawet wtedy, gdy używa go
-  jeden serwis i zmienia się razem z nim. **Cena:** kilka importów więcej i rzeczy zmieniające się
-  razem leżą osobno. **Wyjątek:** `ParsedTicket.embedding_text()` zostaje na modelu, ale tylko
-  woła `build_embedding_text()` z `service/` — tę samą funkcję, której używa zapytanie
-  `find_tickets_vector`, bo dwa miejsca sklejające ten tekst rozjechałyby się **bezgłośnie**.
+- **Granica `core_model` / `core_service` działa w OBIE strony:** w `core_model/` wyłącznie modele,
+  jeden na plik; w `core_service/` ani jednego modelu Pydantic. Model wychodzi z serwisu nawet
+  wtedy, gdy używa go jeden serwis i zmienia się razem z nim. **Cena:** kilka importów więcej i
+  rzeczy zmieniające się razem leżą osobno. **Wyjątek:** `ParsedTicket.embedding_text()` zostaje na
+  modelu, ale tylko woła `build_embedding_text()` z `core_service/` — tę samą funkcję, której używa
+  zapytanie `find_tickets_vector`, bo dwa miejsca sklejające ten tekst rozjechałyby się
+  **bezgłośnie**.
 - **Nazwa pliku mówi, CO ROBI, nie czego dotyczy** — `validator_ticket_parsed.py`, nie
-  `artifacts.py`. W `service/` oś `<rola>_<przedmiot>` (`parser_`, `validator_`, `builder_`,
-  `loader_`, `filter_`, `normalizer_`), w `model/` prefiks tematyczny grupujący alfabetycznie
+  `artifacts.py`. W `core_service/` oś `<rola>_<przedmiot>` (`parser_`, `validator_`, `builder_`,
+  `loader_`, `filter_`, `normalizer_`), w `core_model/` prefiks tematyczny grupujący alfabetycznie
   (`ticket_*`, `validation_parsed_*`, `dict_*`, `filter_*`).
   - **Gdy reguł jest wiele i przybywa ich szybciej niż logiki wokół nich, idą do osobnego pliku**
     (`filter_ticket_quality.py` + `filter_ticket_quality_rules.py`): dwa różne rytmy zmian, a plik
@@ -1209,7 +1210,7 @@ dokus-helpdesk-ai/
   - **Znany koszt tej konwencji, do rozstrzygnięcia przy masowym imporcie (p. 31):** wszystkie
     czytniki źródeł produkują ten sam `RawTicket`, więc wariant SQL musi dołożyć źródło do nazwy
     (`parser_ticket_raw_sql`) albo oba dostaną sufiks. Nazwa opisuje WYNIK, a te pliki różni ŹRÓDŁO.
-- **`util/` to funkcje bezstanowe bez wiedzy o dziedzinie** — kryterium: czy da się je opisać
+- **`core_util/` to funkcje bezstanowe bez wiedzy o dziedzinie** — kryterium: czy da się je opisać
   i przetestować, ani razu nie mówiąc „zgłoszenie". Stąd `strip_html()` i
   `describe_validation_error()` są tam, a nie przy swoich wywołujących; drugi powód jest
   praktyczny — czytnik SQL z masowego importu (p. 31) potrzebuje tego samego strippera.
@@ -1219,11 +1220,11 @@ dokus-helpdesk-ai/
 - **Handlery cienkie** — żądanie → serwis → odpowiedź; zero logiki i LLM w handlerze.
 - **Osobne modele domenowe i API.** Encje/obiekty domeny nie wychodzą wprost przez HTTP —
   przepisujemy jawnie. Chroni kontrakt i blokuje wyciek pól wewnętrznych (ID, scoring). Modele API
-  żyją przy trasach jak modele narzędzi przy narzędziach: `routers/<zasób>/models.py` dla jednej
-  trasy, `routers/models.py` dla wspólnych (zgłoszenie, źródło, błąd); mapowanie w
-  `routers/mapping.py`. Obiektu `router` pakiet zasobu nie wystawia — przesłoniłby moduł
+  żyją przy trasach jak modele narzędzi przy narzędziach: `entry_routers/<zasób>/models.py` dla
+  jednej trasy, `entry_routers/models.py` dla wspólnych (zgłoszenie, źródło, błąd); mapowanie w
+  `entry_routers/mapping.py`. Obiektu `router` pakiet zasobu nie wystawia — przesłoniłby moduł
   `router.py`, więc `main.py` importuje go pełną ścieżką.
-- **Katalog z samymi danymi (`text/`) potrzebuje `__init__.py`**, choć nikt go nie importuje:
+- **Katalog z samymi danymi (`core_text/`) potrzebuje `__init__.py`**, choć nikt go nie importuje:
   `[tool.setuptools.packages.find]` wykrywa pakiety po tym pliku, a bez niego treść wypada
   z dystrybucji i `FileNotFoundError` wychodzi dopiero w runtime. Powód jest zapisany w samym
   pliku — pusty `__init__.py` w katalogu bez kodu wygląda jak pozostałość do sprzątnięcia.
@@ -1232,10 +1233,10 @@ dokus-helpdesk-ai/
 
 1. **Rozmawia z usługą zewnętrzną?** → pakiet tej usługi (`engine_llm/`, `engine_embedding/`), razem
    z jej modelami transportu.
-2. **Da się to opisać i przetestować, ani razu nie nazywając dziedziny?** → `util/`.
-3. **Model danych czy operacja na nich?** → `model/` albo `service/`.
-4. **Dane klienta, które klient zmienia bez deployu** (słownik, zestaw reguł)? → `text/`.
-   Prompt — treść czytana zdanie po zdaniu — leży w katalogu swojego grafu, nie w `text/`.
+2. **Da się to opisać i przetestować, ani razu nie nazywając dziedziny?** → `core_util/`.
+3. **Model danych czy operacja na nich?** → `core_model/` albo `core_service/`.
+4. **Dane klienta, które klient zmienia bez deployu** (słownik, zestaw reguł)? → `core_text/`.
+   Prompt — treść czytana zdanie po zdaniu — leży w katalogu swojego grafu, nie w `core_text/`.
 5. **Narzędzie agenta, węzeł grafu albo przebieg funkcji?** → `agent_tools/<materiał>/<narzędzie>/`,
    `agent_nodes/<węzeł>/`, `agent_graphs/<funkcja>/` — każdy z wersją właściwą i atrapą (p. 1–5);
    prompt grafu leży w katalogu grafu.
@@ -1304,7 +1305,7 @@ Trzy kategorie, których nie mieszamy:
    jednorazowe migracje artefaktów). Uruchamiane `python scripts/nazwa.py`.
 2. **Deweloperskie usługi** — `<usługa>/scripts/*.py`, sięgają do kodu, configu albo endpointów
    tej usługi. Uruchamiane `python api/scripts/nazwa.py`.
-3. **Produkcyjne** — `api/app/cli/cli.py`, jeden wpis w `[project.scripts]` na całe drzewo
+3. **Produkcyjne** — `api/app/entry_cli/cli.py`, jeden wpis w `[project.scripts]` na całe drzewo
    subkomend.
 
 **Kryterium podziału 1 vs 2: czy skrypt dotyka konkretnej usługi.** Eksport zrzutu bazy do
@@ -1323,17 +1324,17 @@ Wspólne:
 - **Komenda nazywa się `helpdesk`, nie nazwą helpdeskowanego produktu** — przy założeniu „jedna
   instancja = jeden produkt" wpisanie nazwy klienta w komendę własnego narzędzia kłamałoby przy
   drugim wdrożeniu.
-- **Drzewo ma dwa poziomy: `helpdesk <obszar> <czynność>`; obszar to pakiet w `cli/`, czynność to
-  plik w nim** (`helpdesk rag index` → `cli/rag/index.py`, od 2026-10-02). Obszar zbiera to, co
-  dzieli zależności: `rag` woła Qdranta i embedder, `tickets` wytwarza artefakt LLM-em, a bramki
-  i „Popraw" stoją **poza `rag`**, bo z definicji działają bez indeksu. Ścieżka = komenda to
+- **Drzewo ma dwa poziomy: `helpdesk <obszar> <czynność>`; obszar to pakiet w `entry_cli/`, czynność
+  to plik w nim** (`helpdesk rag index` → `entry_cli/rag/index.py`, od 2026-10-02). Obszar zbiera
+  to, co dzieli zależności: `rag` woła Qdranta i embedder, `tickets` wytwarza artefakt LLM-em, a
+  bramki i „Popraw" stoją **poza `rag`**, bo z definicji działają bez indeksu. Ścieżka = komenda to
   jedyna rzecz, która pozwala trafić z komendy do kodu bez czytania `cli.py`. Kod wspólny kilku
   komend obszaru — w jego `common.py`.
 - **Moduł komendy wystawia `HELP` i funkcję nazwaną od intencji (`search_tickets`), a rejestruje
   ją `__init__.py` obszaru** (`rag.command("search", help=search.HELP)(search.search_tickets)`).
   Moduły nie dekorują obiektu Typer z pakietu, więc nie ma cyklu importów; funkcja nazywa się
   inaczej niż moduł, bo inaczej przesłoniłaby go w przestrzeni pakietu, a testy podmieniają
-  funkcje po ścieżce modułu (`app.cli.rag.search._run_search`).
+  funkcje po ścieżce modułu (`app.entry_cli.rag.search._run_search`).
 - **Na górze `cli.py` i każdego `__init__.py` obszaru stoi tabelka komend** — drzewo rozsypuje się
   po kilku modułach, więc bez niej trzeba je odtwarzać z wywołań `add_typer`.
 - **W obrazie entry point tworzy launcher z `Dockerfile`, nie `pip install`** — `pyproject.toml`
@@ -1699,15 +1700,16 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   `__init__` importuje każdy graf. Bierze się ją pełną ścieżką `app.agent_graphs.factory`.
 - **Prompt grafu składa `graph.py`: `system_prompt()` i `user_prompt(state)`**; treść zgłoszenia
   bierze wyłącznie z `anonymized`, a stan przed anonimizacją to błąd, nie pusty prompt.
-- **Odpowiedź grafu przychodzi narzędziem `respond_<graf>`, nie tekstem (2026-10-02).** Definicja
-  w `respond_tool.py`, opis dla modelu w `respond_tool.md` (znaczenie pól — tylko tam, nie
-  w prompcie), schemat z modelu wyniku przez `json_schema_without_docs()` (`util/json_schema.py`),
-  który wycina docstringi i `examples` (notatki dla nas i wzory, które model przepisuje). Zysk:
-  koniec pętli rozstrzyga to, CO model wywołał, a nie brak wywołań; format ma jedno źródło; błąd
-  walidacji wraca tą samą drogą co błędne argumenty narzędzia. Schemat nie ma `sources` (zasada 9),
-  odpowiedź musi być jedynym wywołaniem w turze. Długi tekst w argumencie (`suggest_*`, `polish`)
-  — do zmierzenia w p. 25–28. Także `parse_ticket` (`respond_parse_ticket`, 2026-10-02) — bez
-  pól `FILLED_BY_GRAPH` (`ticket_id`, `date`, wersja słownika), które dokłada graf ze stanu.
+- **Odpowiedź grafu przychodzi narzędziem `respond_<graf>`, nie tekstem (2026-10-02).** Definicja w
+  `respond_tool.py`, opis dla modelu w `respond_tool.md` (znaczenie pól — tylko tam, nie w
+  prompcie), schemat z modelu wyniku przez `json_schema_without_docs()`
+  (`core_util/json_schema.py`), który wycina docstringi i `examples` (notatki dla nas i wzory, które
+  model przepisuje). Zysk: koniec pętli rozstrzyga to, CO model wywołał, a nie brak wywołań; format
+  ma jedno źródło; błąd walidacji wraca tą samą drogą co błędne argumenty narzędzia. Schemat nie ma
+  `sources` (zasada 9), odpowiedź musi być jedynym wywołaniem w turze. Długi tekst w argumencie
+  (`suggest_*`, `polish`) — do zmierzenia w p. 25–28. Także `parse_ticket` (`respond_parse_ticket`,
+  2026-10-02) — bez pól `FILLED_BY_GRAPH` (`ticket_id`, `date`, wersja słownika), które dokłada graf
+  ze stanu.
 - **Atrapa grafu (`build_fake_graph()`) jest jednorazowa** — `FakeAgentNode` ma zaplanowane tury,
   więc trasa i CLI budują ją na każde wywołanie. `ainvoke` zwraca słownik, nie model stanu.
 - **Każdy graf wystawia to samo API** — `STATE`, `TOOL_NAMES`, `system_prompt()`,
@@ -1721,8 +1723,9 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Graf decyduje, które narzędzia model widzi (`TOOL_NAMES`), ale nie trzyma ich opisów** — te
   leżą przy narzędziach; definicję składa `tool_definitions()` z `agent_graphs/base.py`, a narzędzie
   spoza `TOOL_NAMES` to błąd składania.
-- **Model wyniku wspólny dla kilku grafów — w `model/` (`Verdict`, `Proposal`); używany przez jeden
-  graf — w `agent_graphs/<graf>/models.py`** (`SearchDone`, `PolishedText`), jak modele narzędzi.
+- **Model wyniku wspólny dla kilku grafów — w `core_model/` (`Verdict`, `Proposal`); używany przez
+  jeden graf — w `agent_graphs/<graf>/models.py`** (`SearchDone`, `PolishedText`), jak modele
+  narzędzi.
 - **`search` kończy się pustym `respond_search`** — wynikiem są źródła z `cite()` i zapytania
   agenta z `messages`, nic z deklaracji modelu.
 - **Prompt parsujący leży w `agent_graphs/parse_ticket/`, jak każdy prompt grafu (2026-10-02)** — i
@@ -1770,7 +1773,7 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Prompt = logika, nie konfiguracja** — szablony w repo, jeden plik na prompt, **nigdy w ENV**.
   - **Gdzie leży treść:** każdy prompt — także parsujący — w katalogu swojego grafu
     (`prompt_system.md`, `prompt_user.md`, `respond_tool.md`), a opis narzędzia agenta w katalogu
-    narzędzia (`description.md`); w `api/app/text/` wyłącznie dane klienta (słowniki, zestawy
+    narzędzia (`description.md`); w `api/app/core_text/` wyłącznie dane klienta (słowniki, zestawy
     reguł). Kod składający leży w `graph.py` obok. Moduł sięga po
     dokument jawną ścieżką.
   - **Cała instrukcja w turze systemowej, w turze użytkownika same dane** (wzorzec z 6.3).
@@ -1780,17 +1783,17 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
     z którymi wklejone polecenie mogłoby się zlać. Jedyny wyjątek to **zdanie zamykające**
     powtarzające kontrakt wyjścia PO danych — recency jest tam, gdzie format się trzyma. Od
     2026-10-02 także prompt parsujący (wcześniej trzymał reguły w turze użytkownika).
-  - **Reżim zmiany widać po ścieżce.** Prompty (katalogi grafów) to NASZ kod: zmiana wymaga
-    commita, review i testu-strażnika, a przy prompcie parsującym zmienia znaczenie wszystkich
-    przyszłych artefaktów (zasada 7). `text/` to DANE KLIENTA: zmiana to podbicie `version`,
-    a od p. 29 edycja przez GUI. Dawniej oba reżimy mieszały się w płaskim `text/` i rozróżniał je
-    tylko nagłówek pliku — przeniesienie promptu parsującego do grafu to zlikwidowało.
-  - **Treść promptu to dokument `.md`, moduł `.py` obok tylko go składa.** Prompt jest jedyną
-    rzeczą w projekcie, którą człowiek musi kontrolować zdanie po zdaniu — sklejany z kilku
-    stałych czyta się przez składnię Pythona, a jako dokument diff w review pokazuje zmianę
-    treści wprost. Komentarze redakcyjne (`<!-- … -->`) muszą być **wycinane przed wysłaniem**:
-    notatka dla nas nie ma prawa dotrzeć do modelu. Wycina je jedno miejsce — `util/markdown.py`
-    — wspólne dla wszystkich rodzin promptów.
+  - **Reżim zmiany widać po ścieżce.** Prompty (katalogi grafów) to NASZ kod: zmiana wymaga commita,
+    review i testu-strażnika, a przy prompcie parsującym zmienia znaczenie wszystkich przyszłych
+    artefaktów (zasada 7). `core_text/` to DANE KLIENTA: zmiana to podbicie `version`, a od p. 29
+    edycja przez GUI. Dawniej oba reżimy mieszały się w płaskim `core_text/` i rozróżniał je tylko
+    nagłówek pliku — przeniesienie promptu parsującego do grafu to zlikwidowało.
+  - **Treść promptu to dokument `.md`, moduł `.py` obok tylko go składa.** Prompt jest jedyną rzeczą
+    w projekcie, którą człowiek musi kontrolować zdanie po zdaniu — sklejany z kilku stałych czyta
+    się przez składnię Pythona, a jako dokument diff w review pokazuje zmianę treści wprost.
+    Komentarze redakcyjne (`<!-- … -->`) muszą być **wycinane przed wysłaniem**: notatka dla nas nie
+    ma prawa dotrzeć do modelu. Wycina je jedno miejsce — `core_util/markdown.py` — wspólne dla
+    wszystkich rodzin promptów.
   - **Wyjątek: treści konfigurowane przez klienta** — reguły bramek i zasady „Popraw" (patrz
     „Bramki jakości"). Wyjątek dotyczy **treści**, nie szkieletu: rama promptu zostaje w repo pod
     testem-strażnikiem, a z magazynu reguł wchodzą dane wstawiane w wyznaczone miejsce.
@@ -1800,7 +1803,7 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   - **Wyjątek w wyjątku: słowniki wstawiane do promptu parsującego** (`resolution`, podpowiedź
     dla `component`) **są danymi klienta** — inny helpdesk ma inne rodzaje rozstrzygnięć
     („odpowiedzialność po stronie urzędu" nie znaczy nic poza sektorem publicznym). Żyją
-    w `api/app/text/` jako plik danych czytany przez `service/loader_dict_resolution.py`,
+    w `api/app/core_text/` jako plik danych czytany przez `core_service/loader_dict_resolution.py`,
     **nie w ENV**
     (potrzebna struktura, nie płaski string)
     i nie w SQL przed p. 29 — dokładnie tą samą drogą co zasady „Popraw": wbudowany zestaw
@@ -1967,11 +1970,11 @@ Raises:                      # only when the method raises
 - Konstruktor: `Example result:` = opis skonfigurowanej instancji.
 - **Docstring nietrywialnej klasy rozbudowany**, nie jednolinijkowy: „Do czego" (przeznaczenie
   + rola w architekturze) i „Flow" (przebieg krok po kroku, z odwołaniem do metod).
-- **Nietrywialny moduł ma na górze opis pisany jak odpowiedź na „do czego to jest?"**:
-  przeznaczenie pełnym zdaniem, tabelka, gdy plik jest listą (reguły, komendy, metody), przykład
-  przed i po, gdy przekształca dane (zmyślony, ale „po" zdjęte z uruchomionego kodu), kroki jako
-  lista numerowana, na końcu to, o czym pamiętać przy zmianach. Historia decyzji i pomiarów
-  zostaje w CLAUDE.md, nie w pliku. Wzór: `service/rag_indexer.py`, `service/parser_ticket_raw.py`.
+- **Nietrywialny moduł ma na górze opis pisany jak odpowiedź na „do czego to jest?"**: przeznaczenie
+  pełnym zdaniem, tabelka, gdy plik jest listą (reguły, komendy, metody), przykład przed i po, gdy
+  przekształca dane (zmyślony, ale „po" zdjęte z uruchomionego kodu), kroki jako lista numerowana,
+  na końcu to, o czym pamiętać przy zmianach. Historia decyzji i pomiarów zostaje w CLAUDE.md, nie w
+  pliku. Wzór: `core_service/rag_indexer.py`, `core_service/parser_ticket_raw.py`.
 
 ## Konfiguracja i deploy
 
@@ -2173,7 +2176,7 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   przy kilku usługach sama nazwa mówi, co się psuje. **Bez prefiksu zostają testy ponadusługowe**
   (`test_config_plumbing.py` sprawdza `.env.example` wobec `Settings` wszystkich usług) — doklejenie
   im nazwy jednej usługi kłamałoby o zakresie. W folderze każdego rodzaju pliki leżą w podfolderach
-  `<usługa>_<pakiet>` (`api_agent_tools/`, `api_service/`…; `api_app/` dla modułów z korzenia
+  `<usługa>_<pakiet>` (`api_agent_tools/`, `api_core_service/`…; `api_app/` dla modułów z korzenia
   `app/`, `embedder/` w całości), a ponadusługowe zostają w korzeniu folderu rodzaju; `evaluation/`
   jest płaski, dopóki ma kilka plików. Test wymagający stacku ma w nazwie sufiks `_stack`.
 - **Każdy test ma docstring** — jedna linia „scenariusz → oczekiwanie", spójnie we wszystkich
@@ -2504,7 +2507,7 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 - [x] **Etap 0. Fundament repo** — pakiet, `Settings` + `.env.example` + test plumbingu, usługa
   `api` (`/health`, Request-ID, handlery wyjątków), CLI `helpdesk`, warstwa LLM za `LLMClient`,
   usługa `embedder`, compose dev + prod.
-- [x] **Etap 1. Kontrakt zgłoszenia** — `ParsedTicket`, słownik rozstrzygnięć w `text/`, prompt
+- [x] **Etap 1. Kontrakt zgłoszenia** — `ParsedTicket`, słownik rozstrzygnięć w `core_text/`, prompt
   parsujący pod testem-strażnikiem, `helpdesk tickets validate`.
 - [x] **Etap 2. Embedder jako usługa** — PolDense za `Encoder`em, prefiksy trybów, kontrola wymiaru
   w fabryce, `EmbeddingClient` z `embed_query/passage/sts`.
@@ -2546,7 +2549,7 @@ generacji.
   odpowiedź narzędziem `respond_<graf>`; reguły — „Warstwa grafów".
 - [x] **6. Trasy na atrapach grafów** — `/gate/close`, `/gate/reply`, `/search` (przełączony
   z `RagSearchera`), `/parse-ticket`, `/suggest` + `GET /variants` z rejestru, `/polish`; reguły
-  z `text/dict_rules_*`; reguły — „Warstwa API". CLI dla grafów odłożone do p. 46.
+  z `core_text/dict_rules_*`; reguły — „Warstwa API". CLI dla grafów odłożone do p. 46.
 
 ### A. Narzędzia — po jednym punkcie na narzędzie
 

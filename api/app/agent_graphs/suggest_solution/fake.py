@@ -6,8 +6,8 @@ from app.agent_graphs.suggest_solution.respond_tool import RESPOND_TOOL_NAME
 from app.agent_graphs.suggest_solution.state import SuggestSolutionState
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
+from app.core_model.suggest_proposal import Proposal
 from app.engine_anonymization import FakeAnonymizer
-from app.model.suggest_proposal import Proposal
 
 # Propozycja atrapy, gdy nikt nie podał własnej — stała, żeby test, który przypadkiem na niej
 # polega, padł głośno.

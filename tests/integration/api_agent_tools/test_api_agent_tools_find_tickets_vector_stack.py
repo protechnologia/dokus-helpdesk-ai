@@ -35,10 +35,10 @@ from app.agent_tools.tickets.find_tickets_vector import (
     FindTicketsVectorTool,
 )
 from app.config import Settings
+from app.core_model.ticket_parsed import ParsedTicket
+from app.core_service.rag_indexer import TicketIndexer
 from app.db_qdrant import QdrantClient
 from app.engine_embedding import EmbeddingClient
-from app.model.ticket_parsed import ParsedTicket
-from app.service.rag_indexer import TicketIndexer
 
 pytestmark = [
     pytest.mark.stack,

@@ -57,7 +57,7 @@ O czym pamiętać przy zmianach:
 
 from collections.abc import Sequence
 
-from app.model.ticket_parsed import ParsedTicket
+from app.core_model.ticket_parsed import ParsedTicket
 
 NO_ERROR_CODES = "(brak)"
 

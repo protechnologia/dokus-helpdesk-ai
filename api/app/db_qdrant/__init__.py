@@ -11,7 +11,7 @@ vector database becomes a real option, a factory belongs in this package — and
 should have to change.
 
 `TicketPoint` and `TicketHit` — the write side and the read side — live here rather than in
-`model/` on purpose: they describe what crosses the wire to one particular service, so swapping
+`core_model/` on purpose: they describe what crosses the wire to one particular service, so swapping
 that service touches this directory alone (CLAUDE.md -> "Warstwy kodu": what talks to an external
 service gets its own package, transport models included).
 """

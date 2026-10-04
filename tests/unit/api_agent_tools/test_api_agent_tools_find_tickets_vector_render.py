@@ -7,7 +7,7 @@ from app.agent_tools.tickets.find_tickets_vector import (
     FindTicketsVectorResult,
     FoundTicket,
 )
-from app.model.ticket_parsed import ParsedTicket
+from app.core_model.ticket_parsed import ParsedTicket
 
 # Tekst dla modelu i lista źródeł są wspólne dla narzędzia i atrapy (`FindTicketsVectorToolBase`),
 # więc sprawdzamy je na atrapie z produkcji — bez embeddera i Qdranta.

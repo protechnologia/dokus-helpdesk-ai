@@ -1,7 +1,7 @@
 import uuid
 
+from app.core_model.ticket_parsed import ParsedTicket
 from app.db_qdrant import VECTOR_PROBLEM, VECTOR_STS, TicketPoint, point_id_for
-from app.model.ticket_parsed import ParsedTicket
 
 # The same starting record the ParsedTicket tests vary from, so a schema change breaks both files
 # in the same way rather than leaving this one testing a shape that no longer exists.

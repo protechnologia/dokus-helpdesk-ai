@@ -1,9 +1,9 @@
 from pathlib import Path
 
 from app.agent_graphs.polish.models import PolishedText
+from app.core_util.json_schema import json_schema_without_docs
+from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition
-from app.util.json_schema import json_schema_without_docs
-from app.util.markdown import read_document
 
 # Konwencja `respond_<graf>`: wywołanie tego narzędzia prowadzi do węzła `respond`.
 RESPOND_TOOL_NAME = "respond_polish"

@@ -4,7 +4,7 @@ from app.agent_tools.docs.fake_docs import default_sections, default_texts
 from app.agent_tools.docs.read_docs.base import ReadDocsToolBase
 from app.agent_tools.docs.read_docs.errors import UnknownSectionError
 from app.agent_tools.docs.read_docs.models import ReadDocsQuery, ReadDocsResult, ReadSection
-from app.model.doc_section import DocSection
+from app.core_model.doc_section import DocSection
 
 
 class FakeReadDocsTool(ReadDocsToolBase):

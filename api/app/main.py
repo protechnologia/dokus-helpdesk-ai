@@ -5,13 +5,13 @@ from uuid import uuid4
 from fastapi import FastAPI, Request, Response
 
 from app.config import Settings
+from app.entry_routers.gate.router import router as gate_router
+from app.entry_routers.health.router import router as health_router
+from app.entry_routers.parse_ticket.router import router as parse_ticket_router
+from app.entry_routers.polish.router import router as polish_router
+from app.entry_routers.search.router import router as search_router
+from app.entry_routers.suggest.router import router as suggest_router
 from app.errors import REQUEST_ID_HEADER, register_exception_handlers
-from app.routers.gate.router import router as gate_router
-from app.routers.health.router import router as health_router
-from app.routers.parse_ticket.router import router as parse_ticket_router
-from app.routers.polish.router import router as polish_router
-from app.routers.search.router import router as search_router
-from app.routers.suggest.router import router as suggest_router
 
 logger = logging.getLogger(__name__)
 

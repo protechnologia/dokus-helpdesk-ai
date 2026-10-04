@@ -14,8 +14,8 @@ dependencies = []
 
 [project.scripts]
 # Single entry-point for the whole production CLI tree; subcommands are @cli.command().
-# Note: unusable until step 0c creates api/app/cli/cli.py.
-helpdesk = "app.cli.cli:cli"
+# Note: unusable until step 0c creates api/app/entry_cli/cli.py.
+helpdesk = "app.entry_cli.cli:cli"
 
 [tool.setuptools]
 # Code lives in api/app/ because the folder is also the compose service; "api" is the import root,
@@ -83,9 +83,9 @@ ignore = [
 # Typer przekazuje metadane opcji przez wartość domyślną argumentu (`= typer.Option(...)`),
 # FastAPI tak samo wstrzykuje zależności (`= Depends(...)`). To idiom obu frameworków, nie pułapka
 # mutowalnego argumentu domyślnego, przed którą ostrzega B008.
-"scripts/*.py"            = ["B008"]
-"api/app/cli/**/*.py"     = ["B008"]
-"api/app/routers/**/*.py" = ["B008"]
+"scripts/*.py"                  = ["B008"]
+"api/app/entry_cli/**/*.py"     = ["B008"]
+"api/app/entry_routers/**/*.py" = ["B008"]
 # Stan grafu (`GraphState` w base.py i state.py grafów) ma komentarz inline przy każdym polu,
 # a wyrównany typ `messages` sam zajmuje 89 znaków.
 "api/app/agent_graphs/base.py"    = ["E501"]

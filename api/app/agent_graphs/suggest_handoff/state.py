@@ -1,5 +1,5 @@
 from app.agent_graphs.base import GraphState
-from app.model.suggest_proposal import Proposal
+from app.core_model.suggest_proposal import Proposal
 
 
 class SuggestHandoffState(GraphState):

@@ -5,7 +5,7 @@ from typing import ClassVar
 from pydantic import BaseModel
 
 from app.agent_tools.models import SourceRef
-from app.util.markdown import read_document
+from app.core_util.markdown import read_document
 
 # Opis narzędzia dla modelu leży w katalogu narzędzia pod tą nazwą.
 DESCRIPTION_FILE = "description.md"

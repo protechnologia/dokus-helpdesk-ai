@@ -5,12 +5,12 @@
      żeby skasowany opis pola nie przechodził dzięki nazwie w przykładach.
 
      UWAGA: FRAZY UCIECZKOWE („brak", „nie dotyczy") SĄ KONTRAKTEM FILTRU JAKOŚCI.
-     Filtr indeksacji (frazy w service/normalizer_sentinel.py) rozpoznaje rekord bez wiedzy po tym,
+     Filtr indeksacji (frazy w core_service/normalizer_sentinel.py) rozpoznaje rekord bez wiedzy po tym,
      że `solution` niesie frazę ucieczkową i niewiele poza nią — nie po stylu wypowiedzi modelu. To
      jedyny powód, dla którego filtr przeżywa podmianę modelu. Zmiana tych fraz albo instrukcji,
      KIEDY je stosować, jest więc zmianą filtru, choćby nie tknęła jego kodu. Po takiej edycji
      uruchom test na korpusie referencyjnym
-     (tests/evaluation/test_api_service_filter_ticket_quality_corpus.py).
+     (tests/evaluation/test_api_core_service_filter_ticket_quality_corpus.py).
 
      Komentarze redakcyjne jak ten są wycinane przed wysłaniem. -->
 Oddaje kartę zgłoszenia. Wywołaj je raz, po przeczytaniu całego wątku, jako jedyne wywołanie

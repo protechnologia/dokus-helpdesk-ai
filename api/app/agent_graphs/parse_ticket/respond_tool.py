@@ -1,10 +1,10 @@
 from pathlib import Path
 from typing import Any
 
+from app.core_model.ticket_parsed import ParsedTicket
+from app.core_util.json_schema import json_schema_without_docs
+from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition
-from app.model.ticket_parsed import ParsedTicket
-from app.util.json_schema import json_schema_without_docs
-from app.util.markdown import read_document
 
 # Konwencja `respond_<graf>`: wywołanie tego narzędzia prowadzi do węzła `respond`.
 RESPOND_TOOL_NAME = "respond_parse_ticket"

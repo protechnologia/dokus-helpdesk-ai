@@ -7,7 +7,7 @@ from app.agent_tools.tickets.find_tickets_vector.models import (
     FindTicketsVectorResult,
     FoundTicket,
 )
-from app.model.ticket_parsed import ParsedTicket
+from app.core_model.ticket_parsed import ParsedTicket
 
 
 def default_tickets() -> list[FoundTicket]:

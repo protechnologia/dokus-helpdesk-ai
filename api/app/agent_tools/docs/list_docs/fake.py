@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from app.agent_tools.docs.fake_docs import default_sections
 from app.agent_tools.docs.list_docs.base import ListDocsToolBase
 from app.agent_tools.docs.list_docs.models import ListDocsResult
-from app.model.doc_section import DocSection
+from app.core_model.doc_section import DocSection
 
 
 class FakeListDocsTool(ListDocsToolBase):

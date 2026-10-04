@@ -2,7 +2,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.model.doc_section import DocSection
+from app.core_model.doc_section import DocSection
 
 # Dosłowny ciąg ma co najmniej trzy znaki — krótszy trafia w przypadkowe miejsca.
 ExactText = Annotated[str, Field(min_length=3)]

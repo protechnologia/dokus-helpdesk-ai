@@ -1,6 +1,6 @@
 <!--
 Prompt parsujący — strona użytkownika: WYŁĄCZNIE dane. `build_parse_prompt()` w graph.py wypełnia
-go `replace`em: {{vocabulary}} — słownik rozstrzygnięć (dane klienta, text/dict_resolution.json),
+go `replace`em: {{vocabulary}} — słownik rozstrzygnięć (dane klienta, core_text/dict_resolution.json),
 {{thread}} — wątek zgłoszenia PO anonimizacji. Część KONTRAKTU ARTEFAKTU, jak prompt_system.md
 (zasada 7).
 

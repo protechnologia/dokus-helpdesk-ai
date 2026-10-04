@@ -5,9 +5,9 @@ from app.agent_tools.tickets.find_tickets_vector import (
     FindTicketsVectorQuery,
     FindTicketsVectorTool,
 )
+from app.core_model.ticket_parsed import ParsedTicket
 from app.db_qdrant import VECTOR_PROBLEM, DbQdrantConfigError, QdrantClient
 from app.engine_embedding import EmbeddingClient
-from app.model.ticket_parsed import ParsedTicket
 from tests.helpers_transport import capturing, with_transport
 
 # Narzędzie stoi na prawdziwych klientach embeddera i Qdranta, a podmieniony jest tylko transport

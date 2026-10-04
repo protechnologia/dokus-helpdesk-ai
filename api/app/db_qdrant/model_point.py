@@ -2,7 +2,7 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.model.ticket_parsed import ParsedTicket
+from app.core_model.ticket_parsed import ParsedTicket
 
 # Namespace for deriving a point id from a `ticket_id`. Qdrant accepts only unsigned integers or
 # UUIDs as point ids, while ours are source strings ("33644"), so one has to be derived from the
@@ -29,7 +29,7 @@ class TicketPoint(BaseModel):
     Description:
     One record as Qdrant stores it: a point id, two named vectors and the payload an answer is
     later generated from. This is a TRANSPORT model — it lives beside the client rather than in
-    `model/` because it describes what crosses the wire to one particular service (CLAUDE.md ->
+    `core_model/` because it describes what crosses the wire to one particular service (CLAUDE.md ->
     "Warstwy kodu"). Swapping the vector database should touch this directory and nothing else.
 
     Flow:

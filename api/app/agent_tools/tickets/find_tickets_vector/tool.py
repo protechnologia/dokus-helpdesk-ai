@@ -54,10 +54,10 @@ from app.agent_tools.tickets.find_tickets_vector.models import (
     FindTicketsVectorResult,
     FoundTicket,
 )
+from app.core_model.ticket_parsed import ParsedTicket
+from app.core_service.builder_embedding_text import build_embedding_text
 from app.db_qdrant import VECTOR_PROBLEM, DbQdrantConfigError, QdrantClient, TicketHit
 from app.engine_embedding import EmbeddingClient
-from app.model.ticket_parsed import ParsedTicket
-from app.service.builder_embedding_text import build_embedding_text
 
 logger = logging.getLogger(__name__)
 
