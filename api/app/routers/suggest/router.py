@@ -2,9 +2,9 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.graph import run_graph
-from app.graph.factory import GraphBuilder, get_graph_builder
-from app.graph.registry import variant_graphs
+from app.agent_graphs import run_graph
+from app.agent_graphs.factory import GraphBuilder, get_graph_builder
+from app.agent_graphs.registry import variant_graphs
 from app.routers.mapping import to_raw_ticket, to_source_items
 from app.routers.suggest.models import (
     SuggestRequest,

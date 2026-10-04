@@ -9,7 +9,7 @@ _HTML_COMMENT = re.compile(r"<!--.*?-->\s*", re.DOTALL)
 
 @lru_cache
 def read_document(
-    path: Path,  # np. Path("/code/app/graph/gate_close/prompt_system.md")
+    path: Path,  # np. Path("/code/app/agent_graphs/gate_close/prompt_system.md")
 ) -> str:
     """
     Description:
@@ -25,7 +25,7 @@ def read_document(
     przebiegu.
 
     Example args:
-        path=Path("/code/app/graph/gate_close/prompt_system.md")
+        path=Path("/code/app/agent_graphs/gate_close/prompt_system.md")
 
     Example result:
         "Jesteś bramką jakości helpdesku. Oceniasz, czy zgłoszenie można zamknąć…"

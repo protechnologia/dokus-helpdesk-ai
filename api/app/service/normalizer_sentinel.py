@@ -18,8 +18,8 @@ parsera, a wołający sam decyduje, co zrobić z odpowiedzią.
 O czym pamiętać przy zmianach:
 
 - Frazy są sprzężone z promptem parsującym: reguła czyta to, co prompt każe modelowi wpisać,
-  gdy wartości nie ma. Zmiana tych fraz w `graph/parse_ticket/respond_tool.md` jest zmianą tego
-  modułu; rozjazd łapie test na korpusie odniesienia w `tests/evaluation/`.
+  gdy wartości nie ma. Zmiana tych fraz w `agent_graphs/parse_ticket/respond_tool.md` jest
+  zmianą tego modułu; rozjazd łapie test na korpusie odniesienia w `tests/evaluation/`.
 - Sam początek „brak" niczego nie rozstrzyga: zaczyna się od niego wiele realnych treści.
 - Każde pole potrzebuje własnej reguły, bo to samo zdanie znaczy w nich co innego: „Brak
   uprawnienia do kancelarii" jest pełnoprawną przyczyną, a jako rozwiązanie nie mówi nic.

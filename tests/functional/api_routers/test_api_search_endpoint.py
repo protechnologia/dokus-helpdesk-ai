@@ -1,12 +1,12 @@
 from fastapi.testclient import TestClient
 
+from app.agent_graphs import search
+from app.agent_graphs.factory import get_graph_builder
+from app.agent_graphs.fake import FAKE_SEARCH_ARGUMENTS, fake_search_nodes
+from app.agent_nodes.anonymize import AnonymizeNode
+from app.agent_nodes.respond import FakeRespondNode
 from app.anonymization import FakeAnonymizer
-from app.graph import search
-from app.graph.factory import get_graph_builder
-from app.graph.fake import FAKE_SEARCH_ARGUMENTS, fake_search_nodes
 from app.main import create_app
-from app.nodes.anonymize import AnonymizeNode
-from app.nodes.respond import FakeRespondNode
 
 # Kontrakt HTTP `POST /search` w procesie: kształt odpowiedzi (źródła + zapytania agenta),
 # walidacja żądania i to, co trasa wkłada do grafu. Że trasa jest zamontowana w obrazie, sprawdza

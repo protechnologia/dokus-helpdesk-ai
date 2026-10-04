@@ -2,9 +2,9 @@ from datetime import date
 
 import pytest
 
+from app.agent_tools.docs.fake_docs import default_sections
+from app.agent_tools.tickets.find_tickets_text.fake import SIGNING_THREAD
 from app.db_postgres import DbPostgresConfigError, DocRow, DocsTable, TicketRow, TicketsTable
-from app.tools.docs.fake_docs import default_sections
-from app.tools.tickets.find_tickets_text.fake import SIGNING_THREAD
 
 # Tabele testowane bez bazy, na kliencie-atrapie zapisującym SQL i wartości: sprawdzamy, CO idzie
 # do bazy i jak czytamy odpowiedź. Że Postgres odpowiada na to tak, jak zakładamy, sprawdza test

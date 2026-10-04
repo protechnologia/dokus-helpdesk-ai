@@ -4,11 +4,13 @@
 
 - [⚠ Trwa zmiana architektury (od 2026-10-02)](#trwa-zmiana-architektury-od-2026-10-02)
 - [Cel](#cel)
-- [Zasady naczelne (NIE łamać bez wyraźnej decyzji)](#zasady-naczelne-nie-łamać-bez-wyraźnej-decyzji)
+- [Zasady naczelne (NIE łamać bez wyraźnej
+  decyzji)](#zasady-naczelne-nie-łamać-bez-wyraźnej-decyzji)
 - [Stack](#stack)
 - [Don't (szybka lista czerwonych flag)](#dont-szybka-lista-czerwonych-flag)
 - [Praca z agentem](#praca-z-agentem)
-- [Dane wejściowe (stan: znany — analiza 2026-07-29)](#dane-wejściowe-stan-znany--analiza-2026-07-29)
+- [Dane wejściowe (stan: znany — analiza
+  2026-07-29)](#dane-wejściowe-stan-znany--analiza-2026-07-29)
 - [Domena: kontrakt sparsowanego zgłoszenia](#domena-kontrakt-sparsowanego-zgłoszenia)
 - [RAG — architektura](#rag--architektura)
 - [Bramki jakości i asysta pisania (noga 2)](#bramki-jakości-i-asysta-pisania-noga-2)
@@ -21,9 +23,9 @@
 - [Warstwa embeddera](#warstwa-embeddera)
 - [Warstwa bazy wektorowej (Qdrant)](#warstwa-bazy-wektorowej-qdrant)
 - [Warstwa wyszukiwania tekstowego (Postgres)](#warstwa-wyszukiwania-tekstowego-postgres)
-- [Warstwa narzędzi agenta (`tools/`)](#warstwa-narzędzi-agenta-tools)
-- [Warstwa węzłów (`nodes/`)](#warstwa-węzłów-nodes)
-- [Warstwa grafów (`graph/`)](#warstwa-grafów-graph)
+- [Warstwa narzędzi agenta (`agent_tools/`)](#warstwa-narzędzi-agenta-agent_tools)
+- [Warstwa węzłów (`agent_nodes/`)](#warstwa-węzłów-agent_nodes)
+- [Warstwa grafów (`agent_graphs/`)](#warstwa-grafów-agent_graphs)
 - [Warstwa LLM](#warstwa-llm)
 - [Komentarze w kodzie](#komentarze-w-kodzie)
 - [Docstringi](#docstringi)
@@ -46,7 +48,7 @@ prowadzi do nowej. **Rozbieżność kod ↔ dokument jest teraz normą, nie bł�
 |---|---|---|
 | model generujący | Bielik 11B self-hosted; prompty `questions` i `solution` strojone pod 11B | mocny model zewnętrzny — Bielik okazał się za słaby |
 | dane do modelu | surowe; PII chroniła kontrola dostępu, bo LLM był lokalny | anonimizowane przed wyjściem (`anonymizer`: słownik osób, NER, regex), fail-closed; wyłączalne jawnie dla zaufanego endpointu |
-| przebieg funkcji | serwis wołany z handlera (`/search` → `service/rag_searcher.py`) | graf LangGraph na funkcję: anonimizacja → pętla agenta z narzędziami → odpowiedź (`graph/`, `nodes/`, `tools/`) |
+| przebieg funkcji | serwis wołany z handlera (`/search` → `service/rag_searcher.py`) | graf LangGraph na funkcję: anonimizacja → pętla agenta z narzędziami → odpowiedź (`agent_graphs/`, `agent_nodes/`, `agent_tools/`) |
 | zapytanie do indeksu | zgłoszenie parsowane promptem korpusu przed jednym wyszukaniem; `/search` zwraca tę kartę | agent sam pisze `problem` + `symptoms` i może szukać kilka razy; `/search` zwraca zapytania agenta, kartę daje graf `parse_ticket` |
 | wybór materiału | człowiek zaznacza trafienia, `/suggest` bierze identyfikatory (zaprojektowane, nie zaimplementowane) | agent sam dociąga źródła i decyduje, czy wystarczą; człowiek w pętli — później |
 | warianty generacji | dane: `text/variants.json` + `service/loader_variants.py`, guzik bez deployu | kod: osobny graf na wariant, nowy guzik = nowy katalog + deploy |
@@ -57,7 +59,7 @@ filtr jakości, indeksacja i Qdrant, embedder PolDense, `LLMClient` z fabryką o
 o korpusie („Dane wejściowe", „Domena"). Nowe grafy z nich korzystają, a nie je zastępują.
 
 **Wycofane 2026-10-02:** `variants.json`, `loader_variants.py`, modele `variant_generation*`
-i prompty `text/prompt_suggest_*` (nikt ich nie wołał, prompty żyją w `graph/suggest_*`),
+i prompty `text/prompt_suggest_*` (nikt ich nie wołał, prompty żyją w `agent_graphs/suggest_*`),
 a `/search` przeszedł na graf `search` od razu, choć ten stoi na atrapach do p. 9–11 —
 świadomie, mimo „najpierw następca". Tego samego dnia skasowane serwisy wołające model zwykłym
 tekstem: `TicketParser` i `RagSearcher`, a z nimi `helpdesk tickets parse` i `helpdesk rag search`
@@ -131,13 +133,13 @@ Werdykt blokujący da się **świadomie obejść** (patrz „Bramki jakości").
      i schematu, nie jest materiałem do indeksu. **Masowy import (p. 31) pisze do `data/parsed/`
      płasko — próbki porównawcze ma wtedy nadpisać albo skasować.** Walidator chodzi po `*.json`
      bez schodzenia w podkatalogi, więc każdy katalog sprawdza się osobno.
-   - Poprzednia próbka (661 plików z ręcznego bootstrapu) została skasowana 2026-07-31: powstała
-     w trzech turach o różnych regułach (`confirmed` 36% → 9%, średnia długość `solution`
-     210 → 356 zn.), więc miała wbudowany rozjazd niewykrywalny z zewnątrz, a przeprojektowany
-     schemat i tak by jej nie przyjął. **Zasada 7 zaczyna obowiązywać dopiero dla artefaktu
-     z masowego importu (p. 31)** — jednego przebiegu całego korpusu zamrożoną wersją promptu. Pomiary z tamtej
-     próbki (lejek, ryzyka jakości, rozkłady) zostały w tym pliku i pozostają wiążące — zniknęły
-     pliki, nie wiedza.
+   - Poprzednia próbka (661 plików z ręcznego bootstrapu) została skasowana 2026-07-31: powstała w
+     trzech turach o różnych regułach (`confirmed` 36% → 9%, średnia długość `solution` 210 → 356
+     zn.), więc miała wbudowany rozjazd niewykrywalny z zewnątrz, a przeprojektowany schemat i tak
+     by jej nie przyjął. **Zasada 7 zaczyna obowiązywać dopiero dla artefaktu z masowego importu (p.
+     31)** — jednego przebiegu całego korpusu zamrożoną wersją promptu. Pomiary z tamtej próbki
+     (lejek, ryzyka jakości, rozkłady) zostały w tym pliku i pozostają wiążące — zniknęły pliki, nie
+     wiedza.
 8. **Qdrant jest indeksem, nie źródłem prawdy.** Musi dać się skasować i odbudować z katalogu
    JSON-ów jedną komendą.
 9. **Nie zmyślamy treści merytorycznej.** Odpowiedź generowana jest wyłącznie z pól trafionych
@@ -229,10 +231,10 @@ przestałby być widoczny). Eksport jest odtwarzalny i nie woła LLM-a, więc **
 czytane przez żadne zapytanie tego skryptu.
 
 - **Import to cienka warstwa adapterów** — jeden czytnik na format źródłowy
-  (`service/parser_ticket_raw.py`, przy masowym imporcie obok wariantu SQL); reszta systemu widzi wyłącznie
-  znormalizowany `RawTicket`. **Model `RawTicket` mieszka w `model/`, czytnik w `service/`** —
-  jest wejściową połową kontraktu, którego wyjściem jest `ParsedTicket`, więc nie należy do
-  żadnego z czytników (patrz „Warstwy kodu").
+  (`service/parser_ticket_raw.py`, przy masowym imporcie obok wariantu SQL); reszta systemu widzi
+  wyłącznie znormalizowany `RawTicket`. **Model `RawTicket` mieszka w `model/`, czytnik w
+  `service/`** — jest wejściową połową kontraktu, którego wyjściem jest `ParsedTicket`, więc nie
+  należy do żadnego z czytników (patrz „Warstwy kodu").
 - **Nie zaszywamy założeń o źródle w domenie.** Nazwy pól, kodowanie, sposób sklejania wątku
   w konwersację żyją w adapterze.
 - **Dane zawierają PII** (nazwiska, adresy, telefony klientów). Traktujemy je jak wrażliwe:
@@ -407,7 +409,8 @@ wymagające czyszczenia cytowanej historii przed parsowaniem.
     „nie do korpusu" ustawiana ręcznie, nie heurystyka.**
   - **Jedna sprawa rozpada się na dwa rekordy**, gdy prośba klienta i nasza odpowiedź wpadają
     osobno (33942/33951, 33967/34046, 34300/34387). Czytając którykolwiek osobno, widzi się połowę.
-  - **Załączników nie ma w bazie**, więc rozwiązanie „nowa wersja w załączniku" (34352) nie istnieje.
+  - **Załączników nie ma w bazie**, więc rozwiązanie „nowa wersja w załączniku" (34352) nie
+    istnieje.
   **Nic z tego nie jest zrobione — wchodzi w p. 32.**
 - **Część rozwiązań jest pusta merytorycznie** — „Już powinno działać", „Zamykam", „Proszę się
   przelogować". Formalnie komentarz `typ='rozwiazanie'`, ale nie niesie wiedzy do zaproponowania
@@ -919,8 +922,8 @@ przemierzenia (p. 25–27), ale wnioski o formie przenoszą się między modelam
   ale nazywanie luki w bazie spadło z 6/8 na 2/8; u mocnego modelu ta sama zmiana nic nie
   kosztowała. Wniosek mierzony tylko na mocnym modelu byłby fałszywy.
 - **Reguła wyrażona pośrednio albo przez rozróżnienie jest na 11B martwa** („NIE ZMYŚLASZ" →
-  obietnice terminów wobec klienta; „przenoś tylko wartości narzucone z zewnątrz" → wartości
-  z jednej instalacji jako polecenie). Naprawa: reguła pozytywna albo zakaz wyliczający klasy wprost.
+  obietnice terminów wobec klienta; „przenoś tylko wartości narzucone z zewnątrz" → wartości z
+  jednej instalacji jako polecenie). Naprawa: reguła pozytywna albo zakaz wyliczający klasy wprost.
 - **Limit liczby kroków i uwag to decyzja o TREŚCI** — model sam wybiera, co poświęci. **Reguła
   rozbijająca bez limitu puchnie** (procedura klik po kliku: 3 kroki z limitem, 7 bez).
 - **Zakaz przepisywania cudzych pytań jest darmowy** (0–1 przypadków we wszystkich wariantach).
@@ -1032,12 +1035,14 @@ merytorycznie").
 - Dev (kod montowany z hosta): `docker compose -f docker-compose.yml up -d`
 - Prod (bez montowania): `docker compose -f docker-compose.prod.yml up -d`
 - Z GPU dla embeddera: warstwa `docker-compose.gpu.yml`
-- Po zmianie zależności lub `Dockerfile` (albo kodu na prodzie): `docker compose up -d --build <usługa>`
+- Po zmianie zależności lub `Dockerfile` (albo kodu na prodzie): `docker compose up -d --build
+  <usługa>`
 - Weryfikacja realnej konfiguracji: `docker compose config` (nie zawartość `.env`)
 
 **Przygotowanie danych (skrypty repo)**
-- Eksport zgłoszeń ze zrzutu do `data/raw/`: `python scripts/export_raw_tickets.py export --module-id 116`
-  (wymaga kontenera z zaimportowanym zrzutem; kontrola liczb wobec bazy na końcu przebiegu)
+- Eksport zgłoszeń ze zrzutu do `data/raw/`: `python scripts/export_raw_tickets.py export
+  --module-id 116` (wymaga kontenera z zaimportowanym zrzutem; kontrola liczb wobec bazy na końcu
+  przebiegu)
 
 **Pipeline danych (CLI `helpdesk`)**
 - Walidacja artefaktów: `helpdesk tickets validate data/parsed/`
@@ -1124,9 +1129,9 @@ dokus-helpdesk-ai/
 │       ├── db_postgres/          # Postgres: client.py, table/<tabela>/ (klasa + .sql), row/
 │       ├── anonymization/        # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 19)
 │       │                         # --- agent: katalog na jednostkę, właściwa + fake.py ---
-│       ├── tools/                # narzędzia agenta: base.py, folder na materiał, katalog na narzędzie
-│       ├── nodes/                # węzły grafów: kontrakt Node, katalog na węzeł
-│       └── graph/                # grafy funkcji: base.py, factory.py, registry.py, fake.py, katalog na graf
+│       ├── agent_tools/          # narzędzia agenta: base.py, folder na materiał, katalog na narzędzie
+│       ├── agent_nodes/          # węzły grafów: kontrakt Node, katalog na węzeł
+│       └── agent_graphs/         # grafy funkcji: base.py, factory.py, registry.py, fake.py, katalog na graf
 ├── embedder/                     # kolejna usługa: model PL za REST-em
 │   ├── Dockerfile
 │   ├── requirements.txt
@@ -1141,7 +1146,7 @@ dokus-helpdesk-ai/
 │   ├── dictionary/               # build.sh z poprawkami słownika, custom_words.txt z nazwami własnymi
 │   └── initdb/                   # konfiguracja wyszukiwania `pl_search` (tylko pusty wolumen)
 ├── tests/
-│   ├── unit/                     # podfoldery <usługa>_<pakiet>: api_tools/, api_service/, embedder/…
+│   ├── unit/                     # podfoldery <usługa>_<pakiet>: api_agent_tools/, api_service/, embedder/…
 │   ├── integration/              # jednostka + prawdziwa zależność: pliki, FastAPI, LangGraph, Qdrant
 │   ├── functional/               # cała aplikacja przez HTTP albo komendę
 │   └── evaluation/               # golden sety
@@ -1163,6 +1168,9 @@ dokus-helpdesk-ai/
   wyjątki i modele transportu razem, żeby podmiana dostawcy była zmianą jednego katalogu — dlatego
   te modele **nie wychodzą** do `model/`. Reszta idzie osią techniczną (`model` / `service` /
   `text` / `util`).
+- **Pakiety agenta mają wspólny przedrostek od roli: `agent_graphs/`, `agent_nodes/`,
+  `agent_tools/` (2026-10-04, wcześniej `graph/`, `nodes/`, `tools/`).** Nie `langgraph_`:
+  LangGrapha importuje tylko `agent_graphs/`, a narzędzia mają od niego nie zależeć.
 - **Pakiety baz nazywają się od bazy: `db_qdrant/` i `db_postgres/` (2026-10-04, wcześniej
   `retrieval/` i `db/`).** Odkąd Postgres też wyszukuje, „retrieval" pasowało do obu, a „db" nie
   mówiło, o którą bazę chodzi. `llm/` zostaje nazwą roli, bo ma interfejs i wymiennych dostawców;
@@ -1187,17 +1195,16 @@ dokus-helpdesk-ai/
   `find_tickets_vector`, bo dwa miejsca sklejające ten tekst rozjechałyby się **bezgłośnie**.
 - **Nazwa pliku mówi, CO ROBI, nie czego dotyczy** — `validator_ticket_parsed.py`, nie
   `artifacts.py`. W `service/` oś `<rola>_<przedmiot>` (`parser_`, `validator_`, `builder_`,
-  `loader_`, `filter_`, `normalizer_`), w `model/` prefiks tematyczny grupujący alfabetycznie (`ticket_*`,
-  `validation_parsed_*`, `dict_*`, `filter_*`).
+  `loader_`, `filter_`, `normalizer_`), w `model/` prefiks tematyczny grupujący alfabetycznie
+  (`ticket_*`, `validation_parsed_*`, `dict_*`, `filter_*`).
   - **Gdy reguł jest wiele i przybywa ich szybciej niż logiki wokół nich, idą do osobnego pliku**
     (`filter_ticket_quality.py` + `filter_ticket_quality_rules.py`): dwa różne rytmy zmian, a plik
     reguł czyta się jak listę, nie jak kod. Każda reguła to funkcja modułowa — bezstanowa, więc
     klasa dałaby tylko miejsce na `self` — a krotka `RULES` na końcu jest tym, po czym iteruje
     orkiestrator i po czym parametryzują się testy. Dołożenie reguły to dopisanie funkcji.
-  - **Znany koszt tej konwencji, do rozstrzygnięcia przy masowym imporcie (p. 31):** wszystkie czytniki źródeł
-    produkują ten sam `RawTicket`, więc wariant SQL musi dołożyć źródło do nazwy
-    (`parser_ticket_raw_sql`) albo oba dostaną sufiks. Nazwa opisuje WYNIK, a te pliki różni
-    ŹRÓDŁO.
+  - **Znany koszt tej konwencji, do rozstrzygnięcia przy masowym imporcie (p. 31):** wszystkie
+    czytniki źródeł produkują ten sam `RawTicket`, więc wariant SQL musi dołożyć źródło do nazwy
+    (`parser_ticket_raw_sql`) albo oba dostaną sufiks. Nazwa opisuje WYNIK, a te pliki różni ŹRÓDŁO.
 - **`util/` to funkcje bezstanowe bez wiedzy o dziedzinie** — kryterium: czy da się je opisać
   i przetestować, ani razu nie mówiąc „zgłoszenie". Stąd `strip_html()` i
   `describe_validation_error()` są tam, a nie przy swoich wywołujących; drugi powód jest
@@ -1225,9 +1232,9 @@ dokus-helpdesk-ai/
 3. **Model danych czy operacja na nich?** → `model/` albo `service/`.
 4. **Dane klienta, które klient zmienia bez deployu** (słownik, zestaw reguł)? → `text/`.
    Prompt — treść czytana zdanie po zdaniu — leży w katalogu swojego grafu, nie w `text/`.
-5. **Narzędzie agenta, węzeł grafu albo przebieg funkcji?** → `tools/<materiał>/<narzędzie>/`,
-   `nodes/<węzeł>/`, `graph/<funkcja>/` — każdy z wersją właściwą i atrapą (p. 1–5); prompt
-   grafu leży w katalogu grafu.
+5. **Narzędzie agenta, węzeł grafu albo przebieg funkcji?** → `agent_tools/<materiał>/<narzędzie>/`,
+   `agent_nodes/<węzeł>/`, `agent_graphs/<funkcja>/` — każdy z wersją właściwą i atrapą (p. 1–5);
+   prompt grafu leży w katalogu grafu.
 
 ## Styl kodu
 
@@ -1293,7 +1300,8 @@ Trzy kategorie, których nie mieszamy:
    jednorazowe migracje artefaktów). Uruchamiane `python scripts/nazwa.py`.
 2. **Deweloperskie usługi** — `<usługa>/scripts/*.py`, sięgają do kodu, configu albo endpointów
    tej usługi. Uruchamiane `python api/scripts/nazwa.py`.
-3. **Produkcyjne** — `api/app/cli/cli.py`, jeden wpis w `[project.scripts]` na całe drzewo subkomend.
+3. **Produkcyjne** — `api/app/cli/cli.py`, jeden wpis w `[project.scripts]` na całe drzewo
+   subkomend.
 
 **Kryterium podziału 1 vs 2: czy skrypt dotyka konkretnej usługi.** Eksport zrzutu bazy do
 `data/raw/` nie importuje `api.app` i nie odpytuje żadnego endpointu — jest repo-level. Sonda po
@@ -1334,7 +1342,8 @@ Wspólne:
 
 ### Gotchas
 
-- **Tekst pomocy przez `help=`** — inaczej Typer wstawi do `--help` docstring pisany dla programisty.
+- **Tekst pomocy przez `help=`** — inaczej Typer wstawi do `--help` docstring pisany dla
+  programisty.
 - **`@cli.callback()` nawet przy jednej komendzie** — inaczej Typer zwija drzewo i odpala ją wprost.
 
 ## Warstwa API
@@ -1371,15 +1380,15 @@ Wspólne:
 - **Odpowiedź bramki: `overridable` zawsze `true` i `rules_version`** — furtka jest kontraktem
   (zasada 10), a wersja zestawu reguł pozwala odtworzyć, dlaczego wczoraj przeszło. Reguły bierze
   trasa z `get_rule_set()`, nigdy z żądania.
-- **`GET /variants` i `/suggest` czytają rejestr `graph/registry.py`** — każdy pakiet
-  `graph/suggest_<wariant>` to guzik (`LABEL`, `REQUIRES_HITS`, `STATE`), więc nowy wariant to nowy
-  katalog bez zmiany routera. Wariant bez narzędzi wiedzy nie ma `sources` w stanie i wraca
+- **`GET /variants` i `/suggest` czytają rejestr `agent_graphs/registry.py`** — każdy pakiet
+  `agent_graphs/suggest_<wariant>` to guzik (`LABEL`, `REQUIRES_HITS`, `STATE`), więc nowy wariant
+  to nowy katalog bez zmiany routera. Wariant bez narzędzi wiedzy nie ma `sources` w stanie i wraca
   z pustą listą.
-- **Trasy biorą graf z `graph/factory.py` (`get_graph_builder()`, zależność FastAPI), budowany
-  na każde żądanie** — atrapa jest jednorazowa. Do p. 9 `build_function_graph()` zawsze oddaje atrapę,
-  także przy prawdziwym `LLM_PROVIDER`: nic nie wychodzi z procesu, a odmowa położyłaby trasy na
-  stacku dev. Test podmienia zależność przez `dependency_overrides`, wstawiając graf z atrap,
-  do których ma dostęp.
+- **Trasy biorą graf z `agent_graphs/factory.py` (`get_graph_builder()`, zależność FastAPI),
+  budowany na każde żądanie** — atrapa jest jednorazowa. Do p. 9 `build_function_graph()` zawsze
+  oddaje atrapę, także przy prawdziwym `LLM_PROVIDER`: nic nie wychodzi z procesu, a odmowa
+  położyłaby trasy na stacku dev. Test podmienia zależność przez `dependency_overrides`, wstawiając
+  graf z atrap, do których ma dostęp.
 
 ## Warstwa embeddera
 
@@ -1538,12 +1547,12 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Wyszukiwanie i reguły bramek (p. 29) dostają osobne schematy i role**, żeby przebudowa
   indeksu nie mogła dotknąć reguł.
 
-## Warstwa narzędzi agenta (`tools/`)
+## Warstwa narzędzi agenta (`agent_tools/`)
 
-- **W `tools/` jest wyłącznie to, co agent może wywołać i co się wykonuje.** Narzędzie odpowiedzi
-  grafu (`respond_<graf>`) tu nie trafia — nic go nie wykonuje, to kontrakt wyjścia grafu.
-  Anonimizator i model też nie: anonimizacja to stały węzeł, którego agent nie może pominąć,
-  a model jest wołającym, nie narzędziem. Tabela narzędzi stoi na górze `tools/__init__.py`.
+- **W `agent_tools/` jest wyłącznie to, co agent może wywołać i co się wykonuje.** Narzędzie
+  odpowiedzi grafu (`respond_<graf>`) tu nie trafia — nic go nie wykonuje, to kontrakt wyjścia
+  grafu. Anonimizator i model też nie: anonimizacja to stały węzeł, którego agent nie może pominąć,
+  a model jest wołającym, nie narzędziem. Tabela narzędzi stoi na górze `agent_tools/__init__.py`.
 - **Sześć narzędzi, dwa materiały (2026-10-03).** Zgłoszenia: `find_tickets_vector` (po znaczeniu)
   i `find_tickets_text` (pola `exact` i `words`) — oba źródła wiedzy, każde oddaje to, co trzyma
   jego baza: wektorowe karty, tekstowe oryginalne wątki po anonimizacji. Dokumentacja idzie
@@ -1551,11 +1560,11 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   i oddają wiersze spisu treści, a treść daje `read_docs` — jedyne narzędzie dokumentacji, które
   cytuje. Dzięki temu lista źródeł pokazuje to, co model przeczytał, a nie to, co zobaczył
   w spisie. Właściwe jest dziś tylko `find_tickets_vector`; reszta to modele i atrapy.
-- **Narzędzia leżą w folderze swojego materiału: `tools/tickets/` i `tools/docs/` (2026-10-03)**,
-  nazwanym jak `SourceRef.source`; katalog narzędzia zachowuje pełną nazwę narzędzia.
-  `base.py` materiału trzyma tekst wspólny dla jego narzędzi: rekord zgłoszenia
-  (ten sam w obu wyszukiwaniach) oraz wiersz i nagłówek sekcji (spis, oba wyszukiwania, odczyt).
-  Atrapy narzędzi dokumentacji stoją na jednej zmyślonej dokumentacji (`docs/fake_docs.py`), żeby
+- **Narzędzia leżą w folderze swojego materiału: `agent_tools/tickets/` i `agent_tools/docs/`
+  (2026-10-03)**, nazwanym jak `SourceRef.source`; katalog narzędzia zachowuje pełną nazwę
+  narzędzia. `base.py` materiału trzyma tekst wspólny dla jego narzędzi: rekord zgłoszenia (ten sam
+  w obu wyszukiwaniach) oraz wiersz i nagłówek sekcji (spis, oba wyszukiwania, odczyt). Atrapy
+  narzędzi dokumentacji stoją na jednej zmyślonej dokumentacji (`docs/fake_docs.py`), żeby
   identyfikator z atrapy wyszukiwania dało się odczytać atrapą odczytu.
 - **Opis narzędzia dla modelu leży w katalogu narzędzia (`description.md`) i jest ten sam
   w każdym grafie (2026-10-03)** — mówi, jak pytać narzędzie i co ono oddaje; po co wyniki
@@ -1565,7 +1574,7 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **`SourceRef.score` trzeba podać, ale wolno podać `None`** — źródło znalezione dosłownie albo
   odczytane po identyfikatorze nie ma podobieństwa. Pole bez wartości domyślnej, żeby jego brak
   był decyzją narzędzia, a nie przeoczeniem; w odpowiedzi API to `null`.
-- **Na górze `tools/` kontrakty (`base.py`) i jedyny wspólny model `SourceRef` (`models.py`);
+- **Na górze `agent_tools/` kontrakty (`base.py`) i jedyny wspólny model `SourceRef` (`models.py`);
   w katalogu narzędzia `tool.py`, `fake.py` i `models.py` z modelami TYLKO tego narzędzia** —
   zapytanie (`FindTicketsVectorQuery`), znaleziony element (`FoundTicket`), wynik
   (`FindTicketsVectorResult`), bez wspólnych baz. `errors.py` dochodzi, gdy narzędzie ma własne
@@ -1616,34 +1625,34 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Atrapa narzędzia zwraca przy każdym wyszukaniu ten sam wynik, ze stałymi id, i zapisuje
   zapytania w publicznym `queries`** — test grafu sprawdza, o co pytał agent, a nie jak szukało
   narzędzie. Konstruktor przyjmuje własne elementy i `dropped_below_threshold`, więc scenariusz
-  „próg wszystko wyciął" to jedna linia. Wbudowany zestaw `FakeFindTicketsVectorTool` to **jeden objaw
-  i trzy różne przyczyny** — najczęstszy kształt trafień w korpusie, na którym agent ma dopytywać,
-  a nie zgadywać. Dane atrap są zmyślone, nigdy kopiowane z korpusu (PII).
-- **Test kontraktu sam znajduje narzędzia** (`test_api_tools_contract.py`: pakiety w `app/tools/`
-  na każdej głębokości → podklasy `KnowledgeSource`) i sprawdza to, czego `ABC` nie wymusza: `name`, `query_model`
-  z `extra="forbid"` oraz jedną nazwę na pakiet. Nowe narzędzie jest objęte testem bez dopisywania
-  go do żadnej listy.
+  „próg wszystko wyciął" to jedna linia. Wbudowany zestaw `FakeFindTicketsVectorTool` to **jeden
+  objaw i trzy różne przyczyny** — najczęstszy kształt trafień w korpusie, na którym agent ma
+  dopytywać, a nie zgadywać. Dane atrap są zmyślone, nigdy kopiowane z korpusu (PII).
+- **Test kontraktu sam znajduje narzędzia** (`test_api_agent_tools_contract.py`: pakiety w
+  `app/agent_tools/` na każdej głębokości → podklasy `KnowledgeSource`) i sprawdza to, czego `ABC`
+  nie wymusza: `name`, `query_model` z `extra="forbid"` oraz jedną nazwę na pakiet. Nowe narzędzie
+  jest objęte testem bez dopisywania go do żadnej listy.
 - **Każde źródło wiedzy jest tylko do odczytu** — wstrzyknięcie przez treść zgłoszenia może co
   najwyżej skierować agenta do nietrafionego materiału, nie zmienić indeksu.
 
-## Warstwa węzłów (`nodes/`)
+## Warstwa węzłów (`agent_nodes/`)
 
-- **Kontrakt węzła (`Node` w `nodes/base.py`) to `name` i `run(state)`**; atrapa i węzeł właściwy
-  mają ten sam kontrakt.
-- **Pola wspólne stanu w `GraphState` (`graph/base.py`), `state.py` grafu dziedziczy i dokłada
-  swoje** (zmiana 2026-10-02, wcześniej osobny pełny stan na graf): `input_text`, `anonymized`,
-  `messages`, `iterations`, `log` są w bazie; `output` w typie wyniku (`Verdict`, `ParsedTicket`…),
-  `sources` (tylko grafy z narzędziami wiedzy) i dane wejściowe (`rules`) — w grafie. LangGraph
-  czyta reduktory z pól odziedziczonych (sprawdzone). Pułapka serializacji Pydantica dotyczy pola
-  typowanego klasą bazową, nie dziedziczenia — dlatego żadnego pola ani listy nie typujemy
-  `GraphState`. Węzeł przyjmuje stan jako `BaseModel` i czyta pola, których potrzebuje.
+- **Kontrakt węzła (`Node` w `agent_nodes/base.py`) to `name` i `run(state)`**; atrapa i węzeł
+  właściwy mają ten sam kontrakt.
+- **Pola wspólne stanu w `GraphState` (`agent_graphs/base.py`), `state.py` grafu dziedziczy i
+  dokłada swoje** (zmiana 2026-10-02, wcześniej osobny pełny stan na graf): `input_text`,
+  `anonymized`, `messages`, `iterations`, `log` są w bazie; `output` w typie wyniku (`Verdict`,
+  `ParsedTicket`…), `sources` (tylko grafy z narzędziami wiedzy) i dane wejściowe (`rules`) — w
+  grafie. LangGraph czyta reduktory z pól odziedziczonych (sprawdzone). Pułapka serializacji
+  Pydantica dotyczy pola typowanego klasą bazową, nie dziedziczenia — dlatego żadnego pola ani listy
+  nie typujemy `GraphState`. Węzeł przyjmuje stan jako `BaseModel` i czyta pola, których potrzebuje.
 - **Węzeł zwraca wyłącznie zmieniane pola, a listy tylko nowymi elementami.** Listy łączą reduktory
   z adnotacji pola (LangGraph czyta je stamtąd): `messages` i `log` — `operator.add` w bazie,
-  `sources` — `merge_sources` z `graph/base.py` (po kluczu `source:item_id`, pierwsze trafienie
-  wygrywa). `sources` deklaruje graf sam, więc może zapomnieć reduktora i wtedy po cichu nadpisuje
-  listę zamiast doklejać — pilnuje tego test grafów (p. 12).
+  `sources` — `merge_sources` z `agent_graphs/base.py` (po kluczu `source:item_id`, pierwsze
+  trafienie wygrywa). `sources` deklaruje graf sam, więc może zapomnieć reduktora i wtedy po cichu
+  nadpisuje listę zamiast doklejać — pilnuje tego test grafów (p. 12).
 - **Każde wywołanie węzła dopisuje jeden wpis do `log`** (`LogEntry(node, message)` z
-  `nodes/models.py`, budowany przez `Node.log_entry()`) — przebieg grafu do odczytania bez
+  `agent_nodes/models.py`, budowany przez `Node.log_entry()`) — przebieg grafu do odczytania bez
   zewnętrznego tracingu. W `message` wyłącznie nazwy, liczby i identyfikatory, nigdy treść
   zgłoszenia ani odpowiedzi modelu: log wraca w stanie razem z wynikiem.
 - **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `llm/messages.py`), żadnych typów
@@ -1663,25 +1672,27 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   anonimizatora** (fail-closed). Atrapa węzła byłaby drugą drogą obok anonimizacji; test kontraktu
   węzłów pilnuje, że w `anonymize/` jest tylko `node.py`.
 - **Atrapy pozostałych węzłów odtwarzają ustalony fragment stanu i zapisują stan w publicznym
-  `calls`.** `FakeAgentNode` oddaje zaplanowane tury po kolei (domyślnie jedna: odpowiedź bez narzędzi;
-  `tool_call_turn()` buduje turę z wywołaniem), a brak kolejnej tury to błąd, nie powtórka.
-  `FakeRunToolsNode` odpowiada stałym tekstem na każde wywołanie z ostatniej tury, z jego `call_id`,
-  i dokłada `sources` tylko wtedy, gdy je podano. `FakeRespondNode` ustawia `output` na wynik
-  z konstruktora.
-- **Test kontraktu węzłów sam znajduje węzły** (`test_api_nodes_contract.py`) i sprawdza, że nazwa
-  węzła = nazwa jego katalogu — atrapa i węzeł właściwy wpinają się do grafu pod tą samą nazwą.
+  `calls`.** `FakeAgentNode` oddaje zaplanowane tury po kolei (domyślnie jedna: odpowiedź bez
+  narzędzi; `tool_call_turn()` buduje turę z wywołaniem), a brak kolejnej tury to błąd, nie
+  powtórka. `FakeRunToolsNode` odpowiada stałym tekstem na każde wywołanie z ostatniej tury, z jego
+  `call_id`, i dokłada `sources` tylko wtedy, gdy je podano. `FakeRespondNode` ustawia `output` na
+  wynik z konstruktora.
+- **Test kontraktu węzłów sam znajduje węzły** (`test_api_agent_nodes_contract.py`) i sprawdza, że
+  nazwa węzła = nazwa jego katalogu — atrapa i węzeł właściwy wpinają się do grafu pod tą samą
+  nazwą.
 
-## Warstwa grafów (`graph/`)
+## Warstwa grafów (`agent_graphs/`)
 
-- **LangSmith wyłącza import pakietu `app.graph`** — `langsmith.configure(enabled=False)`
-  w `graph/__init__.py`. Zmierzone 2026-10-02: przy `LANGSMITH_TRACING=true` LangGraph wysyła stan
-  każdego węzła, także `input_text` sprzed anonimizacji; przełącznik globalny wygrywa z ENV.
-  Pilnuje `test_api_graph_langsmith.py` (pada bez blokady — sprawdzone). Import LangGrapha ~1,1 s.
+- **LangSmith wyłącza import pakietu `app.agent_graphs`** — `langsmith.configure(enabled=False)` w
+  `agent_graphs/__init__.py`. Zmierzone 2026-10-02: przy `LANGSMITH_TRACING=true` LangGraph wysyła
+  stan każdego węzła, także `input_text` sprzed anonimizacji; przełącznik globalny wygrywa z ENV.
+  Pilnuje `test_api_agent_graphs_langsmith.py` (pada bez blokady — sprawdzone). Import LangGrapha
+  ~1,1 s.
 - **`build_graph()` przyjmuje gotowe węzły, a krawędzie prowadzi po nazwach** — węzły zamienione
   w argumentach dają ten sam graf, dwa o jednej nazwie to błąd przy składaniu.
-- **Fabryka grafów leży w `graph/factory.py`, jak fabryki innych pakietów, ale `graph/__init__.py`
-  jej nie eksportuje** — po p. 9 pociągnie `Settings` i klientów, a ten `__init__` importuje
-  każdy graf. Bierze się ją pełną ścieżką `app.graph.factory`.
+- **Fabryka grafów leży w `agent_graphs/factory.py`, jak fabryki innych pakietów, ale
+  `agent_graphs/__init__.py` jej nie eksportuje** — po p. 9 pociągnie `Settings` i klientów, a ten
+  `__init__` importuje każdy graf. Bierze się ją pełną ścieżką `app.agent_graphs.factory`.
 - **Prompt grafu składa `graph.py`: `system_prompt()` i `user_prompt(state)`**; treść zgłoszenia
   bierze wyłącznie z `anonymized`, a stan przed anonimizacją to błąd, nie pusty prompt.
 - **Odpowiedź grafu przychodzi narzędziem `respond_<graf>`, nie tekstem (2026-10-02).** Definicja
@@ -1693,28 +1704,28 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   odpowiedź musi być jedynym wywołaniem w turze. Długi tekst w argumencie (`suggest_*`, `polish`)
   — do zmierzenia w p. 25–28. Także `parse_ticket` (`respond_parse_ticket`, 2026-10-02) — bez
   pól `FILLED_BY_GRAPH` (`ticket_id`, `date`, wersja słownika), które dokłada graf ze stanu.
-- **Atrapa grafu (`build_fake_graph()`) jest jednorazowa** — `FakeAgentNode` ma zaplanowane tury, więc
-  trasa i CLI budują ją na każde wywołanie. `ainvoke` zwraca słownik, nie model stanu.
+- **Atrapa grafu (`build_fake_graph()`) jest jednorazowa** — `FakeAgentNode` ma zaplanowane tury,
+  więc trasa i CLI budują ją na każde wywołanie. `ainvoke` zwraca słownik, nie model stanu.
 - **Każdy graf wystawia to samo API** — `STATE`, `TOOL_NAMES`, `system_prompt()`,
   `user_prompt(state)`, `model_tools(tools)`, `build_graph(…)`, `build_fake_graph()`,
   `example_state()` (oraz `respond_tool()`, a w `suggest_*` `LABEL` i `REQUIRES_HITS`).
-  `test_api_graph_contract.py` sam znajduje grafy w `app/graph/` i sprawdza je wszystkie, więc nowy
-  graf jest objęty bez dopisywania.
+  `test_api_agent_graphs_contract.py` sam znajduje grafy w `app/agent_graphs/` i sprawdza je
+  wszystkie, więc nowy graf jest objęty bez dopisywania.
 - **Dwa kształty przebiegu.** Bez narzędzi wiedzy: anonymize → agent → respond. Z nimi: pętla
   agent ⇄ run_tools, a o kierunku po turze modelu decyduje wspólne `route_after_agent()` z
-  `graph/base.py` — tylko po tym, CO model wywołał (limit iteracji dochodzi w p. 9).
+  `agent_graphs/base.py` — tylko po tym, CO model wywołał (limit iteracji dochodzi w p. 9).
 - **Graf decyduje, które narzędzia model widzi (`TOOL_NAMES`), ale nie trzyma ich opisów** — te
-  leżą przy narzędziach; definicję składa `tool_definitions()` z `graph/base.py`, a narzędzie
+  leżą przy narzędziach; definicję składa `tool_definitions()` z `agent_graphs/base.py`, a narzędzie
   spoza `TOOL_NAMES` to błąd składania.
 - **Model wyniku wspólny dla kilku grafów — w `model/` (`Verdict`, `Proposal`); używany przez jeden
-  graf — w `graph/<graf>/models.py`** (`SearchDone`, `PolishedText`), jak modele narzędzi.
+  graf — w `agent_graphs/<graf>/models.py`** (`SearchDone`, `PolishedText`), jak modele narzędzi.
 - **`search` kończy się pustym `respond_search`** — wynikiem są źródła z `cite()` i zapytania
   agenta z `messages`, nic z deklaracji modelu.
-- **Prompt parsujący leży w `graph/parse_ticket/`, jak każdy prompt grafu (2026-10-02)** — i nadal
-  jest KONTRAKTEM ARTEFAKTU (zasada 7): `prompt_system.md` (rola, jak czytać wątek),
+- **Prompt parsujący leży w `agent_graphs/parse_ticket/`, jak każdy prompt grafu (2026-10-02)** — i
+  nadal jest KONTRAKTEM ARTEFAKTU (zasada 7): `prompt_system.md` (rola, jak czytać wątek),
   `respond_tool.md` (znaczenie pól, przykłady) i `prompt_user.md` (słownik i wątek) pod
-  testem-strażnikiem `test_api_graph_parse_ticket_prompt.py`, który zamraża frazy. Korpus przy
-  masowym imporcie (p. 31) zbuduje ten sam graf — innej drogi do tego promptu nie ma.
+  testem-strażnikiem `test_api_agent_graphs_parse_ticket_prompt.py`, który zamraża frazy. Korpus
+  przy masowym imporcie (p. 31) zbuduje ten sam graf — innej drogi do tego promptu nie ma.
 - **Reguły klienta (`gate_close`, `gate_reply`, `polish`) są wymagane: brak albo pusta lista to
   `ValidationError` przy budowie stanu** (decyzja 2026-10-02) — graf w ogóle nie rusza.
 
@@ -1826,11 +1837,12 @@ zapytania), korpus `data/parsed/bielik-11b-golden200/` (200 artefaktów) i dystr
 
 - **Każde zapytanie ma dwa kształty: `query_raw` i `query_problem` + `query_symptoms`** (dopisane
   2026-10-03, także w dystraktorach). Drugi to kształt narzędzia `find_tickets_vector`, napisany
-  **wyłącznie z `query_raw`, bez wglądu w rekord-cel**, według opisu narzędzia dla agenta.
-  Zastępuje zapytanie agenta do czasu pomiaru z p. 23, więc **nie wolno go poprawiać pod wynik**.
-  Przez narzędzie daje rekord-cel na pierwszym miejscu w 152 ze 162 zapytań (93,8%, wobec 98,1%
-  dla surowych), w pierwszej piątce w 161, a próg 0.48 przechodzi 160; trafienie dostają 3 z 16
-  dystraktorów. Pilnuje tego `tests/evaluation/test_api_tools_find_tickets_vector_golden_stack.py`.
+  **wyłącznie z `query_raw`, bez wglądu w rekord-cel**, według opisu narzędzia dla agenta. Zastępuje
+  zapytanie agenta do czasu pomiaru z p. 23, więc **nie wolno go poprawiać pod wynik**. Przez
+  narzędzie daje rekord-cel na pierwszym miejscu w 152 ze 162 zapytań (93,8%, wobec 98,1% dla
+  surowych), w pierwszej piątce w 161, a próg 0.48 przechodzi 160; trafienie dostają 3 z 16
+  dystraktorów. Pilnuje tego
+  `tests/evaluation/test_api_agent_tools_find_tickets_vector_golden_stack.py`.
 
 - **Zapytanie zna WYŁĄCZNIE to, co widzi zgłaszający** — nigdy przyczyny ani terminologii
   z rozwiązania. Inaczej zadanie staje się za łatwe dla **wszystkich** modeli i pomiar przestaje
@@ -2037,13 +2049,13 @@ Raises:                      # only when the method raises
   na maszynie deweloperskiej jest normą, nie wyjątkiem, a poprawianie jej edycją YAML-a wraca przy
   każdym `git pull`. **`api` domyślnie na 8010, nie 8000** — 8000 bywa zajęte przez inny lokalny
   projekt, a baza, która nie wstaje po `up`, jest gorsza niż nietypowy numer.
-- **`DOCKER_*_PORT` rusza wyłącznie stronę hosta.** W mapowaniu `adres:port_hosta:port_kontenera`
-  o znaczeniu członu decyduje wyłącznie **pozycja**, a strony są nierównoważne: port kontenera jest
-  **stały** (8000 dla obu aplikacji, 6333 dla Qdranta, 5432 dla Postgresa) i to jego używają
-  usługi, rozmawiając ze sobą po nazwie (`EMBEDDING_BASE_URL`, `QDRANT_URL`, `POSTGRES_HOST`). Zmiana `DOCKER_EMBEDDER_PORT` jest
-  **niewidoczna wewnątrz sieci compose** — pułapka realna, bo nazwa brzmi podobnie do
-  `EMBEDDING_BASE_URL`, a robi co innego. Uboczny skutek: `api` i `embedder` mają w kontenerze ten
-  sam port 8000 i **to nie jest konflikt** — kolidują dopiero porty hosta.
+- **`DOCKER_*_PORT` rusza wyłącznie stronę hosta.** W mapowaniu `adres:port_hosta:port_kontenera` o
+  znaczeniu członu decyduje wyłącznie **pozycja**, a strony są nierównoważne: port kontenera jest
+  **stały** (8000 dla obu aplikacji, 6333 dla Qdranta, 5432 dla Postgresa) i to jego używają usługi,
+  rozmawiając ze sobą po nazwie (`EMBEDDING_BASE_URL`, `QDRANT_URL`, `POSTGRES_HOST`). Zmiana
+  `DOCKER_EMBEDDER_PORT` jest **niewidoczna wewnątrz sieci compose** — pułapka realna, bo nazwa
+  brzmi podobnie do `EMBEDDING_BASE_URL`, a robi co innego. Uboczny skutek: `api` i `embedder` mają
+  w kontenerze ten sam port 8000 i **to nie jest konflikt** — kolidują dopiero porty hosta.
 - **Adres nasłuchu domyślnie `127.0.0.1`, nie `0.0.0.0`** — stack nie ma jeszcze
   uwierzytelniania (p. 36), więc nie może odpowiadać z sieci bez świadomej decyzji.
 - **Montowanie kodu z hosta NIE obejmuje zależności** — dev podmienia `./api/app`, ale
@@ -2065,8 +2077,8 @@ Raises:                      # only when the method raises
 
 - **Request-ID = korelacja logów, nie monitoring.** Nadawany/propagowany w middleware
   (nagłówek + logi), pozwala zszyć wpisy jednego żądania.
-- **Przyczynę błędu logujemy w handlerach wyjątków, nie w middleware** — middleware widzi już
-  gotową `Response`, a `detail` (jedyne „dlaczego") żyje tylko w wyjątku. Uwaga: `RequestValidationError`
+- **Przyczynę błędu logujemy w handlerach wyjątków, nie w middleware** — middleware widzi już gotową
+  `Response`, a `detail` (jedyne „dlaczego") żyje tylko w wyjątku. Uwaga: `RequestValidationError`
   to **nie** `HTTPException` — potrzebuje osobnego handlera (najczęstsze 422).
 - **Awaria zależności ma własny handler i status „spróbuj później".** Wyjątek warstwy
   transportowej (`EncoderError` w embedderze, `LLMError` i `AnonymizationError` w `api`) łapiemy
@@ -2091,12 +2103,14 @@ Raises:                      # only when the method raises
 Na tym etapie projekt to **API + CLI**; UI dochodzi później (p. 45). Gdy dojdzie,
 obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przypadkiem:
 
-- Front to **statyka wpiekana w `api`** (`api/app/static/`), nie osobna usługa compose —
-  dlatego nie występuje w warstwach compose (wyjątek od zasady 3: to nie komponent gadający REST-em).
-- Pełny React (SPA) + Ant Design v6 (React ≥18; `antd` i `@ant-design/icons` w tej samej generacji major). Bez komponentów za paywallem.
+- Front to **statyka wpiekana w `api`** (`api/app/static/`), nie osobna usługa compose — dlatego nie
+  występuje w warstwach compose (wyjątek od zasady 3: to nie komponent gadający REST-em).
+- Pełny React (SPA) + Ant Design v6 (React ≥18; `antd` i `@ant-design/icons` w tej samej generacji
+  major). Bez komponentów za paywallem.
 - Pliki statyczne z React serwowane przez FastAPI — z tego samego origin. Dev: Vite z proxy `/api`.
 - Wygląd przez tokeny antd w `ConfigProvider`. Bez Tailwinda.
-- Nie rozbijaj małych komponentów na kilkanaście plików (np. nawigacja jako dane w configu, nie JSX).
+- Nie rozbijaj małych komponentów na kilkanaście plików (np. nawigacja jako dane w configu, nie
+  JSX).
 - Wykresy: `@ant-design/charts`.
 
 ## Dokumentacja
@@ -2120,7 +2134,8 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
      docker compose up -d   # uruchom całą kompozycję
      ```
   5. **Konfiguracja** — wszystkie zmienne środowiskowe w tabeli (nazwa, domyślna, opis).
-  6. **API** — tabela endpointów, a pod nią opis każdego (wywołanie, przykład wejścia, przykład wyjścia).
+  6. **API** — tabela endpointów, a pod nią opis każdego (wywołanie, przykład wejścia, przykład
+     wyjścia).
   7. **Integracje** — zawartość `integrations/` z przykładem użycia.
   8. **Uwagi techniczne.**
   9. **Testy** — jak uruchomić, markery.
@@ -2151,13 +2166,12 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   (`test_api_llm_fake.py` + `test_api_llm_factory.py` + `test_api_llm_openai.py` +
   `test_api_llm_openai_errors.py`), nie jeden zbiorczy.
 - **Nazwa pliku zaczyna się od usługi, której test dotyczy** (`test_api_*`, `test_embedder_*`) —
-  przy kilku usługach sama nazwa mówi, co się psuje. **Bez prefiksu zostają testy
-  ponadusługowe** (`test_config_plumbing.py` sprawdza `.env.example` wobec `Settings` wszystkich
-  usług) — doklejenie im nazwy jednej usługi kłamałoby o zakresie. W folderze każdego rodzaju pliki
-  leżą w podfolderach `<usługa>_<pakiet>` (`api_tools/`, `api_service/`…; `api_app/` dla modułów
-  z korzenia `app/`, `embedder/` w całości), a ponadusługowe zostają w korzeniu folderu rodzaju;
-  `evaluation/` jest płaski, dopóki ma kilka plików. Test wymagający stacku ma w nazwie sufiks
-  `_stack`.
+  przy kilku usługach sama nazwa mówi, co się psuje. **Bez prefiksu zostają testy ponadusługowe**
+  (`test_config_plumbing.py` sprawdza `.env.example` wobec `Settings` wszystkich usług) — doklejenie
+  im nazwy jednej usługi kłamałoby o zakresie. W folderze każdego rodzaju pliki leżą w podfolderach
+  `<usługa>_<pakiet>` (`api_agent_tools/`, `api_service/`…; `api_app/` dla modułów z korzenia
+  `app/`, `embedder/` w całości), a ponadusługowe zostają w korzeniu folderu rodzaju; `evaluation/`
+  jest płaski, dopóki ma kilka plików. Test wymagający stacku ma w nazwie sufiks `_stack`.
 - **Każdy test ma docstring** — jedna linia „scenariusz → oczekiwanie", spójnie we wszystkich
   testach pliku (nie część z docstringiem, część bez).
 - **Bez obronnego boilerplate'u bez uzasadnienia.** Zadeklarowanych zależności (runtime i dev)
@@ -2170,9 +2184,9 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   niczego spoza repo, więc nic nie pada przez brak stacku.) Jedyny wyjątek: test ewaluacyjny na
   korpusie z `data/` pomija się bez danych, bo `data/` celowo nie ma w repo.
 - **Markery nazywają wymagania, nie rodzaj (zmiana 2026-10-03):** `stack_api`, `stack_qdrant`,
-  `stack_embedder`, `stack_postgres` + parasol `stack` (działająca usługa) i `llm_live` (płatny model, **poza**
-  parasolem, żeby `-m stack` go nie łapał). Wszystkie rejestrowane w `pyproject.toml`. Dawne `integration*` i `functional` mieszały
-  rodzaj z wymaganiem.
+  `stack_embedder`, `stack_postgres` + parasol `stack` (działająca usługa) i `llm_live` (płatny
+  model, **poza** parasolem, żeby `-m stack` go nie łapał). Wszystkie rejestrowane w
+  `pyproject.toml`. Dawne `integration*` i `functional` mieszały rodzaj z wymaganiem.
 - **Funkcjonalne dzielą się po tym, czego potrzebują.** Bez markera: cała aplikacja w procesie
   (`TestClient(create_app())`, `CliRunner`) na atrapach — chodzą w domyślnym `pytest`. Z markerem
   `stack`: to samo wejście na działającym kontenerze — dowodzą wdrożenia i zachowania prawdziwej
@@ -2499,7 +2513,7 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
   `embed_query()` → top-K → próg; pierwszy test z markerem `functional`.
 - [x] **6.1–6.4. Opis wariantów i prompty generacji** — `variants.json` + `loader_variants.py`
   (skasowane 2026-10-02 — warianty to grafy), prompty `questions` i `solution` strojone pomiarem
-  (dziś w `graph/suggest_*`; wnioski: „Wnioski ze strojenia promptów").
+  (dziś w `agent_graphs/suggest_*`; wnioski: „Wnioski ze strojenia promptów").
 
 ### 0. Na atrapach — kończy się pełną implementacją na atrapach
 
@@ -2507,20 +2521,20 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 oraz `__init__.py`; narzędzie ma do tego własne `models.py`.** Osobny graf na każdy wariant
 generacji.
 
-- [x] **1. Struktura `api/app/tools/` z listą narzędzi** — kontrakty (`base.py`), wspólny
+- [x] **1. Struktura `api/app/agent_tools/` z listą narzędzi** — kontrakty (`base.py`), wspólny
   `SourceRef` (`models.py`), katalogi `find_tickets_vector/` i `find_docs_vector/` z własnymi
-  `models.py` (dziś w folderach materiałów), tabela narzędzi w `tools/__init__.py`; reguły —
+  `models.py` (dziś w folderach materiałów), tabela narzędzi w `agent_tools/__init__.py`; reguły —
   „Warstwa narzędzi agenta".
-- [x] **2. Atrapy wszystkich narzędzi** — `FakeFindTicketsVectorTool` i `FakeFindDocsVectorTool` (`fake.py`
-  w katalogu narzędzia) oraz test kontraktu, który sam znajduje narzędzia w `app/tools/`; reguły —
-  „Warstwa narzędzi agenta".
-- [x] **3. Struktura `api/app/nodes/` z listą węzłów** — kontrakt `Node` (`base.py`), katalogi
-  `anonymize/`, `agent/`, `run_tools/`, `respond/`; reduktor `merge_sources` w `graph/base.py`
-  (stan ma każdy graf własny, w `state.py`); do tego `ChatMessage`/`ToolCall` (`llm/messages.py`)
-  i `AnonymizedText` (`anonymization/`); reguły — „Warstwa węzłów".
-- [x] **4. Atrapy wszystkich węzłów** — `FakeAgentNode`, `FakeRunToolsNode`, `FakeRespondNode`; `anonymize`
-  od razu właściwy (`AnonymizeNode`) na `FakeAnonymizer` z fabryką odmawiającą przy prawdziwym
-  LLM; test kontraktu węzłów; reguły — „Warstwa węzłów".
+- [x] **2. Atrapy wszystkich narzędzi** — `FakeFindTicketsVectorTool` i `FakeFindDocsVectorTool`
+  (`fake.py` w katalogu narzędzia) oraz test kontraktu, który sam znajduje narzędzia w
+  `app/agent_tools/`; reguły — „Warstwa narzędzi agenta".
+- [x] **3. Struktura `api/app/agent_nodes/` z listą węzłów** — kontrakt `Node` (`base.py`), katalogi
+  `anonymize/`, `agent/`, `run_tools/`, `respond/`; reduktor `merge_sources` w
+  `agent_graphs/base.py` (stan ma każdy graf własny, w `state.py`); do tego `ChatMessage`/`ToolCall`
+  (`llm/messages.py`) i `AnonymizedText` (`anonymization/`); reguły — „Warstwa węzłów".
+- [x] **4. Atrapy wszystkich węzłów** — `FakeAgentNode`, `FakeRunToolsNode`, `FakeRespondNode`;
+  `anonymize` od razu właściwy (`AnonymizeNode`) na `FakeAnonymizer` z fabryką odmawiającą przy
+  prawdziwym LLM; test kontraktu węzłów; reguły — „Warstwa węzłów".
 - [x] **5. Wszystkie grafy na atrapach** — `gate_close`, `gate_reply`, `search`, `parse_ticket`,
   `suggest_questions`, `suggest_solution`, `suggest_handoff`, `polish` (ten ostatni do
   potwierdzenia w p. 28); LangGraph jako zależność, LangSmith zablokowany, `GraphState` z logiem,
@@ -2617,13 +2631,13 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
   do modelu jako wiadomość `tool` (jak w p. 10), z jednym retry; `requires_hits`: graf wymagający
   źródeł bez źródeł nie oddaje propozycji. *Dlaczego:*
   „bez trafień nie ma rozwiązania" ma wynikać z kodu, nie z posłuszeństwa modelu.
-- [ ] **12. Test przechodzący po wszystkich grafach** — `test_api_graph_contract.py` już sprawdza
-  na atrapach: anonimizacja pierwsza, prompty bez komentarzy redakcyjnych i z tekstem wyłącznie
-  po anonimizacji, model widzi tylko narzędzia z `TOOL_NAMES`, `sources` z `merge_sources`.
-  Zostaje to, co wymaga właściwych węzłów: limit iteracji, `run_tools` odrzucający narzędzie
-  spoza listy, złośliwy zestaw reguł nie przestawia formatu. *Dlaczego:* przy katalogu na graf da
-  się zapomnieć anonimizacji albo reduktora, a jeden test łapie to dla każdego przyszłego grafu;
-  stoi po p. 9–11, bo limit i lista dozwolonych to zachowanie właściwych węzłów.
+- [ ] **12. Test przechodzący po wszystkich grafach** — `test_api_agent_graphs_contract.py` już
+  sprawdza na atrapach: anonimizacja pierwsza, prompty bez komentarzy redakcyjnych i z tekstem
+  wyłącznie po anonimizacji, model widzi tylko narzędzia z `TOOL_NAMES`, `sources` z
+  `merge_sources`. Zostaje to, co wymaga właściwych węzłów: limit iteracji, `run_tools` odrzucający
+  narzędzie spoza listy, złośliwy zestaw reguł nie przestawia formatu. *Dlaczego:* przy katalogu na
+  graf da się zapomnieć anonimizacji albo reduktora, a jeden test łapie to dla każdego przyszłego
+  grafu; stoi po p. 9–11, bo limit i lista dozwolonych to zachowanie właściwych węzłów.
 - [ ] **46. CLI dla grafów** (dopisany 2026-10-02, numer spoza kolejności) — `helpdesk gate
   close|reply`, `helpdesk suggest <wariant>`, „Popraw" i karta zgłoszenia na tej samej fabryce
   grafów co trasy; także wyszukiwanie i parsowanie zgłoszeń do korpusu (dawne `rag search`
@@ -2706,10 +2720,10 @@ każdy mierzy się osobno.
   docelowym rozstrzyga o jakości indeksu.
 - [ ] **25. `suggest_questions`** — prompt z 6.3 przemierzony na modelu docelowym z placeholderami,
   z regułą zgodności przyczyny z objawem i zdaniem o trafieniach tekstowych, które są wątkami bez
-  pól karty; ewaluacja wariantu; sentinele `questions_summary`
-  rozpoznaje `no_questions()` dopisane do `normalizer_sentinel.py`, a pomiar rozstrzyga, czy
-  model radzi sobie bez osobnego bloku przyczyn przed rekordami. *Dlaczego:* część zabiegów z 6.3 powstała pod 11B,
-  a znana dziura (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
+  pól karty; ewaluacja wariantu; sentinele `questions_summary` rozpoznaje `no_questions()` dopisane
+  do `normalizer_sentinel.py`, a pomiar rozstrzyga, czy model radzi sobie bez osobnego bloku
+  przyczyn przed rekordami. *Dlaczego:* część zabiegów z 6.3 powstała pod 11B, a znana dziura
+  (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
 - [ ] **26. `suggest_solution`** — prompt z 6.4 przemierzony na modelu docelowym, z regułą
   zgodności trafienia z objawem i osobną regułą ostrzeżenia o kroku nieodwracalnym; ewaluacja
   wariantu. *Dlaczego:* ostrzeżenie nie padło w żadnym z czterech pomiarów, a bez reguły zgodności
@@ -2725,8 +2739,8 @@ każdy mierzy się osobno.
 ### G. Reguły i powrót do korpusu
 
 - [ ] **29. Magazyn reguł w SQL** — osobny schemat i osobna rola w Postgresie z p. 48, nie nowa
-  usługa; wersje, audyt werdyktów, kontrola dostępu do edycji; później też magazyn notatek. *Dlaczego:* klient stroi reguły bez deployu,
-  a edycja to zmiana konfiguracji produkcyjnej.
+  usługa; wersje, audyt werdyktów, kontrola dostępu do edycji; później też magazyn notatek.
+  *Dlaczego:* klient stroi reguły bez deployu, a edycja to zmiana konfiguracji produkcyjnej.
 - [ ] **30. Zamknięte zgłoszenie wraca do korpusu** — tylko z pozytywnym werdyktem bramki, kartą
   z grafu `parse_ticket`; do rozstrzygnięcia: zapis automatyczny czy kolejka do akceptacji i kto
   uruchamia indeksację (zasada 8). *Dlaczego:* noga 2 karmi nogę 1, a to jedyna droga, którą
@@ -2781,11 +2795,11 @@ każdy mierzy się osobno.
 
 ### J. Później
 
-- [ ] **44. Notatki agenta i HITL w pętli** — notatki jako narzędzie pomocnicze w `tools/notes/`
-  (sterują szukaniem, nigdy generacją), przerwanie pętli na decyzję człowieka — z nim wraca
-  `retrieve()`, odczyt znalezionego zgłoszenia po id (dokumentacja ma odczyt od p. 52).
-  *Dlaczego:* odłożone świadomie; kontrakt
-  narzędzia pomocniczego z p. 1 i magazyn z p. 29 mają je przyjąć bez zmian we wspólnych węzłach.
+- [ ] **44. Notatki agenta i HITL w pętli** — notatki jako narzędzie pomocnicze w
+  `agent_tools/notes/` (sterują szukaniem, nigdy generacją), przerwanie pętli na decyzję człowieka —
+  z nim wraca `retrieve()`, odczyt znalezionego zgłoszenia po id (dokumentacja ma odczyt od p. 52).
+  *Dlaczego:* odłożone świadomie; kontrakt narzędzia pomocniczego z p. 1 i magazyn z p. 29 mają je
+  przyjąć bez zmian we wspólnych węzłach.
 - [ ] **45. Rozszerzenia** — reranker, frontend,
   rozbicie wątków-projektów, kolejność diagnostyczna w `questions`. *Dlaczego:* każde czeka na
   pomiar, który pokaże, że jest potrzebne.

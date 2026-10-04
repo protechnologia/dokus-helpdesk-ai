@@ -11,6 +11,6 @@
 # CO TU LEŻY: WYŁĄCZNIE DANE KLIENTA, wersjonowane polem `version` w pliku — dict_resolution.json
 # i domyślne zestawy reguł dict_rules_<graf>.json (gate_close, gate_reply, polish). Przejmie je
 # magazyn reguł (p. 29), gdzie staną się edytowalne przez GUI. Prompty — nasz kod, pod
-# testami-strażnikami — leżą w katalogach grafów (app/graph/<graf>/), także prompt parsujący.
+# testami-strażnikami — leżą w katalogach grafów (app/agent_graphs/<graf>/), także prompt parsujący.
 # Dawniej oba reżimy mieszały się tutaj i rozróżniał je tylko nagłówek pliku (CLAUDE.md ->
 # „Prompty").

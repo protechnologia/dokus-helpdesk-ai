@@ -2,8 +2,8 @@ import logging
 
 from fastapi import APIRouter, Depends
 
-from app.graph import gate_close, gate_reply, run_graph
-from app.graph.factory import GraphBuilder, get_graph_builder
+from app.agent_graphs import gate_close, gate_reply, run_graph
+from app.agent_graphs.factory import GraphBuilder, get_graph_builder
 from app.model.gate_verdict import Verdict
 from app.routers.gate.models import GateReplyRequest, VerdictResponse
 from app.routers.mapping import to_raw_ticket

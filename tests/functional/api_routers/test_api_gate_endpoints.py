@@ -4,14 +4,14 @@ import pytest
 from fastapi.testclient import TestClient
 from langgraph.graph.state import CompiledStateGraph
 
+from app.agent_graphs import gate_close, gate_reply
+from app.agent_graphs.factory import get_graph_builder
+from app.agent_nodes.agent import FakeAgentNode, tool_call_turn
+from app.agent_nodes.anonymize import AnonymizeNode
+from app.agent_nodes.respond import FakeRespondNode
 from app.anonymization import FakeAnonymizer
-from app.graph import gate_close, gate_reply
-from app.graph.factory import get_graph_builder
 from app.main import create_app
 from app.model.gate_verdict import Verdict
-from app.nodes.agent import FakeAgentNode, tool_call_turn
-from app.nodes.anonymize import AnonymizeNode
-from app.nodes.respond import FakeRespondNode
 from app.service.loader_dict_rules import get_rule_set
 
 # Kontrakt HTTP obu bramek w procesie: kształt werdyktu, furtka, wersja reguł i to, co trasa
@@ -28,14 +28,14 @@ class GateGraph:
 
     def __init__(
         self,
-        graph: ModuleType,  # np. app.graph.gate_close
+        graph: ModuleType,  # np. app.agent_graphs.gate_close
     ) -> None:
         """
         Description:
         Składa graf bramki, który oddaje werdykt `BLOCK` wywołaniem jej narzędzia odpowiedzi.
 
         Example args:
-            graph=app.graph.gate_close
+            graph=app.agent_graphs.gate_close
 
         Example result:
             GateGraph z publicznymi `anonymizer`, `agent` i `compiled`

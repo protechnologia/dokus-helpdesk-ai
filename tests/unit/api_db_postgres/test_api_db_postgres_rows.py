@@ -2,9 +2,9 @@ from datetime import date
 
 import pytest
 
+from app.agent_tools.docs.fake_docs import default_sections
+from app.agent_tools.tickets.find_tickets_text.fake import SIGNING_THREAD
 from app.db_postgres import DocRow, TicketRow
-from app.tools.docs.fake_docs import default_sections
-from app.tools.tickets.find_tickets_text.fake import SIGNING_THREAD
 
 
 def test_a_ticket_row_is_built_from_its_thread() -> None:

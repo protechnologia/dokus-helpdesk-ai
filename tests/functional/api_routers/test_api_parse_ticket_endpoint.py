@@ -1,12 +1,12 @@
 from fastapi.testclient import TestClient
 
+from app.agent_graphs import parse_ticket
+from app.agent_graphs.factory import get_graph_builder
+from app.agent_nodes.agent import FakeAgentNode
+from app.agent_nodes.anonymize import AnonymizeNode
+from app.agent_nodes.respond import FakeRespondNode
 from app.anonymization import FakeAnonymizer
-from app.graph import parse_ticket
-from app.graph.factory import get_graph_builder
 from app.main import create_app
-from app.nodes.agent import FakeAgentNode
-from app.nodes.anonymize import AnonymizeNode
-from app.nodes.respond import FakeRespondNode
 
 # Kontrakt HTTP `POST /parse-ticket`: karta zgłoszenia pole po polu, bez pól wewnętrznych.
 

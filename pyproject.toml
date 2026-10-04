@@ -88,8 +88,8 @@ ignore = [
 "api/app/routers/**/*.py" = ["B008"]
 # Stan grafu (`GraphState` w base.py i state.py grafów) ma komentarz inline przy każdym polu,
 # a wyrównany typ `messages` sam zajmuje 89 znaków.
-"api/app/graph/base.py"    = ["E501"]
-"api/app/graph/*/state.py" = ["E501"]
+"api/app/agent_graphs/base.py"    = ["E501"]
+"api/app/agent_graphs/*/state.py" = ["E501"]
 # Tabela przypadków (tekst w bazie, zapytanie, oczekiwanie) czyta się wierszami; przełamana na
 # kilka linii przestaje być tabelą.
 "tests/integration/postgres/test_postgres_text_search_stack.py" = ["E501"]

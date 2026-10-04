@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.graph.registry import variant_graphs
+from app.agent_graphs.registry import variant_graphs
 from app.main import create_app
 
 # Kontrakt HTTP `/suggest` i `/variants`. Testy idą po rejestrze grafów, nie po zaszytej trójce
