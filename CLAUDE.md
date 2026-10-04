@@ -1496,22 +1496,31 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   klienta, podaje go tabeli i woła jej metody; samego klienta nie dotyka.
 - **Wiersz to płaskie odbicie kolumn tabeli** (`TicketRow`, `DocRow`): pole na kolumnę, w tych
   samych typach. W tym kształcie wchodzi do tabeli i z niej wraca, także jako wynik szukania;
-  na modele dziedziny przechodzi się jawnie (`from_ticket()` / `to_ticket()`, `from_section()` /
-  `to_section()`).
-- **Zgłoszenia przeszukuje się wyłącznie w wątku po anonimizacji (2026-10-03).** Pola rekordu
-  leżą w tabeli, każde w swojej kolumnie, ale do przeszukiwanego tekstu nie wchodzą. Zmierzone na
-  200 kartach golden200: 36% słów karty nie występuje w wątku, z którego powstała, a najczęstsze
-  z nich to formułki parsera — „główna aplikacja" w `component` (184 karty), „pytano o…" (181),
-  „brak" (116) — więc zapytanie o „aplikacja" trafiałoby w 183 karty z 200. Cena: giną trafienia
-  po parafrazie z `cause` i `solution` (39% i 42% słów spoza wątku); czy to boli, pokaże p. 23.
-  Znaleziony wiersz od razu niesie cały rekord, więc `find_tickets_text` nie zależy od Qdranta.
-  W dokumentacji przeszukiwany jest tytuł i treść sekcji; opis z metryczki nie, bo pisze go model.
+  buduje się go jawnie (`TicketRow.from_thread()`, `DocRow.from_section()` / `to_section()`).
+- **Qdrant trzyma karty zgłoszeń, Postgres oryginały po anonimizacji (2026-10-04).** Tabela
+  zgłoszeń ma cztery kolumny: numer, datę, temat i cały wątek jako jeden tekst. Karty w niej nie
+  ma, więc tabela nie zależy od parsowania, a zmiana pól karty jej nie dotyka. Cena: trafienie
+  tekstowe wraca bez karty i model sam wyczytuje przyczynę z wątku. Gdyby pomiar (p. 23, p. 25)
+  pokazał, że to szkodzi, narzędzie dociągnie kartę z Qdranta po numerze zgłoszenia
+  (`point_id_for()`), bez zmiany tabeli.
+- **Wątek zostaje jednym tekstem, nie dzieli się na opis i komentarze.** Anonimizator przyjmuje
+  i oddaje cały wątek, ten sam, który czyta parser, więc do bazy idzie on bez obróbki. Temat
+  wycina się z linii „Temat:" tego tekstu (`RawTicket.subject_of_thread()`), bo temat ze źródła
+  jest sprzed anonimizacji. Podział wróci, gdy trzeba będzie szukać albo ważyć części osobno.
+- **Szuka się w wątku, nie w karcie (2026-10-03).** Zmierzone na 200 kartach golden200: 36% słów
+  karty nie występuje w wątku, z którego powstała, a najczęstsze z nich to formułki parsera —
+  „główna aplikacja" w `component` (184 karty), „pytano o…" (181), „brak" (116) — więc zapytanie
+  o „aplikacja" trafiałoby w 183 karty z 200. Cena: giną trafienia po parafrazie z `cause`
+  i `solution` (39% i 42% słów spoza wątku); czy to boli, pokaże p. 23. W dokumentacji
+  przeszukiwany jest tytuł i treść sekcji; opis z metryczki nie, bo pisze go model.
 - **Przeszukiwany tekst baza łączy RAZ, przy zapisie wiersza** — w dwóch kolumnach wyliczanych
   (`search_text` do podciągu, `search_vector` do słów i frazy). Zmierzone na 1100 wierszach:
   łączenie kolumn i przepuszczanie ich przez słownik przy każdym zapytaniu trwa 4–5 s, z kolumną
   wyliczaną — 1–2 ms, a zapis 1100 wierszy 5 s.
 - **Kodów błędów nie szuka się osobną drogą.** Kod znajduje podciąg w wątku; pole `error_codes`
-  tylko go powtarza (2% słów spoza wątku), więc osobne szukanie po nim nic by nie dało.
+  karty tylko go powtarza (2% słów spoza wątku), więc osobne szukanie po nim nic by nie dało.
+  Podciąg nie przechodzi przez złamanie linii: komunikat rozbity w wątku na dwie linie nie
+  zostanie znaleziony w całości.
 - **Zmiana kolumn nie dociera do istniejącej tabeli** — `CREATE TABLE IF NOT EXISTS` jej nie
   rusza. Tabelę kasuje się i odbudowuje z plików.
 - **Nazwa tabeli jest sprawdzana wzorcem identyfikatora**, bo nie da się jej podać parametrem
@@ -1527,10 +1536,8 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   Anonimizator i model też nie: anonimizacja to stały węzeł, którego agent nie może pominąć,
   a model jest wołającym, nie narzędziem. Tabela narzędzi stoi na górze `tools/__init__.py`.
 - **Sześć narzędzi, dwa materiały (2026-10-03).** Zgłoszenia: `find_tickets_vector` (po znaczeniu)
-  i `find_tickets_text` (pola `exact` i `words`) — oba źródła wiedzy, oba oddają całe rekordy, bo
-  są krótkie, a przyczyny z kilku trafień model ma zobaczyć razem. Tekstowe dokłada pod rekordem
-  wątek po anonimizacji: szuka w wątku, nie w rekordzie, więc dopasowanego ciągu może
-  w rekordzie nie być. Dokumentacja idzie
+  i `find_tickets_text` (pola `exact` i `words`) — oba źródła wiedzy, każde oddaje to, co trzyma
+  jego baza: wektorowe karty, tekstowe oryginalne wątki po anonimizacji. Dokumentacja idzie
   dwustopniowo: `list_docs`, `find_docs_vector` i `find_docs_text` to narzędzia pomocnicze
   i oddają wiersze spisu treści, a treść daje `read_docs` — jedyne narzędzie dokumentacji, które
   cytuje. Dzięki temu lista źródeł pokazuje to, co model przeczytał, a nie to, co zobaczył
@@ -1568,7 +1575,8 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   element na liście źródeł; **klucz to `source:item_id`**, bo id są unikalne tylko w obrębie
   materiału, a deduplikacja po samym id scaliłaby zgłoszenie z fragmentem dokumentacji.
   **`source` nazywa materiał („tickets", „docs"), nie narzędzie (2026-10-03):** to samo zgłoszenie
-  znalezione wektorowo i tekstowo jest na liście raz. Warunek: oba indeksy mają tę samą jednostkę
+  znalezione wektorowo i tekstowo jest na liście raz, z tytułem z pierwszego trafienia (`problem`
+  karty albo temat wątku). Warunek: oba indeksy mają tę samą jednostkę
   — przy dokumentacji plik z metryczki, także gdy wektor powstał z jego fragmentu.
 - **`SourceRef` niesie jednolinijkowy `title`, ale nie treść.** Tytuł (`problem` zgłoszenia,
   nazwa i wersja dokumentu) pozwala człowiekowi rozpoznać źródło bez otwierania — samo id wystarcza
@@ -1582,10 +1590,10 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
 - **Ten sam wynik daje dwie rzeczy: tekst dla modelu (`render_for_model`) i listę źródeł (`cite`)**
   — w węźle `run_tools` odpowiednio wiadomość `tool` i wpisy w `sources`. Tylko źródło wie, które
   pola się liczą i jak je pokazać; lista źródeł powstaje z `cite()`, nigdy z deklaracji modelu.
-- **Tekst narzędzi zgłoszeń dla modelu: nagłówek z licznikami i rekordy.** Rekordy niosą pola pod
-  nazwami ze schematu, bo prompty grafów odwołują się do nich po nazwie; `cause` zostaje
-  w brzmieniu parsera, także gdy mówi „brak". Wątek w `find_tickets_text` stoi między liniami
-  z numerem zgłoszenia, bo ma własne puste linie. Payload niezgodny z `ParsedTicket` to
+- **Tekst narzędzi zgłoszeń dla modelu: nagłówek z licznikami, pod nim karty albo wątki.** Karty
+  niosą pola pod nazwami ze schematu, bo prompty grafów odwołują się do nich po nazwie; `cause`
+  zostaje w brzmieniu parsera, także gdy mówi „brak". Wątek w `find_tickets_text` stoi między
+  liniami z numerem zgłoszenia, bo ma własne puste linie. Payload niezgodny z `ParsedTicket` to
   `RetrievalConfigError` bez treści zgłoszenia w komunikacie: indeks z innej wersji kontraktu
   naprawia przebudowa, nie czekanie.
 - **Zapytanie niesie wyłącznie to, czego szukać** — schemat to `query_model` narzędzia. Ile pobrać
@@ -2113,15 +2121,15 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 610 (0)            | 16 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 613 (0)            | 16 s |
 | integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 127 (45)           | 24 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 73 (9)             | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 5 (3)              | 49 s |
 
-Liczby i czasy z 2026-10-03: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
+Liczby i czasy z 2026-10-04: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 9 s, a ewaluacyjne poniżej sekundy —
 całe 49 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
-(`pytest -m ""`): 815 testów, 67 s.
+(`pytest -m ""`): 818 testów, 67 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2566,9 +2574,10 @@ punkty niżej to narzędzia właściwe.
   a `SourceRef.score` staje się opcjonalny. *Dlaczego:* lista źródeł ma pokazywać to, co model
   przeczytał, a `requires_hits` wymusza wtedy odczyt przed rozwiązaniem.
 - [ ] **53. `find_tickets_text`** — te same pola `exact` i `words` po zanonimizowanym wątku
-  zgłoszenia; zwraca ten sam rekord co `find_tickets_vector` i pod nim wątek; do ustalenia na
-  prawdziwych danych: limit długości wątku w wyniku i to, czy wątek w tabeli niesie etykiety
-  z `as_thread()` („KOMENTARZ", rola, data), czy samą treść. *Dlaczego:* parser gubi około połowy dosłownych komunikatów (14 z 30 na
+  zgłoszenia; zwraca oryginalne wątki, bez kart; do ustalenia na prawdziwych danych: limit
+  długości wątku w wyniku, czy do tabeli idą wszystkie zgłoszenia, czy tylko te z kartą przyjętą
+  przez filtr jakości, i czy wątek niesie etykiety z `as_thread()` („KOMENTARZ", rola, data),
+  czy samą treść. *Dlaczego:* parser gubi około połowy dosłownych komunikatów (14 z 30 na
   golden200), a `error_codes` jest niemal puste (9 z 200); w bloku A stoi na zmyślonych danych,
   bo do bazy trafia wyłącznie tekst po anonimizacji — prawdziwe wątki przychodzą z p. 19 i p. 31.
 - [ ] **56. `read_tickets`** — pełny tekst wątku po numerach zgłoszeń (`TicketsTable.read_by_id()`
@@ -2687,7 +2696,8 @@ każdy mierzy się osobno.
   masowym imporcie (p. 31) i przy powrocie zamkniętych zgłoszeń (p. 30), więc jego jakość na modelu
   docelowym rozstrzyga o jakości indeksu.
 - [ ] **25. `suggest_questions`** — prompt z 6.3 przemierzony na modelu docelowym z placeholderami,
-  z regułą zgodności przyczyny z objawem; ewaluacja wariantu; sentinele `questions_summary`
+  z regułą zgodności przyczyny z objawem i zdaniem o trafieniach tekstowych, które są wątkami bez
+  pól karty; ewaluacja wariantu; sentinele `questions_summary`
   rozpoznaje `no_questions()` dopisane do `normalizer_sentinel.py`, a pomiar rozstrzyga, czy
   model radzi sobie bez osobnego bloku przyczyn przed rekordami. *Dlaczego:* część zabiegów z 6.3 powstała pod 11B,
   a znana dziura (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
@@ -2720,7 +2730,7 @@ każdy mierzy się osobno.
   zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed parsowaniem, model parsujący
   wybrany na podstawie `porownanie-modeli-parsowania.md`, prompt dostosowany do placeholderów,
   czytnik SQL, wznawianie, raport, porządek w `data/parsed/` (golden200 zostaje); zanonimizowany
-  wątek i sparsowany rekord idą do tabeli wyszukiwania (p. 53). *Dlaczego:* to
+  wątek idzie do tabeli wyszukiwania (p. 53). *Dlaczego:* to
   jedyny drogi przebieg (zasada 7), więc anonimizator i prompt muszą być gotowe przed nim.
 - [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
   „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy. *Dlaczego:* 77 ze 123 zgłoszeń

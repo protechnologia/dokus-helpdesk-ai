@@ -2,8 +2,8 @@
 Description:
 Źródło wiedzy: historyczne zgłoszenia znalezione po dosłownym brzmieniu — kodzie błędu,
 fragmencie komunikatu albo słowach kluczowych w dowolnej odmianie. Uzupełnia
-`find_tickets_vector`, które szuka po znaczeniu, i oddaje te same sparsowane zgłoszenia,
-a pod każdym wątek, z którego powstało.
+`find_tickets_vector`: tamto szuka po znaczeniu i oddaje karty, to szuka w oryginalnych
+wątkach i oddaje wątki.
 
 | plik             | co zawiera                                                              |
 |------------------|-------------------------------------------------------------------------|

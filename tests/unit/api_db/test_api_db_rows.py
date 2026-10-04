@@ -1,31 +1,25 @@
+from datetime import date
+
+import pytest
+
 from app.db import DocRow, TicketRow
 from app.tools.docs.fake_docs import default_sections
-from app.tools.tickets.find_tickets_vector.fake import default_tickets
+from app.tools.tickets.find_tickets_text.fake import SIGNING_THREAD
 
 
-def test_a_ticket_survives_the_trip_through_its_row() -> None:
-    """Zgłoszenie → wiersz → zgłoszenie: bez zmian, a wątek jedzie obok w swoim polu."""
-    ticket = default_tickets()[0].ticket
+def test_a_ticket_row_is_built_from_its_thread() -> None:
+    """Numer, data i wątek → wiersz z tematem wyciętym z wątku: do bazy trafia tylko tekst po
+    anonimizacji, więc temat nie przychodzi ze źródła."""
+    row = TicketRow.from_thread("90011", date(2026, 3, 2), SIGNING_THREAD)
 
-    row = TicketRow.from_ticket(ticket, thread="Dzień dobry, od wczoraj nie przychodzą przesyłki.")
-
-    assert row.to_ticket() == ticket
-    assert row.thread.startswith("Dzień dobry")
+    assert row.subject == "Błąd przy podpisie"
+    assert row.thread  == SIGNING_THREAD
 
 
-def test_error_codes_are_one_text_with_a_code_per_line() -> None:
-    """Lista kodów → jeden tekst, po kodzie na linię, i z powrotem lista; brak kodów to pusty
-    tekst, a nie lista z jednym pustym kodem."""
-    plain  = default_tickets()[0].ticket
-    ticket = plain.model_copy(update={"error_codes": ["ERR-4210", "ORA-00942"]})
-
-    with_codes    = TicketRow.from_ticket(ticket, thread="wątek")
-    without_codes = TicketRow.from_ticket(plain, thread="wątek")
-
-    assert with_codes.error_codes                == "ERR-4210\nORA-00942"
-    assert with_codes.to_ticket().error_codes    == ["ERR-4210", "ORA-00942"]
-    assert without_codes.error_codes             == ""
-    assert without_codes.to_ticket().error_codes == []
+def test_a_text_that_is_not_a_thread_gives_no_row() -> None:
+    """Tekst bez linii z tematem → ValueError: wiersz bez tytułu wyglądałby na poprawny."""
+    with pytest.raises(ValueError):
+        TicketRow.from_thread("90011", date(2026, 3, 2), "Dzień dobry, nie działa podpis.")
 
 
 def test_a_section_survives_the_trip_through_its_row() -> None:

@@ -5,8 +5,8 @@ Wszystko, co może wywołać pętla agenta. Wspólne kontrakty i `SourceRef` imp
 z pakietu tego narzędzia (`from app.tools.tickets.find_tickets_vector import FoundTicket`).
 
 Każdy materiał ma dwie drogi wyszukiwania: `_vector` po znaczeniu (Qdrant) i `_text` po
-dosłownym brzmieniu (Postgres). Zgłoszenia wracają od razu w całości, bo są krótkie, a przyczyny
-z kilku trafień model ma zobaczyć razem. Dokumentacja idzie dwustopniowo: spis treści
+dosłownym brzmieniu (Postgres). Zgłoszenia wracają od razu w całości: po znaczeniu jako karty,
+po brzmieniu jako oryginalne wątki. Dokumentacja idzie dwustopniowo: spis treści
 i wyszukiwarki oddają wiersze z identyfikatorem sekcji, a treść daje dopiero odczyt.
 
 Do czego:
@@ -36,8 +36,8 @@ narzędzie i co ono oddaje. Po co wyniki w danej funkcji, mówi prompt grafu.
 
 | narzędzie             | rodzaj        | zapytanie agenta      | co oddaje                       |
 |-----------------------|---------------|-----------------------|---------------------------------|
-| `find_tickets_vector` | źródło wiedzy | `problem`, `symptoms` | zgłoszenia z podobieństwem      |
-| `find_tickets_text`   | źródło wiedzy | `exact`, `words`      | zgłoszenia z etykietą i wątkiem |
+| `find_tickets_vector` | źródło wiedzy | `problem`, `symptoms` | karty zgłoszeń z podobieństwem  |
+| `find_tickets_text`   | źródło wiedzy | `exact`, `words`      | oryginalne wątki z etykietą     |
 | `list_docs`           | pomocnicze    | —                     | spis treści dokumentacji        |
 | `find_docs_vector`    | pomocnicze    | `text`                | wiersze spisu z podobieństwem   |
 | `find_docs_text`      | pomocnicze    | `exact`, `words`      | wiersze spisu z fragmentem      |

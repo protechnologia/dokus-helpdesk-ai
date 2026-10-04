@@ -1,10 +1,10 @@
 """
 Description:
-Tekst, którym narzędzia zgłoszeń pokazują modelowi znalezione rekordy. Wspólny dla
-`find_tickets_vector` i `find_tickets_text`: oba zwracają te same sparsowane zgłoszenia, więc
-model ma je czytać w tym samym kształcie, niezależnie od tego, którą drogą zostały znalezione.
+Tekst, którym narzędzia zgłoszeń pokazują modelowi zgłoszenie w obu postaciach: kartę
+(`find_tickets_vector`) i oryginalny wątek (`find_tickets_text`). Jedno miejsce, żeby karta
+i wątek wyglądały tak samo w każdym narzędziu, które je pokaże.
 
-Przed — nagłówek narzędzia i zgłoszenia z informacją, jak każde znaleziono:
+Karty. Przed — nagłówek narzędzia i zgłoszenia z informacją, jak każde znaleziono:
 
     header  = "Znalezione zgłoszenia: 2 (odcięte progiem: 1)"
     entries = [
@@ -29,6 +29,14 @@ Po — tekst dla modelu:
     [90003] 2026-06-03 · podobieństwo 0.86
     …
 
+Wątek — oryginalny tekst między dwiema liniami z numerem zgłoszenia:
+
+    --- wątek 90011 ---
+    ZGŁOSZENIE 90011 z 2026-03-02
+    Temat: Błąd przy podpisie
+    …
+    --- koniec wątku 90011 ---
+
 Co się dzieje po drodze:
 
 1. Nagłówek przychodzi z narzędzia, bo tylko ono wie, co policzyło (próg albo limit trafień).
@@ -40,8 +48,8 @@ O czym pamiętać przy zmianach:
 - Ten tekst jest częścią promptu: jego kształt stroi się pomiarem razem z promptami grafów
   (p. 23, 25–26), nie na oko.
 - Bez trafień zostaje sam nagłówek.
-- Wyszukiwanie tekstowe dokłada pod rekordem wątek zgłoszenia (`render_ticket_thread()`):
-  karta streszcza sprawę, a dosłowne brzmienie, po którym szukano, bywa tylko w wątku.
+- Karta i wątek nie występują razem: baza wektorowa trzyma karty, baza tekstowa oryginały,
+  a każde narzędzie pokazuje to, co trzyma jego baza.
 - Osobnego bloku przyczyn przed rekordami już nie ma (2026-10-03). Powstał pod model 11B, do
   którego przyczyna schowana wśród pól rekordu nie docierała; czy mocny model radzi sobie bez
   niego, sprawdza pomiar w p. 25.

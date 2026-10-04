@@ -1,14 +1,14 @@
 """
 Description:
 Test integracyjny tabel Postgresa z prawdziwą bazą: czy to, co tabela zapisuje, wraca z niej
-w tym samym kształcie, i czy szukanie widzi wszystkie kolumny, które miało widzieć. Wymaga
+w tym samym kształcie, i czy szukanie widzi dokładnie ten tekst, który miało widzieć. Wymaga
 działającego stacku.
 
 | tabela         | scenariusz                             | oczekiwanie                            |
 |----------------|----------------------------------------|----------------------------------------|
 | `TicketsTable` | zapis i odczyt po numerach             | te same wiersze, w kolejności numerów  |
-| `TicketsTable` | słowo tylko w wątku, tylko w polu      | zgłoszenie znalezione w obu wypadkach  |
-| `TicketsTable` | kod błędu z pola `error_codes`         | zgłoszenie znalezione podciągiem       |
+| `TicketsTable` | słowo z wątku w innej odmianie         | zgłoszenie znalezione                  |
+| `TicketsTable` | fragment komunikatu z wątku            | zgłoszenia znalezione podciągiem       |
 | `DocsTable`    | zapis dwóch dokumentów i spis          | sekcje w kolejności dokumentów         |
 | `DocsTable`    | odczyt po identyfikatorach             | sekcje z treścią, w kolejności żądania |
 | `DocsTable`    | słowo z tytułu, słowo z opisu          | tytuł przeszukiwany, opis nie          |
@@ -34,10 +34,11 @@ from tests.conftest import build_postgres_client
 
 pytestmark = [pytest.mark.stack, pytest.mark.stack_postgres]
 
-# Dwa zmyślone zgłoszenia z atrapy narzędzia, każde ze swoim wątkiem. „Załącznik" jest tylko
-# w wątku pierwszego, „dostawca" tylko w jego polach.
+# Dwa zmyślone zgłoszenia z atrapy narzędzia. „Załącznik" jest tylko w wątku pierwszego,
+# komunikat błędu w obu.
 ROWS = [
-    TicketRow.from_ticket(matched.ticket, thread=matched.thread) for matched in default_tickets()
+    TicketRow.from_thread(matched.ticket_id, matched.date, matched.thread)
+    for matched in default_tickets()
 ]
 
 # Cztery zmyślone sekcje z dwóch dokumentów, z miejscem każdej w jej dokumencie.
@@ -126,14 +127,14 @@ async def test_tickets_are_read_back_as_they_were_written(tickets: TicketsTable)
     assert read == [ROWS[1], ROWS[0]]
 
 
-async def test_a_ticket_is_found_by_its_thread_and_not_by_its_fields(tickets: TicketsTable) -> None:
-    """Słowo tylko z wątku, w innej odmianie → zgłoszenie znalezione; słowo tylko z pól rekordu
-    → nic: pola pisał parser, a trafienie ma dać się wskazać w wątku."""
+async def test_a_ticket_is_found_by_a_word_of_its_thread(tickets: TicketsTable) -> None:
+    """Słowo z wątku w innej odmianie → to jedno zgłoszenie; słowo, którego nie ma w żadnym
+    wątku → nic."""
     by_thread = await tickets.words("załączniki", limit=5)
-    by_fields = await tickets.words("dostawca", limit=5)
+    nothing   = await tickets.words("hipopotam", limit=5)
 
     assert by_thread == [ROWS[0]]
-    assert by_fields == []
+    assert nothing   == []
 
 
 async def test_a_message_is_found_as_a_substring_of_the_thread(tickets: TicketsTable) -> None:

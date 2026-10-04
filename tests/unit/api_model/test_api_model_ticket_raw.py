@@ -1,5 +1,7 @@
 from datetime import date as Date
 
+import pytest
+
 from app.model.ticket_raw import RawTicket
 from app.model.ticket_raw_comment import RawComment
 
@@ -73,3 +75,25 @@ def test_thread_says_when_there_are_no_comments():
 def test_thread_says_when_the_body_is_empty():
     """Pusty opis → jawny znacznik zamiast pustego miejsca w prompcie."""
     assert "(brak opisu)" in _ticket(body="").as_thread()
+
+
+def test_the_subject_is_cut_back_out_of_the_thread() -> None:
+    """Tekst wątku → temat z linii, którą zapisało `as_thread()`: tak tabela wyszukiwania dostaje
+    tytuł po anonimizacji całego wątku."""
+    thread = _ticket(subject="Błąd wysyłki przez ePUAP").as_thread()
+
+    assert RawTicket.subject_of_thread(thread) == "Błąd wysyłki przez ePUAP"
+
+
+def test_a_subject_line_inside_the_content_is_not_the_subject() -> None:
+    """Linia „Temat:" także w opisie zgłaszającego → temat z nagłówka wątku, bo ten stoi
+    pierwszy."""
+    thread = _ticket(body="Temat: to nie jest temat").as_thread()
+
+    assert RawTicket.subject_of_thread(thread) == "Błąd wysyłki"
+
+
+def test_a_text_without_the_subject_line_is_refused() -> None:
+    """Tekst, który nie jest wątkiem → ValueError: tytułu źródła nie wolno zgadywać."""
+    with pytest.raises(ValueError, match="Temat"):
+        RawTicket.subject_of_thread("Dzień dobry, od wczoraj nie działa wysyłka.")

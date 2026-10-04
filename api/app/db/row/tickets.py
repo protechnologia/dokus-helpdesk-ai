@@ -2,10 +2,7 @@ from datetime import date as Date
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.model.ticket_parsed import ParsedTicket
-
-# Kody błędów w kolumnie tekstowej: jeden kod na linię.
-CODES_SEPARATOR = "\n"
+from app.model.ticket_raw import RawTicket
 
 
 class TicketRow(BaseModel):
@@ -14,94 +11,52 @@ class TicketRow(BaseModel):
     Jeden wiersz tabeli zgłoszeń — pole na każdą kolumnę, w tych samych typach co w bazie.
 
     Do czego:
-    W tym kształcie wiersz wchodzi do tabeli i z niej wraca. Na sparsowane zgłoszenie i z niego
-    przechodzi się jawnie: `from_ticket()` przy zapisie, `to_ticket()` po odczycie.
+    Tabela trzyma zgłoszenie w oryginalnym brzmieniu, po anonimizacji: cały wątek jako jeden
+    tekst. Karty zgłoszenia tu nie ma — karty trzyma baza wektorowa.
 
     Flow:
-        1. Indeksacja buduje wiersz z `ParsedTicket` i pełnego tekstu wątku PO ANONIMIZACJI.
+        1. Indeksacja buduje wiersz przez `from_thread()`: numer, data i wątek PO ANONIMIZACJI.
         2. Tabela zapisuje pola wprost do kolumn o tych samych nazwach.
-        3. Szukanie i odczyt oddają takie same wiersze; narzędzie bierze z nich `to_ticket()`
-           albo `thread`.
+        3. Szukanie i odczyt oddają takie same wiersze.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    ticket_id:                     str  = Field(min_length=1, examples=["33644"])
-    ticket_date:                   Date = Field(examples=["2026-03-14"])
-    component:                     str  = Field(examples=["ePUAP"])
-    problem:                       str  = Field(examples=["Wysyłka przez ePUAP kończy się błędem"])
-    symptoms:                      str  = Field(examples=["Po kliknięciu Wyślij komunikat o sieci"])
-    # Kody błędów, każdy w swojej linii; pusty tekst to brak kodów.
-    error_codes:                   str  = Field(examples=["ERR-4210\nSQLSTATE 23000"])
-    cause:                         str  = Field(examples=["Certyfikat bez uprawnienia"])
-    solution:                      str  = Field(examples=["Wygenerowano nowy certyfikat."])
-    resolution:                    str  = Field(examples=["naprawione"])
-    resolution_vocabulary_version: int  = Field(examples=[1])
-    questions_summary:             str  = Field(examples=["pytano o wersję przeglądarki"])
-    # Pełny tekst wątku po anonimizacji: opis zgłaszającego i komentarze.
-    thread:                        str  = Field(min_length=1, examples=["Dzień dobry, przy…"])
+    ticket_id:   str  = Field(min_length=1, examples=["33644"])
+    ticket_date: Date = Field(examples=["2026-03-14"])
+    # Temat wycięty z wątku — tytuł, po którym człowiek rozpozna zgłoszenie na liście źródeł.
+    subject:     str  = Field(min_length=1, examples=["Błąd wysyłki przez ePUAP"])
+    # Pełny tekst wątku po anonimizacji: temat, opis zgłaszającego i komentarze.
+    thread:      str  = Field(min_length=1, examples=["ZGŁOSZENIE 33644 z 2026-03-14\nTemat: …"])
 
     @classmethod
-    def from_ticket(
+    def from_thread(
         cls,
-        ticket: ParsedTicket,  # np. ParsedTicket(ticket_id="33644", …)
-        thread: str,           # pełny tekst wątku po anonimizacji
+        ticket_id:   str,   # np. "33644"
+        ticket_date: Date,  # np. date(2026, 3, 14)
+        thread:      str,   # pełny tekst wątku po anonimizacji, w kształcie `RawTicket.as_thread()`
     ) -> "TicketRow":
         """
         Description:
-        Buduje wiersz ze sparsowanego zgłoszenia i tekstu wątku. Lista kodów błędów staje się
-        jednym tekstem, po kodzie na linię.
+        Buduje wiersz z numeru, daty i tekstu wątku. Temat wycina z wątku, a nie bierze ze źródła:
+        do bazy trafia wyłącznie tekst po anonimizacji, a anonimizowany jest cały wątek naraz.
 
         Example args:
-            ticket=ParsedTicket(ticket_id="33644", error_codes=["ERR-4210"], …)
-            thread="Dzień dobry, przy wysyłce przez ePUAP…"
+            ticket_id="33644"
+            ticket_date=date(2026, 3, 14)
+            thread="ZGŁOSZENIE 33644 z 2026-03-14\\nTemat: Błąd wysyłki przez ePUAP\\n\\nOPIS…"
 
         Example result:
-            TicketRow(ticket_id="33644", error_codes="ERR-4210", thread="Dzień dobry…", …)
+            TicketRow(ticket_id="33644", subject="Błąd wysyłki przez ePUAP", thread="ZGŁOSZENIE…")
+
+        Raises:
+            ValueError: w wątku nie ma linii z tematem
         """
         row = cls(
-            ticket_id                     = ticket.ticket_id,
-            ticket_date                   = ticket.date,
-            component                     = ticket.component,
-            problem                       = ticket.problem,
-            symptoms                      = ticket.symptoms,
-            error_codes                   = CODES_SEPARATOR.join(ticket.error_codes),
-            cause                         = ticket.cause,
-            solution                      = ticket.solution,
-            resolution                    = ticket.resolution,
-            resolution_vocabulary_version = ticket.resolution_vocabulary_version,
-            questions_summary             = ticket.questions_summary,
-            thread                        = thread,
+            ticket_id   = ticket_id,
+            ticket_date = ticket_date,
+            subject     = RawTicket.subject_of_thread(thread),
+            thread      = thread,
         )
 
         return row
-
-    def to_ticket(self) -> ParsedTicket:
-        """
-        Description:
-        Odtwarza sparsowane zgłoszenie z pól wiersza — to, które narzędzie pokazuje modelowi.
-
-        Example args:
-            (brak)
-
-        Example result:
-            ParsedTicket(ticket_id="33644", error_codes=["ERR-4210"], …)
-        """
-        # Pusty tekst to brak kodów — `"".split()` dałoby jeden pusty kod.
-        codes = self.error_codes.split(CODES_SEPARATOR) if self.error_codes else []
-
-        ticket = ParsedTicket(
-            ticket_id                     = self.ticket_id,
-            date                          = self.ticket_date,
-            component                     = self.component,
-            problem                       = self.problem,
-            symptoms                      = self.symptoms,
-            error_codes                   = codes,
-            cause                         = self.cause,
-            solution                      = self.solution,
-            resolution                    = self.resolution,
-            resolution_vocabulary_version = self.resolution_vocabulary_version,
-            questions_summary             = self.questions_summary,
-        )
-
-        return ticket

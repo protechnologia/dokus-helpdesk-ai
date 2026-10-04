@@ -1,23 +1,14 @@
--- Tabela wyszukiwania tekstowego zgłoszeń: pole sparsowanego rekordu na kolumnę i pełny tekst
--- wątku. {table} i {name} podstawia TicketsTable (nazwa tabeli w cudzysłowie i bez niego).
+-- Tabela wyszukiwania tekstowego zgłoszeń: zgłoszenie w oryginalnym brzmieniu, po anonimizacji.
+-- Karty zgłoszenia tu nie ma — karty trzyma baza wektorowa. {table} i {name} podstawia
+-- TicketsTable (nazwa tabeli w cudzysłowie i bez niego).
 
 CREATE TABLE IF NOT EXISTS {table} (
-    ticket_id                     text    PRIMARY KEY,  -- numer zgłoszenia
-    ticket_date                   date    NOT NULL,     -- data zgłoszenia
-    component                     text    NOT NULL,     -- czego dotyczy sprawa
-    problem                       text    NOT NULL,     -- zwięzły opis problemu
-    symptoms                      text    NOT NULL,     -- objawy widziane przez użytkownika
-    error_codes                   text    NOT NULL,     -- kody błędów, każdy w swojej linii
-    cause                         text    NOT NULL,     -- ustalona przyczyna
-    solution                      text    NOT NULL,     -- co rozwiązało sprawę
-    resolution                    text    NOT NULL,     -- klasa rozstrzygnięcia ze słownika
-    resolution_vocabulary_version integer NOT NULL,     -- wersja słownika rozstrzygnięć
-    questions_summary             text    NOT NULL,     -- o co dopytywał konsultant
-    thread                        text    NOT NULL,     -- pełny tekst wątku po anonimizacji
+    ticket_id   text PRIMARY KEY,  -- numer zgłoszenia
+    ticket_date date NOT NULL,     -- data zgłoszenia
+    subject     text NOT NULL,     -- temat wycięty z wątku, tytuł na liście źródeł
+    thread      text NOT NULL,     -- pełny tekst wątku po anonimizacji
 
-    -- Przeszukiwany tekst: sam wątek. Pola rekordu do niego nie wchodzą — to słowa parsera, nie
-    -- zgłoszenia, a trafienie ma dać się wskazać w wątku. Kopia wątku pod nazwą kolumny, w której
-    -- szuka klasa bazowa tabel.
+    -- Przeszukiwany tekst: cały wątek. Kopia pod nazwą kolumny, w której szuka klasa bazowa tabel.
     search_text text GENERATED ALWAYS AS (thread) STORED,
 
     -- Słowa wątku po przejściu przez polski słownik.

@@ -1,20 +1,18 @@
 """
 Description:
-Tabela wyszukiwania tekstowego zgłoszeń. Wiersz to jedno zgłoszenie: każde pole sparsowanego
-rekordu w swojej kolumnie i pełny tekst wątku PO ANONIMIZACJI. Kolumny i indeks widać wprost
+Tabela wyszukiwania tekstowego zgłoszeń. Wiersz to jedno zgłoszenie w oryginalnym brzmieniu:
+numer, data, temat i pełny tekst wątku PO ANONIMIZACJI. Kolumny i indeks widać wprost
 w `_create.sql` obok.
 
-Szuka się wyłącznie w wątku. Pola rekordu leżą w tabeli po to, żeby znaleziony wiersz niósł
-cały rekord, ale do przeszukiwanego tekstu nie wchodzą: pisał je parser, więc trafienie w nie
-nie byłoby trafieniem w to, co napisano w zgłoszeniu.
+Baza wektorowa trzyma karty zgłoszeń, ta tabela — oryginały. Karty tu nie ma i nie szuka się
+po niej: trafienie ma być trafieniem w to, co napisano w zgłoszeniu, a nie w słowa parsera.
 
 O czym pamiętać przy zmianach:
 
 - Kolumna dopisana do `_create.sql` musi trafić też do `_upsert.sql` i do `TicketRow`, w tej samej
   kolejności. Rozjazd łapie test na stacku: zapis i odczyt tego samego wiersza.
-- Znaleziony wiersz od razu niesie cały rekord, więc `find_tickets_text` nie zależy od Qdranta.
-  Oba indeksy powstają z tych samych plików (zasada 8), więc to kopia, nie drugie źródło.
-- Surowy wątek tu nie trafia — tylko tekst po anonimizacji.
+- Tabela nie zależy od parsowania: powstaje z samych zgłoszeń po anonimizacji.
+- Surowy wątek tu nie trafia — tylko tekst po anonimizacji, także temat.
 - Zmiana kolumn nie dociera do istniejącej tabeli: `CREATE TABLE IF NOT EXISTS` jej nie rusza.
   Tabelę kasuje się i odbudowuje z plików.
 """
@@ -40,13 +38,12 @@ UPSERT  = (SQL_DIR / "_upsert.sql").read_text(encoding="utf-8")  # zapis wierszy
 class TicketsTable(TextTable):
     """
     Description:
-    Tabela wyszukiwania tekstowego zgłoszeń: zapis, szukanie w pełnym tekście zgłoszenia i odczyt
-    po numerze.
+    Tabela wyszukiwania tekstowego zgłoszeń: zapis, szukanie w tekście wątku i odczyt po numerze.
 
     Do czego:
     Stąd `find_tickets_text` bierze zgłoszenia pasujące dosłownie do kodu błędu, komunikatu albo
-    słów kluczowych — od razu jako wiersze ze sparsowanym rekordem. Odczyt po numerze daje pełny
-    tekst wątku zgłoszenia znalezionego inną drogą, np. w bazie wektorowej. Szukanie i odczyt to
+    słów kluczowych — jako wiersze z oryginalnym wątkiem. Odczyt po numerze daje wątek
+    zgłoszenia znalezionego inną drogą, np. karty z bazy wektorowej. Szukanie i odczyt to
     mechanika klasy bazowej; SQL zakładania i zapisu leży obok, w plikach `.sql`.
 
     Flow:
@@ -97,7 +94,7 @@ class TicketsTable(TextTable):
 
     async def upsert(
         self,
-        rows: Sequence[TicketRow],  # np. [TicketRow.from_ticket(ticket, thread="…")]
+        rows: Sequence[TicketRow],  # np. [TicketRow.from_thread("90011", date(2026, 3, 2), "…")]
     ) -> None:
         """
         Description:
@@ -105,7 +102,7 @@ class TicketsTable(TextTable):
         tekst baza przelicza sama.
 
         Example args:
-            rows=[TicketRow(ticket_id="90011", problem="Błąd komunikacji…", thread="…", …)]
+            rows=[TicketRow(ticket_id="90011", subject="Błąd przy podpisie", thread="…", …)]
 
         Example result:
             None
@@ -130,8 +127,8 @@ class TicketsTable(TextTable):
     ) -> list[TicketRow]:
         """
         Description:
-        Oddaje zgłoszenia o podanych numerach, w kolejności numerów — razem z pełnym tekstem
-        wątku. Numeru, którego w tabeli nie ma, po prostu nie ma w wyniku.
+        Oddaje zgłoszenia o podanych numerach, w kolejności numerów. Numeru, którego w tabeli
+        nie ma, po prostu nie ma w wyniku.
 
         Example args:
             ticket_ids=["90011", "90012"]
@@ -162,7 +159,7 @@ class TicketsTable(TextTable):
             limit=5
 
         Example result:
-            [TicketRow(ticket_id="90003", problem="Nie przychodzą przesyłki…", …)]
+            [TicketRow(ticket_id="90003", subject="Brak przesyłek z e-Doręczeń", …)]
 
         Raises:
             DbError: baza nie odpowiedziała albo odrzuciła zapytanie
@@ -212,7 +209,7 @@ class TicketsTable(TextTable):
             limit=5
 
         Example result:
-            [TicketRow(ticket_id="90014", error_codes="ORA-00942", …)]
+            [TicketRow(ticket_id="90014", subject="Błąd przy zapisie pisma", …)]
 
         Raises:
             DbError: baza nie odpowiedziała albo odrzuciła zapytanie

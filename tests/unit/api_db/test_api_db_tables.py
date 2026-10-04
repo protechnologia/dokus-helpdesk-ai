@@ -1,8 +1,10 @@
+from datetime import date
+
 import pytest
 
 from app.db import DbConfigError, DocRow, DocsTable, TicketRow, TicketsTable
 from app.tools.docs.fake_docs import default_sections
-from app.tools.tickets.find_tickets_vector.fake import default_tickets
+from app.tools.tickets.find_tickets_text.fake import SIGNING_THREAD
 
 # Tabele testowane bez bazy, na kliencie-atrapie zapisującym SQL i wartości: sprawdzamy, CO idzie
 # do bazy i jak czytamy odpowiedź. Że Postgres odpowiada na to tak, jak zakładamy, sprawdza test
@@ -10,7 +12,7 @@ from app.tools.tickets.find_tickets_vector.fake import default_tickets
 
 TABLES = [TicketsTable, DocsTable]
 
-TICKET_ROW = TicketRow.from_ticket(default_tickets()[0].ticket, thread="Od wczoraj brak przesyłek.")
+TICKET_ROW = TicketRow.from_thread("90011", date(2026, 3, 2), SIGNING_THREAD)
 DOC_ROW    = DocRow.from_section(default_sections()[0], body="Uprawnienie nadaje…", ordinal=0)
 
 
@@ -219,12 +221,12 @@ async def test_tickets_are_read_by_their_numbers() -> None:
     to kolejność numerów."""
     client = StubClient(rows=[TICKET_ROW.model_dump()])
 
-    found = await TicketsTable(client).read_by_id(["90001", "90002"])
+    found = await TicketsTable(client).read_by_id(["90011", "90012"])
 
     sql, ids = client.calls[0]
 
     assert found == [TICKET_ROW]
-    assert ids   == ["90001", "90002"]
+    assert ids   == ["90011", "90012"]
     assert "ticket_id = ANY($1::text[])" in sql and "array_position($1::text[], ticket_id)" in sql
 
 

@@ -1,8 +1,7 @@
+from datetime import date as Date
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-
-from app.model.ticket_parsed import ParsedTicket
 
 # Dosłowny ciąg ma co najmniej trzy znaki: krótszy trafia w przypadkowe miejsca (numer telefonu,
 # data), a zgłoszenie znalezione po „50" wygląda na trafienie, choć nim nie jest.
@@ -53,9 +52,8 @@ class FindTicketsTextQuery(BaseModel):
 class MatchedTicket(BaseModel):
     """
     Description:
-    Jedno historyczne zgłoszenie zwrócone przez `find_tickets_text`: czym je znaleziono, całe
-    sparsowane zgłoszenie — to samo, które oddaje `find_tickets_vector` — i wątek, z którego
-    powstało.
+    Jedno historyczne zgłoszenie zwrócone przez `find_tickets_text`: czym je znaleziono i jego
+    oryginalny wątek po anonimizacji. Karty tu nie ma — karty oddaje `find_tickets_vector`.
 
     Podobieństwa tu nie ma: dopasowanie dosłowne nie ma stopnia, a etykieta mówi więcej niż
     liczba — trafienie po przepisanym komunikacie waży inaczej niż po słowach kluczowych.
@@ -64,8 +62,11 @@ class MatchedTicket(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     matched_by: MatchKind = Field(examples=["exact"])
-    ticket:     ParsedTicket
-    # Wątek po anonimizacji: karta gubi dosłowne brzmienie, po którym tu się szuka.
+    ticket_id:  str       = Field(min_length=1, examples=["90011"])
+    date:       Date      = Field(examples=["2026-03-02"])
+    # Temat zgłoszenia — tytuł na liście źródeł.
+    subject:    str       = Field(min_length=1, examples=["Błąd przy podpisie"])
+    # Wątek w oryginalnym brzmieniu, po anonimizacji.
     thread:     str       = Field(min_length=1, examples=["ZGŁOSZENIE 90011 z 2026-03-02\n…"])
 
 
