@@ -2537,9 +2537,10 @@ pułapka → „Gotchas" warstwy). **Gdy natrafisz na lukę „ostatniej mili" a
 skrót — dopisz punkt** (zwykle do bloku I), zamiast zostawiać go w milczeniu.
 
 **Kolejność bloków:** blok 0 jest zrobiony — cały produkt działa od wejścia do odpowiedzi na
-atrapach, bez modelu i Qdranta. Dalej po jednym punkcie na narzędzie (A) i na węzeł (B), a po
-decyzjach (C), prawdziwym modelu (D) i anonimizacji (E) — po jednym na graf (F), bo treść
-promptów stroi się na modelu docelowym, a ten nie ruszy bez anonimizatora.
+atrapach, bez modelu i Qdranta. Dalej po jednym punkcie na narzędzie (A) i na węzeł (B), razem
+z prawdziwym modelem (p. 18 i 17, dawny blok D), a po decyzjach (C) i anonimizacji (E) — po
+jednym na graf (F), bo treść promptów stroi się na modelu docelowym, a ten na danych klientów
+nie ruszy bez anonimizatora.
 
 #### Zrobione
 
@@ -2644,10 +2645,13 @@ punkty niżej to narzędzia właściwe.
   jeden wątek na wywołanie, sprawdzone na zmyślonych wątkach; długość i kształt wątku rozstrzyga
   pomiar na prawdziwych (p. 23); reguły — „Warstwa narzędzi agenta".
 
-#### B. Węzły — po jednym punkcie na węzeł
+#### B. Węzły i prawdziwy model — po jednym punkcie na węzeł
 
 Właściwe węzły na atrapach zależności. Grafy już działają na atrapach węzłów, więc właściwe
-wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
+wchodzą po jednym, a przebieg grafu się przy tym nie zmienia. Prawdziwy model (p. 18 i 17) stoi
+tu od 2026-10-05, zaraz po `run_tools`, a przed `respond`: pierwszy przebieg pętli na prawdziwym
+modelu ma być jak najwcześniej, bo jego wynik przestawi limity, opisy narzędzi i prompty taniej
+niż zgadywanie.
 
 - [x] **9. `agent`** (2026-10-05) — `AgentNode` na `LLMClient.complete_turn()`, `FakeLLMClient`
   ze scenariuszem tur, `provider_items` w wiadomości, limit tur `AGENT_MAX_ITERATIONS`
@@ -2661,6 +2665,20 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
   ma dostać handler 503 (dziś `api` ma je tylko dla LLM i anonimizatora); limity wywołań narzędzi
   (`AGENT_MAX_CALLS_*`) egzekwowane funkcją z `limits.py`, której używa już atrapa. *Dlaczego:*
   lista źródeł powstaje z wywołań narzędzi, nigdy z deklaracji modelu (zasada 9).
+- [ ] **18. Dwie role LLM w konfiguracji** (przeniesiony 2026-10-05, numer spoza kolejności) —
+  zaufana i generująca, z flagą per endpoint „może widzieć surowe dane", domyślnie wyłączoną.
+  *Dlaczego:* pomyłka tej flagi to przeciek, więc wyłączenie ochrony ma być jawnym aktem
+  w konfiguracji.
+- [ ] **17. Tura z narzędziami u prawdziwych dostawców** (przeniesiony 2026-10-05, numer spoza
+  kolejności) — implementacja kontraktu z p. 9 (`complete_turn()`, która staje się wtedy
+  abstrakcyjna) w klientach Claude / OpenAI / Ollama; pętla zostaje w grafie. U OpenAI przez API
+  Responses (klient już na nim stoi), bez przechowywania u dostawcy: elementy rozumowania wracają
+  do modelu w następnej turze w postaci zaszyfrowanej. Wywołanie narzędzia WYMUSZONE tam, gdzie
+  dostawca pozwala łączyć je z rozumowaniem (każda tura ma być wywołaniem), w przeciwnym razie
+  `auto` z jednym ponowieniem — do sprawdzenia u obu dostawców; tryb strict u OpenAI wymaga
+  przetłumaczenia schematu (wszystkie pola wymagane), sonda szła bez niego; tura z narzędziami ma
+  prosić o cache promptu tak jak `complete()` u Claude'a i zwracać zużycie do `LLMUsage`.
+  *Dlaczego:* format wywołań narzędzi to wiedza dostawcy (zasada 4).
 - [ ] **11. `respond`** — walidacja argumentów `respond_<graf>` do typu wyniku grafu; błąd wraca
   do modelu jako wiadomość `tool` (jak w p. 10), z jednym retry; `requires_hits`: graf wymagający
   źródeł bez źródeł nie oddaje propozycji; do rozstrzygnięcia, co z turą bez poprawnej odpowiedzi
@@ -2698,22 +2716,6 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
 - [x] **16. Decyzje przesądzone przez blok 0 zapisane z cenami** (2026-10-04) — agent wybiera
   materiał, każda funkcja ma własną pętlę, warianty są kodem, zapytanie do indeksu pisze agent.
 
-#### D. Model — zastępuje atrapę modelu z p. 9
-
-- [ ] **17. Tura z narzędziami u prawdziwych dostawców** — implementacja kontraktu z p. 9
-  (`complete_turn()`, która staje się wtedy abstrakcyjna) w klientach Claude / OpenAI / Ollama;
-  pętla zostaje w grafie. U OpenAI przez API Responses
-  (klient już na nim stoi), bez przechowywania u dostawcy: elementy rozumowania wracają do modelu
-  w następnej turze w postaci zaszyfrowanej. Wywołanie narzędzia WYMUSZONE tam, gdzie dostawca
-  pozwala łączyć je z rozumowaniem (każda tura ma być wywołaniem), w przeciwnym razie `auto`
-  z jednym ponowieniem — do sprawdzenia u obu dostawców; tryb strict u OpenAI wymaga
-  przetłumaczenia schematu (wszystkie pola wymagane), sonda szła bez niego; tura z narzędziami
-  ma prosić o cache promptu tak jak `complete()` u Claude'a i zwracać zużycie do `LLMUsage`.
-  *Dlaczego:* format wywołań narzędzi to wiedza dostawcy (zasada 4).
-- [ ] **18. Dwie role LLM w konfiguracji** — zaufana i generująca, z flagą per endpoint „może
-  widzieć surowe dane", domyślnie wyłączoną. *Dlaczego:* pomyłka tej flagi to przeciek, więc
-  wyłączenie ochrony ma być jawnym aktem w konfiguracji.
-
 #### E. Anonimizacja — zastępuje atrapę anonimizatora z p. 4
 
 - [ ] **19. Usługa `anonymizer` w compose** — słownik osób ze źródła (z rolami), NER i regex
@@ -2729,8 +2731,8 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
 
 #### F. Grafy — po jednym punkcie na graf: treść promptu i pomiar
 
-Na prawdziwym modelu i anonimizatorze (bloki D–E). Każdy pomiar ≥2 przebiegi, z czytaniem surowych
-odpowiedzi i raportem z datą i wersją promptu; przy generacji do
+Na prawdziwym modelu i anonimizatorze (p. 17–18 i blok E). Każdy pomiar ≥2 przebiegi, z czytaniem
+surowych odpowiedzi i raportem z datą i wersją promptu; przy generacji do
 wyboru golden set odpowiedzi albo przegląd ręczny — warianty mają różne kryteria sukcesu, więc
 każdy mierzy się osobno.
 
