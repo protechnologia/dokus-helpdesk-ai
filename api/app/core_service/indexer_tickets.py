@@ -8,8 +8,8 @@ indeks da się skasować i odbudować jedną komendą.
 
 | metoda      | komenda                 | co robi                                          |
 |-------------|-------------------------|--------------------------------------------------|
-| `build()`   | `rag index <katalog>`   | dokłada artefakty, nadpisując punkty tych samych |
-| `rebuild()` | `rag reindex <katalog>` | kasuje kolekcję i buduje od zera                 |
+| `build()`   | `tickets index <katalog>`   | dokłada artefakty, nadpisując punkty tych samych |
+| `rebuild()` | `tickets reindex <katalog>` | kasuje kolekcję i buduje od zera                 |
 
 Przed — artefakt `data/unsafe/parsed/33644.json`:
 

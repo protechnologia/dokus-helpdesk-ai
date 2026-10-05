@@ -10,7 +10,7 @@ O czym pamiętać przy zmianach:
 
 - Schemat kolekcji to `VECTORS` w klasie niżej i wymiar z konfiguracji. Zmiana nazw albo wymiaru
   nie dociera do istniejącej kolekcji: `ensure()` jej nie naprawia, tylko odmawia, a kolekcję
-  kasuje się i odbudowuje z `data/unsafe/parsed/` (`helpdesk rag reindex`).
+  kasuje się i odbudowuje z `data/unsafe/parsed/` (`helpdesk tickets reindex`).
 - Nazwa wektora przy szukaniu jest argumentem wymaganym, bez wartości domyślnej. Kolekcja ma dwie
   przestrzenie, a szukanie po niewłaściwej nie jest błędem, tylko daje trochę gorsze wyniki —
   wartość domyślna pozwoliłaby trafić tam przez zapomnienie.

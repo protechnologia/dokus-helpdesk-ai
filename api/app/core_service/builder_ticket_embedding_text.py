@@ -20,7 +20,7 @@ Po — jeden tekst:
 O czym pamiętać przy zmianach:
 
 - Zmiana tej funkcji zmienia wektory po obu stronach, więc wymaga pełnego re-indeksu
-  (`helpdesk rag reindex`).
+  (`helpdesk tickets reindex`).
 - `solution` celowo tu nie ma: szukamy po podobieństwie problemu, nie rozwiązania.
 """
 

@@ -129,7 +129,7 @@ async def test_a_payload_outside_the_contract_is_a_config_error_without_content(
 
     assert "'90001'" in message
     assert "solution" in message
-    assert "rag reindex" in message
+    assert "tickets reindex" in message
     assert broken["problem"] not in message
     assert raised.value.__cause__ is None
 

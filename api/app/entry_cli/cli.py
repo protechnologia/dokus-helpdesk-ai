@@ -3,25 +3,24 @@ from importlib.metadata import version
 import typer
 
 from app.entry_cli.docs import docs
-from app.entry_cli.rag import rag
 from app.entry_cli.tickets import tickets
 
 # --- helpdesk: całe drzewo komend ------------------------------------------------------------
 #
 # Obszar to pakiet w `entry_cli/`, czynność to plik w nim:
-# `helpdesk rag index` → `entry_cli/rag/index.py`.
+# `helpdesk tickets index` → `entry_cli/tickets/index.py`.
 #
 # | komenda                   | plik                  | co robi                          |
 # |---------------------------|-----------------------|----------------------------------|
 # | `version`                 | `cli.py`              | wersja pakietu; smoke test CLI   |
 # | `tickets validate <kat.>` | `tickets/validate.py` | artefakty wobec ParsedTicket     |
-# | `rag index <kat.>`        | `rag/index.py`        | artefakty do kolekcji Qdranta    |
-# | `rag reindex <kat.>`      | `rag/reindex.py`      | kolekcja od zera                 |
+# | `tickets index <kat.>`    | `tickets/index.py`    | artefakty do kolekcji Qdranta    |
+# | `tickets reindex <kat.>`  | `tickets/reindex.py`  | kolekcja zgłoszeń od zera        |
 # | `docs validate <kat.>`    | `docs/validate.py`    | paczka dokumentacji wobec plików |
 # | `docs index <kat.>`       | `docs/index.py`       | indeks dokumentacji od zera      |
 #
-# Zaplanowane (p. 46): komendy na grafach — wyszukiwanie, parsowanie zgłoszeń, propozycje; bramki
-# i „Popraw" stoją POZA obszarem `rag`, bo z definicji działają bez indeksu.
+# Zaplanowane (p. 46): komendy na grafach — wyszukiwanie, parsowanie zgłoszeń, propozycje, bramki
+# i „Popraw" — we własnych obszarach.
 #
 # no_args_is_help: samo `helpdesk` drukuje drzewo, zamiast błędu użycia.
 cli = typer.Typer(
@@ -32,7 +31,6 @@ cli = typer.Typer(
 # Obszary wchodzą jako pod-aplikacje, więc drzewo zostaje `helpdesk <obszar> <czynność>` zamiast
 # płaskiej listy coraz dłuższych jednoczłonowych nazw.
 cli.add_typer(tickets, name="tickets")
-cli.add_typer(rag, name="rag")
 cli.add_typer(docs, name="docs")
 
 

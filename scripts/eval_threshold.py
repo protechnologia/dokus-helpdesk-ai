@@ -8,7 +8,7 @@ Do czego:
 WYMAGA ZBUDOWANEGO INDEKSU I CHODZĄCEGO STACKU:
 
     docker compose up -d                          # embedder + qdrant
-    helpdesk rag index data/unsafe/parsed/<zestaw>       # napełnij kolekcję
+    helpdesk tickets index data/unsafe/parsed/<zestaw>       # napełnij kolekcję
     python scripts/eval_threshold.py table        # tabela koszt/zysk per próg
     python scripts/eval_threshold.py detail       # rozbicie per dystraktor i lista strat
     python scripts/eval_threshold.py plot         # wykres obu rozkładów z linią progu (PNG)
@@ -286,7 +286,7 @@ def _collection_size(
 
     if info.status_code == 404:
         typer.echo(
-            f"BŁĄD: nie ma kolekcji '{collection}' — zbuduj ją `helpdesk rag index`.", err=True
+            f"BŁĄD: nie ma kolekcji '{collection}' — zbuduj ją `helpdesk tickets index`.", err=True
         )
         raise typer.Exit(code=2)
 

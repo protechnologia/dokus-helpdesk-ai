@@ -256,7 +256,7 @@ dokus-helpdesk-ai/
 ├── pyproject.toml                # pytest/lint + pakietowanie (entry-point `helpdesk`)
 ├── requirements-dev.txt          # zależności testów/lintera (poza obrazem)
 ├── CLAUDE.md / README.md
-├── scripts/                      # narzędzia repo niezwiązane z usługą
+├── scripts/                      # skrypty repo: przygotowanie danych i pomiary
 ├── data/
 │   ├── safe/                     # dane zmyślone — W repo
 │   │   ├── instruction/          # syntetyczna dokumentacja: manifest.json + pliki .md
@@ -272,7 +272,6 @@ dokus-helpdesk-ai/
 │   ├── Dockerfile
 │   ├── .dockerignore
 │   ├── requirements.txt          # zależności RUNTIME tej usługi (do obrazu)
-│   ├── scripts/                  # skrypty deweloperskie (python api/scripts/…)
 │   └── app/                      # kod aplikacji
 │       ├── entry_cli/            # CLI (Typer): pakiet na obszar, plik na komendę — cienkie adaptery
 │       ├── main.py               # montaż aplikacji, middleware, handlery wyjątków
@@ -1119,18 +1118,12 @@ merytorycznie").
 
 ### Warstwa CLI
 
-Trzy kategorie, których nie mieszamy:
-1. **Repo-level** — `scripts/*.py`, narzędzia niezwiązane z żadną usługą (przygotowanie danych,
-   jednorazowe migracje artefaktów). Uruchamiane `python scripts/nazwa.py`.
-2. **Deweloperskie usługi** — `<usługa>/scripts/*.py`, sięgają do kodu, configu albo endpointów
-   tej usługi. Uruchamiane `python api/scripts/nazwa.py`.
-3. **Produkcyjne** — `api/app/entry_cli/cli.py`, jeden wpis w `[project.scripts]` na całe drzewo
+Dwie kategorie, których nie mieszamy:
+1. **Skrypty** — `scripts/*.py` w korzeniu repo: przygotowanie danych i pomiary, uruchamiane
+   `python scripts/nazwa.py`. Jeden folder na wszystkie (2026-10-05); skrypt, który potrzebuje
+   kodu usługi, sam dokłada `api/` do ścieżki.
+2. **Produkcyjne** — `api/app/entry_cli/cli.py`, jeden wpis w `[project.scripts]` na całe drzewo
    subkomend.
-
-**Kryterium podziału 1 vs 2: czy skrypt dotyka konkretnej usługi.** Eksport zrzutu bazy do
-`data/unsafe/raw/` nie importuje `api.app` i nie odpytuje żadnego endpointu — jest repo-level. Sonda
-po `Settings` albo po `/embed` należy do usługi. Ta sama logika co przy nazwach testów: prefiks
-usługi dostaje to, co jej dotyczy, a rzeczy ponadusługowe zostają bez niego.
 
 **Skrypty z `scripts/` nie mają własnego `requirements.txt`** — nie trafiają do żadnego obrazu.
 Zależności biorą z `.venv`: `requirements-dev.txt` albo edytowalnej instalacji `api` (stamtąd
@@ -1139,21 +1132,22 @@ Typer). Poza tym trzymamy je na bibliotece standardowej.
 Wspólne:
 - Framework: Typer.
 - Wpis w `[project.scripts]` = osobna komenda (`helpdesk`); `@cli.command()` = subkomenda
-  (`helpdesk rag index`).
+  (`helpdesk tickets index`).
 - **Komenda nazywa się `helpdesk`, nie nazwą helpdeskowanego produktu** — przy założeniu „jedna
   instancja = jeden produkt" wpisanie nazwy klienta w komendę własnego narzędzia kłamałoby przy
   drugim wdrożeniu.
-- **Drzewo ma dwa poziomy: `helpdesk <obszar> <czynność>`; obszar to pakiet w `entry_cli/`, czynność
-  to plik w nim** (`helpdesk rag index` → `entry_cli/rag/index.py`, od 2026-10-02). Obszar zbiera
-  to, co dzieli zależności: `rag` woła Qdranta i embedder, `tickets` pracuje na artefaktach,
-  `docs` na paczce dokumentacji i jej dwóch indeksach, a bramki i „Popraw" stoją **poza `rag`**,
-  bo z definicji działają bez indeksu. Ścieżka = komenda to jedyna rzecz, która pozwala trafić
-  z komendy do kodu bez czytania `cli.py`. Kod wspólny kilku komend obszaru — w jego `common.py`.
+- **Drzewo ma dwa poziomy: `helpdesk <obszar> <czynność>`; obszar to pakiet w `entry_cli/`,
+  czynność to plik w nim** (`helpdesk tickets index` → `entry_cli/tickets/index.py`). Obszar to
+  materiał (od 2026-10-05, wcześniej indeksacja zgłoszeń stała w osobnym obszarze `rag`):
+  `tickets` — artefakty zgłoszeń i ich indeks, `docs` — paczka dokumentacji i jej indeksy.
+  Czynności nazywają się tak samo w obu (`validate`, `index`). Komendy na grafach dostaną własne
+  obszary (p. 46). Ścieżka = komenda to jedyna rzecz, która pozwala trafić z komendy do kodu bez
+  czytania `cli.py`. Kod wspólny kilku komend obszaru — w jego `common.py`.
 - **Moduł komendy wystawia `HELP` i funkcję nazwaną od intencji (`index_artifacts`), a rejestruje
-  ją `__init__.py` obszaru** (`rag.command("index", help=index.HELP)(index.index_artifacts)`).
+  ją `__init__.py` obszaru** (`tickets.command("index", help=index.HELP)(index.index_artifacts)`).
   Moduły nie dekorują obiektu Typer z pakietu, więc nie ma cyklu importów; funkcja nazywa się
   inaczej niż moduł, bo inaczej przesłoniłaby go w przestrzeni pakietu, a testy podmieniają
-  funkcje po ścieżce modułu (`app.entry_cli.rag.common._run`).
+  funkcje po ścieżce modułu (`app.entry_cli.tickets.common._run`).
 - **Na górze `cli.py` i każdego `__init__.py` obszaru stoi tabelka komend** — drzewo rozsypuje się
   po kilku modułach, więc bez niej trzeba je odtwarzać z wywołań `add_typer`.
 - **W obrazie entry point tworzy launcher z `Dockerfile`, nie `pip install`** — `pyproject.toml`
@@ -1165,7 +1159,7 @@ Wspólne:
   Serwis złożony z konfiguracji komenda bierze z fabryki obok niego
   (`core_service/factory_docs_indexer.py`, `factory_tickets_indexer.py`), jak trasy biorą graf
   z `agent_graphs/factory.py`, i zamyka go jednym `aclose()`.
-- **Komendy niszczące (`rag reindex`, `docs index`) pytają o potwierdzenie** albo wymagają
+- **Komendy niszczące (`tickets reindex`, `docs index`) pytają o potwierdzenie** albo wymagają
   `--yes`; pytanie nazywa to, co zniknie.
 
 #### Gotchas
@@ -1264,7 +1258,7 @@ dwie różne rzeczy, stąd rozłączne nazwy.
 - **`EMBEDDING_TIMEOUT_SECONDS` wymiaruje NAJWOLNIEJSZE wywołanie — batch indeksacji na zimnym
   modelu, nie zapytanie runtime.** Zmierzone 2026-08-13 na CPU (PolDense-150M, 200 artefaktów):
   batch 32 realnych rekordów to ~9 s przy ciepłym modelu, ale **pierwsze wywołanie po starcie
-  kontenera przekroczyło 30 s i wywaliło cały przebieg `helpdesk rag index`** komunikatem
+  kontenera przekroczyło 30 s i wywaliło cały przebieg `helpdesk tickets index`** komunikatem
   „Embedder timed out". Stąd domyślne **120 s**. Uwaga przy strojeniu: `/health` odpowiada, zanim
   model policzy pierwszy wektor, więc **healthcheck nie chroni przed tym timeoutem**.
 
@@ -1341,7 +1335,7 @@ wektor:
 - **`point_id` = UUID5 z identyfikatora źródłowego (`ticket_id`, `section_id` z numerem
   fragmentu), namespace ZAMROŻONY** (pod testem złotej wartości) i wspólny dla obu kolekcji.
   Qdrant przyjmuje tylko `uint` albo UUID, a nasze id to stringi; odwzorowanie musi być
-  **funkcją** id, inaczej `helpdesk rag reindex` duplikuje korpus zamiast go nadpisać. Zmiana
+  **funkcją** id, inaczej `helpdesk tickets reindex` duplikuje korpus zamiast go nadpisać. Zmiana
   namespace’u rozsypuje wszystkie id naraz — nic poza tym testem by tego nie złapało.
 - **Kolekcja przy rozjeździe NIE jest naprawiana** — inny wymiar albo brak named vectora to
   `DbQdrantConfigError` z **obiema liczbami** w komunikacie. Bez tego rozjazd wychodzi jako
@@ -1982,8 +1976,9 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 
 **Pipeline danych (CLI `helpdesk`)**
 - Walidacja artefaktów: `helpdesk tickets validate data/unsafe/parsed/`
-- Indeksacja do Qdranta: `helpdesk rag index <katalog>`
-- Pełna odbudowa indeksu: `helpdesk rag reindex` (kasuje kolekcję, wstaje z `data/unsafe/parsed/`)
+- Indeksacja do Qdranta: `helpdesk tickets index <katalog>`
+- Pełna odbudowa indeksu: `helpdesk tickets reindex` (kasuje kolekcję, wstaje
+  z `data/unsafe/parsed/`)
 - Sprawdzenie paczki dokumentacji: `helpdesk docs validate <katalog>` (same pliki, bez stacku)
 - Indeksacja dokumentacji: `helpdesk docs index <katalog>` (zastępuje tabelę i kolekcję;
   **wymaga stacku**); paczka syntetyczna do osobnego indeksu:
@@ -2369,6 +2364,8 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   zgłoszenia o tym samym objawie mają niemal identyczne `problem` + `symptoms`, więc wpadają do
   trafień razem i niosą różne `cause`; pytania rozróżniające powstają z trafień, nie z ręcznego
   rekordu. Cena: trafienia mówią, jakie są przyczyny, ale nie od czego zacząć (p. 45).
+- **Osobny folder `scripts/` w usłudze (`api/scripts/`)** — dwa foldery o tej samej nazwie mylą
+  bardziej, niż porządkują; wszystkie skrypty leżą w `scripts/` w korzeniu.
 - **Skrypty pomiarowe (`eval_*`) jako testy ewaluacyjne** — przyrząd z parametrami (model,
   kandydaci na próg) nie ma kryterium zaliczenia; zamrożony próg jest osobnym testem
   w `tests/evaluation/`. Usunięty 2026-10-05 `eval_index.py` mierzył zbudowany indeks zapytaniami
@@ -2443,7 +2440,8 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
   w fabryce, `EmbeddingClient` z `embed_query/passage/sts`.
 - [x] **Etap 3. Ewaluacja embeddera** — golden set i `scripts/eval_embeddings.py`; decyzja:
   PolDense-150M, tryb `query→passage`.
-- [x] **Etap 4. Indeksacja** — filtr jakości, named vectors, payload, `helpdesk rag index/reindex`.
+- [x] **Etap 4. Indeksacja** — filtr jakości, named vectors, payload,
+  `helpdesk tickets index/reindex`.
   Na 200 artefaktach 171 zaindeksowanych, 29 odrzuconych; `recall@1` 98,1% przez stack to
   sprawdzian okablowania, nie skuteczności (golden set i korpus to te same rekordy).
 - [x] **Etap 5. Wyszukiwanie** — `POST /search` z parserem zapytania przed wyszukaniem;

@@ -9,8 +9,8 @@ from app.core_service.factory_tickets_indexer import build_tickets_indexer
 from app.db_qdrant import DbQdrantError
 from app.engine_embedding import EmbeddingError
 
-# Wspólne dla `rag index` i `rag reindex` — różni je wyłącznie to, czy kolekcja jest najpierw
-# kasowana.
+# Wspólne dla `tickets index` i `tickets reindex` — różni je wyłącznie to, czy kolekcja jest
+# najpierw kasowana.
 
 # Ile odrzuconych zgłoszeń wypisać, zanim lista zostanie ucięta. Pełna lista należy do pliku
 # raportu, nie do terminala — ale kilka przykładów sprawia, że odsetek odrzuceń jest wiarygodny.
@@ -102,7 +102,7 @@ def execute_index_build(
     """
     Description:
     Wykonuje jeden przebieg indeksacji i go wypisuje, zamieniając każdą porażkę na kod wyjścia.
-    Wspólne dla `rag index` i `rag reindex`.
+    Wspólne dla `tickets index` i `tickets reindex`.
 
     Example args:
         directory=Path("data/unsafe/parsed")

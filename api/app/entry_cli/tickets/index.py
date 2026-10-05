@@ -2,7 +2,7 @@ from pathlib import Path
 
 import typer
 
-from app.entry_cli.rag.common import execute_index_build
+from app.entry_cli.tickets.common import execute_index_build
 
 HELP = "Zbuduj indeks z artefaktów, nie kasując istniejącej kolekcji."
 
@@ -13,7 +13,7 @@ def index_artifacts(
 ) -> None:
     """
     Description:
-    `helpdesk rag index` — indeksuje artefakty do istniejącej kolekcji, nadpisując punkty
+    `helpdesk tickets index` — indeksuje artefakty do istniejącej kolekcji, nadpisując punkty
     zgłoszeń, które już tam są. Ponowne uruchomienie jest bezpieczne: id punktu wynika
     z `ticket_id`, więc to samo zgłoszenie trafia w ten sam punkt, zamiast się dublować.
 

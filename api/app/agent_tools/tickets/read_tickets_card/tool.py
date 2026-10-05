@@ -75,7 +75,7 @@ def card_from_point(
         raise DbQdrantConfigError(
             f"payload zgłoszenia {point.ticket_id!r} nie spełnia kontraktu ParsedTicket "
             f"(pola: {', '.join(fields)}) — indeks zbudowano inną wersją kontraktu, "
-            f"przebuduj go: helpdesk rag reindex"
+            f"przebuduj go: helpdesk tickets reindex"
         ) from None
 
     return card

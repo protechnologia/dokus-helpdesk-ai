@@ -3,7 +3,7 @@ from pathlib import Path
 import typer
 
 from app.config import Settings
-from app.entry_cli.rag.common import execute_index_build
+from app.entry_cli.tickets.common import execute_index_build
 
 HELP = "Skasuj kolekcję i zbuduj ją od zera."
 
@@ -15,7 +15,7 @@ def reindex_artifacts(
 ) -> None:
     """
     Description:
-    `helpdesk rag reindex` — kasuje kolekcję i buduje ją od zera z artefaktów.
+    `helpdesk tickets reindex` — kasuje kolekcję i buduje ją od zera z artefaktów.
 
     Pyta przed zniszczeniem czegokolwiek, chyba że podano `--yes`. Indeks da się odbudować
     z `data/unsafe/parsed/` tą samą komendą (zasada 8), więc ryzykiem jest przestój, nie utrata

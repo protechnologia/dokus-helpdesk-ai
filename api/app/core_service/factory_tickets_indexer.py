@@ -4,8 +4,8 @@ Buduje indekser zgłoszeń z konfiguracji: klient embeddera, klient Qdranta i ko
 o nazwie z `QDRANT_COLLECTION`.
 
 Do czego:
-Komendy `helpdesk rag index` i `helpdesk rag reindex` biorą stąd gotowy indekser, tak jak trasy
-biorą graf z `agent_graphs/factory.py` — same nie składają klientów.
+Komendy `helpdesk tickets index` i `helpdesk tickets reindex` biorą stąd gotowy indekser, tak
+jak trasy biorą graf z `agent_graphs/factory.py` — same nie składają klientów.
 
 O czym pamiętać przy zmianach:
 

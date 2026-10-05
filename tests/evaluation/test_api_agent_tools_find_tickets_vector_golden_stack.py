@@ -31,7 +31,7 @@ O czym pamiętać przy zmianach:
   (p. 23).
 - Indeksem jest skonfigurowana kolekcja, a nie własna, bo zbudowanie własnej z 200 artefaktów trwa
   na CPU ponad dwie i pół minuty. Pusta kolekcja wywala test; buduje ją
-  `helpdesk rag index data/unsafe/parsed/bielik-11b-golden200`.
+  `helpdesk tickets index data/unsafe/parsed/bielik-11b-golden200`.
 - Indeks i golden set to te same rekordy, więc liczby pilnują, że ścieżka się nie zepsuła,
   a skutecznością produktu nie są.
 - Zmiana `RAG_SCORE_MIN` albo `RAG_TOP_K` przesuwa wszystkie trzy liczby. Co próg robi z każdym
@@ -179,7 +179,7 @@ async def _measure(
 
         assert indexed > 0, (
             f"kolekcja `{settings.qdrant_collection}` jest pusta — zbuduj indeks: "
-            f"helpdesk rag index data/unsafe/parsed/bielik-11b-golden200"
+            f"helpdesk tickets index data/unsafe/parsed/bielik-11b-golden200"
         )
 
         # --- zapytania z rekordem-celem ---

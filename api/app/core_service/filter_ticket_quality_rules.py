@@ -1,7 +1,7 @@
 """
 Description:
-Lista reguł filtra jakości, który przy indeksacji (`helpdesk rag index`) decyduje, czy sparsowane
-zgłoszenie niesie jakąkolwiek wiedzę i warto je wpuścić do Qdranta.
+Lista reguł filtra jakości, który przy indeksacji (`helpdesk tickets index`) decyduje, czy
+sparsowane zgłoszenie niesie jakąkolwiek wiedzę i warto je wpuścić do Qdranta.
 
 | reguła          | odpala, gdy                                                    |
 |-----------------|----------------------------------------------------------------|

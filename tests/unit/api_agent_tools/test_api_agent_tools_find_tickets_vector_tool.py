@@ -204,7 +204,7 @@ async def test_a_hit_without_a_ticket_number_is_a_config_error_without_content()
     message = str(raised.value)
 
     assert "p-90001" in message
-    assert "rag reindex" in message
+    assert "tickets reindex" in message
     assert broken["problem"] not in message
 
 

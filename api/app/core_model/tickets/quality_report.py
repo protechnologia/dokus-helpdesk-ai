@@ -13,7 +13,7 @@ class QualityReport(BaseModel):
     Flow:
         1. Filtr ocenia każdy artefakt i dopisuje jego `QualityVerdict`.
         2. `kept` i `dropped` dzielą werdykty, `by_reason` liczy odrzucenia per reguła.
-        3. Wołający (komenda `helpdesk rag index`) wypisuje rozbicie i decyduje, co indeksować —
+        3. Wołający (komenda `helpdesk tickets index`) wypisuje rozbicie i decyduje, co indeksować —
            serwis raportuje, nie wypisuje i nie indeksuje.
 
     Liczby per powód zamiast jednej sumy, bo reguła, która odrzuca nie te rekordy, jest w jednej

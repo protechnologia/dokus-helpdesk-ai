@@ -83,7 +83,7 @@ def found_ticket_from_hit(
     if not hit.ticket_id:
         raise DbQdrantConfigError(
             f"punkt {hit.point_id!r} nie ma `ticket_id` w payloadzie — indeks zbudowano inną "
-            f"wersją kontraktu, przebuduj go: helpdesk rag reindex"
+            f"wersją kontraktu, przebuduj go: helpdesk tickets reindex"
         )
 
     found = FoundTicket(
