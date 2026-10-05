@@ -2,6 +2,7 @@ import operator
 from collections.abc import Mapping, Sequence
 from typing import Annotated, Literal
 
+from langgraph.graph import END
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -36,7 +37,8 @@ class GraphState(BaseModel):
     """
     Description:
     Pola stanu, które czytają albo piszą wspólne węzły każdego grafu: wejście, jego wersja po
-    anonimizacji, rozmowa z modelem, licznik tur, zużycie modelu i log przebiegu.
+    anonimizacji, rozmowa z modelem, licznik tur, licznik poprawek odpowiedzi, zużycie modelu
+    i log przebiegu.
 
     Do czego:
     `state.py` każdego grafu dziedziczy po tej klasie i dokłada własne pola — `output` w typie
@@ -49,12 +51,13 @@ class GraphState(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    input_text: str                                        = Field(min_length=1)          # wejście surowe; do modelu idzie wyłącznie `anonymized`
-    anonymized: AnonymizedText | None                      = None                         # ustawia węzeł `anonymize`
-    messages:   Annotated[list[ChatMessage], operator.add] = Field(default_factory=list)  # rozmowa z modelem; reduktor dokleja nowe wiadomości
-    iterations: int                                        = 0                            # liczba tur modelu; podbija węzeł `agent`
-    usage:      Annotated[LLMUsage, add_usage]             = Field(default_factory=LLMUsage)  # tokeny i koszt wywołań modelu; reduktor sumuje tury
-    log:        Annotated[list[LogEntry], operator.add]    = Field(default_factory=list)  # przebieg: po wpisie od każdego wywołania węzła
+    input_text:      str                                        = Field(min_length=1)          # wejście surowe; do modelu idzie wyłącznie `anonymized`
+    anonymized:      AnonymizedText | None                      = None                         # ustawia węzeł `anonymize`
+    messages:        Annotated[list[ChatMessage], operator.add] = Field(default_factory=list)  # rozmowa z modelem; reduktor dokleja nowe wiadomości
+    iterations:      int                                        = 0                            # liczba tur modelu; podbija węzeł `agent`
+    respond_retries: int                                        = 0                            # ile razy węzeł `respond` odesłał odpowiedź do poprawki
+    usage:           Annotated[LLMUsage, add_usage]             = Field(default_factory=LLMUsage)  # tokeny i koszt wywołań modelu; reduktor sumuje tury
+    log:             Annotated[list[LogEntry], operator.add]    = Field(default_factory=list)  # przebieg: po wpisie od każdego wywołania węzła
 
 
 def merge_sources(
@@ -100,8 +103,9 @@ def route_after_agent(
     | sam tekst albo odpowiedź z innym narzędziem    | `respond` — błąd formatu              |
     | narzędzia wiedzy w ostatniej dozwolonej turze  | `respond` — narzędzia już nie ruszają |
 
-    Błędy formatu i turę uciętą limitem rozstrzyga `respond` (p. 11), więc tu nie giną. Limit
-    liczy tury modelu (`iterations`), nie wywołania narzędzi — te mają własne limity w `run_tools`.
+    Błędy formatu i turę uciętą limitem rozstrzyga `respond`, więc tu nie giną: odsyła je modelowi
+    do poprawki, jeden raz. Limit liczy tury modelu (`iterations`), nie wywołania narzędzi — te
+    mają własne limity w `run_tools`.
 
     Example args:
         state=SearchState(messages=[tool_call_turn("find_tickets_vector", {…})], iterations=1, …)
@@ -124,6 +128,39 @@ def route_after_agent(
 
     # --- same narzędzia wiedzy: kolejny obieg ---
     return "run_tools"
+
+
+def route_after_respond(
+    state: GraphState,  # np. GateCloseState(messages=[…, ChatMessage(role="tool", …)], …)
+) -> Literal["agent", "__end__"]:
+    """
+    Description:
+    Rozgałęzienie po węźle `respond` w każdym grafie: koniec przebiegu albo jeszcze jedna tura
+    modelu. Rozstrzyga ostatnia wiadomość rozmowy — gdy nie jest turą modelu, model jest winien
+    odpowiedź na to, co odesłał mu `respond`.
+
+    | co zrobił `respond`                               | ostatnia wiadomość | dokąd   |
+    |---------------------------------------------------|--------------------|---------|
+    | przyjął odpowiedź i zapisał wynik                 | tura modelu        | koniec  |
+    | skończył bez wyniku: graf wymaga źródeł, brak ich | tura modelu        | koniec  |
+    | odesłał odpowiedź do poprawki                     | `tool` albo `user` | `agent` |
+
+    Pętli tu nie ma: poprawka jest jedna na sprawę, a drugą odpowiedź nie do przyjęcia węzeł
+    `respond` kończy błędem, zanim przebieg wróci do tego rozgałęzienia.
+
+    Example args:
+        state=GateCloseState(messages=[tool_call_turn("respond_gate_close", {…}),
+                                       ChatMessage(role="tool", call_id="call_1", content="…")], …)
+
+    Example result:
+        "agent"
+    """
+    # --- rozmowa czeka na turę modelu: `respond` odesłał odpowiedź do poprawki ---
+    if state.messages and state.messages[-1].role != "assistant":
+        return "agent"
+
+    # --- rozmowa kończy się turą modelu: wynik zapisany albo świadomie go nie ma ---
+    return END
 
 
 # Miejsce w opisie narzędzia (`description.md`), w które wchodzi jego limit wywołań.

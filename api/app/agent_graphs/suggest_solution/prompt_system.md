@@ -8,7 +8,7 @@
 
      Cała instrukcja tutaj, w turze użytkownika same dane — wzorzec z podkroku 6.3, tam
      uzasadniony. JEDYNY WARIANT Z `REQUIRES_HITS = True`: bez źródeł węzeł `respond` nie odda
-     propozycji (p. 11, zasada 9) — model może coś napisać, ale nic z tego nie wyjdzie.
+     propozycji (zasada 9) — model może coś napisać, ale nic z tego nie wyjdzie.
 
      Notatki niżej pochodzą ze strojenia na 11B i zostają, bo tłumaczą treść:
 

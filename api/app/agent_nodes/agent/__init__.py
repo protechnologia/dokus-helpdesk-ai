@@ -12,9 +12,9 @@ limit tur → `respond`.
 | `fake.py` | `FakeAgentNode` — oddaje zaplanowane tury; `tool_call_turn()` je buduje  |
 | `base.py` | `AgentNodeBase` — część wspólna obu: nazwa i zapis tury w stanie grafu   |
 
-Status: węzeł właściwy; turę z narzędziami mają klienci wszystkich dostawców, a całą pętlę na
-żywym modelu sprawdza test `llm_live` grafu `search`. Trasy biorą węzeł razem z `respond`
-w p. 11 (CLAUDE.md -> „Plan").
+Status: węzeł właściwy; turę z narzędziami mają klienci wszystkich dostawców, a każdy graf na
+żywym modelu sprawdzają testy `llm_live`. Fabryka grafów wpina go w graf, gdy model generujący
+nie jest atrapą.
 """
 
 from app.agent_nodes.agent.fake import FakeAgentNode, tool_call_turn

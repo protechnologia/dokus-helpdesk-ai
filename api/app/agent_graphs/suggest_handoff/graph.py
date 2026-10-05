@@ -4,11 +4,13 @@ from pathlib import Path
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from app.agent_graphs.base import tool_definitions
-from app.agent_graphs.suggest_handoff.respond_tool import respond_tool
+from app.agent_graphs.base import route_after_respond, tool_definitions
+from app.agent_graphs.suggest_handoff.respond_tool import RESPOND_TOOL_NAME, respond_tool
 from app.agent_graphs.suggest_handoff.state import SuggestHandoffState
 from app.agent_nodes import Node
+from app.agent_nodes.respond import RespondNode
 from app.agent_tools import KnowledgeSource
+from app.core_model.graphs.proposal import Proposal
 from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition
 
@@ -93,6 +95,27 @@ def model_tools(
     return definitions
 
 
+def respond_node() -> RespondNode:
+    """
+    Description:
+    Węzeł odpowiedzi tego grafu: waliduje argumenty `respond_suggest_handoff` do `Proposal`.
+    Wariant nie wymaga źródeł (`REQUIRES_HITS`), więc propozycja powstaje z samego wątku.
+
+    Example args:
+        (brak)
+
+    Example result:
+        RespondNode czytający wywołanie `respond_suggest_handoff` jako `Proposal`
+    """
+    node = RespondNode(
+        respond_tool_name = RESPOND_TOOL_NAME,
+        output_model      = Proposal,
+        requires_sources  = REQUIRES_HITS,
+    )
+
+    return node
+
+
 def build_graph(
     anonymize: Node,  # np. AnonymizeNode(FakeAnonymizer())
     agent:     Node,  # np. FakeAgentNode()
@@ -103,13 +126,17 @@ def build_graph(
     Składa graf przekazania z gotowych węzłów: anonimizacja → jedna tura modelu → propozycja. Bez
     narzędzi i bez `run_tools`. Krawędzie idą po nazwach węzłów, nie po argumentach.
 
+    Po `respond` przebieg się kończy, chyba że węzeł odesłał odpowiedź modelowi do poprawki —
+    wtedy model dostaje jeszcze jedną turę (`route_after_respond`).
+
     Example args:
         anonymize=AnonymizeNode(FakeAnonymizer())
         agent=FakeAgentNode()
         respond=FakeRespondNode(Proposal(text="…"))
 
     Example result:
-        CompiledStateGraph: __start__ → anonymize → agent → respond → __end__
+        CompiledStateGraph: __start__ → anonymize → agent → respond → __end__,
+        respond → agent przy poprawce
 
     Raises:
         ValueError: dwa węzły o tej samej nazwie
@@ -122,6 +149,10 @@ def build_graph(
     graph.add_edge(START, "anonymize")
     graph.add_edge("anonymize", "agent")
     graph.add_edge("agent", "respond")
-    graph.add_edge("respond", END)
+    graph.add_conditional_edges(
+        "respond",            # po odczytaniu odpowiedzi modelu
+        route_after_respond,  # odpowiedź odesłana do poprawki → jeszcze jedna tura modelu
+        ["agent", END],       # możliwe cele
+    )
 
     return graph.compile()

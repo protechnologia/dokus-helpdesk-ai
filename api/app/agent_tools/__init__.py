@@ -24,6 +24,7 @@ Trzy poziomy, na każdym `base.py` z tym, co wspólne poziom niżej:
 
     agent_tools/base.py, models.py        kontrakty, JSON wyniku i błędu, `SourceRef` — wspólne
     agent_tools/errors.py                 `ToolCallError` — błąd, który wraca do modelu
+    agent_tools/factory.py                narzędzia właściwe na klientach z konfiguracji
     agent_tools/<materiał>/fake_*.py      zmyślony materiał, na którym stoją atrapy jego narzędzi
     agent_tools/<materiał>/<narzędzie>/   narzędzie: `tool.py`, `fake.py`, `base.py`, `models.py`
                                     i `description.md`

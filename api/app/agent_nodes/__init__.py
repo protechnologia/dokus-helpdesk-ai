@@ -9,8 +9,7 @@ Stanu tu nie ma — pola wspólne to `GraphState` w `app/agent_graphs/base.py`, 
 część wspólną — także `base.py`. Węzeł używany przez jeden graf mieszka w katalogu tego grafu, nie
 tutaj.
 
-Węzły (CLAUDE.md -> „Plan"; `anonymize`, `agent` i `run_tools` właściwe, `respond` to atrapa —
-właściwy w p. 11):
+Węzły — wszystkie cztery mają wersję właściwą, a trzy z nich także atrapę:
 
 | węzeł       | co robi                                                                  |
 |-------------|--------------------------------------------------------------------------|
@@ -18,7 +17,8 @@ właściwy w p. 11):
 | `agent`     | tura modelu z narzędziami: prompt grafu i rozmowa → tura w `messages`    |
 | `run_tools` | wywołania z listy dozwolonych; tekst do `messages`, źródła do `sources`, |
 |             | a wywołanie nie do wykonania dostaje błąd dla modelu zamiast wyniku      |
-| `respond`   | walidacja do modelu wyjścia, jeden retry, `requires_hits`                |
+| `respond`   | odpowiedź modelu → wynik grafu w `output`; odpowiedź nie do przyjęcia    |
+|             | wraca do modelu raz, a graf wymagający źródeł bez źródeł nie ma wyniku   |
 """
 
 from app.agent_nodes.base import Node

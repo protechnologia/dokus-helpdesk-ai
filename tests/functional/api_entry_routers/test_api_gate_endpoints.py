@@ -5,13 +5,14 @@ from fastapi.testclient import TestClient
 from langgraph.graph.state import CompiledStateGraph
 
 from app.agent_graphs import gate_close, gate_reply
-from app.agent_graphs.factory import get_graph_builder
+from app.agent_graphs.factory import build_real_graph, get_graph_builder
 from app.agent_nodes.agent import FakeAgentNode, tool_call_turn
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
 from app.core_model.graphs.verdict import Verdict
 from app.core_service.loader_dict_rules import get_rule_set
 from app.engine_anonymization import FakeAnonymizer
+from app.engine_llm import ChatMessage, FakeLLMClient
 from app.main import create_app
 
 # Kontrakt HTTP obu bramek w procesie: kształt werdyktu, furtka, wersja reguł i to, co trasa
@@ -59,6 +60,38 @@ class GateGraph:
             self.agent,
             FakeRespondNode(BLOCK),
         )
+
+
+def client_answering_with(
+    graph: ModuleType,         # np. app.agent_graphs.gate_close
+    turns: list[ChatMessage],  # np. [tool_call_turn("respond_gate_close", {"verdict": "pass"})]
+) -> TestClient:
+    """
+    Description:
+    Aplikacja, w której bramka stoi na węzłach właściwych, a model — atrapa — odpowiada podanymi
+    turami po kolei. Tak test odtwarza model, który odpowiada źle: atrapa grafu z fabryki zawsze
+    oddaje poprawny werdykt.
+
+    Example args:
+        graph=app.agent_graphs.gate_close
+        turns=[ChatMessage(role="assistant", content="Można zamknąć.")]
+
+    Example result:
+        TestClient, którego bramka czyta odpowiedzi modelu prawdziwym węzłem `respond`
+    """
+    compiled = build_real_graph(
+        graph          = graph,
+        llm            = FakeLLMClient(turns=turns),
+        anonymizer     = FakeAnonymizer(),
+        tools          = [],
+        limits         = {},
+        max_iterations = 1,
+    )
+
+    app = create_app()
+    app.dependency_overrides[get_graph_builder] = lambda: (lambda module: compiled)
+
+    return TestClient(app)
 
 
 def client_with(
@@ -181,3 +214,52 @@ def test_a_request_without_content_is_refused(path: str, body: dict[str, str]) -
     response = TestClient(create_app()).post(path, json=body)
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "graph, path, body",
+    [(gate_close, "/gate/close", TICKET), (gate_reply, "/gate/reply", REPLY)],
+    ids=["close", "reply"],
+)
+def test_a_model_that_never_gives_a_verdict_is_service_unavailable(
+    graph: ModuleType,
+    path:  str,
+    body:  dict[str, str],
+) -> None:
+    """Sprawdza, czy bramka, której model dwa razy odpowiada zwykłym tekstem zamiast werdyktu,
+    kończy żądanie statusem 503 we wspólnym kształcie błędu, z identyfikatorem żądania.
+
+    Wyłapuje bramkę, która w takiej sytuacji oddaje błąd serwera albo zmyślony werdykt: helpdesk
+    ma dostać sygnał „werdykt niedostępny" i sam zdecydować, czy puścić zgłoszenie dalej."""
+    text     = ChatMessage(role="assistant", content="Wygląda dobrze, można zamknąć.")
+    response = client_answering_with(graph, [text, text]).post(path, json=body)
+
+    assert response.status_code      == 503
+    assert response.json()["detail"] == "Language model call failed"
+    assert "request_id" in response.json()
+
+
+def test_a_corrected_verdict_goes_out_with_the_correction_in_the_log() -> None:
+    """Sprawdza, czy bramka zamknięcia, której model najpierw blokuje bez wskazówki, a po
+    poprawce ze wskazówką, oddaje status 200 z poprawionym werdyktem. Log przebiegu pokazuje
+    obie tury modelu i poprawkę, a zużycie liczy dwa wywołania modelu.
+
+    Wyłapuje blokadę bez wskazówki, która wyszłaby do helpdesku, oraz poprawkę niewidoczną dla
+    wołającego: w odpowiedzi ma być widać, że sprawa kosztowała dodatkową turę i dlaczego."""
+    reasons  = ["Nie widać, co zrobiono."]
+    complete = {"verdict": "block", "reasons": reasons, "hint": "Dopisz, co zmieniono."}
+    turns    = [
+        tool_call_turn(gate_close.RESPOND_TOOL_NAME, {"verdict": "block", "reasons": reasons}),
+        tool_call_turn(gate_close.RESPOND_TOOL_NAME, complete, call_id="call_2"),
+    ]
+
+    response = client_answering_with(gate_close, turns).post("/gate/close", json=TICKET)
+    answer   = response.json()
+
+    assert response.status_code == 200
+    assert (answer["verdict"], answer["hint"]) == ("block", "Dopisz, co zmieniono.")
+    assert [entry["node"] for entry in answer["log"]] == [
+        "anonymize", "agent", "respond", "agent", "respond",
+    ]
+    assert answer["log"][2]["message"]    == "do poprawki: błędne argumenty"
+    assert answer["usage"]["llm_calls"]   == 2

@@ -1,6 +1,12 @@
 import pytest
 
-from app.agent_graphs import GraphState, merge_sources, route_after_agent, tool_definitions
+from app.agent_graphs import (
+    GraphState,
+    merge_sources,
+    route_after_agent,
+    route_after_respond,
+    tool_definitions,
+)
 from app.agent_graphs.base import MAX_CALLS_PLACEHOLDER
 from app.agent_nodes.agent import tool_call_turn
 from app.agent_tools import SourceRef
@@ -126,6 +132,31 @@ def test_the_turn_limit_stops_the_loop(iterations: int, target: str) -> None:
     )
 
     assert route == target
+
+
+@pytest.mark.parametrize(
+    "messages, target",
+    [
+        ([RESPOND],                                                           "__end__"),
+        ([RESPOND, ChatMessage(role="tool", call_id="call_2", content="{}")], "agent"),
+        ([TEXT, ChatMessage(role="user", content="Wywołaj narzędzie.")],      "agent"),
+        ([],                                                                  "__end__"),
+    ],
+    ids=["model-turn-last", "tool-error-last", "user-message-last", "empty-conversation"],
+)
+def test_after_respond_the_run_ends_unless_the_model_owes_a_turn(
+    messages: list[ChatMessage],
+    target:   str,
+) -> None:
+    """Sprawdza, czy po węźle odpowiedzi przebieg kończy się, gdy rozmowa kończy się turą modelu,
+    a wraca do modelu, gdy ostatnią wiadomością jest poprawka od węzła odpowiedzi: błąd w miejscu
+    wyniku narzędzia albo zwykła wiadomość.
+
+    Wyłapuje poprawkę, która nigdy nie dociera do modelu (przebieg kończy się bez wyniku), oraz
+    przebieg, który po przyjętej odpowiedzi pyta model jeszcze raz."""
+    state = GraphState(input_text="x", messages=messages)
+
+    assert route_after_respond(state) == target
 
 
 def test_tool_definitions_take_the_description_from_the_tool() -> None:

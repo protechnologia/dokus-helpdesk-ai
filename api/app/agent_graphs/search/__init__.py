@@ -9,7 +9,8 @@ Przebieg: anonymize → pętla agent ⇄ run_tools → respond. Narzędzia: wysz
 identyfikatory, odczyty treść (opisy dla modelu w katalogach narzędzi); koniec wywołaniem
 `respond_search` bez argumentów.
 
-Status: na atrapach węzłów (`fake.py`); prompt pętli i pomiar w p. 23 (CLAUDE.md -> „Plan").
+Status: węzły właściwe z fabryki grafów, atrapa w `fake.py`; prompt pętli i pomiar
+w p. 23 (CLAUDE.md -> „Plan").
 """
 
 from app.agent_graphs.search.fake import build_fake_graph, example_state
@@ -18,6 +19,7 @@ from app.agent_graphs.search.graph import (
     TOOL_NAMES,
     build_graph,
     model_tools,
+    respond_node,
     system_prompt,
     user_prompt,
 )
@@ -35,6 +37,7 @@ __all__ = [
     "build_graph",
     "example_state",
     "model_tools",
+    "respond_node",
     "respond_tool",
     "system_prompt",
     "user_prompt",

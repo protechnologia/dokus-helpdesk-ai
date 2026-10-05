@@ -1,9 +1,12 @@
 import logging
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request, Response
 
+from app.agent_graphs.factory import close_process_agent_tools
 from app.config import Settings
 from app.entry_routers.gate.router import router as gate_router
 from app.entry_routers.health.router import router as health_router
@@ -37,6 +40,27 @@ def _configure_logging(
     )
 
 
+@asynccontextmanager
+async def _lifespan(
+    app: FastAPI,  # aplikacja, której cykl życia obsługujemy; wymagane przez FastAPI
+) -> AsyncIterator[None]:
+    """
+    Description:
+    Cykl życia aplikacji. Przy starcie nic nie robi — klienci powstają przy pierwszym żądaniu,
+    które ich potrzebuje. Przy wyłączaniu zamyka narzędzia agenta zbudowane na prawdziwych
+    bazach, czyli pulę połączeń Postgresa i połączenia HTTP do embeddera i Qdranta.
+
+    Example args:
+        app=FastAPI()
+
+    Example result:
+        None — po wyjściu z bloku połączenia narzędzi są zamknięte
+    """
+    yield
+
+    await close_process_agent_tools()
+
+
 def create_app() -> FastAPI:
     """
     Description:
@@ -56,8 +80,9 @@ def create_app() -> FastAPI:
     _configure_logging(settings.log_level)
 
     app = FastAPI(
-        title   = "dokus-helpdesk-ai",
-        version = "0.1.0",
+        title    = "dokus-helpdesk-ai",
+        version  = "0.1.0",
+        lifespan = _lifespan,
     )
 
     # --- identyfikator korelacji: przyjęty od wołającego, jeśli jest, inaczej nadany ---

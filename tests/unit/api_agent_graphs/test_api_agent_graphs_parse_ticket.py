@@ -1,4 +1,10 @@
-from app.agent_graphs.parse_ticket import FILLED_BY_GRAPH, example_state, respond_tool, user_prompt
+from app.agent_graphs.parse_ticket import (
+    FILLED_BY_GRAPH,
+    example_state,
+    filled_by_graph,
+    respond_tool,
+    user_prompt,
+)
 from app.agent_graphs.parse_ticket.graph import build_parse_prompt
 from app.engine_anonymization import AnonymizedText
 
@@ -22,3 +28,20 @@ def test_the_model_is_not_asked_for_what_the_graph_fills() -> None:
     Wyłapuje schemat, w którym model mógłby te pola podać, czyli je wymyślić: mają pochodzić ze
     stanu grafu, a nie z odpowiedzi modelu."""
     assert not set(FILLED_BY_GRAPH) & set(respond_tool().parameters["properties"])
+
+
+def test_the_graph_fills_exactly_what_the_model_is_not_asked_for() -> None:
+    """Sprawdza, czy graf parsujący dokłada do karty dokładnie te pola, o które model nie jest
+    pytany, i bierze je ze stanu: numer zgłoszenia, datę i wersję słownika rozstrzygnięć.
+
+    Wyłapuje pole wycięte ze schematu narzędzia odpowiedzi, którego nikt potem nie wypełnia:
+    każda karta byłaby wtedy odrzucana jako niepełna, a model nie miałby jak tego poprawić."""
+    state  = example_state()
+    filled = filled_by_graph(state)
+
+    assert set(filled) == set(FILLED_BY_GRAPH)
+    assert filled      == {
+        "ticket_id":                     state.ticket_id,
+        "date":                          state.date,
+        "resolution_vocabulary_version": state.vocabulary.version,
+    }

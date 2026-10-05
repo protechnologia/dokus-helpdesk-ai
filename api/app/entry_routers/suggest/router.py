@@ -58,6 +58,9 @@ async def suggest_answer(
         request=SuggestRequest(ticket_id="41002", body="Nie przychodzą przesyłki…",
                                variant="questions")
 
+    Wariant, który wymaga źródeł, bez odczytanych źródeł wraca bez propozycji: `text` jest puste,
+    a lista źródeł pusta.
+
     Example result:
         SuggestResponse(variant="questions", text="1. Od kiedy…", sources=[SourceItem(…), …])
 
@@ -78,19 +81,23 @@ async def suggest_answer(
     # Wariant bez narzędzi wiedzy nie ma pola `sources` — wraca z pustą listą, i to jest informacja.
     sources = getattr(final, "sources", [])
 
+    # Graf kończy bez wyniku tylko wtedy, gdy wymaga źródeł, a agent żadnego nie odczytał.
+    text = final.output.text if final.output is not None else None
+
     response = SuggestResponse(
         variant = request.variant,
-        text    = final.output.text,
+        text    = text,
         sources = to_source_items(sources),
         usage   = to_usage_item(final.usage),
         log     = to_log_items(final.log),
     )
 
     logger.info(
-        "suggest ticket_id=%s variant=%s sources=%d",
+        "suggest ticket_id=%s variant=%s sources=%d proposal=%s",
         request.ticket_id,
         request.variant,
         len(response.sources),
+        response.text is not None,
     )
 
     return response

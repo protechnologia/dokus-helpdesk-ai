@@ -20,10 +20,14 @@ class SuggestResponse(BaseModel):
     Odpowiedź `POST /suggest` — ten sam kształt dla każdego wariantu: tekst propozycji, źródła
     i wariant, którym powstała. Wariant bez narzędzi wiedzy wraca z pustą listą źródeł, i to jest
     informacja, nie brak danych.
+
+    `text` jest puste (`null`), gdy wariant wymaga źródeł (`requires_hits`), a agent żadnego nie
+    odczytał: propozycji wtedy nie ma, cokolwiek model napisał (zasada 9). To poprawna odpowiedź
+    („nowy typ problemu"), nie błąd — stąd 200 z pustą listą źródeł.
     """
 
     variant: str              = Field(examples=["questions"])
-    text:    str              = Field(examples=["1. Od kiedy nie przychodzą przesyłki? …"])
+    text:    str | None       = Field(examples=["1. Od kiedy nie przychodzą przesyłki? …"])
     sources: list[SourceItem] = Field(default_factory=list)
     usage:   UsageItem
     log:     list[LogItem]    = Field(default_factory=list)

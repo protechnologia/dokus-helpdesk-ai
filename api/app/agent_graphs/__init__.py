@@ -14,12 +14,13 @@ Import tego pakietu wyłącza LangSmith (niżej), więc żaden graf nie ruszy z 
 Atrapy wspólne dla grafów z narzędziami wiedzy leżą w `fake.py` tego pakietu.
 
 Fabryka, z której trasy biorą grafy, leży w `factory.py`. Nie jest stąd eksportowana: czyta
-konfigurację, a po p. 11 pociągnie też klientów — a ten plik importuje każdy graf.
+konfigurację i pociąga klientów modelu, anonimizatora i baz — a ten plik importuje każdy graf.
+Przy atrapie modelu oddaje atrapę grafu, przy prawdziwym dostawcy graf z węzłów właściwych.
 
-Grafy (CLAUDE.md -> „Plan", p. 5; trasy biorą je dziś złożone z atrap węzłów). Bez narzędzi
-wiedzy przebieg to anonymize → agent → respond, z nimi anonymize → agent ⇄ run_tools → respond,
-gdzie pętlę ucina limit tur modelu (`AGENT_MAX_ITERATIONS`). Każdy kończy się wywołaniem
-`respond_<graf>`:
+Grafy. Bez narzędzi wiedzy przebieg to anonymize → agent → respond, z nimi anonymize → agent ⇄
+run_tools → respond, gdzie pętlę ucina limit tur modelu (`AGENT_MAX_ITERATIONS`). Każdy kończy
+się wywołaniem `respond_<graf>`; odpowiedź, której nie da się przyjąć, `respond` odsyła modelowi
+do poprawki, raz (respond → agent):
 
 | graf                | narzędzia                 | wynik          |
 |---------------------|---------------------------|----------------|
@@ -42,6 +43,7 @@ from app.agent_graphs.base import (
     GraphState,
     merge_sources,
     route_after_agent,
+    route_after_respond,
     run_graph,
     tool_definitions,
 )
@@ -54,6 +56,7 @@ __all__ = [
     "GraphState",
     "merge_sources",
     "route_after_agent",
+    "route_after_respond",
     "run_graph",
     "tool_definitions",
 ]

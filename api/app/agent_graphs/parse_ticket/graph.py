@@ -1,15 +1,18 @@
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from app.agent_graphs.base import tool_definitions
-from app.agent_graphs.parse_ticket.respond_tool import respond_tool
+from app.agent_graphs.base import route_after_respond, tool_definitions
+from app.agent_graphs.parse_ticket.respond_tool import RESPOND_TOOL_NAME, respond_tool
 from app.agent_graphs.parse_ticket.state import ParseTicketState
 from app.agent_nodes import Node
+from app.agent_nodes.respond import RespondNode
 from app.agent_tools import KnowledgeSource
 from app.core_model.dicts.resolution_vocabulary import ResolutionVocabulary
+from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition
 
@@ -156,6 +159,54 @@ def model_tools(
     return definitions
 
 
+def filled_by_graph(
+    state: ParseTicketState,  # np. ParseTicketState(ticket_id="90101", date=date(2026, 9, 30), …)
+) -> dict[str, Any]:
+    """
+    Description:
+    Pola karty, które wypełnia graf, a nie model (`FILLED_BY_GRAPH`): tożsamość i data zgłoszenia
+    ze źródła oraz wersja słownika, który graf wstawił do promptu. Węzeł `respond` dokłada je do
+    argumentów `respond_parse_ticket`, zanim zwaliduje całość do `ParsedTicket`.
+
+    Example args:
+        state=ParseTicketState(input_text="ZGŁOSZENIE 90101…", ticket_id="90101",
+                               date=date(2026, 9, 30),
+                               vocabulary=ResolutionVocabulary(version=1, classes=[…]))
+
+    Example result:
+        {"ticket_id": "90101", "date": date(2026, 9, 30), "resolution_vocabulary_version": 1}
+    """
+    filled = {
+        "ticket_id":                     state.ticket_id,
+        "date":                          state.date,
+        "resolution_vocabulary_version": state.vocabulary.version,
+    }
+
+    return filled
+
+
+def respond_node() -> RespondNode:
+    """
+    Description:
+    Węzeł odpowiedzi tego grafu: do argumentów `respond_parse_ticket` dokłada pola od grafu
+    (`filled_by_graph()`) i waliduje całość do `ParsedTicket`. Karta z pustym polem, z kluczem
+    spoza schematu albo z rozstrzygnięciem spoza słownika wraca do modelu do poprawki.
+
+    Example args:
+        (brak)
+
+    Example result:
+        RespondNode czytający wywołanie `respond_parse_ticket` jako `ParsedTicket`
+    """
+    node = RespondNode(
+        respond_tool_name = RESPOND_TOOL_NAME,
+        output_model      = ParsedTicket,
+        filled_by_graph   = filled_by_graph,
+    )
+
+    return node
+
+
 def build_graph(
     anonymize: Node,  # np. AnonymizeNode(FakeAnonymizer())
     agent:     Node,  # np. FakeAgentNode([ChatMessage(role="assistant", content="{…}")])
@@ -166,13 +217,17 @@ def build_graph(
     Składa graf karty zgłoszenia z gotowych węzłów: anonimizacja → jedna tura modelu → karta. Bez
     narzędzi i bez `run_tools`. Krawędzie idą po nazwach węzłów, nie po argumentach.
 
+    Po `respond` przebieg się kończy, chyba że węzeł odesłał odpowiedź modelowi do poprawki —
+    wtedy model dostaje jeszcze jedną turę (`route_after_respond`).
+
     Example args:
         anonymize=AnonymizeNode(FakeAnonymizer())
         agent=FakeAgentNode([…])
         respond=FakeRespondNode(ParsedTicket(…))
 
     Example result:
-        CompiledStateGraph: __start__ → anonymize → agent → respond → __end__
+        CompiledStateGraph: __start__ → anonymize → agent → respond → __end__,
+        respond → agent przy poprawce
 
     Raises:
         ValueError: dwa węzły o tej samej nazwie
@@ -185,6 +240,10 @@ def build_graph(
     graph.add_edge(START, "anonymize")
     graph.add_edge("anonymize", "agent")
     graph.add_edge("agent", "respond")
-    graph.add_edge("respond", END)
+    graph.add_conditional_edges(
+        "respond",            # po odczytaniu odpowiedzi modelu
+        route_after_respond,  # odpowiedź odesłana do poprawki → jeszcze jedna tura modelu
+        ["agent", END],       # możliwe cele
+    )
 
     return graph.compile()

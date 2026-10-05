@@ -5,11 +5,17 @@ from pathlib import Path
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from app.agent_graphs.base import route_after_agent, tool_definitions
+from app.agent_graphs.base import (
+    route_after_agent,
+    route_after_respond,
+    tool_definitions,
+)
 from app.agent_graphs.suggest_questions.respond_tool import RESPOND_TOOL_NAME, respond_tool
 from app.agent_graphs.suggest_questions.state import SuggestQuestionsState
 from app.agent_nodes import Node
+from app.agent_nodes.respond import RespondNode
 from app.agent_tools import AgentTool
+from app.core_model.graphs.proposal import Proposal
 from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition
 
@@ -106,6 +112,28 @@ def model_tools(
     return definitions
 
 
+def respond_node() -> RespondNode:
+    """
+    Description:
+    Węzeł odpowiedzi tego grafu: waliduje argumenty `respond_suggest_questions` do `Proposal`.
+    Wariant nie wymaga źródeł (`REQUIRES_HITS`), więc pytania powstają także wtedy, gdy agent
+    niczego nie odczytał.
+
+    Example args:
+        (brak)
+
+    Example result:
+        RespondNode czytający wywołanie `respond_suggest_questions` jako `Proposal`
+    """
+    node = RespondNode(
+        respond_tool_name = RESPOND_TOOL_NAME,
+        output_model      = Proposal,
+        requires_sources  = REQUIRES_HITS,
+    )
+
+    return node
+
+
 def build_graph(
     anonymize:      Node,  # np. AnonymizeNode(FakeAnonymizer())
     agent:          Node,  # np. FakeAgentNode([tool_call_turn("find_tickets_vector", …), …])
@@ -121,6 +149,9 @@ def build_graph(
     narzędzia nie są już wykonywane i przebieg też idzie do `respond`. Krawędzie idą po nazwach
     węzłów.
 
+    Po `respond` przebieg się kończy, chyba że węzeł odesłał odpowiedź modelowi do poprawki —
+    wtedy model dostaje jeszcze jedną turę (`route_after_respond`).
+
     Example args:
         anonymize=AnonymizeNode(FakeAnonymizer())
         agent=FakeAgentNode([…])
@@ -129,7 +160,8 @@ def build_graph(
         max_iterations=20
 
     Example result:
-        CompiledStateGraph: __start__ → anonymize → agent ⇄ run_tools, agent → respond → __end__
+        CompiledStateGraph: __start__ → anonymize → agent ⇄ run_tools, agent → respond → __end__,
+        respond → agent przy poprawce
 
     Raises:
         ValueError: dwa węzły o tej samej nazwie
@@ -153,6 +185,10 @@ def build_graph(
         ["run_tools", "respond"],  # możliwe cele
     )
     graph.add_edge("run_tools", "agent")
-    graph.add_edge("respond", END)
+    graph.add_conditional_edges(
+        "respond",            # po odczytaniu odpowiedzi modelu
+        route_after_respond,  # odpowiedź odesłana do poprawki → jeszcze jedna tura modelu
+        ["agent", END],       # możliwe cele
+    )
 
     return graph.compile()

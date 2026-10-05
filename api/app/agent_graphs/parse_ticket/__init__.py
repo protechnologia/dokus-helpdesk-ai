@@ -8,8 +8,8 @@ Przebieg: anonymize → agent → respond. Bez narzędzi wiedzy; kartę model od
 `respond_parse_ticket` (`respond_tool.py`) bez pól `FILLED_BY_GRAPH` — tożsamość, datę i wersję
 słownika dokłada graf ze stanu.
 
-Status: na atrapach węzłów (`fake.py`); prompt na modelu docelowym w p. 24 (CLAUDE.md -> „Plan
-i TODO").
+Status: węzły właściwe z fabryki grafów, atrapa w `fake.py`; prompt na modelu docelowym
+w p. 24 (CLAUDE.md -> „Plan").
 """
 
 from app.agent_graphs.parse_ticket.fake import build_fake_graph, default_ticket, example_state
@@ -17,7 +17,9 @@ from app.agent_graphs.parse_ticket.graph import (
     STATE,
     TOOL_NAMES,
     build_graph,
+    filled_by_graph,
     model_tools,
+    respond_node,
     system_prompt,
     user_prompt,
 )
@@ -38,7 +40,9 @@ __all__ = [
     "build_graph",
     "default_ticket",
     "example_state",
+    "filled_by_graph",
     "model_tools",
+    "respond_node",
     "respond_tool",
     "system_prompt",
     "user_prompt",

@@ -8,7 +8,8 @@ Przebieg: anonymize → agent → respond. Bez narzędzi wiedzy i bez `run_tools
 modelu to `respond_polish` (`respond_tool.py`). Zasady stylu przychodzą w stanie (`rules`)
 i trafiają do oddzielonej sekcji danych w turze użytkownika.
 
-Status: na atrapach węzłów (`fake.py`); prompt to szkielet, treść i pomiar w p. 28.
+Status: węzły właściwe z fabryki grafów, atrapa w `fake.py`; prompt to szkielet, treść
+i pomiar w p. 28.
 """
 
 from app.agent_graphs.polish.fake import build_fake_graph, example_state
@@ -17,6 +18,7 @@ from app.agent_graphs.polish.graph import (
     TOOL_NAMES,
     build_graph,
     model_tools,
+    respond_node,
     system_prompt,
     user_prompt,
 )
@@ -34,6 +36,7 @@ __all__ = [
     "build_graph",
     "example_state",
     "model_tools",
+    "respond_node",
     "respond_tool",
     "system_prompt",
     "user_prompt",

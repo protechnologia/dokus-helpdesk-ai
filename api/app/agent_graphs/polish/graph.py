@@ -4,10 +4,12 @@ from pathlib import Path
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from app.agent_graphs.base import tool_definitions
-from app.agent_graphs.polish.respond_tool import respond_tool
+from app.agent_graphs.base import route_after_respond, tool_definitions
+from app.agent_graphs.polish.models import PolishedText
+from app.agent_graphs.polish.respond_tool import RESPOND_TOOL_NAME, respond_tool
 from app.agent_graphs.polish.state import PolishState
 from app.agent_nodes import Node
+from app.agent_nodes.respond import RespondNode
 from app.agent_tools import KnowledgeSource
 from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition
@@ -95,6 +97,26 @@ def model_tools(
     return definitions
 
 
+def respond_node() -> RespondNode:
+    """
+    Description:
+    Węzeł odpowiedzi tego grafu: waliduje argumenty `respond_polish` do `PolishedText`. Pusty
+    tekst nie przechodzi walidacji i wraca do modelu do poprawki.
+
+    Example args:
+        (brak)
+
+    Example result:
+        RespondNode czytający wywołanie `respond_polish` jako `PolishedText`
+    """
+    node = RespondNode(
+        respond_tool_name = RESPOND_TOOL_NAME,
+        output_model      = PolishedText,
+    )
+
+    return node
+
+
 def build_graph(
     anonymize: Node,  # np. AnonymizeNode(FakeAnonymizer())
     agent:     Node,  # np. FakeAgentNode()
@@ -105,13 +127,17 @@ def build_graph(
     Składa graf „Popraw" z gotowych węzłów: anonimizacja → jedna tura modelu → tekst. Bez narzędzi
     i bez `run_tools`. Krawędzie idą po nazwach węzłów, nie po argumentach.
 
+    Po `respond` przebieg się kończy, chyba że węzeł odesłał odpowiedź modelowi do poprawki —
+    wtedy model dostaje jeszcze jedną turę (`route_after_respond`).
+
     Example args:
         anonymize=AnonymizeNode(FakeAnonymizer())
         agent=FakeAgentNode()
         respond=FakeRespondNode(PolishedText(text="…"))
 
     Example result:
-        CompiledStateGraph: __start__ → anonymize → agent → respond → __end__
+        CompiledStateGraph: __start__ → anonymize → agent → respond → __end__,
+        respond → agent przy poprawce
 
     Raises:
         ValueError: dwa węzły o tej samej nazwie
@@ -124,6 +150,10 @@ def build_graph(
     graph.add_edge(START, "anonymize")
     graph.add_edge("anonymize", "agent")
     graph.add_edge("agent", "respond")
-    graph.add_edge("respond", END)
+    graph.add_conditional_edges(
+        "respond",            # po odczytaniu odpowiedzi modelu
+        route_after_respond,  # odpowiedź odesłana do poprawki → jeszcze jedna tura modelu
+        ["agent", END],       # możliwe cele
+    )
 
     return graph.compile()

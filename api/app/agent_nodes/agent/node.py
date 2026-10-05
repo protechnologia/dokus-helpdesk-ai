@@ -43,6 +43,8 @@ O czym pamiętać przy zmianach:
   żądania musi być identyczny co do znaku, żeby dostawca czytał go z cache promptu.
 - Wiadomości wracają do modelu w całości, razem z `provider_items` tur modelu — klient dostawcy
   odsyła je w następnej turze bez zmian.
+- Węzeł bywa wołany jeszcze raz po `respond`: gdy ten odeśle odpowiedź do poprawki, w rozmowie
+  jest już jego komunikat, a model dostaje jedną turę więcej.
 - Błędu modelu węzeł nie łapie: `LLMError` zatrzymuje przebieg, a trasa oddaje 503.
 """
 

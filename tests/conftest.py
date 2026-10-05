@@ -31,6 +31,9 @@ O czym pamiętać przy zmianach:
 - Komplet testów to `pytest -m "not llm_live"`. `pytest -m ""` zdejmuje wszystkie wykluczenia,
   więc wybiera też testy `llm_live`. Te biorą model przez `live_generation_llm()`, które przy
   takim wyborze odmawia: płatnego modelu nie da się zawołać bez wpisania `llm_live` w `-m`.
+- Poza testami `llm_live` oba modele są atrapą, cokolwiek stoi w `.env`
+  (`fake_models_outside_live_tests`). Fabryka grafów przy prawdziwym dostawcy składa graf na
+  prawdziwym modelu, a zwykły test trasy nie może go zawołać ani zależeć od pliku dewelopera.
 - Adresów nie wpisuje się w plikach testów. Konfiguracja wskazuje nazwy z sieci compose
   (`http://embedder:8000`), których z hosta nie da się rozwiązać, więc każdy test spoza kontenera
   potrzebuje podmiany; powielona w plikach rozjeżdżała się po zmianie portu w jednym miejscu.
@@ -104,6 +107,35 @@ def live_generation_llm(
     )
 
     return llm
+
+
+@pytest.fixture(autouse=True)
+def fake_models_outside_live_tests(
+    request:     pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie markery testu
+    monkeypatch: pytest.MonkeyPatch,     # wstrzykiwane przez pytest; cofa zmienne po teście
+) -> None:
+    """
+    Description:
+    Ustawia oba modele na atrapę w każdym teście poza `llm_live`, niezależnie od pliku `.env`.
+
+    Konfiguracja aplikacji czyta `.env` z katalogu roboczego, a tam deweloper trzyma prawdziwego
+    dostawcę dla testów na żywym modelu. Fabryka grafów składa wtedy graf na prawdziwym modelu,
+    więc zwykły test trasy albo wołałby płatny model, albo padał na odmowie anonimizatora —
+    zależnie od tego, co akurat stoi w pliku. Zmienna środowiskowa wygrywa z `.env`, więc
+    podmiana działa bez ruszania pliku. Test, który sprawdza innego dostawcę, ustawia go sam.
+
+    Example args:
+        (wstrzykiwane przez pytest)
+
+    Example result:
+        None — `Settings()` w teście oddaje `fake` dla obu modeli
+    """
+    # --- test na żywym modelu ma czytać konfigurację dewelopera ---
+    if request.node.get_closest_marker(LLM_LIVE_MARKER) is not None:
+        return
+
+    monkeypatch.setenv("LLM_GENERATION_PROVIDER", "fake")
+    monkeypatch.setenv("LLM_ANONYMIZATION_PROVIDER", "fake")
 
 
 def embedder_url() -> str:
@@ -195,10 +227,10 @@ def build_postgres_client(
 def build_host_settings() -> Settings:
     """
     Description:
-    Konfiguracja aplikacji z adresami usług podmienionymi na dostępne z hosta. Cała reszta
-    przychodzi ze środowiska bez zmian — przede wszystkim dostawca LLM — więc test jedzie na
-    konfiguracji, z jaką działa produkt, a podmienione są tylko dwa adresy, które poza siecią
-    compose nie mają prawa zadziałać.
+    Konfiguracja aplikacji z adresami usług podmienionymi na dostępne z hosta. Reszta przychodzi
+    ze środowiska bez zmian — progi, limity, nazwy kolekcji — więc test jedzie na konfiguracji,
+    z jaką działa produkt, a podmienione są tylko dwa adresy, które poza siecią compose nie mają
+    prawa zadziałać. Dostawcę modelu ustawia osobno `fake_models_outside_live_tests`.
 
     Funkcja obok fixture `host_settings`, bo fixture o zakresie modułu (jeden pomiar na cały plik)
     nie może użyć fixture o zakresie pojedynczego testu.

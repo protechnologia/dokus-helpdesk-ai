@@ -2,10 +2,10 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.agent_nodes.base import Node
+from app.agent_nodes.respond.base import RespondNodeBase
 
 
-class FakeRespondNode(Node):
+class FakeRespondNode(RespondNodeBase):
     """
     Description:
     Atrapa węzła `respond`: nie waliduje odpowiedzi modelu, tylko ustawia `output` na wynik podany
@@ -13,10 +13,12 @@ class FakeRespondNode(Node):
 
     Flow:
         1. Test (albo atrapa grafu) tworzy ją z gotowym wynikiem.
-        2. `run()` zapisuje stan w `calls` i zwraca ten wynik jako `output`.
-    """
+        2. `run()` zapisuje stan w `calls` i zwraca ten wynik jako `output` — tą samą zmianą
+           stanu co węzeł właściwy po przyjęciu odpowiedzi (`output_update()`).
 
-    name = "respond"
+    Atrapa niczego nie odsyła do poprawki i nie sprawdza źródeł: oddaje wynik zawsze, cokolwiek
+    model odpowiedział. Te reguły ma tylko węzeł właściwy.
+    """
 
     def __init__(
         self,
@@ -54,9 +56,4 @@ class FakeRespondNode(Node):
         """
         self.calls.append(state)
 
-        update = {
-            "output": self._output,
-            "log":    [self.log_entry(f"output: {type(self._output).__name__}")],
-        }
-
-        return update
+        return self.output_update(self._output)
