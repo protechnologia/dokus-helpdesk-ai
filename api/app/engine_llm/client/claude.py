@@ -1,4 +1,6 @@
 import time
+from collections.abc import Sequence
+from typing import Any
 
 # Three failure modes, kept apart because the caller's message names which one happened:
 #   APITimeoutError    — the request outlived its timeout
@@ -14,6 +16,9 @@ from anthropic import (
 from app.engine_llm.base import LLMClient
 from app.engine_llm.errors import LLMError
 from app.engine_llm.models.completion import LLMCompletion
+from app.engine_llm.models.messages import ChatMessage, ToolCall, ToolDefinition
+from app.engine_llm.models.turn import LLMTurn
+from app.engine_llm.models.usage import LLMUsage
 from app.engine_llm.pricing.claude import calculate_cost_usd, price_of
 
 # Ceiling on ONE answer, not a target. A parsed ticket is a small JSON object, but a thread with a
@@ -39,6 +44,19 @@ MODELS_ACCEPTING_TEMPERATURE = ("claude-haiku-4-5",)
 # krótsze niż minimum modelu (512–4096 tokenów) nie są cache'owane wcale.
 PROMPT_CACHE = {"type": "ephemeral"}
 
+# Tura z narzędziami: model MA wywołać któreś narzędzie, nie odpowiedzieć tekstem. Każdy graf
+# kończy się wywołaniem `respond_<graf>`, więc tura bez wywołania jest zawsze błędem formatu.
+# NIESPRAWDZONE na żywym API (p. 17 zweryfikował na żywo tylko OpenAI): to API nie pozwala łączyć
+# wymuszenia z rozszerzonym myśleniem, którego ten klient nie włącza — gdyby model myślał
+# domyślnie, dostawca odpowie 400 i wymuszenie trzeba będzie zamienić na `auto`.
+TOOL_CHOICE_ANY = {"type": "any"}
+
+# Rodzaje bloków odpowiedzi, które klient czyta albo odsyła w ustalonym kształcie.
+BLOCK_TEXT              = "text"
+BLOCK_TOOL_USE          = "tool_use"
+BLOCK_THINKING          = "thinking"
+BLOCK_REDACTED_THINKING = "redacted_thinking"
+
 
 class ClaudeLLMClient(LLMClient):
     """
@@ -60,6 +78,19 @@ class ClaudeLLMClient(LLMClient):
         3. The text blocks of the answer are joined, usage is read from `response.usage`, and the
            call is priced here — the price list is provider knowledge and stays on this side of
            the abstraction.
+        4. `complete_turn()` robi to samo dla tury z narzędziami: `_build_turn_request()`
+           tłumaczy rozmowę i narzędzia na kształt Messages API, a `_to_turn()` czyta
+           z odpowiedzi wywołania narzędzi.
+
+    Tura z narzędziami w tym API:
+
+    | nasza wiadomość        | w żądaniu                                                     |
+    |------------------------|---------------------------------------------------------------|
+    | prompt systemowy       | pole `system`                                                 |
+    | `user`                 | wiadomość `user` z tekstem                                    |
+    | `assistant` od modelu  | wiadomość `assistant` z jego blokami (`provider_items`)       |
+    | `assistant` bez nich   | blok `text` i bloki `tool_use` złożone z tekstu i wywołań     |
+    | `tool`                 | blok `tool_result`; wyniki jednej tury w JEDNEJ wiadomości `user` |
     """
 
     def __init__(
@@ -124,8 +155,71 @@ class ClaudeLLMClient(LLMClient):
         """
         started_at = time.perf_counter()
         request    = self._build_request(prompt, system)
+        response   = await self._send(request)
 
-        # --- call the provider ---
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        completion = self._to_completion(response, elapsed_ms)
+
+        self._log_call(prompt, completion)
+
+        return completion
+
+    async def complete_turn(
+        self,
+        system:   str,                       # np. "Jesteś asystentem wdrożeniowca helpdesku…"
+        messages: Sequence[ChatMessage],     # rozmowa: zgłoszenie, tury modelu, wyniki narzędzi
+        tools:    Sequence[ToolDefinition],  # narzędzia, które model może wywołać w tej turze
+    ) -> LLMTurn:
+        """
+        Description:
+        Wykonuje jedną turę modelu w rozmowie z narzędziami i oddaje ją w naszym kształcie, ze
+        zużyciem i kosztem. Model musi wywołać narzędzie (`tool_choice: any`).
+
+        Example args:
+            system="Jesteś asystentem wdrożeniowca helpdesku…"
+            messages=[ChatMessage(role="user", content="=== ZGŁOSZENIE ===\nNie przychodzą…")]
+            tools=[ToolDefinition(name="find_tickets_vector", …),
+                   ToolDefinition(name="respond_search", …)]
+
+        Example result:
+            LLMTurn(message=ChatMessage(role="assistant",
+                                        tool_calls=[ToolCall(name="find_tickets_vector", …)],
+                                        provider_items=[{"type": "tool_use", …}]),
+                    model="claude-sonnet-5", latency_ms=3120.4, usage=LLMUsage(calls=1, …))
+
+        Raises:
+            LLMError: dostawca nie odpowiedział w czasie, był nieosiągalny, odrzucił żądanie
+                albo odpowiedział turą bez tekstu i bez wywołań
+        """
+        started_at = time.perf_counter()
+        request    = self._build_turn_request(system, messages, tools)
+        response   = await self._send(request)
+
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        turn       = self._to_turn(response, elapsed_ms)
+
+        self._log_turn(messages, turn)
+
+        return turn
+
+    async def _send(
+        self,
+        request: dict,  # np. {"model": "claude-haiku-4-5", "max_tokens": 8000, "messages": […]}
+    ):
+        """
+        Description:
+        Wysyła żądanie do Messages API i tłumaczy awarie SDK na `LLMError`. Wspólne dla
+        `complete()` i `complete_turn()`, żeby oba mówiły o awarii tym samym komunikatem.
+
+        Example args:
+            request={"model": "claude-haiku-4-5", "max_tokens": 8000, "messages": […]}
+
+        Example result:
+            Message(content=[TextBlock(text="…")], usage=Usage(input_tokens=4820, …))
+
+        Raises:
+            LLMError: dostawca nie odpowiedział w czasie, był nieosiągalny albo odrzucił żądanie
+        """
         try:
             response = await self._client.messages.create(**request)
         except APITimeoutError as exc:
@@ -142,12 +236,7 @@ class ClaudeLLMClient(LLMClient):
                 f"API modelu {self._model} odrzuciło żądanie (HTTP {exc.status_code})"
             ) from exc
 
-        elapsed_ms = (time.perf_counter() - started_at) * 1000
-        completion = self._to_completion(response, elapsed_ms)
-
-        self._log_call(prompt, completion)
-
-        return completion
+        return response
 
     def _build_request(
         self,
@@ -188,6 +277,293 @@ class ClaudeLLMClient(LLMClient):
 
         return request
 
+    def _build_turn_request(
+        self,
+        system:   str,                       # np. "Jesteś asystentem wdrożeniowca helpdesku…"
+        messages: Sequence[ChatMessage],     # rozmowa w naszym kształcie
+        tools:    Sequence[ToolDefinition],  # narzędzia grafu, z `respond_<graf>` na końcu
+    ) -> dict:
+        """
+        Description:
+        Składa żądanie tury z narzędziami. Wydzielone, bo czyste: test sprawdza kształt żądania
+        bez sieci i bez klucza.
+
+        Cache promptu jest włączony tak samo jak w `complete()`. Obejmuje początek żądania
+        w kolejności narzędzia → prompt systemowy → wiadomości, więc narzędzia idą w kolejności,
+        w jakiej przyszły: ten sam początek co do znaku w każdej turze.
+
+        Example args:
+            system="Jesteś asystentem wdrożeniowca helpdesku…"
+            messages=[ChatMessage(role="user", content="=== ZGŁOSZENIE ===\nNie przychodzą…")]
+            tools=[ToolDefinition(name="respond_search", description="Kończy.", parameters={…})]
+
+        Example result:
+            {"model": "claude-sonnet-5", "max_tokens": 8000, "cache_control": {"type": "ephemeral"},
+             "system": "Jesteś asystentem…",
+             "messages": [{"role": "user", "content": "=== ZGŁOSZENIE ===…"}],
+             "tools": [{"name": "respond_search", "description": "Kończy.", "input_schema": {…}}],
+             "tool_choice": {"type": "any"}}
+        """
+        request: dict = {
+            "model":         self._model,
+            "max_tokens":    MAX_OUTPUT_TOKENS,
+            "cache_control": PROMPT_CACHE,
+            "system":        system,
+            "messages":      self._turn_messages(messages),
+            "tools":         [self._tool_param(tool) for tool in tools],
+            "tool_choice":   TOOL_CHOICE_ANY,
+        }
+
+        # Wysyłane tylko tam, gdzie nadal jest przyjmowane — gdzie indziej to twarde 400.
+        if self._accepts_temperature:
+            request["temperature"] = self._temperature
+
+        return request
+
+    @staticmethod
+    def _tool_param(
+        tool: ToolDefinition,  # np. ToolDefinition(name="read_docs", description="…", …)
+    ) -> dict:
+        """
+        Description:
+        Zapisuje definicję narzędzia w kształcie tego API: schemat argumentów idzie pod nazwą
+        `input_schema`.
+
+        Example args:
+            tool=ToolDefinition(name="read_docs", description="Czyta sekcje.", parameters={…})
+
+        Example result:
+            {"name": "read_docs", "description": "Czyta sekcje.", "input_schema": {…}}
+        """
+        param = {
+            "name":         tool.name,
+            "description":  tool.description,
+            "input_schema": tool.parameters,
+        }
+
+        return param
+
+    def _turn_messages(
+        self,
+        messages: Sequence[ChatMessage],  # np. [ChatMessage(role="user", …), …]
+    ) -> list[dict]:
+        """
+        Description:
+        Tłumaczy rozmowę na wiadomości Messages API. W tym API nie ma roli `tool`: wynik
+        narzędzia to blok `tool_result` w wiadomości `user`, a wyniki wszystkich wywołań z jednej
+        tury modelu muszą stać w JEDNEJ takiej wiadomości, zaraz po tej turze.
+
+        Example args:
+            messages=[ChatMessage(role="user", content="Nie przychodzą przesyłki"),
+                      ChatMessage(role="assistant", tool_calls=[ToolCall(call_id="toolu_1", …)]),
+                      ChatMessage(role="tool", call_id="toolu_1", content='{"tickets": []}')]
+
+        Example result:
+            [{"role": "user", "content": "Nie przychodzą przesyłki"},
+             {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_1", …}]},
+             {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_1",
+                                           "content": '{"tickets": []}'}]}]
+        """
+        translated: list[dict] = []
+
+        for message in messages:
+            # --- tura użytkownika ---
+            if message.role == "user":
+                translated.append({"role": "user", "content": message.content})
+                continue
+
+            # --- tura modelu ---
+            if message.role == "assistant":
+                translated.append({"role": "assistant", "content": self._assistant_blocks(message)})
+                continue
+
+            # --- wynik narzędzia: dokładany do wiadomości z wynikami tej samej tury modelu ---
+            block  = {
+                "type":        "tool_result",
+                "tool_use_id": message.call_id,
+                "content":     message.content,
+            }
+            latest = translated[-1] if translated else None
+
+            if latest and latest["role"] == "user" and isinstance(latest["content"], list):
+                latest["content"].append(block)
+                continue
+
+            translated.append({"role": "user", "content": [block]})
+
+        return translated
+
+    @staticmethod
+    def _assistant_blocks(
+        message: ChatMessage,  # np. ChatMessage(role="assistant", tool_calls=[ToolCall(…)])
+    ) -> list[dict]:
+        """
+        Description:
+        Bloki jednej tury modelu. Turę, która przyszła od tego dostawcy, odsyłamy jego blokami
+        (`provider_items`): mogą w nich być bloki myślenia z podpisem, których nie wolno zmieniać.
+        Turę bez nich — z atrapy albo od innego dostawcy — składamy z tekstu i wywołań.
+
+        Example args:
+            message=ChatMessage(role="assistant", content="Sprawdzę.",
+                                tool_calls=[ToolCall(call_id="toolu_1", name="read_docs", …)])
+
+        Example result:
+            [{"type": "text", "text": "Sprawdzę."},
+             {"type": "tool_use", "id": "toolu_1", "name": "read_docs", "input": {…}}]
+        """
+        if message.provider_items:
+            return list(message.provider_items)
+
+        blocks: list[dict] = []
+
+        if message.content:
+            blocks.append({"type": BLOCK_TEXT, "text": message.content})
+
+        blocks.extend(
+            {
+                "type":  BLOCK_TOOL_USE,
+                "id":    call.call_id,
+                "name":  call.name,
+                "input": call.arguments,
+            }
+            for call in message.tool_calls
+        )
+
+        return blocks
+
+    def _to_turn(
+        self,
+        response,           # np. Message(content=[ToolUseBlock(id="toolu_1", …)], usage=Usage(…))
+        elapsed_ms: float,  # np. 3120.4
+    ) -> LLMTurn:
+        """
+        Description:
+        Przepisuje jedną odpowiedź SDK na turę modelu w naszym kształcie. Wydzielone, bo czyste:
+        test podaje atrapę odpowiedzi i sprawdza mapowanie bez sieci i bez klucza.
+
+        Example args:
+            response=Message(content=[ToolUseBlock(id="toolu_1", name="read_docs", input={…})], …)
+            elapsed_ms=3120.4
+
+        Example result:
+            LLMTurn(message=ChatMessage(role="assistant", tool_calls=[ToolCall(…)],
+                                        provider_items=[{"type": "tool_use", …}]),
+                    model="claude-sonnet-5", latency_ms=3120.4, usage=LLMUsage(calls=1, …))
+
+        Raises:
+            LLMError: tura nie ma ani tekstu, ani wywołań narzędzi, albo argumenty wywołania nie
+                są obiektem
+        """
+        calls = [
+            ToolCall(
+                call_id   = block.id,
+                name      = block.name,
+                arguments = self._arguments_of(block),
+            )
+            for block in response.content
+            if block.type == BLOCK_TOOL_USE
+        ]
+        text = "".join(block.text for block in response.content if block.type == BLOCK_TEXT)
+
+        # Model nic nie napisał i niczego nie wywołał.
+        if not calls and not text:
+            raise LLMError(
+                f"tura modelu nie zawiera tekstu ani wywołań narzędzi "
+                f"(stop_reason={response.stop_reason})"
+            )
+
+        message = ChatMessage(
+            role           = "assistant",
+            content        = text,
+            tool_calls     = calls,
+            provider_items = [self._block_to_item(block) for block in response.content],
+        )
+
+        turn = LLMTurn(
+            message    = message,
+            model      = response.model,
+            latency_ms = elapsed_ms,
+            usage      = self._usage(response),
+        )
+
+        return turn
+
+    @staticmethod
+    def _arguments_of(
+        block,  # np. ToolUseBlock(id="toolu_1", name="read_docs", input={"section_ids": ["a"]})
+    ) -> dict[str, Any]:
+        """
+        Description:
+        Argumenty wywołania narzędzia z bloku `tool_use`. To API podaje je już jako obiekt, nie
+        jako tekst JSON, więc zostaje tylko sprawdzić, że to słownik.
+
+        Example args:
+            block=ToolUseBlock(id="toolu_1", name="read_docs", input={"section_ids": ["a"]})
+
+        Example result:
+            {"section_ids": ["a"]}
+
+        Raises:
+            LLMError: argumenty nie są obiektem
+        """
+        if not isinstance(block.input, dict):
+            raise LLMError(
+                f"model podał argumenty narzędzia `{block.name}`, które nie są obiektem JSON"
+            )
+
+        return dict(block.input)
+
+    @staticmethod
+    def _block_to_item(
+        block,  # np. ToolUseBlock(type="tool_use", id="toolu_1", name="read_docs", input={…})
+    ) -> dict[str, Any]:
+        """
+        Description:
+        Zapisuje blok odpowiedzi w kształcie, w jakim to API przyjmuje go z powrotem w następnej
+        turze. Znane rodzaje bloków są przepisywane pole po polu, bo odpowiedź niesie też pola,
+        których żądanie nie przyjmuje; blok nieznanego rodzaju idzie w całości.
+
+        | rodzaj bloku        | co wraca do dostawcy                      |
+        |---------------------|-------------------------------------------|
+        | `text`              | tekst                                     |
+        | `tool_use`          | identyfikator, nazwa i argumenty          |
+        | `thinking`          | treść myślenia i jej podpis, bez zmian    |
+        | `redacted_thinking` | zaszyfrowane dane, bez zmian              |
+
+        Example args:
+            block=ToolUseBlock(type="tool_use", id="toolu_1", name="read_docs", input={…})
+
+        Example result:
+            {"type": "tool_use", "id": "toolu_1", "name": "read_docs", "input": {…}}
+        """
+        # --- tekst modelu ---
+        if block.type == BLOCK_TEXT:
+            return {"type": BLOCK_TEXT, "text": block.text}
+
+        # --- wywołanie narzędzia ---
+        if block.type == BLOCK_TOOL_USE:
+            return {
+                "type":  BLOCK_TOOL_USE,
+                "id":    block.id,
+                "name":  block.name,
+                "input": block.input,
+            }
+
+        # --- myślenie: podpis poświadcza treść, więc oba idą nietknięte ---
+        if block.type == BLOCK_THINKING:
+            return {
+                "type":      BLOCK_THINKING,
+                "thinking":  block.thinking,
+                "signature": block.signature,
+            }
+
+        # --- myślenie ukryte przez dostawcę ---
+        if block.type == BLOCK_REDACTED_THINKING:
+            return {"type": BLOCK_REDACTED_THINKING, "data": block.data}
+
+        # --- rodzaj, którego ten klient nie zna: bez pól pustych ---
+        return block.model_dump(mode="json", exclude_none=True)
+
     def _to_completion(
         self,
         response,           # e.g. anthropic.types.Message with content=[TextBlock(text="{…}")]
@@ -210,6 +586,37 @@ class ClaudeLLMClient(LLMClient):
             LLMError: the answer carried no text block (the model stopped before writing anything)
         """
         text  = self._extract_text(response)
+        usage = self._usage(response)
+
+        completion = LLMCompletion(
+            text               = text,
+            model              = response.model,
+            prompt_tokens      = usage.prompt_tokens,
+            completion_tokens  = usage.completion_tokens,
+            cache_write_tokens = usage.cache_write_tokens,
+            cache_read_tokens  = usage.cache_read_tokens,
+            latency_ms         = elapsed_ms,
+            cost_usd           = usage.cost_usd,
+        )
+
+        return completion
+
+    @staticmethod
+    def _usage(
+        response,  # np. Message(model="claude-haiku-4-5", usage=Usage(input_tokens=4820, …))
+    ) -> LLMUsage:
+        """
+        Description:
+        Czyta zużycie jednego wywołania w czterech klasach tokenów i wycenia je. Wspólne dla
+        `complete()` i `complete_turn()`: oba płacą według tych samych liczników. W tym API klasy
+        są rozłączne od razu — `input_tokens` to samo świeże wejście.
+
+        Example args:
+            response=Message(model="claude-haiku-4-5", usage=Usage(input_tokens=4820, …))
+
+        Example result:
+            LLMUsage(calls=1, prompt_tokens=4820, completion_tokens=640, cost_usd=0.0080)
+        """
         usage = response.usage
 
         # Cache counters are absent on SDK versions that do not report them, and `None` on a call
@@ -219,14 +626,12 @@ class ClaudeLLMClient(LLMClient):
 
         # Priced against the model the response REPORTS, not the one we asked for. The two normally
         # match, but when they do not, the bill follows what actually ran.
-        return LLMCompletion(
-            text               = text,
-            model              = response.model,
+        counted = LLMUsage(
+            calls              = 1,
             prompt_tokens      = usage.input_tokens,
             completion_tokens  = usage.output_tokens,
             cache_write_tokens = cache_write_tokens,
             cache_read_tokens  = cache_read_tokens,
-            latency_ms         = elapsed_ms,
             cost_usd           = calculate_cost_usd(
                 model              = response.model,
                 prompt_tokens      = usage.input_tokens,
@@ -235,6 +640,8 @@ class ClaudeLLMClient(LLMClient):
                 cache_read_tokens  = cache_read_tokens,
             ),
         )
+
+        return counted
 
     @staticmethod
     def _extract_text(response) -> str:  # e.g. Message(content=[TextBlock(text='{"problem": …}')])

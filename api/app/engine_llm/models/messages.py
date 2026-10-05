@@ -13,8 +13,8 @@ class ToolDefinition(BaseModel):
 
     Do czego:
     Własny typ, jak `ChatMessage`: graf buduje definicje z nazwy, opisu `.md` i schematu modelu
-    Pydantic, a format narzędzia u konkretnego dostawcy tłumaczy jego klient (CLAUDE.md -> „Plan
-    i TODO", p. 17). Tak samo opisuje się narzędzia wiedzy i narzędzie odpowiedzi grafu
+    Pydantic, a format narzędzia u konkretnego dostawcy tłumaczy jego klient (CLAUDE.md ->
+    „Warstwa LLM"). Tak samo opisuje się narzędzia wiedzy i narzędzie odpowiedzi grafu
     (`respond_<graf>`).
     """
 
@@ -51,7 +51,7 @@ class ChatMessage(BaseModel):
     Do czego:
     Własny typ zamiast wiadomości LangChaina: pętla rozmawia z modelem przez `LLMClient`
     (zasada 4), a format wiadomości u konkretnego dostawcy tłumaczy jego klient (CLAUDE.md ->
-    „Plan", p. 17). LangGraph nie wymaga typów LangChaina, więc stan grafu nie musi ich
+    „Warstwa LLM"). LangGraph nie wymaga typów LangChaina, więc stan grafu nie musi ich
     znać. Prompt systemowy nie jest wiadomością — dokłada go węzeł `agent` przy każdej turze.
 
     `provider_items` to elementy, które dostawca każe odesłać bez zmian w następnej turze:

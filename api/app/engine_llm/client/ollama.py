@@ -1,4 +1,6 @@
+import json
 import time
+from collections.abc import Sequence
 
 # Ollama speaks the OpenAI protocol, so the official SDK drives it — no second HTTP layer, and the
 # three failure modes below keep the meanings they have there:
@@ -15,6 +17,9 @@ from openai import (
 from app.engine_llm.base import LLMClient
 from app.engine_llm.errors import LLMConfigError, LLMError
 from app.engine_llm.models.completion import LLMCompletion
+from app.engine_llm.models.messages import ChatMessage, ToolCall, ToolDefinition
+from app.engine_llm.models.turn import LLMTurn
+from app.engine_llm.models.usage import LLMUsage
 from app.engine_llm.pricing.selfhosted import calculate_cost_usd
 
 # Fallbacks used when nothing is configured. Both are ENV settings (`NUM_CTX` and
@@ -80,6 +85,13 @@ class OllamaLLMClient(LLMClient):
         2. `complete()` sends one prompt, prepending the system prompt as the first message.
         3. The answer text is read and usage is mapped; `cost_usd` is zero by construction, so the
            number worth reading is `latency_ms`.
+        4. `complete_turn()` robi to samo dla tury z narzędziami, w kształcie Chat Completions:
+           prompt systemowy to pierwsza wiadomość, wywołania narzędzi stoją w `tool_calls` tury
+           modelu, a wynik narzędzia to wiadomość o roli `tool`.
+
+    Tura z narzędziami nie wymusza wywołania narzędzia (`tool_choice` zostaje domyślne): serwery
+    zgodne z OpenAI różnie traktują wymuszenie, a część odrzuca je błędem. Turę z samym tekstem
+    rozstrzyga graf. Te same strażniki okna kontekstu co w `complete()` pilnują też tury.
     """
 
     def __init__(
@@ -193,7 +205,81 @@ class OllamaLLMClient(LLMClient):
             "temperature":           self._temperature,
         }
 
-        # --- call the local server ---
+        response = await self._send(request)
+
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        completion = self._to_completion(response, elapsed_ms, len(prompt) + len(system or ""))
+
+        self._log_call(prompt, completion)
+
+        return completion
+
+    async def complete_turn(
+        self,
+        system:   str,                       # np. "Jesteś asystentem wdrożeniowca helpdesku…"
+        messages: Sequence[ChatMessage],     # rozmowa: zgłoszenie, tury modelu, wyniki narzędzi
+        tools:    Sequence[ToolDefinition],  # narzędzia, które model może wywołać w tej turze
+    ) -> LLMTurn:
+        """
+        Description:
+        Wykonuje jedną turę modelu w rozmowie z narzędziami i oddaje ją w naszym kształcie.
+        Koszt jest zawsze zerowy; przed wysłaniem i po odpowiedzi działają te same strażniki
+        okna kontekstu co w `complete()`.
+
+        Example args:
+            system="Jesteś asystentem wdrożeniowca helpdesku…"
+            messages=[ChatMessage(role="user", content="=== ZGŁOSZENIE ===\nNie przychodzą…")]
+            tools=[ToolDefinition(name="find_tickets_vector", …),
+                   ToolDefinition(name="respond_search", …)]
+
+        Example result:
+            LLMTurn(message=ChatMessage(role="assistant",
+                                        tool_calls=[ToolCall(name="find_tickets_vector", …)]),
+                    model="model-lokalny:tag", latency_ms=41200.0, usage=LLMUsage(calls=1, …))
+
+        Raises:
+            LLMError: serwer nie odpowiedział w czasie, był nieosiągalny, odrzucił żądanie,
+                rozmowa nie mieści się w oknie kontekstu albo tura nie ma tekstu ani wywołań
+        """
+        started_at = time.perf_counter()
+        request    = self._build_turn_request(system, messages, tools)
+
+        # Wszystko, co serwer ma przeczytać: rozmowa z promptem systemowym i definicje narzędzi.
+        sent_text = (
+            json.dumps(request["messages"], ensure_ascii=False)
+            + json.dumps(request["tools"], ensure_ascii=False)
+        )
+
+        # --- odmowa, zanim serwer utnie po cichu to, co się nie mieści ---
+        self._reject_if_too_long(sent_text, None)
+
+        response = await self._send(request)
+
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        turn       = self._to_turn(response, elapsed_ms, len(sent_text))
+
+        self._log_turn(messages, turn)
+
+        return turn
+
+    async def _send(
+        self,
+        request: dict,  # np. {"model": "model-lokalny:tag", "messages": […], "temperature": 0.0}
+    ):
+        """
+        Description:
+        Wysyła żądanie do serwera i tłumaczy awarie SDK na `LLMError`. Wspólne dla `complete()`
+        i `complete_turn()`, żeby oba mówiły o awarii tym samym komunikatem.
+
+        Example args:
+            request={"model": "model-lokalny:tag", "messages": […], "temperature": 0.0}
+
+        Example result:
+            ChatCompletion(choices=[Choice(message=…)], usage=Usage(prompt_tokens=6200, …))
+
+        Raises:
+            LLMError: serwer nie odpowiedział w czasie, był nieosiągalny albo odrzucił żądanie
+        """
         try:
             response = await self._client.chat.completions.create(**request)
         except APITimeoutError as exc:
@@ -216,12 +302,200 @@ class OllamaLLMClient(LLMClient):
                 f"(HTTP {exc.status_code})"
             ) from exc
 
-        elapsed_ms = (time.perf_counter() - started_at) * 1000
-        completion = self._to_completion(response, elapsed_ms, len(prompt) + len(system or ""))
+        return response
 
-        self._log_call(prompt, completion)
+    def _build_turn_request(
+        self,
+        system:   str,                       # np. "Jesteś asystentem wdrożeniowca helpdesku…"
+        messages: Sequence[ChatMessage],     # rozmowa w naszym kształcie
+        tools:    Sequence[ToolDefinition],  # narzędzia grafu, z `respond_<graf>` na końcu
+    ) -> dict:
+        """
+        Description:
+        Składa żądanie tury z narzędziami w kształcie Chat Completions. Wydzielone, bo czyste:
+        test sprawdza kształt żądania bez działającego serwera.
 
-        return completion
+        Example args:
+            system="Jesteś asystentem wdrożeniowca helpdesku…"
+            messages=[ChatMessage(role="user", content="=== ZGŁOSZENIE ===\nNie przychodzą…")]
+            tools=[ToolDefinition(name="respond_search", description="Kończy.", parameters={…})]
+
+        Example result:
+            {"model": "model-lokalny:tag", "max_completion_tokens": 1500, "temperature": 0.0,
+             "messages": [{"role": "system", "content": "Jesteś asystentem…"},
+                          {"role": "user", "content": "=== ZGŁOSZENIE ===…"}],
+             "tools": [{"type": "function",
+                        "function": {"name": "respond_search", "description": "Kończy.",
+                                     "parameters": {…}}}]}
+        """
+        request: dict = {
+            "model":                 self._model,
+            "max_completion_tokens": self._max_output_tokens,
+            "messages":              [
+                {"role": "system", "content": system},
+                *self._turn_messages(messages),
+            ],
+            "tools":                 [self._tool_param(tool) for tool in tools],
+            "temperature":           self._temperature,
+        }
+
+        return request
+
+    @staticmethod
+    def _tool_param(
+        tool: ToolDefinition,  # np. ToolDefinition(name="read_docs", description="…", …)
+    ) -> dict:
+        """
+        Description:
+        Zapisuje definicję narzędzia w kształcie Chat Completions: nazwa, opis i schemat stoją
+        pod kluczem `function`.
+
+        Example args:
+            tool=ToolDefinition(name="read_docs", description="Czyta sekcje.", parameters={…})
+
+        Example result:
+            {"type": "function",
+             "function": {"name": "read_docs", "description": "Czyta sekcje.", "parameters": {…}}}
+        """
+        param = {
+            "type":     "function",
+            "function": {
+                "name":        tool.name,
+                "description": tool.description,
+                "parameters":  tool.parameters,
+            },
+        }
+
+        return param
+
+    @staticmethod
+    def _turn_messages(
+        messages: Sequence[ChatMessage],  # np. [ChatMessage(role="user", …), …]
+    ) -> list[dict]:
+        """
+        Description:
+        Tłumaczy rozmowę na wiadomości Chat Completions, w tej samej kolejności. Argumenty
+        wywołania narzędzia idą w tym protokole jako tekst JSON, nie jako obiekt.
+
+        Example args:
+            messages=[ChatMessage(role="user", content="Nie przychodzą przesyłki"),
+                      ChatMessage(role="assistant", tool_calls=[ToolCall(call_id="call_1", …)]),
+                      ChatMessage(role="tool", call_id="call_1", content='{"tickets": []}')]
+
+        Example result:
+            [{"role": "user", "content": "Nie przychodzą przesyłki"},
+             {"role": "assistant", "content": "",
+              "tool_calls": [{"id": "call_1", "type": "function",
+                              "function": {"name": "find_tickets_vector", "arguments": "{…}"}}]},
+             {"role": "tool", "tool_call_id": "call_1", "content": '{"tickets": []}'}]
+        """
+        translated: list[dict] = []
+
+        for message in messages:
+            # --- wynik narzędzia: wskazuje wywołanie, na które odpowiada ---
+            if message.role == "tool":
+                translated.append({
+                    "role":         "tool",
+                    "tool_call_id": message.call_id,
+                    "content":      message.content,
+                })
+                continue
+
+            # --- tura użytkownika ---
+            if message.role == "user":
+                translated.append({"role": "user", "content": message.content})
+                continue
+
+            # --- tura modelu: tekst i, jeśli są, wywołania narzędzi ---
+            turn: dict = {"role": "assistant", "content": message.content}
+
+            if message.tool_calls:
+                turn["tool_calls"] = [
+                    {
+                        "id":       call.call_id,
+                        "type":     "function",
+                        "function": {
+                            "name":      call.name,
+                            "arguments": json.dumps(call.arguments, ensure_ascii=False),
+                        },
+                    }
+                    for call in message.tool_calls
+                ]
+
+            translated.append(turn)
+
+        return translated
+
+    def _to_turn(
+        self,
+        response,             # np. ChatCompletion(choices=[Choice(message=…)], usage=Usage(…))
+        elapsed_ms: float,    # np. 41200.0
+        sent_chars: int = 0,  # np. 18240 — rozmowa i narzędzia; 0 pomija porównanie z licznikiem
+    ) -> LLMTurn:
+        """
+        Description:
+        Przepisuje jedną odpowiedź serwera na turę modelu w naszym kształcie. Wydzielone, bo
+        czyste: test podaje atrapę odpowiedzi i sprawdza mapowanie bez działającego serwera.
+
+        Example args:
+            response=ChatCompletion(choices=[Choice(message=Message(tool_calls=[…]))], usage=…)
+            elapsed_ms=41200.0
+
+        Example result:
+            LLMTurn(message=ChatMessage(role="assistant", tool_calls=[ToolCall(…)]),
+                    model="model-lokalny:tag", latency_ms=41200.0, usage=LLMUsage(calls=1, …))
+
+        Raises:
+            LLMError: brak wariantu odpowiedzi, tura bez tekstu i bez wywołań, argumenty
+                wywołania niebędące obiektem JSON albo rozmowa ucięta przez okno kontekstu
+        """
+        if not response.choices:
+            raise LLMError("odpowiedź modelu nie zawiera żadnego wariantu odpowiedzi")
+
+        choice = response.choices[0]
+        text   = choice.message.content or ""
+
+        # Lokalny serwer bywa, że nie nadaje wywołaniu identyfikatora; wynik narzędzia musi je
+        # jednak wskazać, więc brakujący zastępuje numer wywołania w tej turze.
+        calls = [
+            ToolCall(
+                call_id   = call.id or f"call_{number}",
+                name      = call.function.name,
+                arguments = self._parse_arguments(call.function.name, call.function.arguments),
+            )
+            for number, call in enumerate(choice.message.tool_calls or [], start=1)
+        ]
+
+        # Model nic nie napisał i niczego nie wywołał.
+        if not calls and not text:
+            raise LLMError(
+                f"tura modelu nie zawiera tekstu ani wywołań narzędzi "
+                f"(finish_reason={choice.finish_reason})"
+            )
+
+        usage = response.usage
+
+        # --- te same strażniki okna kontekstu co w `complete()` ---
+        self._reject_if_window_was_filled(usage.prompt_tokens)
+        self._reject_if_server_read_less(usage.prompt_tokens, sent_chars)
+
+        turn = LLMTurn(
+            message    = ChatMessage(role="assistant", content=text, tool_calls=calls),
+            model      = response.model,
+            latency_ms = elapsed_ms,
+            usage      = LLMUsage(
+                calls             = 1,
+                prompt_tokens     = usage.prompt_tokens,
+                completion_tokens = usage.completion_tokens,
+                cost_usd          = calculate_cost_usd(
+                    model             = response.model,
+                    prompt_tokens     = usage.prompt_tokens,
+                    completion_tokens = usage.completion_tokens,
+                ),
+            ),
+        )
+
+        return turn
 
     def _reject_if_too_long(
         self,
@@ -309,6 +583,31 @@ class OllamaLLMClient(LLMClient):
             f"zmierz je i popraw, zgłoszenie zostaje pominięte"
         )
 
+    def _reject_if_window_was_filled(
+        self,
+        prompt_tokens: int,  # np. 8192 — ile tokenów wejścia naliczył serwer
+    ) -> None:
+        """
+        Description:
+        Odrzuca odpowiedź, gdy wejście wypełniło całe okno kontekstu: koniec tekstu został wtedy
+        najprawdopodobniej ucięty, a w tym korpusie to na końcu wątku stoi rozstrzygnięcie.
+        Wspólne dla `complete()` i `complete_turn()`.
+
+        Example args:
+            prompt_tokens=8192
+
+        Example result:
+            None — wraca bez słowa, gdy wejście zmieściło się z zapasem
+
+        Raises:
+            LLMError: serwer naliczył co najmniej tyle tokenów wejścia, ile ma okno
+        """
+        if prompt_tokens >= self._num_ctx:
+            raise LLMError(
+                f"prompt wypełnił całe okno kontekstu ({prompt_tokens} z {self._num_ctx} "
+                f"tokenów) — koniec wątku został najprawdopodobniej ucięty, artefakt odrzucony"
+            )
+
     def _to_completion(
         self,
         response,           # e.g. ChatCompletion(choices=[Choice(message=…)], usage=Usage(…))
@@ -345,11 +644,7 @@ class OllamaLLMClient(LLMClient):
         # LARGER than the window the server actually runs with. The length check would then pass a
         # prompt the server truncates, and this is the only place that notices. Verified against the
         # live pod on 2026-08-02 by configuring 1024 against a server running 32768.
-        if usage.prompt_tokens >= self._num_ctx:
-            raise LLMError(
-                f"prompt wypełnił całe okno kontekstu ({usage.prompt_tokens} z {self._num_ctx} "
-                f"tokenów) — koniec wątku został najprawdopodobniej ucięty, artefakt odrzucony"
-            )
+        self._reject_if_window_was_filled(usage.prompt_tokens)
 
         # Third check, and the only one that does not trust `NUM_CTX`. Compares what we SENT
         # with what the server says it READ: a server that quietly ran a smaller window reports far

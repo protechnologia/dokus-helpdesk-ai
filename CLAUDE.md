@@ -104,9 +104,9 @@ aplikacji i dostęp do instancji testowej, na której agent sprawdzi opisany obj
 pierwszym narzędziem, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzji
 o granicach.
 
-**Stan na dziś.** Szkielet stoi w całości, a część jednostek to atrapy: odpowiedź, anonimizator
-oraz model w turze z narzędziami. Węzły agenta i wykonania narzędzi są właściwe, ale trasy biorą
-jeszcze grafy złożone z atrap. Wszystkie osiem narzędzi ma wersję właściwą; dwa, które czytają
+**Stan na dziś.** Szkielet stoi w całości, a część jednostek to atrapy: odpowiedź i anonimizator.
+Węzły agenta i wykonania narzędzi są właściwe, a pętla przeszła na prawdziwym modelu (OpenAI),
+ale trasy biorą jeszcze grafy złożone z atrap. Wszystkie osiem narzędzi ma wersję właściwą; dwa, które czytają
 wątki zgłoszeń, czekają na dane, bo tabela wątków napełni się dopiero po anonimizacji.
 
 ### Zasady produktu
@@ -1852,9 +1852,25 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 - **`LLMClient` ma dwie metody: `complete()` (prompt → tekst) i `complete_turn()` (prompt
   systemowy, rozmowa, narzędzia → jedna tura; 2026-10-05).** Wynik tury to `LLMTurn`: wiadomość
   modelu w naszym kształcie i zużycie od razu w `LLMUsage`. Klient wykonuje jedno wywołanie
-  i niczego nie pamięta — pętla żyje w grafie. Do p. 17 turę umie tylko `FakeLLMClient`
-  (scenariusz `turns`); klient bez niej zgłasza `LLMError`, a metoda stanie się abstrakcyjna
-  razem z p. 17.
+  i niczego nie pamięta — pętla żyje w grafie. Obie metody są abstrakcyjne: turę ma każdy
+  klient, a atrapa oddaje ją ze scenariusza `turns`.
+- **Tura z narzędziami u dostawców (2026-10-05).** Każdy klient tłumaczy rozmowę i narzędzia na
+  swoje API, a turę modelu oddaje z tym, co dostawca każe odesłać, w `provider_items`; w następnej
+  turze odsyła te elementy zamiast składać turę od nowa z naszych pól.
+  - **OpenAI (API Responses), sprawdzone na żywym `gpt-6.1-sol`:** wywołanie narzędzia wymuszone
+    (`tool_choice: required`), `strict: False` podane jawnie, bo to API domyślnie włącza tryb
+    strict, a nasze schematy go nie spełniają; `store: False` z prośbą o zaszyfrowane
+    rozumowanie (`include`). Do `provider_items` idą wszystkie elementy odpowiedzi. Elementu
+    rozumowania w podejrzanej turze nie było, więc jego odsyłania na żywo nie widzieliśmy.
+  - **Claude (Messages API), NIESPRAWDZONE na żywo:** wymuszenie przez `tool_choice: any`; to API
+    nie łączy go z rozszerzonym myśleniem, którego klient nie włącza. Wyniki narzędzi jednej
+    tury idą w JEDNEJ wiadomości `user`, a bloki odpowiedzi są przepisywane pole po polu, bo
+    odpowiedź niesie pola, których żądanie nie przyjmuje.
+  - **Ollama (Chat Completions), NIESPRAWDZONE na żywo:** bez wymuszenia, bo serwery zgodne
+    z OpenAI różnie je traktują; tura z samym tekstem jest tam zwykłym wynikiem. Strażniki okna
+    kontekstu z `complete()` pilnują też tury.
+  - **Argumenty wywołania, które nie są obiektem JSON, to `LLMError`**, bez cytowania treści. Czy
+    argumenty są poprawne, sprawdza dopiero `run_tools`.
 - **Koszt przebiegu jest w stanie grafu i w odpowiedzi każdej trasy (2026-10-04).** Węzeł `agent`
   zwraca zużycie SWOJEJ tury (`LLMUsage`: wywołania, cztery klasy tokenów, `cost_usd`), a reduktor
   `add_usage` w `GraphState` je sumuje; trasy oddają to jako `usage`. Na atrapach wywołania są
@@ -1883,7 +1899,9 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   Model czyta wątki wszystkich znalezionych zgłoszeń, także wbrew promptowi — na prawdziwych
   wątkach to będzie główny koszt sprawy (p. 23–26). Reguła „instrukcje sprawdzasz zawsze" musi iść
   w parze z regułą, że fakty wolno brać także z instrukcji: inaczej trop z instrukcji ląduje tylko
-  w uwagach. Zapisy rozmów: `data/unsafe/docs/przebieg-*.md`.
+  w uwagach. Zapisy rozmów: `data/unsafe/docs/przebieg-*.md`. Od 2026-10-05 pętla na węzłach
+  właściwych jest testem `llm_live` grafu `search`; jeden przebieg na `gpt-6.1-sol` to 5 tur,
+  0,027 USD i 25 tys. z 33 tys. tokenów wejścia odczytanych z cache.
 
 #### Prompty
 
@@ -2121,8 +2139,10 @@ w p. 46.
   z pomiarem `find_tickets_vector` na golden secie i z indeksem paczki syntetycznej:
   `pytest tests/evaluation/ -m "not llm_live"` (stack i oba zbudowane indeksy: zgłoszeń oraz
   syntetyczny dokumentacji)
-- Na żywym LLM: `pytest tests/integration/ -m llm_live` — **kosztuje / bije po sieci, pytaj
-  przed**; woła model generujący z konfiguracji (`LLM_GENERATION_*`)
+- Na żywym LLM:
+  `pytest tests/integration/api_engine_llm/ tests/integration/api_agent_graphs/ -m llm_live` —
+  **kosztuje / bije po sieci, pytaj przed**; woła model generujący z konfiguracji
+  (`LLM_GENERATION_*`). Z wąskimi ścieżkami, bo kolekcja całego `tests/integration/` to ok. 11 s
 - **Podając marker, podaj też folder** — marker odsiewa dopiero PO imporcie, więc bez ścieżki
   pytest wczytuje wszystkie pliki testowe, żeby uruchomić kilkanaście (kolekcja podzbioru spada
   wtedy trzykrotnie). Foldery i markery można łączyć:
@@ -2271,8 +2291,8 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1090 (0)           | 18 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 233 (79)           | 68 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1129 (0)           | 18 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 240 (79)           | 68 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 100 (9)            | 11 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 53 s |
 
@@ -2280,9 +2300,9 @@ Liczby i czasy z 2026-10-05: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku. Bez testów na stacku
 integracyjne trwają 8 s, a ewaluacyjne poniżej sekundy — całe 53 s to 207 wyszukań golden setów
 przez prawdziwy embedder (178 w zgłoszeniach, 29 w dokumentacji). Komplet jednym poleceniem
-(`pytest -m "not llm_live"`): 1459 testów, 149 s; domyślny `pytest`, bez stacku: 1333 testy,
-21 s. Cztery testy integracyjne na żywym modelu (`llm_live`) są w liczbie testów folderu, ale
-poza oboma przebiegami.
+(`pytest -m "not llm_live"`): 1498 testów, 152 s; domyślny `pytest`, bez stacku: 1372 testy,
+21 s. Jedenaście testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
+folderu, ale poza oboma przebiegami.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2356,8 +2376,9 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   się model, na którym produkt ma chodzić; innego dostawcę sprawdza się inną konfiguracją.
   Odmawia błędem, gdy wybór testów nie wymienia `llm_live` (płatne wywołanie nie może być
   skutkiem ubocznym `-m ""`) i gdy dostawcą jest `fake`. Odpowiedzi modelu plik liczy raz
-  i dzieli między testy — dziś dwa wywołania `complete()` na przebieg; testy tury z narzędziami
-  dochodzą z p. 17.
+  i dzieli między testy. Trzy pliki: `complete()` (dwa wywołania), tura z narzędziami (dwie
+  tury na zmyślonych narzędziach) i pętla grafu `search` na węzłach właściwych (jedna sprawa,
+  około 0,03 USD na `gpt-6.1-sol`).
 - **Testy uruchamiaj JEDNYM poleceniem** — całość (`pytest -m "not llm_live"`) albo podzbiór
   wskazany folderami i markerami (`pytest tests/integration/ tests/functional/ -m stack`).
   Oszczędza kilkukrotne ładowanie ciężkich SDK i kolekcję testów; zmierzone: ~110 s wobec ~128 s
@@ -2571,6 +2592,9 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Reguły bramek jako regexy/lista słów zamiast LLM-a** — „potoczne słownictwo" i „nie widać,
   co zrobiono" nie są wyrażalne słownikiem. Kandydat na tanie pre-filtry przed wywołaniem
   LLM-a, jeśli koszt zacznie boleć.
+- **Tryb strict narzędzi u OpenAI** — wymaga schematów, w których każde pole jest wymagane;
+  argumenty i tak waliduje `run_tools`, a błąd wraca do modelu. Wraca, gdy pomiar pokaże częste
+  błędne argumenty (p. 23).
 - **Flaga „endpoint może widzieć surowe dane" przy konfiguracji LLM** — przy dwóch osobnych
   konfiguracjach powtarzałaby to, co mówi sama nazwa zestawu: model w `LLM_ANONYMIZATION_*` widzi
   surowy tekst z definicji. Cena: jedynym zabezpieczeniem jest to, co w tym zestawie stoi,
@@ -2723,21 +2747,16 @@ niż zgadywanie.
   zamiast jednego `LLM_*`, fabryka buduje klienta z kompletu jednej roli, strażnik anonimizacji
   czyta dostawcę modelu generującego; bez flagi „może widzieć surowe dane"; reguły — „Warstwa
   LLM", „Warstwa węzłów", „Konfiguracja i deploy".
-- [ ] **17. Tura z narzędziami u prawdziwych dostawców** (przeniesiony 2026-10-05, numer spoza
-  kolejności) — implementacja kontraktu z p. 9 (`complete_turn()`, która staje się wtedy
-  abstrakcyjna) w klientach Claude / OpenAI / Ollama; pętla zostaje w grafie. U OpenAI przez API
-  Responses (klient już na nim stoi), bez przechowywania u dostawcy: elementy rozumowania wracają
-  do modelu w następnej turze w postaci zaszyfrowanej. Wywołanie narzędzia WYMUSZONE tam, gdzie
-  dostawca pozwala łączyć je z rozumowaniem (każda tura ma być wywołaniem), w przeciwnym razie
-  `auto` z jednym ponowieniem — do sprawdzenia u obu dostawców; tryb strict u OpenAI wymaga
-  przetłumaczenia schematu (wszystkie pola wymagane), sonda szła bez niego; tura z narzędziami ma
-  prosić o cache promptu tak jak `complete()` u Claude'a i zwracać zużycie do `LLMUsage`.
-  *Dlaczego:* format wywołań narzędzi to wiedza dostawcy (zasada 4).
+- [x] **17. Tura z narzędziami u prawdziwych dostawców** (2026-10-05) — `complete_turn()`
+  w klientach OpenAI, Claude i Ollama, metoda abstrakcyjna; na żywo sprawdzony OpenAI
+  (`gpt-6.1-sol`), razem z całą pętlą na węzłach właściwych; Claude i Ollama mają tylko testy
+  na podstawionych odpowiedziach; reguły — „Warstwa LLM", „Testy".
 - [ ] **11. `respond`** — walidacja argumentów `respond_<graf>` do typu wyniku grafu; błąd wraca
   do modelu jako wiadomość `tool` (jak w p. 10), z jednym retry; `requires_hits`: graf wymagający
   źródeł bez źródeł nie oddaje propozycji; do rozstrzygnięcia, co z turą bez poprawnej odpowiedzi
-  — sam tekst, odpowiedź razem z innym narzędziem, narzędzia wiedzy ucięte limitem tur; z tym
-  punktem fabryka grafów przechodzi z atrap na węzły właściwe. *Dlaczego:*
+  — sam tekst (u Ollamy zwykły przypadek, bo wywołania się tam nie wymusza; tu trafia jedno
+  ponowienie planowane w p. 17), odpowiedź razem z innym narzędziem, narzędzia wiedzy ucięte
+  limitem tur; z tym punktem fabryka grafów przechodzi z atrap na węzły właściwe. *Dlaczego:*
   „bez trafień nie ma rozwiązania" ma wynikać z kodu, nie z posłuszeństwa modelu.
 - [ ] **12. Test przechodzący po wszystkich grafach** — `test_api_agent_graphs_contract.py` już
   sprawdza na atrapach: anonimizacja pierwsza, prompty bez komentarzy redakcyjnych i z tekstem

@@ -1,6 +1,8 @@
+import json
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from typing import Any
 
 from app.engine_llm.errors import LLMError
 from app.engine_llm.models.completion import LLMCompletion
@@ -70,6 +72,7 @@ class LLMClient(ABC):
                 nie da się użyć
         """
 
+    @abstractmethod
     async def complete_turn(
         self,
         system:   str,                       # np. "Jesteś asystentem wdrożeniowca helpdesku…"
@@ -87,8 +90,9 @@ class LLMClient(ABC):
         każe odesłać bez zmian (rozumowanie, bloki myślenia), klient zostawia w `provider_items`
         zwracanej wiadomości i sam stamtąd czyta, gdy ta wiadomość wraca w `messages`.
 
-        Dziś turę z narzędziami umie tylko `FakeLLMClient`. Klienci dostawców dostają ją w p. 17
-        (CLAUDE.md -> „Plan") i do tego czasu zgłaszają błąd stąd.
+        Model ma w każdej turze wywołać narzędzie: także odpowiedź końcowa przychodzi narzędziem
+        (`respond_<graf>`). Klient wymusza to u dostawcy, który na to pozwala; gdzie się nie da,
+        tura z samym tekstem wraca jak każda inna i rozstrzyga ją graf.
 
         Example args:
             system="Jesteś asystentem wdrożeniowca helpdesku…"
@@ -102,10 +106,50 @@ class LLMClient(ABC):
                     model="gpt-6.1-sol", latency_ms=3120.4, usage=LLMUsage(calls=1, …))
 
         Raises:
-            LLMError: dostawca odmówił, nie odpowiedział w czasie albo ten klient nie umie tury
-                z narzędziami
+            LLMError: dostawca odmówił, nie odpowiedział w czasie albo odpowiedział turą, której
+                nie da się użyć (bez tekstu i bez wywołań, z argumentami niebędącymi JSON-em)
         """
-        raise LLMError(f"{type(self).__name__} nie obsługuje jeszcze tury z narzędziami (p. 17)")
+
+    @staticmethod
+    def _parse_arguments(
+        tool_name: str,  # np. "find_tickets_vector"
+        raw:       str,  # np. '{"problem": "Brak przesyłek", "symptoms": "pusta skrzynka"}'
+    ) -> dict[str, Any]:
+        """
+        Description:
+        Zamienia argumenty wywołania narzędzia z tekstu JSON, w jakim podają je dostawcy mówiący
+        protokołem OpenAI, na słownik. Czy argumenty są POPRAWNE, sprawdza dopiero klasa
+        argumentów narzędzia w węźle `run_tools`; tutaj chodzi tylko o to, żeby dało się je
+        w ogóle zapisać w `ToolCall`. Puste argumenty to pusty słownik.
+
+        Example args:
+            tool_name="find_tickets_vector"
+            raw='{"problem": "Brak przesyłek", "symptoms": "pusta skrzynka"}'
+
+        Example result:
+            {"problem": "Brak przesyłek", "symptoms": "pusta skrzynka"}
+
+        Raises:
+            LLMError: tekst nie jest JSON-em albo nie jest obiektem
+        """
+        # --- narzędzie bez argumentów: dostawca bywa, że podaje pusty tekst ---
+        if not raw.strip():
+            return {}
+
+        try:
+            arguments = json.loads(raw)
+        except json.JSONDecodeError:
+            # Bez treści: argumenty powstały ze zgłoszenia, czyli z danych klienta.
+            raise LLMError(
+                f"model podał argumenty narzędzia `{tool_name}`, które nie są JSON-em"
+            ) from None
+
+        if not isinstance(arguments, dict):
+            raise LLMError(
+                f"model podał argumenty narzędzia `{tool_name}`, które nie są obiektem JSON"
+            )
+
+        return arguments
 
     def _log_call(
         self,

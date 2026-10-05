@@ -16,9 +16,9 @@ pytestmark = pytest.mark.llm_live
 #
 # KOSZTUJE: jeden przebieg pliku to dwa krótkie wywołania modelu, policzone raz i wspólne dla
 # wszystkich testów. Uruchamia się go świadomie, z folderem:
-# `pytest tests/integration/ -m llm_live`. Innego dostawcę sprawdza się inną konfiguracją, nie
-# zmianą w tym pliku. Bez `llm_live` w `-m` i przy atrapie modelu testy odmawiają
-# (`live_generation_llm()` w `tests/conftest.py`).
+# `pytest tests/integration/api_engine_llm/ -m llm_live`. Innego dostawcę sprawdza się inną
+# konfiguracją, nie zmianą w tym pliku. Bez `llm_live` w `-m` i przy atrapie modelu testy
+# odmawiają (`live_generation_llm()` w `tests/conftest.py`).
 
 # Dostawca self-hosted: nasz sprzęt nie nalicza tokenów, więc koszt wywołania to zero.
 PROVIDER_SELFHOSTED = "ollama"
