@@ -30,21 +30,30 @@ services:
       # Parsed tickets are the durable artifact (rule 7) and must survive `down -v`, so they
       # stay a host directory rather than a named volume.
       - ./data:/code/data
-    # The three LLM_* values below interpolate to an EMPTY STRING while the provider is `fake`,
-    # and that is deliberate: they are optional and only a real provider fills them. The empty
-    # string never reaches a client, because `_drop_blank_values` in Settings turns it back into
-    # the declared default — this is the exact trap that validator exists for, not an oversight.
+    # Sześć wartości LLM niżej (BASE_URL, API_KEY i MODEL obu ról) interpoluje się do PUSTEGO
+    # TEKSTU, dopóki dostawcą jest `fake` — celowo: są opcjonalne i wypełnia je dopiero prawdziwy
+    # dostawca. Pusty tekst nie dociera do klienta, bo `_drop_blank_values` w Settings zamienia go
+    # z powrotem na wartość domyślną; po to ten walidator istnieje, to nie przeoczenie.
     environment:
       LOG_LEVEL:                 ${LOG_LEVEL:-INFO}
-      LLM_PROVIDER:              ${LLM_PROVIDER:-fake}
-      LLM_BASE_URL:              ${LLM_BASE_URL:-}
-      LLM_API_KEY:               ${LLM_API_KEY:-}
-      LLM_MODEL:                 ${LLM_MODEL:-}
-      LLM_TEMPERATURE:           ${LLM_TEMPERATURE:-0}
-      LLM_TIMEOUT_SECONDS:       ${LLM_TIMEOUT_SECONDS:-60}
-      # Read only by self-hosted runners (`ollama`); hosted providers manage their own window.
-      LLM_NUM_CTX:               ${LLM_NUM_CTX:-8192}
-      LLM_MAX_OUTPUT_TOKENS:     ${LLM_MAX_OUTPUT_TOKENS:-1500}
+      # Rola generująca: model, który pisze odpowiedzi w grafach — opis w .env.example.
+      LLM_GENERATION_PROVIDER:          ${LLM_GENERATION_PROVIDER:-fake}
+      LLM_GENERATION_BASE_URL:          ${LLM_GENERATION_BASE_URL:-}
+      LLM_GENERATION_API_KEY:           ${LLM_GENERATION_API_KEY:-}
+      LLM_GENERATION_MODEL:             ${LLM_GENERATION_MODEL:-}
+      LLM_GENERATION_TEMPERATURE:       ${LLM_GENERATION_TEMPERATURE:-0}
+      LLM_GENERATION_TIMEOUT_SECONDS:   ${LLM_GENERATION_TIMEOUT_SECONDS:-60}
+      LLM_GENERATION_NUM_CTX:           ${LLM_GENERATION_NUM_CTX:-8192}
+      LLM_GENERATION_MAX_OUTPUT_TOKENS: ${LLM_GENERATION_MAX_OUTPUT_TOKENS:-1500}
+      # Rola anonimizująca: model pomagający anonimizatorowi; widzi SUROWY tekst zgłoszeń.
+      LLM_ANONYMIZATION_PROVIDER:          ${LLM_ANONYMIZATION_PROVIDER:-fake}
+      LLM_ANONYMIZATION_BASE_URL:          ${LLM_ANONYMIZATION_BASE_URL:-}
+      LLM_ANONYMIZATION_API_KEY:           ${LLM_ANONYMIZATION_API_KEY:-}
+      LLM_ANONYMIZATION_MODEL:             ${LLM_ANONYMIZATION_MODEL:-}
+      LLM_ANONYMIZATION_TEMPERATURE:       ${LLM_ANONYMIZATION_TEMPERATURE:-0}
+      LLM_ANONYMIZATION_TIMEOUT_SECONDS:   ${LLM_ANONYMIZATION_TIMEOUT_SECONDS:-60}
+      LLM_ANONYMIZATION_NUM_CTX:           ${LLM_ANONYMIZATION_NUM_CTX:-8192}
+      LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS: ${LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS:-1500}
       EMBEDDING_BASE_URL:        ${EMBEDDING_BASE_URL:-http://embedder:8000}
       EMBEDDING_VECTOR_SIZE:     ${EMBEDDING_VECTOR_SIZE:-768}
       EMBEDDING_TIMEOUT_SECONDS: ${EMBEDDING_TIMEOUT_SECONDS:-120}

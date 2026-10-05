@@ -7,7 +7,7 @@ a ta powierzchnia to wszystko, co domena może wiedzieć o modelu.
 | gdzie        | co zawiera                                                        |
 |--------------|-------------------------------------------------------------------|
 | `base.py`    | `LLMClient` — interfejs, przez który reszta aplikacji woła model  |
-| `factory.py` | `get_llm_client()` — klient po `LLM_PROVIDER`, z fail-fast        |
+| `factory.py` | `get_llm_client()` — klient z kompletu ustawień roli, z fail-fast |
 | `client/`    | klienci dostawców, plik na dostawcę; jedyne miejsce na ich SDK    |
 | `pricing/`   | cenniki modeli i liczenie kosztu wywołania                        |
 | `models/`    | wiadomości, wynik wywołania, tura rozmowy i zużycie w przebiegu   |

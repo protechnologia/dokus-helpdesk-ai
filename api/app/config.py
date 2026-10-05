@@ -1,7 +1,35 @@
 from typing import Any, ClassVar
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class LLMSettings(BaseModel):
+    """
+    Description:
+    Konfiguracja jednego modelu językowego: komplet ustawień jednej roli, wyjęty z `Settings`.
+
+    Do czego:
+    `Settings` trzyma dwa takie komplety, każdy pod własnym przedrostkiem zmiennych:
+    `LLM_GENERATION_*` dla modelu, który pisze odpowiedzi w grafach, i `LLM_ANONYMIZATION_*` dla
+    modelu, który pomaga anonimizatorowi. Fabryka klienta (`get_llm_client()`) dostaje jeden
+    komplet i nie musi wiedzieć, której roli służy.
+
+    `env_prefix` niesie przedrostek zmiennych tego kompletu tylko po to, żeby komunikat błędu
+    nazwał właściwą zmienną: przy dwóch kompletach samo „brakuje klucza" nie mówi, którego.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    env_prefix:        str         = Field(examples=["LLM_GENERATION_"])
+    provider:          str         = Field(examples=["openai"])
+    base_url:          str | None  = Field(examples=["https://api.openai.com/v1"])
+    api_key:           str | None  = Field(examples=["sk-proj-...HNkA"])
+    model:             str | None  = Field(examples=["gpt-5.4-mini"])
+    temperature:       float       = Field(examples=[0.0])
+    timeout_seconds:   float       = Field(examples=[60.0])
+    num_ctx:           int         = Field(examples=[8192])
+    max_output_tokens: int         = Field(examples=[1500])
 
 
 class Settings(BaseSettings):
@@ -19,8 +47,9 @@ class Settings(BaseSettings):
         3. Field types and defaults apply; a missing required value fails fast at construction.
 
     Field names map to ENV names by upper-casing: `qdrant_url` <- `QDRANT_URL`. The prefixes
-    (`LLM_`, `EMBEDDING_`, `QDRANT_`, `POSTGRES_`, `RAG_`, `AGENT_`) are the only namespacing —
-    there is one `.env` for the whole compose project, not one per service.
+    (`LLM_GENERATION_`, `LLM_ANONYMIZATION_`, `EMBEDDING_`, `QDRANT_`, `POSTGRES_`, `RAG_`,
+    `AGENT_`) are the only namespacing — there is one `.env` for the whole compose project, not
+    one per service.
     """
 
     # Przedrostek pól z limitami wywołań narzędzi; reszta nazwy pola to nazwa narzędzia.
@@ -35,21 +64,36 @@ class Settings(BaseSettings):
     # --- observability ---
     log_level: str = "INFO"                             # e.g. "DEBUG"
 
-    # --- LLM: defaults to the offline fake, so `up` and `pytest` cost nothing ---
-    llm_provider:        str        = "fake"            # e.g. "openai"
-    llm_base_url:        str | None = None              # e.g. "https://api.openai.com/v1"
-    llm_api_key:         str | None = None              # e.g. "sk-proj-...HNkA"
-    llm_model:           str | None = None              # e.g. "gpt-4o-mini"
-    llm_temperature:     float      = 0.0               # 0 for every extraction task
-    llm_timeout_seconds: float      = 60.0              # seconds
+    # --- LLM: dwie osobne konfiguracje, po jednej na rolę ---
+    # Każda rola ma własny komplet tych samych ośmiu ustawień i nic nie dziedziczy po drugiej.
+    # Obie domyślnie stoją na atrapie, więc `up` i `pytest` nic nie wysyłają i nic nie kosztują.
+    #
+    # `num_ctx` i `max_output_tokens` to budżet kontekstu w tokenach. Dostawcy chmurowi oba
+    # ignorują; liczą się przy modelu self-hosted (Ollama, vLLM), gdzie okno ustawiamy sami,
+    # a pomyłka jest cicha: nadmiar ponad `num_ctx` serwer ucina bez błędu. Budżet odpowiedzi
+    # jest odejmowany od okna, nie doliczany.
 
-    # Context budget, in tokens. Hosted providers manage their own window and ignore both values;
-    # they exist for self-hosted runners (Ollama, vLLM), where the window is OUR decision and a
-    # wrong one is silent — anything past `llm_num_ctx` is dropped without an error.
-    # Both belong in ENV rather than in code because they depend on the model and the machine:
-    # the same client serves a 4.5B model on a laptop and Bielik 11B on a rented GPU.
-    llm_num_ctx:           int = 8192                   # must fit what the model declares
-    llm_max_output_tokens: int = 1500                   # carved OUT of llm_num_ctx, not added
+    # Rola generująca: model, który pisze odpowiedzi w grafach. Dostaje tekst po anonimizacji.
+    llm_generation_provider:          str        = "fake"  # np. "openai"
+    llm_generation_base_url:          str | None = None    # np. "https://api.openai.com/v1"
+    llm_generation_api_key:           str | None = None    # np. "sk-proj-...HNkA"
+    llm_generation_model:             str | None = None    # np. "gpt-5.4-mini"
+    llm_generation_temperature:       float      = 0.0     # parsowanie zgłoszeń zawsze na 0
+    llm_generation_timeout_seconds:   float      = 60.0    # sekundy
+    llm_generation_num_ctx:           int        = 8192    # musi mieścić się w oknie modelu
+    llm_generation_max_output_tokens: int        = 1500    # część `num_ctx`, nie dodatek
+
+    # Rola anonimizująca: model, który pomaga anonimizatorowi rozpoznawać dane osobowe (p. 19).
+    # Widzi SUROWY tekst zgłoszeń, więc to, co tu wpiszesz, jest decyzją o tym, dokąd ten tekst
+    # trafia — ma to być model pod naszą kontrolą, nie dostawca komercyjny.
+    llm_anonymization_provider:          str        = "fake"  # np. "ollama"
+    llm_anonymization_base_url:          str | None = None    # np. "http://ollama:11434/v1"
+    llm_anonymization_api_key:           str | None = None    # Ollama klucza nie potrzebuje
+    llm_anonymization_model:             str | None = None    # np. "model-lokalny:tag"
+    llm_anonymization_temperature:       float      = 0.0     # rozpoznawanie ma być powtarzalne
+    llm_anonymization_timeout_seconds:   float      = 60.0    # sekundy
+    llm_anonymization_num_ctx:           int        = 8192    # musi mieścić się w oknie modelu
+    llm_anonymization_max_output_tokens: int        = 1500    # część `num_ctx`, nie dodatek
 
     # --- embedder service (own compose service, reached over REST) ---
     embedding_base_url:        str   = "http://embedder:8000"
@@ -135,7 +179,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="before")
     @classmethod
-    def _drop_blank_values(cls, values: Any) -> Any:    # e.g. {"llm_model": "  "}
+    def _drop_blank_values(cls, values: Any) -> Any:    # e.g. {"llm_generation_model": "  "}
         """
         Description:
         Drops keys whose value is an empty or whitespace-only string, so the field falls back to
@@ -144,10 +188,10 @@ class Settings(BaseSettings):
         time instead of a readable configuration error at startup.
 
         Example args:
-            values={"qdrant_url": "", "llm_model": "gpt-4o-mini"}
+            values={"qdrant_url": "", "llm_generation_model": "gpt-5.4-mini"}
 
         Example result:
-            {"llm_model": "gpt-4o-mini"}
+            {"llm_generation_model": "gpt-5.4-mini"}
         """
         # Sources normally hand over a dict; anything else is passed through untouched.
         if not isinstance(values, dict):
@@ -158,6 +202,58 @@ class Settings(BaseSettings):
             for key, value in values.items()
             if not (isinstance(value, str) and value.strip() == "")
         }
+
+    def llm_generation(self) -> LLMSettings:
+        """
+        Description:
+        Konfiguracja modelu generującego — tego, który pisze odpowiedzi w grafach — jako jeden
+        komplet dla fabryki klienta.
+
+        Example args:
+            (brak)
+
+        Example result:
+            LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", model="gpt-5.4-mini", …)
+        """
+        llm = LLMSettings(
+            env_prefix        = "LLM_GENERATION_",
+            provider          = self.llm_generation_provider,
+            base_url          = self.llm_generation_base_url,
+            api_key           = self.llm_generation_api_key,
+            model             = self.llm_generation_model,
+            temperature       = self.llm_generation_temperature,
+            timeout_seconds   = self.llm_generation_timeout_seconds,
+            num_ctx           = self.llm_generation_num_ctx,
+            max_output_tokens = self.llm_generation_max_output_tokens,
+        )
+
+        return llm
+
+    def llm_anonymization(self) -> LLMSettings:
+        """
+        Description:
+        Konfiguracja modelu anonimizującego — tego, który pomaga anonimizatorowi i widzi surowy
+        tekst zgłoszeń — jako jeden komplet dla fabryki klienta.
+
+        Example args:
+            (brak)
+
+        Example result:
+            LLMSettings(env_prefix="LLM_ANONYMIZATION_", provider="ollama", …)
+        """
+        llm = LLMSettings(
+            env_prefix        = "LLM_ANONYMIZATION_",
+            provider          = self.llm_anonymization_provider,
+            base_url          = self.llm_anonymization_base_url,
+            api_key           = self.llm_anonymization_api_key,
+            model             = self.llm_anonymization_model,
+            temperature       = self.llm_anonymization_temperature,
+            timeout_seconds   = self.llm_anonymization_timeout_seconds,
+            num_ctx           = self.llm_anonymization_num_ctx,
+            max_output_tokens = self.llm_anonymization_max_output_tokens,
+        )
+
+        return llm
 
     def tool_call_limits(self) -> dict[str, int]:
         """

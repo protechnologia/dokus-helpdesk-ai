@@ -32,7 +32,8 @@ class LLMClient(ABC):
     | `complete_turn()` | rozmowa i narzędzia → jedna tura: tekst albo wywołania narzędzi  |
 
     Flow:
-        1. `get_llm_client()` (`factory.py`) buduje implementację wskazaną przez `LLM_PROVIDER`
+        1. `get_llm_client()` (`factory.py`) buduje implementację wskazaną przez dostawcę z
+           kompletu ustawień roli (`LLM_GENERATION_PROVIDER` albo `LLM_ANONYMIZATION_PROVIDER`)
            i odmawia, gdy jej konfiguracja jest niepełna.
         2. Wołający podaje gotowy prompt (`complete()`) albo rozmowę z narzędziami
            (`complete_turn()`, woła ją węzeł `agent`).

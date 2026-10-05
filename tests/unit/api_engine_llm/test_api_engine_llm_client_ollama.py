@@ -67,6 +67,10 @@ class StubResponse:
         self.model   = model
 
 
+# Przedrostek zmiennych roli, której klient służy w tych testach — nim nazywa zmienne w błędach.
+ENV_PREFIX = "LLM_ANONYMIZATION_"
+
+
 def make_client() -> OllamaLLMClient:
     """
     Description:
@@ -79,7 +83,7 @@ def make_client() -> OllamaLLMClient:
     Example result:
         OllamaLLMClient(model="SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0")
     """
-    return OllamaLLMClient(model=MODEL)
+    return OllamaLLMClient(model=MODEL, env_prefix=ENV_PREFIX)
 
 
 def test_maps_usage_and_text():
@@ -127,7 +131,7 @@ def test_any_model_name_is_accepted():
     ceny, więc odmowa przy nieznanej nazwie blokowałaby przebieg bez powodu."""
     # Odwrotnie niż w klientach chmurowych, gdzie nieznany model to LLMConfigError: tu nie ma
     # rachunku, który mógłby zaskoczyć.
-    assert OllamaLLMClient(model="jakis/nowy-model:latest")
+    assert OllamaLLMClient(model="jakis/nowy-model:latest", env_prefix=ENV_PREFIX)
 
 
 def test_cache_fields_stay_at_zero():
@@ -217,15 +221,16 @@ def test_input_longer_than_the_window_is_refused():
 
 def test_the_refusal_names_the_settings_to_change():
     """Sprawdza, czy komunikat odmowy przy za długim wejściu wymienia obie zmienne konfiguracji, od
-    których zależy limit: `LLM_NUM_CTX` i `LLM_MAX_OUTPUT_TOKENS`.
+    których zależy limit, z przedrostkiem roli, której klient służy: `LLM_ANONYMIZATION_NUM_CTX`
+    i `LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS`.
 
-    Wyłapuje komunikat bez tych nazw: osoba uruchamiająca przebieg widziałaby samą odmowę i nie
-    wiedziała, które ustawienie podnieść."""
+    Wyłapuje komunikat bez tych nazw albo z nazwą zmiennej innej roli: osoba uruchamiająca
+    przebieg nie wiedziałaby, które ustawienie podnieść, albo podniosłaby nie to."""
     with pytest.raises(LLMError) as exc:
         make_client()._reject_if_too_long("x" * 87_000, system=None)
 
-    assert "LLM_NUM_CTX"           in str(exc.value)
-    assert "LLM_MAX_OUTPUT_TOKENS" in str(exc.value)
+    assert "LLM_ANONYMIZATION_NUM_CTX"           in str(exc.value)
+    assert "LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS" in str(exc.value)
 
 
 def test_system_prompt_counts_towards_the_limit():
@@ -272,13 +277,13 @@ def test_answer_filling_the_whole_window_is_rejected():
 def test_answer_budget_larger_than_the_window_fails_at_build_time():
     """Sprawdza, czy klienta nie da się zbudować, gdy limit odpowiedzi jest równy oknu kontekstu
     (oba po 1000 tokenów): budowa kończy się wyjątkiem `LLMConfigError`, który wymienia
-    `LLM_MAX_OUTPUT_TOKENS`.
+    `LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS`.
 
     Wyłapuje brak tego sprawdzenia przy starcie: na zgłoszenie nie zostawałoby w oknie żadne
     miejsce i każde wywołanie padałoby z błędem, który wygląda na problem z danymi, a nie
     z konfiguracją."""
-    with pytest.raises(LLMConfigError, match="LLM_MAX_OUTPUT_TOKENS"):
-        OllamaLLMClient(model=MODEL, num_ctx=1000, max_output_tokens=1000)
+    with pytest.raises(LLMConfigError, match="LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS"):
+        OllamaLLMClient(model=MODEL, env_prefix=ENV_PREFIX, num_ctx=1000, max_output_tokens=1000)
 
 
 def test_answer_budget_is_carved_out_of_the_window():
@@ -288,7 +293,12 @@ def test_answer_budget_is_carved_out_of_the_window():
 
     Wyłapuje limit liczony z całego okna, bez odjęcia miejsca na odpowiedź: wejście i odpowiedź
     razem nie zmieściłyby się wtedy w oknie."""
-    client = OllamaLLMClient(model=MODEL, num_ctx=8192, max_output_tokens=1500)
+    client = OllamaLLMClient(
+        model             = MODEL,
+        env_prefix        = ENV_PREFIX,
+        num_ctx           = 8192,
+        max_output_tokens = 1500,
+    )
 
     assert client._max_prompt_chars < 8192 * 3
 
@@ -334,13 +344,18 @@ def test_detects_truncation_even_when_the_window_is_misconfigured():
     mniej tokenów, niż wynika z wysłanego tekstu: 16 386 tokenów przy 92 175 wysłanych znakach,
     choć w konfiguracji okno ma 32 768 tokenów.
 
-    Wyłapuje ucięcie wejścia, którego nie widzą sprawdzenia oparte na `LLM_NUM_CTX`: gdy serwer
+    Wyłapuje ucięcie wejścia, którego nie widzą sprawdzenia oparte na `NUM_CTX`: gdy serwer
     działa z mniejszym oknem niż wpisane w konfiguracji, koniec wątku przepada, a odpowiedź wygląda
     poprawnie."""
     # Realny przypadek z 2026-08-02: wysłane 92 175 znaków, serwer naliczył 16 386 tokenów, bo
     # jego okno wynosiło 16384 zamiast skonfigurowanych 32768. Dwa pozostałe strażniki mierzą
-    # wobec LLM_NUM_CTX, więc oba to przepuściły — ten nie zależy od konfiguracji.
-    client = OllamaLLMClient(model=MODEL, num_ctx=32768, max_output_tokens=1500)
+    # wobec NUM_CTX z konfiguracji, więc oba to przepuściły — ten od konfiguracji nie zależy.
+    client = OllamaLLMClient(
+        model             = MODEL,
+        env_prefix        = ENV_PREFIX,
+        num_ctx           = 32768,
+        max_output_tokens = 1500,
+    )
 
     with pytest.raises(LLMError, match="przeczytał mniej"):
         client._to_completion(_answer(16386), elapsed_ms=6000, sent_chars=92175)
@@ -348,16 +363,21 @@ def test_detects_truncation_even_when_the_window_is_misconfigured():
 
 def test_the_message_points_at_the_window_setting():
     """Sprawdza, czy komunikat błędu o tym, że serwer przeczytał mniej, niż wysłaliśmy, wymienia
-    zmienną `LLM_NUM_CTX`.
+    zmienną `LLM_ANONYMIZATION_NUM_CTX`.
 
     Wyłapuje komunikat, który jej nie nazywa: przyczyną jest tu źle ustawione okno kontekstu,
     a nie treść zgłoszenia, więc bez tej wskazówki szukałoby się błędu w złym miejscu."""
-    client = OllamaLLMClient(model=MODEL, num_ctx=32768, max_output_tokens=1500)
+    client = OllamaLLMClient(
+        model             = MODEL,
+        env_prefix        = ENV_PREFIX,
+        num_ctx           = 32768,
+        max_output_tokens = 1500,
+    )
 
     with pytest.raises(LLMError) as exc:
         client._to_completion(_answer(16386), elapsed_ms=6000, sent_chars=92175)
 
-    assert "LLM_NUM_CTX" in str(exc.value)
+    assert "LLM_ANONYMIZATION_NUM_CTX" in str(exc.value)
 
 
 def test_intact_calls_are_not_flagged():

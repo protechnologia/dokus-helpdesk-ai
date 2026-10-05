@@ -369,8 +369,8 @@ def test_empty_base_url_is_not_passed_as_empty_string() -> None:
     z domyślnym adresem OpenAI, `https://api.openai.com`.
 
     Wyłapuje przekazanie pustego adresu do SDK: docker compose wstawia pusty tekst w miejsce
-    nieustawionej zmiennej `LLM_BASE_URL`, a klient kończyłby wtedy każde wywołanie błędem
-    połączenia."""
+    nieustawionej zmiennej adresu (`LLM_GENERATION_BASE_URL`), a klient kończyłby wtedy każde
+    wywołanie błędem połączenia."""
     # CLAUDE.md -> „Pułapki": docker compose wstawia pusty string zamiast braku, a
     # Client(base_url="") daje błąd połączenia zamiast czytelnego błędu configu.
     client = OpenAILLMClient(api_key=API_KEY, model=MODEL, base_url="")

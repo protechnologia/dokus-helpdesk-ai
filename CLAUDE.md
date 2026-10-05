@@ -83,9 +83,10 @@ w ustalonym kształcie. Trasa API i komenda CLI tylko uruchamiają graf. Nowa fu
 grafu, bez zmian w pozostałych.
 
 **Generuje mocny model zewnętrzny, a dane wychodzą do niego po anonimizacji.** Model lokalny okazał
-się za słaby. Anonimizacja jest stałym pierwszym węzłem każdego grafu: agent nie może jej pominąć,
-a jej awaria zatrzymuje przebieg, zamiast przepuścić surowe zgłoszenie. Wyłącza się ją jawnie,
-tylko dla zaufanego endpointu.
+się za słaby, żeby generować, ale może pomagać anonimizatorowi — i jako jedyny widzi wtedy surowy
+tekst. Anonimizacja jest stałym pierwszym węzłem każdego grafu: agent nie może jej pominąć,
+a jej awaria zatrzymuje przebieg, zamiast przepuścić surowe zgłoszenie. Wyłączyć się jej dziś
+nie da.
 
 **Agent sam dociera do wiedzy, narzędziami.** Model nie dostaje gotowych trafień, tylko narzędzia
 z listy dozwolonej dla danej funkcji. Najpierw wyszukuje — po znaczeniu albo dosłownie — potem
@@ -179,7 +180,8 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
   **gemma** — zweryfikować przed komercyjnym wdrożeniem (p. 40). Wymiar wektora jest
   konfiguracją kolekcji Qdranta: zmiana modelu to nowa kolekcja, nie migracja.
 - **LLM: mocny model zewnętrzny** — komercyjne API albo endpoint self-hosted zgodny z OpenAI
-  (RunPod, Ollama); domyślnie `FakeLLMClient` (offline). Dwie role, zaufana i generująca (p. 18).
+  (RunPod, Ollama); domyślnie `FakeLLMClient` (offline). Dwie osobne konfiguracje: model
+  generujący (`LLM_GENERATION_*`) i model pomagający anonimizatorowi (`LLM_ANONYMIZATION_*`).
 - **Orkiestracja: LangGraph** — wyłącznie jako silnik przebiegu grafów; model i narzędzia idą
   przez nasze kontrakty.
 - Deploy: Docker Compose
@@ -1227,7 +1229,7 @@ Wspólne:
   z pustą listą.
 - **Trasy biorą graf z `agent_graphs/factory.py` (`get_graph_builder()`, zależność FastAPI),
   budowany na każde żądanie** — atrapa jest jednorazowa. Do p. 11 `build_function_graph()` zawsze
-  oddaje atrapę, także przy prawdziwym `LLM_PROVIDER`: nic nie wychodzi z procesu, a odmowa
+  oddaje atrapę, także przy prawdziwym modelu generującym: nic nie wychodzi z procesu, a odmowa
   położyłaby trasy na stacku dev. Właściwe węzły `agent` i `run_tools` wejdą do tras razem
   z `respond`: z jego atrapą prawdziwy model liczyłby tury, których wynik zastępuje atrapa.
   Test podmienia zależność przez `dependency_overrides`, wstawiając graf z atrap, do których ma
@@ -1681,9 +1683,10 @@ czasu jest pusta.
   typ zamiast `str`, żeby granica była widoczna w sygnaturach: kod przyjmujący `AnonymizedText` nie
   przyjmie surowego tekstu przez pomyłkę.
 - **`FakeAnonymizer` oddaje tekst BEZ ZMIAN, więc `build_anonymizer` odmawia go przy każdym
-  `LLM_PROVIDER` innym niż `fake`** (`AnonymizationConfigError` przy starcie). Do czasu prawdziwego
-  anonimizatora (p. 19) stack z modelem zewnętrznym po prostu nie wstanie — zamiast cicho wysłać
-  surowe zgłoszenie.
+  `LLM_GENERATION_PROVIDER` innym niż `fake`** (`AnonymizationConfigError` przy starcie). Do czasu
+  prawdziwego anonimizatora (p. 19) stack z modelem zewnętrznym po prostu nie wstanie — zamiast
+  cicho wysłać surowe zgłoszenie. Rozstrzyga dostawca modelu generującego; konfiguracja modelu
+  anonimizującego o odmowie nie decyduje.
 - **Węzeł `anonymize` nie ma atrapy — od razu jest właściwy (`AnonymizeNode`) i nie łapie błędów
   anonimizatora** (fail-closed). Atrapa węzła byłaby drugą drogą obok anonimizacji; test kontraktu
   węzłów pilnuje, że w `anonymize/` jest tylko `node.py`.
@@ -1797,8 +1800,17 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 
 - **Jeden plik importuje SDK dostawcy** — reszta kodu tylko przez `LLMClient` (zasada 4).
   Zmiana API komercyjne → model on-prem = zmiana konfiguracji/klienta, nie logiki.
-- **Fabryka `get_llm_client()` po `LLM_PROVIDER`, fail-fast** — brak klucza/modelu/base_url →
-  `LLMConfigError` przy budowie klienta, nie błąd połączenia w środku żądania.
+- **Dwie osobne konfiguracje LLM, po jednej na rolę (2026-10-05):** `LLM_GENERATION_*` dla
+  modelu, który pisze odpowiedzi w grafach, i `LLM_ANONYMIZATION_*` dla modelu, który pomaga
+  anonimizatorowi. Każda to komplet tych samych ośmiu zmiennych i nic nie dziedziczy po drugiej;
+  obie domyślnie stoją na `fake`. Model anonimizujący widzi surowy tekst zgłoszeń, więc to, co
+  stoi w jego konfiguracji, jest decyzją o tym, dokąd ten tekst trafia — osobnej flagi nie ma.
+  Do p. 19 nikt tego klienta nie buduje.
+- **Fabryka `get_llm_client()` buduje klienta z jednego kompletu (`LLMSettings` z
+  `Settings.llm_generation()` albo `llm_anonymization()`), fail-fast** — brak klucza albo modelu
+  to `LLMConfigError` przy budowie klienta, nie błąd połączenia w środku żądania. Komunikat
+  nazywa zmienną z przedrostkiem roli (`LLM_ANONYMIZATION_API_KEY`); klient Ollamy dostaje ten
+  przedrostek po to samo.
 - **SDK dostawców importowane LENIWIE, wewnątrz builderów** — świadomy wyjątek od „importy na
   górze". Powód zmierzony: `anthropic` ładuje się ~5,5 s, `openai` ~3,3 s, bo oba budują modele
   Pydantic **całego swojego API** (typy beta, tool runner, streaming, Vertex) już przy imporcie.
@@ -1823,7 +1835,7 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   listę rodzin PRZYJMUJĄCYCH, jak klient Claude'a, więc nowy model parametru nie dostanie;
   test pilnuje, że każdy wiersz cennika jest po jednej ze stron.
 - **Endpoint zgodny z API OpenAI** (Ollama, vLLM, RunPod) mówi Chat Completions i idzie przez
-  dostawcę `ollama` — osobnego klienta z zerowym cennikiem. `LLM_BASE_URL` przy dostawcy
+  dostawcę `ollama` — osobnego klienta z zerowym cennikiem. `BASE_URL` przy dostawcy
   `openai` to pośrednik, który mówi API Responses.
   Inny kształt API (Azure) → osobny klient, nie `if` w istniejącym.
 - **Wywołania async z jawnym timeoutem.**
@@ -2120,8 +2132,9 @@ w p. 46.
 
 **Konfiguracja (ENV):**
 - Cała konfiguracja przez ENV (pydantic-settings) — żadnych sekretów/endpointów na sztywno.
-- **Jeden `.env` w korzeniu** (nie per usługa; wartości rozdzielamy prefiksami `LLM_*`,
-  `EMBEDDING_*`, `QDRANT_*`, `POSTGRES_*`, `RAG_*`, `AGENT_*`). `.env` w `.gitignore`, **`.env.example` w repo =
+- **Jeden `.env` w korzeniu** (nie per usługa; wartości rozdzielamy prefiksami
+  `LLM_GENERATION_*`, `LLM_ANONYMIZATION_*`, `EMBEDDING_*`, `QDRANT_*`, `POSTGRES_*`, `RAG_*`,
+  `AGENT_*`). `.env` w `.gitignore`, **`.env.example` w repo =
   kontrakt** — każda zmienna z compose i `Settings` musi tam być. Bez `.env.prod`/`.env.dev` —
   różnice środowisk przez warstwy compose i ENV na maszynie docelowej.
 - **Progi i parametry retrievalu (`RAG_TOP_K`, `RAG_SCORE_MIN`…) idą do ENV** — to strojenie,
@@ -2168,15 +2181,18 @@ w p. 46.
 - **Pusty string zamiast braku** — `docker compose` dla niezdefiniowanego `${VAR:-}` wstawia
   **pusty string**. Bez walidatora „pusty/biały → `None`" w `Settings` dostajesz
   `Client(base_url="")` → błąd połączenia zamiast czytelnego błędu configu.
-  - **U nas puste są trzy wpisy i to stan docelowy, nie usterka:** `LLM_BASE_URL`, `LLM_API_KEY`
-    i `LLM_MODEL` przy `LLM_PROVIDER=fake`. `docker compose config` pokazuje przy nich `""`,
-    a walidator zamienia je na `None` (zweryfikowane w kontenerze). **Usunięcie ich z compose
-    łamie test „każde pole `Settings` jest podane usłudze"**, więc to nie jest sprzątanie —
-    to zmiana dwóch reguł naraz.
+  - **U nas pustych jest sześć wpisów i to stan docelowy, nie usterka:** `BASE_URL`, `API_KEY`
+    i `MODEL` obu konfiguracji LLM przy dostawcy `fake`. `docker compose config` pokazuje przy
+    nich `""`, a walidator zamienia je na `None` (zweryfikowane w kontenerze). **Usunięcie ich
+    z compose łamie test „każde pole `Settings` jest podane usłudze"**, więc to nie jest
+    sprzątanie — to zmiana dwóch reguł naraz.
   - **Nie „naprawiaj" tego wpisując `none` / `null` / `unused`** — sprawdzone na `Settings`:
     to zwykłe łańcuchy i pole `str | None` przyjmuje je jako **poprawną wartość**
-    (`llm_base_url = 'none'`), więc klient pójdzie pod adres `none`. Wersja gorsza od pustego
-    stringa, bo walidator łapie wyłącznie ten drugi. Jedynym sposobem na „brak" jest brak.
+    (`llm_generation_base_url = 'none'`), więc klient pójdzie pod adres `none`. Wersja gorsza
+    od pustego stringa, bo walidator łapie wyłącznie ten drugi. Jedynym sposobem na „brak"
+    jest brak.
+- **Stare zmienne `LLM_*` bez roli nie są czytane (2026-10-05)** — `Settings` pomija nieznane
+  nazwy, więc `.env` sprzed podziału na role daje po cichu stack na atrapie modelu.
 - **Powłoka przebija `.env`** — przy `${VAR:-default}` Compose stawia zmienną powłoki **wyżej**
   niż `.env`, cicho; jedno `set -a; . ./.env` zamraża stare wartości na resztę sesji. Stąd:
   **weryfikuj `docker compose config`, nie `.env`**.
@@ -2240,7 +2256,7 @@ w p. 46.
   `EncoderConfigError` i `AnonymizationConfigError`, a w `api` także `EmbeddingConfigError`,
   `DbQdrantConfigError` i `DbPostgresConfigError`, dziedziczą po błędzie swojej warstwy, więc
   wpadłyby w handler 503 — handler **wyrzuca je z powrotem**. Powód: 503 znaczy „spróbuj za
-  chwilę", a przy złym `LLM_PROVIDER` czekanie nic nie da; zielony kontener oddający uprzejme
+  chwilę", a przy złym dostawcy LLM czekanie nic nie da; zielony kontener oddający uprzejme
   503 na każde żądanie jest gorszy niż głośna śmierć.
 - **Każda usługa ma swoje handlery i swój Request-ID** — kodu nie dzielimy, więc to świadome
   powielenie; id **przyjęte od wołającego wygrywa**, żeby jeden identyfikator spinał `api`
@@ -2252,7 +2268,7 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1086 (0)           | 18 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1090 (0)           | 18 s |
 | integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 229 (79)           | 68 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 100 (9)            | 11 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 53 s |
@@ -2260,8 +2276,8 @@ w p. 46.
 Liczby i czasy z 2026-10-05: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 8 s, a ewaluacyjne poniżej sekundy —
 całe 53 s to 207 wyszukań golden setów przez prawdziwy embedder (178 w zgłoszeniach, 29
-w dokumentacji). Komplet jednym poleceniem (`pytest -m ""`): 1455 testów, 147 s; domyślny
-`pytest`, bez stacku: 1329 testów, 21 s.
+w dokumentacji). Komplet jednym poleceniem (`pytest -m ""`): 1459 testów, 149 s; domyślny
+`pytest`, bez stacku: 1333 testy, 21 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2541,6 +2557,10 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Reguły bramek jako regexy/lista słów zamiast LLM-a** — „potoczne słownictwo" i „nie widać,
   co zrobiono" nie są wyrażalne słownikiem. Kandydat na tanie pre-filtry przed wywołaniem
   LLM-a, jeśli koszt zacznie boleć.
+- **Flaga „endpoint może widzieć surowe dane" przy konfiguracji LLM** — przy dwóch osobnych
+  konfiguracjach powtarzałaby to, co mówi sama nazwa zestawu: model w `LLM_ANONYMIZATION_*` widzi
+  surowy tekst z definicji. Cena: jedynym zabezpieczeniem jest to, co w tym zestawie stoi,
+  a pracy bez anonimizacji nie da się włączyć wcale (p. 19).
 - **Zgłoszenia spoza modułu Dokus** — łamie założenie „jedna instancja = jeden produkt": wraca
   pole `system` do schematu i do embeddingu, czyli ponowny przebieg LLM po korpusie, a `typ`
   komentarza przestaje być wiarygodny.
@@ -2685,10 +2705,10 @@ niż zgadywanie.
   `dropped_below_threshold` przy zapytaniu w odpowiedzi `/search`; trasy zostają na atrapach
   grafów do p. 11; reguły — „Warstwa węzłów", „Warstwa narzędzi agenta", „Warstwa API", „Logi
   i obserwowalność".
-- [ ] **18. Dwie role LLM w konfiguracji** (przeniesiony 2026-10-05, numer spoza kolejności) —
-  zaufana i generująca, z flagą per endpoint „może widzieć surowe dane", domyślnie wyłączoną.
-  *Dlaczego:* pomyłka tej flagi to przeciek, więc wyłączenie ochrony ma być jawnym aktem
-  w konfiguracji.
+- [x] **18. Dwie konfiguracje LLM** (2026-10-05) — `LLM_GENERATION_*` i `LLM_ANONYMIZATION_*`
+  zamiast jednego `LLM_*`, fabryka buduje klienta z kompletu jednej roli, strażnik anonimizacji
+  czyta dostawcę modelu generującego; bez flagi „może widzieć surowe dane"; reguły — „Warstwa
+  LLM", „Warstwa węzłów", „Konfiguracja i deploy".
 - [ ] **17. Tura z narzędziami u prawdziwych dostawców** (przeniesiony 2026-10-05, numer spoza
   kolejności) — implementacja kontraktu z p. 9 (`complete_turn()`, która staje się wtedy
   abstrakcyjna) w klientach Claude / OpenAI / Ollama; pętla zostaje w grafie. U OpenAI przez API
@@ -2728,7 +2748,8 @@ niż zgadywanie.
   jedyny argument — lokalny LLM.
 - [ ] **14. Które endpointy mogą widzieć surowe dane** — własny sprzęt, RunPod (Secure czy
   Community Cloud), dostawca komercyjny. *Dlaczego:* kryterium to granica zaufania endpointu,
-  a nie to, czy model zaufany i generujący są tym samym modelem.
+  a nie to, czy model anonimizujący i generujący są tym samym modelem; odpowiedź zapisuje się
+  tym, co stoi w `LLM_ANONYMIZATION_*`.
 - [ ] **15. Czy są instrukcje i skąd** — format rozstrzygnięty 2026-10-03 (metryczka i pliki `.md`,
   p. 49); zostaje: kto przygotowuje wydania, ile wydań trzyma indeks i czy listing mieści się
   w prompcie. *Dlaczego:* to źródło opcjonalne, a instrukcja do starej wersji psuje odpowiedź tak
@@ -2741,7 +2762,10 @@ niż zgadywanie.
 - [ ] **19. Usługa `anonymizer` w compose** — słownik osób ze źródła (z rolami), NER i regex
   z sumami kontrolnymi, deterministycznie, na CPU; fail-closed, pseudonimy spójne w wątku,
   mapowanie wraca do helpdesku; mierzona w dwie strony (przecieki i zniszczona wiedza — w tym
-  kody i komunikaty błędów, po których szuka `find_tickets_text`).
+  kody i komunikaty błędów, po których szuka `find_tickets_text`). NER może pomagać lokalny
+  model językowy (`LLM_ANONYMIZATION_*`); do rozstrzygnięcia, kto go woła — `api` czy usługa
+  `anonymizer`, do której ta konfiguracja by się wtedy przeniosła — oraz czy praca bez
+  anonimizacji dla zaufanego endpointu ma być jej jawnym ustawieniem.
   *Dlaczego:* surowy tekst nie opuszcza sieci compose; słownik daje role tam, gdzie flaga autora
   jest bezużyteczna (Automat mailowy), a nadgorliwość w korpusie jest nieodwracalna.
 - [ ] **20. Detektor sekretów w tej samej usłudze** — kontekst dla haseł słownikowych, entropia

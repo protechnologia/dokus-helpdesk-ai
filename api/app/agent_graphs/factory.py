@@ -15,7 +15,7 @@ def build_function_graph(
 ) -> CompiledStateGraph:
     """
     Description:
-    Buduje graf funkcji, o który prosi trasa. DZIŚ ZAWSZE ATRAPĘ, niezależnie od `LLM_PROVIDER`:
+    Buduje graf funkcji, o który prosi trasa. DZIŚ ZAWSZE ATRAPĘ, także przy prawdziwym modelu:
     właściwe są węzły `agent` i `run_tools`, a `respond` to jeszcze atrapa (p. 11). Graf
     z prawdziwym modelem i tą atrapą płaciłby za tury, których wynik i tak zastępuje atrapa —
     a atrapa grafu nie wysyła niczego poza proces, więc nie ma czego chronić odmową, a odmowa

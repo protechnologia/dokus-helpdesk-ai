@@ -17,8 +17,9 @@ from app.engine_llm.errors import LLMConfigError, LLMError
 from app.engine_llm.models.completion import LLMCompletion
 from app.engine_llm.pricing.selfhosted import calculate_cost_usd
 
-# Fallbacks used when nothing is configured. Both are ENV settings (`LLM_NUM_CTX`,
-# `LLM_MAX_OUTPUT_TOKENS`) because they depend on the model and the machine, not on this code.
+# Fallbacks used when nothing is configured. Both are ENV settings (`NUM_CTX` and
+# `MAX_OUTPUT_TOKENS` of the role this client serves, e.g. `LLM_GENERATION_NUM_CTX`) because they
+# depend on the model and the machine, not on this code.
 #
 # CRUCIAL: `num_ctx` here does NOT set the server's window — it only tells this client what the
 # window IS, so it can refuse work that will not fit. Ollama ignores `num_ctx` sent in a request;
@@ -48,7 +49,7 @@ CHARS_PER_TOKEN = 3.0
 # Ceiling on the same ratio, measured AFTER the answer comes back, to catch a truncation the
 # configured window cannot reveal.
 #
-# Why a second, differently-shaped check: everything else here compares against `LLM_NUM_CTX`, a
+# Why a second, differently-shaped check: everything else here compares against `NUM_CTX`, a
 # number a HUMAN typed. When that number is wrong — the server silently runs a smaller window than
 # the model declares, e.g. because it lacked VRAM for the KV cache — both the length check and the
 # window check pass while the tail of the thread is quietly dropped. This one needs no
@@ -75,7 +76,7 @@ class OllamaLLMClient(LLMClient):
     from `pricing/selfhosted.py` — our own hardware bills no tokens.
 
     Flow:
-        1. `get_llm_client()` builds it from `Settings`, requiring only `LLM_MODEL` and a base URL.
+        1. `get_llm_client()` builds it from one `LLMSettings`, requiring only the model name.
         2. `complete()` sends one prompt, prepending the system prompt as the first message.
         3. The answer text is read and usage is mapped; `cost_usd` is zero by construction, so the
            number worth reading is `latency_ms`.
@@ -84,6 +85,7 @@ class OllamaLLMClient(LLMClient):
     def __init__(
         self,
         model:       str,                                   # e.g. "bielik-4.5b-v3.0-instruct:Q8_0"
+        env_prefix:  str,                                   # np. "LLM_ANONYMIZATION_"
         base_url:    str   = "http://localhost:11434/v1",   # Ollama's OpenAI-compatible endpoint
         timeout:     float = 1800.0,                        # seconds — 30 min, see below
         temperature: float = 0.0,                           # local models accept it without fuss
@@ -104,8 +106,13 @@ class OllamaLLMClient(LLMClient):
         roughly one token per second (measured 2026-08-02), so a full ticket takes minutes and the
         hosted default would abort every single call.
 
+        `env_prefix` to przedrostek zmiennych roli, której klient służy. Potrzebny wyłącznie
+        komunikatom błędów: przy dwóch konfiguracjach LLM mają nazwać zmienną do poprawienia
+        (`LLM_ANONYMIZATION_NUM_CTX`), a nie zostawić operatora z pytaniem, której roli dotyczą.
+
         Example args:
             model="SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0"
+            env_prefix="LLM_ANONYMIZATION_"
             base_url="http://localhost:11434/v1"
             timeout=1800.0
             temperature=0.0
@@ -123,11 +130,12 @@ class OllamaLLMClient(LLMClient):
         # like a data problem instead of a configuration one.
         if max_output_tokens >= num_ctx:
             raise LLMConfigError(
-                f"LLM_MAX_OUTPUT_TOKENS ({max_output_tokens}) musi być mniejsze niż "
-                f"LLM_NUM_CTX ({num_ctx}) — odpowiedź dzieli okno kontekstu ze zgłoszeniem"
+                f"{env_prefix}MAX_OUTPUT_TOKENS ({max_output_tokens}) musi być mniejsze niż "
+                f"{env_prefix}NUM_CTX ({num_ctx}) — odpowiedź dzieli okno kontekstu ze zgłoszeniem"
             )
 
         self._model             = model
+        self._env_prefix        = env_prefix
         self._temperature       = temperature
         self._num_ctx           = num_ctx
         self._max_output_tokens = max_output_tokens
@@ -193,7 +201,7 @@ class OllamaLLMClient(LLMClient):
             # anything broke — the message says so, because the fix is a longer timeout.
             raise LLMError(
                 f"model {self._model} nie odpowiedział w limicie czasu; "
-                f"na CPU zwiększ LLM_TIMEOUT_SECONDS"
+                f"na CPU zwiększ {self._env_prefix}TIMEOUT_SECONDS"
             ) from exc
         except APIConnectionError as exc:
             # The overwhelmingly likely cause of this one locally: the server is not running.
@@ -251,8 +259,8 @@ class OllamaLLMClient(LLMClient):
 
         raise LLMError(
             f"wejście za długie dla okna kontekstu: ~{total_chars:,} znaków przy limicie "
-            f"~{self._max_prompt_chars:,} (LLM_NUM_CTX={self._num_ctx}, "
-            f"LLM_MAX_OUTPUT_TOKENS={self._max_output_tokens}); "
+            f"~{self._max_prompt_chars:,} ({self._env_prefix}NUM_CTX={self._num_ctx}, "
+            f"{self._env_prefix}MAX_OUTPUT_TOKENS={self._max_output_tokens}); "
             f"model ucina nadmiar po cichu, więc zgłoszenie zostaje pominięte"
         )
 
@@ -266,7 +274,7 @@ class OllamaLLMClient(LLMClient):
         Refuses an answer produced from less input than we sent, by comparing characters sent
         against tokens the server reports reading.
 
-        The only check here that does NOT depend on `LLM_NUM_CTX`. That matters: when the configured
+        The only check here that does NOT depend on `NUM_CTX`. That matters: when the configured
         window is larger than the one the server really runs — which happens when a runner quietly
         shrinks the window to fit available VRAM — the length check and the window check both pass
         while the tail of the thread is dropped. This one still fires, because the ratio between
@@ -296,7 +304,8 @@ class OllamaLLMClient(LLMClient):
         raise LLMError(
             f"serwer przeczytał mniej, niż wysłaliśmy: {sent_chars:,} znaków naliczone jako "
             f"{prompt_tokens:,} tokenów ({chars_per_token:.1f} znaku na token przy oczekiwanych "
-            f"~1,3). Okno kontekstu serwera jest mniejsze niż LLM_NUM_CTX={self._num_ctx} — "
+            f"~1,3). Okno kontekstu serwera jest mniejsze niż "
+            f"{self._env_prefix}NUM_CTX={self._num_ctx} — "
             f"zmierz je i popraw, zgłoszenie zostaje pominięte"
         )
 
@@ -332,7 +341,7 @@ class OllamaLLMClient(LLMClient):
         # prompt filled the whole window, the tail was almost certainly cut — and in this corpus the
         # tail is where the resolution lives.
         #
-        # This check also catches the case the client cannot prevent: `LLM_NUM_CTX` configured
+        # This check also catches the case the client cannot prevent: `NUM_CTX` configured
         # LARGER than the window the server actually runs with. The length check would then pass a
         # prompt the server truncates, and this is the only place that notices. Verified against the
         # live pod on 2026-08-02 by configuring 1024 against a server running 32768.
@@ -342,7 +351,7 @@ class OllamaLLMClient(LLMClient):
                 f"tokenów) — koniec wątku został najprawdopodobniej ucięty, artefakt odrzucony"
             )
 
-        # Third check, and the only one that does not trust `LLM_NUM_CTX`. Compares what we SENT
+        # Third check, and the only one that does not trust `NUM_CTX`. Compares what we SENT
         # with what the server says it READ: a server that quietly ran a smaller window reports far
         # fewer tokens than the text can possibly tokenise to.
         self._reject_if_server_read_less(usage.prompt_tokens, sent_chars)

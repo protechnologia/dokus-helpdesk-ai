@@ -118,7 +118,7 @@ def _env_names_from_example() -> set[str]:
         (none)
 
     Example result:
-        {"LOG_LEVEL", "LLM_PROVIDER", "QDRANT_URL"}
+        {"LOG_LEVEL", "LLM_GENERATION_PROVIDER", "QDRANT_URL"}
     """
     names: set[str] = set()
 
@@ -145,7 +145,7 @@ def _env_names_from_settings(settings_class: type[BaseSettings]) -> set[str]:
         settings_class=ApiSettings
 
     Example result:
-        {"LOG_LEVEL", "LLM_PROVIDER", "QDRANT_URL"}
+        {"LOG_LEVEL", "LLM_GENERATION_PROVIDER", "QDRANT_URL"}
     """
     return {field_name.upper() for field_name in settings_class.model_fields}
 
@@ -160,7 +160,7 @@ def _env_names_from_all_services() -> set[str]:
         (none)
 
     Example result:
-        {"LOG_LEVEL", "LLM_PROVIDER", "QDRANT_URL", "EMBEDDING_BACKEND"}
+        {"LOG_LEVEL", "LLM_GENERATION_PROVIDER", "QDRANT_URL", "EMBEDDING_BACKEND"}
     """
     return set().union(*(_env_names_from_settings(cls) for cls in SERVICE_SETTINGS))
 
@@ -223,7 +223,7 @@ def _env_keys_passed_to_containers() -> set[str]:
         (none)
 
     Example result:
-        {"LOG_LEVEL", "LLM_PROVIDER", "EMBEDDING_BACKEND"}
+        {"LOG_LEVEL", "LLM_GENERATION_PROVIDER", "EMBEDDING_BACKEND"}
     """
     compose = _load_compose(COMPOSE_BASE)
     keys: set[str] = set()

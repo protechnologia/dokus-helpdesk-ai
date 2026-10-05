@@ -7,7 +7,7 @@ class FakeAnonymizer(Anonymizer):
     Description:
     Atrapa anonimizatora: oddaje tekst BEZ ZMIAN, opakowany w `AnonymizedText`. Niczego nie
     anonimizuje, więc wolno jej używać wyłącznie z atrapą modelu — `build_anonymizer` odmawia jej
-    zbudowania przy każdym innym `LLM_PROVIDER`.
+    zbudowania przy każdym innym `LLM_GENERATION_PROVIDER`.
 
     Flow:
         1. Każde `anonymize()` zapisuje tekst w `texts` i zwraca go bez zmian.

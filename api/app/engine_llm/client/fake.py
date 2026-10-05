@@ -45,7 +45,7 @@ class LLMTurnCall(BaseModel):
 class FakeLLMClient(LLMClient):
     """
     Description:
-    Atrapa modelu: implementacja domyślna (`LLM_PROVIDER=fake`) i ta, na której chodzą testy.
+    Atrapa modelu: implementacja domyślna obu ról (dostawca `fake`) i ta, na której chodzą testy.
     Niczego nigdzie nie wysyła, więc `docker compose up` i `pytest` nic nie kosztują i działają
     offline (CLAUDE.md -> „Warstwa LLM").
 

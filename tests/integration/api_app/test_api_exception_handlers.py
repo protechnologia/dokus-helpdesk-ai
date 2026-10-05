@@ -58,7 +58,7 @@ def client() -> TestClient:
 
     @app.get("/llm-misconfigured")
     async def llm_misconfigured() -> None:
-        raise LLMConfigError("Unknown LLM_PROVIDER='openai'")
+        raise LLMConfigError("nieznany LLM_GENERATION_PROVIDER='openai'")
 
     @app.get("/anonymization-down")
     async def anonymization_down() -> None:
@@ -66,7 +66,7 @@ def client() -> TestClient:
 
     @app.get("/anonymization-misconfigured")
     async def anonymization_misconfigured() -> None:
-        raise AnonymizationConfigError("atrapa anonimizatora przy LLM_PROVIDER=ollama")
+        raise AnonymizationConfigError("atrapa anonimizatora przy LLM_GENERATION_PROVIDER=ollama")
 
     @app.get("/embedder-down")
     async def embedder_down() -> None:
