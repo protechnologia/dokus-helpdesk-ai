@@ -1,20 +1,31 @@
 """
 Description:
-Węzeł `run_tools`: wykonuje wywołania narzędzi z ostatniej wiadomości modelu — wyłącznie z listy
-dozwolonych dla grafu. Argumenty waliduje model zapytania narzędzia; jego wynik jako JSON wraca
-do `messages` jako wiadomość `tool`, a źródła z `cite()` odczytów trafiają do `sources`.
-Wywołanie ponad limit swojego narzędzia (`limits.py`, wartości z `AGENT_MAX_CALLS_*`) dostaje
-błąd zamiast wyniku.
+Węzeł `run_tools`: wykonuje wywołania narzędzi z ostatniej wiadomości modelu — wyłącznie tych,
+które dostał, czyli dozwolonych w grafie. Argumenty waliduje klasa argumentów narzędzia; jego
+wynik jako JSON wraca do `messages` jako wiadomość `tool`, a źródła z `cite()` odczytów trafiają
+do `sources`. Wywołanie, którego nie da się wykonać — ponad limit swojego narzędzia, z nieznaną
+nazwą, z błędnymi argumentami albo odrzucone przez samo narzędzie — dostaje w miejscu wyniku
+`{"error": …}` i przebieg idzie dalej.
 
-Status: atrapa (`FakeRunToolsNode`); właściwy węzeł w p. 10 (CLAUDE.md -> „Plan").
+| plik        | co zawiera                                                                   |
+|-------------|------------------------------------------------------------------------------|
+| `node.py`   | `RunToolsNode` — węzeł właściwy, woła narzędzia agenta                       |
+| `fake.py`   | `FakeRunToolsNode` — odpowiada ustalonym tekstem; `FakeToolAnswer`           |
+| `base.py`   | `RunToolsNodeBase` — część wspólna obu: nazwa i zapis odpowiedzi w stanie    |
+| `limits.py` | które wywołania są ponad limit (`AGENT_MAX_CALLS_*`) i co model wtedy czyta  |
+
+Status: węzeł właściwy na atrapach i na prawdziwych narzędziach; trasy biorą go razem z `respond`
+w p. 11 (CLAUDE.md -> „Plan").
 """
 
 from app.agent_nodes.run_tools.fake import FakeRunToolsNode, FakeToolAnswer
 from app.agent_nodes.run_tools.limits import calls_over_limit, limit_exceeded_text
+from app.agent_nodes.run_tools.node import RunToolsNode
 
 __all__ = [
     "FakeRunToolsNode",
     "FakeToolAnswer",
+    "RunToolsNode",
     "calls_over_limit",
     "limit_exceeded_text",
 ]

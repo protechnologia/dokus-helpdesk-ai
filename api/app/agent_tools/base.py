@@ -1,3 +1,4 @@
+import json
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from pathlib import Path
@@ -65,6 +66,47 @@ def result_as_json(
     return result.model_dump_json(indent=2, exclude=exclude)
 
 
+def error_as_json(
+    message: str,  # np. "nieznane zgłoszenie: 90019"
+) -> str:
+    """
+    Description:
+    Tekst, który model czyta w miejscu wyniku narzędzia, gdy wywołania nie wykonano: JSON z jednym
+    polem `error`. Ten sam format co wynik (`result_as_json()`), więc model czyta błąd tą samą
+    drogą i może poprawić wywołanie w następnej turze. Polskie litery zostają bez zmian.
+
+    Example args:
+        message="nieznane zgłoszenie: 90019"
+
+    Example result:
+        {"error": "nieznane zgłoszenie: 90019"}
+    """
+    return json.dumps({"error": message}, ensure_ascii=False)
+
+
+def is_error_json(
+    text: str,  # np. '{"error": "nieznane zgłoszenie: 90019"}'
+) -> bool:
+    """
+    Description:
+    Rozpoznaje, czy tekst z wiadomości `tool` to błąd zapisany przez `error_as_json()`, a nie
+    wynik narzędzia. Wynik nigdy nie jest obiektem z samym polem `error`: każdy ma własne pola
+    ze swojego modelu.
+
+    Example args:
+        text='{"error": "nieznane zgłoszenie: 90019"}'
+
+    Example result:
+        True
+    """
+    try:
+        body = json.loads(text)
+    except json.JSONDecodeError:  # nie JSON, więc nie błąd z `error_as_json()`
+        return False
+
+    return isinstance(body, dict) and set(body) == {"error"}
+
+
 def label_matches(
     exact_ids: Iterable[str],  # np. ["90011"] — znalezione frazą z `exact`
     words_ids: Iterable[str],  # np. ["90012", "90011"] — znalezione słowami z `words`
@@ -105,15 +147,18 @@ class KnowledgeSource(ABC):
     (`read_tickets_card`, `read_tickets_thread`, `read_docs`): na listę źródeł trafia to, co model
     przeczytał, a nie to, co tylko znalazł. Nowe źródło to nowy katalog w folderze swojego
     materiału (`app/agent_tools/tickets/`, `app/agent_tools/docs/`): implementacja, jej atrapa
-    i `models.py` z własnym zapytaniem i wynikiem. Grafy sięgają po źródło przez własny adapter,
-    więc ten plik nie wie nic o LangGraphie ani LangChainie.
+    i `models.py` z własnym zapytaniem i wynikiem. Źródło woła węzeł `run_tools`, więc ten plik
+    nie wie nic o LangGraphie ani LangChainie.
 
     Flow:
         1. Agent woła `search()` z argumentami zgodnymi z `query_model` — identyfikatorami, które
            dostał od wyszukiwania albo ze spisu treści.
         2. `render_for_model()` zamienia wynik na tekst, który czyta model: JSON wyniku.
-        3. `cite()` zamienia ten sam wynik na źródła, które może wnieść do odpowiedzi. W adapterze
-           grafu te dwie rzeczy stają się treścią i artefaktem narzędzia.
+        3. `cite()` zamienia ten sam wynik na źródła, które może wnieść do odpowiedzi. Węzeł
+           `run_tools` wkłada tekst do rozmowy z modelem, a źródła do stanu grafu.
+
+    Odczyt, którego nie da się wykonać z winy zapytania (nieznany identyfikator), zgłasza odmianę
+    `ToolCallError`: węzeł oddaje jej komunikat modelowi w miejscu wyniku.
 
     Każda implementacja musi być tylko do odczytu: prompt wstrzyknięty przez treść zgłoszenia może
     co najwyżej skierować agenta do nietrafionego materiału, nigdy zmienić zawartości indeksu.
@@ -129,7 +174,7 @@ class KnowledgeSource(ABC):
     # samym materiale różnymi drogami mają ją wspólną, więc to samo zgłoszenie jest źródłem raz.
     source: ClassVar[str]
 
-    # Klasa zapytania: adapter robi z niej schemat argumentów dla modelu i nią je waliduje.
+    # Klasa zapytania: graf robi z niej schemat argumentów dla modelu, `run_tools` nią je waliduje.
     query_model: ClassVar[type[BaseModel]]
 
     @abstractmethod
@@ -261,3 +306,21 @@ class AuxiliaryTool(ABC):
 
 # Każde narzędzie, które może dostać agent — tym typem przyjmuje je kod składający grafy.
 AgentTool = KnowledgeSource | AuxiliaryTool
+
+
+def arguments_model_of(
+    tool: AgentTool,  # np. FakeReadTicketsCardTool()
+) -> type[BaseModel]:
+    """
+    Description:
+    Klasa argumentów narzędzia, niezależnie od jego rodzaju: źródło wiedzy trzyma ją pod nazwą
+    `query_model`, narzędzie pomocnicze pod `args_model`. Z niej graf robi schemat argumentów
+    dla modelu, a węzeł `run_tools` nią je waliduje.
+
+    Example args:
+        tool=FakeReadTicketsCardTool()
+
+    Example result:
+        ReadTicketsCardQuery
+    """
+    return tool.query_model if isinstance(tool, KnowledgeSource) else tool.args_model

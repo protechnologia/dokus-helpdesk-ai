@@ -3,10 +3,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.agent_nodes.base import Node
+from app.agent_nodes.run_tools.base import RunToolsNodeBase
 from app.agent_nodes.run_tools.limits import calls_over_limit, limit_exceeded_text
 from app.agent_tools import SourceRef
-from app.engine_llm import ChatMessage
 
 DEFAULT_TOOL_RESULT = "fake-tool-result"
 
@@ -24,7 +23,7 @@ class FakeToolAnswer(BaseModel):
     sources: list[SourceRef] = Field(default_factory=list)
 
 
-class FakeRunToolsNode(Node):
+class FakeRunToolsNode(RunToolsNodeBase):
     """
     Description:
     Atrapa węzła `run_tools`: nie woła narzędzi, tylko na każde wywołanie z ostatniej tury modelu
@@ -35,14 +34,14 @@ class FakeRunToolsNode(Node):
            na konkretne narzędzia (`answers`) — tak odtwarza się przebieg „szukaj, potem czytaj",
            w którym źródła dokłada dopiero odczyt.
         2. `run()` zapisuje stan w `calls` i zwraca po jednej wiadomości `tool` na każde
-           wywołanie, z jego `call_id`.
+           wywołanie, z jego `call_id` — tą samą zmianą stanu co węzeł właściwy
+           (`results_update()`).
         3. Wywołanie ponad limit swojego narzędzia (`limits`) dostaje błąd zamiast odpowiedzi
            i nie dokłada źródeł — tą samą regułą, którą stosuje węzeł właściwy (`limits.py`).
-        4. `sources` trafiają do aktualizacji tylko wtedy, gdy wywołane narzędzia je dokładają —
-           graf bez narzędzi wiedzy nie ma tego pola w stanie.
-    """
 
-    name = "run_tools"
+    Argumentów atrapa nie sprawdza i nie odmawia nieznanemu narzędziu: odpowiada na wszystko, co
+    model wywołał. Te odmowy ma tylko węzeł właściwy.
+    """
 
     def __init__(
         self,
@@ -93,7 +92,6 @@ class FakeRunToolsNode(Node):
         self.calls.append(state)
 
         calls   = state.messages[-1].tool_calls if state.messages else []
-        names   = ", ".join(call.name for call in calls) or "brak"
         refused = calls_over_limit(state.messages, self._limits)
 
         # Wywołanie ponad limit dostaje błąd i nie dokłada źródeł; pozostałe swoją odpowiedź.
@@ -104,24 +102,11 @@ class FakeRunToolsNode(Node):
             for call in calls
         ]
 
-        results = [
-            ChatMessage(role="tool", call_id=call.call_id, content=answer.text)
-            for call, answer in zip(calls, answers, strict=True)
-        ]
-        sources = [ref for answer in answers for ref in answer.sources]
-
-        # Same nazwy i liczby — treść wyników to dane klienta.
-        summary = f"wywołania: {names}; źródła: {len(sources)}"
-
-        if refused:
-            summary += f"; ponad limit: {len(refused)}"
-
-        update: dict[str, Any] = {
-            "messages": results,
-            "log":      [self.log_entry(summary)],
-        }
-
-        if sources:
-            update["sources"] = sources
+        update = self.results_update(
+            calls      = calls,
+            texts      = [answer.text for answer in answers],
+            sources    = [ref for answer in answers for ref in answer.sources],
+            over_limit = len(refused),
+        )
 
         return update

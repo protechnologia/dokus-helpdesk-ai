@@ -1,11 +1,15 @@
-class UnknownTicketError(Exception):
+from app.agent_tools.errors import ToolCallError
+
+
+class UnknownTicketError(ToolCallError):
     """
     Description:
     Agent poprosił o wątek zgłoszenia, którego w bazie nie ma — literówka w numerze albo numer
     wymyślony.
 
     Błąd, a nie pusty wynik: komunikat wraca do modelu jako wynik narzędzia, żeby mógł poprawić
-    wywołanie (p. 10), więc wymienia nieznany numer — to identyfikator, nie dane klienta.
+    wywołanie (stąd `ToolCallError`), więc wymienia nieznany numer — to identyfikator, nie dane
+    klienta.
 
     Inaczej niż w `read_tickets_card`: wątek ma każde zgłoszenie, więc jego brak znaczy zły
     numer, a karty może nie być dla zgłoszenia, które istnieje.

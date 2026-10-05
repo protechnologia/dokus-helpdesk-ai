@@ -4,7 +4,10 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.db_postgres import DbPostgresConfigError, DbPostgresError
+from app.db_qdrant import DbQdrantConfigError, DbQdrantError
 from app.engine_anonymization import AnonymizationConfigError, AnonymizationError
+from app.engine_embedding import EmbeddingConfigError, EmbeddingError
 from app.engine_llm import LLMConfigError, LLMError
 from app.entry_routers.models import ErrorResponse
 
@@ -17,6 +20,14 @@ REQUEST_ID_HEADER = "X-Request-ID"
 # sprawdzono przy budowie klienta, więc zostaje to, co przejściowe (timeout, awaria dostawcy).
 # 503 mówi wołającemu, że może ponowić, a helpdeskowi — że decyduje sam (fail-open po jego stronie).
 DEPENDENCY_FAILURE_STATUS = 503
+
+# Zależności narzędzi agenta: błąd warstwy → jego odmiana konfiguracyjna i opis dla wołającego.
+# Jeden handler dla trzech, bo różni je tylko ten wiersz.
+TOOL_DEPENDENCIES: dict[type[Exception], tuple[type[Exception], str]] = {
+    EmbeddingError:  (EmbeddingConfigError,  "Embedding service call failed"),
+    DbQdrantError:   (DbQdrantConfigError,   "Vector index call failed"),
+    DbPostgresError: (DbPostgresConfigError, "Text index call failed"),
+}
 
 
 def _request_id_of(
@@ -186,6 +197,52 @@ async def _handle_anonymization_error(
     return JSONResponse(status_code=DEPENDENCY_FAILURE_STATUS, content=body.model_dump())
 
 
+async def _handle_tool_dependency_error(
+    request: Request,    # np. Request(scope={...})
+    exc:     Exception,  # np. DbQdrantError("Qdrant nie odpowiedział w czasie: POST /…")
+) -> JSONResponse:
+    """
+    Description:
+    Obsługuje awarię zależności, na których stoją narzędzia agenta: embeddera, Qdranta
+    i Postgresa. Węzeł `run_tools` takiego błędu nie łapie, więc przebieg grafu staje, a wołający
+    dostaje 503 zamiast gołego 500 — z opisem, która zależność zawiodła.
+
+    Example args:
+        request=Request(scope={...})
+        exc=DbQdrantError("Qdrant nie odpowiedział w czasie: POST /collections/tickets/…")
+
+    Example result:
+        JSONResponse(status_code=503, content={"detail": "Vector index call failed", …})
+
+    Raises:
+        EmbeddingConfigError, DbQdrantConfigError, DbPostgresConfigError: puszczane dalej bez
+            zmian — z tego samego powodu co przy LLM
+    """
+    config_error, detail = next(
+        entry for error, entry in TOOL_DEPENDENCIES.items() if isinstance(exc, error)
+    )
+
+    # Błąd konfiguracji (pusty adres, złe hasło, indeks z innej wersji kontraktu) to nie stan
+    # przejściowy: czekanie go nie naprawi, więc kończy żądanie głośno.
+    if isinstance(exc, config_error):
+        raise exc
+
+    request_id = _request_id_of(request)
+    # Treść wyjątku tylko na DEBUG: Qdrant i Postgres potrafią zacytować w błędzie fragment
+    # zapytania, czyli dane klienta.
+    logger.error(
+        "tool_dependency_error path=%s error_type=%s request_id=%s",
+        request.url.path,
+        type(exc).__name__,
+        request_id,
+    )
+    logger.debug("tool_dependency_error details=%s", exc)
+
+    body = ErrorResponse(detail=detail, request_id=request_id)
+
+    return JSONResponse(status_code=DEPENDENCY_FAILURE_STATUS, content=body.model_dump())
+
+
 def register_exception_handlers(
     app: FastAPI,  # np. FastAPI()
 ) -> None:
@@ -206,3 +263,6 @@ def register_exception_handlers(
     # zależności jest udokumentowanym 503, a nie tym, co autor trasy akurat pamiętał złapać.
     app.add_exception_handler(LLMError, _handle_llm_error)
     app.add_exception_handler(AnonymizationError, _handle_anonymization_error)
+
+    for error in TOOL_DEPENDENCIES:
+        app.add_exception_handler(error, _handle_tool_dependency_error)

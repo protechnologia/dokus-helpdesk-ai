@@ -103,10 +103,10 @@ aplikacji i dostęp do instancji testowej, na której agent sprawdzi opisany obj
 pierwszym narzędziem, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzji
 o granicach.
 
-**Stan na dziś.** Szkielet stoi w całości, a część jednostek to atrapy: wykonanie narzędzi
-i odpowiedź, anonimizator oraz model w turze z narzędziami. Węzeł agenta jest właściwy, ale trasy
-biorą jeszcze grafy złożone z atrap. Wszystkie osiem narzędzi ma wersję właściwą; dwa, które
-czytają wątki zgłoszeń, czekają na dane, bo tabela wątków napełni się dopiero po anonimizacji.
+**Stan na dziś.** Szkielet stoi w całości, a część jednostek to atrapy: odpowiedź, anonimizator
+oraz model w turze z narzędziami. Węzły agenta i wykonania narzędzi są właściwe, ale trasy biorą
+jeszcze grafy złożone z atrap. Wszystkie osiem narzędzi ma wersję właściwą; dwa, które czytają
+wątki zgłoszeń, czekają na dane, bo tabela wątków napełni się dopiero po anonimizacji.
 
 ### Zasady produktu
 
@@ -1202,7 +1202,10 @@ Wspólne:
 - **Odpowiedź `/search` niesie wywołania narzędzi agenta** (`queries`: narzędzie i argumenty,
   wyszukiwania i odczyty, bez `respond_search`), obok źródeł z `cite()`. Źle odczytany
   `component` albo zgubiony kod błędu są niewidoczne w samej liście źródeł; pełną kartę nowego
-  zgłoszenia daje `/parse-ticket`.
+  zgłoszenia daje `/parse-ticket`. Wyszukiwanie po znaczeniu niesie tam też
+  `dropped_below_threshold` (2026-10-05): ile trafień TEGO zapytania odciął próg, odczytane
+  z wyniku narzędzia w rozmowie. Przy zapytaniu, nie jako suma na odpowiedź: agent szuka kilka
+  razy i te same słabe trafienia liczyłyby się wielokrotnie.
 - **Każda odpowiedź trasy opartej na grafie niesie `usage`** — liczbę wywołań modelu, tokeny
   w czterech klasach i `cost_usd` całej sprawy, żeby wołający widział koszt bez logów.
 - **Każda taka odpowiedź niesie też `log` (2026-10-04)** — wpisy przebiegu grafu ze stanu
@@ -1225,8 +1228,8 @@ Wspólne:
 - **Trasy biorą graf z `agent_graphs/factory.py` (`get_graph_builder()`, zależność FastAPI),
   budowany na każde żądanie** — atrapa jest jednorazowa. Do p. 11 `build_function_graph()` zawsze
   oddaje atrapę, także przy prawdziwym `LLM_PROVIDER`: nic nie wychodzi z procesu, a odmowa
-  położyłaby trasy na stacku dev. Właściwy węzeł `agent` wejdzie do tras razem z `run_tools`
-  i `respond`: z samymi ich atrapami prawdziwy model liczyłby tury, których wynik zastępuje atrapa.
+  położyłaby trasy na stacku dev. Właściwe węzły `agent` i `run_tools` wejdą do tras razem
+  z `respond`: z jego atrapą prawdziwy model liczyłby tury, których wynik zastępuje atrapa.
   Test podmienia zależność przez `dependency_overrides`, wstawiając graf z atrap, do których ma
   dostęp.
 
@@ -1366,9 +1369,9 @@ wektor:
   niewłaściwym nie jest błędem — zwraca wiarygodnie wyglądające bzdury (zmierzone: `query→sts` daje
   96,7% zamiast 98,3%, czyli spadek, nie awarię).
 - **Odcięte progiem trafienia są LICZONE, nie milcząco gubione** (`dropped_below_threshold` w wyniku
-  `find_tickets_vector`; do odpowiedzi `/search` wraca w p. 10) — inaczej ostry próg wygląda
-  dokładnie tak samo jak pusty indeks, a to dwie różne awarie. Przy `RAG_SCORE_MIN` = 0.48 odcinanie
-  jest regułą, nie wyjątkiem.
+  `find_tickets_vector`; w odpowiedzi `/search` stoi przy zapytaniu, które go dało) — inaczej
+  ostry próg wygląda dokładnie tak samo jak pusty indeks, a to dwie różne awarie. Przy
+  `RAG_SCORE_MIN` = 0.48 odcinanie jest regułą, nie wyjątkiem.
 - **`RAG_SCORE_MIN` = 0.48 stoi świadomie po stronie odsiewania śmieci** (pomiar na 171 rekordach,
   raport `data/unsafe/docs/pomiar-progu-score.md`) — trafienie bez treści wygląda na odpowiedź, a
   przy 47% singletonów „nic nie znalazłem" jest normalną odpowiedzią. Próg zostaje także teraz, gdy
@@ -1517,6 +1520,8 @@ czasu jest pusta.
   tylko to, które przeszło parsowanie i filtr jakości, więc `read_tickets_card` oddaje numery bez
   karty w `without_card`. Nieznany numer w `read_tickets_thread` i nieznany identyfikator
   w `read_docs` to błąd wracający do modelu; `read_docs` nie oddaje wtedy wyniku częściowego.
+  Błąd własny narzędzia dziedziczy po `ToolCallError` (`agent_tools/errors.py`), bo tylko tę
+  rodzinę węzeł `run_tools` oddaje modelowi; pilnuje tego test kontraktu narzędzi.
 - **`read_tickets_thread` czyta jeden wątek na wywołanie (2026-10-05).** Przyjmuje `ticket_id`,
   nie listę, i oddaje sam wątek, więc `AGENT_MAX_CALLS_READ_TICKETS_THREAD` jest wprost liczbą
   wątków przeczytanych w sprawie. Przy liście sufit wynosił limit razy pięć, a model w sondzie
@@ -1633,7 +1638,9 @@ czasu jest pusta.
   w ENV, pole na narzędzie.** Wywołanie ponad limit dostaje błąd jako wynik narzędzia
   (`{"error": …}`), bez źródeł, a przebieg idzie dalej — model ma odpowiedzieć z tego, co ma.
   Liczy wspólna funkcja z `agent_nodes/run_tools/limits.py`, z wiadomości w stanie, bez osobnego
-  licznika; używa jej już atrapa `run_tools`, a fabryka podaje limity grafom z narzędziami. Ten
+  licznika; używają jej węzeł i atrapa `run_tools`, a fabryka podaje limity grafom z narzędziami.
+  Wywołanie, na które model dostał błąd, limitu nie zużywa (2026-10-05): błąd wraca po to, żeby
+  model wywołanie poprawił, a limit wątków ma być liczbą wątków przeczytanych. Ten
   sam limit stoi w opisie narzędzia dla modelu: miejsce `{{max_calls}}` w `description.md`
   wypełnia `tool_definitions()`, więc narzędzie bez limitu to błąd składania. Ile jedno
   wywołanie może pobrać (20 kart, 5 sekcji), zostaje stałą w modelu zapytania; wątek jest zawsze
@@ -1657,10 +1664,18 @@ czasu jest pusta.
   prompt systemowy grafu, rozmowę ze stanu i definicje narzędzi (`LLMClient.complete_turn()`),
   a turę modelu dokleja do `messages`. Pierwsza tura otwiera rozmowę turą użytkownika
   z `user_prompt(state)` i zostawia ją w `messages`; atrapa węzła jej nie dokłada, bo nie zna
-  promptu grafu. Dokąd idzie przebieg, rozstrzyga graf; czy narzędzie jest dozwolone — `run_tools`
-  (p. 10); czy odpowiedź ma poprawny kształt, także gdy model odpowiedział samym tekstem —
+  promptu grafu. Dokąd idzie przebieg, rozstrzyga graf; czy narzędzie jest dozwolone —
+  `run_tools`; czy odpowiedź ma poprawny kształt, także gdy model odpowiedział samym tekstem —
   `respond` (p. 11). Zapis tury w stanie (licznik, zużycie, wpis w logu) jest wspólny z atrapą
   (`agent/base.py`).
+- **Węzeł `run_tools` jest właściwy (`RunToolsNode`, 2026-10-05).** Wykonuje po kolei wywołania
+  z ostatniej tury modelu i na każde odpowiada jedną wiadomością `tool`: wynikiem z narzędzia
+  albo błędem `{"error": …}`. Do modelu wraca wyłącznie `ToolCallError` — nieznane narzędzie,
+  argumenty odrzucone przez klasę argumentów narzędzia, odmowa samego narzędzia — oraz odmowa
+  z powodu limitu. Awarii embeddera, Qdranta ani Postgresa węzeł nie łapie: przebieg staje,
+  a trasa oddaje 503. Wykonuje narzędzia, które dostał w konstruktorze; że jest to lista grafu,
+  pilnuje składający, podając tę samą listę `model_tools()`. Zapis odpowiedzi w stanie
+  (wiadomości, źródła, wpis w logu z licznikami) jest wspólny z atrapą (`run_tools/base.py`).
 - **`AnonymizedText` mieszka w `engine_anonymization/`** — pakiecie na usługę anonimizatora, jak
   `engine_embedding/` (kontrakt `Anonymizer`, `FakeAnonymizer`, fabryka `build_anonymizer`). Osobny
   typ zamiast `str`, żeby granica była widoczna w sygnaturach: kod przyjmujący `AnonymizedText` nie
@@ -2213,17 +2228,20 @@ w p. 46.
   `Response`, a `detail` (jedyne „dlaczego") żyje tylko w wyjątku. Uwaga: `RequestValidationError`
   to **nie** `HTTPException` — potrzebuje osobnego handlera (najczęstsze 422).
 - **Awaria zależności ma własny handler i status „spróbuj później".** Wyjątek warstwy
-  transportowej (`EncoderError` w embedderze, `LLMError` i `AnonymizationError` w `api`) łapiemy
-  osobno i zwracamy **503** we wspólnym
-  kształcie `ErrorResponse` — surowy 500 nie odróżnia „model chwilowo padł" od „zapytanie jest
-  błędne", a to decyduje, czy przebieg indeksacji ma ponowić, czy porzucić zgłoszenie.
-  **Treść wyjątku zostaje w logu, nie w odpowiedzi** — komunikat biblioteki modelu potrafi
-  zacytować wejście, czyli dane klienta.
-- **Błąd konfiguracji NIGDY nie zamienia się w status HTTP.** `LLMConfigError`/`EncoderConfigError`/
-  `AnonymizationConfigError`
-  dziedziczą po błędzie swojej warstwy, więc wpadłyby w handler 503 — handler **wyrzuca je z
-  powrotem**. Powód: 503 znaczy „spróbuj za chwilę", a przy złym `LLM_PROVIDER` czekanie nic nie
-  da; zielony kontener oddający uprzejme 503 na każde żądanie jest gorszy niż głośna śmierć.
+  transportowej (`EncoderError` w embedderze; w `api` `LLMError`, `AnonymizationError` oraz
+  zależności narzędzi agenta: `EmbeddingError`, `DbQdrantError`, `DbPostgresError`) łapiemy
+  osobno i zwracamy **503** we wspólnym kształcie `ErrorResponse` — surowy 500 nie odróżnia
+  „model chwilowo padł" od „zapytanie jest błędne", a to decyduje, czy przebieg indeksacji ma
+  ponowić, czy porzucić zgłoszenie. **Treść wyjątku zostaje w logu, nie w odpowiedzi** —
+  komunikat biblioteki modelu potrafi zacytować wejście, czyli dane klienta. Przy zależnościach
+  narzędzi treść idzie tylko na DEBUG: Qdrant i Postgres potrafią zacytować w błędzie fragment
+  zapytania.
+- **Błąd konfiguracji NIGDY nie zamienia się w status HTTP.** `LLMConfigError`,
+  `EncoderConfigError` i `AnonymizationConfigError`, a w `api` także `EmbeddingConfigError`,
+  `DbQdrantConfigError` i `DbPostgresConfigError`, dziedziczą po błędzie swojej warstwy, więc
+  wpadłyby w handler 503 — handler **wyrzuca je z powrotem**. Powód: 503 znaczy „spróbuj za
+  chwilę", a przy złym `LLM_PROVIDER` czekanie nic nie da; zielony kontener oddający uprzejme
+  503 na każde żądanie jest gorszy niż głośna śmierć.
 - **Każda usługa ma swoje handlery i swój Request-ID** — kodu nie dzielimy, więc to świadome
   powielenie; id **przyjęte od wołającego wygrywa**, żeby jeden identyfikator spinał `api`
   i embedder w jednym przebiegu indeksacji.
@@ -2234,16 +2252,16 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1062 (0)           | 18 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 211 (79)           | 68 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 98 (9)             | 11 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1086 (0)           | 18 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 229 (79)           | 68 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 100 (9)            | 11 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 53 s |
 
 Liczby i czasy z 2026-10-05: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 8 s, a ewaluacyjne poniżej sekundy —
 całe 53 s to 207 wyszukań golden setów przez prawdziwy embedder (178 w zgłoszeniach, 29
-w dokumentacji). Komplet jednym poleceniem (`pytest -m ""`): 1411 testów, 149 s; domyślny
-`pytest`, bez stacku: 1285 testów, 26 s.
+w dokumentacji). Komplet jednym poleceniem (`pytest -m ""`): 1455 testów, 147 s; domyślny
+`pytest`, bez stacku: 1329 testów, 21 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2420,6 +2438,11 @@ instancji klienta i atrapy jego własnych odpowiedzi.
 testujesz narzędzie stojące na tabeli: narzędzie dostaje prawdziwą tabelę, a podmieniony jest
 tylko klient, który na spis, odczyt, podciąg i słowa oddaje ustalone odpowiedzi i zapisuje
 zapytania. Treść SQL-a tabel sprawdza osobna atrapa w `test_api_db_postgres_tables.py`.
+
+**Narzędzie z padniętą zależnością bierz z `tests/helpers_agent_tools.py`** — narzędzie właściwe
+na kliencie z transportem, który nie odpowiada. Nie definiuj w teście podklasy narzędzia: test
+kontraktu narzędzi znajduje wszystkie klasy narzędzi w procesie i policzy ją jako drugie
+narzędzie o tej samej nazwie.
 
 ## Zakres i plan
 
@@ -2657,14 +2680,11 @@ niż zgadywanie.
   ze scenariuszem tur, `provider_items` w wiadomości, limit tur `AGENT_MAX_ITERATIONS`
   w rozgałęzieniu grafów; trasy zostają na atrapach grafów do p. 11; reguły — „Warstwa węzłów",
   „Warstwa grafów", „Warstwa LLM".
-- [ ] **10. `run_tools`** — wywołania wyłącznie z listy dozwolonych, argumenty walidowane
-  `query_model` (błąd wraca do modelu jako wiadomość `tool`, żeby mógł poprawić wywołanie), tekst
-  z `render_for_model()` do `messages`, źródła z `cite()` do `sources`; licznik
-  `dropped_below_threshold` ma wrócić do odpowiedzi `/search` (zgubiony przy przejściu na graf —
-  „nic nie było" i „próg wyciął" to różne odpowiedzi); awaria embeddera albo Qdranta w narzędziu
-  ma dostać handler 503 (dziś `api` ma je tylko dla LLM i anonimizatora); limity wywołań narzędzi
-  (`AGENT_MAX_CALLS_*`) egzekwowane funkcją z `limits.py`, której używa już atrapa. *Dlaczego:*
-  lista źródeł powstaje z wywołań narzędzi, nigdy z deklaracji modelu (zasada 9).
+- [x] **10. `run_tools`** (2026-10-05) — `RunToolsNode` na kontraktach narzędzi: błąd wywołania
+  (`ToolCallError`) wraca do modelu, awaria embeddera, Qdranta albo Postgresa to 503,
+  `dropped_below_threshold` przy zapytaniu w odpowiedzi `/search`; trasy zostają na atrapach
+  grafów do p. 11; reguły — „Warstwa węzłów", „Warstwa narzędzi agenta", „Warstwa API", „Logi
+  i obserwowalność".
 - [ ] **18. Dwie role LLM w konfiguracji** (przeniesiony 2026-10-05, numer spoza kolejności) —
   zaufana i generująca, z flagą per endpoint „może widzieć surowe dane", domyślnie wyłączoną.
   *Dlaczego:* pomyłka tej flagi to przeciek, więc wyłączenie ochrony ma być jawnym aktem

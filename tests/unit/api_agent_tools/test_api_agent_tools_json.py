@@ -2,7 +2,7 @@ import json
 
 from pydantic import BaseModel
 
-from app.agent_tools.base import result_as_json
+from app.agent_tools.base import error_as_json, is_error_json, result_as_json
 
 
 class Inner(BaseModel):
@@ -71,3 +71,29 @@ def test_excluded_fields_do_not_reach_the_model() -> None:
     body   = json.loads(result_as_json(result, exclude={"items": {"__all__": {"internal"}}}))
 
     assert body["items"] == [{"text": "a"}, {"text": "b"}]
+
+
+def test_an_error_is_json_with_the_message_under_one_field() -> None:
+    """Sprawdza, czy błąd zapisany dla modelu jest poprawnym JSON-em z jednym polem `error`,
+    w którym stoi komunikat bez zmian, z polskimi literami wprost.
+
+    Wyłapuje błąd podany w innym kształcie niż wyniki narzędzi albo z polskimi znakami zamienionymi
+    na kody: model czyta go w tym samym miejscu, w którym czyta wynik."""
+    text = error_as_json("nieznane zgłoszenie: 90019 — „bez wątku”")
+
+    assert json.loads(text) == {"error": "nieznane zgłoszenie: 90019 — „bez wątku”"}
+    assert "\\u" not in text
+
+
+def test_an_error_is_told_apart_from_a_result() -> None:
+    """Sprawdza, czy rozpoznawanie błędu odróżnia tekst zapisany jako błąd od wyniku narzędzia,
+    od wyniku, który sam ma pole o nazwie `error` obok innych pól, i od tekstu, który nie jest
+    JSON-em.
+
+    Wyłapuje pomyłkę w obie strony: wynik wzięty za błąd nie liczyłby się do limitu wywołań,
+    a błąd wzięty za wynik zabierałby modelowi wywołanie, które się nie wykonało."""
+    assert is_error_json(error_as_json("limit wyczerpany"))
+    assert not is_error_json(result_as_json(Result(items=[Inner(text="a")])))
+    assert not is_error_json('{"error": "x", "items": []}')
+    assert not is_error_json("fake-tool-result")
+    assert not is_error_json('["error"]')

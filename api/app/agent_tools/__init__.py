@@ -22,7 +22,8 @@ jednym z nich (CLAUDE.md -> „Jak to działa").
 
 Trzy poziomy, na każdym `base.py` z tym, co wspólne poziom niżej:
 
-    agent_tools/base.py, models.py        kontrakty, JSON wyniku i `SourceRef` — wspólne
+    agent_tools/base.py, models.py        kontrakty, JSON wyniku i błędu, `SourceRef` — wspólne
+    agent_tools/errors.py                 `ToolCallError` — błąd, który wraca do modelu
     agent_tools/<materiał>/fake_*.py      zmyślony materiał, na którym stoją atrapy jego narzędzi
     agent_tools/<materiał>/<narzędzie>/   narzędzie: `tool.py`, `fake.py`, `base.py`, `models.py`
                                     i `description.md`
@@ -30,7 +31,9 @@ Trzy poziomy, na każdym `base.py` z tym, co wspólne poziom niżej:
 Materiały są dwa — `tickets/` i `docs/` — i nazywają się tak jak `SourceRef.source`. W katalogu
 narzędzia: implementacja (`tool.py`), jej atrapa (`fake.py`), ich część wspólna (`base.py`: nazwa
 i — w odczytach — lista źródeł) i `models.py` z własnym zapytaniem i wynikiem — bez wspólnej
-bazy — oraz `errors.py`, gdy narzędzie ma własne błędy do zgłoszenia.
+bazy — oraz `errors.py`, gdy narzędzie ma własne błędy do zgłoszenia. Taki błąd dziedziczy po
+`ToolCallError`: węzeł `run_tools` oddaje go modelowi jako wynik narzędzia zamiast przerywać
+przebieg.
 Nowe narzędzie to nowy katalog w folderze swojego materiału. Opis, który czyta MODEL, leży
 w katalogu narzędzia (`description.md`) i jest ten sam w każdym grafie: mówi, jak pytać
 narzędzie i co ono oddaje. Po co wyniki w danej funkcji, mówi prompt grafu.
@@ -54,6 +57,7 @@ rejestru.
 """
 
 from app.agent_tools.base import AgentTool, AuxiliaryTool, KnowledgeSource
+from app.agent_tools.errors import ToolCallError
 from app.agent_tools.models import SourceRef
 
 __all__ = [
@@ -61,4 +65,5 @@ __all__ = [
     "AuxiliaryTool",
     "KnowledgeSource",
     "SourceRef",
+    "ToolCallError",
 ]

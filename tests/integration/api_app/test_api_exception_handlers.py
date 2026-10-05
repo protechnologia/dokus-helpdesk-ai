@@ -2,9 +2,30 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
+from app.db_postgres import DbPostgresConfigError, DbPostgresError
+from app.db_qdrant import DbQdrantConfigError, DbQdrantError
 from app.engine_anonymization import AnonymizationConfigError, AnonymizationError
+from app.engine_embedding import EmbeddingConfigError, EmbeddingError
 from app.engine_llm import LLMConfigError, LLMError
 from app.errors import register_exception_handlers
+
+# Trasy, które prowokują awarię zależności, i opis, jaki wołający ma wtedy dostać.
+DOWN = {
+    "/llm-down":           "Language model call failed",
+    "/anonymization-down": "Anonymization failed",
+    "/embedder-down":      "Embedding service call failed",
+    "/qdrant-down":        "Vector index call failed",
+    "/postgres-down":      "Text index call failed",
+}
+
+# Trasy, które prowokują błąd konfiguracji tych samych zależności.
+MISCONFIGURED = [
+    "/llm-misconfigured",
+    "/anonymization-misconfigured",
+    "/embedder-misconfigured",
+    "/qdrant-misconfigured",
+    "/postgres-misconfigured",
+]
 
 
 @pytest.fixture
@@ -18,8 +39,7 @@ def client() -> TestClient:
         (wstrzykiwane przez pytest)
 
     Example result:
-        TestClient nad aplikacją z /boom, /needs-param, /llm-down, /llm-misconfigured,
-        /anonymization-down i /anonymization-misconfigured
+        TestClient nad aplikacją z /boom, /needs-param oraz trasami z `DOWN` i `MISCONFIGURED`
     """
     app = FastAPI()
     register_exception_handlers(app)
@@ -47,6 +67,30 @@ def client() -> TestClient:
     @app.get("/anonymization-misconfigured")
     async def anonymization_misconfigured() -> None:
         raise AnonymizationConfigError("atrapa anonimizatora przy LLM_PROVIDER=ollama")
+
+    @app.get("/embedder-down")
+    async def embedder_down() -> None:
+        raise EmbeddingError("Could not reach the embedder; text was 'Drukarka nie drukuje'")
+
+    @app.get("/embedder-misconfigured")
+    async def embedder_misconfigured() -> None:
+        raise EmbeddingConfigError("EMBEDDING_BASE_URL nie może być puste")
+
+    @app.get("/qdrant-down")
+    async def qdrant_down() -> None:
+        raise DbQdrantError("Qdrant odpowiedział HTTP 500: payload 'Jan Kowalski'")
+
+    @app.get("/qdrant-misconfigured")
+    async def qdrant_misconfigured() -> None:
+        raise DbQdrantConfigError("punkt 'df3b' nie ma `ticket_id` w payloadzie")
+
+    @app.get("/postgres-down")
+    async def postgres_down() -> None:
+        raise DbPostgresError("zapytanie do Postgresa nie powiodło się: 'Jan Kowalski'")
+
+    @app.get("/postgres-misconfigured")
+    async def postgres_misconfigured() -> None:
+        raise DbPostgresConfigError("POSTGRES_PASSWORD nie może być puste")
 
     # raise_server_exceptions=False: odpowiadają handlery, zamiast wyjątku wpadającego do testu.
     return TestClient(app, raise_server_exceptions=False)
@@ -90,21 +134,15 @@ def test_validation_error_hides_submitted_values(client: TestClient) -> None:
     assert "not-a-number" not in response.text
 
 
-@pytest.mark.parametrize(
-    "path, detail",
-    [
-        ("/llm-down",           "Language model call failed"),
-        ("/anonymization-down", "Anonymization failed"),
-    ],
-    ids=["llm", "anonymization"],
-)
+@pytest.mark.parametrize("path, detail", DOWN.items(), ids=lambda value: value.strip("/"))
 def test_a_dependency_failure_becomes_service_unavailable(
     client: TestClient,
     path:   str,
     detail: str,
 ) -> None:
-    """Sprawdza, czy awaria modelu językowego albo anonimizatora w trakcie żądania wraca jako
-    status 503 z ogólnym opisem, osobnym dla każdej z tych dwóch zależności.
+    """Sprawdza, czy awaria zależności w trakcie żądania — modelu językowego, anonimizatora,
+    embeddera, Qdranta albo Postgresa — wraca jako status 503 z ogólnym opisem, osobnym dla każdej
+    z nich.
 
     Wyłapuje awarię zależności oddaną jako zwykły błąd serwera: taki błąd nie mówi wołającemu,
     czy zawiniło jego żądanie, czy usługa chwilowo nie działa i można ponowić albo zdecydować
@@ -115,31 +153,27 @@ def test_a_dependency_failure_becomes_service_unavailable(
     assert response.json()["detail"] == detail
 
 
-@pytest.mark.parametrize("path", ["/llm-down", "/anonymization-down"], ids=["llm", "anonymization"])
+@pytest.mark.parametrize("path", DOWN, ids=lambda value: value.strip("/"))
 def test_a_dependency_failure_hides_its_message(client: TestClient, path: str) -> None:
-    """Sprawdza, czy odpowiedź po awarii modelu językowego albo anonimizatora nie zawiera treści
-    wyjątku: w teście wyjątki cytują fragment promptu i zmyślone nazwisko, a w odpowiedzi nie ma
+    """Sprawdza, czy odpowiedź po awarii którejkolwiek zależności nie zawiera treści wyjątku:
+    w teście wyjątki cytują fragment zgłoszenia i zmyślone nazwisko, a w odpowiedzi nie ma
     żadnego z nich.
 
     Wyłapuje przeciek danych klienta przez komunikat błędu: wyjątek zależności potrafi zacytować
-    prompt albo tekst zgłoszenia."""
+    prompt, tekst zgłoszenia albo fragment odpowiedzi bazy."""
     response = client.get(path)
 
     assert "Drukarka" not in response.text
     assert "Kowalski" not in response.text
 
 
-@pytest.mark.parametrize(
-    "path",
-    ["/llm-misconfigured", "/anonymization-misconfigured"],
-    ids=["llm", "anonymization"],
-)
+@pytest.mark.parametrize("path", MISCONFIGURED, ids=lambda value: value.strip("/"))
 def test_config_error_is_not_dressed_up_as_a_transient_failure(
     client: TestClient,
     path:   str,
 ) -> None:
-    """Sprawdza, czy błąd konfiguracji modelu językowego albo anonimizatora kończy żądanie statusem
-    500, a nie 503, choć w kodzie jest odmianą błędu zależności, który daje 503.
+    """Sprawdza, czy błąd konfiguracji którejkolwiek zależności kończy żądanie statusem 500, a nie
+    503, choć w kodzie jest odmianą błędu zależności, który daje 503.
 
     Wyłapuje złą konfigurację przebraną za chwilową awarię: status 503 znaczy „spróbuj za
     chwilę", a przy błędnej konfiguracji czekanie nic nie da, więc usterka ma być widoczna od

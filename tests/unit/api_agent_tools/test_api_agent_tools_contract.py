@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 import app.agent_tools
 from app.agent_graphs.base import MAX_CALLS_PLACEHOLDER
-from app.agent_tools import AuxiliaryTool, KnowledgeSource
+from app.agent_tools import AuxiliaryTool, KnowledgeSource, ToolCallError
 from app.config import Settings
 
 
@@ -78,12 +78,45 @@ def all_tools_of(
     return found
 
 
+def tool_errors() -> list[type[Exception]]:
+    """
+    Description:
+    Zbiera klasy wyjątków zdefiniowane w modułach `errors.py` pakietów narzędzi — także tych,
+    których jeszcze nie ma.
+
+    Example args:
+        (brak)
+
+    Example result:
+        [UnknownSectionError, UnknownTicketError]
+    """
+    found: list[type[Exception]] = []
+
+    for package in tool_packages():
+        try:
+            module = importlib.import_module(f"{package}.errors")
+        except ModuleNotFoundError:  # narzędzie bez własnych błędów
+            continue
+
+        found.extend(
+            member
+            for member in vars(module).values()
+            if isinstance(member, type)
+            and issubclass(member, Exception)
+            and member.__module__ == module.__name__
+        )
+
+    return found
+
+
 SOURCES   = all_tools_of(KnowledgeSource)
 AUXILIARY = all_tools_of(AuxiliaryTool)
 TOOLS     = [*SOURCES, *AUXILIARY]
 
 # Układ opisu narzędzia (`description.md`), wspólny dla wszystkich narzędzi.
 DESCRIPTION_SECTIONS = ["# Do czego służy", "# Jak wywoływać", "# Co zwraca", "# Zasady"]
+
+ERRORS = tool_errors()
 
 
 def arguments_model(
@@ -252,3 +285,22 @@ def test_every_tool_has_a_call_limit_in_the_configuration() -> None:
     limits = Settings(_env_file=None).tool_call_limits()
 
     assert set(limits) == {tool.name for tool in TOOLS}
+
+
+def test_some_tool_brings_its_own_errors() -> None:
+    """Sprawdza, czy zbieranie błędów własnych narzędzi cokolwiek znajduje: dziś mają je odczyt
+    wątku i odczyt sekcji dokumentacji.
+
+    Wyłapuje zbieranie, które po zmianie układu katalogów nie widzi żadnego modułu `errors.py`:
+    test niżej przechodziłby wtedy na pustej liście i niczego nie sprawdzał."""
+    assert len(ERRORS) >= 2
+
+
+@pytest.mark.parametrize("error", ERRORS, ids=lambda cls: cls.__name__)
+def test_every_error_of_a_tool_goes_back_to_the_model(error: type[Exception]) -> None:
+    """Sprawdza, czy każdy błąd zdefiniowany przez narzędzie w jego `errors.py` jest odmianą
+    `ToolCallError`.
+
+    Wyłapuje nowy błąd narzędzia poza tą rodziną: węzeł wykonujący narzędzia nie oddałby go
+    modelowi do poprawienia, tylko przerwał całe żądanie błędem serwera."""
+    assert issubclass(error, ToolCallError)

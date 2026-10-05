@@ -6,7 +6,8 @@ from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.agent_nodes import LogEntry
-from app.agent_tools import AgentTool, KnowledgeSource, SourceRef
+from app.agent_tools import AgentTool, SourceRef
+from app.agent_tools.base import arguments_model_of
 from app.core_util.json_schema import json_schema_without_docs
 from app.engine_anonymization import AnonymizedText
 from app.engine_llm import ChatMessage, LLMUsage, ToolDefinition
@@ -168,10 +169,7 @@ def tool_definitions(
         ToolDefinition(
             name        = tool.name,
             description = tool.description.replace(MAX_CALLS_PLACEHOLDER, str(limits[tool.name])),
-            parameters  = json_schema_without_docs(
-                # oba rodzaje trzymają model argumentów pod inną nazwą
-                tool.query_model if isinstance(tool, KnowledgeSource) else tool.args_model
-            ),
+            parameters  = json_schema_without_docs(arguments_model_of(tool)),
         )
         for tool in tools
     ]

@@ -2,6 +2,7 @@ import json
 
 from app.agent_nodes.agent import tool_call_turn
 from app.agent_nodes.run_tools import calls_over_limit, limit_exceeded_text
+from app.agent_tools.base import error_as_json
 from app.engine_llm import ChatMessage, ToolCall
 
 # Liczenie wywołań narzędzi wobec limitów: funkcja wspólna dla atrapy `run_tools` i węzła
@@ -9,7 +10,8 @@ from app.engine_llm import ChatMessage, ToolCall
 
 
 def _answer(
-    call_id: str,  # np. "call_1"
+    call_id: str,         # np. "call_1"
+    content: str = "{}",  # np. error_as_json("nieznane zgłoszenie: 90019")
 ) -> ChatMessage:
     """
     Description:
@@ -17,11 +19,12 @@ def _answer(
 
     Example args:
         call_id="call_1"
+        content="{}"
 
     Example result:
         ChatMessage(role="tool", call_id="call_1", content="{}")
     """
-    return ChatMessage(role="tool", call_id=call_id, content="{}")
+    return ChatMessage(role="tool", call_id=call_id, content=content)
 
 
 def _find(
@@ -64,6 +67,21 @@ def test_a_call_over_the_limit_is_refused() -> None:
     ]
 
     assert calls_over_limit(messages, {"find_tickets_vector": 2}) == {"call_3"}
+
+
+def test_a_call_answered_with_an_error_does_not_count() -> None:
+    """Sprawdza, czy wcześniejsze wywołanie, na które model dostał błąd zamiast wyniku, nie liczy
+    się do limitu: przy limicie 1 kolejne wyszukiwanie po nieudanym nie jest wskazane do odmowy,
+    a po udanym jest.
+
+    Wyłapuje liczenie nieudanych wywołań na równi z udanymi: model, który pomylił argument
+    i dostał radę, żeby go poprawić, trafiałby z poprawką na wyczerpany limit."""
+    error  = error_as_json("błędne argumenty")
+    failed = [_find("call_1"), _answer("call_1", error), _find("call_2")]
+    done   = [_find("call_1"), _answer("call_1"), _find("call_2")]
+
+    assert calls_over_limit(failed, {"find_tickets_vector": 1}) == set()
+    assert calls_over_limit(done, {"find_tickets_vector": 1})   == {"call_2"}
 
 
 def test_each_tool_is_counted_on_its_own() -> None:

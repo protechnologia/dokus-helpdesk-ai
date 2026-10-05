@@ -1,4 +1,7 @@
-class UnknownSectionError(Exception):
+from app.agent_tools.errors import ToolCallError
+
+
+class UnknownSectionError(ToolCallError):
     """
     Description:
     Agent poprosił o sekcję, której w dokumentacji nie ma — literówka w identyfikatorze albo
@@ -6,8 +9,8 @@ class UnknownSectionError(Exception):
 
     Błąd, a nie krótsza lista: odczyt trzech sekcji zamiast czterech wygląda dokładnie jak
     poprawny, a odpowiedź oparta na niepełnym materiale nie nosi po tym śladu. Komunikat wraca
-    do modelu jako wynik narzędzia, żeby mógł poprawić wywołanie (p. 10), więc wymienia nieznane
-    identyfikatory — to nazwy sekcji, nie dane klienta.
+    do modelu jako wynik narzędzia, żeby mógł poprawić wywołanie (stąd `ToolCallError`), więc
+    wymienia nieznane identyfikatory — to nazwy sekcji, nie dane klienta.
     """
 
     def __init__(

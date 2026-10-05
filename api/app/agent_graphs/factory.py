@@ -16,11 +16,11 @@ def build_function_graph(
     """
     Description:
     Buduje graf funkcji, o który prosi trasa. DZIŚ ZAWSZE ATRAPĘ, niezależnie od `LLM_PROVIDER`:
-    właściwy jest dopiero węzeł `agent` (p. 9), a `run_tools` i `respond` to atrapy (p. 10–11).
-    Graf z prawdziwym modelem i tymi atrapami płaciłby za tury, których wynik i tak zastępuje
-    atrapa — a atrapa grafu nie wysyła niczego poza proces, więc nie ma czego chronić odmową,
-    a odmowa położyłaby trasy na stacku dev z prawdziwym modelem. Wybór po konfiguracji (klient
-    LLM, anonimizator, narzędzia) wchodzi tu z p. 11.
+    właściwe są węzły `agent` i `run_tools`, a `respond` to jeszcze atrapa (p. 11). Graf
+    z prawdziwym modelem i tą atrapą płaciłby za tury, których wynik i tak zastępuje atrapa —
+    a atrapa grafu nie wysyła niczego poza proces, więc nie ma czego chronić odmową, a odmowa
+    położyłaby trasy na stacku dev z prawdziwym modelem. Wybór po konfiguracji (klient LLM,
+    anonimizator, narzędzia) wchodzi tu z p. 11.
 
     Atrapa jest jednorazowa (`FakeAgentNode` ma zaplanowane tury), dlatego graf powstaje na każde
     żądanie, a nie raz na proces.

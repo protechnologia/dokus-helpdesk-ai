@@ -1,8 +1,8 @@
 """
 Description:
 Limity wywołań narzędzi w jednym przebiegu grafu: które wywołania z ostatniej tury modelu są
-ponad limit i co model dostaje zamiast wyniku. Wspólne dla atrapy `run_tools` i węzła właściwego
-(p. 10), żeby oba liczyły tak samo.
+ponad limit i co model dostaje zamiast wyniku. Wspólne dla węzła `run_tools` i jego atrapy, żeby
+oba liczyły tak samo.
 
 Przed — rozmowa, w której model wołał `find_tickets_vector` już dwa razy, i limit 2:
 
@@ -17,7 +17,8 @@ Po — identyfikatory wywołań ponad limit:
 Co się dzieje po drodze:
 
 1. Wywołania z wcześniejszych tur są policzone z wiadomości w stanie grafu — osobnego licznika
-   w stanie nie ma.
+   w stanie nie ma. Liczą się te, które dały wynik; wywołanie, na które model dostał błąd,
+   limitu nie zużywa.
 2. Wywołania z ostatniej tury idą po kolei: mieszczące się w limicie podbijają licznik, kolejne
    są ponad limit.
 3. Wywołanie ponad limit dostaje `limit_exceeded_text()` zamiast wyniku i nie dokłada źródeł.
@@ -26,15 +27,20 @@ O czym pamiętać przy zmianach:
 
 - Limit dotyczy jednego przebiegu grafu, czyli jednej sprawy, i liczy WYWOŁANIA, nie pobrane
   elementy. Ile jedno wywołanie może pobrać, ustala model zapytania narzędzia.
+- Wywołanie zakończone błędem (złe argumenty, nieznany numer, odmowa z powodu limitu) nie
+  zużywa limitu: błąd wraca do modelu po to, żeby mógł wywołanie poprawić, a limit odczytu
+  wątków ma być liczbą wątków przeczytanych. Pętlę samych błędów ucina limit tur modelu.
+- W obrębie jednej tury miejsca w limicie są rozdzielane przed wykonaniem: wywołanie, które
+  potem skończy się błędem, zajmuje swoje do końca tej tury i zwalnia je dopiero w następnej.
 - Narzędzie bez wpisu w `limits` nie ma limitu. Mapę z konfiguracji daje
   `Settings.tool_call_limits()`, a w niej jest każde narzędzie.
 - Tekst błędu czyta model: mówi, co się stało i co dalej. Żądanie się nie wywala.
 """
 
-import json
 from collections import Counter
 from collections.abc import Mapping, Sequence
 
+from app.agent_tools.base import error_as_json, is_error_json
 from app.engine_llm import ChatMessage
 
 
@@ -45,7 +51,8 @@ def calls_over_limit(
     """
     Description:
     Wskazuje wywołania z ostatniej tury modelu, które przekraczają limit swojego narzędzia —
-    licząc wywołania z wcześniejszych tur i te stojące przed nimi w tej samej turze.
+    licząc wywołania z wcześniejszych tur, które dały wynik, i te stojące przed nimi w tej samej
+    turze.
 
     Example args:
         messages=[tool_call_turn("read_docs", {…}), …, tool_call_turn("read_docs", {…}, "call_3")]
@@ -60,8 +67,18 @@ def calls_over_limit(
 
     *earlier, last = messages
 
-    # --- wywołania z wcześniejszych tur ---
-    used = Counter(call.name for message in earlier for call in message.tool_calls)
+    # --- wywołania z wcześniejszych tur: liczą się te, które dały wynik, nie błąd ---
+    failed = {
+        message.call_id
+        for message in earlier
+        if message.role == "tool" and is_error_json(message.content)
+    }
+    used = Counter(
+        call.name
+        for message in earlier
+        for call in message.tool_calls
+        if call.call_id not in failed
+    )
 
     # --- ostatnia tura, po kolei ---
     refused: set[str] = set()
@@ -86,7 +103,7 @@ def limit_exceeded_text(
     """
     Description:
     Tekst, który model dostaje zamiast wyniku narzędzia wywołanego ponad limit — JSON z polem
-    `error`, jak każdy wynik narzędzia.
+    `error`, jak każdy błąd wracający do modelu (`error_as_json()`).
 
     Example args:
         tool_name="read_tickets_thread"
@@ -101,4 +118,4 @@ def limit_exceeded_text(
         f"Nie wołaj go ponownie — odpowiedz na podstawie tego, co już masz."
     )
 
-    return json.dumps({"error": error}, ensure_ascii=False)
+    return error_as_json(error)

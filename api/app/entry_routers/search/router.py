@@ -1,3 +1,4 @@
+import json
 import logging
 
 from fastapi import APIRouter, Depends
@@ -18,6 +19,38 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["rag"])
 
+# Pole wyniku wyszukiwania po znaczeniu: ile trafień odciął próg podobieństwa.
+DROPPED_FIELD = "dropped_below_threshold"
+
+
+def _dropped_below_threshold(
+    result_text: str | None,  # np. '{"tickets": [], "dropped_below_threshold": 3}'
+) -> int | None:
+    """
+    Description:
+    Czyta z wyniku narzędzia, ile trafień odciął próg podobieństwa. Wynik narzędzia to JSON
+    z polami pod nazwami ze schematu, więc licznik jest w nim wprost. Brak wyniku, błąd zamiast
+    wyniku albo narzędzie bez progu dają `None`.
+
+    Example args:
+        result_text='{"tickets": [], "dropped_below_threshold": 3}'
+
+    Example result:
+        3
+    """
+    # --- wywołanie bez odpowiedzi: tura ucięta limitem tur ---
+    if result_text is None:
+        return None
+
+    try:
+        body = json.loads(result_text)
+    except json.JSONDecodeError:  # nie JSON, więc nie wynik narzędzia
+        return None
+
+    dropped = body.get(DROPPED_FIELD) if isinstance(body, dict) else None
+
+    return dropped if isinstance(dropped, int) else None
+
 
 def _agent_queries(
     messages: list[ChatMessage],  # np. [ChatMessage(role="assistant", tool_calls=[…]), …]
@@ -25,16 +58,26 @@ def _agent_queries(
     """
     Description:
     Wyciąga z rozmowy zapytania, które agent wysłał do narzędzi wiedzy — bez wywołania odpowiedzi
-    (`respond_search`), które niczego nie szuka.
+    (`respond_search`), które niczego nie szuka. Do wyszukiwania po znaczeniu dokłada licznik
+    trafień odciętych progiem, odczytany z wyniku tego wywołania.
 
     Example args:
-        messages=[tool_call_turn("find_tickets_vector", {"problem": "…", "symptoms": "…"}), …]
+        messages=[tool_call_turn("find_tickets_vector", {"problem": "…", "symptoms": "…"}),
+                  ChatMessage(role="tool", call_id="call_1", content='{"tickets": […], …}')]
 
     Example result:
-        [AgentQuery(tool="find_tickets_vector", arguments={"problem": "…", "symptoms": "…"})]
+        [AgentQuery(tool="find_tickets_vector", arguments={"problem": "…", "symptoms": "…"},
+                    dropped_below_threshold=3)]
     """
+    # Wynik wywołania to wiadomość `tool` z jego `call_id`.
+    results = {message.call_id: message.content for message in messages if message.role == "tool"}
+
     queries = [
-        AgentQuery(tool=call.name, arguments=call.arguments)
+        AgentQuery(
+            tool                    = call.name,
+            arguments               = call.arguments,
+            dropped_below_threshold = _dropped_below_threshold(results.get(call.call_id)),
+        )
         for message in messages
         for call in message.tool_calls
         if call.name in search.TOOL_NAMES
@@ -58,7 +101,8 @@ async def search_tickets(
 
     Example result:
         SearchResponse(sources=[SourceItem(…), …],
-                       queries=[AgentQuery(tool="find_tickets_vector", …)])
+                       queries=[AgentQuery(tool="find_tickets_vector", …,
+                                           dropped_below_threshold=0), …])
     """
     state = search.STATE(input_text=to_raw_ticket(request).as_thread())
     final = await run_graph(build(search), state)
@@ -72,10 +116,11 @@ async def search_tickets(
 
     # Same identyfikatory i liczby — źródła niosą dane klientów (CLAUDE.md -> „Logi").
     logger.info(
-        "search ticket_id=%s sources=%d queries=%d",
+        "search ticket_id=%s sources=%d queries=%d dropped_below_threshold=%d",
         request.ticket_id,
         len(response.sources),
         len(response.queries),
+        sum(query.dropped_below_threshold or 0 for query in response.queries),
     )
 
     return response
