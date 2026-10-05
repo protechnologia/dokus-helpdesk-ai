@@ -17,7 +17,7 @@
       "`expected_total` — ile sekcji paczki pasuje do zapytania; narzędzie ma oddać tyle w sumie: zwrócone + `omitted_over_limit`.",
       "read_docs: treść porównuje się z plikiem `<section_id>.md`; `expected_error` — odczyt kończy się błędem bez wyniku częściowego.",
       "Zapytania pisane tak, jak opis narzędzia każe pytać agentowi — NIE poprawiać ich pod wynik.",
-      "Sprawdzone sondą 2026-10-04 na DocsTable (pl_search) i DocsCollection (jeden wektor na sekcję: tytuł + treść, query→passage): oczekiwania spełnione poza t25 (czeka na spacje w kolumnie szukania, p. 50) oraz v23 i v24 (czekają na wektory z fragmentów, p. 8 i p. 49)."
+      "Sprawdzone 2026-10-05 narzędziami właściwymi na indeksie syntetycznym (find_docs_vector: fragmenty do 1000 znaków, 5 sekcji, próg 0.37; find_docs_text: limit 5): oczekiwania spełnione poza v27, które przy tym progu dostaje dwie sekcje (0,385 i 0,377)."
     ],
     "phenomena": {
       "dystraktor": "Dwie sekcje o tym samym zagadnieniu w różnych kanałach albo po dwóch stronach (wysyłka/odbiór); zapytanie nazywa jedną.",
@@ -346,14 +346,14 @@
     {
       "id": "t11",
       "phenomenon": "kod",
-      "query": {"exact": ["EDR-0417"]},
+      "query": {"exact": "EDR-0417"},
       "expected": [{"section_id": "adm-edoreczenia-konfiguracja", "matched_by": "exact"}],
       "expected_total": 1
     },
     {
       "id": "t12",
       "phenomenon": "kod",
-      "query": {"exact": ["0417"]},
+      "query": {"exact": "0417"},
       "expected": [{"section_id": "adm-edoreczenia-konfiguracja", "matched_by": "exact"}],
       "expected_total": 1,
       "note": "Fragment kodu: sam numer bez przedrostka."
@@ -361,7 +361,7 @@
     {
       "id": "t13",
       "phenomenon": "kod",
-      "query": {"exact": ["SocketTimeoutException"]},
+      "query": {"exact": "SocketTimeoutException"},
       "expected": [{"section_id": "adm-limity-serwera", "matched_by": "exact"}],
       "expected_total": 1,
       "note": "Fragment nazwy sklejonej kropkami: java.net.SocketTimeoutException."
@@ -369,7 +369,7 @@
     {
       "id": "t14",
       "phenomenon": "kod",
-      "query": {"exact": ["OCSP/CRL"]},
+      "query": {"exact": "OCSP/CRL"},
       "expected": [
         {"section_id": "adm-podpis-weryfikacja", "matched_by": "exact"},
         {"section_id": "usr-dokumenty-podpis", "matched_by": "exact"}
@@ -379,14 +379,14 @@
     {
       "id": "t15",
       "phenomenon": "kod",
-      "query": {"exact": ["SQLSTATE[23505]"]},
+      "query": {"exact": "SQLSTATE[23505]"},
       "expected": [{"section_id": "adm-numeracja-roczna", "matched_by": "exact"}],
       "expected_total": 1
     },
     {
       "id": "t16",
       "phenomenon": "kod",
-      "query": {"exact": ["wys-413"]},
+      "query": {"exact": "wys-413"},
       "expected": [{"section_id": "usr-wysylka-limit-zalacznika", "matched_by": "exact"}],
       "expected_total": 1,
       "note": "W treści wielkimi literami: WYS-413."
@@ -394,7 +394,7 @@
     {
       "id": "t17",
       "phenomenon": "nazwa-opcji",
-      "query": {"exact": ["Ustawienia → Uprawnienia → Kancelaria"]},
+      "query": {"exact": "Ustawienia → Uprawnienia → Kancelaria"},
       "expected": [
         {"section_id": "adm-kancelaria-edoreczenia", "matched_by": "exact"},
         {"section_id": "adm-kancelaria-epuap", "matched_by": "exact"}
@@ -404,7 +404,7 @@
     {
       "id": "t18",
       "phenomenon": "nazwa-opcji",
-      "query": {"exact": ["Przekaż bufor"]},
+      "query": {"exact": "Przekaż bufor"},
       "expected": [{"section_id": "usr-wysylka-enadawca-w-toku", "matched_by": "exact"}],
       "not_expected": ["adm-enadawca-konfiguracja"],
       "expected_total": 1,
@@ -413,7 +413,7 @@
     {
       "id": "t19",
       "phenomenon": "nazwa-opcji",
-      "query": {"exact": ["Przywróć domyślny układ tabeli"]},
+      "query": {"exact": "Przywróć domyślny układ tabeli"},
       "expected": [
         {"section_id": "usr-sprawy-niewidoczne", "matched_by": "exact"},
         {"section_id": "usr-odswiezanie", "matched_by": "exact"}
@@ -423,21 +423,21 @@
     {
       "id": "t20",
       "phenomenon": "nazwa-opcji",
-      "query": {"exact": ["Nie udało się skomunikować z serwerem"]},
+      "query": {"exact": "Nie udało się skomunikować z serwerem"},
       "expected": [{"section_id": "usr-komunikat-brak-serwera", "matched_by": "exact"}],
       "expected_total": 1
     },
     {
       "id": "t21",
       "phenomenon": "nazwa-opcji",
-      "query": {"exact": ["{{ZNAK_SPRAWY}}"]},
+      "query": {"exact": "{{ZNAK_SPRAWY}}"},
       "expected": [{"section_id": "usr-dokumenty-szablony", "matched_by": "exact"}],
       "expected_total": 1
     },
     {
       "id": "t22",
       "phenomenon": "znaki-wzorca",
-      "query": {"exact": ["100%"]},
+      "query": {"exact": "100%"},
       "expected": [{"section_id": "usr-dokumenty-skanowanie", "matched_by": "exact"}],
       "not_expected": ["adm-limity-serwera"],
       "expected_total": 1,
@@ -446,7 +446,7 @@
     {
       "id": "t23",
       "phenomenon": "znaki-wzorca",
-      "query": {"exact": ["w_toku"]},
+      "query": {"exact": "w_toku"},
       "expected": [{"section_id": "adm-limity-serwera", "matched_by": "exact"}],
       "not_expected": ["usr-wysylka-status-w-toku", "usr-wysylka-enadawca-w-toku"],
       "expected_total": 1,
@@ -455,7 +455,7 @@
     {
       "id": "t24",
       "phenomenon": "zlamanie-linii",
-      "query": {"exact": ["Sesja wygasła z powodu braku aktywności"]},
+      "query": {"exact": "Sesja wygasła z powodu braku aktywności"},
       "expected": [{"section_id": "usr-komunikat-sesja-wygasla", "matched_by": "exact"}],
       "expected_total": 1,
       "note": "Ten fragment komunikatu mieści się w jednej linii pliku."
@@ -463,10 +463,10 @@
     {
       "id": "t25",
       "phenomenon": "zlamanie-linii",
-      "query": {"exact": ["Zaloguj się ponownie, aby kontynuować pracę"]},
+      "query": {"exact": "Zaloguj się ponownie, aby kontynuować pracę"},
       "expected": [{"section_id": "usr-komunikat-sesja-wygasla", "matched_by": "exact"}],
       "expected_total": 1,
-      "note": "Ten fragment jest w pliku złamany po „Zaloguj się”. Podciąg go dziś nie znajduje, fraza przez słownik — tak."
+      "note": "Ten fragment jest w pliku złamany po „Zaloguj się”. Podciąg znajduje go, bo w przeszukiwanym tekście i w zapytaniu każdy ciąg białych znaków jest jedną spacją."
     },
     {
       "id": "t26",
@@ -487,7 +487,7 @@
     {
       "id": "t28",
       "phenomenon": "oba-pola",
-      "query": {"exact": ["PDP-203"], "words": "sekwencja numeracja"},
+      "query": {"exact": "PDP-203", "words": "sekwencja numeracja"},
       "expected": [
         {"section_id": "adm-podpis-weryfikacja", "matched_by": "exact"},
         {"section_id": "adm-numeracja-roczna", "matched_by": "words"}
@@ -506,7 +506,7 @@
     {
       "id": "t30",
       "phenomenon": "dluga-sekcja",
-      "query": {"exact": ["PIECZEC_UZYCIE"]},
+      "query": {"exact": "PIECZEC_UZYCIE"},
       "expected": [{"section_id": "adm-wykaz-uprawnien", "matched_by": "exact"}],
       "expected_total": 1,
       "note": "Ostatnia linia sekcji."
@@ -521,7 +521,7 @@
     {
       "id": "t32",
       "phenomenon": "brak-w-dokumentacji",
-      "query": {"exact": ["KSeF"], "words": "faktura ustrukturyzowana"},
+      "query": {"exact": "KSeF", "words": "faktura ustrukturyzowana"},
       "expected": [],
       "expected_total": 0
     }

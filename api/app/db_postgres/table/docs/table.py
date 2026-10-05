@@ -5,7 +5,8 @@ w dokumencie i treść. Kolumny i indeks widać wprost w `_create.sql` obok.
 
 Szuka się w tytule i w treści sekcji: baza łączy je w `search_text` i liczy z nich
 `search_vector`. Opis z metryczki nie jest przeszukiwany — pisze go model przy przygotowaniu
-plików, a trafienie ma wynikać z oryginału.
+plików, a trafienie ma wynikać z oryginału. Szukanie oddaje identyfikatory sekcji, a wiersze
+z opisem i treścią — odczyt.
 
 O czym pamiętać przy zmianach:
 
@@ -51,7 +52,8 @@ class DocsTable(TextTable):
 
     Flow:
         1. Indeksacja dokumentacji: `drop()`, `create()`, potem `upsert()`.
-        2. Narzędzia: `list_all()`, metody szukania, `read_by_id()` — wszystkie oddają `DocRow`.
+        2. Szukanie: `words()`, `phrase()` i `substring()` → identyfikatory pasujących sekcji.
+        3. Odczyt: `list_all()` i `read_by_id()` → wiersze `DocRow`.
     """
 
     def __init__(
@@ -169,74 +171,60 @@ class DocsTable(TextTable):
     async def words(
         self,
         query: str,  # np. "uprawnienie kancelaria"
-        limit: int,  # np. 5
-    ) -> list[DocRow]:
+    ) -> list[str]:
         """
         Description:
         Znajduje sekcje zawierające wszystkie słowa zapytania — w dowolnej kolejności i odmianie,
-        w tytule albo w treści.
+        w tytule albo w treści — i oddaje ich identyfikatory, najlepiej dopasowane pierwsze.
 
         Example args:
             query="uprawnienie kancelaria"
-            limit=5
 
         Example result:
-            [DocRow(section_id="adm-kancelaria-edoreczenia", …), DocRow(…)]
+            ["adm-kancelaria-edoreczenia", "adm-kancelaria-epuap"]
 
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
-        records = await self._find_words(query=query, limit=limit, order=KEY)
-        rows    = [DocRow(**record) for record in records]
-
-        return rows
+        return await self._find_words(query=query, key=KEY)
 
     async def phrase(
         self,
         query: str,  # np. "nie udało się skomunikować z serwerem"
-        limit: int,  # np. 5
-    ) -> list[DocRow]:
+    ) -> list[str]:
         """
         Description:
-        Znajduje sekcje zawierające słowa zapytania obok siebie, w tej samej kolejności —
-        komunikat albo nazwę opcji przepisaną z ekranu.
+        Znajduje sekcje zawierające słowa zapytania obok siebie, w tej samej kolejności, w dowolnej
+        odmianie, i oddaje ich identyfikatory.
 
         Example args:
             query="nie udało się skomunikować z serwerem"
-            limit=5
 
         Example result:
-            [DocRow(section_id="usr-komunikat-brak-serwera", …)]
+            ["usr-komunikat-brak-serwera"]
 
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
-        records = await self._find_phrase(query=query, limit=limit, order=KEY)
-        rows    = [DocRow(**record) for record in records]
-
-        return rows
+        return await self._find_phrase(query=query, key=KEY)
 
     async def substring(
         self,
         query: str,  # np. "Ustawienia → Uprawnienia"
-        limit: int,  # np. 5
-    ) -> list[DocRow]:
+    ) -> list[str]:
         """
         Description:
-        Znajduje sekcje zawierające zapytanie dosłownie, bez względu na wielkość liter — kod,
-        ścieżkę w menu albo fragment komunikatu.
+        Znajduje sekcje zawierające zapytanie dosłownie, bez względu na wielkość liter i na to,
+        jak tekst złamano między liniami — kod, ścieżkę w menu albo komunikat — i oddaje ich
+        identyfikatory.
 
         Example args:
             query="Ustawienia → Uprawnienia"
-            limit=5
 
         Example result:
-            [DocRow(section_id="adm-kancelaria-edoreczenia", …), DocRow(…)]
+            ["adm-kancelaria-edoreczenia", "adm-kancelaria-epuap"]
 
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
-        records = await self._find_substring(query=query, limit=limit, order=KEY)
-        rows    = [DocRow(**record) for record in records]
-
-        return rows
+        return await self._find_substring(query=query, key=KEY)

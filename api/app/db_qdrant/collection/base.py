@@ -10,14 +10,15 @@ przy budowie obiektu) i metryka (wspólna, niżej).
 
 Żądania do Qdranta, wszystkie pod `/collections/<nazwa>`:
 
-| metoda          | żądanie               | co robi                                         |
-|-----------------|-----------------------|-------------------------------------------------|
-| `ensure()`      | `GET`, potem `PUT`    | sprawdza schemat albo zakłada kolekcję          |
-| `drop()`        | `GET`, potem `DELETE` | kasuje kolekcję                                 |
-| `count()`       | `POST /points/count`  | dokładna liczba punktów                         |
-| `_upsert()`     | `PUT /points`         | zapis punktów partiami                          |
-| `_search()`     | `POST /points/query`  | najbliższe punkty w jednej przestrzeni          |
-| `_read_by_id()` | `POST /points`        | punkty o podanych identyfikatorach, z wektorami |
+| metoda             | żądanie                     | co robi                                      |
+|--------------------|-----------------------------|----------------------------------------------|
+| `ensure()`         | `GET`, potem `PUT`          | sprawdza schemat albo zakłada kolekcję       |
+| `drop()`           | `GET`, potem `DELETE`       | kasuje kolekcję                              |
+| `count()`          | `POST /points/count`        | dokładna liczba punktów                      |
+| `_upsert()`        | `PUT /points`               | zapis punktów partiami                       |
+| `_search()`        | `POST /points/query`        | najbliższe punkty w jednej przestrzeni       |
+| `_search_groups()` | `POST /points/query/groups` | najbliższy punkt każdej z najbliższych grup  |
+| `_read_by_id()`    | `POST /points`              | punkty o podanych identyfikatorach i wektory |
 
 O czym pamiętać przy zmianach:
 
@@ -67,8 +68,9 @@ class VectorCollection:
     Flow:
         1. Budowana z klienta, nazwy i wymiaru wektora; zła nazwa albo wymiar to błąd od razu.
         2. `ensure()` zakłada kolekcję albo sprawdza schemat istniejącej.
-        3. `_upsert()` zapisuje punkty, `_search()` szuka, `_read_by_id()` czyta — wszystkie
-           na słownikach, a na swoje modele zamienia je podklasa.
+        3. `_upsert()` zapisuje punkty, `_search()` i `_search_groups()` szukają,
+           `_read_by_id()` czyta — wszystkie na słownikach, a na swoje modele zamienia je
+           podklasa.
         4. `count()` liczy punkty, `drop()` kasuje kolekcję.
     """
 
@@ -327,6 +329,70 @@ class VectorCollection:
             "search collection=%s using=%s limit=%d hits=%d",
             self._name,
             vector_name,
+            limit,
+            len(entries),
+        )
+
+        return entries
+
+    async def _search_groups(
+        self,
+        vector:      list[float],  # np. [0.0123, -0.0456] — z embed_query()
+        vector_name: str,          # np. "section" — w której przestrzeni szukać
+        group_by:    str,          # np. "section_id" — pole payloadu wspólne dla grupy
+        limit:       int,          # np. 5 — ile GRUP, nie punktów
+    ) -> list[dict]:
+        """
+        Description:
+        Znajduje `limit` najbliższych grup punktów w JEDNEJ nazwanej przestrzeni i oddaje
+        najbliższy punkt każdej z nich, od najbardziej podobnego, z payloadem. Grupą są punkty
+        o tej samej wartości pola payloadu, np. fragmenty jednej sekcji dokumentacji.
+
+        Grupuje Qdrant, nie wołający: pobranie punktów z zapasem i zwinięcie ich u siebie gubi
+        grupy, gdy jedna długa sekcja zajmuje cały zapas.
+
+        Example args:
+            vector=[0.0123, -0.0456]
+            vector_name="section"
+            group_by="section_id"
+            limit=5
+
+        Example result:
+            [{"id": "bc925b88-…", "score": 0.74, "payload": {"section_id": "adm-…", …}}]
+
+        Raises:
+            DbQdrantError: Qdrant nie odpowiedział, nie ma kolekcji albo takiego wektora, albo
+                odpowiedź ma nierozpoznany kształt
+        """
+        body = await self._client.request(
+            "POST",
+            f"{self._path}/points/query/groups",
+            json={
+                "query":        vector,
+                "using":        vector_name,
+                "group_by":     group_by,
+                "group_size":   1,      # z grupy tylko najbliższy punkt
+                "limit":        limit,  # liczba grup
+                "with_payload": True,
+            },
+        )
+
+        result = body.get("result")
+        groups = result.get("groups") if isinstance(result, dict) else None
+
+        if not isinstance(groups, list):
+            raise DbQdrantError(
+                f"Qdrant oddał nierozpoznany wynik wyszukiwania grup w kolekcji '{self._name}'"
+            )
+
+        # Grupa bez punktów nie ma czego oddać; Qdrant takich nie zwraca, ale kształt jest jego.
+        entries = [group["hits"][0] for group in groups if group.get("hits")]
+
+        logger.info(
+            "search collection=%s using=%s group_by=%s limit=%d groups=%d",
+            self._name,
+            vector_name,
+            group_by,
             limit,
             len(entries),
         )

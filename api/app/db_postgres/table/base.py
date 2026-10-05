@@ -20,8 +20,26 @@ Trzy drogi szukania:
 | `_find_phrase()`    | cały komunikat, słowa w tej samej kolejności | „brak połączenia z bazą" |
 | `_find_substring()` | dosłowny ciąg, bez względu na wielkość liter | „ORA-00942"              |
 
+Każda oddaje IDENTYFIKATORY wszystkich pasujących wierszy, bez limitu i bez treści. Limit,
+łączenie dróg i liczenie tego, co się nie zmieściło, należą do narzędzia; treść daje odczyt
+(`_read_by_id()`).
+
+Przed — wątek w `thread` i zapytanie agenta:
+
+    …komunikat „Zaloguj się
+    ponownie, aby kontynuować pracę"…        "Zaloguj się ponownie, aby kontynuować"
+
+Po — `search_text`, w którym szuka podciąg: komunikat stoi w jednej linii, więc zapytanie go
+znajduje:
+
+    …komunikat „Zaloguj się ponownie, aby kontynuować pracę"…
+
 O czym pamiętać przy zmianach:
 
+- W `search_text` i w zapytaniu do podciągu każdy ciąg białych znaków, także twarda spacja,
+  staje się jedną spacją (`WHITESPACE_RUN`). Po obu stronach liczy to baza tym samym wzorcem,
+  więc „biały znak" znaczy to samo w tekście i w zapytaniu; ten sam wzorzec stoi w `_create.sql`
+  każdej tabeli. Kolumna z treścią (`body`, `thread`) zostaje dosłowna.
 - Przeszukiwany tekst jest łączony RAZ, przy zapisie wiersza, nie przy zapytaniu. Zmierzone na
   1100 wierszach: łączenie i przepuszczanie przez słownik przy każdym zapytaniu trwa 4–5 s,
   z kolumną wyliczaną — 1–2 ms.
@@ -32,6 +50,8 @@ O czym pamiętać przy zmianach:
   `escape_like()`, bo `%` i `_` są we wzorcu znakami specjalnymi.
 - Kody idą przez podciąg, bo parser pełnotekstowy skleja kod z interpunkcją w jeden token
   (`java.lang.outofmemoryerror`) i fragmentu kodu słowami nie znajdzie.
+- Szukanie nie ma limitu, bo oddaje same identyfikatory: nawet zapytanie pasujące do całego
+  korpusu to kilkanaście kilobajtów, a narzędzie musi wiedzieć, ile wierszy pasowało w sumie.
 """
 
 import re
@@ -54,6 +74,11 @@ SEARCH_VECTOR = "search_vector"
 
 # Znak, którym w zapytaniu do podciągu poprzedza się `%`, `_` i samego siebie.
 LIKE_ESCAPE = "\\"
+
+# Ciąg białych znaków w rozumieniu bazy: `\s` i twarda spacja, której `\s` tu nie obejmuje
+# (sprawdzone na obrazie usługi `postgres`), a która siedzi w co piętnastym zgłoszeniu. Ten sam
+# wzorzec stoi w kolumnie `search_text` w `_create.sql` każdej tabeli.
+WHITESPACE_RUN = r"[\s\u00A0]+"
 
 CONFIG_PRESENT = "SELECT count(*) FROM pg_ts_config WHERE cfgname = $1"
 
@@ -96,10 +121,11 @@ class TextTable:
         1. Budowana z klienta i nazwy; zła nazwa to błąd od razu.
         2. Podklasa zakłada tabelę i zapisuje wiersze własnym SQL-em; przed zakładaniem woła
            `_require_search_config()`.
-        3. `_find_words()`, `_find_phrase()` i `_find_substring()` szukają, `_read_by_id()`
-           i `_list()` czytają — wszystkie oddają wiersze jako słowniki kolumna → wartość, bez
-           kolumn wyliczanych, a na swój model zamienia je podklasa.
-        4. `drop()` kasuje tabelę, `aclose()` zamyka jej klienta.
+        3. `_find_words()`, `_find_phrase()` i `_find_substring()` szukają i oddają klucze
+           pasujących wierszy.
+        4. `_read_by_id()` i `_list()` czytają: oddają wiersze jako słowniki kolumna → wartość,
+           bez kolumn wyliczanych, a na swój model zamienia je podklasa.
+        5. `drop()` kasuje tabelę, `aclose()` zamyka jej klienta.
     """
 
     def __init__(
@@ -206,100 +232,98 @@ class TextTable:
     async def _find_words(
         self,
         query: str,  # np. "uprawnienie kancelaria"
-        limit: int,  # np. 5
-        order: str,  # kolejność przy równym dopasowaniu, np. "section_id"
-    ) -> list[dict[str, object]]:
+        key:   str,  # kolumna klucza, np. "section_id"
+    ) -> list[str]:
         """
         Description:
         Znajduje wiersze zawierające wszystkie słowa zapytania — w dowolnej kolejności i odmianie,
-        przez polski słownik. Najlepiej dopasowane pierwsze.
+        przez polski słownik — i oddaje ich klucze. Najlepiej dopasowane pierwsze, przy równym
+        dopasowaniu według klucza.
 
         Example args:
             query="uprawnienie kancelaria"
-            limit=5
-            order="section_id"
+            key="section_id"
 
         Example result:
-            [{"section_id": "adm-kancelaria-edoreczenia", "body": "Uprawnienie do kancelarii…", …}]
+            ["adm-kancelaria-edoreczenia", "adm-kancelaria-epuap"]
 
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
         tsquery = f"plainto_tsquery('{TEXT_SEARCH_CONFIG}', $1)"
 
-        records = await self._find(
+        keys = await self._find(
+            key       = key,
             condition = f"{SEARCH_VECTOR} @@ {tsquery}",
-            order     = f"ts_rank({SEARCH_VECTOR}, {tsquery}) DESC, {order}",
+            order     = f"ts_rank({SEARCH_VECTOR}, {tsquery}) DESC, {key}",
             value     = query,
-            limit     = limit,
         )
 
-        return records
+        return keys
 
     async def _find_phrase(
         self,
         query: str,  # np. "nie udało się skomunikować z serwerem"
-        limit: int,  # np. 5
-        order: str,  # kolejność przy równym dopasowaniu, np. "ticket_id"
-    ) -> list[dict[str, object]]:
+        key:   str,  # kolumna klucza, np. "ticket_id"
+    ) -> list[str]:
         """
         Description:
         Znajduje wiersze zawierające słowa zapytania obok siebie, w tej samej kolejności — dla
-        komunikatu przepisanego z ekranu. Odmiana nadal nie ma znaczenia.
+        komunikatu przepisanego z ekranu — i oddaje ich klucze. Odmiana nadal nie ma znaczenia.
 
         Example args:
             query="nie udało się skomunikować z serwerem"
-            limit=5
-            order="ticket_id"
+            key="ticket_id"
 
         Example result:
-            [{"ticket_id": "90011", "problem": "Błąd komunikacji z serwerem…", …}]
+            ["90011", "90012"]
 
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
         tsquery = f"phraseto_tsquery('{TEXT_SEARCH_CONFIG}', $1)"
 
-        records = await self._find(
+        keys = await self._find(
+            key       = key,
             condition = f"{SEARCH_VECTOR} @@ {tsquery}",
-            order     = f"ts_rank({SEARCH_VECTOR}, {tsquery}) DESC, {order}",
+            order     = f"ts_rank({SEARCH_VECTOR}, {tsquery}) DESC, {key}",
             value     = query,
-            limit     = limit,
         )
 
-        return records
+        return keys
 
     async def _find_substring(
         self,
         query: str,  # np. "ORA-00942"
-        limit: int,  # np. 5
-        order: str,  # kolejność wyników, np. "ticket_id"
-    ) -> list[dict[str, object]]:
+        key:   str,  # kolumna klucza, np. "ticket_id"
+    ) -> list[str]:
         """
         Description:
         Znajduje wiersze zawierające zapytanie dosłownie, bez względu na wielkość liter — dla
-        kodu błędu albo jego fragmentu. Dopasowanie dosłowne nie ma stopnia, więc o kolejności
-        decyduje wyłącznie `order`.
+        kodu błędu, nazwy opcji albo komunikatu — i oddaje ich klucze. Białe znaki zapytania
+        baza sprowadza do pojedynczych spacji, tak jak w przeszukiwanym tekście. Dopasowanie
+        dosłowne nie ma stopnia, więc o kolejności decyduje wyłącznie klucz.
 
         Example args:
             query="ORA-00942"
-            limit=5
-            order="ticket_id"
+            key="ticket_id"
 
         Example result:
-            [{"ticket_id": "90014", "error_codes": "ORA-00942", …}]
+            ["90014"]
 
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
-        records = await self._find(
-            condition = f"{SEARCH_TEXT} ILIKE '%' || $1 || '%' ESCAPE '{LIKE_ESCAPE}'",
-            order     = order,
+        needle = f"regexp_replace($1, '{WHITESPACE_RUN}', ' ', 'g')"
+
+        keys = await self._find(
+            key       = key,
+            condition = f"{SEARCH_TEXT} ILIKE '%' || {needle} || '%' ESCAPE '{LIKE_ESCAPE}'",
+            order     = key,
             value     = escape_like(query),  # `%` i `_` mają być szukane dosłownie
-            limit     = limit,
         )
 
-        return records
+        return keys
 
     async def _read_by_id(
         self,
@@ -354,35 +378,35 @@ class TextTable:
 
     async def _find(
         self,
+        key:       str,  # kolumna klucza, np. "section_id"
         condition: str,  # np. "search_vector @@ plainto_tsquery('pl_search', $1)"
         order:     str,  # np. "section_id"
         value:     str,  # wartość parametru $1 — zapytanie agenta
-        limit:     int,  # np. 5
-    ) -> list[dict[str, object]]:
+    ) -> list[str]:
         """
         Description:
-        Wykonuje jedno wyszukiwanie i oddaje wiersze do limitu. Warunek i kolejność przychodzą
-        z metod tej klasy, nigdy od wołającego spoza niej.
+        Wykonuje jedno wyszukiwanie i oddaje klucze wszystkich pasujących wierszy, w podanej
+        kolejności. Klucz, warunek i kolejność przychodzą z metod tej klasy i z klas tabel,
+        nigdy od wołającego spoza pakietu.
 
         Example args:
-            condition="search_text ILIKE '%' || $1 || '%' ESCAPE '\\'"
+            key="section_id"
+            condition="search_vector @@ plainto_tsquery('pl_search', $1)"
             order="section_id"
-            value="00942"
-            limit=5
+            value="uprawnienie"
 
         Example result:
-            [{"section_id": "usr-komunikat-brak-serwera", "body": "Komunikat…", …}]
+            ["adm-kancelaria-edoreczenia", "adm-kancelaria-epuap"]
 
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
         records = await self._client.fetch_rows(
-            f"SELECT * FROM {self._sql_name} WHERE {condition} ORDER BY {order} LIMIT $2",
+            f"SELECT {key} FROM {self._sql_name} WHERE {condition} ORDER BY {order}",
             value,
-            limit,
         )
 
-        return [self._data(record) for record in records]
+        return [str(record[key]) for record in records]
 
     def _data(
         self,

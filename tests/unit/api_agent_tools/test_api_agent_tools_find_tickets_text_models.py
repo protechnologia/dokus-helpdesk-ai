@@ -13,7 +13,7 @@ def test_a_query_with_nothing_to_search_is_refused() -> None:
 
 @pytest.mark.parametrize(
     "arguments",
-    [{"exact": ["SQLSTATE[23000]"]}, {"words": "załącznik limit"}],
+    [{"exact": "SQLSTATE[23000]"}, {"words": "załącznik limit"}],
     ids=["exact", "words"],
 )
 def test_one_field_is_enough(arguments: dict) -> None:
@@ -25,7 +25,14 @@ def test_a_too_short_exact_text_is_refused() -> None:
     """Dosłowny ciąg krótszy niż trzy znaki → ValidationError: „50" trafia w numery telefonów
     i daty, a takie trafienie wygląda na odpowiedź."""
     with pytest.raises(ValidationError):
-        FindTicketsTextQuery(exact=["50"])
+        FindTicketsTextQuery(exact="50")
+
+
+def test_exact_takes_one_phrase_not_a_list() -> None:
+    """Lista fraz w `exact` → ValidationError: jedno wywołanie to jedna fraza, żeby wynik mówił,
+    która trafiła."""
+    with pytest.raises(ValidationError):
+        FindTicketsTextQuery(exact=["SQLSTATE[23000]", "ORA-00942"])
 
 
 def test_an_unknown_argument_is_refused() -> None:

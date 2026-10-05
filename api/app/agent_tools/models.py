@@ -1,13 +1,15 @@
 from datetime import date as Date
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 # --- wspólne dla obu wyszukiwań tekstowych (`find_tickets_text`, `find_docs_text`) ---
 
-# Dosłowny ciąg ma co najmniej trzy znaki: krótszy trafia w przypadkowe miejsca (numer telefonu,
-# data), a trafienie po „50" wygląda na trafienie, choć nim nie jest.
-ExactText = Annotated[str, Field(min_length=3)]
+# Fraza szukana dosłownie ma co najmniej trzy znaki: krótsza trafia w przypadkowe miejsca (numer
+# telefonu, data), a trafienie po „50" wygląda na trafienie, choć nim nie jest. Spacje z brzegów
+# są najpierw obcinane i dopiero potem liczona jest długość: fraza z samych spacji spełniałaby
+# wymóg trzech znaków, a pasuje do każdego tekstu, w którym jest spacja.
+ExactText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3)]
 
 # Czym coś znaleziono: dosłownym ciągiem albo słowami kluczowymi. Wartości to nazwy pól zapytania,
 # którymi agent sam pytał.

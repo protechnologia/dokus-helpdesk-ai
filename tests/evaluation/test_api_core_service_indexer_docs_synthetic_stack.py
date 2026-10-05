@@ -9,7 +9,7 @@ działającego stacku z zaindeksowaną paczką.
 | spis treści z tabeli                  | 27 sekcji w kolejności zestawu zapytań      |
 | treść każdej sekcji                   | znak w znak jak plik `.md`                  |
 | liczba punktów w kolekcji             | tyle, ile fragmentów daje dzisiejsze cięcie |
-| szczegół z końca najdłuższej sekcji   | jej fragment w pierwszej piątce trafień     |
+| szczegół z końca najdłuższej sekcji   | ta sekcja w pierwszej piątce trafień        |
 
 Po co: indeksacja składa się z kilku ogniw (czytnik paczki, cięcie, embedder, dwie bazy) i każde da
 się zepsuć tak, że komenda dalej kończy się kodem 0. Testy integracyjne sprawdzają je na trzech
@@ -24,8 +24,8 @@ O czym pamiętać przy zmianach:
   zbudowano przy innym `RAG_DOCS_FRAGMENT_CHARS` albo przed zmianą cięcia — wtedy wystarczy
   powtórzyć indeksację.
 - Ostatni wiersz tabelki to jedyna asercja zależna od modelu embeddingowego. Przy jednym wektorze
-  na sekcję celu nie było w pierwszej piątce; pierwsze miejsce i próg mierzy dopiero narzędzie
-  `find_docs_vector` (CLAUDE.md -> p. 8).
+  na sekcję celu nie było w pierwszej piątce; pierwsze miejsce i próg mierzy test narzędzia
+  `find_docs_vector` na tym samym zestawie.
 """
 
 import asyncio
@@ -71,7 +71,7 @@ class IndexState(NamedTuple):
     listed:    list[str]       # identyfikatory sekcji w kolejności spisu treści
     bodies:    dict[str, str]  # treść każdej sekcji, po identyfikatorze
     points:    int             # liczba punktów w kolekcji
-    tail_hits: list[str]       # sekcje pięciu pierwszych trafień zapytania o koniec sekcji
+    tail_hits: list[str]       # pięć pierwszych sekcji dla zapytania o koniec sekcji
 
 
 def _golden() -> dict:
@@ -116,7 +116,7 @@ async def _read_index(
         settings=Settings(embedding_base_url="http://localhost:8001", …)
 
     Example result:
-        IndexState(listed=["adm-kancelaria-edoreczenia", …], bodies={…}, points=47, tail_hits=[…])
+        IndexState(listed=["adm-kancelaria-edoreczenia", …], bodies={…}, points=58, tail_hits=[…])
     """
     table_name, collection_name = docs_index_names(settings, synthetic=True)
 
@@ -180,7 +180,7 @@ def index(settings: Settings) -> IndexState:
         settings=Settings(…)
 
     Example result:
-        IndexState(listed=[…], bodies={…}, points=47, tail_hits=[…])
+        IndexState(listed=[…], bodies={…}, points=58, tail_hits=[…])
     """
     return asyncio.run(_read_index(settings))
 
@@ -213,8 +213,8 @@ def test_the_collection_holds_one_point_per_fragment(
 
 
 def test_a_detail_from_the_end_of_the_long_section_is_within_reach(index: IndexState) -> None:
-    """Zapytanie o szczegół z dwóch ostatnich linii najdłuższej sekcji → jej fragment
-    w pierwszej piątce trafień; jeden wektor na całą sekcję tego nie dawał."""
+    """Zapytanie o szczegół z dwóch ostatnich linii najdłuższej sekcji → ta sekcja w pierwszej
+    piątce trafień; jeden wektor na całą sekcję tego nie dawał."""
     expected = _tail_query()["expected"][0]
 
     assert expected in index.tail_hits

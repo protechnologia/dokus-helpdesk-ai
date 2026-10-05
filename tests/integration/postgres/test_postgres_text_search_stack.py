@@ -159,12 +159,12 @@ async def _run_cases() -> dict[str, bool]:
         await table.create()
         await table.upsert([_row(case, ordinal) for ordinal, case in enumerate(CASES)])
 
-        # --- każde zapytanie swoją drogą; limit obejmuje całą tabelę ---
+        # --- każde zapytanie swoją drogą; szukanie oddaje identyfikatory wszystkich trafień ---
         outcomes = {}
 
         for case in CASES:
-            rows = await getattr(table, case.mode)(case.query, limit=len(CASES))
-            outcomes[case.name] = case.name in {row.section_id for row in rows}
+            found = await getattr(table, case.mode)(case.query)
+            outcomes[case.name] = case.name in found
 
         await table.drop()
     finally:

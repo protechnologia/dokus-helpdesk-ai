@@ -312,9 +312,10 @@ async def test_docs_are_created_with_the_section_vector(docs: DocsCollection) ->
     assert await docs.ensure() is False
 
 
-async def test_fragments_of_a_section_are_stored_as_separate_points(docs: DocsCollection) -> None:
-    """Dwa fragmenty jednej sekcji → dwa punkty; oba wracają z wyszukiwania i payload każdego
-    odtwarza tę samą `DocSection`, z datą i ścieżką rozdziału."""
+async def test_fragments_of_a_section_come_back_as_one_section(docs: DocsCollection) -> None:
+    """Dwa fragmenty jednej sekcji → dwa punkty w kolekcji, ale jedno trafienie: Qdrant oddaje
+    sekcję raz, z jej najbliższym fragmentem, a payload odtwarza `DocSection` z datą i ścieżką
+    rozdziału."""
     await docs.ensure()
 
     section = SECTIONS[0]
@@ -324,10 +325,28 @@ async def test_fragments_of_a_section_are_stored_as_separate_points(docs: DocsCo
     assert await docs.upsert([first, second]) == 2
     assert await docs.count()                 == 2
 
-    hits = await docs.search(vector=first.vector_section, limit=5)
+    hits = await docs.search(vector=second.vector_section, limit=5)
 
-    assert [hit.point_id for hit in hits] == [first.point_id, second.point_id]
-    assert all(DocSection.model_validate(hit.payload) == section for hit in hits)
+    assert [hit.point_id for hit in hits]           == [second.point_id]
+    assert DocSection.model_validate(hits[0].payload) == section
+
+
+async def test_a_long_section_does_not_crowd_out_the_others(docs: DocsCollection) -> None:
+    """Sekcja z pięciu fragmentów bliższych zapytaniu niż jedyny fragment drugiej sekcji, limit 2
+    → obie sekcje: limit liczy sekcje, więc długa sekcja nie zajmuje całego wyniku."""
+    await docs.ensure()
+
+    long_section = [
+        DocPoint.from_fragment(SECTIONS[0], number, [0.4, 0.3, 0.2, 0.1 + number / 100])
+        for number in range(5)
+    ]
+    short_section = DocPoint.from_fragment(SECTIONS[1], 0, [0.1, 0.2, 0.3, 0.4])
+
+    await docs.upsert([*long_section, short_section])
+
+    hits = await docs.search(vector=[0.4, 0.3, 0.2, 0.1], limit=2)
+
+    assert [hit.section_id for hit in hits] == [SECTIONS[0].section_id, SECTIONS[1].section_id]
 
 
 async def test_reimporting_the_same_fragment_overwrites_it(docs: DocsCollection) -> None:

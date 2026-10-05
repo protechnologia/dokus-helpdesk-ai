@@ -69,14 +69,14 @@ class FakeFindTicketsTextTool(FindTicketsTextToolBase):
 
     async def find(
         self,
-        query: FindTicketsTextQuery,  # np. FindTicketsTextQuery(exact=["SQLSTATE[23000]"])
+        query: FindTicketsTextQuery,  # np. FindTicketsTextQuery(exact="SQLSTATE[23000]")
     ) -> FindTicketsTextResult:
         """
         Description:
         Zapisuje zapytanie i zwraca ustalony wynik — niezależnie od treści zapytania.
 
         Example args:
-            query=FindTicketsTextQuery(exact=["Nie udało się skomunikować z serwerem"])
+            query=FindTicketsTextQuery(exact="Nie udało się skomunikować z serwerem")
 
         Example result:
             FindTicketsTextResult(tickets=[MatchedTicket(ticket_id="90011", matched_by="exact"), …],

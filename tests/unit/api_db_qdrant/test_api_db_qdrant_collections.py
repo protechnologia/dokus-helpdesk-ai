@@ -29,6 +29,7 @@ SIZE     = 768
 PATH        = f"/collections/{NAME}"
 PATH_POINTS = f"{PATH}/points"
 PATH_QUERY  = f"{PATH_POINTS}/query"
+PATH_GROUPS = f"{PATH_QUERY}/groups"
 PATH_COUNT  = f"{PATH_POINTS}/count"
 
 # Obie kolekcje z ich schematem: to, co wspólne, sprawdzamy na każdej.
@@ -104,6 +105,27 @@ def _hits(
         httpx.Response(200, json={"result": {"points": [{…}]}})
     """
     return httpx.Response(200, json={"result": {"points": list(entries)}})
+
+
+def _groups(
+    *entries: dict,  # np. {"id": "a", "score": 0.74, "payload": {"section_id": "adm-…"}}
+) -> httpx.Response:
+    """
+    Description:
+    Odpowiedź Qdranta na wyszukiwanie grup: każdy wpis jako jedyne trafienie swojej grupy.
+
+    Example args:
+        entries=({"id": "a", "score": 0.74, "payload": {"section_id": "adm-kancelaria-…"}},)
+
+    Example result:
+        httpx.Response(200, json={"result": {"groups": [{"id": "adm-…", "hits": [{…}]}]}})
+    """
+    groups = [
+        {"id": entry["payload"]["section_id"], "hits": [entry]}
+        for entry in entries
+    ]
+
+    return httpx.Response(200, json={"result": {"groups": groups}})
 
 
 def _stored(
@@ -413,16 +435,17 @@ async def test_ticket_search_returns_hits_in_the_order_qdrant_gave_them() -> Non
     assert hits[0].point_id                == "a"
 
 
-async def test_doc_search_asks_the_section_space() -> None:
-    """`search()` dokumentacji → `using: section` bez podawania nazwy: wektor jest jeden,
-    a trafienie we fragment niesie identyfikator jego sekcji."""
+async def test_doc_search_asks_for_sections_not_fragments() -> None:
+    """`search()` dokumentacji → wyszukiwanie grup po `section_id`, po jednym punkcie z grupy,
+    w przestrzeni `section`: w kolekcji leżą fragmenty, a `limit` ma znaczyć liczbę sekcji —
+    inaczej jedna długa sekcja zajęłaby cały wynik."""
     seen: list = []
     collection = _collection(
         DocsCollection,
         capturing(
             seen,
             {
-                ("POST", PATH_QUERY): _hits(
+                ("POST", PATH_GROUPS): _groups(
                     {"id": DOC_POINT.point_id, "score": 0.74, "payload": DOC_POINT.payload}
                 )
             },
@@ -431,10 +454,28 @@ async def test_doc_search_asks_the_section_space() -> None:
 
     hits = await collection.search(vector=[0.5, 0.6], limit=3)
 
-    assert seen[0]["body"]["using"] == VECTOR_SECTION
-    assert seen[0]["body"]["limit"] == 3
-    assert hits[0].section_id       == DOC_POINT.section_id
-    assert hits[0].score            == 0.74
+    assert seen[0]["body"] == {
+        "query":        [0.5, 0.6],
+        "using":        VECTOR_SECTION,
+        "group_by":     "section_id",
+        "group_size":   1,
+        "limit":        3,
+        "with_payload": True,
+    }
+    assert [hit.section_id for hit in hits] == [DOC_POINT.section_id]
+    assert hits[0].score                    == 0.74
+
+
+async def test_doc_search_with_an_unrecognised_body_fails_with_our_message() -> None:
+    """200 bez grup → `DbQdrantError` z nazwą kolekcji, a nie `KeyError` gdzieś dalej
+    w narzędziu."""
+    collection = _collection(
+        DocsCollection,
+        routed({("POST", PATH_GROUPS): httpx.Response(200, json={"result": {}})}),
+    )
+
+    with pytest.raises(DbQdrantError, match=NAME):
+        await collection.search(vector=[0.1], limit=5)
 
 
 async def test_search_finding_nothing_is_an_answer() -> None:

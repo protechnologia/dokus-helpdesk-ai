@@ -81,6 +81,7 @@ class Settings(BaseSettings):
     #
     # Top 5 because more dilutes the answer: the generation prompt is built from 1-3 records, and
     # this is the pool the threshold narrows down to them.
+    # Ta sama liczba ogranicza wynik obu wyszukiwań w dokumentacji: tyle sekcji oddaje jedno.
     rag_top_k:     int   = 5                            # e.g. 10
     # Measured 2026-08-20 on 171 records (data/unsafe/docs/pomiar-progu-score.md): 0.48 keeps 157 of
     # 162 correct hits and fully silences 14 of 16 distractors. The trade leans towards cutting
@@ -91,24 +92,34 @@ class Settings(BaseSettings):
     # shortest records. Do NOT raise without re-measuring: 0.50 takes four more.
     rag_score_min: float = 0.48                         # cosine similarity, range -1.0 .. 1.0
     # Najwyżej tyle znaków ma fragment sekcji dokumentacji, z którego powstaje jeden wektor.
-    # Wartość wstępna — rozstrzyga pomiar na paczce syntetycznej (CLAUDE.md -> p. 8). Zmiana
-    # wymaga ponownego `helpdesk docs index`.
-    rag_docs_fragment_chars: int = Field(default=1500, ge=1)
+    # Zmierzone 2026-10-05 na paczce syntetycznej: przy 1000 szczegół z końca najdłuższej sekcji
+    # stoi pierwszy z zapasem 0,058, przy 1500 przegrywa o 0,004, a jeden wektor na sekcję gubi
+    # go poza pierwszą piątką. Paczka ma jedną długą sekcję, więc wartość wraca do pomiaru na
+    # właściwej dokumentacji. Zmiana wymaga ponownego `helpdesk docs index`.
+    rag_docs_fragment_chars: int = Field(default=1000, ge=1)
+    # Minimalne podobieństwo sekcji dokumentacji do zapytania — osobne od `rag_score_min`, bo
+    # sekcja i karta zgłoszenia to inne teksty. Zmierzone 2026-10-05 na paczce syntetycznej:
+    # zapytania z odpowiedzią mają 0,37–0,60, bez odpowiedzi 0,33–0,39; 0.37 zachowuje wszystkie
+    # 24 i wycisza 4 z 5. Wybór po stronie zachowania trafień: model dostaje opis sekcji, nie
+    # treść, więc słabe trafienie odrzuci sam, a brakującego nie odzyska. Wartość wstępna.
+    rag_docs_score_min: float = 0.37                    # cosinus, zakres -1.0 .. 1.0
 
     # --- agent: limity wywołań narzędzi w jednym przebiegu grafu ---
     # Ile razy model może wywołać dane narzędzie przy jednej sprawie. Chroni przed pętlą, która
     # zużywa tokeny bez końca: wywołanie ponad limit dostaje błąd zamiast wyniku, a model ma
     # odpowiedzieć na podstawie tego, co już ma. Ten sam limit stoi w opisie narzędzia dla modelu.
     # Wartości ostrożne: wyszukiwanie oddaje kilkadziesiąt tokenów, odczyt wątków i sekcji tysiące.
+    # Wyszukiwania tekstowe mają więcej, bo jedno wywołanie to jedna fraza, a zgłoszenie niesie
+    # ich bywa kilka: kod z ekranu, kod z logów, komunikat.
     # Pole na narzędzie, o nazwie `agent_max_calls_<narzędzie>` — z niej składa się
     # `tool_call_limits()`, więc nowe narzędzie to nowe pole tutaj.
     agent_max_calls_find_tickets_vector: int = Field(default=3, ge=1)
-    agent_max_calls_find_tickets_text:   int = Field(default=3, ge=1)
+    agent_max_calls_find_tickets_text:   int = Field(default=5, ge=1)
     agent_max_calls_read_tickets_card:   int = Field(default=3, ge=1)
     agent_max_calls_read_tickets_thread: int = Field(default=2, ge=1)
     agent_max_calls_list_docs:           int = Field(default=1, ge=1)
     agent_max_calls_find_docs_vector:    int = Field(default=3, ge=1)
-    agent_max_calls_find_docs_text:      int = Field(default=3, ge=1)
+    agent_max_calls_find_docs_text:      int = Field(default=5, ge=1)
     agent_max_calls_read_docs:           int = Field(default=2, ge=1)
 
     @model_validator(mode="before")

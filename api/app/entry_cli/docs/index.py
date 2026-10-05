@@ -31,7 +31,7 @@ async def _run(
         synthetic=False
 
     Example result:
-        DocsIndexReport(documents=2, sections=27, fragments=47, warnings=[])
+        DocsIndexReport(documents=2, sections=27, fragments=58, warnings=[])
 
     Raises:
         DocsIndexRefused: paczki nie wolno zaindeksować w tym indeksie

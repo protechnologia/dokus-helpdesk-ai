@@ -57,7 +57,8 @@ services:
       # starts, reports healthy and quietly runs on the code default.
       RAG_TOP_K:                 ${RAG_TOP_K:-5}
       RAG_SCORE_MIN:             ${RAG_SCORE_MIN:-0.48}
-      RAG_DOCS_FRAGMENT_CHARS:   ${RAG_DOCS_FRAGMENT_CHARS:-1500}
+      RAG_DOCS_FRAGMENT_CHARS:   ${RAG_DOCS_FRAGMENT_CHARS:-1000}
+      RAG_DOCS_SCORE_MIN:        ${RAG_DOCS_SCORE_MIN:-0.37}
       # Postgres: host i port to strona KONTENERA (nazwa usługi i 5432), nie DOCKER_POSTGRES_PORT.
       # Baza, użytkownik i hasło to te same zmienne, które dostaje usługa `postgres` — jedno
       # źródło, więc obie strony nie mogą się rozjechać.
@@ -69,12 +70,12 @@ services:
       POSTGRES_TIMEOUT_SECONDS:  ${POSTGRES_TIMEOUT_SECONDS:-30}
       # Limity wywołań narzędzi agenta w jednym przebiegu grafu — opis w .env.example.
       AGENT_MAX_CALLS_FIND_TICKETS_VECTOR: ${AGENT_MAX_CALLS_FIND_TICKETS_VECTOR:-3}
-      AGENT_MAX_CALLS_FIND_TICKETS_TEXT:   ${AGENT_MAX_CALLS_FIND_TICKETS_TEXT:-3}
+      AGENT_MAX_CALLS_FIND_TICKETS_TEXT:   ${AGENT_MAX_CALLS_FIND_TICKETS_TEXT:-5}
       AGENT_MAX_CALLS_READ_TICKETS_CARD:   ${AGENT_MAX_CALLS_READ_TICKETS_CARD:-3}
       AGENT_MAX_CALLS_READ_TICKETS_THREAD: ${AGENT_MAX_CALLS_READ_TICKETS_THREAD:-2}
       AGENT_MAX_CALLS_LIST_DOCS:           ${AGENT_MAX_CALLS_LIST_DOCS:-1}
       AGENT_MAX_CALLS_FIND_DOCS_VECTOR:    ${AGENT_MAX_CALLS_FIND_DOCS_VECTOR:-3}
-      AGENT_MAX_CALLS_FIND_DOCS_TEXT:      ${AGENT_MAX_CALLS_FIND_DOCS_TEXT:-3}
+      AGENT_MAX_CALLS_FIND_DOCS_TEXT:      ${AGENT_MAX_CALLS_FIND_DOCS_TEXT:-5}
       AGENT_MAX_CALLS_READ_DOCS:           ${AGENT_MAX_CALLS_READ_DOCS:-2}
     # --reload belongs to the dev layer, not to the image: the shipped CMD has no reloader.
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

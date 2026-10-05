@@ -15,7 +15,7 @@ def test_a_query_with_nothing_to_search_is_refused() -> None:
 
 @pytest.mark.parametrize(
     "arguments",
-    [{"exact": ["Uprawnienia → Kancelaria"]}, {"words": "uprawnienie kancelaria"}],
+    [{"exact": "Uprawnienia → Kancelaria"}, {"words": "uprawnienie kancelaria"}],
     ids=["exact", "words"],
 )
 def test_one_field_is_enough(arguments: dict) -> None:
@@ -26,7 +26,23 @@ def test_one_field_is_enough(arguments: dict) -> None:
 def test_a_too_short_exact_text_is_refused() -> None:
     """Dosłowny ciąg krótszy niż trzy znaki → ValidationError: trafiałby w przypadkowe miejsca."""
     with pytest.raises(ValidationError):
-        FindDocsTextQuery(exact=["50"])
+        FindDocsTextQuery(exact="50")
+
+
+def test_a_phrase_is_measured_and_kept_without_the_spaces_around_it() -> None:
+    """Fraza z samych spacji → ValidationError, bo pasowałaby do każdego tekstu; spacje wokół
+    frazy → obcięte, żeby nie rozstrzygały o trafieniu."""
+    with pytest.raises(ValidationError):
+        FindDocsTextQuery(exact="   ")
+
+    assert FindDocsTextQuery(exact="  EDR-0417 ").exact == "EDR-0417"
+
+
+def test_exact_takes_one_phrase_not_a_list() -> None:
+    """Lista fraz w `exact` → ValidationError: jedno wywołanie to jedna fraza, żeby wynik mówił,
+    która trafiła."""
+    with pytest.raises(ValidationError):
+        FindDocsTextQuery(exact=["EDR-0417", "Przekaż bufor"])
 
 
 def test_an_unknown_argument_is_refused() -> None:

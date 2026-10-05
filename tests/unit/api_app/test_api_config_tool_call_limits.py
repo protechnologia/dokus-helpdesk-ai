@@ -51,10 +51,13 @@ def test_a_limit_comes_from_the_environment(
 
 def test_default_limits_are_cautious(clean_env: None) -> None:
     """Wartości domyślne → małe: limit ma chronić przed pętlą zużywającą tokeny, więc zaczyna
-    ostrożnie, a podnosi go wdrożenie."""
+    ostrożnie, a podnosi go wdrożenie. Odczyt oddaje tysiące tokenów, więc ma najwyżej 3;
+    wyszukiwanie kilkadziesiąt, a tekstowe bierze jedną frazę na wywołanie, więc najwyżej 5."""
     limits = Settings(_env_file=None).tool_call_limits()
+    reads  = [limit for name, limit in limits.items() if name.startswith("read_")]
 
-    assert all(1 <= limit <= 3 for limit in limits.values())
+    assert all(1 <= limit <= 5 for limit in limits.values())
+    assert all(limit <= 3 for limit in reads)
 
 
 @pytest.mark.parametrize("value", ["0", "-1"])

@@ -70,7 +70,7 @@ class FindTicketsTextToolBase(AuxiliaryTool):
     @abstractmethod
     async def find(
         self,
-        query: FindTicketsTextQuery,  # np. FindTicketsTextQuery(exact=["SQLSTATE[23000]"])
+        query: FindTicketsTextQuery,  # np. FindTicketsTextQuery(exact="SQLSTATE[23000]")
     ) -> FindTicketsTextResult:
         """
         Description:
@@ -78,7 +78,7 @@ class FindTicketsTextToolBase(AuxiliaryTool):
         dosłowne trafienia najpierw, przycięte limitem.
 
         Example args:
-            query=FindTicketsTextQuery(exact=["Nie udało się skomunikować z serwerem"])
+            query=FindTicketsTextQuery(exact="Nie udało się skomunikować z serwerem")
 
         Example result:
             FindTicketsTextResult(tickets=[MatchedTicket(ticket_id="90011", matched_by="exact")],
@@ -94,7 +94,7 @@ class FindTicketsTextToolBase(AuxiliaryTool):
         Wyszukuje i zwraca tekst dla modelu: JSON wyniku.
 
         Example args:
-            args=FindTicketsTextQuery(exact=["Nie udało się skomunikować z serwerem"])
+            args=FindTicketsTextQuery(exact="Nie udało się skomunikować z serwerem")
 
         Example result:
             {"tickets": [{"ticket_id": "90011", "matched_by": "exact"}], "omitted_over_limit": 0}

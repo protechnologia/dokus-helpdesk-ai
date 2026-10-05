@@ -55,7 +55,8 @@ O czym pamiętać przy zmianach:
   przekroczyć go o długość tego nagłówka (w przykładzie drugi fragment ma 128 znaków).
 - Koniec zdania to kropka, wykrzyknik albo pytajnik przed odstępem, więc bywa nim też skrót
   („np."). Ma to znaczenie tylko wtedy, gdy cięcie wypadnie akurat w tym miejscu.
-- Fragmenty nie nachodzą na siebie. Długość fragmentu rozstrzyga pomiar (CLAUDE.md -> p. 8).
+- Fragmenty nie nachodzą na siebie. Długość fragmentu wybrano pomiarem (CLAUDE.md ->
+  „Instrukcje").
 """
 
 import re
@@ -79,7 +80,7 @@ HEADING = re.compile(r"#{1,6}\s")
 
 def split_into_fragments(
     body:      str,  # treść pliku `.md` sekcji
-    max_chars: int,  # np. 1500 — RAG_DOCS_FRAGMENT_CHARS
+    max_chars: int,  # np. 1000 — RAG_DOCS_FRAGMENT_CHARS
 ) -> list[str]:
     """
     Description:
@@ -126,7 +127,7 @@ def build_fragment_text(
 
 def _fit(
     text:      str,                                      # np. akapit: lista kodów uprawnień
-    max_chars: int,                                      # np. 1500
+    max_chars: int,                                      # np. 1000
     levels:    tuple[tuple[re.Pattern[str], str], ...],  # np. FINER_LEVELS — czym jeszcze dzielić
 ) -> list[str]:
     """
@@ -166,7 +167,7 @@ def _fit(
 def _pack(
     pieces:    list[str],  # np. ["Wstęp…", "### Kancelaria", "- `KANC_PODGLAD` — …"]
     separator: str,        # np. "\n\n" — czym łączyć kawałki w jednym fragmencie
-    max_chars: int,        # np. 1500
+    max_chars: int,        # np. 1000
 ) -> list[str]:
     """
     Description:

@@ -14,7 +14,11 @@ CREATE TABLE IF NOT EXISTS {table} (
 
     -- Przeszukiwany tekst: tytuł sekcji i jej treść. Opis z metryczki pisze model przy
     -- przygotowaniu plików, a trafienie ma wynikać z oryginału — dlatego go tu nie ma.
-    search_text text GENERATED ALWAYS AS (title || E'\n' || body) STORED,
+    -- Każdy ciąg białych znaków, także twarda spacja, staje się jedną spacją: komunikat złamany
+    -- w pliku między liniami ma być do znalezienia w całości. Treść w `body` zostaje dosłowna.
+    search_text text GENERATED ALWAYS AS (
+        regexp_replace(title || E'\n' || body, '[\s\u00A0]+', ' ', 'g')
+    ) STORED,
 
     -- Słowa tego samego tekstu po przejściu przez polski słownik. Wyrażenie musi być powtórzone:
     -- kolumna wyliczana nie może czytać innej kolumny wyliczanej.

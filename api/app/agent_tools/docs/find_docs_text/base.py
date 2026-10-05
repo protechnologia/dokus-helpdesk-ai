@@ -52,8 +52,8 @@ class FindDocsTextToolBase(AuxiliaryTool):
 
     Do czego:
     Po tej klasie dziedziczą atrapa (`FakeFindDocsTextTool`) i narzędzie właściwe na Postgresie
-    (p. 50). Każda dokłada wyłącznie `find()`, więc tekst dla modelu jest ten sam w testach i na
-    produkcji.
+    (`FindDocsTextTool`). Każda dokłada wyłącznie `find()`, więc tekst dla modelu jest ten sam
+    w testach i na produkcji.
 
     Flow:
         1. `run()` woła `find()` podklasy i dostaje `FindDocsTextResult`.
@@ -71,11 +71,11 @@ class FindDocsTextToolBase(AuxiliaryTool):
     ) -> FindDocsTextResult:
         """
         Description:
-        Znajduje sekcje dokumentacji zawierające dosłowne ciągi albo słowa z zapytania, dosłowne
-        trafienia najpierw, przycięte limitem.
+        Znajduje sekcje dokumentacji zawierające frazę z `exact` albo wszystkie słowa z `words`,
+        znalezione frazą najpierw, przycięte limitem.
 
         Example args:
-            query=FindDocsTextQuery(exact=["Nie udało się skomunikować z serwerem"])
+            query=FindDocsTextQuery(exact="Nie udało się skomunikować z serwerem")
 
         Example result:
             FindDocsTextResult(sections=[MatchedSection(matched_by="exact", …)],

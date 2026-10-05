@@ -13,14 +13,14 @@ Przed — sekcja w paczce:
     manifest.json:  {"section_id": "adm-wykaz-uprawnien", "title": "Wykaz uprawnień", …}
     adm-wykaz-uprawnien.md:  20 tys. znaków — wstęp i 22 bloki z kodami uprawnień
 
-Po — jeden wiersz w tabeli i dwadzieścia jeden punktów w kolekcji:
+Po — jeden wiersz w tabeli i dwadzieścia siedem punktów w kolekcji:
 
     DocRow(section_id="adm-wykaz-uprawnien", ordinal=12, title="Wykaz uprawnień", body="…całość…")
 
     DocPoint(point_id=uuid("adm-wykaz-uprawnien#0"),  payload={"section_id": "adm-wykaz-…", …})
     DocPoint(point_id=uuid("adm-wykaz-uprawnien#1"),  payload={…ten sam opis sekcji…})
     …
-    DocPoint(point_id=uuid("adm-wykaz-uprawnien#20"), payload={…})
+    DocPoint(point_id=uuid("adm-wykaz-uprawnien#26"), payload={…})
 
 Co się dzieje po drodze:
 
@@ -147,7 +147,7 @@ class DocsIndexer:
         embedder:       EmbeddingClient,  # np. EmbeddingClient(base_url="http://embedder:8000")
         table:          DocsTable,        # np. DocsTable(PostgresClient(…))
         collection:     DocsCollection,   # np. DocsCollection(QdrantClient(…), "docs", 768)
-        fragment_chars: int,              # np. 1500 — RAG_DOCS_FRAGMENT_CHARS
+        fragment_chars: int,              # np. 1000 — RAG_DOCS_FRAGMENT_CHARS
         synthetic:      bool,             # True, gdy tabela i kolekcja to indeks syntetyczny
     ):
         """
@@ -159,7 +159,7 @@ class DocsIndexer:
             embedder=EmbeddingClient(base_url="http://embedder:8000")
             table=DocsTable(PostgresClient(host="postgres", …))
             collection=DocsCollection(QdrantClient(base_url="http://qdrant:6333"), "docs", 768)
-            fragment_chars=1500
+            fragment_chars=1000
             synthetic=False
 
         Example result:
@@ -184,7 +184,7 @@ class DocsIndexer:
             package=DocPackage(path=Path("data/unsafe/instruction"), directories=[…])
 
         Example result:
-            DocsIndexReport(documents=2, sections=27, fragments=47, warnings=[])
+            DocsIndexReport(documents=2, sections=27, fragments=58, warnings=[])
 
         Raises:
             DocsIndexRefused: paczki nie wolno zaindeksować w tym indeksie

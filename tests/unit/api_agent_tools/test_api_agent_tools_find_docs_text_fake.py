@@ -2,7 +2,7 @@ import json
 
 from app.agent_tools.docs.find_docs_text import FakeFindDocsTextTool, FindDocsTextQuery
 
-QUERY = FindDocsTextQuery(exact=["Nie udało się skomunikować z serwerem"])
+QUERY = FindDocsTextQuery(exact="Nie udało się skomunikować z serwerem")
 
 FOUND_IDS = ["usr-komunikat-brak-serwera", "adm-kancelaria-edoreczenia"]
 

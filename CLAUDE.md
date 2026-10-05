@@ -104,7 +104,7 @@ pierwszym narzędziem, które coś wykonuje, a nie tylko czyta, więc wymaga oso
 o granicach.
 
 **Stan na dziś.** Szkielet stoi w całości, a część jednostek to atrapy: pętla agenta, wykonanie
-narzędzi i odpowiedź, anonimizator oraz sześć z ośmiu narzędzi.
+narzędzi i odpowiedź, anonimizator oraz cztery z ośmiu narzędzi.
 
 ### Zasady produktu
 
@@ -863,7 +863,8 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — indeksacja i narzędzia powstają
   tytuł i treść, a opis służy tylko do spisu i do wyników wyszukiwania.
 - **Podrozdział bywa dłuższy niż jeden wektor:** limit embeddera, 8192 tokeny, to ok. 18 tys.
   znaków. Stąd cała treść leży w Postgresie, a do Qdranta idzie pocięta na fragmenty: po
-  akapitach, najwyżej `RAG_DOCS_FRAGMENT_CHARS` znaków (wstępnie 1500, rozstrzyga p. 8). Akapit,
+  akapitach, najwyżej `RAG_DOCS_FRAGMENT_CHARS` znaków (1000, z pomiaru na paczce syntetycznej;
+  do przeliczenia na właściwej dokumentacji, p. 55). Akapit,
   który sam mieści się w limicie, nie jest cięty; dłuższy dzieli się na linie, zdania i słowa.
   Nagłówek zostaje ze swoim blokiem, a do wektora idzie tytuł sekcji i fragment. Sekcja powyżej
   18 tys. znaków dostaje przy wczytaniu ostrzeżenie bez odmowy (próg tymczasowy, p. 55).
@@ -878,10 +879,13 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — indeksacja i narzędzia powstają
   z zestawem 66 zapytań w `data/safe/golden/docs-synthetic.json`. Mierzy okablowanie narzędzi, nie
   skuteczność, i nie może trafić do właściwego indeksu. Ma własny: `helpdesk docs index
   --synthetic` pisze do tabeli `docs_text_synthetic` i kolekcji o nazwie z dopiskiem `_synthetic`,
-  a flaga komendy i `synthetic` w manifeście muszą się zgadzać w obie strony. Przy 1500 znakach
-  paczka daje 47 fragmentów; w sondzie 23 z 24 zapytań wektorowych zestawu miały cel na pierwszym
-  miejscu, a zapytanie o szczegół z końca najdłuższej sekcji — na drugim (przy jednym wektorze na
-  sekcję poza pierwszą piątką).
+  a flaga komendy i `synthetic` w manifeście muszą się zgadzać w obie strony.
+- **Fragmenty po 1000 znaków — zmierzone 2026-10-05** (raport:
+  `data/unsafe/docs/pomiar-dokumentacji-fragmenty-i-prog.md`). Paczka daje wtedy 58 fragmentów
+  i wszystkie 24 zapytania wektorowe z odpowiedzią mają cel na pierwszym miejscu. Zapytanie
+  o szczegół z końca najdłuższej sekcji wygrywa o 0,058; przy 1500 znakach przegrywa o 0,004, przy
+  jednym wektorze na sekcję wypada poza pierwszą piątkę, a przy samym tytule i opisie ląduje na
+  19. miejscu. Paczka ma jedną długą sekcję, więc między 400 a 1000 znaków nie rozstrzyga.
 
 ## Architektura
 
@@ -1321,11 +1325,20 @@ wektor:
   i opisem sekcji z metryczki w payloadzie, bez treści** — treść leży w Postgresie. Nazwa kolekcji
   to `QDRANT_DOCS_COLLECTION`. Sekcja ma tyle punktów, na ile fragmentów pocięto jej treść
   (decyzja 2026-10-04); identyfikator punktu powstaje z `section_id` i numeru fragmentu, a payload
-  jest ten sam w każdym fragmencie sekcji. Wyszukiwanie oddaje trafienia we fragmenty, więc sekcja
-  może wrócić kilka razy; do jednego wyniku zwinie je narzędzie (p. 8). Zmierzone na paczce
-  syntetycznej: 8192 tokeny to ok. 18 tys. znaków, sekcja przy limicie liczy się na CPU ponad
-  minutę, dłuższą embedder ucina bez błędu, a szczegół z końca długiej sekcji jeden wektor gubi.
-  Długość fragmentu rozstrzyga pomiar (p. 8).
+  jest ten sam w każdym fragmencie sekcji. Zmierzone na paczce syntetycznej: 8192 tokeny to ok.
+  18 tys. znaków, sekcja przy limicie liczy się na CPU ponad minutę, dłuższą embedder ucina bez
+  błędu, a szczegół z końca długiej sekcji jeden wektor gubi.
+- **Wyszukiwanie w dokumentacji oddaje sekcje, a fragmenty zwija Qdrant (2026-10-05).** Kolekcja
+  pyta o grupy po `section_id` (`/points/query/groups`) i z każdej sekcji dostaje najbliższy
+  fragment, więc limit liczy sekcje. Zwijanie w narzędziu wymagałoby pobierania z zapasem,
+  a zapas zależy od najdłuższej sekcji: na paczce syntetycznej pięć sekcji wymagało do 25
+  fragmentów przy 1500 znakach i 31 przy 1000.
+- **Dokumentacja ma własny próg, `RAG_DOCS_SCORE_MIN` = 0.37, po stronie zachowania trafień
+  (2026-10-05).** Na paczce syntetycznej zapytania z odpowiedzią mają 0,37–0,60, a bez odpowiedzi
+  0,31–0,39, więc rozkłady się stykają: 0.37 zachowuje wszystkie 24 i wycisza 4 z 5, a 0.39
+  wycisza 5 z 5 i gubi jedno z 24. Odwrotnie niż przy zgłoszeniach, bo model dostaje tu opis
+  sekcji, nie treść: słabe trafienie odrzuci sam, a brakującego nie odzyska. Liczbę sekcji
+  ustawia wspólne `RAG_TOP_K`. Wartość wstępna — sekcje i zapytania pisał ten sam autor (p. 55).
 - **Kolekcja ma `aclose()`, które zamyka jej klienta** — narzędzie dostaje kolekcję, nie klienta,
   a ma po sobie sprzątać jednym wywołaniem. Klient wspólny dla kilku kolekcji zamyka się wtedy
   kilka razy; powtórne zamknięcie nic nie robi.
@@ -1373,9 +1386,9 @@ wektor:
 
 Usługa `postgres` to drugi indeks obok Qdranta: szuka po słowach w odmianie i po dosłownych
 ciągach, czego wektor nie robi. Po stronie `api` stoi pakiet `app/db_postgres/` z tabelami zgłoszeń
-i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs index`, tabelę zgłoszeń wypełni
-indeksacja (p. 31, p. 53), a czytać będą narzędzia `find_*_text`, `list_docs` i `read_docs`
-(p. 50–53).
+i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs index` i szuka w niej
+`find_docs_text`; tabelę zgłoszeń wypełni indeksacja (p. 31, p. 53), a czytać będą
+`find_tickets_text`, `list_docs` i `read_docs` (p. 51–53).
 
 - **Trzy drogi dopasowania, każda do czego innego:** słowa (`plainto_tsquery` — dowolna kolejność
   i odmiana), fraza (`phraseto_tsquery` — cały komunikat w tej samej kolejności) i podciąg
@@ -1412,8 +1425,13 @@ indeksacja (p. 31, p. 53), a czytać będą narzędzia `find_*_text`, `list_docs
   klienta, podaje go tabeli i woła jej metody; samego klienta nie dotyka. Tabela ma `aclose()`,
   które zamyka jej klienta: kto dostał samą tabelę, sprząta jednym wywołaniem.
 - **Wiersz to płaskie odbicie kolumn tabeli** (`TicketRow`, `DocRow`): pole na kolumnę, w tych
-  samych typach. W tym kształcie wchodzi do tabeli i z niej wraca, także jako wynik szukania;
-  buduje się go jawnie (`TicketRow.from_thread()`, `DocRow.from_section()` / `to_section()`).
+  samych typach. W tym kształcie wchodzi do tabeli i wraca z odczytu; buduje się go jawnie
+  (`TicketRow.from_thread()`, `DocRow.from_section()` / `to_section()`).
+- **Szukanie oddaje identyfikatory wszystkich pasujących wierszy, bez limitu i bez treści
+  (2026-10-05).** Limit, łączenie dróg i licznik pominiętych należą do narzędzia, a ono musi
+  wiedzieć, ile wierszy pasowało w sumie; opis albo treść daje odczyt po identyfikatorach.
+  Zapytanie pasujące do całego korpusu to kilkanaście kilobajtów numerów. Frazy
+  (`phraseto_tsquery`) nie woła dziś żadne narzędzie: `exact` idzie podciągiem.
 - **Qdrant trzyma karty zgłoszeń, Postgres oryginały po anonimizacji (2026-10-04).** Tabela
   zgłoszeń ma cztery kolumny: numer, datę, temat i cały wątek jako jeden tekst. Karty w niej nie
   ma, więc tabela nie zależy od parsowania, a zmiana pól karty jej nie dotyka. Model nie wie,
@@ -1435,9 +1453,10 @@ indeksacja (p. 31, p. 53), a czytać będą narzędzia `find_*_text`, `list_docs
   wyliczaną — 1–2 ms, a zapis 1100 wierszy 5 s.
 - **Kodów błędów nie szuka się osobną drogą.** Kod znajduje podciąg w wątku; pole `error_codes`
   karty tylko go powtarza (2% słów spoza wątku), więc osobne szukanie po nim nic by nie dało.
-  Podciąg nie przechodzi przez złamanie linii: komunikat rozbity w wątku na dwie linie nie
-  zostanie znaleziony w całości. Naprawa w p. 50 (decyzja 2026-10-04): w `search_text`
-  i w zapytaniu każdy ciąg białych znaków staje się jedną spacją; `body` zostaje dosłowne.
+- **W `search_text` i w zapytaniu do podciągu każdy ciąg białych znaków jest jedną spacją
+  (2026-10-05)**, więc komunikat złamany w źródle między liniami da się znaleźć w całości; `body`
+  i `thread` zostają dosłowne. Po obu stronach liczy to baza tym samym wzorcem. Wzorzec wymienia
+  twardą spację osobno: `\s` tej bazy jej nie obejmuje, a ma ją 124 z 1825 zgłoszeń.
 - **Zmiana kolumn nie dociera do istniejącej tabeli** — `CREATE TABLE IF NOT EXISTS` jej nie
   rusza. Tabelę kasuje się i odbudowuje z plików.
 - **Nazwa tabeli jest sprawdzana wzorcem identyfikatora**, bo nie da się jej podać parametrem
@@ -1459,9 +1478,17 @@ indeksacja (p. 31, p. 53), a czytać będą narzędzia `find_*_text`, `list_docs
   `read_tickets_card` (karta) i `read_tickets_thread` (oryginalny wątek po anonimizacji).
   Dokumentacja: `list_docs`, `find_docs_vector` i `find_docs_text` oddają opisy sekcji
   z metryczki, treść `read_docs`. Model nie wie, która baza co trzyma, i wybiera kartę albo wątek
-  niezależnie od tego, jak zgłoszenie znalazł. Właściwe są dziś `find_tickets_vector`
-  i `read_tickets_card`; reszta to modele i atrapy. Cena: jedna tura modelu więcej na każde
-  wyszukanie.
+  niezależnie od tego, jak zgłoszenie znalazł. Właściwe są dziś `find_tickets_vector`,
+  `read_tickets_card`, `find_docs_vector` i `find_docs_text`; reszta to modele i atrapy. Cena:
+  jedna tura modelu więcej na każde wyszukanie.
+- **W wyszukiwaniu tekstowym `exact` i `words` szukają niezależnie, a wyniki się sumują.** Fraza
+  z `exact` idzie podciągiem; słowa z `words` idą przez słownik i muszą wystąpić wszystkie.
+  Trafienia frazą stoją pierwsze, a element znaleziony obiema drogami jest w wyniku raz, jako
+  `exact`. Wynik ma najwyżej `RAG_TOP_K` pozycji, reszta jest policzona w `omitted_over_limit`.
+- **`exact` to jedna fraza, nie lista (2026-10-05).** Przy liście wynik nie mówił, która fraza
+  trafiła, a „którakolwiek z fraz" obok „wszystkie słowa" trzeba było modelowi tłumaczyć;
+  w zestawie zapytań żadne nie podawało więcej niż jednej. Cena: kilka tropów (kod z ekranu, kod
+  z logów, komunikat) to kilka wywołań, stąd limit wywołań obu wyszukiwań tekstowych 5, a nie 3.
 - **Wyszukiwanie zgłoszeń oddaje sam numer, bez `problem` karty.** Sprawy o tym samym objawie
   mają różne przyczyny; wiersz z samym objawem zachęcałby do przeczytania jednej karty, a przy
   gołych numerach model nie ma po czym wybierać i czyta wszystkie. `score` widzi tylko model
@@ -1488,6 +1515,12 @@ indeksacja (p. 31, p. 53), a czytać będą narzędzia `find_*_text`, `list_docs
   w danej funkcji, mówi prompt grafu. Wcześniej leżał w każdym grafie osobno: 18 plików, w których
   różniło się jedno zdanie, a i to prompty systemowe już mówiły. Cena: poprawka opisu zmienia
   wszystkie grafy naraz, więc po strojeniu jednego trzeba przemierzyć pozostałe.
+- **Każdy opis narzędzia ma ten sam układ (2026-10-05):** sekcje „Do czego służy", „Jak
+  wywoływać", „Co zwraca" i „Zasady". Argumenty stoją w tabelce (argument, typ, co podać,
+  przykład, opis), pola zwracanego JSON-u w drugiej; odesłania do innych narzędzi i limity idą do
+  zasad. Linie do 70 znaków, dłuższe bywają tylko wiersze tabelki argumentów. Sekcji pilnuje test
+  kontraktu narzędzi. Przykład w tabelce to wzór, który model może przepisać — z tego powodu
+  schemat odpowiedzi przykładów nie niesie — więc do sprawdzenia w pomiarach grafów (p. 23).
 - **Na górze `agent_tools/` kontrakty (`base.py`) i jedyny wspólny model `SourceRef` (`models.py`);
   w katalogu narzędzia `tool.py`, `fake.py` i `models.py` z modelami TYLKO tego narzędzia** —
   zapytanie (`FindTicketsVectorQuery`), znaleziony element (`FoundTicket`), wynik
@@ -2146,15 +2179,16 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 885 (0)            | 17 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 172 (59)           | 43 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 98 (9)             | 10 s |
-| ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 9 (7)              | 33 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 942 (0)            | 19 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 181 (68)           | 53 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 98 (9)             | 9 s  |
+| ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 44 (42)            | 42 s |
 
 Liczby i czasy z 2026-10-05: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 8 s, a ewaluacyjne poniżej sekundy —
-całe 33 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
-(`pytest -m ""`): 1164 testy, 109 s; domyślny `pytest`, bez stacku: 1089 testów, 21 s.
+całe 42 s to 207 wyszukań golden setów przez prawdziwy embedder (178 w zgłoszeniach, 29
+w dokumentacji). Komplet jednym poleceniem (`pytest -m ""`): 1265 testów, 110 s; domyślny
+`pytest`, bez stacku: 1146 testów, 19 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2382,6 +2416,10 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   materiał do pytań. Pomiar: na 200 artefaktach 8 par o podobnym `problem` i ani jednej do
   scalenia. Puste `cause` po obu stronach nie jest zgodnością. Prawdziwe duplikaty (to samo
   zgłoszenie wysłane dwa razy) to inna klasa, do rozważenia przy pełnym korpusie.
+- **Lista fraz w `exact` wyszukiwań tekstowych** — wynik nie mówił, która fraza trafiła,
+  a semantyka „którakolwiek" wymagała tłumaczenia; jedna fraza na wywołanie.
+- **Zwijanie fragmentów dokumentacji do sekcji w narzędziu** — wymaga pobierania fragmentów
+  z zapasem zależnym od najdłuższej sekcji (do 25–31 fragmentów na pięć sekcji); grupuje Qdrant.
 - **Zwijanie zgodnych trafień w wynikach wyszukiwania** — przy `RAG_TOP_K` = 5 licznik zgodnych
   trafień jest artefaktem okna, nie pomiarem korpusu, a bez licznika zostaje sama krótsza lista.
   Wraca z rozdzieleniem „ile pobrać" od „ile pokazać"; bez re-indeksu.
@@ -2503,24 +2541,18 @@ punkty niżej to narzędzia właściwe.
   `stack_postgres` i test na stacku; reguły — „Warstwa wyszukiwania tekstowego (Postgres)".
 - [x] **54. Syntetyczna dokumentacja i golden set** (2026-10-04) — dwa dokumenty, 27 sekcji
   w `data/safe/instruction/syntetyczna-instrukcja-*` i 66 zapytań w kształcie czterech narzędzi
-  w `data/safe/golden/docs-synthetic.json`; mierzy okablowanie, nie skuteczność. Trzy oczekiwania
-  zestawu czekają na p. 8 i p. 50.
+  w `data/safe/golden/docs-synthetic.json`; mierzy okablowanie, nie skuteczność.
 - [x] **49. Indeksacja dokumentacji** (2026-10-05) — `helpdesk docs validate|index`: czytnik
   paczki, cięcie sekcji na fragmenty, indekser zastępujący tabelę i kolekcję, osobny indeks
   syntetyczny;
   reguły — „Instrukcje", „Warstwa bazy wektorowej (Qdrant)", „Warstwa CLI".
-- [ ] **8. `find_docs_vector`** — wyszukiwanie w kolekcji dokumentacji; zwraca wiersze listingu
-  (identyfikator, dokument, rozdział, opis), nie treść; jednostką wyniku jest plik z metryczki
-  także wtedy, gdy wektor powstaje z jego fragmentu — fragment zwija się do pliku. *Dlaczego:*
-  treść model pobiera odczytem (p. 52) i tylko odczyt trafia na listę źródeł, a wyszukiwanie
-  tekstowe i wektorowe muszą wskazywać ten sam identyfikator; pomiar na paczce z p. 54
-  rozstrzyga długość fragmentu (odniesienie: sam tytuł i opis) i osobny próg podobieństwa —
-  w sondzie zapytania bez odpowiednika dostawały 0,31–0,38, a poprawne 0,37–0,60.
-- [ ] **50. `find_docs_text`** — pola `exact` (dosłowne ciągi, `ILIKE`) i `words` (indeks
-  pełnotekstowy ze słownikiem); wiersze listingu z etykietą, czym znaleziono; przed nim spacje
-  zamiast białych znaków w `search_text` obu tabel i w zapytaniu. *Dlaczego:* model wie, czy ma
-  kod, czy słowa kluczowe, ale nie wie, jak leżą w bazie, a komunikat złamany między liniami
-  jest dziś dla podciągu nie do znalezienia.
+- [x] **8. `find_docs_vector`** (2026-10-05) — `FindDocsVectorTool` na embedderze i kolekcji
+  dokumentacji: sekcje grupowane w Qdrancie, próg `RAG_DOCS_SCORE_MIN`, fragmenty po 1000 znaków
+  z pomiaru; reguły — „Instrukcje", „Warstwa bazy wektorowej (Qdrant)".
+- [x] **50. `find_docs_text`** (2026-10-05) — `FindDocsTextTool` na tabeli dokumentacji; spacje
+  zamiast białych znaków w `search_text` obu tabel i w zapytaniu, szukanie tabel oddaje
+  identyfikatory; `exact` jako jedna fraza; wspólny układ opisów wszystkich narzędzi; reguły —
+  „Warstwa wyszukiwania tekstowego (Postgres)", „Warstwa narzędzi agenta".
 - [ ] **51. `list_docs`** — listing z metryczek jako narzędzie pomocnicze. *Dlaczego:* przy małej
   dokumentacji lepszy bywa listing w prompcie systemowym (cache'owany prefiks, bez tury) — do
   rozstrzygnięcia przy właściwej dokumentacji (p. 15).
@@ -2710,7 +2742,8 @@ każdy mierzy się osobno.
 - [ ] **55. Przygotowanie właściwej dokumentacji** (dopisany 2026-10-03) — podział mocnym modelem
   na pliki `.md` i metryczkę, skrypt sprawdzający, że każda sekcja jest dosłownym podciągiem
   źródła i że sekcje pokrywają całość, przegląd opisów przez człowieka, próg ostrzeżenia
-  o długiej sekcji (dziś tymczasowo 18 tys. znaków). *Dlaczego:* dokumentacja
+  o długiej sekcji (dziś tymczasowo 18 tys. znaków) oraz przeliczenie `RAG_DOCS_FRAGMENT_CHARS`
+  i `RAG_DOCS_SCORE_MIN`, zmierzonych dotąd tylko na paczce syntetycznej. *Dlaczego:* dokumentacja
   wraca do promptu jako cytowane źródło, więc parafraza modelu stałaby się „tak mówi instrukcja";
   model dzieli i opisuje, treści nie przepisuje.
 

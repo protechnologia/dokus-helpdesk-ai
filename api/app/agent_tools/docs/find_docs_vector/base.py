@@ -54,8 +54,8 @@ class FindDocsVectorToolBase(AuxiliaryTool):
 
     Do czego:
     Po tej klasie dziedziczą atrapa (`FakeFindDocsVectorTool`) i narzędzie właściwe na kolekcji
-    dokumentacji w Qdrancie (p. 8). Każda dokłada wyłącznie `find()`, więc tekst dla modelu jest
-    ten sam w testach i na produkcji.
+    dokumentacji w Qdrancie (`FindDocsVectorTool`). Każda dokłada wyłącznie `find()`, więc tekst
+    dla modelu jest ten sam w testach i na produkcji.
 
     Flow:
         1. `run()` woła `find()` podklasy i dostaje `FindDocsVectorResult`.

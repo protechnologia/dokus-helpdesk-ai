@@ -5,6 +5,7 @@ import pytest
 from app.agent_tools.docs.fake_docs import default_sections
 from app.agent_tools.tickets.fake_tickets import SIGNING_THREAD
 from app.db_postgres import DbPostgresConfigError, DocRow, DocsTable, TicketRow, TicketsTable
+from app.db_postgres.table.base import WHITESPACE_RUN
 
 # Tabele testowane bez bazy, na kliencie-atrapie zapisującym SQL i wartości: sprawdzamy, CO idzie
 # do bazy i jak czytamy odpowiedź. Że Postgres odpowiada na to tak, jak zakładamy, sprawdza test
@@ -138,9 +139,28 @@ async def test_the_table_is_created_with_its_searched_text_and_index() -> None:
 
     assert len(client.calls) == 2
     assert 'CREATE TABLE IF NOT EXISTS "docs_text"' in create
-    assert "search_text text GENERATED ALWAYS AS (title || E'\\n' || body) STORED" in create
+    assert "regexp_replace(title || E'\\n' || body, " in create
     assert "to_tsvector('pl_search', title || E'\\n' || body)" in create
     assert 'CREATE INDEX IF NOT EXISTS "docs_text_search" ON "docs_text" USING gin' in create
+
+
+@pytest.mark.parametrize("table_class", TABLES)
+async def test_the_searched_text_and_the_query_collapse_whitespace_the_same_way(
+    table_class: type,
+) -> None:
+    """Kolumna `search_text` i zapytanie do podciągu → ten sam wzorzec białych znaków, zamieniany
+    na jedną spację: komunikat złamany w źródle między liniami da się znaleźć tylko wtedy, gdy
+    obie strony liczą „biały znak" tak samo."""
+    creating  = StubClient()
+    searching = StubClient()
+
+    await table_class(creating).create()
+    await table_class(searching).substring("Zaloguj się\nponownie")
+
+    collapse = f"'{WHITESPACE_RUN}', ' ', 'g')"
+
+    assert collapse in creating.calls[1][0]
+    assert collapse in searching.calls[0][0]
 
 
 async def test_a_database_without_the_search_configuration_gets_no_table() -> None:
@@ -171,18 +191,20 @@ async def test_words_and_phrases_use_the_stored_vector(
     function:    str,
 ) -> None:
     """Słowa i fraza → warunek na zapisanym wektorze słów tabeli tego materiału; zapytanie agenta
-    i limit idą parametrami, w treści SQL-a jest tylko nazwa tabeli."""
+    idzie parametrem, w treści SQL-a jest tylko nazwa tabeli, a limitu nie ma: narzędzie musi
+    wiedzieć, ile wierszy pasowało w sumie."""
     client = StubClient()
     table  = table_class(client)
 
-    await getattr(table, method)("serwer'; --", limit=5)
+    await getattr(table, method)("serwer'; --")
 
     sql, *values = client.calls[0]
 
     assert function in sql
     assert f'FROM "{table.name}"' in sql
-    assert values == ["serwer'; --", 5]
+    assert values == ["serwer'; --"]
     assert "serwer" not in sql
+    assert "LIMIT"  not in sql
 
 
 async def test_a_substring_query_is_escaped_before_it_is_sent() -> None:
@@ -190,12 +212,12 @@ async def test_a_substring_query_is_escaped_before_it_is_sent() -> None:
     na złączonym tekście: komunikat błędu ma być szukany dosłownie."""
     client = StubClient()
 
-    await TicketsTable(client).substring("100%_gotowe", limit=5)
+    await TicketsTable(client).substring("100%_gotowe")
 
     sql, *values = client.calls[0]
 
     assert "search_text ILIKE" in sql and "ESCAPE" in sql
-    assert values == ["100\\%\\_gotowe", 5]
+    assert values == ["100\\%\\_gotowe"]
 
 
 # --- zapis i odczyt wierszy ---
@@ -216,18 +238,36 @@ async def test_rows_are_written_in_one_statement_column_by_column() -> None:
     assert arrays == [[value] for value in TICKET_ROW.model_dump().values()]
 
 
+@pytest.mark.parametrize(
+    ("table_class", "key"),
+    [(TicketsTable, "ticket_id"), (DocsTable, "section_id")],
+)
 @pytest.mark.parametrize("method", ["words", "phrase", "substring"])
-async def test_found_tickets_come_back_as_rows(method: str) -> None:
-    """Wiersze z bazy → `TicketRow` z tymi samymi polami, bez kolumn wyliczanych, które baza
-    oddaje razem z wierszem; brak wierszy → pusta lista."""
-    record = {**TICKET_ROW.model_dump(), "search_text": "…", "search_vector": "'przesyłka':4"}
-    stored = StubClient(rows=[record])
+async def test_a_search_gives_back_the_keys_of_what_matched(
+    table_class: type,
+    key:         str,
+    method:      str,
+) -> None:
+    """Szukanie → identyfikatory pasujących wierszy w kolejności bazy, a z bazy schodzi sama
+    kolumna klucza: treść daje dopiero odczyt. Brak wierszy → pusta lista."""
+    stored = StubClient(rows=[{key: "pierwszy"}, {key: "drugi"}])
 
-    found   = await getattr(TicketsTable(stored), method)("x", limit=5)
-    nothing = await getattr(TicketsTable(StubClient()), method)("x", limit=5)
+    found   = await getattr(table_class(stored), method)("x")
+    nothing = await getattr(table_class(StubClient()), method)("x")
 
-    assert found   == [TICKET_ROW]
+    assert found   == ["pierwszy", "drugi"]
     assert nothing == []
+    assert stored.calls[0][0].startswith(f'SELECT {key} FROM "{table_class(stored).name}"')
+
+
+async def test_rows_read_by_id_come_back_without_the_searched_columns() -> None:
+    """Wiersz z bazy → `TicketRow` z tymi samymi polami, bez kolumn wyliczanych, które baza
+    oddaje razem z wierszem."""
+    record = {**TICKET_ROW.model_dump(), "search_text": "…", "search_vector": "'przesyłka':4"}
+
+    found = await TicketsTable(StubClient(rows=[record])).read_by_id(["90011"])
+
+    assert found == [TICKET_ROW]
 
 
 async def test_tickets_are_read_by_their_numbers() -> None:

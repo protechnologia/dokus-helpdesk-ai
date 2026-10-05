@@ -15,10 +15,11 @@ class FindDocsTextQuery(BaseModel):
     # Nieznany argument to błąd, jak w `FindTicketsVectorQuery`.
     model_config = ConfigDict(extra="forbid")
 
-    # Nazwy opcji, komunikaty i kody — przepisane bez zmian.
-    exact: list[ExactText] = Field(default_factory=list, examples=[["Uprawnienia → Kancelaria"]])
+    # Jedna fraza: nazwa opcji, komunikat albo kod — przepisana bez zmian. Kilka fraz to kilka
+    # wywołań: wynik mówi wtedy, która z nich trafiła.
+    exact: ExactText | None = Field(default=None, examples=["Uprawnienia → Kancelaria"])
     # Słowa kluczowe; odmiana nie ma znaczenia.
-    words: str | None      = Field(default=None, min_length=1, examples=["uprawnienie kancelaria"])
+    words: str | None       = Field(default=None, min_length=1, examples=["uprawnienie kancelaria"])
 
     @model_validator(mode="after")
     def _requires_something_to_search(self) -> "FindDocsTextQuery":

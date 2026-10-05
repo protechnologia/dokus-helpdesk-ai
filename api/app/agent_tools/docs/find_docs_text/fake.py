@@ -76,7 +76,7 @@ class FakeFindDocsTextTool(FindDocsTextToolBase):
         Zapisuje zapytanie i zwraca ustalony wynik — niezależnie od treści zapytania.
 
         Example args:
-            query=FindDocsTextQuery(exact=["Nie udało się skomunikować z serwerem"])
+            query=FindDocsTextQuery(exact="Nie udało się skomunikować z serwerem")
 
         Example result:
             FindDocsTextResult(sections=[MatchedSection(matched_by="exact", …), …],

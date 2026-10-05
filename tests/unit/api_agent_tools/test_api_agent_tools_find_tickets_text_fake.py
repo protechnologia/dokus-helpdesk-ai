@@ -2,7 +2,7 @@ import json
 
 from app.agent_tools.tickets.find_tickets_text import FakeFindTicketsTextTool, FindTicketsTextQuery
 
-QUERY = FindTicketsTextQuery(exact=["Nie udało się skomunikować z serwerem"])
+QUERY = FindTicketsTextQuery(exact="Nie udało się skomunikować z serwerem")
 
 
 async def test_the_result_is_the_same_on_every_search() -> None:

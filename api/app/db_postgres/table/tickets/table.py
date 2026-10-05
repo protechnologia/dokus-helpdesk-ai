@@ -41,15 +41,15 @@ class TicketsTable(TextTable):
     Tabela wyszukiwania tekstowego zgłoszeń: zapis, szukanie w tekście wątku i odczyt po numerze.
 
     Do czego:
-    Stąd `find_tickets_text` bierze zgłoszenia pasujące dosłownie do kodu błędu, komunikatu albo
-    słów kluczowych — jako wiersze z oryginalnym wątkiem. Odczyt po numerze daje wątek
-    zgłoszenia znalezionego inną drogą, np. karty z bazy wektorowej. Szukanie i odczyt to
-    mechanika klasy bazowej; SQL zakładania i zapisu leży obok, w plikach `.sql`.
+    Stąd `find_tickets_text` bierze numery zgłoszeń pasujących dosłownie do kodu błędu,
+    komunikatu albo słów kluczowych. Odczyt po numerze daje wątek zgłoszenia znalezionego
+    dowolną drogą, także karty z bazy wektorowej. Szukanie i odczyt to mechanika klasy bazowej;
+    SQL zakładania i zapisu leży obok, w plikach `.sql`.
 
     Flow:
         1. Indeksacja: `create()`, potem `upsert()` (p. 31, p. 53).
-        2. Narzędzie: `words()`, `phrase()` albo `substring()` → wiersze `TicketRow`.
-        3. Odczyt: `read_by_id()` → wiersze o podanych numerach.
+        2. Szukanie: `words()`, `phrase()` i `substring()` → numery pasujących zgłoszeń.
+        3. Odczyt: `read_by_id()` → wiersze `TicketRow` o podanych numerach.
     """
 
     def __init__(
@@ -147,74 +147,59 @@ class TicketsTable(TextTable):
     async def words(
         self,
         query: str,  # np. "załącznik limit"
-        limit: int,  # np. 5
-    ) -> list[TicketRow]:
+    ) -> list[str]:
         """
         Description:
         Znajduje zgłoszenia, których wątek zawiera wszystkie słowa zapytania — w dowolnej
-        kolejności i odmianie.
+        kolejności i odmianie — i oddaje ich numery, najlepiej dopasowane pierwsze.
 
         Example args:
             query="załącznik limit"
-            limit=5
 
         Example result:
-            [TicketRow(ticket_id="90003", subject="Brak przesyłek z e-Doręczeń", …)]
+            ["90003"]
 
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
-        records = await self._find_words(query=query, limit=limit, order=KEY)
-        rows    = [TicketRow(**record) for record in records]
-
-        return rows
+        return await self._find_words(query=query, key=KEY)
 
     async def phrase(
         self,
         query: str,  # np. "nie udało się skomunikować z serwerem"
-        limit: int,  # np. 5
-    ) -> list[TicketRow]:
+    ) -> list[str]:
         """
         Description:
-        Znajduje zgłoszenia zawierające słowa zapytania obok siebie, w tej samej kolejności —
-        komunikat przepisany z ekranu.
+        Znajduje zgłoszenia zawierające słowa zapytania obok siebie, w tej samej kolejności,
+        w dowolnej odmianie, i oddaje ich numery.
 
         Example args:
             query="nie udało się skomunikować z serwerem"
-            limit=5
 
         Example result:
-            [TicketRow(ticket_id="90011", …), TicketRow(ticket_id="90012", …)]
+            ["90011", "90012"]
 
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
-        records = await self._find_phrase(query=query, limit=limit, order=KEY)
-        rows    = [TicketRow(**record) for record in records]
-
-        return rows
+        return await self._find_phrase(query=query, key=KEY)
 
     async def substring(
         self,
         query: str,  # np. "ORA-00942"
-        limit: int,  # np. 5
-    ) -> list[TicketRow]:
+    ) -> list[str]:
         """
         Description:
-        Znajduje zgłoszenia zawierające zapytanie dosłownie, bez względu na wielkość liter — kod
-        błędu albo jego fragment.
+        Znajduje zgłoszenia zawierające zapytanie dosłownie, bez względu na wielkość liter i na
+        to, jak wątek złamano między liniami — kod błędu albo komunikat — i oddaje ich numery.
 
         Example args:
             query="ORA-00942"
-            limit=5
 
         Example result:
-            [TicketRow(ticket_id="90014", subject="Błąd przy zapisie pisma", …)]
+            ["90014"]
 
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
-        records = await self._find_substring(query=query, limit=limit, order=KEY)
-        rows    = [TicketRow(**record) for record in records]
-
-        return rows
+        return await self._find_substring(query=query, key=KEY)

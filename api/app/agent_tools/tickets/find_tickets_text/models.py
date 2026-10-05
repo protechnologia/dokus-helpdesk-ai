@@ -14,10 +14,11 @@ class FindTicketsTextQuery(BaseModel):
     # Nieznany argument to błąd, jak w `FindTicketsVectorQuery`.
     model_config = ConfigDict(extra="forbid")
 
-    # Kody błędów, sygnatury i fragmenty komunikatów — przepisane bez zmian.
-    exact: list[ExactText] = Field(default_factory=list, examples=[["SQLSTATE[23000]"]])
+    # Jedna fraza: kod błędu, sygnatura albo fragment komunikatu — przepisana bez zmian. Kilka
+    # fraz to kilka wywołań: wynik mówi wtedy, która z nich trafiła.
+    exact: ExactText | None = Field(default=None, examples=["SQLSTATE[23000]"])
     # Słowa kluczowe; odmiana nie ma znaczenia.
-    words: str | None      = Field(default=None, min_length=1, examples=["załącznik limit"])
+    words: str | None       = Field(default=None, min_length=1, examples=["załącznik limit"])
 
     @model_validator(mode="after")
     def _requires_something_to_search(self) -> "FindTicketsTextQuery":

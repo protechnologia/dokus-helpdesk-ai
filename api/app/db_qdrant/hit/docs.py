@@ -1,8 +1,8 @@
 """
 Description:
 Trafienie w dokumentacji: to, co oddaje wyszukiwanie w kolekcji dokumentacji — identyfikator
-punktu, podobieństwo i opis sekcji z payloadu. Trafia się we FRAGMENT sekcji, więc kilka trafień
-może wskazywać tę samą sekcję.
+punktu, podobieństwo i opis sekcji z payloadu. Punkt to fragment sekcji, ale wyszukiwanie oddaje
+każdą sekcję raz: jej najbliższy fragment.
 
 Wpis odpowiedzi Qdranta:
 
@@ -17,8 +17,8 @@ O czym pamiętać przy zmianach:
 
 - Payload zapisuje `DocPoint` (`point/docs.py`) i jest to opis sekcji z metryczki, bez treści
   i bez numeru fragmentu.
-- Trafienia tej samej sekcji zwija do jednego wyniku narzędzie `find_docs_vector`
-  (CLAUDE.md -> p. 8), nie kolekcja.
+- Fragmenty tej samej sekcji zwija do jednego trafienia Qdrant, przy wyszukiwaniu
+  (`DocsCollection.search()`), nie narzędzie.
 """
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -27,16 +27,16 @@ from pydantic import BaseModel, ConfigDict, Field
 class DocHit(BaseModel):
     """
     Description:
-    Jeden fragment sekcji dokumentacji tak, jak oddało go wyszukiwanie: podobieństwo i opis
-    sekcji z payloadu.
+    Jedna sekcja dokumentacji tak, jak oddało ją wyszukiwanie: podobieństwo jej najbliższego
+    fragmentu i opis sekcji z payloadu.
 
     Do czego:
-    Model TRANSPORTU, strona wyszukiwania obok `DocPoint`. Z niego `find_docs_vector` zbuduje wiersz
-    spisu; treści sekcji nie niesie.
+    Model TRANSPORTU, strona wyszukiwania obok `DocPoint`. Z niego `find_docs_vector` buduje
+    znalezioną sekcję; treści sekcji nie niesie.
 
     Flow:
         1. `from_qdrant()` czyta jeden wpis odpowiedzi wyszukiwania.
-        2. Kolekcja oddaje ich listę, od najbardziej podobnego.
+        2. Kolekcja oddaje ich listę, od najbardziej podobnej sekcji.
     """
 
     model_config = ConfigDict(extra="forbid")

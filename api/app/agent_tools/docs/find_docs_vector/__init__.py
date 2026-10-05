@@ -14,9 +14,11 @@ narzędzi dokumentacji wcale, a każdy graf musi działać z samymi zgłoszeniam
 | `models.py`      | zapytanie, znaleziona sekcja i wynik                         |
 | `description.md` | opis narzędzia dla modelu, ten sam w każdym grafie           |
 | `base.py`        | część wspólna narzędzia i atrapy: nazwa i tekst dla modelu   |
+| `tool.py`        | `FindDocsVectorTool` — wyszukiwanie przez embedder i Qdranta |
 | `fake.py`        | `FakeFindDocsVectorTool` — ustalony zestaw sekcji, bez usług |
 
-Status: modele i atrapa. Narzędzie właściwe (`tool.py`) na kolekcji dokumentacji powstaje w p. 8.
+Przykład zapytania i wyniku — w opisie `tool.py`; przykład tekstu, który czyta model — w opisie
+`base.py`.
 """
 
 from app.agent_tools.docs.find_docs_vector.base import FindDocsVectorToolBase
@@ -26,9 +28,11 @@ from app.agent_tools.docs.find_docs_vector.models import (
     FindDocsVectorResult,
     FoundSection,
 )
+from app.agent_tools.docs.find_docs_vector.tool import FindDocsVectorTool
 
 __all__ = [
     "FakeFindDocsVectorTool",
+    "FindDocsVectorTool",
     "FindDocsVectorToolBase",
     "FindDocsVectorQuery",
     "FindDocsVectorResult",

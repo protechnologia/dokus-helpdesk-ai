@@ -7,11 +7,13 @@ działającego stacku.
 | tabela         | scenariusz                             | oczekiwanie                            |
 |----------------|----------------------------------------|----------------------------------------|
 | `TicketsTable` | zapis i odczyt po numerach             | te same wiersze, w kolejności numerów  |
-| `TicketsTable` | słowo z wątku w innej odmianie         | zgłoszenie znalezione                  |
-| `TicketsTable` | fragment komunikatu z wątku            | zgłoszenia znalezione podciągiem       |
+| `TicketsTable` | słowo z wątku w innej odmianie         | numer zgłoszenia                       |
+| `TicketsTable` | fragment komunikatu z wątku            | numery znalezione podciągiem           |
 | `DocsTable`    | zapis dwóch dokumentów i spis          | sekcje w kolejności dokumentów         |
 | `DocsTable`    | odczyt po identyfikatorach             | sekcje z treścią, w kolejności żądania |
 | `DocsTable`    | słowo z tytułu, słowo z opisu          | tytuł przeszukiwany, opis nie          |
+| `DocsTable`    | komunikat złamany między liniami       | znaleziony podciągiem, treść dosłowna  |
+| `DocsTable`    | twarda spacja w treści                 | znaleziona zwykłą spacją               |
 | obie           | ponowny zapis tych samych wierszy      | bez duplikatów                         |
 
 O czym pamiętać przy zmianach:
@@ -127,27 +129,27 @@ async def test_tickets_are_read_back_as_they_were_written(tickets: TicketsTable)
 async def test_a_ticket_is_found_by_a_word_of_its_thread(tickets: TicketsTable) -> None:
     """Słowo z wątku w innej odmianie → to jedno zgłoszenie; słowo, którego nie ma w żadnym
     wątku → nic."""
-    by_thread = await tickets.words("załączniki", limit=5)
-    nothing   = await tickets.words("hipopotam", limit=5)
+    by_thread = await tickets.words("załączniki")
+    nothing   = await tickets.words("hipopotam")
 
-    assert by_thread == [ROWS[0]]
+    assert by_thread == [ROWS[0].ticket_id]
     assert nothing   == []
 
 
 async def test_a_message_is_found_as_a_substring_of_the_thread(tickets: TicketsTable) -> None:
     """Fragment komunikatu inną wielkością liter → oba zgłoszenia, w których wątku padł."""
-    found = await tickets.substring("SKOMUNIKOWAĆ Z SERWEREM", limit=5)
+    found = await tickets.substring("SKOMUNIKOWAĆ Z SERWEREM")
 
-    assert found == ROWS
+    assert found == [row.ticket_id for row in ROWS]
 
 
 async def test_writing_the_same_tickets_twice_duplicates_nothing(tickets: TicketsTable) -> None:
     """Ten sam zapis drugi raz → nadal dwa zgłoszenia: ponowna indeksacja nadpisuje, nie dokłada."""
     await tickets.upsert(ROWS)
 
-    found = await tickets.substring("skomunikować z serwerem", limit=5)
+    found = await tickets.substring("skomunikować z serwerem")
 
-    assert found == ROWS
+    assert found == [row.ticket_id for row in ROWS]
 
 
 async def test_the_listing_follows_the_documents(docs: DocsTable) -> None:
@@ -185,8 +187,63 @@ async def test_the_title_is_searched_and_the_description_is_not(docs: DocsTable)
 
     await docs.upsert([row])
 
-    by_title       = await docs.words("jednorożec", limit=5)
-    by_description = await docs.words("hipopotam", limit=5)
+    by_title       = await docs.words("jednorożec")
+    by_description = await docs.words("hipopotam")
 
-    assert by_title       == [row]
+    assert by_title       == [row.section_id]
     assert by_description == []
+
+
+def _probe_row(
+    body: str,  # np. "Pojawia się komunikat „Zaloguj się\nponownie, aby kontynuować”."
+) -> DocRow:
+    """
+    Description:
+    Jedna zmyślona sekcja o podanej treści, do sprawdzenia, co widzi podciąg.
+
+    Example args:
+        body="Pojawia się komunikat „Zaloguj się\nponownie, aby kontynuować”."
+
+    Example result:
+        DocRow(section_id="probna-sekcja", body="Pojawia się komunikat…", …)
+    """
+    row = DocRow(
+        section_id   = "probna-sekcja",
+        ordinal      = 9,
+        document     = "Dokument próbny",
+        version      = "1",
+        chapter_path = "[]",
+        title        = "Sekcja próbna",
+        description  = "Opis próbny",
+        body         = body,
+    )
+
+    return row
+
+
+async def test_a_message_broken_across_lines_is_found_and_the_body_stays_verbatim(
+    docs: DocsTable,
+) -> None:
+    """Komunikat złamany w pliku po „Zaloguj się", z wcięciem następnej linii → znajduje go
+    zapytanie w jednej linii i zapytanie złamane inaczej; treść sekcji wraca znak w znak."""
+    row = _probe_row("Pojawia się komunikat „Zaloguj się\n   ponownie, aby kontynuować pracę”.")
+
+    await docs.upsert([row])
+
+    one_line = await docs.substring("Zaloguj się ponownie, aby kontynuować pracę")
+    rebroken = await docs.substring("Zaloguj się ponownie,\naby  kontynuować")
+    read     = await docs.read_by_id([row.section_id])
+
+    assert one_line == [row.section_id]
+    assert rebroken == [row.section_id]
+    assert read     == [row]
+
+
+async def test_a_hard_space_in_the_body_matches_a_plain_space(docs: DocsTable) -> None:
+    """Twarda spacja w treści → znajduje ją zapytanie ze zwykłą spacją: `\\s` bazy jej nie
+    obejmuje, więc wzorzec wymienia ją osobno."""
+    row = _probe_row("Opcja „Przekaż\u00a0bufor” wysyła przesyłki do operatora.")
+
+    await docs.upsert([row])
+
+    assert await docs.substring("Przekaż bufor") == [row.section_id]

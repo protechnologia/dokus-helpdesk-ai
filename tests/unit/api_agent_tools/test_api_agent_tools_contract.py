@@ -82,6 +82,9 @@ SOURCES   = all_tools_of(KnowledgeSource)
 AUXILIARY = all_tools_of(AuxiliaryTool)
 TOOLS     = [*SOURCES, *AUXILIARY]
 
+# Układ opisu narzędzia (`description.md`), wspólny dla wszystkich narzędzi.
+DESCRIPTION_SECTIONS = ["# Do czego służy", "# Jak wywoływać", "# Co zwraca", "# Zasady"]
+
 
 def arguments_model(
     tool: type,  # np. FakeFindTicketsVectorTool albo FakeListDocsTool
@@ -127,6 +130,15 @@ def test_every_tool_describes_itself_to_the_model(tool: type) -> None:
     definicję dla modelu, a notatka dla nas nie ma prawa do niego dotrzeć."""
     assert isinstance(getattr(tool, "description", None), str) and tool.description
     assert "<!--" not in tool.description
+
+
+@pytest.mark.parametrize("tool", TOOLS, ids=lambda cls: cls.__name__)
+def test_every_description_has_the_same_four_sections(tool: type) -> None:
+    """Każdy opis narzędzia → te same cztery sekcje w tej samej kolejności: model czyta osiem
+    opisów naraz i ma w każdym znaleźć argumenty, wynik i zasady w tym samym miejscu."""
+    headings = [line for line in tool.description.splitlines() if line.startswith("#")]
+
+    assert headings == DESCRIPTION_SECTIONS
 
 
 @pytest.mark.parametrize("tool", AUXILIARY, ids=lambda cls: cls.__name__)

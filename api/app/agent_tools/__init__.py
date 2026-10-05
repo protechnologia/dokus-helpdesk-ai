@@ -46,9 +46,9 @@ narzędzie i co ono oddaje. Po co wyniki w danej funkcji, mówi prompt grafu.
 | `find_docs_text`      | pomocnicze    | `exact`, `words`      | opisy sekcji, czym znaleziono    |
 | `read_docs`           | źródło wiedzy | `section_ids`         | treść sekcji; cytuje             |
 
-`find_tickets_vector` i `read_tickets_card` mają narzędzie właściwe i atrapę; pozostałe na razie
-same modele i atrapy (p. 8, 50–53, 56). Narzędzia dokumentacji są opcjonalne: bez dokumentacji
-nie trafiają do rejestru.
+`find_tickets_vector`, `read_tickets_card`, `find_docs_vector` i `find_docs_text` mają narzędzie
+właściwe i atrapę; pozostałe na razie same modele i atrapy (p. 51–53, 56). Narzędzia dokumentacji
+są opcjonalne: bez dokumentacji nie trafiają do rejestru.
 """
 
 from app.agent_tools.base import AgentTool, AuxiliaryTool, KnowledgeSource
