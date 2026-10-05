@@ -2112,14 +2112,17 @@ w p. 46.
 **Testy i jakość**
 - Lint: `ruff check .`
 - Wszystko, co nie potrzebuje stacku ani płatnego modelu (każdy rodzaj testu): `pytest`
-- Wszystko naraz: `pytest -m ""` — **jedno polecenie na cały przebieg**; wymaga stacku
+- Wszystko naraz: `pytest -m "not llm_live"` — **jedno polecenie na cały przebieg**; wymaga
+  stacku. **Nie `pytest -m ""`** — ono wybiera też testy na żywym modelu, a te bez jawnego
+  `llm_live` kończą się błędem
 - Jeden rodzaj: `pytest tests/unit/`, `pytest tests/integration/`, `pytest tests/functional/`
 - Na stacku: `pytest tests/integration/ tests/functional/ -m stack` (albo `-m stack_<usługa>`)
 - Ewaluacyjne: `pytest tests/evaluation/` — bez korpusu odniesienia w `data/` testy się pomijają;
   z pomiarem `find_tickets_vector` na golden secie i z indeksem paczki syntetycznej:
-  `pytest tests/evaluation/ -m ""` (stack i oba zbudowane indeksy: zgłoszeń oraz syntetyczny
-  dokumentacji)
-- Na żywym LLM: `pytest -m llm_live` — **kosztuje / bije po sieci, pytaj przed**
+  `pytest tests/evaluation/ -m "not llm_live"` (stack i oba zbudowane indeksy: zgłoszeń oraz
+  syntetyczny dokumentacji)
+- Na żywym LLM: `pytest tests/integration/ -m llm_live` — **kosztuje / bije po sieci, pytaj
+  przed**; woła model generujący z konfiguracji (`LLM_GENERATION_*`)
 - **Podając marker, podaj też folder** — marker odsiewa dopiero PO imporcie, więc bez ścieżki
   pytest wczytuje wszystkie pliki testowe, żeby uruchomić kilkanaście (kolekcja podzbioru spada
   wtedy trzykrotnie). Foldery i markery można łączyć:
@@ -2269,15 +2272,17 @@ w p. 46.
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
 | jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1090 (0)           | 18 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 229 (79)           | 68 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 233 (79)           | 68 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 100 (9)            | 11 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 53 s |
 
-Liczby i czasy z 2026-10-05: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
-działającym stacku. Bez testów na stacku integracyjne trwają 8 s, a ewaluacyjne poniżej sekundy —
-całe 53 s to 207 wyszukań golden setów przez prawdziwy embedder (178 w zgłoszeniach, 29
-w dokumentacji). Komplet jednym poleceniem (`pytest -m ""`): 1459 testów, 149 s; domyślny
-`pytest`, bez stacku: 1333 testy, 21 s.
+Liczby i czasy z 2026-10-05: każdy folder osobno, w komplecie
+(`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku. Bez testów na stacku
+integracyjne trwają 8 s, a ewaluacyjne poniżej sekundy — całe 53 s to 207 wyszukań golden setów
+przez prawdziwy embedder (178 w zgłoszeniach, 29 w dokumentacji). Komplet jednym poleceniem
+(`pytest -m "not llm_live"`): 1459 testów, 149 s; domyślny `pytest`, bez stacku: 1333 testy,
+21 s. Cztery testy integracyjne na żywym modelu (`llm_live`) są w liczbie testów folderu, ale
+poza oboma przebiegami.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2298,7 +2303,8 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   im nazwy jednej usługi kłamałoby o zakresie. W folderze każdego rodzaju pliki leżą w podfolderach
   `<usługa>_<pakiet>` (`api_agent_tools/`, `api_core_service/`…; `api_app/` dla modułów z korzenia
   `app/`, `embedder/` w całości), a ponadusługowe zostają w korzeniu folderu rodzaju; `evaluation/`
-  jest płaski, dopóki ma kilka plików. Test wymagający stacku ma w nazwie sufiks `_stack`.
+  jest płaski, dopóki ma kilka plików. Test wymagający stacku ma w nazwie sufiks `_stack`,
+  a test na żywym modelu sufiks `_live`.
 - **Każdy test ma docstring z dwóch prostych akapitów (od 2026-10-05, wcześniej jedna linia
   „scenariusz → oczekiwanie"):** „Sprawdza, czy…" — co test sprawdza, i „Wyłapuje…" — jaką usterkę
   złapie i czym ona grozi. Pisane tak, żeby zrozumiał je ktoś, kto pliku nie otworzył: bez
@@ -2343,9 +2349,17 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   tych, które celowo stoją obok niego. Sama rejestracja markera niczego nie odsiewa: bez tego gołe
   `pytest` odpala też testy na stacku i jest zielone tylko wtedy, gdy akurat chodzi stack. `-m`
   z linii poleceń **nadpisuje** tę wartość, więc `pytest -m stack_embedder` dalej wybiera dokładnie
-  to, o co prosi.
-- **Testy uruchamiaj JEDNYM poleceniem** — całość (`pytest -m ""`) albo podzbiór wskazany folderami
-  i markerami (`pytest tests/integration/ tests/functional/ -m stack`).
+  to, o co prosi. Z tego samego powodu `pytest -m ""` zdejmuje OBA wykluczenia naraz i wybiera
+  też testy `llm_live` — komplet to `-m "not llm_live"`.
+- **Testy `llm_live` biorą model przez `live_generation_llm()` z `tests/conftest.py`
+  (2026-10-05).** Oddaje konfigurację modelu generującego (`LLM_GENERATION_*`), czyli testuje
+  się model, na którym produkt ma chodzić; innego dostawcę sprawdza się inną konfiguracją.
+  Odmawia błędem, gdy wybór testów nie wymienia `llm_live` (płatne wywołanie nie może być
+  skutkiem ubocznym `-m ""`) i gdy dostawcą jest `fake`. Odpowiedzi modelu plik liczy raz
+  i dzieli między testy — dziś dwa wywołania `complete()` na przebieg; testy tury z narzędziami
+  dochodzą z p. 17.
+- **Testy uruchamiaj JEDNYM poleceniem** — całość (`pytest -m "not llm_live"`) albo podzbiór
+  wskazany folderami i markerami (`pytest tests/integration/ tests/functional/ -m stack`).
   Oszczędza kilkukrotne ładowanie ciężkich SDK i kolekcję testów; zmierzone: ~110 s wobec ~128 s
   przy trzech osobnych poleceniach, a kolekcja podzbioru spada trzykrotnie po dodaniu folderu.
   - **Przy debugowaniu czasu testów mierz sekwencyjnie i naprzemiennie A/B/A/B** — dwa przebiegi

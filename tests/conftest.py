@@ -28,6 +28,9 @@ O czym pamiętać przy zmianach:
 - Test z markerem `stack_<usługa>` nosi też `stack`, żeby `-m stack` brał wszystko, co wymaga
   działającej usługi. `llm_live` stoi obok parasola celowo: `-m stack` nie może odpalić płatnego
   modelu.
+- Komplet testów to `pytest -m "not llm_live"`. `pytest -m ""` zdejmuje wszystkie wykluczenia,
+  więc wybiera też testy `llm_live`. Te biorą model przez `live_generation_llm()`, które przy
+  takim wyborze odmawia: płatnego modelu nie da się zawołać bez wpisania `llm_live` w `-m`.
 - Adresów nie wpisuje się w plikach testów. Konfiguracja wskazuje nazwy z sieci compose
   (`http://embedder:8000`), których z hosta nie da się rozwiązać, więc każdy test spoza kontenera
   potrzebuje podmiany; powielona w plikach rozjeżdżała się po zmianie portu w jednym miejscu.
@@ -40,7 +43,7 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from app.config import Settings
+from app.config import LLMSettings, Settings
 from app.db_postgres import PostgresClient
 
 EMBEDDER_URL_ENV     = "EMBEDDER_TEST_URL"
@@ -59,6 +62,48 @@ API_URL_DEFAULT = "http://localhost:8010"
 # z DOCKER_POSTGRES_PORT. Przy własnych wartościach w `.env` test dostaje DSN przez zmienną.
 POSTGRES_DSN_ENV     = "POSTGRES_TEST_DSN"
 POSTGRES_DSN_DEFAULT = "postgresql://helpdesk:helpdesk@localhost:5433/helpdesk"
+
+# Marker testów wołających prawdziwy, płatny model.
+LLM_LIVE_MARKER = "llm_live"
+
+
+def live_generation_llm(
+    config: pytest.Config,  # np. request.config
+) -> LLMSettings:
+    """
+    Description:
+    Konfiguracja modelu generującego dla testów `llm_live` — jedyne wejście, przez które taki
+    test bierze model. Odmawia w dwóch sytuacjach, w obu błędem, nie pominięciem:
+
+    - testy wybrano bez jawnej prośby o żywy model, na przykład `pytest -m ""`, które zdejmuje
+      wszystkie wykluczenia naraz — płatne wywołanie nie może być skutkiem ubocznym;
+    - konfiguracja wskazuje atrapę modelu — zielony wynik bez ani jednego wywołania byłby
+      fałszywy.
+
+    Example args:
+        config=request.config
+
+    Example result:
+        LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", model="gpt-5.4-mini", …)
+
+    Raises:
+        AssertionError: wybór testów nie wymienia `llm_live` albo dostawcą jest `fake`
+    """
+    selected = config.getoption("markexpr")
+
+    assert LLM_LIVE_MARKER in selected, (
+        f"testy na żywym, płatnym modelu uruchamia się jawnie: -m {LLM_LIVE_MARKER} "
+        f"(wybrano -m {selected!r}); komplet testów to -m 'not {LLM_LIVE_MARKER}'"
+    )
+
+    llm = Settings().llm_generation()
+
+    assert llm.provider.strip().lower() != "fake", (
+        f"testy {LLM_LIVE_MARKER} wymagają prawdziwego modelu, a LLM_GENERATION_PROVIDER wskazuje "
+        f"atrapę — ustaw dostawcę, klucz i model w .env"
+    )
+
+    return llm
 
 
 def embedder_url() -> str:
