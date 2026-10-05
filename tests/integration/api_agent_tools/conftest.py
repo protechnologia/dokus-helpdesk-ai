@@ -55,6 +55,7 @@ from app.core_model.docs.doc_package import DocPackage
 from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_service.indexer_docs import DocsIndexer
 from app.core_service.indexer_tickets import TicketsIndexer
+from app.core_service.loader_dict_resolution import get_resolution_classes
 from app.db_postgres import DocsTable, TicketRow, TicketsTable
 from app.db_qdrant import DocsCollection, QdrantClient, TicketsCollection
 from app.engine_embedding import EmbeddingClient
@@ -321,7 +322,7 @@ async def tickets_cards(
             top_k     = 5,
             score_min = -1.0,
         ),
-        read       = ReadTicketsCardTool(tickets=collection),
+        read       = ReadTicketsCardTool(tickets=collection, resolution=get_resolution_classes()),
         embedder   = embedder,
         collection = collection,
         cards      = CARDS,

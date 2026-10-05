@@ -29,6 +29,11 @@ TICKETS_TABLE = "tickets_text"
 
 KEY = "ticket_id"
 
+# Kolejność trafień: najnowsze zgłoszenia pierwsze, przy tej samej dacie wyższy numer pierwszy.
+# Nowszy rekord bywa poprawką starszego (odmowa obalona później, zmieniony limit operatora),
+# więc gdy pasuje więcej zgłoszeń, niż narzędzie pokazuje, mają zostać najświeższe.
+NEWEST_FIRST = "ticket_date DESC, ticket_id DESC"
+
 # SQL tej tabeli leży obok, w plikach — tam widać kolumny, indeks i zapis.
 SQL_DIR = Path(__file__).parent
 CREATE  = (SQL_DIR / "_create.sql").read_text(encoding="utf-8")  # tabela i jej indeks
@@ -48,7 +53,8 @@ class TicketsTable(TextTable):
 
     Flow:
         1. Indeksacja: `create()`, potem `upsert()` (p. 31).
-        2. Szukanie: `words()`, `phrase()` i `substring()` → numery pasujących zgłoszeń.
+        2. Szukanie: `words()`, `phrase()` i `substring()` → numery pasujących zgłoszeń, od
+           najnowszych.
         3. Odczyt: `read_by_id()` → wiersze `TicketRow` o podanych numerach.
     """
 
@@ -151,7 +157,8 @@ class TicketsTable(TextTable):
         """
         Description:
         Znajduje zgłoszenia, których wątek zawiera wszystkie słowa zapytania — w dowolnej
-        kolejności i odmianie — i oddaje ich numery, najlepiej dopasowane pierwsze.
+        kolejności i odmianie — i oddaje ich numery, najlepiej dopasowane pierwsze, a przy równym
+        dopasowaniu najnowsze.
 
         Example args:
             query="załącznik limit"
@@ -162,7 +169,7 @@ class TicketsTable(TextTable):
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
-        return await self._find_words(query=query, key=KEY)
+        return await self._find_words(query=query, key=KEY, order=NEWEST_FIRST)
 
     async def phrase(
         self,
@@ -171,7 +178,7 @@ class TicketsTable(TextTable):
         """
         Description:
         Znajduje zgłoszenia zawierające słowa zapytania obok siebie, w tej samej kolejności,
-        w dowolnej odmianie, i oddaje ich numery.
+        w dowolnej odmianie, i oddaje ich numery; przy równym dopasowaniu najnowsze pierwsze.
 
         Example args:
             query="nie udało się skomunikować z serwerem"
@@ -182,7 +189,7 @@ class TicketsTable(TextTable):
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
-        return await self._find_phrase(query=query, key=KEY)
+        return await self._find_phrase(query=query, key=KEY, order=NEWEST_FIRST)
 
     async def substring(
         self,
@@ -191,15 +198,16 @@ class TicketsTable(TextTable):
         """
         Description:
         Znajduje zgłoszenia zawierające zapytanie dosłownie, bez względu na wielkość liter i na
-        to, jak wątek złamano między liniami — kod błędu albo komunikat — i oddaje ich numery.
+        to, jak wątek złamano między liniami — kod błędu albo komunikat — i oddaje ich numery,
+        od najnowszego zgłoszenia.
 
         Example args:
-            query="ORA-00942"
+            query="Nie udało się skomunikować z serwerem"
 
         Example result:
-            ["90014"]
+            ["90011", "90012"]
 
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
-        return await self._find_substring(query=query, key=KEY)
+        return await self._find_substring(query=query, key=KEY, order=NEWEST_FIRST)

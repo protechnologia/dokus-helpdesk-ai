@@ -6,7 +6,9 @@ from app.agent_tools.tickets.read_tickets_card.models import (
     ReadTicketsCardQuery,
     ReadTicketsCardResult,
 )
+from app.core_model.dicts.resolution_vocabulary import ResolutionVocabulary
 from app.core_model.tickets.parsed_ticket import ParsedTicket
+from app.core_service.loader_dict_resolution import get_resolution_classes
 
 
 class FakeReadTicketsCardTool(ReadTicketsCardToolBase):
@@ -25,18 +27,24 @@ class FakeReadTicketsCardTool(ReadTicketsCardToolBase):
 
     def __init__(
         self,
-        cards: Sequence[ParsedTicket] | None = None,  # np. [ParsedTicket(ticket_id="90001", …)]
+        cards:      Sequence[ParsedTicket] | None = None,  # np. [ParsedTicket(ticket_id="90001")]
+        resolution: ResolutionVocabulary | None = None,    # np. ResolutionVocabulary(version=1, …)
     ):
         """
         Description:
-        Ustala karty, z których atrapa czyta, i zakłada dziennik zapytań.
+        Ustala karty, z których atrapa czyta, i słownik, z którego powstaje lista klas w opisie
+        narzędzia; zakłada dziennik zapytań. Bez podanego słownika bierze zestaw domyślny —
+        ten, na którym napisano wbudowane karty.
 
         Example args:
             cards=None
+            resolution=None
 
         Example result:
             FakeReadTicketsCardTool czytająca wbudowane cztery karty
         """
+        super().__init__(resolution if resolution is not None else get_resolution_classes())
+
         cards = list(cards) if cards is not None else default_cards()
 
         self._cards = {card.ticket_id: card for card in cards}

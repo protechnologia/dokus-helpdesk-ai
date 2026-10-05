@@ -22,7 +22,9 @@ Trzy drogi szukania:
 
 Każda oddaje IDENTYFIKATORY wszystkich pasujących wierszy, bez limitu i bez treści. Limit,
 łączenie dróg i liczenie tego, co się nie zmieściło, należą do narzędzia; treść daje odczyt
-(`_read_by_id()`).
+(`_read_by_id()`). Kolejność trafień podaje tabela konkretna: zgłoszenia stoją od najnowszych,
+sekcje dokumentacji według identyfikatora. Przy słowach i frazie pierwsza jest trafność, a ta
+kolejność rozstrzyga remisy.
 
 Przed — wątek w `thread` i zapytanie agenta:
 
@@ -233,16 +235,18 @@ class TextTable:
         self,
         query: str,  # np. "uprawnienie kancelaria"
         key:   str,  # kolumna klucza, np. "section_id"
+        order: str,  # kolejność przy równej trafności, np. "ticket_date DESC, ticket_id DESC"
     ) -> list[str]:
         """
         Description:
         Znajduje wiersze zawierające wszystkie słowa zapytania — w dowolnej kolejności i odmianie,
         przez polski słownik — i oddaje ich klucze. Najlepiej dopasowane pierwsze, przy równym
-        dopasowaniu według klucza.
+        dopasowaniu w kolejności podanej przez tabelę.
 
         Example args:
             query="uprawnienie kancelaria"
             key="section_id"
+            order="section_id"
 
         Example result:
             ["adm-kancelaria-edoreczenia", "adm-kancelaria-epuap"]
@@ -255,7 +259,7 @@ class TextTable:
         keys = await self._find(
             key       = key,
             condition = f"{SEARCH_VECTOR} @@ {tsquery}",
-            order     = f"ts_rank({SEARCH_VECTOR}, {tsquery}) DESC, {key}",
+            order     = f"ts_rank({SEARCH_VECTOR}, {tsquery}) DESC, {order}",
             value     = query,
         )
 
@@ -265,15 +269,18 @@ class TextTable:
         self,
         query: str,  # np. "nie udało się skomunikować z serwerem"
         key:   str,  # kolumna klucza, np. "ticket_id"
+        order: str,  # kolejność przy równej trafności, np. "ticket_date DESC, ticket_id DESC"
     ) -> list[str]:
         """
         Description:
         Znajduje wiersze zawierające słowa zapytania obok siebie, w tej samej kolejności — dla
         komunikatu przepisanego z ekranu — i oddaje ich klucze. Odmiana nadal nie ma znaczenia.
+        Najlepiej dopasowane pierwsze, przy równym dopasowaniu w kolejności podanej przez tabelę.
 
         Example args:
             query="nie udało się skomunikować z serwerem"
             key="ticket_id"
+            order="ticket_date DESC, ticket_id DESC"
 
         Example result:
             ["90011", "90012"]
@@ -286,7 +293,7 @@ class TextTable:
         keys = await self._find(
             key       = key,
             condition = f"{SEARCH_VECTOR} @@ {tsquery}",
-            order     = f"ts_rank({SEARCH_VECTOR}, {tsquery}) DESC, {key}",
+            order     = f"ts_rank({SEARCH_VECTOR}, {tsquery}) DESC, {order}",
             value     = query,
         )
 
@@ -296,17 +303,19 @@ class TextTable:
         self,
         query: str,  # np. "ORA-00942"
         key:   str,  # kolumna klucza, np. "ticket_id"
+        order: str,  # kolejność trafień, np. "ticket_date DESC, ticket_id DESC"
     ) -> list[str]:
         """
         Description:
         Znajduje wiersze zawierające zapytanie dosłownie, bez względu na wielkość liter — dla
         kodu błędu, nazwy opcji albo komunikatu — i oddaje ich klucze. Białe znaki zapytania
         baza sprowadza do pojedynczych spacji, tak jak w przeszukiwanym tekście. Dopasowanie
-        dosłowne nie ma stopnia, więc o kolejności decyduje wyłącznie klucz.
+        dosłowne nie ma stopnia, więc o kolejności decyduje wyłącznie tabela.
 
         Example args:
             query="ORA-00942"
             key="ticket_id"
+            order="ticket_date DESC, ticket_id DESC"
 
         Example result:
             ["90014"]
@@ -319,7 +328,7 @@ class TextTable:
         keys = await self._find(
             key       = key,
             condition = f"{SEARCH_TEXT} ILIKE '%' || {needle} || '%' ESCAPE '{LIKE_ESCAPE}'",
-            order     = key,
+            order     = order,
             value     = escape_like(query),  # `%` i `_` mają być szukane dosłownie
         )
 

@@ -8,6 +8,7 @@ w tabeli zgłoszeń da się znaleźć po dosłownym brzmieniu i po słowach. Wym
 | komunikat z ekranu inną wielkością liter    | oba zgłoszenia, w których padł, jako `exact` |
 | słowa w innej odmianie niż w wątku          | zgłoszenie znalezione słowami                |
 | fraza i słowa trafiające w różne zgłoszenia | wszystkie, te z frazy pierwsze, każde raz    |
+| fraza, którą mają trzy zgłoszenia           | od najnowszego, nie według numeru            |
 
 Tabelę buduje fixture `tickets_threads` z `conftest.py` tego folderu: pięć zmyślonych wątków
 z zestawu atrap.
@@ -67,3 +68,12 @@ async def test_a_phrase_and_words_bring_their_own_tickets(tickets_threads) -> No
         ("90012", "exact"),
         ("90003", "words"),
     ]
+
+
+async def test_tickets_found_by_a_phrase_come_newest_first(tickets_threads) -> None:
+    """Fraza z trzech wątków → zgłoszenia od najnowszego (czerwiec, kwiecień, luty), czyli
+    odwrotnie niż według numeru: gdy trafień jest więcej niż limit, model ma zobaczyć
+    najświeższe, bo nowszy rekord bywa poprawką starszego."""
+    result = await tickets_threads.find.find(FindTicketsTextQuery(exact="e-Doręczeń"))
+
+    assert [found.ticket_id for found in result.tickets] == ["90003", "90002", "90001"]

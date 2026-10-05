@@ -186,7 +186,7 @@ class DocsTable(TextTable):
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
-        return await self._find_words(query=query, key=KEY)
+        return await self._find_words(query=query, key=KEY, order=KEY)
 
     async def phrase(
         self,
@@ -206,7 +206,7 @@ class DocsTable(TextTable):
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
-        return await self._find_phrase(query=query, key=KEY)
+        return await self._find_phrase(query=query, key=KEY, order=KEY)
 
     async def substring(
         self,
@@ -227,4 +227,4 @@ class DocsTable(TextTable):
         Raises:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
-        return await self._find_substring(query=query, key=KEY)
+        return await self._find_substring(query=query, key=KEY, order=KEY)

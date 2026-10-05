@@ -40,9 +40,9 @@ O czym pamiętać przy zmianach:
   w jeden token, więc fragmentu kodu („00942" z „ORA-00942") słowami nie znajdzie.
 - Wynik to same numery, więc z tabeli nic nie jest czytane: wątek daje `read_tickets_thread`,
   kartę `read_tickets_card`, i tylko one cytują.
-- Zgłoszenia znalezione frazą stoją w kolejności numerów czytanych jako tekst („10718" przed
-  „6773"), bo dopasowanie dosłowne nie ma stopnia. Przy trafieniach ponad limit to ona
-  rozstrzyga, które numery model zobaczy.
+- Zgłoszenia znalezione frazą stoją od najnowszego: dopasowanie dosłowne nie ma stopnia,
+  a nowszy rekord bywa poprawką starszego. Przy trafieniach ponad limit model widzi więc
+  najświeższe. Kolejność ustala tabela zgłoszeń, nie narzędzie.
 - Ile zwrócić, ustawia konfiguracja, nie agent — zapytanie niesie tylko to, czego szukać.
 """
 

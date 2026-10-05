@@ -2,7 +2,12 @@ import httpx
 import pytest
 
 from app.agent_tools.tickets.fake_tickets import default_cards
-from app.agent_tools.tickets.read_tickets_card import ReadTicketsCardQuery, ReadTicketsCardTool
+from app.agent_tools.tickets.read_tickets_card import (
+    FakeReadTicketsCardTool,
+    ReadTicketsCardQuery,
+    ReadTicketsCardTool,
+)
+from app.core_service.loader_dict_resolution import get_resolution_classes
 from app.db_qdrant import (
     DbQdrantConfigError,
     QdrantClient,
@@ -69,7 +74,10 @@ def _tool(
         ),
     )
 
-    tool = ReadTicketsCardTool(tickets=TicketsCollection(qdrant, "tickets", len(VECTOR)))
+    tool = ReadTicketsCardTool(
+        tickets    = TicketsCollection(qdrant, "tickets", len(VECTOR)),
+        resolution = get_resolution_classes(),
+    )
 
     return tool
 
@@ -132,6 +140,14 @@ async def test_a_payload_outside_the_contract_is_a_config_error_without_content(
     assert "tickets reindex" in message
     assert broken["problem"] not in message
     assert raised.value.__cause__ is None
+
+
+def test_the_tool_and_its_fake_describe_themselves_the_same() -> None:
+    """Ten sam słownik w narzędziu i w atrapie → ten sam opis dla modelu, z klasami
+    rozstrzygnięcia: test grafu na atrapie sprawdza opis, który model dostanie na produkcji."""
+    vocabulary = get_resolution_classes()
+
+    assert _tool([]).description == FakeReadTicketsCardTool(resolution=vocabulary).description
 
 
 async def test_aclose_closes_the_qdrant_client() -> None:

@@ -37,7 +37,7 @@ JSON z samymi numerami zgłoszeń, bez treści:
 
 | pole                 | co zawiera                                 |
 |----------------------|--------------------------------------------|
-| tickets              | znalezione zgłoszenia                      |
+| tickets              | trafienia frazą pierwsze, od najnowszych   |
 | tickets[].ticket_id  | numer zgłoszenia                           |
 | tickets[].matched_by | czym znalezione: `exact` albo `words`      |
 | omitted_over_limit   | ile pasujących zgłoszeń ponad limit wyniku |

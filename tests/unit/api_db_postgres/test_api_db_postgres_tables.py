@@ -207,6 +207,31 @@ async def test_words_and_phrases_use_the_stored_vector(
     assert "LIMIT"  not in sql
 
 
+@pytest.mark.parametrize(
+    ("table_class", "order"),
+    [(TicketsTable, "ticket_date DESC, ticket_id DESC"), (DocsTable, "section_id")],
+)
+async def test_each_table_orders_what_it_finds_its_own_way(
+    table_class: type,
+    order:       str,
+) -> None:
+    """Szukanie w zgłoszeniach → najnowsze pierwsze; w dokumentacji → według identyfikatora.
+    Przy słowach pierwsza jest trafność, a kolejność tabeli rozstrzyga remisy: gdy pasuje więcej
+    zgłoszeń, niż narzędzie pokazuje, mają zostać najświeższe."""
+    client = StubClient()
+    table  = table_class(client)
+
+    await table.substring("x")
+    await table.words("x")
+
+    substring_sql = client.calls[0][0]
+    words_sql     = client.calls[1][0]
+
+    assert substring_sql.endswith(f"ORDER BY {order}")
+    assert "ORDER BY ts_rank(" in words_sql
+    assert words_sql.endswith(f"DESC, {order}")
+
+
 async def test_a_substring_query_is_escaped_before_it_is_sent() -> None:
     """Zapytanie do podciągu ze znakami `%` i `_` → do bazy idą unieszkodliwione, a warunek stoi
     na złączonym tekście: komunikat błędu ma być szukany dosłownie."""

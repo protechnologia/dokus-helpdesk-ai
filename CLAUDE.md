@@ -1434,7 +1434,10 @@ czasu jest pusta.
   (2026-10-05).** Limit, łączenie dróg i licznik pominiętych należą do narzędzia, a ono musi
   wiedzieć, ile wierszy pasowało w sumie; opis albo treść daje odczyt po identyfikatorach.
   Zapytanie pasujące do całego korpusu to kilkanaście kilobajtów numerów. Frazy
-  (`phraseto_tsquery`) nie woła dziś żadne narzędzie: `exact` idzie podciągiem.
+  (`phraseto_tsquery`) nie woła dziś żadne narzędzie: `exact` idzie podciągiem. Kolejność trafień
+  podaje tabela: zgłoszenia stoją od najnowszych (przy słowach najpierw trafność, data
+  rozstrzyga remisy), bo nowszy rekord bywa poprawką starszego, a gdy pasuje ich więcej, niż
+  narzędzie pokazuje, mają zostać najświeższe; sekcje dokumentacji stoją według identyfikatora.
 - **Qdrant trzyma karty zgłoszeń, Postgres oryginały po anonimizacji (2026-10-04).** Tabela
   zgłoszeń ma cztery kolumny: numer, datę, temat i cały wątek jako jeden tekst. Karty w niej nie
   ma, więc tabela nie zależy od parsowania, a zmiana pól karty jej nie dotyka. Model nie wie,
@@ -1494,7 +1497,7 @@ czasu jest pusta.
 - **`exact` to jedna fraza, nie lista (2026-10-05).** Przy liście wynik nie mówił, która fraza
   trafiła, a „którakolwiek z fraz" obok „wszystkie słowa" trzeba było modelowi tłumaczyć;
   w zestawie zapytań żadne nie podawało więcej niż jednej. Cena: kilka tropów (kod z ekranu, kod
-  z logów, komunikat) to kilka wywołań, stąd limit wywołań obu wyszukiwań tekstowych 5, a nie 3.
+  z logów, komunikat) to kilka wywołań, stąd limit 5 wywołań wyszukiwania.
 - **Wyszukiwanie zgłoszeń oddaje sam numer, bez `problem` karty.** Sprawy o tym samym objawie
   mają różne przyczyny; wiersz z samym objawem zachęcałby do przeczytania jednej karty, a przy
   gołych numerach model nie ma po czym wybierać i czyta wszystkie. `score` widzi tylko model
@@ -1515,9 +1518,9 @@ czasu jest pusta.
   nie listę, i oddaje sam wątek, więc `AGENT_MAX_CALLS_READ_TICKETS_THREAD` jest wprost liczbą
   wątków przeczytanych w sprawie. Przy liście sufit wynosił limit razy pięć, a model w sondzie
   brał wszystkie znalezione wątki naraz. Kilka wątków to kilka wywołań, które model może zgłosić
-  w jednej turze. Limit zostaje 2, czyli dwa wątki na sprawę zamiast dziesięciu (do przestrojenia
-  w p. 23). Karty zostają listą: są krótkie, a przy jednym objawie i różnych przyczynach model ma
-  je przeczytać razem.
+  w jednej turze. Limit to 3 wątki na sprawę zamiast dziesięciu (do przestrojenia w p. 23).
+  Karty zostają listą: są krótkie, a przy jednym objawie i różnych przyczynach model ma je
+  przeczytać razem.
 - **Narzędzia leżą w folderze swojego materiału: `agent_tools/tickets/` i `agent_tools/docs/`
   (2026-10-03)**, nazwanym jak `SourceRef.source`; katalog narzędzia zachowuje pełną nazwę
   narzędzia. Atrapy narzędzi jednego materiału stoją na jednym zmyślonym zestawie
@@ -1573,6 +1576,12 @@ czasu jest pusta.
   rozstrzygnięć jest z tekstu wycinana — to metadane artefaktu. Payload niezgodny
   z `ParsedTicket` to `DbQdrantConfigError` bez treści zgłoszenia w komunikacie: indeks z innej
   wersji kontraktu naprawia przebudowa, nie czekanie.
+- **Co znaczy każda klasa `resolution`, model czyta w opisie `read_tickets_card` (2026-10-05).**
+  Karta niesie samą nazwę klasy, a miejsce `{{resolution_classes}}` w `description.md` narzędzie
+  wypełnia przy budowie listą klas ze słownika klienta — nazwa i znaczenie, jako dane pod
+  własnym nagłówkiem. Opis zmienia się więc razem ze słownikiem, bez naszego deployu. Słownik
+  podaje ten, kto buduje narzędzie; atrapa bierze zestaw domyślny. Cena: karta sparsowana
+  starszą wersją słownika może nieść klasę, której na dzisiejszej liście już nie ma.
 - **Zapytanie niesie wyłącznie to, czego szukać** — schemat to `query_model` narzędzia. Ile pobrać
   i gdzie uciąć to strojenie (`RAG_TOP_K`, `RAG_SCORE_MIN`), nie decyzja modelu; nieznany argument
   to błąd walidacji (`extra="forbid"` w każdym modelu zapytania). **Kształt zapytania dobiera się do
@@ -1625,7 +1634,7 @@ czasu jest pusta.
   sam limit stoi w opisie narzędzia dla modelu: miejsce `{{max_calls}}` w `description.md`
   wypełnia `tool_definitions()`, więc narzędzie bez limitu to błąd składania. Ile jedno
   wywołanie może pobrać (20 kart, 5 sekcji), zostaje stałą w modelu zapytania; wątek jest zawsze
-  jeden.
+  jeden. Wartości od 2026-10-05: wyszukiwania i karty po 5, sekcje i wątki po 3, spis treści 1.
 - **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `engine_llm/models/messages.py`), żadnych typów
   LangChaina (2026-10-02).** Pętla rozmawia z modelem przez `LLMClient`, a format wiadomości
   u dostawcy tłumaczy jego klient (p. 17). Skoro i model, i narzędzia idą przez nasze kontrakty,
@@ -2195,16 +2204,16 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1020 (0)           | 26 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 191 (78)           | 74 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1029 (0)           | 18 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 192 (79)           | 68 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 98 (9)             | 11 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 53 s |
 
 Liczby i czasy z 2026-10-05: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 8 s, a ewaluacyjne poniżej sekundy —
 całe 53 s to 207 wyszukań golden setów przez prawdziwy embedder (178 w zgłoszeniach, 29
-w dokumentacji). Komplet jednym poleceniem (`pytest -m ""`): 1349 testów, 137 s; domyślny
-`pytest`, bez stacku: 1224 testy, 24 s.
+w dokumentacji). Komplet jednym poleceniem (`pytest -m ""`): 1359 testów, 140 s; domyślny
+`pytest`, bez stacku: 1233 testy, 27 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2707,9 +2716,8 @@ każdy mierzy się osobno.
   narzędzi `_text` liczony osobno — czy znajdują coś, czego wektor nie znajduje, jest dziś
   niezmierzone; do tego czy model czyta karty WSZYSTKICH znalezionych numerów, czy tylko
   pierwszego, i ile kosztuje dodatkowa tura odczytu; na prawdziwych wątkach także: ile wątków
-  na sprawę (dziś 2), limit długości wątku, czy wątek ma nieść etykiety z `as_thread()`
-  („KOMENTARZ", rola, data) i które trafienia frazą widać ponad limitem (dziś według numeru
-  czytanego jako tekst). *Dlaczego:*
+  na sprawę (dziś 3), limit długości wątku i czy wątek ma nieść etykiety z `as_thread()`
+  („KOMENTARZ", rola, data). *Dlaczego:*
   najgroźniejszy błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach
   (e-Doręczenia: 6 zgłoszeń, 6 przyczyn), a zapytanie agenta nie powstaje już promptem korpusu.
 - [ ] **24. `parse_ticket`** — karta zgłoszenia promptem parsującym na modelu docelowym, porównana z

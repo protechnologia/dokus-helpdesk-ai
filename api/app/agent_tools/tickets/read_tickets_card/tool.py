@@ -29,6 +29,8 @@ O czym pamiętać przy zmianach:
 - Payload niezgodny z `ParsedTicket` znaczy, że indeks zbudowano inną wersją kontraktu. Czekanie
   tego nie naprawi, stąd `DbQdrantConfigError`, a nie błąd „spróbuj później".
 - Z punktem wracają wektory, których to narzędzie nie używa — taki jest odczyt kolekcji.
+- Słownik rozstrzygnięć służy wyłącznie opisowi narzędzia dla modelu (co znaczy każda klasa);
+  kart nim nie sprawdzamy ani nie zmieniamy.
 """
 
 import logging
@@ -40,6 +42,7 @@ from app.agent_tools.tickets.read_tickets_card.models import (
     ReadTicketsCardQuery,
     ReadTicketsCardResult,
 )
+from app.core_model.dicts.resolution_vocabulary import ResolutionVocabulary
 from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.db_qdrant import DbQdrantConfigError, TicketPoint, TicketsCollection
 
@@ -99,19 +102,23 @@ class ReadTicketsCardTool(ReadTicketsCardToolBase):
 
     def __init__(
         self,
-        tickets: TicketsCollection,  # np. TicketsCollection(QdrantClient(…), "tickets", 768)
+        tickets:    TicketsCollection,     # np. TicketsCollection(QdrantClient(…), "tickets", 768)
+        resolution: ResolutionVocabulary,  # np. get_resolution_classes()
     ):
         """
         Description:
-        Spina narzędzie z kolekcją zgłoszeń. Kolekcja jest wstrzykiwana, nie budowana tutaj
-        (zasada 4).
+        Spina narzędzie z kolekcją zgłoszeń i ze słownikiem rozstrzygnięć, z którego powstaje
+        lista klas w opisie dla modelu. Oba są wstrzykiwane, nie budowane tutaj (zasada 4).
 
         Example args:
             tickets=TicketsCollection(QdrantClient(base_url="http://qdrant:6333"), "tickets", 768)
+            resolution=ResolutionVocabulary(version=1, classes=[ResolutionClass(…), …])
 
         Example result:
             ReadTicketsCardTool gotowe do odczytu z kolekcji `tickets`
         """
+        super().__init__(resolution)
+
         self._tickets = tickets
 
     async def search(

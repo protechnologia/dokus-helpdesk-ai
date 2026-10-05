@@ -108,20 +108,20 @@ class Settings(BaseSettings):
     # Ile razy model może wywołać dane narzędzie przy jednej sprawie. Chroni przed pętlą, która
     # zużywa tokeny bez końca: wywołanie ponad limit dostaje błąd zamiast wyniku, a model ma
     # odpowiedzieć na podstawie tego, co już ma. Ten sam limit stoi w opisie narzędzia dla modelu.
-    # Wartości ostrożne: wyszukiwanie oddaje kilkadziesiąt tokenów, odczyt wątków i sekcji tysiące.
-    # Wątek czyta się po jednym na wywołanie, więc jego limit jest liczbą wątków na sprawę.
-    # Wyszukiwania tekstowe mają więcej, bo jedno wywołanie to jedna fraza, a zgłoszenie niesie
-    # ich bywa kilka: kod z ekranu, kod z logów, komunikat.
+    # Wyszukiwania mają po 5: oddają kilkadziesiąt tokenów, a jedno wywołanie tekstowe to jedna
+    # fraza — zgłoszenie niesie ich bywa kilka: kod z ekranu, kod z logów, komunikat. Karty też 5,
+    # bo są krótkie. Odczyt wątków i sekcji oddaje tysiące tokenów, więc ma po 3; wątek czyta się
+    # po jednym na wywołanie, więc jego limit jest wprost liczbą wątków na sprawę.
     # Pole na narzędzie, o nazwie `agent_max_calls_<narzędzie>` — z niej składa się
     # `tool_call_limits()`, więc nowe narzędzie to nowe pole tutaj.
-    agent_max_calls_find_tickets_vector: int = Field(default=3, ge=1)
+    agent_max_calls_find_tickets_vector: int = Field(default=5, ge=1)
     agent_max_calls_find_tickets_text:   int = Field(default=5, ge=1)
-    agent_max_calls_read_tickets_card:   int = Field(default=3, ge=1)
-    agent_max_calls_read_tickets_thread: int = Field(default=2, ge=1)
+    agent_max_calls_read_tickets_card:   int = Field(default=5, ge=1)
+    agent_max_calls_read_tickets_thread: int = Field(default=3, ge=1)
     agent_max_calls_list_docs:           int = Field(default=1, ge=1)
-    agent_max_calls_find_docs_vector:    int = Field(default=3, ge=1)
+    agent_max_calls_find_docs_vector:    int = Field(default=5, ge=1)
     agent_max_calls_find_docs_text:      int = Field(default=5, ge=1)
-    agent_max_calls_read_docs:           int = Field(default=2, ge=1)
+    agent_max_calls_read_docs:           int = Field(default=3, ge=1)
 
     @model_validator(mode="before")
     @classmethod

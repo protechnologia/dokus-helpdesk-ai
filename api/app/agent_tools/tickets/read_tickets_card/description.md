@@ -12,6 +12,10 @@
      Zmiana dotyczy wszystkich grafów naraz, więc po strojeniu jednego
      trzeba przemierzyć pozostałe (p. 23, 25–26).
 
+     Miejsce `{{resolution_classes}}` wypełnia narzędzie klasami ze
+     słownika klienta (`dict_resolution.json`): po punkcie na klasę,
+     nazwa i jej znaczenie. Znaczeń nie wpisujemy tu ręcznie.
+
      Komentarze redakcyjne jak ten są wycinane przed wysłaniem. -->
 # Do czego służy
 
@@ -39,9 +43,13 @@ JSON:
 | cards[].error_codes       | kody błędów i sygnatury                |
 | cards[].cause             | ustalona przyczyna                     |
 | cards[].solution          | co rozwiązało sprawę, z zastrzeżeniami |
-| cards[].resolution        | klasa rozstrzygnięcia                  |
+| cards[].resolution        | klasa rozstrzygnięcia, opisana niżej   |
 | cards[].questions_summary | o co dopytywał prowadzący sprawę       |
 | without_card              | numery zgłoszeń, które nie mają karty  |
+
+Klasy rozstrzygnięcia (`resolution`):
+
+{{resolution_classes}}
 
 # Zasady
 
