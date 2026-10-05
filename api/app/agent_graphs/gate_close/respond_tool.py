@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.core_model.gate_verdict import Verdict
+from app.core_model.graphs.verdict import Verdict
 from app.core_util.json_schema import json_schema_without_docs
 from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition

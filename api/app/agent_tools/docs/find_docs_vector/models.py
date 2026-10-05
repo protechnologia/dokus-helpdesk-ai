@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core_model.doc_section import DocSection
+from app.core_model.docs.doc_section import DocSection
 
 
 class FindDocsVectorQuery(BaseModel):

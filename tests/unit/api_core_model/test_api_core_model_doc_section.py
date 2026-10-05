@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.core_model.doc_section import DocSection
+from app.core_model.docs.doc_section import DocSection
 
 VALID = {
     "section_id":  "adm-kancelaria-edoreczenia",

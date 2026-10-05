@@ -12,9 +12,9 @@ from app.agent_graphs.parse_ticket.respond_tool import (
     field_rules,
     respond_tool,
 )
-from app.core_model.dict_resolution_class import ResolutionClass
-from app.core_model.dict_resolution_vocabulary import ResolutionVocabulary
-from app.core_model.ticket_parsed import ParsedTicket
+from app.core_model.dicts.resolution_class import ResolutionClass
+from app.core_model.dicts.resolution_vocabulary import ResolutionVocabulary
+from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_service.loader_dict_resolution import get_resolution_classes
 
 THREAD = "ZGŁOSZENIE 33644\nTemat: Błąd wysyłki\n\n[klient] Nie udało się wysłać dokumentu."

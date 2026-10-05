@@ -61,8 +61,8 @@ import json
 from datetime import date as Date
 from pathlib import Path
 
-from app.core_model.ticket_raw import RawTicket
-from app.core_model.ticket_raw_comment import RawComment
+from app.core_model.tickets.raw_comment import RawComment
+from app.core_model.tickets.raw_ticket import RawTicket
 from app.core_util.html import strip_html
 
 # Znaczniki czasu w źródle to datetime z MySQL; do artefaktu trafia tylko część z datą.

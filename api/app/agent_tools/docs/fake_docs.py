@@ -19,7 +19,7 @@ O czym pamiętać przy zmianach:
 
 from datetime import date
 
-from app.core_model.doc_section import DocSection
+from app.core_model.docs.doc_section import DocSection
 
 ADMIN_GUIDE = {"document": "Instrukcja administratora", "version": "4.12", "date": date(2026, 5, 4)}
 USER_GUIDE  = {"document": "Instrukcja użytkownika",    "version": "4.12", "date": date(2026, 5, 4)}

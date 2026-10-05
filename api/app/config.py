@@ -92,7 +92,7 @@ class Settings(BaseSettings):
     rag_score_min: float = 0.48                         # cosine similarity, range -1.0 .. 1.0
     # Najwyżej tyle znaków ma fragment sekcji dokumentacji, z którego powstaje jeden wektor.
     # Wartość wstępna — rozstrzyga pomiar na paczce syntetycznej (CLAUDE.md -> p. 8). Zmiana
-    # wymaga ponownego `helpdesk docs import`.
+    # wymaga ponownego `helpdesk docs index`.
     rag_docs_fragment_chars: int = Field(default=1500, ge=1)
 
     # --- agent: limity wywołań narzędzi w jednym przebiegu grafu ---

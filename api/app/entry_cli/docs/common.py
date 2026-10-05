@@ -1,9 +1,9 @@
 import typer
 
-from app.core_model.doc_directory import DocDirectory
-from app.core_model.doc_package import DocPackage
+from app.core_model.docs.doc_directory import DocDirectory
+from app.core_model.docs.doc_package import DocPackage
 
-# Wspólne dla `docs validate` i `docs import`: obie wypisują to samo o wczytanej paczce.
+# Wspólne dla `docs validate` i `docs index`: obie wypisują to samo o wczytanej paczce.
 
 
 def _describe(
@@ -56,7 +56,7 @@ def print_package(
         else:
             typer.echo(f"OK   {_describe(directory)}")
 
-        # Ostrzeżenie nie wstrzymuje importu, ale operator ma je zobaczyć przy swoim dokumencie.
+        # Ostrzeżenie niczego nie wstrzymuje, ale operator ma je zobaczyć przy swoim dokumencie.
         for warning in directory.warnings:
             typer.echo(f"       UWAGA: {warning}")
 

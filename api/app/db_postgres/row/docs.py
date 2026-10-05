@@ -3,7 +3,7 @@ from datetime import date as Date
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core_model.doc_section import DocSection
+from app.core_model.docs.doc_section import DocSection
 
 
 class DocRow(BaseModel):
@@ -16,7 +16,7 @@ class DocRow(BaseModel):
     przechodzi się jawnie: `from_section()` przy zapisie, `to_section()` po odczycie.
 
     Flow:
-        1. Import dokumentacji buduje wiersz z opisu sekcji, jej treści i miejsca w dokumencie.
+        1. Indekser dokumentacji buduje wiersz z opisu sekcji, jej treści i miejsca w dokumencie.
         2. Tabela zapisuje pola wprost do kolumn o tych samych nazwach.
         3. Szukanie i odczyt oddają takie same wiersze; narzędzie bierze z nich `to_section()`
            albo `body`.

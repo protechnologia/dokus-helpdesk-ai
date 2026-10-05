@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from app.core_model.dict_resolution_vocabulary import ResolutionVocabulary
+from app.core_model.dicts.resolution_vocabulary import ResolutionVocabulary
 
 # Wbudowany zestaw domyślny. Magazyn reguł w SQL (p. 29) podmienia to ŹRÓDŁO, a ta funkcja jest
 # szwem, który czyni podmianę niewidoczną: każdy wołający pyta o słownik tutaj, więc żaden nie

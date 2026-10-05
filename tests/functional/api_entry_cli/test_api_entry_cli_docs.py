@@ -4,16 +4,16 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from app.core_model.doc_import_report import DocsImportReport
-from app.core_model.doc_package import DocPackage
-from app.core_service.importer_docs import DocsImportRefused
+from app.core_model.docs.doc_package import DocPackage
+from app.core_model.docs.docs_index_report import DocsIndexReport
+from app.core_service.indexer_docs import DocsIndexRefused
 from app.db_postgres import DbPostgresError
 from app.db_qdrant import DbQdrantError
 from app.engine_embedding import EmbeddingError
 from app.entry_cli.cli import cli
 
 # Komendy `helpdesk docs` przez prawdziwe drzewo CLI: kody wyjścia, pytanie o potwierdzenie i to,
-# co trafia na ekran. Paczki są zmyślone, w `tmp_path`; sam import zastępuje `StubRun`.
+# co trafia na ekran. Paczki są zmyślone, w `tmp_path`; samą indeksację zastępuje `StubRun`.
 
 runner = CliRunner()
 
@@ -63,7 +63,7 @@ def _write_document(
 class StubRun:
     """
     Description:
-    Zastępuje przebieg importu zapisem wywołań, żeby CLI dało się testować bez embeddera, Qdranta
+    Zastępuje przebieg indeksacji zapisem wywołań, żeby CLI dało się testować bez embeddera, Qdranta
     i Postgresa. Zapisuje każde wywołanie i oddaje wynik ustawiony przez test.
 
     Stoi w miejscu `_run`, nie serwisu: ten plik testuje kontrakt komendy, a przejście przez
@@ -82,14 +82,14 @@ class StubRun:
             StubRun z pustym `calls`
         """
         self.calls:  list[dict]       = []
-        self.report: DocsImportReport = DocsImportReport(documents=1, sections=1, fragments=1)
+        self.report: DocsIndexReport = DocsIndexReport(documents=1, sections=1, fragments=1)
         self.error:  Exception | None = None
 
     async def __call__(
         self,
         package:   DocPackage,  # np. DocPackage(path=Path("/tmp/x"), directories=[…])
         synthetic: bool,        # np. False
-    ) -> DocsImportReport:
+    ) -> DocsIndexReport:
         """
         Description:
         Zapisuje wywołanie i oddaje raport albo zgłasza ustawiony błąd.
@@ -99,7 +99,7 @@ class StubRun:
             synthetic=False
 
         Example result:
-            DocsImportReport(documents=1, sections=1, fragments=1)
+            DocsIndexReport(documents=1, sections=1, fragments=1)
 
         Raises:
             Exception: błąd przypisany przez test do `error`
@@ -116,7 +116,7 @@ class StubRun:
 def stub_run(monkeypatch: pytest.MonkeyPatch) -> StubRun:
     """
     Description:
-    Wstawia `StubRun` w miejsce przebiegu importu i oddaje go testowi.
+    Wstawia `StubRun` w miejsce przebiegu indeksacji i oddaje go testowi.
 
     Example args:
         (brak)
@@ -126,7 +126,7 @@ def stub_run(monkeypatch: pytest.MonkeyPatch) -> StubRun:
     """
     stub = StubRun()
 
-    monkeypatch.setattr("app.entry_cli.docs.import_._run", stub)
+    monkeypatch.setattr("app.entry_cli.docs.index._run", stub)
 
     return stub
 
@@ -145,7 +145,7 @@ def test_a_valid_package_exits_zero(tmp_path: Path) -> None:
 
 
 def test_a_synthetic_document_is_marked(tmp_path: Path) -> None:
-    """Dokument zmyślony → dopisek w jego linii: operator widzi to przed importem."""
+    """Dokument zmyślony → dopisek w jego linii: operator widzi to przed indeksacją."""
     _write_document(tmp_path, "zmyslony", synthetic=True)
 
     result = runner.invoke(cli, ["docs", "validate", str(tmp_path)])
@@ -156,7 +156,7 @@ def test_a_synthetic_document_is_marked(tmp_path: Path) -> None:
 
 def test_a_broken_package_exits_one(tmp_path: Path) -> None:
     """Sekcja bez pliku → kod 1 i błąd pod nazwą katalogu, więc komenda działa jako bramka
-    przed importem."""
+    przed indeksacją."""
     directory = _write_document(tmp_path, "administrator")
     (directory / "wstep.md").unlink()
 
@@ -199,14 +199,14 @@ def test_validate_of_a_missing_directory_exits_two(tmp_path: Path) -> None:
     assert result.exit_code == 2
 
 
-# --- import: odmowa przed pytaniem --------------------------------------------------------
+# --- index: odmowa przed pytaniem ---------------------------------------------------------
 
-def test_import_of_a_broken_package_runs_nothing(tmp_path: Path, stub_run: StubRun) -> None:
-    """Paczka z błędami → kod 1 bez pytania o potwierdzenie i bez importu."""
+def test_index_of_a_broken_package_runs_nothing(tmp_path: Path, stub_run: StubRun) -> None:
+    """Paczka z błędami → kod 1 bez pytania o potwierdzenie i bez indeksacji."""
     directory = _write_document(tmp_path, "administrator")
     (directory / "wstep.md").unlink()
 
-    result = runner.invoke(cli, ["docs", "import", str(tmp_path)])
+    result = runner.invoke(cli, ["docs", "index", str(tmp_path)])
 
     assert result.exit_code == 1
     assert "Zastąpić" not in result.output
@@ -221,7 +221,7 @@ def test_a_synthetic_package_is_refused_without_the_flag(
     indeksu nawet z `--yes`."""
     _write_document(tmp_path, "zmyslony", synthetic=True)
 
-    result = runner.invoke(cli, ["docs", "import", str(tmp_path), "--yes"])
+    result = runner.invoke(cli, ["docs", "index", str(tmp_path), "--yes"])
 
     assert result.exit_code == 1
     assert "właściwego indeksu" in result.output
@@ -232,36 +232,36 @@ def test_a_real_package_is_refused_with_the_flag(tmp_path: Path, stub_run: StubR
     """Dokument prawdziwy z `--synthetic` → kod 1 i nic nie rusza."""
     _write_document(tmp_path, "administrator")
 
-    result = runner.invoke(cli, ["docs", "import", str(tmp_path), "--synthetic", "--yes"])
+    result = runner.invoke(cli, ["docs", "index", str(tmp_path), "--synthetic", "--yes"])
 
     assert result.exit_code == 1
     assert stub_run.calls == []
 
 
-def test_import_of_an_empty_package_runs_nothing(tmp_path: Path, stub_run: StubRun) -> None:
-    """Pusty katalog → kod 1 i nic nie rusza: import zastępuje indeks, więc pusta paczka
+def test_index_of_an_empty_package_runs_nothing(tmp_path: Path, stub_run: StubRun) -> None:
+    """Pusty katalog → kod 1 i nic nie rusza: indeksacja zastępuje indeks, więc pusta paczka
     skasowałaby działający."""
-    result = runner.invoke(cli, ["docs", "import", str(tmp_path), "--yes"])
+    result = runner.invoke(cli, ["docs", "index", str(tmp_path), "--yes"])
 
     assert result.exit_code == 1
     assert stub_run.calls == []
 
 
-def test_import_of_a_missing_directory_exits_two(tmp_path: Path, stub_run: StubRun) -> None:
+def test_index_of_a_missing_directory_exits_two(tmp_path: Path, stub_run: StubRun) -> None:
     """Katalog, którego nie ma → kod 2."""
-    result = runner.invoke(cli, ["docs", "import", str(tmp_path / "nie-ma"), "--yes"])
+    result = runner.invoke(cli, ["docs", "index", str(tmp_path / "nie-ma"), "--yes"])
 
     assert result.exit_code == 2
     assert stub_run.calls == []
 
 
-# --- import: potwierdzenie ----------------------------------------------------------------
+# --- index: potwierdzenie -----------------------------------------------------------------
 
-def test_import_asks_before_replacing(tmp_path: Path, stub_run: StubRun) -> None:
+def test_index_asks_before_replacing(tmp_path: Path, stub_run: StubRun) -> None:
     """Bez `--yes`, odpowiedź „nie" → kod 1 i nic nie rusza."""
     _write_document(tmp_path, "administrator")
 
-    result = runner.invoke(cli, ["docs", "import", str(tmp_path)], input="n\n")
+    result = runner.invoke(cli, ["docs", "index", str(tmp_path)], input="n\n")
 
     assert result.exit_code == 1
     assert stub_run.calls == []
@@ -274,7 +274,7 @@ def test_the_question_names_the_table_and_the_collection(
     """Pytanie o potwierdzenie → nazywa tabelę i kolekcję, które znikną."""
     _write_document(tmp_path, "administrator")
 
-    result = runner.invoke(cli, ["docs", "import", str(tmp_path)], input="n\n")
+    result = runner.invoke(cli, ["docs", "index", str(tmp_path)], input="n\n")
 
     assert "tabelę 'docs_text' i kolekcję 'docs'" in result.output
 
@@ -283,22 +283,22 @@ def test_the_synthetic_flag_points_at_the_synthetic_index(
     tmp_path: Path,
     stub_run: StubRun,
 ) -> None:
-    """`--synthetic` → pytanie nazywa osobny indeks syntetyczny, a import dostaje tę flagę."""
+    """`--synthetic` → pytanie nazywa osobny indeks syntetyczny, a indekser dostaje tę flagę."""
     _write_document(tmp_path, "zmyslony", synthetic=True)
 
-    result = runner.invoke(cli, ["docs", "import", str(tmp_path), "--synthetic"], input="y\n")
+    result = runner.invoke(cli, ["docs", "index", str(tmp_path), "--synthetic"], input="y\n")
 
     assert result.exit_code == 0
     assert "tabelę 'docs_text_synthetic' i kolekcję 'docs_synthetic'" in result.output
     assert stub_run.calls[0]["synthetic"] is True
 
 
-def test_import_proceeds_when_confirmed(tmp_path: Path, stub_run: StubRun) -> None:
-    """Potwierdzenie przyjęte → import dostaje wczytaną paczkę, a liczby trafiają na ekran."""
+def test_index_proceeds_when_confirmed(tmp_path: Path, stub_run: StubRun) -> None:
+    """Potwierdzenie przyjęte → indekser dostaje wczytaną paczkę, a liczby trafiają na ekran."""
     _write_document(tmp_path, "administrator")
-    stub_run.report = DocsImportReport(documents=1, sections=1, fragments=3)
+    stub_run.report = DocsIndexReport(documents=1, sections=1, fragments=3)
 
-    result = runner.invoke(cli, ["docs", "import", str(tmp_path)], input="y\n")
+    result = runner.invoke(cli, ["docs", "index", str(tmp_path)], input="y\n")
 
     assert result.exit_code == 0
     assert stub_run.calls[0]["synthetic"] is False
@@ -310,14 +310,14 @@ def test_yes_skips_the_question(tmp_path: Path, stub_run: StubRun) -> None:
     """`--yes` → bez pytania, więc komenda nadaje się do skryptu."""
     _write_document(tmp_path, "administrator")
 
-    result = runner.invoke(cli, ["docs", "import", str(tmp_path), "--yes"])
+    result = runner.invoke(cli, ["docs", "index", str(tmp_path), "--yes"])
 
     assert result.exit_code == 0
     assert "Zastąpić" not in result.output
     assert len(stub_run.calls) == 1
 
 
-# --- import: awarie -----------------------------------------------------------------------
+# --- index: awarie ------------------------------------------------------------------------
 
 @pytest.mark.parametrize(
     "error",
@@ -337,16 +337,16 @@ def test_an_unreachable_service_exits_two(
     _write_document(tmp_path, "administrator")
     stub_run.error = error
 
-    result = runner.invoke(cli, ["docs", "import", str(tmp_path), "--yes"])
+    result = runner.invoke(cli, ["docs", "index", str(tmp_path), "--yes"])
 
     assert result.exit_code == 2
 
 
-def test_a_refusal_from_the_import_itself_exits_one(tmp_path: Path, stub_run: StubRun) -> None:
-    """Odmowa zgłoszona dopiero przez import → kod 1, jak przy odmowie przed pytaniem."""
+def test_a_refusal_from_the_indexer_itself_exits_one(tmp_path: Path, stub_run: StubRun) -> None:
+    """Odmowa zgłoszona dopiero przez indekser → kod 1, jak przy odmowie przed pytaniem."""
     _write_document(tmp_path, "administrator")
-    stub_run.error = DocsImportRefused("paczka ma błędy")
+    stub_run.error = DocsIndexRefused("paczka ma błędy")
 
-    result = runner.invoke(cli, ["docs", "import", str(tmp_path), "--yes"])
+    result = runner.invoke(cli, ["docs", "index", str(tmp_path), "--yes"])
 
     assert result.exit_code == 1

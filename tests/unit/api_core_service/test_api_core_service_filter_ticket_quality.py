@@ -1,6 +1,6 @@
 import pytest
 
-from app.core_model.ticket_parsed import ParsedTicket
+from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_service.filter_ticket_quality import (
     MIN_RECORDS_FOR_DROP_RATE,
     drop_rate_warning,

@@ -32,7 +32,7 @@ class TicketsCollection(VectorCollection):
 
     Do czego:
     Stąd `find_tickets_vector` bierze zgłoszenia o podobnym problemie, a indeksacja
-    (`TicketIndexer`) tu je zapisuje. Odczyt po numerze daje kartę zgłoszenia znalezionego inną
+    (`TicketsIndexer`) tu je zapisuje. Odczyt po numerze daje kartę zgłoszenia znalezionego inną
     drogą, np. wątku z wyszukiwania tekstowego. Mechanika żądań stoi w klasie bazowej.
 
     Flow:

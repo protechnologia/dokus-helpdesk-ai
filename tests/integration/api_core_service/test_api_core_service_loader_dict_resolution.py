@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from app.core_model.dict_resolution_vocabulary import ResolutionVocabulary
+from app.core_model.dicts.resolution_vocabulary import ResolutionVocabulary
 from app.core_service.loader_dict_resolution import DEFAULT_DICT_FILE, get_resolution_classes
 
 

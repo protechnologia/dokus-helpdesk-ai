@@ -18,7 +18,7 @@ from app.entry_cli.tickets import tickets
 # | `rag index <kat.>`        | `rag/index.py`        | artefakty do kolekcji Qdranta    |
 # | `rag reindex <kat.>`      | `rag/reindex.py`      | kolekcja od zera                 |
 # | `docs validate <kat.>`    | `docs/validate.py`    | paczka dokumentacji wobec plików |
-# | `docs import <kat.>`      | `docs/import_.py`     | indeks dokumentacji od zera      |
+# | `docs index <kat.>`       | `docs/index.py`       | indeks dokumentacji od zera      |
 #
 # Zaplanowane (p. 46): komendy na grafach — wyszukiwanie, parsowanie zgłoszeń, propozycje; bramki
 # i „Popraw" stoją POZA obszarem `rag`, bo z definicji działają bez indeksu.

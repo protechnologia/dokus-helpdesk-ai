@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 import pytest
 
 from app.agent_tools.docs.fake_docs import default_sections
-from app.core_model.doc_section import DocSection
+from app.core_model.docs.doc_section import DocSection
 from app.db_qdrant import (
     VECTOR_PROBLEM,
     VECTOR_STS,

@@ -40,7 +40,7 @@ from app.agent_tools.tickets.read_tickets_card.models import (
     ReadTicketsCardQuery,
     ReadTicketsCardResult,
 )
-from app.core_model.ticket_parsed import ParsedTicket
+from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.db_qdrant import DbQdrantConfigError, TicketPoint, TicketsCollection
 
 logger = logging.getLogger(__name__)

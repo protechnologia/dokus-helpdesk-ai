@@ -22,7 +22,7 @@ O czym pamiętać przy zmianach:
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core_model.ticket_parsed import ParsedTicket
+from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.db_qdrant.point.base import named_vector, point_id_for
 
 # Nazwane wektory każdego punktu. `problem` to strona passage, z którą porównywane jest zapytanie

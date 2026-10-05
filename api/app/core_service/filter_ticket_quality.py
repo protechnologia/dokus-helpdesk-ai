@@ -1,6 +1,6 @@
-from app.core_model.filter_quality_report import QualityReport
-from app.core_model.filter_quality_verdict import QualityVerdict, RuleHit
-from app.core_model.ticket_parsed import ParsedTicket
+from app.core_model.tickets.parsed_ticket import ParsedTicket
+from app.core_model.tickets.quality_report import QualityReport
+from app.core_model.tickets.quality_verdict import QualityVerdict, RuleHit
 from app.core_service.filter_ticket_quality_rules import RULES
 
 # Udział korpusu, który filtr powinien odrzucić. Zmierzony dwa razy na różnych próbkach: 19%

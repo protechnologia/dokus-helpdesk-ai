@@ -3,7 +3,7 @@ Description:
 Czyta paczkę dokumentacji z dysku i mówi, co się w niej nie zgadza. Paczka to katalog,
 w którym każdy dokument ma swój podkatalog: `manifest.json` i plik `<section_id>.md` z treścią
 na każdą sekcję. Nie woła żadnej usługi — z jej wyniku korzysta i `helpdesk docs validate`,
-i `helpdesk docs import`.
+i `helpdesk docs index`.
 
 Przed — paczka na dysku:
 
@@ -37,7 +37,7 @@ Co jest sprawdzane:
 | plik `.md` bez wpisu w manifeście            | błąd katalogu                       |
 | plik sekcji pusty albo nie w UTF-8           | błąd katalogu                       |
 | ten sam `section_id` w kilku dokumentach     | błąd paczki                         |
-| sekcja dłuższa niż `SECTION_WARN_CHARS`      | ostrzeżenie, importu nie wstrzymuje |
+| sekcja dłuższa niż `SECTION_WARN_CHARS`      | ostrzeżenie, niczego nie wstrzymuje |
 
 O czym pamiętać przy zmianach:
 
@@ -53,9 +53,9 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from app.core_model.doc_directory import DocDirectory
-from app.core_model.doc_manifest import DocManifest
-from app.core_model.doc_package import DocPackage
+from app.core_model.docs.doc_directory import DocDirectory
+from app.core_model.docs.doc_manifest import DocManifest
+from app.core_model.docs.doc_package import DocPackage
 from app.core_util.validation_text import describe_validation_error
 
 MANIFEST_NAME  = "manifest.json"

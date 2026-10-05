@@ -14,7 +14,7 @@ Wymaga działającego stacku.
 Co się dzieje po drodze:
 
 1. Fixture kasuje kolekcję testową i zapisuje trzy zmyślone zgłoszenia jako pliki JSON.
-2. Indeksuje je produkcyjnym `TicketIndexer`: prawdziwy embedder liczy wektory, Qdrant je zapisuje.
+2. Indeksuje je produkcyjnym `TicketsIndexer`: prawdziwy embedder liczy wektory, Qdrant je zapisuje.
 3. Test pyta wyszukiwanie polami `problem` i `symptoms` jednego ze zgłoszeń, a znalezione
    numery podaje odczytowi kart.
 4. Po teście kolekcja jest kasowana, a połączenia zamykane.
@@ -40,8 +40,8 @@ from app.agent_tools.tickets.find_tickets_vector import (
 )
 from app.agent_tools.tickets.read_tickets_card import ReadTicketsCardQuery, ReadTicketsCardTool
 from app.config import Settings
-from app.core_model.ticket_parsed import ParsedTicket
-from app.core_service.rag_indexer import TicketIndexer
+from app.core_model.tickets.parsed_ticket import ParsedTicket
+from app.core_service.indexer_tickets import TicketsIndexer
 from app.db_qdrant import QdrantClient, TicketsCollection
 from app.engine_embedding import EmbeddingClient
 
@@ -127,7 +127,7 @@ async def clients(
     """
     Description:
     Oddaje klienta embeddera i kolekcję testową w działającym Qdrancie, zaindeksowaną
-    produkcyjną ścieżką (`TicketIndexer`) — narzędzie ma znaleźć to, co naprawdę zapisuje
+    produkcyjną ścieżką (`TicketsIndexer`) — narzędzie ma znaleźć to, co naprawdę zapisuje
     indeksacja. Kolekcja jest kasowana przed testem i po nim: przerwany przebieg nie zostawi
     starego stanu następnemu.
 
@@ -158,7 +158,7 @@ async def clients(
         artifact = tmp_path / f"{ticket.ticket_id}.json"
         artifact.write_text(ticket.model_dump_json(), encoding="utf-8")
 
-    indexer = TicketIndexer(embedder=embedder, tickets=tickets)
+    indexer = TicketsIndexer(embedder=embedder, tickets=tickets)
     await indexer.build(tmp_path)
 
     yield embedder, tickets

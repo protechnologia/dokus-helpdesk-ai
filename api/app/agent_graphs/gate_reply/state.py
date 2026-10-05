@@ -1,7 +1,7 @@
 from pydantic import Field
 
 from app.agent_graphs.base import GraphState
-from app.core_model.gate_verdict import Verdict
+from app.core_model.graphs.verdict import Verdict
 
 
 class GateReplyState(GraphState):

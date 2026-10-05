@@ -9,7 +9,7 @@ from app.agent_graphs.gate_close import (
 from app.agent_nodes.agent import FakeAgentNode
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
-from app.core_model.gate_verdict import Verdict
+from app.core_model.graphs.verdict import Verdict
 from app.engine_anonymization import AnonymizedText, FakeAnonymizer
 from app.engine_llm import LLMError
 

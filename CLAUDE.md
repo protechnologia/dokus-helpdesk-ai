@@ -280,8 +280,8 @@ dokus-helpdesk-ai/
 │       ├── entry_routers/        # trasy: katalog na zasób (router.py + models.py z modelami API);
 │       │                         #   wspólne modele API i mapowanie na górze pakietu
 │       │                         # --- nasza strona: podział po RODZAJU obiektu ---
-│       ├── core_model/           # ticket_*, validation_parsed_*, dict_resolution_*, doc_*
-│       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, importer_*, factory_*, rag_indexer
+│       ├── core_model/           # tickets/, docs/, dicts/, graphs/ — folder na temat, plik nazwany jak model
+│       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, indexer_*, factory_*
 │       ├── core_text/            # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
 │       ├── core_util/            # html, validation_text, time
 │       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
@@ -361,8 +361,12 @@ dokus-helpdesk-ai/
   **bezgłośnie**.
 - **Nazwa pliku mówi, CO ROBI, nie czego dotyczy** — `validator_ticket_parsed.py`, nie
   `artifacts.py`. W `core_service/` oś `<rola>_<przedmiot>` (`parser_`, `validator_`, `builder_`,
-  `loader_`, `filter_`, `normalizer_`, `importer_`, `factory_`), w `core_model/` prefiks tematyczny
-  grupujący alfabetycznie (`ticket_*`, `validation_parsed_*`, `dict_*`, `doc_*`, `filter_*`).
+  `loader_`, `filter_`, `normalizer_`, `indexer_`, `factory_`), a przedmiot mówi,
+  którego materiału plik dotyczy (`builder_ticket_embedding_text.py` obok
+  `builder_doc_embedding_text.py`). W `core_model/` folder na temat (od 2026-10-05): `tickets/`
+  i `docs/` na materiały, jak w `agent_tools/` i w pakietach baz, `dicts/` na słowniki i zestawy
+  reguł klienta, `graphs/` na wyniki wspólne dla kilku grafów. Plik nazywa się jak jego model
+  (`RawTicket` → `tickets/raw_ticket.py`, `Verdict` → `graphs/verdict.py`).
   - **Gdy reguł jest wiele i przybywa ich szybciej niż logiki wokół nich, idą do osobnego pliku**
     (`filter_ticket_quality.py` + `filter_ticket_quality_rules.py`): dwa różne rytmy zmian, a plik
     reguł czyta się jak listę, nie jak kod. Każda reguła to funkcja modułowa — bezstanowa, więc
@@ -524,7 +528,7 @@ Raises:                      # only when the method raises
   pełnym zdaniem, tabelka, gdy plik jest listą (reguły, komendy, metody), przykład przed i po, gdy
   przekształca dane (zmyślony, ale „po" zdjęte z uruchomionego kodu), kroki jako lista numerowana,
   na końcu to, o czym pamiętać przy zmianach. Historia decyzji i pomiarów zostaje w CLAUDE.md, nie w
-  pliku. Wzór: `core_service/rag_indexer.py`, `core_service/parser_ticket_raw.py`.
+  pliku. Wzór: `core_service/indexer_tickets.py`, `core_service/parser_ticket_raw.py`.
 
 ## Dane
 
@@ -595,10 +599,9 @@ z 2026-09-02 i jest właściwym wejściem dla masowego importu (p. 31).
 naprawdę wejdzie do indeksu" — realny lejek jest o ~35% węższy.
 
 **1496 liczono na surowym HTML-u i bez filtru statusu.** Przy liczeniu po stripie i z filtrem
-`status ∈ (rozwiazany, zamkniety)` zostaje **1408** (pomiar 2026-08-05 przez
-`scripts/select_parse_sample.py`). Rozkład odrzuceń: **85** przez status, **138** przez opis
-≤ 50 zn., **186** przez brak komentarza > 50 zn. Obie liczby są poprawne — mierzą co innego,
-więc przy etapie 4 nie należy szukać „zgubionych" 88 rekordów.
+`status ∈ (rozwiazany, zamkniety)` zostaje **1408** (pomiar 2026-08-05). Rozkład odrzuceń: **85**
+przez status, **138** przez opis ≤ 50 zn., **186** przez brak komentarza > 50 zn. Obie liczby są
+poprawne — mierzą co innego, więc przy etapie 4 nie należy szukać „zgubionych" 88 rekordów.
 
 #### Ile z tego naprawdę wejdzie do indeksu
 
@@ -844,7 +847,7 @@ Odwrotna strona powyższych ryzyk — to działa zawsze i jest najtańszym zyski
 ### Instrukcje
 
 Drugi materiał obok zgłoszeń: dokumentacja aplikacji podzielona na podrozdziały. Właściwej
-dokumentacji jeszcze nie ma (p. 15, p. 55) — import i narzędzia powstają na paczce syntetycznej.
+dokumentacji jeszcze nie ma (p. 15, p. 55) — indeksacja i narzędzia powstają na paczce syntetycznej.
 
 - **Jednostką jest podrozdział, w całości.** Na podrozdziały dzieli człowiek z modelem przed
   wgraniem; agent wyszukuje podrozdziały i czyta je w całości.
@@ -862,18 +865,19 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — import i narzędzia powstają na 
 - **Podrozdział bywa dłuższy niż jeden wektor:** limit embeddera, 8192 tokeny, to ok. 18 tys.
   znaków. Stąd cała treść leży w Postgresie, a do Qdranta idzie pocięta na fragmenty: po
   akapitach, najwyżej `RAG_DOCS_FRAGMENT_CHARS` znaków (wstępnie 1500, rozstrzyga p. 8). Akapit,
-  który sam mieści się w limicie, nie jest cięty; dłuższy dzieli się na linie, potem na słowa.
+  który sam mieści się w limicie, nie jest cięty; dłuższy dzieli się na linie, zdania i słowa.
   Nagłówek zostaje ze swoim blokiem, a do wektora idzie tytuł sekcji i fragment. Sekcja powyżej
   18 tys. znaków dostaje przy wczytaniu ostrzeżenie bez odmowy (próg tymczasowy, p. 55).
-- **Import zastępuje indeks, nie dokłada do niego (2026-10-05).** `helpdesk docs import` kasuje
-  i buduje od nowa tabelę i kolekcję dokumentacji, ale dopiero z kompletem wierszy i wektorów
-  w ręku, więc awaria embeddera nie zostawia pustego indeksu. Po imporcie w indeksie jest
-  dokładnie to, co w paczce: sekcja usunięta z paczki znika i nie zostają punkty dawnych
-  fragmentów. Cena: nie da się wgrać jednego dokumentu obok pozostałych, a import całej paczki
-  syntetycznej trwa na CPU ponad minutę.
+- **Indeksacja zastępuje indeks, nie dokłada do niego (2026-10-05).** `helpdesk docs index`
+  kasuje i buduje od nowa tabelę i kolekcję dokumentacji, ale dopiero z kompletem wierszy
+  i wektorów w ręku, więc awaria embeddera nie zostawia pustego indeksu. Po przebiegu w indeksie
+  jest dokładnie to, co w paczce: sekcja usunięta z paczki znika i nie zostają punkty dawnych
+  fragmentów. Cena: nie da się wgrać jednego dokumentu obok pozostałych, a indeksacja całej
+  paczki syntetycznej trwa na CPU ponad minutę. Słowo „import" zostaje dla masowego importu
+  zgłoszeń (p. 31), który jest czymś innym: parsowaniem korpusu modelem.
 - **Paczka syntetyczna (2026-10-04):** dwa zmyślone dokumenty, 27 sekcji, `synthetic: true`,
   z zestawem 66 zapytań w `data/safe/golden/docs-synthetic.json`. Mierzy okablowanie narzędzi, nie
-  skuteczność, i nie może trafić do właściwego indeksu. Ma własny: `helpdesk docs import
+  skuteczność, i nie może trafić do właściwego indeksu. Ma własny: `helpdesk docs index
   --synthetic` pisze do tabeli `docs_text_synthetic` i kolekcji o nazwie z dopiskiem `_synthetic`,
   a flaga komendy i `synthetic` w manifeście muszą się zgadzać w obie strony. Przy 1500 znakach
   paczka daje 47 fragmentów; w sondzie 23 z 24 zapytań wektorowych zestawu miały cel na pierwszym
@@ -885,7 +889,7 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — import i narzędzia powstają na 
 ### Domena: kontrakt sparsowanego zgłoszenia
 
 Serce projektu. **Ten schemat jest kontraktem** — trzyma go model Pydantic w
-`api/app/core_model/ticket_parsed.py` i to on rozstrzyga, co jest poprawnym artefaktem.
+`api/app/core_model/tickets/parsed_ticket.py` i to on rozstrzyga, co jest poprawnym artefaktem.
 
 **Rdzeń: 10 pól** (ustalone 2026-07-31, po przeglądzie pod kątem uniwersalności produktu —
 schemat pierwotny miał 17 i był projektowany pod ten jeden korpus, nie pod produkt):
@@ -1039,7 +1043,7 @@ przycisk. Stąd trzy wymagania na kontrakt:
 
 - **Werdykt jest danymi, nie prozą** — `{verdict, reasons[], missing[], hint}`. Wołający musi móc
   pokazać listę braków w swoim UI, a nie wklejać akapit od modelu. Model `Verdict`
-  (`core_model/gate_verdict.py`) odrzuca `block` bez `reasons` albo bez `hint`, więc zasadę 10
+  (`core_model/graphs/verdict.py`) odrzuca `block` bez `reasons` albo bez `hint`, więc zasadę 10
   egzekwuje walidacja (i retry w `respond`), nie posłuszeństwo modelu.
 - **Awaria LLM-a nie może zablokować helpdesku.** Padnięty model = werdykt niedostępny,
   a wtedy **decyduje helpdesk** (`fail-open` po jego stronie — my zwracamy 503).
@@ -1145,8 +1149,6 @@ Wspólne:
   `docs` na paczce dokumentacji i jej dwóch indeksach, a bramki i „Popraw" stoją **poza `rag`**,
   bo z definicji działają bez indeksu. Ścieżka = komenda to jedyna rzecz, która pozwala trafić
   z komendy do kodu bez czytania `cli.py`. Kod wspólny kilku komend obszaru — w jego `common.py`.
-  Czynność będąca słowem kluczowym Pythona dostaje w nazwie pliku podkreślenie na końcu
-  (`helpdesk docs import` → `entry_cli/docs/import_.py`).
 - **Moduł komendy wystawia `HELP` i funkcję nazwaną od intencji (`index_artifacts`), a rejestruje
   ją `__init__.py` obszaru** (`rag.command("index", help=index.HELP)(index.index_artifacts)`).
   Moduły nie dekorują obiektu Typer z pakietu, więc nie ma cyklu importów; funkcja nazywa się
@@ -1160,10 +1162,10 @@ Wspólne:
   bo **masowy import (p. 31) uruchamia się w kontenerze**, nie na hoście dewelopera.
 - `pip install -e .` tylko po zmianie pyproject.toml, po zmianie kodu nigdy.
 - CLI to cienkie adaptery nad serwisami domenowymi (jak handlery HTTP) — zero logiki w komendzie.
-  `docs import` bierze gotowy importer z fabryki obok serwisu
-  (`core_service/factory_docs_importer.py`), jak trasy biorą graf z `agent_graphs/factory.py`;
-  `rag` składa jeszcze indekser z konfiguracji w `rag/common.py`.
-- **Komendy niszczące (`rag reindex`, `docs import`) pytają o potwierdzenie** albo wymagają
+  Serwis złożony z konfiguracji komenda bierze z fabryki obok niego
+  (`core_service/factory_docs_indexer.py`, `factory_tickets_indexer.py`), jak trasy biorą graf
+  z `agent_graphs/factory.py`, i zamyka go jednym `aclose()`.
+- **Komendy niszczące (`rag reindex`, `docs index`) pytają o potwierdzenie** albo wymagają
   `--yes`; pytanie nazywa to, co zniknie.
 
 #### Gotchas
@@ -1377,7 +1379,7 @@ wektor:
 
 Usługa `postgres` to drugi indeks obok Qdranta: szuka po słowach w odmianie i po dosłownych
 ciągach, czego wektor nie robi. Po stronie `api` stoi pakiet `app/db_postgres/` z tabelami zgłoszeń
-i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs import`, tabelę zgłoszeń wypełni
+i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs index`, tabelę zgłoszeń wypełni
 indeksacja (p. 31, p. 53), a czytać będą narzędzia `find_*_text`, `list_docs` i `read_docs`
 (p. 50–53).
 
@@ -1662,9 +1664,9 @@ nowe zgłoszenie (surowy tekst)
 - **Graf decyduje, które narzędzia model widzi (`TOOL_NAMES`), ale nie trzyma ich opisów** — te
   leżą przy narzędziach; definicję składa `tool_definitions()` z `agent_graphs/base.py`, a narzędzie
   spoza `TOOL_NAMES` to błąd składania.
-- **Model wyniku wspólny dla kilku grafów — w `core_model/` (`Verdict`, `Proposal`); używany przez
-  jeden graf — w `agent_graphs/<graf>/models.py`** (`SearchDone`, `PolishedText`), jak modele
-  narzędzi.
+- **Model wyniku wspólny dla kilku grafów — w `core_model/graphs/` (`Verdict`, `Proposal`);
+  używany przez jeden graf — w `agent_graphs/<graf>/models.py`** (`SearchDone`, `PolishedText`),
+  jak modele narzędzi.
 - **`search` kończy się pustym `respond_search`** — wynikiem są źródła z `cite()` i zapytania
   agenta z `messages`, nic z deklaracji modelu.
 - **Prompt parsujący leży w `agent_graphs/parse_ticket/`, jak każdy prompt grafu (2026-10-02)** — i
@@ -1983,17 +1985,11 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 - Indeksacja do Qdranta: `helpdesk rag index <katalog>`
 - Pełna odbudowa indeksu: `helpdesk rag reindex` (kasuje kolekcję, wstaje z `data/unsafe/parsed/`)
 - Sprawdzenie paczki dokumentacji: `helpdesk docs validate <katalog>` (same pliki, bez stacku)
-- Import dokumentacji: `helpdesk docs import <katalog>` (zastępuje tabelę i kolekcję dokumentacji;
+- Indeksacja dokumentacji: `helpdesk docs index <katalog>` (zastępuje tabelę i kolekcję;
   **wymaga stacku**); paczka syntetyczna do osobnego indeksu:
-  `helpdesk docs import data/safe/instruction --synthetic`
+  `helpdesk docs index data/safe/instruction --synthetic`
 - Ewaluacja embeddera: `python scripts/eval_embeddings.py recall --model <nazwa>`
   (repo-level, nie CLI usługi — ładuje modele wprost, bez stawiania stacku)
-- Ewaluacja zbudowanego indeksu: `python scripts/eval_index.py recall --collection tickets`
-  (**wymaga stacku** — mierzy przez usługę embeddera i Qdranta, czyli tę samą drogę co produkcja;
-  ten sam wzór recall/MRR co wyżej, żeby liczby dało się porównać)
-- Porównanie trybów wyszukiwania: `python scripts/eval_index.py modes --collection tickets`
-  (`query→passage` vs `sts→sts`, na zapytaniach surowych i sparsowanych — cztery pomiary w jednej
-  tabeli; wymaga stacku)
 - Pomiar progu odcięcia: `python scripts/eval_threshold.py table` (rozkłady + tabela koszt/zysk
   per kandydat na próg), `... detail --threshold 0.48` (co ten próg robi z każdym dystraktorem
   i które trafienia poprawne kosztuje) oraz `... plot` (wykres obu rozkładów z linią progu do
@@ -2010,7 +2006,7 @@ w p. 46.
 - Jeden rodzaj: `pytest tests/unit/`, `pytest tests/integration/`, `pytest tests/functional/`
 - Na stacku: `pytest tests/integration/ tests/functional/ -m stack` (albo `-m stack_<usługa>`)
 - Ewaluacyjne: `pytest tests/evaluation/` — bez korpusu odniesienia w `data/` testy się pomijają;
-  z pomiarem `find_tickets_vector` na golden secie i z importem paczki syntetycznej:
+  z pomiarem `find_tickets_vector` na golden secie i z indeksem paczki syntetycznej:
   `pytest tests/evaluation/ -m ""` (stack i oba zbudowane indeksy: zgłoszeń oraz syntetyczny
   dokumentacji)
 - Na żywym LLM: `pytest -m llm_live` — **kosztuje / bije po sieci, pytaj przed**
@@ -2155,15 +2151,15 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 880 (0)            | 17 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 171 (59)           | 43 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 885 (0)            | 17 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 172 (59)           | 43 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 98 (9)             | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 9 (7)              | 33 s |
 
 Liczby i czasy z 2026-10-05: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 8 s, a ewaluacyjne poniżej sekundy —
 całe 33 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
-(`pytest -m ""`): 1158 testów, 105 s; domyślny `pytest`, bez stacku: 1083 testy, 22 s.
+(`pytest -m ""`): 1164 testy, 109 s; domyślny `pytest`, bez stacku: 1089 testów, 21 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2373,8 +2369,16 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   zgłoszenia o tym samym objawie mają niemal identyczne `problem` + `symptoms`, więc wpadają do
   trafień razem i niosą różne `cause`; pytania rozróżniające powstają z trafień, nie z ręcznego
   rekordu. Cena: trafienia mówią, jakie są przyczyny, ale nie od czego zacząć (p. 45).
-- **Import dokumentacji dokładający po jednym dokumencie** — zastąpienie całego indeksu nie
-  zostawia sekcji usuniętych z paczki ani punktów dawnych fragmentów, a pełny import to minuty.
+- **Skrypty pomiarowe (`eval_*`) jako testy ewaluacyjne** — przyrząd z parametrami (model,
+  kandydaci na próg) nie ma kryterium zaliczenia; zamrożony próg jest osobnym testem
+  w `tests/evaluation/`. Usunięty 2026-10-05 `eval_index.py` mierzył zbudowany indeks zapytaniami
+  surowymi, których produkt już nie wysyła; okablowania pilnuje test golden setu, a tryby
+  porównuje `eval_embeddings.py`.
+- **Eksport zgłoszeń ze zrzutu jako komenda `helpdesk`** — skrypt woła `docker exec` na kontenerze
+  ze zrzutem, a w obrazie `api` nie ma ani Dockera, ani dostępu do tego kontenera. Wraca
+  z czytnikiem SQL (p. 31).
+- **Indeksacja dokumentacji dokładająca po jednym dokumencie** — zastąpienie całego indeksu nie
+  zostawia sekcji usuniętych z paczki ani punktów dawnych fragmentów, a pełny przebieg to minuty.
   Wraca, gdy indeks ma trzymać kilka wydań naraz (p. 15).
 - **Deduplikacja rekordów przy indeksacji** — wielość rekordów jest informacją, nie nadmiarem:
   scalenie zgodnych rekordów usuwa dowód, że rozwiązanie jest sprawdzone, a rozłącznych —
@@ -2503,16 +2507,16 @@ punkty niżej to narzędzia właściwe.
   w `data/safe/instruction/syntetyczna-instrukcja-*` i 66 zapytań w kształcie czterech narzędzi
   w `data/safe/golden/docs-synthetic.json`; mierzy okablowanie, nie skuteczność. Trzy oczekiwania
   zestawu czekają na p. 8 i p. 50.
-- [x] **49. Import dokumentacji** (2026-10-05) — `helpdesk docs validate|import`: czytnik paczki,
-  cięcie sekcji na fragmenty, importer zastępujący tabelę i kolekcję, osobny indeks syntetyczny;
+- [x] **49. Indeksacja dokumentacji** (2026-10-05) — `helpdesk docs validate|index`: czytnik
+  paczki, cięcie sekcji na fragmenty, indekser zastępujący tabelę i kolekcję, osobny indeks
+  syntetyczny;
   reguły — „Instrukcje", „Warstwa bazy wektorowej (Qdrant)", „Warstwa CLI".
 - [ ] **8. `find_docs_vector`** — wyszukiwanie w kolekcji dokumentacji; zwraca wiersze listingu
   (identyfikator, dokument, rozdział, opis), nie treść; jednostką wyniku jest plik z metryczki
   także wtedy, gdy wektor powstaje z jego fragmentu — fragment zwija się do pliku. *Dlaczego:*
   treść model pobiera odczytem (p. 52) i tylko odczyt trafia na listę źródeł, a wyszukiwanie
   tekstowe i wektorowe muszą wskazywać ten sam identyfikator; pomiar na paczce z p. 54
-  rozstrzyga długość fragmentu (odniesienie: sam tytuł i opis; do sprawdzenia też cięcie po
-  zdaniach, bo dziś długi akapit prozy dzieli się między słowami) i osobny próg podobieństwa —
+  rozstrzyga długość fragmentu (odniesienie: sam tytuł i opis) i osobny próg podobieństwa —
   w sondzie zapytania bez odpowiednika dostawały 0,31–0,38, a poprawne 0,37–0,60.
 - [ ] **50. `find_docs_text`** — pola `exact` (dosłowne ciągi, `ILIKE`) i `words` (indeks
   pełnotekstowy ze słownikiem); wiersze listingu z etykietą, czym znaleziono; przed nim spacje
@@ -2657,8 +2661,8 @@ każdy mierzy się osobno.
   z regułą zgodności przyczyny z objawem; do sprawdzenia, czy długi tekst w JSON-ie (wątek, sekcja
   instrukcji) czyta się modelowi gorzej niż goły;
   ewaluacja wariantu; sentinele `questions_summary` rozpoznaje `no_questions()` dopisane
-  do `normalizer_sentinel.py`. *Dlaczego:* prompt z 6.3 powstał pod słabszy model, a znana dziura
-  (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
+  do `normalizer_ticket_sentinel.py`. *Dlaczego:* prompt z 6.3 powstał pod słabszy model, a znana
+  dziura (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
 - [ ] **26. `suggest_solution`** — prompt z 6.4 przemierzony na modelu docelowym, z regułą
   zgodności trafienia z objawem i osobną regułą ostrzeżenia o kroku nieodwracalnym; do
   rozstrzygnięcia pomiarem: kiedy model ma czytać wątki (w sondzie `gpt-6.1-sol` brał wszystkie,

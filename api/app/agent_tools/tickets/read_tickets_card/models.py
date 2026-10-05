@@ -2,7 +2,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core_model.ticket_parsed import ParsedTicket
+from app.core_model.tickets.parsed_ticket import ParsedTicket
 
 # Ile kart da się odczytać jednym wywołaniem. Karty są krótkie, a model ma przeczytać wszystkie
 # znalezione — także z kilku wyszukań naraz — więc limit jest wyższy niż przy wątkach.

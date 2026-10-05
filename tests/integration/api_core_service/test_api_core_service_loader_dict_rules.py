@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from app.core_model.dict_rule_set import RuleSet
+from app.core_model.dicts.rule_set import RuleSet
 from app.core_service import loader_dict_rules
 from app.core_service.loader_dict_rules import get_rule_set
 

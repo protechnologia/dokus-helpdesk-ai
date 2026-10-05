@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from app.agent_graphs import gate_close, gate_reply, run_graph
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
 from app.agent_nodes.models import LogEntry
-from app.core_model.gate_verdict import Verdict
+from app.core_model.graphs.verdict import Verdict
 from app.core_service.loader_dict_rules import get_rule_set
 from app.engine_llm import LLMUsage
 from app.entry_routers.gate.models import GateReplyRequest, VerdictResponse

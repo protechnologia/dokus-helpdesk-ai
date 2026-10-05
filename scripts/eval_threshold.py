@@ -1,4 +1,9 @@
-"""Measure where to put RAG_SCORE_MIN — the cost/benefit table, not a single number.
+"""Pomaga wybrać próg `RAG_SCORE_MIN`, poniżej którego trafienie wyszukiwania jest odrzucane.
+
+Do czego:
+    Ten skrypt dla kilku kandydatów na próg liczy dwie rzeczy naraz: ile poprawnych trafień próg
+    zachowuje i ile śmieci odcina. Nie podaje jednej „najlepszej" wartości — pokazuje tabelę,
+    z której widać cenę każdego wyboru.
 
 WYMAGA ZBUDOWANEGO INDEKSU I CHODZĄCEGO STACKU:
 
@@ -8,7 +13,48 @@ WYMAGA ZBUDOWANEGO INDEKSU I CHODZĄCEGO STACKU:
     python scripts/eval_threshold.py detail       # rozbicie per dystraktor i lista strat
     python scripts/eval_threshold.py plot         # wykres obu rozkładów z linią progu (PNG)
 
-Do czego:
+Przykład wyjścia (`table`, przebieg z 2026-10-05):
+
+    Kolekcja 'tickets': 171 punktów
+    A: 162 zapytań golden setu · B: 16 dystraktorów
+
+    A: rekord poprawny     n=162  min 0.409  p05 0.499  p25 0.566  med 0.597  p75 0.634  p95 0.673  max 0.702
+    B: dystraktor top-1    n= 16  min 0.377  p05 0.377  p25 0.416  med 0.443  p75 0.474  p95 0.488  max 0.488
+
+    PRÓG | poprawne zachowane | dystraktory wyciszone | trafienia dystraktorów
+         | (z 162)            | całkiem (z 16)        | odcięte (z 80)
+    ------------------------------------------------------------------------------
+    0.30 | 162  100.0%        |  0    0.0%          |  0/80    0.0%
+    0.36 | 162  100.0%        |  0    0.0%          |  5/80    6.2%
+    0.40 | 162  100.0%        |  1    6.2%          | 14/80   17.5%
+    0.44 | 161   99.4%        |  8   50.0%          | 48/80   60.0%
+    0.46 | 157   96.9%        | 11   68.8%          | 69/80   86.2%
+    0.48 | 157   96.9%        | 14   87.5%          | 78/80   97.5%
+    0.50 | 153   94.4%        | 16  100.0%          | 80/80  100.0%
+    0.54 | 139   85.8%        | 16  100.0%          | 80/80  100.0%
+    0.60 |  76   46.9%        | 16  100.0%          | 80/80  100.0%
+
+    (tabela ma wiersz co 0.02 — tu co drugi albo trzeci; pod nią skrypt wypisuje dwie uwagi
+    o tym, że wynik jest optymistyczny)
+
+Jak czytać:
+    - Dwie linie nad tabelą to rozkład score. A — trafienia poprawne, czyli rekord, którego
+      zapytanie szukało; B — najlepsze trafienie zapytania, które w indeksie nie ma odpowiednika.
+      `p05 0.499` znaczy: 5% poprawnych trafień ma score poniżej 0,499. Próg ma stanąć między
+      tymi rozkładami — tu nachodzą na siebie między 0,41 a 0,49.
+    - Wiersz tabeli to jeden kandydat na próg.
+    - „poprawne zachowane" — ile ze 162 zapytań nadal dostaje swój rekord. To cena progu.
+    - „dystraktory wyciszone całkiem" — ile z 16 zapytań bez odpowiednika nie dostaje już nic.
+      To zysk, o który chodzi.
+    - „trafienia dystraktorów odcięte" — ile z 80 pojedynczych złych trafień (16 zapytań po 5)
+      wypadło. Miara pomocnicza: zapytanie, któremu z pięciu złych trafień zostało jedno, dalej
+      wygląda na odpowiedź.
+    - Dzisiejsze `RAG_SCORE_MIN` to wiersz 0.48: zostaje 157 ze 162 poprawnych, a 14 z 16
+      dystraktorów milknie. Przy 0.50 milkną wszystkie, ale poprawnych ubywa o cztery.
+    - `detail` wypisuje to samo dla jednego progu, zapytanie po zapytaniu, z treścią zapytań.
+      Jego wyjście niesie treść zgłoszeń, więc nie trafia ani tutaj, ani do repo.
+
+Jak to mierzy:
     Próg odcina trafienia poniżej score. Ustawiony za nisko przepuszcza śmieci, które WYGLĄDAJĄ na
     odpowiedź; za wysoko wycina trafienia poprawne i zamienia je w fałszywe „nowy typ problemu".
     Ten skrypt liczy obie strony naraz, na dwóch niezależnych zbiorach:
@@ -37,7 +83,7 @@ Dlaczego score krótkich zapytań jest niski (pomiar 2026-08-20, kluczowe przy c
 
 Adresy usług są argumentami (`--embedder`, `--qdrant`) i domyślnie wskazują **porty hosta**
 publikowane przez compose, nie nazwy z sieci compose: skrypt jest repo-level i chodzi obok stacku.
-"""
+"""  # noqa: E501 — przykład wyjścia ma linie szersze niż limit
 
 import json
 import pathlib
@@ -57,7 +103,7 @@ from app.db_qdrant.point.tickets import VECTOR_PROBLEM  # noqa: E402  (po sys.pa
 DEFAULT_GOLDEN      = REPO_ROOT / "data" / "unsafe" / "golden" / "golden200.json"
 DEFAULT_DISTRACTORS = REPO_ROOT / "data" / "unsafe" / "golden" / "distractors.json"
 
-# Adresy z HOSTA, nie z sieci compose — jak w eval_index.py.
+# Adresy z HOSTA, nie z sieci compose: skrypt chodzi obok stacku.
 DEFAULT_EMBEDDER = "http://localhost:8001"
 DEFAULT_QDRANT   = "http://localhost:6333"
 
@@ -455,7 +501,7 @@ def table(
     )
     typer.echo(
         f"UWAGA: próg zmierzony na {points} rekordach jest DOLNYM oszacowaniem — przy większym\n"
-        "       korpusie score dystraktorów rośnie. Powtórzyć po etapie 10 (~1100 rekordów)."
+        "       korpusie score dystraktorów rośnie. Powtórzyć na pełnym korpusie (p. 33)."
     )
 
 

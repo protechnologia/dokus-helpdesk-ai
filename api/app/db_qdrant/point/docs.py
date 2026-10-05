@@ -17,17 +17,17 @@ O czym pamiętać przy zmianach:
 
 - Payload to opis sekcji z metryczki (`DocSection`), pole w pole, ten sam w każdym fragmencie
   sekcji. Treści tu nie ma — ani sekcji, ani fragmentu: leży w Postgresie i daje ją `read_docs`.
-- Identyfikator punktu powstaje z `section_id` i numeru fragmentu, więc ponowny import trafia
+- Identyfikator punktu powstaje z `section_id` i numeru fragmentu, więc ponowna indeksacja trafia
   w te same punkty. Jednostką wyniku zostaje sekcja: wyszukiwanie wektorowe, tekstowe i odczyt
   wskazują ten sam `section_id`, który punkt niesie w payloadzie.
-- Punkt dostaje gotowy wektor. Tekst fragmentu składa `core_service/builder_doc_fragments.py`.
+- Punkt dostaje gotowy wektor. Tekst fragmentu składa `core_service/builder_doc_embedding_text.py`.
 - Punkt się zapisuje, ale nie czyta z powrotem: z kolekcji wraca trafienie (`hit/docs.py`),
   które nie ma wektora, a ma podobieństwo.
 """
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core_model.doc_section import DocSection
+from app.core_model.docs.doc_section import DocSection
 from app.db_qdrant.point.base import point_id_for
 
 # Jedyny wektor punktu dokumentacji: strona passage, z którą porównywane jest zapytanie.

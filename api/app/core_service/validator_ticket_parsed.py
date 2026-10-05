@@ -2,9 +2,9 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from app.core_model.ticket_parsed import ParsedTicket
-from app.core_model.validation_parsed_file import FileVerdict
-from app.core_model.validation_parsed_report import ValidationReport
+from app.core_model.tickets.file_verdict import FileVerdict
+from app.core_model.tickets.parsed_ticket import ParsedTicket
+from app.core_model.tickets.validation_report import ValidationReport
 from app.core_util.validation_text import describe_validation_error
 
 

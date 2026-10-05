@@ -4,10 +4,10 @@ from pathlib import Path
 import typer
 
 from app.config import Settings
-from app.core_model.rag_index_report import IndexBuildReport
-from app.core_service.rag_indexer import TicketIndexer
-from app.db_qdrant import DbQdrantError, QdrantClient, TicketsCollection
-from app.engine_embedding import EmbeddingClient, EmbeddingError
+from app.core_model.tickets.tickets_index_report import TicketsIndexReport
+from app.core_service.factory_tickets_indexer import build_tickets_indexer
+from app.db_qdrant import DbQdrantError
+from app.engine_embedding import EmbeddingError
 
 # Wspólne dla `rag index` i `rag reindex` — różni je wyłącznie to, czy kolekcja jest najpierw
 # kasowana.
@@ -18,7 +18,7 @@ MAX_LISTED_DROPS = 10
 
 
 def _print_report(
-    report:  IndexBuildReport,  # np. IndexBuildReport(read=200, indexed=171, …)
+    report:  TicketsIndexReport,  # np. TicketsIndexReport(read=200, indexed=171, …)
     verbose: bool,              # np. False
 ) -> None:
     """
@@ -29,7 +29,7 @@ def _print_report(
     działający, i to jedyne miejsce, gdzie tę różnicę widać (CLAUDE.md -> etap 4).
 
     Example args:
-        report=IndexBuildReport(read=200, indexed=171, …)
+        report=TicketsIndexReport(read=200, indexed=171, …)
         verbose=False
 
     Example result:
@@ -65,41 +65,25 @@ def _print_report(
 async def _run(
     directory:  Path,  # np. Path("data/unsafe/parsed")
     drop_first: bool,  # np. True — przebudowa zamiast budowy
-) -> IndexBuildReport:
+) -> TicketsIndexReport:
     """
     Description:
-    Buduje klientów i kolekcję zgłoszeń z `Settings`, uruchamia indeksację i zamyka połączenia.
-
-    Obaj klienci zamykani w `finally`: przebieg, który padnie w połowie, zostawiłby otwarte
-    gniazda, a testy ostrzegałyby o niezamkniętych transportach.
+    Bierze indekser z fabryki, uruchamia indeksację i zamyka połączenia — także wtedy, gdy
+    przebieg padnie w połowie.
 
     Example args:
         directory=Path("data/unsafe/parsed")
         drop_first=False
 
     Example result:
-        IndexBuildReport(read=200, indexed=171, …)
+        TicketsIndexReport(read=200, indexed=171, …)
 
     Raises:
         NotADirectoryError: katalog z artefaktami nie istnieje
         EmbeddingError: embedder nieosiągalny albo odpowiedział błędem
         DbQdrantError: Qdrant nieosiągalny albo odrzucił zapis
     """
-    settings = Settings()
-    embedder = EmbeddingClient(
-        base_url = settings.embedding_base_url,
-        timeout  = settings.embedding_timeout_seconds,
-    )
-    qdrant = QdrantClient(
-        base_url = settings.qdrant_url,
-        timeout  = settings.qdrant_timeout_seconds,
-    )
-    tickets = TicketsCollection(
-        client      = qdrant,
-        name        = settings.qdrant_collection,
-        vector_size = settings.embedding_vector_size,
-    )
-    indexer = TicketIndexer(embedder=embedder, tickets=tickets)
+    indexer = build_tickets_indexer(Settings())
 
     try:
         if drop_first:
@@ -107,8 +91,7 @@ async def _run(
 
         return await indexer.build(directory)
     finally:
-        await embedder.aclose()
-        await qdrant.aclose()
+        await indexer.aclose()
 
 
 def execute_index_build(

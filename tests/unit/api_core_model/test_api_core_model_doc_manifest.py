@@ -3,7 +3,7 @@ from datetime import date
 import pytest
 from pydantic import ValidationError
 
-from app.core_model.doc_manifest import DocManifest
+from app.core_model.docs.doc_manifest import DocManifest
 
 SECTION = {
     "section_id":   "adm-kancelaria-edoreczenia",

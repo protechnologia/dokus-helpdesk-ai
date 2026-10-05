@@ -53,7 +53,7 @@ from app.agent_tools.tickets.find_tickets_vector.models import (
     FindTicketsVectorResult,
     FoundTicket,
 )
-from app.core_service.builder_embedding_text import build_embedding_text
+from app.core_service.builder_ticket_embedding_text import build_embedding_text
 from app.db_qdrant import VECTOR_PROBLEM, DbQdrantConfigError, TicketHit, TicketsCollection
 from app.engine_embedding import EmbeddingClient
 

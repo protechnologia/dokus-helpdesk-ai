@@ -6,7 +6,7 @@ from app.agent_graphs.gate_close.state import GateCloseState
 from app.agent_nodes.agent import FakeAgentNode, tool_call_turn
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
-from app.core_model.gate_verdict import Verdict
+from app.core_model.graphs.verdict import Verdict
 from app.engine_anonymization import FakeAnonymizer
 
 # Werdykt atrapy, gdy nikt nie podał własnego — stały, żeby test, który przypadkiem na nim polega,

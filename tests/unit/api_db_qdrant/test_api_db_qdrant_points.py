@@ -4,8 +4,8 @@ import pytest
 from pydantic import ValidationError
 
 from app.agent_tools.docs.fake_docs import default_sections
-from app.core_model.doc_section import DocSection
-from app.core_model.ticket_parsed import ParsedTicket
+from app.core_model.docs.doc_section import DocSection
+from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.db_qdrant import (
     VECTOR_PROBLEM,
     VECTOR_SECTION,

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import typer
 
-from app.core_model.validation_parsed_report import ValidationReport
+from app.core_model.tickets.validation_report import ValidationReport
 from app.core_service.validator_ticket_parsed import validate_directory
 
 HELP = "Sprawdź pliki JSON w katalogu wobec kontraktu ParsedTicket."

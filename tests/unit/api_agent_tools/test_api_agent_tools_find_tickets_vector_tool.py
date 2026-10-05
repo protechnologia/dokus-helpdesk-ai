@@ -7,7 +7,7 @@ from app.agent_tools.tickets.find_tickets_vector import (
     FindTicketsVectorQuery,
     FindTicketsVectorTool,
 )
-from app.core_model.ticket_parsed import ParsedTicket
+from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.db_qdrant import VECTOR_PROBLEM, DbQdrantConfigError, QdrantClient, TicketsCollection
 from app.engine_embedding import EmbeddingClient
 from tests.helpers_transport import capturing, with_transport

@@ -2,8 +2,8 @@ from datetime import date as Date
 
 from app.agent_nodes.models import LogEntry
 from app.agent_tools import SourceRef
-from app.core_model.ticket_raw import RawTicket
-from app.core_model.ticket_raw_comment import RawComment
+from app.core_model.tickets.raw_comment import RawComment
+from app.core_model.tickets.raw_ticket import RawTicket
 from app.engine_llm import LLMUsage
 from app.entry_routers.models import LogItem, SourceItem, TicketRequest, UsageItem
 

@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any
 
-from app.core_model.ticket_parsed import ParsedTicket
+from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_util.json_schema import json_schema_without_docs
 from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition

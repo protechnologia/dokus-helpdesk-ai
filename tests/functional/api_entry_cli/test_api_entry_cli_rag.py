@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from app.core_model.filter_quality_report import QualityReport
-from app.core_model.filter_quality_verdict import QualityVerdict, RuleHit
-from app.core_model.rag_index_report import IndexBuildReport
+from app.core_model.tickets.quality_report import QualityReport
+from app.core_model.tickets.quality_verdict import QualityVerdict, RuleHit
+from app.core_model.tickets.tickets_index_report import TicketsIndexReport
 from app.db_qdrant import DbQdrantError
 from app.entry_cli.cli import cli
 
@@ -45,7 +45,7 @@ def _corpus(directory: Path) -> Path:
     return directory
 
 
-def _report(indexed: int = 1, dropped_ids: tuple[str, ...] = ()) -> IndexBuildReport:
+def _report(indexed: int = 1, dropped_ids: tuple[str, ...] = ()) -> TicketsIndexReport:
     """
     Description:
     Builds the report a stubbed run returns, with the given tickets marked as dropped.
@@ -55,7 +55,7 @@ def _report(indexed: int = 1, dropped_ids: tuple[str, ...] = ()) -> IndexBuildRe
         dropped_ids=("19596",)
 
     Example result:
-        IndexBuildReport(read=2, indexed=1, filtered=QualityReport(…))
+        TicketsIndexReport(read=2, indexed=1, filtered=QualityReport(…))
     """
     verdicts = [
         QualityVerdict(
@@ -65,7 +65,7 @@ def _report(indexed: int = 1, dropped_ids: tuple[str, ...] = ()) -> IndexBuildRe
         for ticket_id in dropped_ids
     ]
 
-    return IndexBuildReport(
+    return TicketsIndexReport(
         read     = indexed + len(dropped_ids),
         indexed  = indexed,
         filtered = QualityReport(verdicts=verdicts),
@@ -95,10 +95,10 @@ class StubRun:
             StubRun returning a one-record report, recording into `calls`
         """
         self.calls:  list[dict]             = []
-        self.report: IndexBuildReport       = _report()
+        self.report: TicketsIndexReport       = _report()
         self.error:  Exception | None       = None
 
-    async def __call__(self, directory: Path, drop_first: bool) -> IndexBuildReport:
+    async def __call__(self, directory: Path, drop_first: bool) -> TicketsIndexReport:
         """
         Description:
         Records the call and either raises the configured error or returns the report.
@@ -108,7 +108,7 @@ class StubRun:
             drop_first=False
 
         Example result:
-            IndexBuildReport(read=1, indexed=1, …)
+            TicketsIndexReport(read=1, indexed=1, …)
 
         Raises:
             Exception: whatever the test assigned to `error`

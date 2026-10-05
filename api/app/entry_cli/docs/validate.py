@@ -16,10 +16,10 @@ def validate_package(
     """
     Description:
     `helpdesk docs validate` — czyta paczkę dokumentacji i kończy się kodem niezerowym, gdy coś
-    się w niej nie zgadza, więc komenda działa jako bramka przed importem. Żadnej usługi nie
+    się w niej nie zgadza, więc komenda działa jako bramka przed indeksacją. Żadnej usługi nie
     woła: sprawdza wyłącznie pliki.
 
-    Cienki adapter nad `load_doc_package()` — tego samego wczytania używa `helpdesk docs import`,
+    Cienki adapter nad `load_doc_package()` — tego samego wczytania używa `helpdesk docs index`,
     więc paczka, która tu przechodzi, nie zostanie tam odrzucona za błędy.
 
     Example args:

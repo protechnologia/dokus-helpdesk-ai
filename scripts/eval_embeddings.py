@@ -1,32 +1,83 @@
-"""Measure recall@5 of embedding models on the golden set, across models and prefix modes.
+"""Porównuje jakość modeli embeddingowych na golden secie.
 
 Do czego:
-    Rozstrzyga dwie decyzje, których etap 2 świadomie nie podjął: KTÓRY MODEL i KTÓRY TRYB.
-    Obie zapadają pomiarem, nie z góry — i to ten pomiar kasuje jeden z dwóch named vectors
-    (CLAUDE.md -> „Embeddingi i prefiksy PolDense").
+    Ten skrypt sprawdza, jak dobrze model embeddingowy znajduje właściwe zgłoszenie: dla każdego
+    zapytania z golden setu patrzy, na którym miejscu wyników stoi zgłoszenie, które powinno
+    wrócić. Robi to dla każdego podanego modelu i dla obu trybów prefiksów, więc pozwala porównać
+    modele ze sobą i wybrać tryb. Na tej podstawie wybraliśmy PolDense-150M i tryb
+    `query→passage`.
 
-    Skrypt jest repo-level: nie odpytuje usługi `embedder` i nie stawia stacku, bo ładuje modele
-    wprost. Importuje jednak `app.core_model` — po to, żeby tekst do embeddingu budował TA SAMA
-    metoda co przyszła indeksacja (`ParsedTicket.embedding_text()`). Sklejenie go tutaj ręcznie
-    dałoby wynik opisujący coś innego niż produkt.
+        python scripts/eval_embeddings.py recall --model OPI-PIB/PolDense-150M
 
-Flow:
-    1. Wczytuje golden set (`data/unsafe/golden/<zestaw>.json`) i artefakty korpusu.
-    2. Dla każdego modelu ładuje wagi raz, po czym dla każdego trybu:
-       - embeduje CAŁY korpus jako dokumenty (także rekordy odrzucone — są dystraktorami),
-       - embeduje zapytania,
-       - liczy podobieństwo kosinusowe i sprawdza, czy oczekiwany rekord jest w top-K.
-    3. Drukuje tabelę: model × tryb, z rozbiciem per gatunek zapytania i per trudność.
+    Stacku nie potrzebuje: ładuje wagi modelu wprost i liczy podobieństwa w pamięci.
 
-Zasady:
-    - **Prefiksy per model, nie globalnie.** PolDense używa `[query]: `/`[sts]: `, Nomic
-      `search_query: `/`search_document: `, BGE-M3 żadnych. Porównanie „PolDense z prefiksami
-      vs Nomic bez" mierzyłoby nasz błąd, nie modele.
-    - **Korpus przeszukiwany jest NIEPRZEFILTROWANY** — rekordy bez wiedzy zostają jako
-      dystraktory, bo w produkcji filtr etapu 4 też nie będzie doskonały.
-    - **Normalizacja wektorów jest nasza**, tak samo jak w `SentenceTransformerEncoder`:
+Co liczy:
+    1. Czyta golden set (`data/unsafe/golden/<zestaw>.json`): zapytania, każde ze wskazanym
+       zgłoszeniem, które powinno wrócić, i korpus zgłoszeń, w którym się szuka.
+    2. Zamienia na wektory cały korpus i wszystkie zapytania — osobno w każdym trybie.
+    3. Dla każdego zapytania układa zgłoszenia od najbardziej podobnego i zapisuje, na którym
+       miejscu stoi to oczekiwane.
+    4. Drukuje tabelę: model, tryb, a w niej wiersze dla wszystkich zapytań i dla ich grup.
+
+Przykład wyjścia (PolDense-150M, przebieg z 2026-10-05):
+
+    Golden set: golden200.json
+      zapytań: 162, korpus: 200 rekordów (z dystraktorami)
+      długość zapytania: mediana 138 zn.
+
+    OPI-PIB/PolDense-150M
+      ładowanie modelu (pierwszy raz = pobranie wag)…
+        gotowe w 7s, wymiar 768
+      query→passage: embeduję korpus (200 rekordów)…
+        korpus gotowy w 69s
+      query→passage: embeduję zapytania (162)…
+        zapytania gotowe w 31s
+      query→passage
+                                   @1     @2     @3     @4     @5
+        razem                       98.1   98.8   99.4  100.0  100.0   MRR 0.988  (n=162)
+        eksploatacyjne              99.3   99.3  100.0  100.0  100.0   MRR 0.995  (n=135)
+        wdrożeniowo-migracyjne      92.6   96.3   96.3  100.0  100.0   MRR 0.954  (n=27)
+        typowe                      96.7   97.8   98.9  100.0  100.0   MRR 0.979  (n=92)
+        trudne                     100.0  100.0  100.0  100.0  100.0   MRR 1.000  (n=70)
+      sts→sts: embeduję korpus (200 rekordów)…
+        korpus gotowy w 79s
+      sts→sts: embeduję zapytania (162)…
+        zapytania gotowe w 26s
+      sts→sts
+                                   @1     @2     @3     @4     @5
+        razem                       96.9   98.1   98.8   99.4   99.4   MRR 0.980  (n=162)
+        eksploatacyjne              97.0   98.5   99.3  100.0  100.0   MRR 0.982  (n=135)
+        wdrożeniowo-migracyjne      96.3   96.3   96.3   96.3   96.3   MRR 0.968  (n=27)
+        typowe                      94.6   96.7   97.8   98.9   98.9   MRR 0.964  (n=92)
+        trudne                     100.0  100.0  100.0  100.0  100.0   MRR 1.000  (n=70)
+
+Jak czytać tabelę:
+    - `@K` to procent zapytań, dla których oczekiwane zgłoszenie jest w pierwszych K wynikach.
+      `@1 98.1` znaczy: w 98,1% zapytań stoi na pierwszym miejscu; `@5 100.0` — zawsze mieści
+      się w pierwszej piątce.
+    - `MRR` to średnia z 1/miejsce: 1.000, gdy oczekiwane zgłoszenie zawsze jest pierwsze, 0.500,
+      gdy przeciętnie drugie. Jedna liczba mówiąca, jak wysoko model je stawia.
+    - `n` to liczba zapytań w wierszu. Przy n=27 jedno zapytanie waży 3,7 punktu procentowego,
+      więc małe różnice w takim wierszu nic nie znaczą.
+    - „razem" to wszystkie zapytania. Pod spodem te same zapytania podzielone dwa razy: według
+      rodzaju (eksploatacyjne, wdrożeniowo-migracyjne) i według trudności (typowe, trudne).
+    - Dwa bloki to dwa tryby prefiksów. W `query→passage` zapytanie i zgłoszenie są embedowane
+      inaczej (pytanie wobec dokumentu), w `sts→sts` obie strony tak samo (tekst wobec tekstu).
+
+O czym pamiętać przy zmianach:
+    - Prefiksy są ustawiane per model, nie globalnie. PolDense używa `[query]: ` i `[sts]: `,
+      Nomic `search_query: ` i `search_document: `, BGE-M3 żadnych. Porównanie „PolDense
+      z prefiksami wobec Nomica bez" mierzyłoby nasz błąd, nie modele.
+    - Korpus przeszukiwany jest nieprzefiltrowany: rekordy bez wiedzy zostają jako dystraktory,
+      bo w produkcji filtr jakości też nie będzie doskonały.
+    - Wektory normalizujemy sami, tak jak `SentenceTransformerEncoder` w usłudze `embedder`:
       PolDense nie ma modułu `Normalize`, więc bez tego progi znaczyłyby co innego niż
       na produkcji.
+    - Tekst zgłoszenia do embeddingu buduje `ParsedTicket.embedding_text()`, ta sama metoda co
+      indeksacja — dlatego skrypt importuje `app.core_model`. Sklejony tutaj ręcznie opisywałby
+      coś innego niż produkt.
+    - Zapytania idą surowe, tak jak wpływają do helpdesku. Wyniki na 200 rekordach to sufit
+      zadania, a nie skuteczność produktu: każde zapytanie ma w korpusie swój cel.
 """
 
 import json
@@ -45,7 +96,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 # `app` mieszka w api/ i nie jest na ścieżce przy uruchomieniu `python scripts/...`.
 sys.path.insert(0, str(REPO_ROOT / "api"))
 
-from app.core_model.ticket_parsed import ParsedTicket  # noqa: E402  (import po ustawieniu sys.path)
+from app.core_model.tickets.parsed_ticket import ParsedTicket  # noqa: E402  (po sys.path)
 
 DEFAULT_GOLDEN = REPO_ROOT / "data" / "unsafe" / "golden" / "golden200.json"
 

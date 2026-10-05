@@ -34,7 +34,7 @@ from pathlib import Path
 
 import pytest
 
-from app.core_model.ticket_parsed import ParsedTicket
+from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_service.filter_ticket_quality import filter_tickets
 
 # Korpus odniesienia i etykiety z jego przeglądu; oba mają przetrwać masowy import (p. 31).

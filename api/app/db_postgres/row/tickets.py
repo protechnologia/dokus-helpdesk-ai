@@ -2,7 +2,7 @@ from datetime import date as Date
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core_model.ticket_raw import RawTicket
+from app.core_model.tickets.raw_ticket import RawTicket
 
 
 class TicketRow(BaseModel):

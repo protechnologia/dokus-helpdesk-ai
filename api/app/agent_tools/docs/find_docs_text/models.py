@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.agent_tools.models import ExactText, MatchKind
-from app.core_model.doc_section import DocSection
+from app.core_model.docs.doc_section import DocSection
 
 
 class FindDocsTextQuery(BaseModel):

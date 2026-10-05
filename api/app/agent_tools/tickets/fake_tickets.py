@@ -24,7 +24,7 @@ O czym pamiętać przy zmianach:
 
 from datetime import date
 
-from app.core_model.ticket_parsed import ParsedTicket
+from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.db_postgres.row.tickets import TicketRow
 
 QUEUE_THREAD = "\n".join([

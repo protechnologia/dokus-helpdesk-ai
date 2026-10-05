@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from app.core_model.dict_rule_set import RuleSet
+from app.core_model.dicts.rule_set import RuleSet
 
 # Wbudowane zestawy domyślne, po jednym na graf z regułami. Magazyn reguł (p. 29) podmienia ŹRÓDŁO
 # — wołający pytają o zestaw tutaj, więc żaden z nich nie dowie się, skąd przyszedł.

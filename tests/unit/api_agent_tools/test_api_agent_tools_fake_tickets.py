@@ -9,7 +9,7 @@ from app.agent_tools.tickets.read_tickets_thread import (
     FakeReadTicketsThreadTool,
     ReadTicketsThreadQuery,
 )
-from app.core_model.ticket_raw import RawTicket
+from app.core_model.tickets.raw_ticket import RawTicket
 
 # Zmyślone zgłoszenia wspólne dla atrap czterech narzędzi: numer z atrapy wyszukiwania ma dać się
 # odczytać atrapą odczytu, tak jak na produkcji.

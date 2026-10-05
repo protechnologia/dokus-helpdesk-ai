@@ -32,11 +32,11 @@ class DocsCollection(VectorCollection):
     Kolekcja dokumentacji: zakładanie, zapis fragmentów sekcji i szukanie po wektorze.
 
     Do czego:
-    Tu import dokumentacji zapisuje fragmenty, a `find_docs_vector` weźmie stąd sekcje pasujące
+    Tu indekser dokumentacji zapisuje fragmenty, a `find_docs_vector` weźmie stąd sekcje pasujące
     znaczeniowo do zagadnienia (CLAUDE.md -> p. 8). Mechanika żądań stoi w klasie bazowej.
 
     Flow:
-        1. Import: `drop()` i `ensure()` z klasy bazowej, potem `upsert()`.
+        1. Indeksacja: `drop()` i `ensure()` z klasy bazowej, potem `upsert()`.
         2. Narzędzie: `search()` → trafienia `DocHit`, od najbardziej podobnego fragmentu.
     """
 
