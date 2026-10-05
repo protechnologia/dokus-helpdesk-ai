@@ -2,6 +2,7 @@ from importlib.metadata import version
 
 import typer
 
+from app.entry_cli.docs import docs
 from app.entry_cli.rag import rag
 from app.entry_cli.tickets import tickets
 
@@ -10,19 +11,21 @@ from app.entry_cli.tickets import tickets
 # Obszar to pakiet w `entry_cli/`, czynność to plik w nim:
 # `helpdesk rag index` → `entry_cli/rag/index.py`.
 #
-# | komenda                   | plik                  | co robi                        |
-# |---------------------------|-----------------------|--------------------------------|
-# | `version`                 | `cli.py`              | wersja pakietu; smoke test CLI |
-# | `tickets validate <kat.>` | `tickets/validate.py` | artefakty wobec ParsedTicket   |
-# | `rag index <kat.>`        | `rag/index.py`        | artefakty do kolekcji Qdranta  |
-# | `rag reindex <kat.>`      | `rag/reindex.py`      | kolekcja od zera               |
+# | komenda                   | plik                  | co robi                          |
+# |---------------------------|-----------------------|----------------------------------|
+# | `version`                 | `cli.py`              | wersja pakietu; smoke test CLI   |
+# | `tickets validate <kat.>` | `tickets/validate.py` | artefakty wobec ParsedTicket     |
+# | `rag index <kat.>`        | `rag/index.py`        | artefakty do kolekcji Qdranta    |
+# | `rag reindex <kat.>`      | `rag/reindex.py`      | kolekcja od zera                 |
+# | `docs validate <kat.>`    | `docs/validate.py`    | paczka dokumentacji wobec plików |
+# | `docs import <kat.>`      | `docs/import_.py`     | indeks dokumentacji od zera      |
 #
 # Zaplanowane (p. 46): komendy na grafach — wyszukiwanie, parsowanie zgłoszeń, propozycje; bramki
 # i „Popraw" stoją POZA obszarem `rag`, bo z definicji działają bez indeksu.
 #
 # no_args_is_help: samo `helpdesk` drukuje drzewo, zamiast błędu użycia.
 cli = typer.Typer(
-    help            = "Narzędzia operatora: walidacja artefaktów i indeksacja.",
+    help            = "Narzędzia operatora: walidacja artefaktów, indeksacja i dokumentacja.",
     no_args_is_help = True,
 )
 
@@ -30,6 +33,7 @@ cli = typer.Typer(
 # płaskiej listy coraz dłuższych jednoczłonowych nazw.
 cli.add_typer(tickets, name="tickets")
 cli.add_typer(rag, name="rag")
+cli.add_typer(docs, name="docs")
 
 
 @cli.callback()

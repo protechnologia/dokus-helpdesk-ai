@@ -60,11 +60,13 @@ class Settings(BaseSettings):
     # --- Qdrant ---
     qdrant_url:              str   = "http://qdrant:6333"
     qdrant_collection:       str   = "tickets"
+    # Kolekcja dokumentacji: fragmenty sekcji instrukcji, obok kolekcji zgłoszeń.
+    qdrant_docs_collection:  str   = "docs"
     qdrant_timeout_seconds:  float = 30.0               # seconds
 
     # --- Postgres: indeks wyszukiwania tekstowego (od p. 29 także reguły bramek) ---
     # Host i port po stronie sieci compose. Hasło nie ma wartości w kodzie: compose podaje
-    # dev-ową, a klient bazy ma odmówić startu bez niej (p. 49).
+    # dev-ową, a klient bazy odmawia startu bez niej.
     postgres_host:            str        = "postgres"
     postgres_port:            int        = 5432
     postgres_db:              str        = "helpdesk"
@@ -88,6 +90,10 @@ class Settings(BaseSettings):
     # both sides score low however well they match — so this threshold systematically penalises the
     # shortest records. Do NOT raise without re-measuring: 0.50 takes four more.
     rag_score_min: float = 0.48                         # cosine similarity, range -1.0 .. 1.0
+    # Najwyżej tyle znaków ma fragment sekcji dokumentacji, z którego powstaje jeden wektor.
+    # Wartość wstępna — rozstrzyga pomiar na paczce syntetycznej (CLAUDE.md -> p. 8). Zmiana
+    # wymaga ponownego `helpdesk docs import`.
+    rag_docs_fragment_chars: int = Field(default=1500, ge=1)
 
     # --- agent: limity wywołań narzędzi w jednym przebiegu grafu ---
     # Ile razy model może wywołać dane narzędzie przy jednej sprawie. Chroni przed pętlą, która

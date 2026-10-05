@@ -35,9 +35,10 @@ i dwie klasy o tej samej nazwie w jednym pliku łatwo pomylić.
 from app.db_postgres.client import PostgresClient
 from app.db_postgres.errors import DbPostgresConfigError, DbPostgresError
 from app.db_postgres.row import DocRow, TicketRow
-from app.db_postgres.table import DocsTable, TicketsTable
+from app.db_postgres.table import DOCS_TABLE, DocsTable, TicketsTable
 
 __all__ = [
+    "DOCS_TABLE",
     "DbPostgresConfigError",
     "DbPostgresError",
     "DocRow",

@@ -9,8 +9,9 @@ Tabela dokumentacji w Postgresie: klasa i jej SQL w jednym katalogu.
 | `table.py`    | `DocsTable` — zapis, szukanie i odczyt sekcji |
 """
 
-from app.db_postgres.table.docs.table import DocsTable
+from app.db_postgres.table.docs.table import DOCS_TABLE, DocsTable
 
 __all__ = [
+    "DOCS_TABLE",
     "DocsTable",
 ]

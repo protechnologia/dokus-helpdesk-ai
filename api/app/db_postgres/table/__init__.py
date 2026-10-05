@@ -14,10 +14,11 @@ Każda tabela ma swój katalog: klasę w `table.py` i SQL obok, w plikach `_crea
 i `_upsert.sql`. Nowa tabela to nowy katalog.
 """
 
-from app.db_postgres.table.docs import DocsTable
+from app.db_postgres.table.docs import DOCS_TABLE, DocsTable
 from app.db_postgres.table.tickets import TicketsTable
 
 __all__ = [
+    "DOCS_TABLE",
     "DocsTable",
     "TicketsTable",
 ]

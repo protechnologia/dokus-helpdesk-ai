@@ -312,29 +312,41 @@ async def test_docs_are_created_with_the_section_vector(docs: DocsCollection) ->
     assert await docs.ensure() is False
 
 
-async def test_a_section_reads_back_as_the_same_section(docs: DocsCollection) -> None:
-    """Zapisana sekcja → odczytana po `section_id`, a jej payload wraca do tej samej
-    `DocSection`, z datą i ścieżką rozdziału."""
+async def test_fragments_of_a_section_are_stored_as_separate_points(docs: DocsCollection) -> None:
+    """Dwa fragmenty jednej sekcji → dwa punkty; oba wracają z wyszukiwania i payload każdego
+    odtwarza tę samą `DocSection`, z datą i ścieżką rozdziału."""
     await docs.ensure()
 
     section = SECTIONS[0]
-    point   = DocPoint.from_section(section, [0.1, 0.2, 0.3, 0.4])
+    first   = DocPoint.from_fragment(section, 0, [0.1, 0.2, 0.3, 0.4])
+    second  = DocPoint.from_fragment(section, 1, [0.4, 0.3, 0.2, 0.1])
 
-    assert await docs.upsert([point]) == 1
+    assert await docs.upsert([first, second]) == 2
+    assert await docs.count()                 == 2
 
-    stored = (await docs.read_by_id([section.section_id]))[0]
+    hits = await docs.search(vector=first.vector_section, limit=5)
 
-    assert stored.section_id == section.section_id
-    assert DocSection.model_validate(stored.payload)            == section
-    assert _cosine(stored.vector_section, point.vector_section) == pytest.approx(1.0)
+    assert [hit.point_id for hit in hits] == [first.point_id, second.point_id]
+    assert all(DocSection.model_validate(hit.payload) == section for hit in hits)
+
+
+async def test_reimporting_the_same_fragment_overwrites_it(docs: DocsCollection) -> None:
+    """Ten sam fragment zapisany dwa razy → jeden punkt: identyfikator wynika z sekcji
+    i numeru fragmentu."""
+    await docs.ensure()
+
+    await docs.upsert([DocPoint.from_fragment(SECTIONS[0], 0, [0.1, 0.2, 0.3, 0.4])])
+    await docs.upsert([DocPoint.from_fragment(SECTIONS[0], 0, [0.4, 0.3, 0.2, 0.1])])
+
+    assert await docs.count() == 1
 
 
 async def test_doc_search_ranks_the_nearest_section_first(docs: DocsCollection) -> None:
     """Wektor zapytania → sekcje w kolejności podobieństwa, z opisem w payloadzie."""
     await docs.ensure()
 
-    near = DocPoint.from_section(SECTIONS[0], [0.1, 0.1, 0.1, 0.1])
-    far  = DocPoint.from_section(SECTIONS[1], [0.1, 0.1, -0.1, -0.1])
+    near = DocPoint.from_fragment(SECTIONS[0], 0, [0.1, 0.1, 0.1, 0.1])
+    far  = DocPoint.from_fragment(SECTIONS[1], 0, [0.1, 0.1, -0.1, -0.1])
 
     await docs.upsert([far, near])
 

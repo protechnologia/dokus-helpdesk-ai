@@ -46,7 +46,7 @@ TICKET_POINT = TicketPoint(
     payload        = {"ticket_id": "33644"},
 )
 
-DOC_POINT = DocPoint.from_section(default_sections()[0], [0.5, 0.6])
+DOC_POINT = DocPoint.from_fragment(default_sections()[0], 0, [0.5, 0.6])
 
 
 def _collection(
@@ -268,7 +268,7 @@ async def test_ticket_upsert_sends_named_vectors_and_waits() -> None:
 
 
 async def test_doc_upsert_sends_the_section_vector() -> None:
-    """Punkt sekcji → na drucie wektor pod nazwą `section` i opis sekcji w payloadzie."""
+    """Punkt fragmentu → na drucie wektor pod nazwą `section` i opis sekcji w payloadzie."""
     seen: list = []
     collection = _collection(DocsCollection, capturing(seen))
 
@@ -415,7 +415,7 @@ async def test_ticket_search_returns_hits_in_the_order_qdrant_gave_them() -> Non
 
 async def test_doc_search_asks_the_section_space() -> None:
     """`search()` dokumentacji → `using: section` bez podawania nazwy: wektor jest jeden,
-    a trafienie niesie identyfikator sekcji."""
+    a trafienie we fragment niesie identyfikator jego sekcji."""
     seen: list = []
     collection = _collection(
         DocsCollection,
@@ -529,29 +529,19 @@ async def test_a_ticket_missing_from_the_collection_is_missing_from_the_result()
     assert [point.ticket_id for point in points] == ["33644"]
 
 
-@pytest.mark.parametrize("kind, vectors", COLLECTIONS)
-async def test_reading_nothing_asks_nothing(kind: type, vectors: tuple) -> None:
+async def test_reading_nothing_asks_nothing() -> None:
     """Pusta lista identyfikatorów → pusty wynik bez żądania."""
     seen: list = []
-    collection = _collection(kind, capturing(seen))
+    collection = _collection(TicketsCollection, capturing(seen))
 
     assert await collection.read_by_id([]) == []
     assert seen                           == []
 
 
-async def test_doc_read_asks_by_section_ids() -> None:
-    """Identyfikatory sekcji → punkty sekcji, z opisem i wektorem, pod identyfikatorem
-    wyliczonym z `section_id`."""
-    seen: list = []
-    collection = _collection(
-        DocsCollection,
-        capturing(seen, {("POST", PATH_POINTS): _stored(DOC_POINT.to_qdrant())}),
-    )
-
-    points = await collection.read_by_id([DOC_POINT.section_id])
-
-    assert seen[0]["body"]["ids"] == [point_id_for(DOC_POINT.section_id)]
-    assert points                 == [DOC_POINT]
+def test_docs_are_not_read_by_id() -> None:
+    """Kolekcja dokumentacji → bez odczytu po identyfikatorze: sekcja ma kilka punktów, a jej
+    treść czyta się z Postgresa."""
+    assert not hasattr(DocsCollection, "read_by_id")
 
 
 async def test_read_of_a_point_built_otherwise_is_a_config_error() -> None:

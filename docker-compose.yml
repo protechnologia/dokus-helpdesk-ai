@@ -50,12 +50,14 @@ services:
       EMBEDDING_TIMEOUT_SECONDS: ${EMBEDDING_TIMEOUT_SECONDS:-120}
       QDRANT_URL:                ${QDRANT_URL:-http://qdrant:6333}
       QDRANT_COLLECTION:         ${QDRANT_COLLECTION:-tickets}
+      QDRANT_DOCS_COLLECTION:    ${QDRANT_DOCS_COLLECTION:-docs}
       QDRANT_TIMEOUT_SECONDS:    ${QDRANT_TIMEOUT_SECONDS:-30}
       # Retrieval tuning. Passed explicitly even though both have defaults in code: a field the
       # service never receives is the failure that announces itself with nothing — the container
       # starts, reports healthy and quietly runs on the code default.
       RAG_TOP_K:                 ${RAG_TOP_K:-5}
       RAG_SCORE_MIN:             ${RAG_SCORE_MIN:-0.48}
+      RAG_DOCS_FRAGMENT_CHARS:   ${RAG_DOCS_FRAGMENT_CHARS:-1500}
       # Postgres: host i port to strona KONTENERA (nazwa usługi i 5432), nie DOCKER_POSTGRES_PORT.
       # Baza, użytkownik i hasło to te same zmienne, które dostaje usługa `postgres` — jedno
       # źródło, więc obie strony nie mogą się rozjechać.

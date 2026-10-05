@@ -99,7 +99,7 @@ class TextTable:
         3. `_find_words()`, `_find_phrase()` i `_find_substring()` szukają, `_read_by_id()`
            i `_list()` czytają — wszystkie oddają wiersze jako słowniki kolumna → wartość, bez
            kolumn wyliczanych, a na swój model zamienia je podklasa.
-        4. `drop()` kasuje tabelę.
+        4. `drop()` kasuje tabelę, `aclose()` zamyka jej klienta.
     """
 
     def __init__(
@@ -160,6 +160,21 @@ class TextTable:
             DbPostgresError: baza nie odpowiedziała albo odrzuciła polecenie
         """
         await self._client.execute(f"DROP TABLE IF EXISTS {self._sql_name}")
+
+    async def aclose(self) -> None:
+        """
+        Description:
+        Zamyka klienta, na którym stoi tabela — żeby ten, kto dostał samą tabelę, mógł po sobie
+        posprzątać. Klient bywa wspólny dla kilku tabel; zamknięcie przez jedną zamyka go
+        wszystkim, a powtórne zamknięcie nic nie robi.
+
+        Example args:
+            (brak)
+
+        Example result:
+            None
+        """
+        await self._client.aclose()
 
     async def _require_search_config(self) -> None:
         """

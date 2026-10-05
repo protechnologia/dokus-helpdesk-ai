@@ -26,7 +26,7 @@ TICKET_PAYLOAD = {
 }
 
 # Payload sekcji taki, jaki zapisuje `DocPoint`.
-SECTION_PAYLOAD = DocPoint.from_section(SECTION, [0.1, 0.2]).payload
+SECTION_PAYLOAD = DocPoint.from_fragment(SECTION, 0, [0.1, 0.2]).payload
 
 
 # --- trafienie zgłoszenia -----------------------------------------------------------------
@@ -78,7 +78,8 @@ def test_ticket_hit_refuses_an_unknown_field() -> None:
 # --- trafienie dokumentacji ---------------------------------------------------------------
 
 def test_doc_hit_reads_a_qdrant_entry() -> None:
-    """Wpis odpowiedzi wyszukiwania → trafienie sekcji z podobieństwem i opisem z payloadu."""
+    """Wpis odpowiedzi wyszukiwania → trafienie we fragment: podobieństwo i opis jego sekcji
+    z payloadu."""
     hit = DocHit.from_qdrant({"id": "a", "score": 0.74, "payload": SECTION_PAYLOAD})
 
     assert hit.point_id   == "a"

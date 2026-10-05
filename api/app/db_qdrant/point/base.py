@@ -22,13 +22,13 @@ POINT_ID_NAMESPACE = uuid.UUID("6f1d5a3c-6b8e-5e2a-9a44-0f2c6f9c1b77")
 
 
 def point_id_for(
-    source_id: str,  # np. "33644" albo "adm-kancelaria-edoreczenia"
+    source_id: str,  # np. "33644" albo "adm-kancelaria-edoreczenia#0"
 ) -> str:
     """
     Description:
-    Zamienia identyfikator źródłowy — numer zgłoszenia albo identyfikator sekcji — na UUID,
-    którego wymaga Qdrant. Ten sam identyfikator daje zawsze ten sam punkt, więc ponowna
-    indeksacja nadpisuje, a odczyt po identyfikatorze nie potrzebuje wyszukiwania.
+    Zamienia identyfikator źródłowy — numer zgłoszenia albo identyfikator sekcji z numerem
+    fragmentu — na UUID, którego wymaga Qdrant. Ten sam identyfikator daje zawsze ten sam punkt,
+    więc ponowna indeksacja nadpisuje, a odczyt po identyfikatorze nie potrzebuje wyszukiwania.
 
     Example args:
         source_id="33644"

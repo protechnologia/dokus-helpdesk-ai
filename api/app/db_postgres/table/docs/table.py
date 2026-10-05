@@ -50,14 +50,14 @@ class DocsTable(TextTable):
     zakładania i zapisu leży obok, w plikach `.sql`.
 
     Flow:
-        1. Import dokumentacji: `create()`, potem `upsert()` (p. 49).
+        1. Import dokumentacji: `drop()`, `create()`, potem `upsert()`.
         2. Narzędzia: `list_all()`, metody szukania, `read_by_id()` — wszystkie oddają `DocRow`.
     """
 
     def __init__(
         self,
         client: PostgresClient,    # np. PostgresClient(host="postgres", …)
-        name:   str = DOCS_TABLE,  # inna nazwa tylko w testach — własna tabela testu
+        name:   str = DOCS_TABLE,  # inna nazwa: indeks syntetyczny albo tabela testu
     ):
         """
         Description:

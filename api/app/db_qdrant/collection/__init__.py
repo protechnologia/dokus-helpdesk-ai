@@ -7,7 +7,7 @@ mechaniką wspólną z `base.py`.
 | plik         | klasa               | co trzyma kolekcja                                     |
 |--------------|---------------------|--------------------------------------------------------|
 | `tickets.py` | `TicketsCollection` | karty zgłoszeń, wektory `problem` i `sts`              |
-| `docs.py`    | `DocsCollection`    | opisy sekcji dokumentacji, wektor `section`            |
+| `docs.py`    | `DocsCollection`    | fragmenty sekcji dokumentacji, wektor `section`        |
 | `base.py`    | `VectorCollection`  | mechanika wspólna: zakładanie, zapis, szukanie, odczyt |
 
 Kolekcja to plik, nie katalog jak tabela w `db_postgres/`: nie ma obok plików `.sql`, a jej

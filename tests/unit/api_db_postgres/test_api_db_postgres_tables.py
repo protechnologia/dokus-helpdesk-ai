@@ -44,6 +44,7 @@ class StubClient:
         self._value = value
 
         self.calls: list[tuple] = []
+        self.closed = False
 
     async def fetch_rows(self, sql: str, *args: object) -> list[dict]:
         """
@@ -90,6 +91,19 @@ class StubClient:
             None
         """
         self.calls.append((sql, *args))
+
+    async def aclose(self) -> None:
+        """
+        Description:
+        Zapisuje, że klient został zamknięty.
+
+        Example args:
+            (brak)
+
+        Example result:
+            None
+        """
+        self.closed = True
 
 
 # --- nazwa i zakładanie tabeli ---
@@ -238,3 +252,13 @@ async def test_sections_are_listed_in_the_order_of_the_documents() -> None:
 
     assert listed == [DOC_ROW]
     assert "ORDER BY document, version, ordinal" in client.calls[0][0]
+
+
+@pytest.mark.parametrize("table", TABLES)
+async def test_aclose_closes_the_client_the_table_stands_on(table: type) -> None:
+    """`aclose()` tabeli → zamknięty klient: kto dostał samą tabelę, może po sobie posprzątać."""
+    client = StubClient()
+
+    await table(client).aclose()
+
+    assert client.closed

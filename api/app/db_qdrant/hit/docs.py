@@ -1,12 +1,13 @@
 """
 Description:
-Trafienie sekcji dokumentacji: to, co oddaje wyszukiwanie w kolekcji dokumentacji —
-identyfikator punktu, podobieństwo i opis sekcji z payloadu.
+Trafienie w dokumentacji: to, co oddaje wyszukiwanie w kolekcji dokumentacji — identyfikator
+punktu, podobieństwo i opis sekcji z payloadu. Trafia się we FRAGMENT sekcji, więc kilka trafień
+może wskazywać tę samą sekcję.
 
 Wpis odpowiedzi Qdranta:
 
     {
-      "id":      "c8810a95-5834-535a-badc-c8f9d1c090c7",
+      "id":      "bc925b88-f5ba-5cda-aa43-65a036e4820d",
       "score":   0.74,
       "payload": {"section_id": "adm-kancelaria-edoreczenia", "document": "Instrukcja…",
                   "version": "4.12", "title": "Uprawnienie do kancelarii e-Doręczeń", …}
@@ -14,8 +15,10 @@ Wpis odpowiedzi Qdranta:
 
 O czym pamiętać przy zmianach:
 
-- Payload zapisuje `DocPoint` (`point/docs.py`) i jest to opis sekcji z metryczki, bez treści.
-- Trafienie nie ma wektora. Punkt z wektorem oddaje odczyt po identyfikatorze sekcji.
+- Payload zapisuje `DocPoint` (`point/docs.py`) i jest to opis sekcji z metryczki, bez treści
+  i bez numeru fragmentu.
+- Trafienia tej samej sekcji zwija do jednego wyniku narzędzie `find_docs_vector`
+  (CLAUDE.md -> p. 8), nie kolekcja.
 """
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -24,8 +27,8 @@ from pydantic import BaseModel, ConfigDict, Field
 class DocHit(BaseModel):
     """
     Description:
-    Jedna sekcja dokumentacji tak, jak oddało ją wyszukiwanie: podobieństwo i opis sekcji
-    z payloadu.
+    Jeden fragment sekcji dokumentacji tak, jak oddało go wyszukiwanie: podobieństwo i opis
+    sekcji z payloadu.
 
     Do czego:
     Model TRANSPORTU, strona wyszukiwania obok `DocPoint`. Z niego `find_docs_vector` zbuduje wiersz
@@ -38,7 +41,7 @@ class DocHit(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    point_id: str   = Field(examples=["c8810a95-5834-535a-badc-c8f9d1c090c7"])
+    point_id: str   = Field(examples=["bc925b88-f5ba-5cda-aa43-65a036e4820d"])
     score:    float = Field(examples=[0.74])
     payload:  dict  = Field(examples=[{"section_id": "adm-kancelaria-edoreczenia"}])
 
@@ -67,11 +70,11 @@ class DocHit(BaseModel):
         odrzuci każdy próg.
 
         Example args:
-            entry={"id": "c8810a95-…", "score": 0.74,
+            entry={"id": "bc925b88-…", "score": 0.74,
                    "payload": {"section_id": "adm-kancelaria-edoreczenia"}}
 
         Example result:
-            DocHit(point_id="c8810a95-…", score=0.74, payload={"section_id": "adm-…"})
+            DocHit(point_id="bc925b88-…", score=0.74, payload={"section_id": "adm-…"})
         """
         hit = cls(
             point_id = str(entry.get("id", "")),

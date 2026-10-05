@@ -16,8 +16,9 @@ from app.db_qdrant import (
     point_id_for,
 )
 
-# Punkty obu materiałów: przejście z modelu dziedziny na to, co trzyma Qdrant, i z powrotem
-# z tego, co Qdrant oddaje przy odczycie po identyfikatorze. Bez transportu — same modele.
+# Punkty obu materiałów: przejście z modelu dziedziny na to, co trzyma Qdrant, a dla zgłoszeń
+# także z powrotem, z tego, co Qdrant oddaje przy odczycie po identyfikatorze. Bez transportu —
+# same modele.
 
 # Ten sam rekord wyjściowy, od którego odchodzą testy `ParsedTicket`, żeby zmiana schematu
 # psuła oba pliki tak samo.
@@ -177,19 +178,29 @@ def test_ticket_point_refuses_an_unknown_field() -> None:
 
 # --- punkt dokumentacji -------------------------------------------------------------------
 
-def test_doc_point_id_comes_from_the_section_id() -> None:
-    """Sekcja → punkt o identyfikatorze wyliczonym z `section_id`: ten sam identyfikator
-    wskazują oba wyszukiwania i odczyt."""
-    point = DocPoint.from_section(SECTION, VECTOR_A)
+def test_doc_point_id_comes_from_the_section_and_the_fragment() -> None:
+    """Fragment sekcji → punkt o identyfikatorze wyliczonym z `section_id` i numeru fragmentu,
+    a sam `section_id` zostaje w payloadzie: po nim trafienie wskazuje sekcję."""
+    point = DocPoint.from_fragment(SECTION, 0, VECTOR_A)
 
-    assert point.point_id   == point_id_for(SECTION.section_id)
+    assert point.point_id   == point_id_for(f"{SECTION.section_id}#0")
     assert point.section_id == SECTION.section_id
+
+
+def test_fragments_of_one_section_are_different_points() -> None:
+    """Dwa fragmenty tej samej sekcji → dwa różne punkty z tym samym opisem sekcji; inaczej
+    drugi nadpisałby pierwszy."""
+    first  = DocPoint.from_fragment(SECTION, 0, VECTOR_A)
+    second = DocPoint.from_fragment(SECTION, 1, VECTOR_B)
+
+    assert first.point_id != second.point_id
+    assert first.payload  == second.payload
 
 
 def test_doc_payload_reads_back_as_the_same_section() -> None:
     """Payload punktu → z powrotem ta sama `DocSection`, z datą i ścieżką rozdziału: tak
     `find_docs_vector` odtworzy wiersz spisu."""
-    payload = DocPoint.from_section(SECTION, VECTOR_A).payload
+    payload = DocPoint.from_fragment(SECTION, 0, VECTOR_A).payload
 
     assert payload["date"]         == SECTION.date.isoformat()
     assert payload["chapter_path"] == SECTION.chapter_path
@@ -197,8 +208,8 @@ def test_doc_payload_reads_back_as_the_same_section() -> None:
 
 
 def test_doc_payload_carries_no_body() -> None:
-    """Payload sekcji → same pola opisu z metryczki; treść sekcji leży w Postgresie."""
-    payload = DocPoint.from_section(SECTION, VECTOR_A).payload
+    """Payload fragmentu → same pola opisu sekcji z metryczki; treść leży w Postgresie."""
+    payload = DocPoint.from_fragment(SECTION, 0, VECTOR_A).payload
 
     assert set(payload) == set(DocSection.model_fields)
 
@@ -206,22 +217,7 @@ def test_doc_payload_carries_no_body() -> None:
 def test_doc_wire_shape_names_its_vector() -> None:
     """`to_qdrant()` → wektor pod nazwą `section`, choć jest jeden: goły wektor trafiłby do
     kolekcji bez nazwanych przestrzeni."""
-    wire = DocPoint.from_section(SECTION, VECTOR_A).to_qdrant()
+    wire = DocPoint.from_fragment(SECTION, 0, VECTOR_A).to_qdrant()
 
     assert set(wire)      == {"id", "vector", "payload"}
     assert wire["vector"] == {VECTOR_SECTION: VECTOR_A}
-
-
-def test_doc_point_reads_back_from_its_own_wire_shape() -> None:
-    """Punkt sekcji zapisany i odczytany → ten sam punkt."""
-    point = DocPoint.from_section(SECTION, VECTOR_A)
-
-    assert DocPoint.from_qdrant(point.to_qdrant()) == point
-
-
-def test_doc_point_without_its_vector_is_a_config_error() -> None:
-    """Odczytany punkt bez wektora `section` → błąd konfiguracji, jak w zgłoszeniach."""
-    entry = {"id": "a", "vector": {VECTOR_PROBLEM: VECTOR_A}, "payload": {}}
-
-    with pytest.raises(DbQdrantConfigError, match=VECTOR_SECTION):
-        DocPoint.from_qdrant(entry)

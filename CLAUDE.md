@@ -266,7 +266,7 @@ dokus-helpdesk-ai/
 │       ├── raw/                  # zgłoszenia źródłowe jak przyszły
 │       ├── parsed/               # sparsowane JSON-y (trwały artefakt, zasada 7)
 │       ├── golden/               # zestawy do ewaluacji: zgłoszenia, dystraktory
-│       ├── instruction/          # właściwa dokumentacja (p. 49, p. 55)
+│       ├── instruction/          # właściwa dokumentacja (p. 55)
 │       └── docs/                 # raporty z pomiarów i dokumenty projektu
 ├── api/                          # folder = usługa z compose, nazwany tak samo
 │   ├── Dockerfile
@@ -280,8 +280,8 @@ dokus-helpdesk-ai/
 │       ├── entry_routers/        # trasy: katalog na zasób (router.py + models.py z modelami API);
 │       │                         #   wspólne modele API i mapowanie na górze pakietu
 │       │                         # --- nasza strona: podział po RODZAJU obiektu ---
-│       ├── core_model/           # ticket_*, validation_parsed_*, dict_resolution_*
-│       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, rag_indexer
+│       ├── core_model/           # ticket_*, validation_parsed_*, dict_resolution_*, doc_*
+│       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, importer_*, factory_*, rag_indexer
 │       ├── core_text/            # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
 │       ├── core_util/            # html, validation_text, time
 │       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
@@ -361,8 +361,8 @@ dokus-helpdesk-ai/
   **bezgłośnie**.
 - **Nazwa pliku mówi, CO ROBI, nie czego dotyczy** — `validator_ticket_parsed.py`, nie
   `artifacts.py`. W `core_service/` oś `<rola>_<przedmiot>` (`parser_`, `validator_`, `builder_`,
-  `loader_`, `filter_`, `normalizer_`), w `core_model/` prefiks tematyczny grupujący alfabetycznie
-  (`ticket_*`, `validation_parsed_*`, `dict_*`, `filter_*`).
+  `loader_`, `filter_`, `normalizer_`, `importer_`, `factory_`), w `core_model/` prefiks tematyczny
+  grupujący alfabetycznie (`ticket_*`, `validation_parsed_*`, `dict_*`, `doc_*`, `filter_*`).
   - **Gdy reguł jest wiele i przybywa ich szybciej niż logiki wokół nich, idą do osobnego pliku**
     (`filter_ticket_quality.py` + `filter_ticket_quality_rules.py`): dwa różne rytmy zmian, a plik
     reguł czyta się jak listę, nie jak kod. Każda reguła to funkcja modułowa — bezstanowa, więc
@@ -851,16 +851,34 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — import i narzędzia powstają na 
 - **Paczka to katalog na dokument:** `manifest.json` (`document`, `version`, `date`, `synthetic`
   i `sections` w kolejności dokumentu: `section_id`, `chapter_path`, `title`, `description`) oraz
   plik `<section_id>.md` z samą treścią na sekcję. Właściwa dokumentacja trafi do
-  `data/unsafe/instruction/`, paczka syntetyczna leży w `data/safe/instruction/`.
+  `data/unsafe/instruction/`, paczka syntetyczna leży w `data/safe/instruction/`. Zgodność
+  manifestu z katalogiem jest sprawdzana w obie strony (`helpdesk docs validate`): plik `.md` bez
+  wpisu to sekcja, która po cichu nie trafiłaby do indeksu. `section_id` jest też nazwą pliku
+  i musi być jedyny w całej paczce, a `synthetic` nie ma wartości domyślnej.
 - **Wydanie (`version`) jest wymagane** — instrukcja do starszej wersji wprowadza w błąd tak samo
   jak odmowa obalona później nowszym zgłoszeniem.
 - **Opis sekcji (`description`) pisze model, treść jest dosłowna.** Dlatego przeszukiwany jest
   tytuł i treść, a opis służy tylko do spisu i do wyników wyszukiwania.
 - **Podrozdział bywa dłuższy niż jeden wektor:** limit embeddera, 8192 tokeny, to ok. 18 tys.
-  znaków. Stąd cała treść leży w Postgresie, a do Qdranta idzie pocięta na fragmenty (p. 49).
+  znaków. Stąd cała treść leży w Postgresie, a do Qdranta idzie pocięta na fragmenty: po
+  akapitach, najwyżej `RAG_DOCS_FRAGMENT_CHARS` znaków (wstępnie 1500, rozstrzyga p. 8). Akapit,
+  który sam mieści się w limicie, nie jest cięty; dłuższy dzieli się na linie, potem na słowa.
+  Nagłówek zostaje ze swoim blokiem, a do wektora idzie tytuł sekcji i fragment. Sekcja powyżej
+  18 tys. znaków dostaje przy wczytaniu ostrzeżenie bez odmowy (próg tymczasowy, p. 55).
+- **Import zastępuje indeks, nie dokłada do niego (2026-10-05).** `helpdesk docs import` kasuje
+  i buduje od nowa tabelę i kolekcję dokumentacji, ale dopiero z kompletem wierszy i wektorów
+  w ręku, więc awaria embeddera nie zostawia pustego indeksu. Po imporcie w indeksie jest
+  dokładnie to, co w paczce: sekcja usunięta z paczki znika i nie zostają punkty dawnych
+  fragmentów. Cena: nie da się wgrać jednego dokumentu obok pozostałych, a import całej paczki
+  syntetycznej trwa na CPU ponad minutę.
 - **Paczka syntetyczna (2026-10-04):** dwa zmyślone dokumenty, 27 sekcji, `synthetic: true`,
   z zestawem 66 zapytań w `data/safe/golden/docs-synthetic.json`. Mierzy okablowanie narzędzi, nie
-  skuteczność, i nie może trafić do właściwego indeksu.
+  skuteczność, i nie może trafić do właściwego indeksu. Ma własny: `helpdesk docs import
+  --synthetic` pisze do tabeli `docs_text_synthetic` i kolekcji o nazwie z dopiskiem `_synthetic`,
+  a flaga komendy i `synthetic` w manifeście muszą się zgadzać w obie strony. Przy 1500 znakach
+  paczka daje 47 fragmentów; w sondzie 23 z 24 zapytań wektorowych zestawu miały cel na pierwszym
+  miejscu, a zapytanie o szczegół z końca najdłuższej sekcji — na drugim (przy jednym wektorze na
+  sekcję poza pierwszą piątką).
 
 ## Architektura
 
@@ -1123,10 +1141,12 @@ Wspólne:
   drugim wdrożeniu.
 - **Drzewo ma dwa poziomy: `helpdesk <obszar> <czynność>`; obszar to pakiet w `entry_cli/`, czynność
   to plik w nim** (`helpdesk rag index` → `entry_cli/rag/index.py`, od 2026-10-02). Obszar zbiera
-  to, co dzieli zależności: `rag` woła Qdranta i embedder, `tickets` pracuje na artefaktach, a
-  bramki i „Popraw" stoją **poza `rag`**, bo z definicji działają bez indeksu. Ścieżka = komenda to
-  jedyna rzecz, która pozwala trafić z komendy do kodu bez czytania `cli.py`. Kod wspólny kilku
-  komend obszaru — w jego `common.py`.
+  to, co dzieli zależności: `rag` woła Qdranta i embedder, `tickets` pracuje na artefaktach,
+  `docs` na paczce dokumentacji i jej dwóch indeksach, a bramki i „Popraw" stoją **poza `rag`**,
+  bo z definicji działają bez indeksu. Ścieżka = komenda to jedyna rzecz, która pozwala trafić
+  z komendy do kodu bez czytania `cli.py`. Kod wspólny kilku komend obszaru — w jego `common.py`.
+  Czynność będąca słowem kluczowym Pythona dostaje w nazwie pliku podkreślenie na końcu
+  (`helpdesk docs import` → `entry_cli/docs/import_.py`).
 - **Moduł komendy wystawia `HELP` i funkcję nazwaną od intencji (`index_artifacts`), a rejestruje
   ją `__init__.py` obszaru** (`rag.command("index", help=index.HELP)(index.index_artifacts)`).
   Moduły nie dekorują obiektu Typer z pakietu, więc nie ma cyklu importów; funkcja nazywa się
@@ -1140,7 +1160,11 @@ Wspólne:
   bo **masowy import (p. 31) uruchamia się w kontenerze**, nie na hoście dewelopera.
 - `pip install -e .` tylko po zmianie pyproject.toml, po zmianie kodu nigdy.
 - CLI to cienkie adaptery nad serwisami domenowymi (jak handlery HTTP) — zero logiki w komendzie.
-- **Komendy niszczące (`rag reindex`) pytają o potwierdzenie** albo wymagają `--yes`.
+  `docs import` bierze gotowy importer z fabryki obok serwisu
+  (`core_service/factory_docs_importer.py`), jak trasy biorą graf z `agent_graphs/factory.py`;
+  `rag` składa jeszcze indekser z konfiguracji w `rag/common.py`.
+- **Komendy niszczące (`rag reindex`, `docs import`) pytają o potwierdzenie** albo wymagają
+  `--yes`; pytanie nazywa to, co zniknie.
 
 #### Gotchas
 
@@ -1290,29 +1314,33 @@ wektor:
   Wymiar jest cechą modelu embeddingowego, nie kolekcji, więc przychodzi z konfiguracji
   (`EMBEDDING_VECTOR_SIZE`) raz, przy budowie obiektu; `ensure()` nie ma argumentów, jak
   `create()` tabeli. Cena: wymiar podaje też ten, kto kolekcję tylko czyta.
-- **Punkt wchodzi do kolekcji i wraca w tym samym kształcie; trafienie to osobny model.**
-  `read_by_id()` bierze numery zgłoszeń albo identyfikatory sekcji i oddaje całe punkty
-  (`TicketPoint`, `DocPoint`) — w kolejności zapytania, bez tych, których w kolekcji nie ma.
-  Trafienie (`TicketHit`, `DocHit`) nie ma wektorów, a ma podobieństwo, więc `score` jest w nim
-  zawsze. Cena: z odczytem wracają wektory, których wołający zwykle nie potrzebuje.
-- **Kolekcja dokumentacji: jeden nazwany wektor `section`, w payloadzie opis sekcji z metryczki
-  bez treści** — treść leży w Postgresie. Nazwę kolekcji podaje wołający; zmienna ENV dojdzie
-  z importem (p. 49). Punktów będzie kilka na sekcję (decyzja 2026-10-04, wchodzi z p. 49): import
-  tnie treść po akapitach, trafienia zwija się po `section_id`, a cała sekcja zostaje tylko
-  w Postgresie. Zmierzone na paczce syntetycznej: 8192 tokeny to ok. 18 tys. znaków, sekcja przy
-  limicie liczy się na CPU ponad minutę, dłuższą embedder ucina bez błędu, a szczegół z końca
-  długiej sekcji jeden wektor gubi. Długość fragmentu rozstrzyga pomiar (p. 8).
+- **Punkt zgłoszenia wchodzi do kolekcji i wraca w tym samym kształcie; trafienie to osobny
+  model.** `read_by_id()` kolekcji zgłoszeń bierze numery zgłoszeń i oddaje całe punkty
+  (`TicketPoint`) — w kolejności zapytania, bez tych, których w kolekcji nie ma. Trafienie
+  (`TicketHit`, `DocHit`) nie ma wektorów, a ma podobieństwo, więc `score` jest w nim zawsze.
+  Cena: z odczytem wracają wektory, których wołający zwykle nie potrzebuje. Kolekcja dokumentacji
+  odczytu po identyfikatorze nie ma: z `section_id` nie da się policzyć, ile sekcja ma punktów,
+  a jej treść czyta się z Postgresa.
+- **Kolekcja dokumentacji: punkt to fragment sekcji, z jednym nazwanym wektorem `section`
+  i opisem sekcji z metryczki w payloadzie, bez treści** — treść leży w Postgresie. Nazwa kolekcji
+  to `QDRANT_DOCS_COLLECTION`. Sekcja ma tyle punktów, na ile fragmentów pocięto jej treść
+  (decyzja 2026-10-04); identyfikator punktu powstaje z `section_id` i numeru fragmentu, a payload
+  jest ten sam w każdym fragmencie sekcji. Wyszukiwanie oddaje trafienia we fragmenty, więc sekcja
+  może wrócić kilka razy; do jednego wyniku zwinie je narzędzie (p. 8). Zmierzone na paczce
+  syntetycznej: 8192 tokeny to ok. 18 tys. znaków, sekcja przy limicie liczy się na CPU ponad
+  minutę, dłuższą embedder ucina bez błędu, a szczegół z końca długiej sekcji jeden wektor gubi.
+  Długość fragmentu rozstrzyga pomiar (p. 8).
 - **Kolekcja ma `aclose()`, które zamyka jej klienta** — narzędzie dostaje kolekcję, nie klienta,
   a ma po sobie sprzątać jednym wywołaniem. Klient wspólny dla kilku kolekcji zamyka się wtedy
   kilka razy; powtórne zamknięcie nic nie robi.
 - **Piszemy wprost na REST Qdranta, bez `qdrant-client`** — użytych endpointów jest kilka, `httpx`
   i tak jest zależnością, a warstwa pośrednia ukryłaby dokładnie to, co tu kontrolujemy ręcznie
   (named vectory, metryka). Ta sama przesłanka, która wykluczyła LangChain/LlamaIndex.
-- **`point_id` = UUID5 z identyfikatora źródłowego (`ticket_id`, `section_id`), namespace
-  ZAMROŻONY** (pod testem złotej wartości) i wspólny dla obu kolekcji. Qdrant przyjmuje tylko
-  `uint` albo UUID, a nasze id to stringi; odwzorowanie musi być **funkcją** id, inaczej
-  `helpdesk rag reindex` duplikuje korpus zamiast go nadpisać. Zmiana namespace’u rozsypuje
-  wszystkie id naraz — nic poza tym testem by tego nie złapało.
+- **`point_id` = UUID5 z identyfikatora źródłowego (`ticket_id`, `section_id` z numerem
+  fragmentu), namespace ZAMROŻONY** (pod testem złotej wartości) i wspólny dla obu kolekcji.
+  Qdrant przyjmuje tylko `uint` albo UUID, a nasze id to stringi; odwzorowanie musi być
+  **funkcją** id, inaczej `helpdesk rag reindex` duplikuje korpus zamiast go nadpisać. Zmiana
+  namespace’u rozsypuje wszystkie id naraz — nic poza tym testem by tego nie złapało.
 - **Kolekcja przy rozjeździe NIE jest naprawiana** — inny wymiar albo brak named vectora to
   `DbQdrantConfigError` z **obiema liczbami** w komunikacie. Bez tego rozjazd wychodzi jako
   odrzucenie punktów w środku przebiegu, już po zapłaceniu za parsowanie LLM-em.
@@ -1349,8 +1377,9 @@ wektor:
 
 Usługa `postgres` to drugi indeks obok Qdranta: szuka po słowach w odmianie i po dosłownych
 ciągach, czego wektor nie robi. Po stronie `api` stoi pakiet `app/db_postgres/` z tabelami zgłoszeń
-i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czytać będą narzędzia
-`find_*_text`, `list_docs` i `read_docs` (p. 49–53).
+i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs import`, tabelę zgłoszeń wypełni
+indeksacja (p. 31, p. 53), a czytać będą narzędzia `find_*_text`, `list_docs` i `read_docs`
+(p. 50–53).
 
 - **Trzy drogi dopasowania, każda do czego innego:** słowa (`plainto_tsquery` — dowolna kolejność
   i odmiana), fraza (`phraseto_tsquery` — cały komunikat w tej samej kolejności) i podciąg
@@ -1384,7 +1413,8 @@ i dokumentacji; wypełnią je import dokumentacji i indeksacja zgłoszeń, a czy
   `table/` ma katalog na tabelę (`tickets/`, `docs/`): klasę w `table.py` i jej SQL obok,
   w `_create.sql` i `_upsert.sql`. Wspólna mechanika — szukanie, odczyt po identyfikatorach,
   kasowanie — stoi w `table/base.py`. `row/` trzyma modele wierszy. Kod spoza pakietu buduje
-  klienta, podaje go tabeli i woła jej metody; samego klienta nie dotyka.
+  klienta, podaje go tabeli i woła jej metody; samego klienta nie dotyka. Tabela ma `aclose()`,
+  które zamyka jej klienta: kto dostał samą tabelę, sprząta jednym wywołaniem.
 - **Wiersz to płaskie odbicie kolumn tabeli** (`TicketRow`, `DocRow`): pole na kolumnę, w tych
   samych typach. W tym kształcie wchodzi do tabeli i z niej wraca, także jako wynik szukania;
   buduje się go jawnie (`TicketRow.from_thread()`, `DocRow.from_section()` / `to_section()`).
@@ -1952,6 +1982,10 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 - Walidacja artefaktów: `helpdesk tickets validate data/unsafe/parsed/`
 - Indeksacja do Qdranta: `helpdesk rag index <katalog>`
 - Pełna odbudowa indeksu: `helpdesk rag reindex` (kasuje kolekcję, wstaje z `data/unsafe/parsed/`)
+- Sprawdzenie paczki dokumentacji: `helpdesk docs validate <katalog>` (same pliki, bez stacku)
+- Import dokumentacji: `helpdesk docs import <katalog>` (zastępuje tabelę i kolekcję dokumentacji;
+  **wymaga stacku**); paczka syntetyczna do osobnego indeksu:
+  `helpdesk docs import data/safe/instruction --synthetic`
 - Ewaluacja embeddera: `python scripts/eval_embeddings.py recall --model <nazwa>`
   (repo-level, nie CLI usługi — ładuje modele wprost, bez stawiania stacku)
 - Ewaluacja zbudowanego indeksu: `python scripts/eval_index.py recall --collection tickets`
@@ -1976,8 +2010,9 @@ w p. 46.
 - Jeden rodzaj: `pytest tests/unit/`, `pytest tests/integration/`, `pytest tests/functional/`
 - Na stacku: `pytest tests/integration/ tests/functional/ -m stack` (albo `-m stack_<usługa>`)
 - Ewaluacyjne: `pytest tests/evaluation/` — bez korpusu odniesienia w `data/` testy się pomijają;
-  z pomiarem `find_tickets_vector` na golden secie: `pytest tests/evaluation/ -m ""` (stack
-  i zbudowany indeks)
+  z pomiarem `find_tickets_vector` na golden secie i z importem paczki syntetycznej:
+  `pytest tests/evaluation/ -m ""` (stack i oba zbudowane indeksy: zgłoszeń oraz syntetyczny
+  dokumentacji)
 - Na żywym LLM: `pytest -m llm_live` — **kosztuje / bije po sieci, pytaj przed**
 - **Podając marker, podaj też folder** — marker odsiewa dopiero PO imporcie, więc bez ścieżki
   pytest wczytuje wszystkie pliki testowe, żeby uruchomić kilkanaście (kolekcja podzbioru spada
@@ -2120,15 +2155,15 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 803 (0)            | 17 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 144 (53)           | 41 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 78 (9)             | 9 s  |
-| ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 5 (3)              | 40 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 880 (0)            | 17 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 171 (59)           | 43 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 98 (9)             | 10 s |
+| ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 9 (7)              | 33 s |
 
-Liczby i czasy z 2026-10-04: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
-działającym stacku. Bez testów na stacku integracyjne trwają 9 s, a ewaluacyjne poniżej sekundy —
-całe 40 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
-(`pytest -m ""`): 1030 testów, 79 s.
+Liczby i czasy z 2026-10-05: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
+działającym stacku. Bez testów na stacku integracyjne trwają 8 s, a ewaluacyjne poniżej sekundy —
+całe 33 s to 178 wyszukań golden setu przez prawdziwy embedder. Komplet jednym poleceniem
+(`pytest -m ""`): 1158 testów, 105 s; domyślny `pytest`, bez stacku: 1083 testy, 22 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2338,6 +2373,9 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   zgłoszenia o tym samym objawie mają niemal identyczne `problem` + `symptoms`, więc wpadają do
   trafień razem i niosą różne `cause`; pytania rozróżniające powstają z trafień, nie z ręcznego
   rekordu. Cena: trafienia mówią, jakie są przyczyny, ale nie od czego zacząć (p. 45).
+- **Import dokumentacji dokładający po jednym dokumencie** — zastąpienie całego indeksu nie
+  zostawia sekcji usuniętych z paczki ani punktów dawnych fragmentów, a pełny import to minuty.
+  Wraca, gdy indeks ma trzymać kilka wydań naraz (p. 15).
 - **Deduplikacja rekordów przy indeksacji** — wielość rekordów jest informacją, nie nadmiarem:
   scalenie zgodnych rekordów usuwa dowód, że rozwiązanie jest sprawdzone, a rozłącznych —
   materiał do pytań. Pomiar: na 200 artefaktach 8 par o podobnym `problem` i ani jednej do
@@ -2465,22 +2503,16 @@ punkty niżej to narzędzia właściwe.
   w `data/safe/instruction/syntetyczna-instrukcja-*` i 66 zapytań w kształcie czterech narzędzi
   w `data/safe/golden/docs-synthetic.json`; mierzy okablowanie, nie skuteczność. Trzy oczekiwania
   zestawu czekają na p. 8 i p. 50.
-- [ ] **49. Import dokumentacji** — `helpdesk docs validate|import <katalog>`: katalog na
-  dokument, w nim `manifest.json` (`document`, `version`, `date`, `synthetic` i `sections`
-  w kolejności dokumentu: `section_id`, `chapter_path`, `title`, `description`) oraz plik
-  `<section_id>.md` z samą treścią na sekcję; cała sekcja idzie do `DocsTable`, a pocięta po
-  akapitach na fragmenty do `DocsCollection` (jej nazwa jako nowa zmienna ENV); zgodność
-  manifestu z katalogiem w obie strony, ostrzeżenie o sekcjach powyżej progu długości bez odmowy
-  (próg przy p. 55), odmowa dokumentu syntetycznego we właściwym indeksie; sprawdzany na paczce
-  z p. 54. *Dlaczego:* na podrozdziały dzieli człowiek z modelem i w tej postaci czyta je agent;
-  aplikacja tnie tylko pod wektor, bo jeden wektor na długi podrozdział gubi szczegóły, a ponad
-  8192 tokeny embedder ucina po cichu.
+- [x] **49. Import dokumentacji** (2026-10-05) — `helpdesk docs validate|import`: czytnik paczki,
+  cięcie sekcji na fragmenty, importer zastępujący tabelę i kolekcję, osobny indeks syntetyczny;
+  reguły — „Instrukcje", „Warstwa bazy wektorowej (Qdrant)", „Warstwa CLI".
 - [ ] **8. `find_docs_vector`** — wyszukiwanie w kolekcji dokumentacji; zwraca wiersze listingu
   (identyfikator, dokument, rozdział, opis), nie treść; jednostką wyniku jest plik z metryczki
   także wtedy, gdy wektor powstaje z jego fragmentu — fragment zwija się do pliku. *Dlaczego:*
   treść model pobiera odczytem (p. 52) i tylko odczyt trafia na listę źródeł, a wyszukiwanie
   tekstowe i wektorowe muszą wskazywać ten sam identyfikator; pomiar na paczce z p. 54
-  rozstrzyga długość fragmentu (odniesienie: sam tytuł i opis) i osobny próg podobieństwa —
+  rozstrzyga długość fragmentu (odniesienie: sam tytuł i opis; do sprawdzenia też cięcie po
+  zdaniach, bo dziś długi akapit prozy dzieli się między słowami) i osobny próg podobieństwa —
   w sondzie zapytania bez odpowiednika dostawały 0,31–0,38, a poprawne 0,37–0,60.
 - [ ] **50. `find_docs_text`** — pola `exact` (dosłowne ciągi, `ILIKE`) i `words` (indeks
   pełnotekstowy ze słownikiem); wiersze listingu z etykietą, czym znaleziono; przed nim spacje
@@ -2675,7 +2707,8 @@ każdy mierzy się osobno.
       kosztuje ponowny przebieg LLM.
 - [ ] **55. Przygotowanie właściwej dokumentacji** (dopisany 2026-10-03) — podział mocnym modelem
   na pliki `.md` i metryczkę, skrypt sprawdzający, że każda sekcja jest dosłownym podciągiem
-  źródła i że sekcje pokrywają całość, przegląd opisów przez człowieka. *Dlaczego:* dokumentacja
+  źródła i że sekcje pokrywają całość, przegląd opisów przez człowieka, próg ostrzeżenia
+  o długiej sekcji (dziś tymczasowo 18 tys. znaków). *Dlaczego:* dokumentacja
   wraca do promptu jako cytowane źródło, więc parafraza modelu stałaby się „tak mówi instrukcja";
   model dzieli i opisuje, treści nie przepisuje.
 
