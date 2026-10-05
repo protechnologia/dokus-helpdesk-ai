@@ -5,7 +5,8 @@
      prompt grafu.
 
      Układ jest ten sam w każdym opisie narzędzia: cztery sekcje,
-     argumenty i pola wyniku w tabelkach, linie do 70 znaków —
+     argumenty w tabelce, wynik w JEDNEJ tabelce — pola zagnieżdżone
+     pełną ścieżką (`sections[].section.title`), linie do 70 znaków;
      dłuższe bywają tylko wiersze tabelki argumentów.
 
      Zmiana dotyczy wszystkich grafów naraz, więc po strojeniu jednego
@@ -27,25 +28,20 @@ streszczenie sprawy.
 
 JSON:
 
-| pole         | co zawiera                            |
-|--------------|---------------------------------------|
-| cards        | karty odczytanych zgłoszeń            |
-| without_card | numery zgłoszeń, które nie mają karty |
-
-Pola karty:
-
-| pole              | co zawiera                                  |
-|-------------------|---------------------------------------------|
-| ticket_id         | numer zgłoszenia                            |
-| date              | data zgłoszenia                             |
-| component         | czego dotyczy: aplikacja, usługa zewnętrzna |
-| problem           | zwięzły opis problemu                       |
-| symptoms          | objawy widziane przez użytkownika           |
-| error_codes       | kody błędów i sygnatury                     |
-| cause             | ustalona przyczyna                          |
-| solution          | co rozwiązało sprawę, z zastrzeżeniami      |
-| resolution        | klasa rozstrzygnięcia                       |
-| questions_summary | o co dopytywał prowadzący sprawę            |
+| pole                      | co zawiera                             |
+|---------------------------|----------------------------------------|
+| cards                     | karty odczytanych zgłoszeń             |
+| cards[].ticket_id         | numer zgłoszenia                       |
+| cards[].date              | data zgłoszenia                        |
+| cards[].component         | aplikacja albo usługa, której dotyczy  |
+| cards[].problem           | zwięzły opis problemu                  |
+| cards[].symptoms          | objawy widziane przez użytkownika      |
+| cards[].error_codes       | kody błędów i sygnatury                |
+| cards[].cause             | ustalona przyczyna                     |
+| cards[].solution          | co rozwiązało sprawę, z zastrzeżeniami |
+| cards[].resolution        | klasa rozstrzygnięcia                  |
+| cards[].questions_summary | o co dopytywał prowadzący sprawę       |
+| without_card              | numery zgłoszeń, które nie mają karty  |
 
 # Zasady
 

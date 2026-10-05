@@ -68,14 +68,17 @@ class FakeReadDocsTool(ReadDocsToolBase):
         """
         self.queries.append(query)
 
+        # Bez powtórzeń, w kolejności żądania — jak w narzędziu właściwym.
+        wanted = list(dict.fromkeys(query.section_ids))
+
         # --- wszystko albo nic: brak jednej sekcji unieważnia cały odczyt ---
-        unknown = [section_id for section_id in query.section_ids if section_id not in self._items]
+        unknown = [section_id for section_id in wanted if section_id not in self._items]
 
         if unknown:
             raise UnknownSectionError(unknown)
 
         result = ReadDocsResult(
-            sections = [self._items[section_id] for section_id in query.section_ids],
+            sections = [self._items[section_id] for section_id in wanted],
         )
 
         return result

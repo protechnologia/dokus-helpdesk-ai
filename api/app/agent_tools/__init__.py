@@ -40,15 +40,17 @@ narzędzie i co ono oddaje. Po co wyniki w danej funkcji, mówi prompt grafu.
 | `find_tickets_vector` | pomocnicze    | `problem`, `symptoms` | numery zgłoszeń z podobieństwem  |
 | `find_tickets_text`   | pomocnicze    | `exact`, `words`      | numery zgłoszeń, czym znaleziono |
 | `read_tickets_card`   | źródło wiedzy | `ticket_ids`          | karty zgłoszeń; cytuje           |
-| `read_tickets_thread` | źródło wiedzy | `ticket_ids`          | oryginalne wątki; cytuje         |
+| `read_tickets_thread` | źródło wiedzy | `ticket_id`           | oryginalny wątek; cytuje         |
 | `list_docs`           | pomocnicze    | —                     | spis treści: opisy sekcji        |
 | `find_docs_vector`    | pomocnicze    | `text`                | opisy sekcji z podobieństwem     |
 | `find_docs_text`      | pomocnicze    | `exact`, `words`      | opisy sekcji, czym znaleziono    |
 | `read_docs`           | źródło wiedzy | `section_ids`         | treść sekcji; cytuje             |
 
-`find_tickets_vector`, `read_tickets_card`, `find_docs_vector` i `find_docs_text` mają narzędzie
-właściwe i atrapę; pozostałe na razie same modele i atrapy (p. 51–53, 56). Narzędzia dokumentacji
-są opcjonalne: bez dokumentacji nie trafiają do rejestru.
+Każde ma narzędzie właściwe i atrapę. Wyszukiwanie po znaczeniu i karty stoją na Qdrancie,
+reszta na Postgresie. Tabela zgłoszeń w Postgresie dostanie prawdziwe wątki po anonimizacji
+(p. 19) i masowym imporcie (p. 31), więc `find_tickets_text` i `read_tickets_thread` są
+sprawdzone na zmyślonych. Narzędzia dokumentacji są opcjonalne: bez dokumentacji nie trafiają do
+rejestru.
 """
 
 from app.agent_tools.base import AgentTool, AuxiliaryTool, KnowledgeSource

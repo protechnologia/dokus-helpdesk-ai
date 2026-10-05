@@ -65,10 +65,12 @@ def test_every_thread_names_its_own_ticket_and_subject() -> None:
 async def test_whatever_a_search_fake_finds_the_thread_fake_can_read() -> None:
     """Numery z atrap obu wyszukiwań → do odczytania atrapą wątków, wszystkie: graf na atrapach
     może przejść całą drogę od wyszukania do źródła."""
-    found  = await _found_numbers()
-    result = await FakeReadTicketsThreadTool().search(ReadTicketsThreadQuery(ticket_ids=found))
+    found = await _found_numbers()
+    tool  = FakeReadTicketsThreadTool()
 
-    assert [thread.ticket_id for thread in result.threads] == found
+    threads = [await tool.search(ReadTicketsThreadQuery(ticket_id=number)) for number in found]
+
+    assert [thread.ticket_id for thread in threads] == found
 
 
 async def test_whatever_a_search_fake_finds_the_card_fake_answers_for() -> None:

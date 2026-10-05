@@ -104,7 +104,8 @@ pierwszym narzędziem, które coś wykonuje, a nie tylko czyta, więc wymaga oso
 o granicach.
 
 **Stan na dziś.** Szkielet stoi w całości, a część jednostek to atrapy: pętla agenta, wykonanie
-narzędzi i odpowiedź, anonimizator oraz cztery z ośmiu narzędzi.
+narzędzi i odpowiedź oraz anonimizator. Wszystkie osiem narzędzi ma wersję właściwą; dwa, które
+czytają wątki zgłoszeń, czekają na dane, bo tabela wątków napełni się dopiero po anonimizacji.
 
 ### Zasady produktu
 
@@ -876,10 +877,11 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — indeksacja i narzędzia powstają
   paczki syntetycznej trwa na CPU ponad minutę. Słowo „import" zostaje dla masowego importu
   zgłoszeń (p. 31), który jest czymś innym: parsowaniem korpusu modelem.
 - **Paczka syntetyczna (2026-10-04):** dwa zmyślone dokumenty, 27 sekcji, `synthetic: true`,
-  z zestawem 66 zapytań w `data/safe/golden/docs-synthetic.json`. Mierzy okablowanie narzędzi, nie
-  skuteczność, i nie może trafić do właściwego indeksu. Ma własny: `helpdesk docs index
-  --synthetic` pisze do tabeli `docs_text_synthetic` i kolekcji o nazwie z dopiskiem `_synthetic`,
-  a flaga komendy i `synthetic` w manifeście muszą się zgadzać w obie strony.
+  z zestawem 61 zapytań do obu wyszukiwań w `data/safe/golden/docs-synthetic.json`. Mierzy
+  okablowanie narzędzi, nie skuteczność, i nie może trafić do właściwego indeksu. Ma własny:
+  `helpdesk docs index --synthetic` pisze do tabeli `docs_text_synthetic` i kolekcji o nazwie
+  z dopiskiem `_synthetic`, a flaga komendy i `synthetic` w manifeście muszą się zgadzać w obie
+  strony.
 - **Fragmenty po 1000 znaków — zmierzone 2026-10-05** (raport:
   `data/unsafe/docs/pomiar-dokumentacji-fragmenty-i-prog.md`). Paczka daje wtedy 58 fragmentów
   i wszystkie 24 zapytania wektorowe z odpowiedzią mają cel na pierwszym miejscu. Zapytanie
@@ -1386,9 +1388,10 @@ wektor:
 
 Usługa `postgres` to drugi indeks obok Qdranta: szuka po słowach w odmianie i po dosłownych
 ciągach, czego wektor nie robi. Po stronie `api` stoi pakiet `app/db_postgres/` z tabelami zgłoszeń
-i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs index` i szuka w niej
-`find_docs_text`; tabelę zgłoszeń wypełni indeksacja (p. 31, p. 53), a czytać będą
-`find_tickets_text`, `list_docs` i `read_docs` (p. 51–53).
+i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs index`, a czytają ją `list_docs`,
+`find_docs_text` i `read_docs`. Tabelę zgłoszeń czytają `find_tickets_text`
+i `read_tickets_thread`; wypełni ją indeksacja wątków po anonimizacji (p. 19, p. 31), do tego
+czasu jest pusta.
 
 - **Trzy drogi dopasowania, każda do czego innego:** słowa (`plainto_tsquery` — dowolna kolejność
   i odmiana), fraza (`phraseto_tsquery` — cały komunikat w tej samej kolejności) i podciąg
@@ -1446,7 +1449,9 @@ i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs index` i szuka w n
   „główna aplikacja" w `component` (184 karty), „pytano o…" (181), „brak" (116) — więc zapytanie
   o „aplikacja" trafiałoby w 183 karty z 200. Cena: giną trafienia po parafrazie z `cause`
   i `solution` (39% i 42% słów spoza wątku); czy to boli, pokaże p. 23. W dokumentacji
-  przeszukiwany jest tytuł i treść sekcji; opis z metryczki nie, bo pisze go model.
+  przeszukiwany jest tytuł i treść sekcji; opis z metryczki nie, bo pisze go model. Samo
+  wyszukiwanie po wątku jest potrzebne, bo parser gubi około połowy dosłownych komunikatów
+  (14 z 30 na golden200), a `error_codes` wypełnia w 9 kartach z 200.
 - **Przeszukiwany tekst baza łączy RAZ, przy zapisie wiersza** — w dwóch kolumnach wyliczanych
   (`search_text` do podciągu, `search_vector` do słów i frazy). Zmierzone na 1100 wierszach:
   łączenie kolumn i przepuszczanie ich przez słownik przy każdym zapytaniu trwa 4–5 s, z kolumną
@@ -1478,9 +1483,10 @@ i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs index` i szuka w n
   `read_tickets_card` (karta) i `read_tickets_thread` (oryginalny wątek po anonimizacji).
   Dokumentacja: `list_docs`, `find_docs_vector` i `find_docs_text` oddają opisy sekcji
   z metryczki, treść `read_docs`. Model nie wie, która baza co trzyma, i wybiera kartę albo wątek
-  niezależnie od tego, jak zgłoszenie znalazł. Właściwe są dziś `find_tickets_vector`,
-  `read_tickets_card`, `find_docs_vector` i `find_docs_text`; reszta to modele i atrapy. Cena:
-  jedna tura modelu więcej na każde wyszukanie.
+  niezależnie od tego, jak zgłoszenie znalazł. Każde ma narzędzie właściwe i atrapę (od
+  2026-10-05); `find_tickets_text` i `read_tickets_thread` są sprawdzone na zmyślonych wątkach,
+  bo prawdziwe przyjdą po anonimizacji (p. 19, p. 31). Cena: jedna tura modelu więcej na każde
+  wyszukanie.
 - **W wyszukiwaniu tekstowym `exact` i `words` szukają niezależnie, a wyniki się sumują.** Fraza
   z `exact` idzie podciągiem; słowa z `words` idą przez słownik i muszą wystąpić wszystkie.
   Trafienia frazą stoją pierwsze, a element znaleziony obiema drogami jest w wyniku raz, jako
@@ -1504,7 +1510,14 @@ i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs index` i szuka w n
 - **Brak karty nie jest błędem, brak wątku albo sekcji jest.** Wątek ma każde zgłoszenie, kartę
   tylko to, które przeszło parsowanie i filtr jakości, więc `read_tickets_card` oddaje numery bez
   karty w `without_card`. Nieznany numer w `read_tickets_thread` i nieznany identyfikator
-  w `read_docs` to błąd wracający do modelu, bez wyniku częściowego.
+  w `read_docs` to błąd wracający do modelu; `read_docs` nie oddaje wtedy wyniku częściowego.
+- **`read_tickets_thread` czyta jeden wątek na wywołanie (2026-10-05).** Przyjmuje `ticket_id`,
+  nie listę, i oddaje sam wątek, więc `AGENT_MAX_CALLS_READ_TICKETS_THREAD` jest wprost liczbą
+  wątków przeczytanych w sprawie. Przy liście sufit wynosił limit razy pięć, a model w sondzie
+  brał wszystkie znalezione wątki naraz. Kilka wątków to kilka wywołań, które model może zgłosić
+  w jednej turze. Limit zostaje 2, czyli dwa wątki na sprawę zamiast dziesięciu (do przestrojenia
+  w p. 23). Karty zostają listą: są krótkie, a przy jednym objawie i różnych przyczynach model ma
+  je przeczytać razem.
 - **Narzędzia leżą w folderze swojego materiału: `agent_tools/tickets/` i `agent_tools/docs/`
   (2026-10-03)**, nazwanym jak `SourceRef.source`; katalog narzędzia zachowuje pełną nazwę
   narzędzia. Atrapy narzędzi jednego materiału stoją na jednym zmyślonym zestawie
@@ -1517,9 +1530,11 @@ i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs index` i szuka w n
   wszystkie grafy naraz, więc po strojeniu jednego trzeba przemierzyć pozostałe.
 - **Każdy opis narzędzia ma ten sam układ (2026-10-05):** sekcje „Do czego służy", „Jak
   wywoływać", „Co zwraca" i „Zasady". Argumenty stoją w tabelce (argument, typ, co podać,
-  przykład, opis), pola zwracanego JSON-u w drugiej; odesłania do innych narzędzi i limity idą do
-  zasad. Linie do 70 znaków, dłuższe bywają tylko wiersze tabelki argumentów. Sekcji pilnuje test
-  kontraktu narzędzi. Przykład w tabelce to wzór, który model może przepisać — z tego powodu
+  przykład, opis), a zwracany JSON w jednej tabelce pól: pole zagnieżdżone stoi pod pełną ścieżką
+  (`sections[].section.title`), bez osobnej tabelki na obiekt w środku. Odesłania do innych
+  narzędzi i limity idą do zasad. Linie do 70 znaków, dłuższe bywają tylko wiersze tabelki
+  argumentów. Sekcji i jednej tabelki wyniku pilnuje test kontraktu narzędzi. Przykład w tabelce
+  to wzór, który model może przepisać — z tego powodu
   schemat odpowiedzi przykładów nie niesie — więc do sprawdzenia w pomiarach grafów (p. 23).
 - **Na górze `agent_tools/` kontrakty (`base.py`) i jedyny wspólny model `SourceRef` (`models.py`);
   w katalogu narzędzia `tool.py`, `fake.py` i `models.py` z modelami TYLKO tego narzędzia** —
@@ -1609,7 +1624,8 @@ i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs index` i szuka w n
   licznika; używa jej już atrapa `run_tools`, a fabryka podaje limity grafom z narzędziami. Ten
   sam limit stoi w opisie narzędzia dla modelu: miejsce `{{max_calls}}` w `description.md`
   wypełnia `tool_definitions()`, więc narzędzie bez limitu to błąd składania. Ile jedno
-  wywołanie może pobrać (20 kart, 5 wątków, 5 sekcji), zostaje stałą w modelu zapytania.
+  wywołanie może pobrać (20 kart, 5 sekcji), zostaje stałą w modelu zapytania; wątek jest zawsze
+  jeden.
 - **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `engine_llm/models/messages.py`), żadnych typów
   LangChaina (2026-10-02).** Pętla rozmawia z modelem przez `LLMClient`, a format wiadomości
   u dostawcy tłumaczy jego klient (p. 17). Skoro i model, i narzędzia idą przez nasze kontrakty,
@@ -2179,16 +2195,16 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 942 (0)            | 19 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 181 (68)           | 53 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 98 (9)             | 9 s  |
-| ewaluacyjne  | `tests/evaluation/`  | czy aplikacja wytwarza poprawne dane i wiedzę, np. golden sety | 44 (42)            | 42 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1020 (0)           | 26 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 191 (78)           | 74 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 98 (9)             | 11 s |
+| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 53 s |
 
 Liczby i czasy z 2026-10-05: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 8 s, a ewaluacyjne poniżej sekundy —
-całe 42 s to 207 wyszukań golden setów przez prawdziwy embedder (178 w zgłoszeniach, 29
-w dokumentacji). Komplet jednym poleceniem (`pytest -m ""`): 1265 testów, 110 s; domyślny
-`pytest`, bez stacku: 1146 testów, 19 s.
+całe 53 s to 207 wyszukań golden setów przez prawdziwy embedder (178 w zgłoszeniach, 29
+w dokumentacji). Komplet jednym poleceniem (`pytest -m ""`): 1349 testów, 137 s; domyślny
+`pytest`, bez stacku: 1224 testy, 24 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2200,6 +2216,9 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
 - **Dzielić wg odpowiedzialności na osobne pliki** — jeden plik = jedna jednostka/aspekt
   (`test_api_engine_llm_fake.py` + `test_api_engine_llm_factory.py` +
   `test_api_engine_llm_openai.py` + `test_api_engine_llm_openai_errors.py`), nie jeden zbiorczy.
+  Testy narzędzi agenta na stacku też mają plik na narzędzie (2026-10-05); indeks, na którym stoi
+  kilka z nich, budują fixture'y z `conftest.py` ich folderu, a test łańcucha „znalezione →
+  odczytane" leży w pliku odczytu.
 - **Nazwa pliku zaczyna się od usługi, której test dotyczy** (`test_api_*`, `test_embedder_*`) —
   przy kilku usługach sama nazwa mówi, co się psuje. **Bez prefiksu zostają testy ponadusługowe**
   (`test_config_plumbing.py` sprawdza `.env.example` wobec `Settings` wszystkich usług) — doklejenie
@@ -2209,6 +2228,15 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   jest płaski, dopóki ma kilka plików. Test wymagający stacku ma w nazwie sufiks `_stack`.
 - **Każdy test ma docstring** — jedna linia „scenariusz → oczekiwanie", spójnie we wszystkich
   testach pliku (nie część z docstringiem, część bez).
+- **Ewaluacyjne mierzą skuteczność na golden setach, nie poprawność (2026-10-05):** ile zapytań
+  dostaje właściwy materiał, ile pustych rekordów odsiewa filtr — z progiem obok zmierzonej
+  liczby. Dziś na paczce syntetycznej i golden200, gdzie liczby pilnują głównie tego, że ścieżka
+  się nie zepsuła; docelowo na rzeczywistych danych. Test, który ma jeden poprawny wynik
+  niezależnie od modelu i zapytań (odczyt po identyfikatorze, spis treści), jest integracyjny,
+  także gdy czyta dane z zestawu. To, czy indeks syntetyczny odpowiada plikom paczki, jest
+  warunkiem pomiaru, nie testem: sprawdzają to fixture'y z `tests/evaluation/conftest.py`,
+  a nieaktualny indeks kończy pomiar błędem. Docstring testu ewaluacyjnego to dwa proste zdania
+  zamiast strzałki: co test sprawdza, z liczbami progu, i jaką usterkę wyłapuje.
 - **Bez obronnego boilerplate'u bez uzasadnienia.** Zadeklarowanych zależności (runtime i dev)
   **nie** guardujemy `pytest.importorskip` — brak zadeklarowanej zależności ma być głośnym
   `ImportError`, nie cichym skipem. `importorskip` zostaje tylko dla zależności faktycznie
@@ -2346,6 +2374,11 @@ instancji klienta i atrapy jego własnych odpowiedzi.
 | `capturing()`      | zapisuje wysłane żądania |
 | `raising()`        | transport nie odpowiada wcale |
 
+**Atrapę klienta Postgresa bierz z `tests/helpers_postgres.py`** (`ScriptedPostgres`), gdy
+testujesz narzędzie stojące na tabeli: narzędzie dostaje prawdziwą tabelę, a podmieniony jest
+tylko klient, który na spis, odczyt, podciąg i słowa oddaje ustalone odpowiedzi i zapisuje
+zapytania. Treść SQL-a tabel sprawdza osobna atrapa w `test_api_db_postgres_tables.py`.
+
 ## Zakres i plan
 
 ### Świadomie pominięte
@@ -2418,6 +2451,8 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   zgłoszenie wysłane dwa razy) to inna klasa, do rozważenia przy pełnym korpusie.
 - **Lista fraz w `exact` wyszukiwań tekstowych** — wynik nie mówił, która fraza trafiła,
   a semantyka „którakolwiek" wymagała tłumaczenia; jedna fraza na wywołanie.
+- **Lista numerów w `read_tickets_thread`** — limit wywołań mnożył się przez długość listy
+  (2 × 5 wątków), a model brał wszystkie znalezione naraz; jeden wątek na wywołanie.
 - **Zwijanie fragmentów dokumentacji do sekcji w narzędziu** — wymaga pobierania fragmentów
   z zapasem zależnym od najdłuższej sekcji (do 25–31 fragmentów na pięć sekcji); grupuje Qdrant.
 - **Zwijanie zgodnych trafień w wynikach wyszukiwania** — przy `RAG_TOP_K` = 5 licznik zgodnych
@@ -2540,7 +2575,7 @@ punkty niżej to narzędzia właściwe.
   sjp.pl z trzema poprawkami, konfiguracja `pl_search`), zmienne `POSTGRES_*`, marker
   `stack_postgres` i test na stacku; reguły — „Warstwa wyszukiwania tekstowego (Postgres)".
 - [x] **54. Syntetyczna dokumentacja i golden set** (2026-10-04) — dwa dokumenty, 27 sekcji
-  w `data/safe/instruction/syntetyczna-instrukcja-*` i 66 zapytań w kształcie czterech narzędzi
+  w `data/safe/instruction/syntetyczna-instrukcja-*` i 61 zapytań do obu wyszukiwań
   w `data/safe/golden/docs-synthetic.json`; mierzy okablowanie, nie skuteczność.
 - [x] **49. Indeksacja dokumentacji** (2026-10-05) — `helpdesk docs validate|index`: czytnik
   paczki, cięcie sekcji na fragmenty, indekser zastępujący tabelę i kolekcję, osobny indeks
@@ -2553,27 +2588,19 @@ punkty niżej to narzędzia właściwe.
   zamiast białych znaków w `search_text` obu tabel i w zapytaniu, szukanie tabel oddaje
   identyfikatory; `exact` jako jedna fraza; wspólny układ opisów wszystkich narzędzi; reguły —
   „Warstwa wyszukiwania tekstowego (Postgres)", „Warstwa narzędzi agenta".
-- [ ] **51. `list_docs`** — listing z metryczek jako narzędzie pomocnicze. *Dlaczego:* przy małej
-  dokumentacji lepszy bywa listing w prompcie systemowym (cache'owany prefiks, bez tury) — do
-  rozstrzygnięcia przy właściwej dokumentacji (p. 15).
-- [ ] **52. `read_docs`** — treść po liście identyfikatorów, z limitem; nieznany identyfikator to
-  błąd wracający do modelu, nigdy krótsza lista; jedyne narzędzie dokumentacji z `cite()`.
-  *Dlaczego:* lista źródeł ma pokazywać to, co model przeczytał, a `requires_hits` wymusza wtedy
-  odczyt przed rozwiązaniem.
-- [ ] **53. `find_tickets_text`** — te same pola `exact` i `words` po zanonimizowanym wątku
-  zgłoszenia; zwraca numery zgłoszeń z informacją, czym każde znaleziono; do ustalenia na
-  prawdziwych danych: czy do tabeli idą wszystkie zgłoszenia, czy tylko te z kartą przyjętą przez
-  filtr jakości. *Dlaczego:* parser gubi około połowy dosłownych komunikatów (14 z 30 na
-  golden200), a `error_codes` jest niemal puste (9 z 200); w bloku A stoi na zmyślonych danych,
-  bo do bazy trafia wyłącznie tekst po anonimizacji — prawdziwe wątki przychodzą z p. 19 i p. 31.
+- [x] **51. `list_docs`** (2026-10-05) — `ListDocsTool` na tabeli dokumentacji: spis w kolejności
+  dokumentów, bez treści; czy spis ma iść narzędziem, czy w prompcie systemowym, rozstrzyga p. 15.
+- [x] **52. `read_docs`** (2026-10-05) — `ReadDocsTool` na tabeli dokumentacji: treść znak w znak,
+  nieznany identyfikator to błąd bez wyniku częściowego; reguły — „Warstwa narzędzi agenta".
+- [x] **53. `find_tickets_text`** (2026-10-05) — `FindTicketsTextTool` na tabeli zgłoszeń,
+  sprawdzone na zmyślonych wątkach; co trafia do tabeli, rozstrzyga p. 31; reguły — „Warstwa
+  narzędzi agenta", „Warstwa wyszukiwania tekstowego (Postgres)".
 - [x] **57. Zgłoszenia dwustopniowo i wyniki w JSON-ie** (2026-10-04) — oba wyszukiwania oddają
   numery, `read_tickets_card` (właściwe i atrapa) i `read_tickets_thread` (atrapa) treść; tylko
   odczyty cytują, `score` wyszedł z `SourceRef`; reguły — „Warstwa narzędzi agenta".
-- [ ] **56. `read_tickets_thread`** — narzędzie właściwe: oryginalne wątki po numerach zgłoszeń
-  z `TicketsTable.read_by_id()` (modele i atrapa już są); do ustalenia na prawdziwych danych:
-  limit długości wątku i czy wątek niesie etykiety z `as_thread()` („KOMENTARZ", rola, data), czy
-  samą treść. *Dlaczego:* parser gubi konkrety, a wątek je ma; model czyta go dla zgłoszeń, które
-  wybrał po kartach, i dla tych, które karty nie mają.
+- [x] **56. `read_tickets_thread`** (2026-10-05) — `ReadTicketsThreadTool` na tabeli zgłoszeń,
+  jeden wątek na wywołanie, sprawdzone na zmyślonych wątkach; długość i kształt wątku rozstrzyga
+  pomiar na prawdziwych (p. 23); reguły — „Warstwa narzędzi agenta".
 
 #### B. Węzły — po jednym punkcie na węzeł
 
@@ -2679,7 +2706,10 @@ każdy mierzy się osobno.
   `query_problem` + `query_symptoms` golden setu — 152 ze 162 na pierwszym miejscu); wkład
   narzędzi `_text` liczony osobno — czy znajdują coś, czego wektor nie znajduje, jest dziś
   niezmierzone; do tego czy model czyta karty WSZYSTKICH znalezionych numerów, czy tylko
-  pierwszego, i ile kosztuje dodatkowa tura odczytu. *Dlaczego:*
+  pierwszego, i ile kosztuje dodatkowa tura odczytu; na prawdziwych wątkach także: ile wątków
+  na sprawę (dziś 2), limit długości wątku, czy wątek ma nieść etykiety z `as_thread()`
+  („KOMENTARZ", rola, data) i które trafienia frazą widać ponad limitem (dziś według numeru
+  czytanego jako tekst). *Dlaczego:*
   najgroźniejszy błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach
   (e-Doręczenia: 6 zgłoszeń, 6 przyczyn), a zapytanie agenta nie powstaje już promptem korpusu.
 - [ ] **24. `parse_ticket`** — karta zgłoszenia promptem parsującym na modelu docelowym, porównana z
@@ -2727,7 +2757,9 @@ każdy mierzy się osobno.
       zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed parsowaniem, model
       parsujący wybrany na podstawie `porownanie-modeli-parsowania.md`, prompt dostosowany do
       placeholderów, czytnik SQL, wznawianie, raport, porządek w `data/unsafe/parsed/` (golden200
-      zostaje); zanonimizowany wątek idzie do tabeli wyszukiwania (p. 53). *Dlaczego:* to jedyny
+      zostaje); zanonimizowany wątek idzie do tabeli wyszukiwania — do ustalenia, czy każdego
+      zgłoszenia, czy tylko tych z kartą przyjętą przez filtr jakości (wątek musi mieć każdy
+      numer, który oddaje wyszukiwanie po kartach). *Dlaczego:* to jedyny
       drogi przebieg (zasada 7), więc anonimizator i prompt muszą być gotowe przed nim.
 - [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
   „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy. *Dlaczego:* 77 ze 123 zgłoszeń

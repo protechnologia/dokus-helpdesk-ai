@@ -2,10 +2,11 @@
      schematem argumentów (`FindTicketsTextQuery` bez docstringów),
      w każdym grafie, który ma to narzędzie na liście. Mówi, jak pytać
      narzędzie i co ono oddaje; po co wyniki w danej funkcji, mówi
-     prompt grafu. Szkielet; narzędzie właściwe w p. 53.
+     prompt grafu.
 
      Układ jest ten sam w każdym opisie narzędzia: cztery sekcje,
-     argumenty i pola wyniku w tabelkach, linie do 70 znaków —
+     argumenty w tabelce, wynik w JEDNEJ tabelce — pola zagnieżdżone
+     pełną ścieżką (`sections[].section.title`), linie do 70 znaków;
      dłuższe bywają tylko wiersze tabelki argumentów.
 
      Zmiana dotyczy wszystkich grafów naraz, więc po strojeniu jednego

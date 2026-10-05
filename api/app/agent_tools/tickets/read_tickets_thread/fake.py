@@ -8,7 +8,7 @@ from app.agent_tools.tickets.read_tickets_thread.base import (
 from app.agent_tools.tickets.read_tickets_thread.errors import UnknownTicketError
 from app.agent_tools.tickets.read_tickets_thread.models import (
     ReadTicketsThreadQuery,
-    ReadTicketsThreadResult,
+    TicketThread,
 )
 from app.db_postgres.row.tickets import TicketRow
 
@@ -23,8 +23,8 @@ class FakeReadTicketsThreadTool(ReadTicketsThreadToolBase):
 
     Flow:
         1. Test tworzy ją z własnymi wierszami tabeli albo z zestawem wbudowanym.
-        2. Każde `search()` zapisuje zapytanie w `queries` i oddaje żądane wątki w kolejności
-           żądania; nieznany numer kończy się `UnknownTicketError`, bez wyniku częściowego.
+        2. Każde `search()` zapisuje zapytanie w `queries` i oddaje żądany wątek; nieznany numer
+           kończy się `UnknownTicketError`.
         3. `render_for_model()` i `cite()` pochodzą z kontraktu i z klasy wspólnej z prawdziwym
            narzędziem.
     """
@@ -52,31 +52,24 @@ class FakeReadTicketsThreadTool(ReadTicketsThreadToolBase):
 
     async def search(
         self,
-        query: ReadTicketsThreadQuery,  # np. ReadTicketsThreadQuery(ticket_ids=["90011"])
-    ) -> ReadTicketsThreadResult:
+        query: ReadTicketsThreadQuery,  # np. ReadTicketsThreadQuery(ticket_id="90011")
+    ) -> TicketThread:
         """
         Description:
-        Zapisuje zapytanie i oddaje żądane wątki w kolejności żądania.
+        Zapisuje zapytanie i oddaje żądany wątek.
 
         Example args:
-            query=ReadTicketsThreadQuery(ticket_ids=["90011"])
+            query=ReadTicketsThreadQuery(ticket_id="90011")
 
         Example result:
-            ReadTicketsThreadResult(threads=[TicketThread(ticket_id="90011", …)])
+            TicketThread(ticket_id="90011", subject="Błąd przy podpisie", …)
 
         Raises:
-            UnknownTicketError: któregoś numeru nie ma w bazie
+            UnknownTicketError: numeru nie ma w bazie
         """
         self.queries.append(query)
 
-        # --- wszystko albo nic: brak jednego wątku unieważnia cały odczyt ---
-        unknown = [ticket_id for ticket_id in query.ticket_ids if ticket_id not in self._threads]
+        if query.ticket_id not in self._threads:
+            raise UnknownTicketError(query.ticket_id)
 
-        if unknown:
-            raise UnknownTicketError(unknown)
-
-        result = ReadTicketsThreadResult(
-            threads = [self._threads[ticket_id] for ticket_id in query.ticket_ids],
-        )
-
-        return result
+        return self._threads[query.ticket_id]

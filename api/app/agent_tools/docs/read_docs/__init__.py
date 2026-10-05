@@ -11,18 +11,22 @@ taka, którą model tylko zobaczył w spisie.
 | `errors.py`      | `UnknownSectionError` — nieznany identyfikator, bez wyniku częściowego  |
 | `description.md` | opis narzędzia dla modelu, ten sam w każdym grafie                      |
 | `base.py`        | część wspólna narzędzia i atrapy: nazwa i lista źródeł                  |
+| `tool.py`        | `ReadDocsTool` — odczyt z tabeli dokumentacji w Postgresie              |
 | `fake.py`        | `FakeReadDocsTool` — zmyślona dokumentacja, bez usług                   |
 
-Status: modele i atrapa. Narzędzie właściwe (`tool.py`) powstaje w p. 52.
+Przykład zapytania i wyniku — w opisie `tool.py`; przykład tekstu, który czyta model — w opisie
+`base.py`.
 """
 
 from app.agent_tools.docs.read_docs.base import ReadDocsToolBase
 from app.agent_tools.docs.read_docs.errors import UnknownSectionError
 from app.agent_tools.docs.read_docs.fake import FakeReadDocsTool
 from app.agent_tools.docs.read_docs.models import ReadDocsQuery, ReadDocsResult, ReadSection
+from app.agent_tools.docs.read_docs.tool import ReadDocsTool
 
 __all__ = [
     "FakeReadDocsTool",
+    "ReadDocsTool",
     "ReadDocsToolBase",
     "ReadDocsQuery",
     "ReadDocsResult",

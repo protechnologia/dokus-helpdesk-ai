@@ -18,6 +18,16 @@ async def test_sections_come_back_in_the_order_asked() -> None:
     assert "nieodwracalne doręczenie" in result.sections[0].text
 
 
+async def test_a_repeated_id_is_read_once() -> None:
+    """Identyfikator podany dwa razy → sekcja w wyniku raz, jak w narzędziu właściwym: baza oddaje
+    wiersz raz, więc atrapa nie może oddawać go dwa razy."""
+    query = ReadDocsQuery(section_ids=["adm-kancelaria-epuap", "adm-kancelaria-epuap"])
+
+    result = await FakeReadDocsTool().search(query)
+
+    assert [item.section.section_id for item in result.sections] == ["adm-kancelaria-epuap"]
+
+
 async def test_an_unknown_id_fails_the_whole_read() -> None:
     """Jeden nieznany identyfikator wśród znanych → UnknownSectionError z jego nazwą, bez wyniku
     częściowego: odczyt jednej sekcji zamiast dwóch wyglądałby jak poprawny."""

@@ -47,7 +47,7 @@ class TicketsTable(TextTable):
     SQL zakładania i zapisu leży obok, w plikach `.sql`.
 
     Flow:
-        1. Indeksacja: `create()`, potem `upsert()` (p. 31, p. 53).
+        1. Indeksacja: `create()`, potem `upsert()` (p. 31).
         2. Szukanie: `words()`, `phrase()` i `substring()` → numery pasujących zgłoszeń.
         3. Odczyt: `read_by_id()` → wiersze `TicketRow` o podanych numerach.
     """

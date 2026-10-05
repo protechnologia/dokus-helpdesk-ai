@@ -55,8 +55,8 @@ class FindTicketsTextToolBase(AuxiliaryTool):
 
     Do czego:
     Po tej klasie dziedziczą atrapa (`FakeFindTicketsTextTool`) i narzędzie właściwe na Postgresie
-    (p. 53). Każda dokłada wyłącznie `find()`, więc tekst dla modelu jest ten sam w testach i na
-    produkcji.
+    (`FindTicketsTextTool`). Każda dokłada wyłącznie `find()`, więc tekst dla modelu jest ten sam
+    w testach i na produkcji.
 
     Flow:
         1. `run()` woła `find()` podklasy i dostaje `FindTicketsTextResult`.

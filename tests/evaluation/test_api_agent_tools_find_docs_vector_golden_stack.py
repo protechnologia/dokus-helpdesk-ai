@@ -32,6 +32,8 @@ O czym pamiętać przy zmianach:
 - Indeksem jest syntetyczny indeks z konfiguracji. Buduje go
   `docker compose exec api helpdesk docs index data/safe/instruction --synthetic --yes`; po
   zmianie `RAG_DOCS_FRAGMENT_CHARS` trzeba go zbudować ponownie.
+- Przed pomiarem fixture `synthetic_docs_collection` z `conftest.py` sprawdza, że kolekcja ma
+  tyle punktów, ile fragmentów daje dzisiejsze cięcie paczki; inny stan kończy pomiar błędem.
 - Zmiana `RAG_DOCS_SCORE_MIN` przesuwa pierwszą i trzecią liczbę w przeciwne strony: przy 0.39
   wszystkie pięć zapytań bez odpowiedzi wraca pustych, ale jedno z 24 traci swoją sekcję.
 """
@@ -178,13 +180,17 @@ async def _measure(
 
 
 @pytest.fixture(scope="module")
-def measurement() -> Measurement:
+def measurement(
+    synthetic_docs_collection: None,  # warunek z conftest.py: kolekcja odpowiada plikom paczki
+) -> Measurement:
     """
     Description:
-    Robi pomiar raz na cały plik: 29 wyszukań przez prawdziwy embedder.
+    Robi pomiar raz na cały plik: 29 wyszukań przez prawdziwy embedder. Najpierw warunek
+    `synthetic_docs_collection` sprawdza, że indeks zbudowano dzisiejszym cięciem paczki —
+    inaczej wynik byłby nieważny.
 
     Example args:
-        (brak)
+        synthetic_docs_collection=None
 
     Example result:
         Measurement(expected_first=24, distractors_below=9, distractors_total=9,
@@ -194,8 +200,11 @@ def measurement() -> Measurement:
 
 
 def test_the_expected_section_comes_back_first(measurement: Measurement) -> None:
-    """Zapytania z odpowiedzią → oczekiwana sekcja prawie zawsze pierwsza: zepsuty tryb embeddera,
-    grupowanie albo próg obniża tę liczbę, zanim cokolwiek padnie."""
+    """Sprawdza, czy wyszukiwanie w dokumentacji stawia właściwą sekcję na pierwszym miejscu: ma
+    tak być dla co najmniej 22 z 24 zapytań, na które paczka ma odpowiedź.
+
+    Wyłapuje pogorszenie wyszukiwania, przy którym nic nie pada, tylko wyniki są gorsze — na
+    przykład po pomyleniu trybu embeddera, zmianie cięcia sekcji na fragmenty albo progu."""
     assert measurement.expected_first >= MIN_EXPECTED_FIRST, (
         f"oczekiwana sekcja wróciła pierwsza dla {measurement.expected_first} zapytań, oczekiwane "
         f">= {MIN_EXPECTED_FIRST} — czy indeks zbudowano przy dzisiejszym "
@@ -204,8 +213,11 @@ def test_the_expected_section_comes_back_first(measurement: Measurement) -> None
 
 
 def test_a_section_about_another_channel_stays_below(measurement: Measurement) -> None:
-    """Dystraktory → prawie wszystkie niżej niż najlepsza oczekiwana sekcja: to samo zagadnienie
-    w innym kanale postawione wyżej odwraca radę."""
+    """Sprawdza, czy sekcja o tym samym zagadnieniu, ale w innym kanale (np. ePUAP zamiast
+    e-Doręczeń), stoi niżej niż sekcja właściwa: ma tak być w co najmniej 8 z 9 takich par.
+
+    Wyłapuje wyszukiwanie, które myli bliźniacze sekcje — a rada z niewłaściwej bywa odwrotnością
+    poprawnej."""
     assert measurement.distractors_below >= MIN_DISTRACTORS_BELOW, (
         f"niżej niż oczekiwana sekcja stoi {measurement.distractors_below} "
         f"z {measurement.distractors_total} dystraktorów, oczekiwane >= {MIN_DISTRACTORS_BELOW}"
@@ -215,8 +227,11 @@ def test_a_section_about_another_channel_stays_below(measurement: Measurement) -
 def test_questions_the_documentation_does_not_answer_mostly_come_back_empty(
     measurement: Measurement,
 ) -> None:
-    """Zapytania bez odpowiedzi w paczce → prawie żadne nie dostaje sekcji: pusty wynik mówi
-    agentowi, że dokumentacja o tym milczy."""
+    """Sprawdza, czy na pytania, których dokumentacja nie opisuje, wyszukiwanie nie oddaje nic:
+    jakąkolwiek sekcję wolno dostać najwyżej 2 z 5 takich zapytań.
+
+    Wyłapuje próg podobieństwa ustawiony za nisko, przy którym agent dostaje sekcje bez związku
+    z pytaniem zamiast informacji, że dokumentacja o tym milczy."""
     assert measurement.unanswered_with_hits <= MAX_UNANSWERED_WITH_HITS, (
         f"sekcję dostało {measurement.unanswered_with_hits} zapytań bez odpowiedzi, dozwolone "
         f"{MAX_UNANSWERED_WITH_HITS} — próg `RAG_DOCS_SCORE_MIN` przepuszcza sekcje bez związku "

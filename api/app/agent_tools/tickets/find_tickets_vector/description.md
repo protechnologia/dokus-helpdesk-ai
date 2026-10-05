@@ -5,7 +5,8 @@
      prompt grafu.
 
      Układ jest ten sam w każdym opisie narzędzia: cztery sekcje,
-     argumenty i pola wyniku w tabelkach, linie do 70 znaków —
+     argumenty w tabelce, wynik w JEDNEJ tabelce — pola zagnieżdżone
+     pełną ścieżką (`sections[].section.title`), linie do 70 znaków;
      dłuższe bywają tylko wiersze tabelki argumentów.
 
      Zmiana dotyczy wszystkich grafów naraz, więc po strojeniu jednego

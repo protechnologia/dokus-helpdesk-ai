@@ -5,7 +5,8 @@
      prompt grafu.
 
      Układ jest ten sam w każdym opisie narzędzia: cztery sekcje,
-     argumenty i pola wyniku w tabelkach, linie do 70 znaków —
+     argumenty w tabelce, wynik w JEDNEJ tabelce — pola zagnieżdżone
+     pełną ścieżką (`sections[].section.title`), linie do 70 znaków;
      dłuższe bywają tylko wiersze tabelki argumentów.
 
      Zmiana dotyczy wszystkich grafów naraz, więc po strojeniu jednego
@@ -28,24 +29,19 @@ zamieniane na embedding i porównywane z fragmentami sekcji.
 
 JSON z opisami sekcji, bez treści:
 
-| pole                    | co zawiera                           |
-|-------------------------|--------------------------------------|
-| sections                | sekcje, od najbardziej podobnej      |
-| sections[].score        | podobieństwo cosinusowe do zapytania |
-| sections[].section      | opis sekcji                          |
-| dropped_below_threshold | ile sekcji odpadło jako zbyt słabe   |
-
-Pola opisu sekcji (`section`):
-
-| pole         | co zawiera                                     |
-|--------------|------------------------------------------------|
-| section_id   | identyfikator sekcji — podajesz go `read_docs` |
-| document     | tytuł dokumentu                                |
-| version      | wydanie dokumentu                              |
-| date         | data wydania                                   |
-| chapter_path | rozdział, w którym sekcja leży                 |
-| title        | tytuł sekcji                                   |
-| description  | krótki opis, o czym jest sekcja                |
+| pole                            | co zawiera                      |
+|---------------------------------|---------------------------------|
+| sections                        | sekcje, od najbardziej podobnej |
+| sections[].score                | podobieństwo cosinusowe         |
+| sections[].section              | opis sekcji                     |
+| sections[].section.section_id   | identyfikator dla `read_docs`   |
+| sections[].section.document     | tytuł dokumentu                 |
+| sections[].section.version      | wydanie dokumentu               |
+| sections[].section.date         | data wydania                    |
+| sections[].section.chapter_path | rozdział, w którym sekcja leży  |
+| sections[].section.title        | tytuł sekcji                    |
+| sections[].section.description  | krótki opis, o czym jest sekcja |
+| dropped_below_threshold         | ile odpadło jako zbyt słabe     |
 
 # Zasady
 

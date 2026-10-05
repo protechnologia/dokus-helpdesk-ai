@@ -232,8 +232,11 @@ def measurement() -> Measurement:
 
 
 def test_the_expected_ticket_comes_back_first(measurement: Measurement) -> None:
-    """Zapytania golden setu przez narzędzie → rekord-cel prawie zawsze wraca jako pierwszy:
-    zepsuty tekst zapytania, tryb embeddera albo wektor obniża tę liczbę, zanim cokolwiek padnie."""
+    """Sprawdza, czy wyszukiwanie zgłoszeń stawia właściwe zgłoszenie na pierwszym miejscu: ma
+    tak być dla co najmniej 145 ze 162 zapytań zestawu.
+
+    Wyłapuje pogorszenie wyszukiwania, przy którym nic nie pada, tylko wyniki są gorsze — na
+    przykład po pomyleniu trybu embeddera albo po zmianie tekstu, z którego liczy się wektor."""
     assert measurement.target_first >= MIN_TARGET_FIRST, (
         f"rekord-cel wrócił jako pierwszy dla {measurement.target_first} zapytań, oczekiwane >= "
         f"{MIN_TARGET_FIRST} — czy indeks stoi na korpusie odniesienia i czy zapytanie idzie "
@@ -244,8 +247,11 @@ def test_the_expected_ticket_comes_back_first(measurement: Measurement) -> None:
 def test_the_expected_ticket_survives_the_limit_and_the_threshold(
     measurement: Measurement,
 ) -> None:
-    """Zapytania golden setu przez narzędzie → rekord-cel prawie zawsze jest wśród zwróconych:
-    próg i limit trafień nie mogą wycinać tego, po co agent pyta."""
+    """Sprawdza, czy właściwe zgłoszenie w ogóle jest wśród zwróconych: ma tak być dla co
+    najmniej 155 ze 162 zapytań zestawu.
+
+    Wyłapuje próg podobieństwa albo limit trafień ustawiony tak, że odcina zgłoszenie, którego
+    agent szuka."""
     assert measurement.target_returned >= MIN_TARGET_RETURNED, (
         f"rekord-cel wrócił dla {measurement.target_returned} zapytań, oczekiwane >= "
         f"{MIN_TARGET_RETURNED} — czy zmieniło się `RAG_SCORE_MIN` albo `RAG_TOP_K`?"
@@ -253,8 +259,11 @@ def test_the_expected_ticket_survives_the_limit_and_the_threshold(
 
 
 def test_queries_without_a_match_mostly_come_back_empty(measurement: Measurement) -> None:
-    """Dystraktory przez narzędzie → prawie żaden nie dostaje trafienia: trafienie bez związku
-    ze zgłoszeniem jest gorsze niż pusta lista, bo wygląda na odpowiedź."""
+    """Sprawdza, czy na pytania, na które baza nie ma odpowiedzi, wyszukiwanie nie oddaje nic:
+    jakiekolwiek zgłoszenie wolno dostać najwyżej 5 z 16 takich zapytań.
+
+    Wyłapuje próg podobieństwa ustawiony za nisko, przy którym agent dostaje zgłoszenia bez
+    związku ze sprawą — a one wyglądają na odpowiedź."""
     assert measurement.distractors_with_hits <= MAX_DISTRACTORS_WITH_HITS, (
         f"trafienie dostało {measurement.distractors_with_hits} dystraktorów, dozwolone "
         f"{MAX_DISTRACTORS_WITH_HITS} — próg przepuszcza zgłoszenia bez związku z zapytaniem"

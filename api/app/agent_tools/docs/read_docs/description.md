@@ -2,10 +2,10 @@
      argumentów (`ReadDocsQuery` bez docstringów), w każdym grafie,
      który ma to narzędzie na liście. Mówi, jak pytać narzędzie i co
      ono oddaje; po co wyniki w danej funkcji, mówi prompt grafu.
-     Szkielet; narzędzie właściwe w p. 52.
 
      Układ jest ten sam w każdym opisie narzędzia: cztery sekcje,
-     argumenty i pola wyniku w tabelkach, linie do 70 znaków —
+     argumenty w tabelce, wynik w JEDNEJ tabelce — pola zagnieżdżone
+     pełną ścieżką (`sections[].section.title`), linie do 70 znaków;
      dłuższe bywają tylko wiersze tabelki argumentów.
 
      Zmiana dotyczy wszystkich grafów naraz, więc po strojeniu jednego
@@ -27,23 +27,18 @@ treści albo z wyszukiwania.
 
 JSON:
 
-| pole               | co zawiera       |
-|--------------------|------------------|
-| sections           | odczytane sekcje |
-| sections[].section | opis sekcji      |
-| sections[].text    | treść sekcji     |
-
-Pola opisu sekcji (`section`):
-
-| pole         | co zawiera                      |
-|--------------|---------------------------------|
-| section_id   | identyfikator sekcji            |
-| document     | tytuł dokumentu                 |
-| version      | wydanie dokumentu               |
-| date         | data wydania                    |
-| chapter_path | rozdział, w którym sekcja leży  |
-| title        | tytuł sekcji                    |
-| description  | krótki opis, o czym jest sekcja |
+| pole                            | co zawiera                      |
+|---------------------------------|---------------------------------|
+| sections                        | odczytane sekcje                |
+| sections[].section              | opis sekcji                     |
+| sections[].section.section_id   | identyfikator sekcji            |
+| sections[].section.document     | tytuł dokumentu                 |
+| sections[].section.version      | wydanie dokumentu               |
+| sections[].section.date         | data wydania                    |
+| sections[].section.chapter_path | rozdział, w którym sekcja leży  |
+| sections[].section.title        | tytuł sekcji                    |
+| sections[].section.description  | krótki opis, o czym jest sekcja |
+| sections[].text                 | treść sekcji                    |
 
 # Zasady
 

@@ -110,8 +110,11 @@ def measurement() -> tuple[int, int]:
 
 
 def test_filter_still_recognises_hollow_records(measurement: tuple[int, int]) -> None:
-    """Filtr na korpusie odniesienia → nadal odrzuca większość rekordów oznaczonych w przeglądzie:
-    zmieniony prompt parsujący albo model nie może uciszyć reguł niezauważenie."""
+    """Sprawdza, czy filtr jakości nadal odrzuca zgłoszenia bez wiedzy: z 38 rekordów, które przy
+    ręcznym przeglądzie uznano za bezwartościowe, ma odrzucić co najmniej 25.
+
+    Wyłapuje sytuację, w której po zmianie promptu parsującego albo modelu filtr przestaje
+    cokolwiek odrzucać i puste rekordy trafiają do indeksu."""
     labelled_drops, _ = measurement
 
     assert labelled_drops >= MIN_LABELLED_DROPS, (
@@ -121,8 +124,11 @@ def test_filter_still_recognises_hollow_records(measurement: tuple[int, int]) ->
 
 
 def test_filter_does_not_reject_good_records(measurement: tuple[int, int]) -> None:
-    """Filtr na korpusie odniesienia → prawie żaden rekord uznany za dobry nie odpada: fałszywy
-    alarm usuwa rekord z indeksu po cichu, a przepuszczony pusty tylko zajmuje miejsce."""
+    """Sprawdza, czy filtr jakości nie wyrzuca dobrych zgłoszeń: ze 162 rekordów, które przy
+    ręcznym przeglądzie uznano za dobre, wolno mu odrzucić najwyżej 2.
+
+    Wyłapuje regułę filtra, która stała się za szeroka i po cichu usuwa z indeksu przydatne
+    rekordy."""
     _, false_positives = measurement
 
     assert false_positives <= MAX_FALSE_POSITIVES, (

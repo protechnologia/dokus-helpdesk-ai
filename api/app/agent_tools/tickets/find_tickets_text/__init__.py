@@ -10,10 +10,14 @@ znaleziono; treść agent czyta osobno, przez `read_tickets_thread` albo `read_t
 | `models.py`      | zapytanie (`exact`, `words`), znalezione zgłoszenie i wynik     |
 | `description.md` | opis narzędzia dla modelu, ten sam w każdym grafie              |
 | `base.py`        | część wspólna narzędzia i atrapy: nazwa i tekst dla modelu      |
+| `tool.py`        | `FindTicketsTextTool` — wyszukiwanie w tabeli w Postgresie      |
 | `fake.py`        | `FakeFindTicketsTextTool` — ustalone numery zgłoszeń, bez usług |
 
-Status: modele i atrapa. Narzędzie właściwe (`tool.py`) na Postgresie powstaje w p. 53, a na
-prawdziwym korpusie ruszy po anonimizacji opisów (p. 19) i masowym imporcie (p. 31).
+Przykład zapytania i wyniku — w opisie `tool.py`; przykład tekstu, który czyta model — w opisie
+`base.py`.
+
+Narzędzie właściwe jest sprawdzone na zmyślonych wątkach. Tabela zgłoszeń dostanie prawdziwe
+wątki dopiero po anonimizacji (p. 19) i masowym imporcie (p. 31) — do tego czasu jest pusta.
 """
 
 from app.agent_tools.tickets.find_tickets_text.base import FindTicketsTextToolBase
@@ -23,9 +27,11 @@ from app.agent_tools.tickets.find_tickets_text.models import (
     FindTicketsTextResult,
     MatchedTicket,
 )
+from app.agent_tools.tickets.find_tickets_text.tool import FindTicketsTextTool
 
 __all__ = [
     "FakeFindTicketsTextTool",
+    "FindTicketsTextTool",
     "FindTicketsTextToolBase",
     "FindTicketsTextQuery",
     "FindTicketsTextResult",

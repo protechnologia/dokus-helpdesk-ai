@@ -141,6 +141,16 @@ def test_every_description_has_the_same_four_sections(tool: type) -> None:
     assert headings == DESCRIPTION_SECTIONS
 
 
+@pytest.mark.parametrize("tool", TOOLS, ids=lambda cls: cls.__name__)
+def test_every_description_shows_the_result_in_one_table(tool: type) -> None:
+    """Sekcja „Co zwraca" → dokładnie jedna tabelka: pola zagnieżdżone stoją w niej pełną ścieżką
+    (`sections[].section.title`), a nie w drugiej tabelce, do której model musiałby je dopasować."""
+    returns    = tool.description.split("# Co zwraca")[1].split("# Zasady")[0]
+    separators = [line for line in returns.splitlines() if line.startswith("|-")]
+
+    assert len(separators) == 1
+
+
 @pytest.mark.parametrize("tool", AUXILIARY, ids=lambda cls: cls.__name__)
 def test_an_auxiliary_tool_has_nothing_to_cite_with(tool: type[AuxiliaryTool]) -> None:
     """Każde narzędzie pomocnicze → bez `cite()` i bez `source`: jego wynik nie ma jak trafić na

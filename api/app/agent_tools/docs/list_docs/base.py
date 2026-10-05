@@ -48,9 +48,9 @@ class ListDocsToolBase(AuxiliaryTool):
     Wspólna część `list_docs`: wszystko poza pobraniem spisu.
 
     Do czego:
-    Po tej klasie dziedziczą atrapa (`FakeListDocsTool`) i narzędzie właściwe na metryczkach
-    wczytanych do bazy (p. 51). Każda dokłada wyłącznie `load()`, więc tekst dla modelu jest ten
-    sam w testach i na produkcji.
+    Po tej klasie dziedziczą atrapa (`FakeListDocsTool`) i narzędzie właściwe na Postgresie
+    (`ListDocsTool`). Każda dokłada wyłącznie `load()`, więc tekst dla modelu jest ten sam
+    w testach i na produkcji.
 
     Flow:
         1. `run()` woła `load()` podklasy i dostaje `ListDocsResult`.

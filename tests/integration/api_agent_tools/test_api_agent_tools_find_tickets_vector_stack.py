@@ -1,36 +1,22 @@
 """
 Description:
-Test integracyjny narzędzi `find_tickets_vector` i `read_tickets_card` z prawdziwym embedderem
-i prawdziwym Qdrantem: czy to, co zapisuje indeksacja, da się znaleźć i odczytać narzędziami.
-Wymaga działającego stacku.
+Test integracyjny narzędzia `find_tickets_vector` z prawdziwym embedderem i Qdrantem: czy karty
+zapisane przez indeksację da się znaleźć po znaczeniu. Wymaga działającego stacku.
 
-| scenariusz                                  | oczekiwanie                                    |
-|---------------------------------------------|------------------------------------------------|
-| pytanie polami zaindeksowanego zgłoszenia   | numer tego zgłoszenia pierwszy                 |
-| odczyt kart znalezionych numerów            | karty równe zapisanym, w kolejności wyszukania |
-| odczyt numeru spoza kolekcji                | numer na liście „bez karty", nie błąd          |
-| próg powyżej każdego możliwego podobieństwa | pusty wynik, komplet policzony jako odcięty    |
+| scenariusz                                  | oczekiwanie                                  |
+|---------------------------------------------|----------------------------------------------|
+| pytanie polami zaindeksowanego zgłoszenia   | numer tego zgłoszenia pierwszy               |
+| próg powyżej każdego możliwego podobieństwa | pusty wynik, komplet policzony jako odcięty  |
 
-Co się dzieje po drodze:
-
-1. Fixture kasuje kolekcję testową i zapisuje trzy zmyślone zgłoszenia jako pliki JSON.
-2. Indeksuje je produkcyjnym `TicketsIndexer`: prawdziwy embedder liczy wektory, Qdrant je zapisuje.
-3. Test pyta wyszukiwanie polami `problem` i `symptoms` jednego ze zgłoszeń, a znalezione
-   numery podaje odczytowi kart.
-4. Po teście kolekcja jest kasowana, a połączenia zamykane.
+Indeks buduje fixture `tickets_cards` z `conftest.py` tego folderu: trzy zmyślone karty
+zaindeksowane produkcyjnym `TicketsIndexer`.
 
 O czym pamiętać przy zmianach:
 
-- Kolekcja jest własna (`find_tickets_vector_integration_test`), nigdy skonfigurowana `tickets` —
-  test ją tworzy i kasuje, a z prawdziwym indeksem skończyłoby się to jego utratą.
-- Asercje są na ranking i równość kart, nigdy na wysokość score.
+- Asercje są na ranking, nigdy na wysokość score.
 - Tryb embeddera, przestrzeń wektorów, liczenie progu i tłumaczenie błędów sprawdzają testy
   jednostkowe na podmienionym transporcie; trafność wyszukiwania to sprawa testów ewaluacyjnych.
 """
-
-from collections.abc import AsyncIterator
-from datetime import date
-from pathlib import Path
 
 import pytest
 
@@ -38,12 +24,6 @@ from app.agent_tools.tickets.find_tickets_vector import (
     FindTicketsVectorQuery,
     FindTicketsVectorTool,
 )
-from app.agent_tools.tickets.read_tickets_card import ReadTicketsCardQuery, ReadTicketsCardTool
-from app.config import Settings
-from app.core_model.tickets.parsed_ticket import ParsedTicket
-from app.core_service.indexer_tickets import TicketsIndexer
-from app.db_qdrant import QdrantClient, TicketsCollection
-from app.engine_embedding import EmbeddingClient
 
 pytestmark = [
     pytest.mark.stack,
@@ -51,188 +31,36 @@ pytestmark = [
     pytest.mark.stack_embedder,
 ]
 
-# Własna kolekcja, nigdy skonfigurowana — patrz opis modułu.
-TEST_COLLECTION = "find_tickets_vector_integration_test"
 
-
-def _ticket(
-    ticket_id: str,  # np. "90001"
-    component: str,  # np. "e-Doręczenia"
-    problem:   str,  # np. "Nie przychodzą przesyłki z e-Doręczeń"
-    symptoms:  str,  # np. "Brak nowych przesyłek, choć nadawcy potwierdzają wysyłkę"
-    solution:  str,  # np. "Zrestartowano kolejkę pobierania."
-) -> ParsedTicket:
-    """
-    Description:
-    Jedno zmyślone zgłoszenie do zaindeksowania; zgłoszenia różnią się tematem, żeby ranking był
-    jednoznaczny.
-
-    Example args:
-        ticket_id="90001"
-        component="e-Doręczenia"
-        problem="Nie przychodzą przesyłki z e-Doręczeń"
-        symptoms="Brak nowych przesyłek, choć nadawcy potwierdzają wysyłkę"
-        solution="Zrestartowano kolejkę pobierania."
-
-    Example result:
-        ParsedTicket(ticket_id="90001", component="e-Doręczenia", …)
-    """
-    ticket = ParsedTicket(
-        ticket_id                     = ticket_id,
-        date                          = date(2026, 2, 10),
-        component                     = component,
-        problem                       = problem,
-        symptoms                      = symptoms,
-        error_codes                   = ["ERR-4210"],
-        cause                         = "brak",
-        solution                      = solution,
-        resolution                    = "naprawione",
-        resolution_vocabulary_version = 1,
-        questions_summary             = "pytano, od kiedy występuje problem",
-    )
-
-    return ticket
-
-
-TICKETS = [
-    _ticket(
-        "90001",
-        "e-Doręczenia",
-        "Nie przychodzą przesyłki z e-Doręczeń",
-        "Brak nowych przesyłek w skrzynce, choć nadawcy potwierdzają wysyłkę",
-        "Zrestartowano kolejkę pobierania; zaległe przesyłki pobrały się same.",
-    ),
-    _ticket(
-        "90002",
-        "główna aplikacja",
-        "Skanowanie wielu stron nie zapisuje dokumentu",
-        "Przy kilkudziesięciu kartkach skan nie dociera do systemu, jedna strona przechodzi",
-        "Podniesiono limit rozmiaru przesyłanego pliku na serwerze aplikacji.",
-    ),
-    _ticket(
-        "90003",
-        "główna aplikacja",
-        "Kopie zapasowe bazy przestały się wykonywać",
-        "Od kilku dni w katalogu kopii nie pojawiają się nowe pliki",
-        "Poprawiono wpis w harmonogramie zadań, kopie wykonują się ponownie.",
-    ),
-]
-
-
-@pytest.fixture
-async def clients(
-    host_settings: Settings,
-    tmp_path:      Path,
-) -> AsyncIterator[tuple[EmbeddingClient, TicketsCollection]]:
-    """
-    Description:
-    Oddaje klienta embeddera i kolekcję testową w działającym Qdrancie, zaindeksowaną
-    produkcyjną ścieżką (`TicketsIndexer`) — narzędzie ma znaleźć to, co naprawdę zapisuje
-    indeksacja. Kolekcja jest kasowana przed testem i po nim: przerwany przebieg nie zostawi
-    starego stanu następnemu.
-
-    Example args:
-        host_settings=Settings(embedding_base_url="http://localhost:8001", …)
-        tmp_path=Path("/tmp/pytest-0")
-
-    Example result:
-        (EmbeddingClient(…), TicketsCollection „find_tickets_vector_integration_test")
-    """
-    embedder = EmbeddingClient(
-        base_url = host_settings.embedding_base_url,
-        timeout  = host_settings.embedding_timeout_seconds,
-    )
-    qdrant = QdrantClient(
-        base_url = host_settings.qdrant_url,
-        timeout  = host_settings.qdrant_timeout_seconds,
-    )
-    tickets = TicketsCollection(
-        client      = qdrant,
-        name        = TEST_COLLECTION,
-        vector_size = host_settings.embedding_vector_size,
-    )
-
-    await tickets.drop()
-
-    for ticket in TICKETS:
-        artifact = tmp_path / f"{ticket.ticket_id}.json"
-        artifact.write_text(ticket.model_dump_json(), encoding="utf-8")
-
-    indexer = TicketsIndexer(embedder=embedder, tickets=tickets)
-    await indexer.build(tmp_path)
-
-    yield embedder, tickets
-
-    await tickets.drop()
-    await embedder.aclose()
-    await qdrant.aclose()
-
-
-@pytest.mark.parametrize("ticket", TICKETS, ids=lambda ticket: ticket.ticket_id)
-async def test_a_ticket_asked_by_its_own_fields_comes_back_first_and_whole(
-    clients: tuple[EmbeddingClient, TicketsCollection],
-    ticket:  ParsedTicket,
+@pytest.mark.parametrize("position", [0, 1, 2], ids=["90001", "90002", "90003"])
+async def test_a_ticket_asked_by_its_own_fields_comes_back_first(
+    tickets_cards,
+    position: int,
 ) -> None:
     """Zapytanie polami zaindeksowanego zgłoszenia → numer tego zgłoszenia na pierwszym miejscu.
     Asercja na ranking, nie na wysokość score."""
-    embedder, tickets = clients
-    tool   = FindTicketsVectorTool(embedder=embedder, tickets=tickets, top_k=5, score_min=-1.0)
-    query  = FindTicketsVectorQuery(problem=ticket.problem, symptoms=ticket.symptoms)
-    result = await tool.find(query)
+    card   = tickets_cards.cards[position]
+    result = await tickets_cards.find.find(
+        FindTicketsVectorQuery(problem=card.problem, symptoms=card.symptoms)
+    )
 
-    assert result.tickets[0].ticket_id == ticket.ticket_id
-    assert len(result.tickets) == len(TICKETS)
+    assert result.tickets[0].ticket_id    == card.ticket_id
+    assert len(result.tickets)            == len(tickets_cards.cards)
     assert result.dropped_below_threshold == 0
 
 
-async def test_found_numbers_read_back_as_the_cards_that_were_indexed(
-    clients: tuple[EmbeddingClient, TicketsCollection],
-) -> None:
-    """Numery z wyszukiwania podane odczytowi → karty równe zaindeksowanym, w kolejności
-    wyszukania: payload z Qdranta wraca do `ParsedTicket` bez strat, a oba narzędzia mówią o tych
-    samych numerach."""
-    embedder, tickets = clients
-    finder = FindTicketsVectorTool(embedder=embedder, tickets=tickets, top_k=5, score_min=-1.0)
-    reader = ReadTicketsCardTool(tickets=tickets)
-
-    found  = await finder.find(
-        FindTicketsVectorQuery(problem=TICKETS[0].problem, symptoms=TICKETS[0].symptoms)
-    )
-    wanted = [ticket.ticket_id for ticket in found.tickets]
-    result = await reader.search(ReadTicketsCardQuery(ticket_ids=wanted))
-
-    indexed = {ticket.ticket_id: ticket for ticket in TICKETS}
-
-    assert result.cards        == [indexed[ticket_id] for ticket_id in wanted]
-    assert result.without_card == []
-    assert [ref.item_id for ref in reader.cite(result)] == wanted
-
-
-async def test_a_number_outside_the_collection_comes_back_without_a_card(
-    clients: tuple[EmbeddingClient, TicketsCollection],
-) -> None:
-    """Numer, którego w kolekcji nie ma → lista „bez karty", a karta znanego numeru wraca
-    normalnie: Qdrant nie zgłasza błędu przy brakującym punkcie, więc narzędzie mówi o tym samo."""
-    _, tickets = clients
-    reader = ReadTicketsCardTool(tickets=tickets)
-    result = await reader.search(
-        ReadTicketsCardQuery(ticket_ids=["99999", TICKETS[1].ticket_id])
-    )
-
-    assert result.cards        == [TICKETS[1]]
-    assert result.without_card == ["99999"]
-
-
-async def test_a_threshold_nothing_passes_counts_everything_as_dropped(
-    clients: tuple[EmbeddingClient, TicketsCollection],
-) -> None:
+async def test_a_threshold_nothing_passes_counts_everything_as_dropped(tickets_cards) -> None:
     """Próg powyżej każdego możliwego podobieństwa → pusty wynik i komplet policzony jako odcięty:
     ostry próg nie może wyglądać jak pusty indeks."""
-    embedder, tickets = clients
-    tool   = FindTicketsVectorTool(embedder=embedder, tickets=tickets, top_k=5, score_min=1.1)
-    result = await tool.find(
-        FindTicketsVectorQuery(problem=TICKETS[0].problem, symptoms=TICKETS[0].symptoms)
+    card = tickets_cards.cards[0]
+    tool = FindTicketsVectorTool(
+        embedder  = tickets_cards.embedder,
+        tickets   = tickets_cards.collection,
+        top_k     = 5,
+        score_min = 1.1,
     )
 
-    assert result.tickets == []
-    assert result.dropped_below_threshold == len(TICKETS)
+    result = await tool.find(FindTicketsVectorQuery(problem=card.problem, symptoms=card.symptoms))
+
+    assert result.tickets                 == []
+    assert result.dropped_below_threshold == len(tickets_cards.cards)

@@ -26,6 +26,8 @@ O czym pamiętać przy zmianach:
 - Indeksem jest syntetyczny indeks z konfiguracji. Buduje go
   `docker compose exec api helpdesk docs index data/safe/instruction --synthetic --yes`; tabelę
   założoną przed zmianą kolumny `search_text` trzeba zbudować ponownie.
+- Przed pomiarem fixture `synthetic_docs_table` z `conftest.py` sprawdza, że tabela indeksu ma
+  dokładnie sekcje paczki z treścią jak w plikach; nieaktualny indeks kończy pomiar błędem.
 """
 
 import asyncio
@@ -94,13 +96,16 @@ async def _search_all(
 
 
 @pytest.fixture(scope="module")
-def results() -> dict[str, FindDocsTextResult]:
+def results(
+    synthetic_docs_table: None,  # warunek z conftest.py: tabela odpowiada plikom paczki
+) -> dict[str, FindDocsTextResult]:
     """
     Description:
-    Odpytuje indeks raz na cały plik: jedno połączenie z bazą na 32 zapytania.
+    Odpytuje indeks raz na cały plik: jedno połączenie z bazą na 32 zapytania. Najpierw warunek
+    `synthetic_docs_table` sprawdza, że indeks odpowiada paczce — inaczej wynik byłby nieważny.
 
     Example args:
-        (brak)
+        synthetic_docs_table=None
 
     Example result:
         {"t01": FindDocsTextResult(…), "t02": FindDocsTextResult(…), …}
@@ -117,8 +122,13 @@ def test_a_query_finds_what_its_entry_declares(
     entry:   dict,
     results: dict[str, FindDocsTextResult],
 ) -> None:
-    """Zapytanie zestawu → oczekiwane sekcje z etykietą, bez sekcji niechcianych i z łączną
-    liczbą pasujących zgodną z wpisem."""
+    """Sprawdza jedno zapytanie zestawu: czy wyszukiwanie po frazie i po słowach znalazło sekcje,
+    które miało znaleźć, nie znalazło tych, których nie powinno, i naliczyło tyle pasujących, ile
+    jest w paczce.
+
+    Wyłapuje błędy słownika i dopasowania, przy których wyszukiwanie dalej działa, ale gubi albo
+    dokłada trafienia — na przykład przestaje rozpoznawać odmianę słowa, myli „widoczne"
+    z „niewidoczne" albo nie znajduje fragmentu kodu błędu."""
     result = results[entry["id"]]
     found  = {item.section.section_id: item.matched_by for item in result.sections}
 

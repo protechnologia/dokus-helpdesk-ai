@@ -48,8 +48,9 @@ class ReadDocsToolBase(KnowledgeSource):
     Wspólna część `read_docs`: wszystko poza samym pobraniem treści.
 
     Do czego:
-    Po tej klasie dziedziczą atrapa (`FakeReadDocsTool`) i narzędzie właściwe (p. 52). Każda dokłada
-    wyłącznie `search()`, więc tekst dla modelu i lista źródeł są te same w testach i na produkcji.
+    Po tej klasie dziedziczą atrapa (`FakeReadDocsTool`) i narzędzie właściwe na Postgresie
+    (`ReadDocsTool`). Każda dokłada wyłącznie `search()`, więc tekst dla modelu i lista źródeł są
+    te same w testach i na produkcji.
 
     Flow:
         1. `search()` podklasy zwraca `ReadDocsResult` albo zgłasza `UnknownSectionError`.

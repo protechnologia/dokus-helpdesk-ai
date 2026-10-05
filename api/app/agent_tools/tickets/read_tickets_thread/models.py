@@ -1,37 +1,30 @@
 from datetime import date as Date
-from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
-
-# Ile wątków da się odczytać jednym wywołaniem. Wątki są długie — bywa po kilka tysięcy słów —
-# więc model ma czytać te, które wybrał po kartach, a nie wszystko, co znalazł.
-MAX_THREADS_PER_READ = 5
-
-TicketId = Annotated[str, Field(min_length=1)]
 
 
 class ReadTicketsThreadQuery(BaseModel):
     """
     Description:
-    O co agent pyta `read_tickets_thread`: numery zgłoszeń z wyszukiwania, których oryginalny
-    wątek chce przeczytać.
+    O co agent pyta `read_tickets_thread`: numer jednego zgłoszenia z wyszukiwania, którego
+    oryginalny wątek chce przeczytać.
+
+    Jeden numer na wywołanie, nie lista: wątki są długie — bywa po kilka tysięcy słów — a tak
+    limit wywołań narzędzia jest wprost limitem wątków przeczytanych w jednej sprawie. Przy liście
+    model brał wszystkie znalezione numery naraz, a limit wywołań mnożył się przez jej długość.
     """
 
     # Nieznany argument to błąd, jak w każdym modelu zapytania.
     model_config = ConfigDict(extra="forbid")
 
-    ticket_ids: list[TicketId] = Field(
-        min_length = 1,
-        max_length = MAX_THREADS_PER_READ,
-        examples   = [["90011"]],
-    )
+    ticket_id: str = Field(min_length=1, examples=["90011"])
 
 
 class TicketThread(BaseModel):
     """
     Description:
-    Jeden odczytany wątek: numer zgłoszenia, data, temat i cały tekst wątku w oryginalnym
-    brzmieniu, po anonimizacji — temat, opis zgłaszającego i komentarze.
+    Co daje jeden odczyt `read_tickets_thread`: numer zgłoszenia, data, temat i cały tekst wątku
+    w oryginalnym brzmieniu, po anonimizacji — temat, opis zgłaszającego i komentarze.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -41,15 +34,3 @@ class TicketThread(BaseModel):
     # Temat zgłoszenia — tytuł na liście źródeł.
     subject:   str  = Field(min_length=1, examples=["Błąd przy podpisie"])
     thread:    str  = Field(min_length=1, examples=["ZGŁOSZENIE 90011 z 2026-03-02\n…"])
-
-
-class ReadTicketsThreadResult(BaseModel):
-    """
-    Description:
-    Co dał jeden odczyt `read_tickets_thread`: wszystkie żądane wątki, w kolejności żądania.
-    Wynik częściowy nie istnieje — brak któregokolwiek zgłoszenia to błąd (`UnknownTicketError`).
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    threads: list[TicketThread] = Field(default_factory=list)

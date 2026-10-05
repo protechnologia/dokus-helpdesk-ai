@@ -46,46 +46,17 @@ O czym pamiętać przy zmianach:
 """
 
 import logging
-from collections.abc import Iterable
 
+from app.agent_tools.base import label_matches
 from app.agent_tools.docs.find_docs_text.base import FindDocsTextToolBase
 from app.agent_tools.docs.find_docs_text.models import (
     FindDocsTextQuery,
     FindDocsTextResult,
     MatchedSection,
 )
-from app.agent_tools.models import MatchKind
 from app.db_postgres import DocsTable
 
 logger = logging.getLogger(__name__)
-
-
-def label_matches(
-    exact_ids: Iterable[str],  # np. ["adm-podpis-weryfikacja"] — znalezione frazą z `exact`
-    words_ids: Iterable[str],  # np. ["adm-numeracja-roczna"] — znalezione słowami z `words`
-) -> dict[str, MatchKind]:
-    """
-    Description:
-    Łączy wyniki obu dróg w jedną listę z etykietami: najpierw to, co znalazła fraza, potem to,
-    co znalazły słowa. Identyfikator znaleziony obiema drogami stoi raz, z etykietą `exact` —
-    trafienie po przepisanej frazie mówi więcej niż po słowach kluczowych.
-
-    Example args:
-        exact_ids=["adm-podpis-weryfikacja"]
-        words_ids=["adm-numeracja-roczna", "adm-podpis-weryfikacja"]
-
-    Example result:
-        {"adm-podpis-weryfikacja": "exact", "adm-numeracja-roczna": "words"}
-    """
-    matched: dict[str, MatchKind] = {}
-
-    for section_id in exact_ids:
-        matched.setdefault(section_id, "exact")
-
-    for section_id in words_ids:
-        matched.setdefault(section_id, "words")
-
-    return matched
 
 
 class FindDocsTextTool(FindDocsTextToolBase):

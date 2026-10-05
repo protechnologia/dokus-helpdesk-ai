@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from pathlib import Path
 from typing import ClassVar
 
 from pydantic import BaseModel
 
-from app.agent_tools.models import SourceRef
+from app.agent_tools.models import MatchKind, SourceRef
 from app.core_util.markdown import read_document
 
 # Opis narzędzia dla modelu leży w katalogu narzędzia pod tą nazwą.
@@ -62,6 +63,35 @@ def result_as_json(
         }
     """
     return result.model_dump_json(indent=2, exclude=exclude)
+
+
+def label_matches(
+    exact_ids: Iterable[str],  # np. ["90011"] — znalezione frazą z `exact`
+    words_ids: Iterable[str],  # np. ["90012", "90011"] — znalezione słowami z `words`
+) -> dict[str, MatchKind]:
+    """
+    Description:
+    Łączy wyniki obu dróg wyszukiwania tekstowego w jedną listę z etykietami: najpierw to, co
+    znalazła fraza, potem to, co znalazły słowa. Identyfikator znaleziony obiema drogami stoi
+    raz, z etykietą `exact` — trafienie po przepisanej frazie mówi więcej niż po słowach
+    kluczowych. Wspólne dla `find_tickets_text` i `find_docs_text`.
+
+    Example args:
+        exact_ids=["90011"]
+        words_ids=["90012", "90011"]
+
+    Example result:
+        {"90011": "exact", "90012": "words"}
+    """
+    matched: dict[str, MatchKind] = {}
+
+    for item_id in exact_ids:
+        matched.setdefault(item_id, "exact")
+
+    for item_id in words_ids:
+        matched.setdefault(item_id, "words")
+
+    return matched
 
 
 class KnowledgeSource(ABC):

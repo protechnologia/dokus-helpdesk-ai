@@ -109,6 +109,7 @@ class Settings(BaseSettings):
     # zużywa tokeny bez końca: wywołanie ponad limit dostaje błąd zamiast wyniku, a model ma
     # odpowiedzieć na podstawie tego, co już ma. Ten sam limit stoi w opisie narzędzia dla modelu.
     # Wartości ostrożne: wyszukiwanie oddaje kilkadziesiąt tokenów, odczyt wątków i sekcji tysiące.
+    # Wątek czyta się po jednym na wywołanie, więc jego limit jest liczbą wątków na sprawę.
     # Wyszukiwania tekstowe mają więcej, bo jedno wywołanie to jedna fraza, a zgłoszenie niesie
     # ich bywa kilka: kod z ekranu, kod z logów, komunikat.
     # Pole na narzędzie, o nazwie `agent_max_calls_<narzędzie>` — z niej składa się

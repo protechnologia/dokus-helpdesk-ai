@@ -5,7 +5,8 @@
      prompt grafu.
 
      Układ jest ten sam w każdym opisie narzędzia: cztery sekcje,
-     argumenty i pola wyniku w tabelkach, linie do 70 znaków —
+     argumenty w tabelce, wynik w JEDNEJ tabelce — pola zagnieżdżone
+     pełną ścieżką (`sections[].section.title`), linie do 70 znaków;
      dłuższe bywają tylko wiersze tabelki argumentów.
 
      Zmiana dotyczy wszystkich grafów naraz, więc po strojeniu jednego
@@ -32,24 +33,19 @@ słowa z `words`.
 
 JSON z opisami sekcji, bez treści:
 
-| pole                  | co zawiera                               |
-|-----------------------|------------------------------------------|
-| sections              | sekcje, dosłowne trafienia pierwsze      |
-| sections[].matched_by | czym znaleziona: `exact` albo `words`    |
-| sections[].section    | opis sekcji                              |
-| omitted_over_limit    | ile pasujących sekcji ponad limit wyniku |
-
-Pola opisu sekcji (`section`):
-
-| pole         | co zawiera                                     |
-|--------------|------------------------------------------------|
-| section_id   | identyfikator sekcji — podajesz go `read_docs` |
-| document     | tytuł dokumentu                                |
-| version      | wydanie dokumentu                              |
-| date         | data wydania                                   |
-| chapter_path | rozdział, w którym sekcja leży                 |
-| title        | tytuł sekcji                                   |
-| description  | krótki opis, o czym jest sekcja                |
+| pole                            | co zawiera                       |
+|---------------------------------|----------------------------------|
+| sections                        | sekcje, trafienia frazą pierwsze |
+| sections[].matched_by           | czym znaleziona: `exact`/`words` |
+| sections[].section              | opis sekcji                      |
+| sections[].section.section_id   | identyfikator dla `read_docs`    |
+| sections[].section.document     | tytuł dokumentu                  |
+| sections[].section.version      | wydanie dokumentu                |
+| sections[].section.date         | data wydania                     |
+| sections[].section.chapter_path | rozdział, w którym sekcja leży   |
+| sections[].section.title        | tytuł sekcji                     |
+| sections[].section.description  | krótki opis, o czym jest sekcja  |
+| omitted_over_limit              | ile sekcji ponad limit wyniku    |
 
 # Zasady
 

@@ -2,7 +2,7 @@
   "meta": {
     "name": "docs-synthetic-v1",
     "created": "2026-10-04",
-    "purpose": "Okablowanie narzędzi dokumentacji (list_docs, find_docs_vector, find_docs_text, read_docs) na syntetycznej paczce — NIE mierzy skuteczności: sekcje i zapytania pisał ten sam autor.",
+    "purpose": "Okablowanie narzędzi dokumentacji (list_docs, find_docs_vector, find_docs_text) na syntetycznej paczce — NIE mierzy skuteczności: sekcje i zapytania pisał ten sam autor.",
     "docs_dir": "data/safe/instruction",
     "documents": [
       "syntetyczna-instrukcja-administratora",
@@ -11,11 +11,10 @@
     "sections": 27,
     "rules": [
       "Dokumentacja jest ZMYŚLONA (manifest ma `synthetic: true`) — nazwy opcji, kody i liczby nie opisują prawdziwej aplikacji i nie mogą trafić do właściwego indeksu.",
-      "`query` każdego wpisu to dokładnie argumenty narzędzia: przechodzi przez jego model zapytania bez zmian (FindDocsVectorQuery, FindDocsTextQuery, ReadDocsQuery).",
+      "`query` każdego wpisu to dokładnie argumenty narzędzia: przechodzi przez jego model zapytania bez zmian (FindDocsVectorQuery, FindDocsTextQuery).",
       "find_docs_vector: `expected` — sekcje odpowiadające na zapytanie, pierwsze trafienie ma być jedną z nich; `distractors` — sekcje bliskie tematem, które mają stać niżej niż najlepsza z `expected`; puste `expected` — poprawną odpowiedzią jest brak trafienia.",
       "find_docs_text: `expected` — sekcje, które muszą wrócić, z `matched_by`; `not_expected` — sekcje, które wrócić nie mogą; pozostałe wolno zwrócić (wykaz uprawnień zawiera większość słów kluczowych paczki). Puste `expected` z `expected_total: 0` — nie wraca nic.",
       "`expected_total` — ile sekcji paczki pasuje do zapytania; narzędzie ma oddać tyle w sumie: zwrócone + `omitted_over_limit`.",
-      "read_docs: treść porównuje się z plikiem `<section_id>.md`; `expected_error` — odczyt kończy się błędem bez wyniku częściowego.",
       "Zapytania pisane tak, jak opis narzędzia każe pytać agentowi — NIE poprawiać ich pod wynik.",
       "Sprawdzone 2026-10-05 narzędziami właściwymi na indeksie syntetycznym (find_docs_vector: fragmenty do 1000 znaków, 5 sekcji, próg 0.37; find_docs_text: limit 5): oczekiwania spełnione poza v27, które przy tym progu dostaje dwie sekcje (0,385 i 0,377)."
     ],
@@ -35,9 +34,7 @@
       "zlamanie-linii": "Komunikat w pliku zawiniętym na stałą szerokość: cały w jednej linii albo złamany między liniami.",
       "zakres-szukania": "Przeszukiwany jest tytuł i treść sekcji, opis z manifestu — nie.",
       "oba-pola": "`exact` i `words` w jednym zapytaniu, każde trafia w inną sekcję.",
-      "ponad-limit": "Zapytanie pasujące do większej liczby sekcji, niż narzędzie zwraca.",
-      "kolejnosc": "Odczyt oddaje sekcje w kolejności żądania, nie spisu treści.",
-      "nieznany-identyfikator": "Identyfikator spoza paczki obok poprawnego."
+      "ponad-limit": "Zapytanie pasujące do większej liczby sekcji, niż narzędzie zwraca."
     }
   },
 
@@ -524,58 +521,6 @@
       "query": {"exact": "KSeF", "words": "faktura ustrukturyzowana"},
       "expected": [],
       "expected_total": 0
-    }
-  ],
-
-  "read_docs": [
-    {
-      "id": "r01",
-      "phenomenon": "kolejnosc",
-      "query": {"section_ids": ["usr-wysylka-status-w-toku", "adm-kancelaria-edoreczenia"]},
-      "expected_section_ids": ["usr-wysylka-status-w-toku", "adm-kancelaria-edoreczenia"],
-      "note": "Dwa dokumenty, kolejność odwrotna niż w spisie treści."
-    },
-    {
-      "id": "r02",
-      "phenomenon": "kolejnosc",
-      "query": {
-        "section_ids": [
-          "usr-odswiezanie",
-          "adm-numeracja-roczna",
-          "usr-sprawy-niewidoczne",
-          "adm-role-i-profile",
-          "usr-dokumenty-szablony"
-        ]
-      },
-      "expected_section_ids": [
-        "usr-odswiezanie",
-        "adm-numeracja-roczna",
-        "usr-sprawy-niewidoczne",
-        "adm-role-i-profile",
-        "usr-dokumenty-szablony"
-      ],
-      "note": "Pięć sekcji — tyle, ile wolno jednym wywołaniem."
-    },
-    {
-      "id": "r03",
-      "phenomenon": "dluga-sekcja",
-      "query": {"section_ids": ["adm-wykaz-uprawnien"]},
-      "expected_section_ids": ["adm-wykaz-uprawnien"],
-      "note": "Treść ma wrócić w całości, z ostatnią linią (`PIECZEC_UZYCIE`)."
-    },
-    {
-      "id": "r04",
-      "phenomenon": "zlamanie-linii",
-      "query": {"section_ids": ["usr-komunikat-sesja-wygasla"]},
-      "expected_section_ids": ["usr-komunikat-sesja-wygasla"],
-      "note": "Treść dosłownie jak w pliku, ze złamaniami linii."
-    },
-    {
-      "id": "r05",
-      "phenomenon": "nieznany-identyfikator",
-      "query": {"section_ids": ["adm-kancelaria-edoreczenia", "adm-nie-ma-takiej-sekcji"]},
-      "expected_error": "unknown_section",
-      "unknown_section_ids": ["adm-nie-ma-takiej-sekcji"]
     }
   ]
 }
