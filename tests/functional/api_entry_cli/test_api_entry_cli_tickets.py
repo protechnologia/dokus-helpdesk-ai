@@ -39,7 +39,11 @@ def _write(directory: Path, name: str, payload: dict) -> None:
 
 
 def test_valid_directory_exits_zero(tmp_path: Path) -> None:
-    """Directory of valid artifacts → exit code 0 and a summary line."""
+    """Sprawdza, czy `helpdesk tickets validate` na katalogu z jednym poprawnym plikiem zgłoszenia
+    kończy się kodem 0 i wypisuje podsumowanie: sprawdzono 1, błędnych 0.
+
+    Wyłapuje komendę, która zgłasza błąd przy poprawnych plikach albo nie mówi, ile ich
+    sprawdziła — przebieg, który niczego nie przeczytał, wyglądałby wtedy tak samo jak udany."""
     _write(tmp_path, "ok.json", VALID_TICKET)
 
     result = runner.invoke(cli, ["tickets", "validate", str(tmp_path)])
@@ -49,7 +53,11 @@ def test_valid_directory_exits_zero(tmp_path: Path) -> None:
 
 
 def test_broken_artifact_exits_one(tmp_path: Path) -> None:
-    """Directory with an invalid artifact → exit code 1, so the command works as a pipeline gate."""
+    """Sprawdza, czy `helpdesk tickets validate` kończy się kodem 1 i wypisuje „BŁĄD" z nazwą
+    pliku, gdy w katalogu jest zgłoszenie z niedozwoloną wartością pola `resolution`.
+
+    Wyłapuje komendę, która przy błędnym pliku kończy się kodem 0: nie dałoby się jej użyć jako
+    bramki w potoku, bo skrypt nie zauważyłby zepsutego zgłoszenia."""
     _write(tmp_path, "bad.json", {**VALID_TICKET, "resolution": "nieznane"})
 
     result = runner.invoke(cli, ["tickets", "validate", str(tmp_path)])
@@ -59,7 +67,11 @@ def test_broken_artifact_exits_one(tmp_path: Path) -> None:
 
 
 def test_missing_directory_exits_two(tmp_path: Path) -> None:
-    """Non-existent directory → exit code 2, distinct from broken artifacts (1)."""
+    """Sprawdza, czy `helpdesk tickets validate` kończy się kodem 2, gdy wskazanego katalogu nie
+    ma — to inny kod niż 1 przy błędnych plikach.
+
+    Wyłapuje pomieszanie tych dwóch sytuacji: potok nie odróżniłby wtedy złej ścieżki od
+    zepsutego korpusu."""
     result = runner.invoke(cli, ["tickets", "validate", str(tmp_path / "nie-ma")])
 
     # A pipeline must be able to tell "you pointed me at nothing" from "the corpus is broken".
@@ -67,7 +79,11 @@ def test_missing_directory_exits_two(tmp_path: Path) -> None:
 
 
 def test_valid_files_are_quiet_by_default(tmp_path: Path) -> None:
-    """Passing files → not listed, so a corpus run shows problems instead of scrolling them off."""
+    """Sprawdza, czy `helpdesk tickets validate` bez dodatkowych opcji nie wypisuje nazw plików,
+    które są poprawne.
+
+    Wyłapuje komendę, która wymienia każdy sprawdzony plik: przy przebiegu po całym korpusie
+    błędy przewinęłyby się poza ekran między liniami o poprawnych plikach."""
     _write(tmp_path, "ok.json", VALID_TICKET)
 
     result = runner.invoke(cli, ["tickets", "validate", str(tmp_path)])
@@ -76,7 +92,11 @@ def test_valid_files_are_quiet_by_default(tmp_path: Path) -> None:
 
 
 def test_verbose_lists_valid_files(tmp_path: Path) -> None:
-    """--verbose → passing files listed too, for checking a small directory by eye."""
+    """Sprawdza, czy z opcją `--verbose` komenda `helpdesk tickets validate` wypisuje także
+    poprawne pliki, każdy w linii „OK" ze swoją nazwą.
+
+    Wyłapuje opcję, która przestała działać: przy małym katalogu nie dałoby się sprawdzić na
+    oko, które pliki komenda faktycznie przeczytała."""
     _write(tmp_path, "ok.json", VALID_TICKET)
 
     result = runner.invoke(cli, ["tickets", "validate", str(tmp_path), "--verbose"])
@@ -85,7 +105,12 @@ def test_verbose_lists_valid_files(tmp_path: Path) -> None:
 
 
 def test_error_detail_is_printed(tmp_path: Path) -> None:
-    """Invalid artifact → the reason is printed, not only the file name."""
+    """Sprawdza, czy przy zgłoszeniu z niedozwoloną wartością pola `resolution` komenda
+    `helpdesk tickets validate` wypisuje powód błędu razem z wartościami dozwolonymi (jest wśród
+    nich „naprawione").
+
+    Wyłapuje raport, który podaje samą nazwę błędnego pliku: operator wiedziałby, że plik jest
+    zły, ale nie wiedziałby, co w nim poprawić."""
     _write(tmp_path, "bad.json", {**VALID_TICKET, "resolution": "nieznane"})
 
     result = runner.invoke(cli, ["tickets", "validate", str(tmp_path)])
@@ -94,7 +119,10 @@ def test_error_detail_is_printed(tmp_path: Path) -> None:
 
 
 def test_command_is_registered_under_tickets() -> None:
-    """`helpdesk tickets --help` → lists validate, so the subcommand tree is actually wired."""
+    """Sprawdza, czy `helpdesk tickets --help` kończy się kodem 0 i wymienia komendę `validate`.
+
+    Wyłapuje komendę, której nie podpięto do drzewa `helpdesk tickets`: jej kod byłby w repo, ale
+    nie dałoby się jej uruchomić z konsoli."""
     result = runner.invoke(cli, ["tickets", "--help"])
 
     assert result.exit_code == 0

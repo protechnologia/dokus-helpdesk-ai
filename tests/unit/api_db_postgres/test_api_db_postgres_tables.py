@@ -111,7 +111,11 @@ class StubClient:
 
 
 def test_each_material_has_its_own_table() -> None:
-    """Tabela zgłoszeń i tabela dokumentacji → różne nazwy domyślne: materiały się nie mieszają."""
+    """Sprawdza, czy tabela zgłoszeń i tabela dokumentacji mają różne nazwy domyślne: `tickets_text`
+    i `docs_text`.
+
+    Wyłapuje pomyłkę, po której oba materiały trafiłyby do jednej tabeli: wyszukiwanie
+    w zgłoszeniach oddawałoby wtedy sekcje dokumentacji i odwrotnie."""
     assert TicketsTable(StubClient()).name == "tickets_text"
     assert DocsTable(StubClient()).name    == "docs_text"
 
@@ -122,15 +126,24 @@ def test_each_material_has_its_own_table() -> None:
     ids=["pusta", "wielka litera", "spacja", "wstrzyknięcie", "od cyfry", "łącznik"],
 )
 def test_a_table_name_outside_the_pattern_is_refused(name: str) -> None:
-    """Nazwa tabeli spoza wzorca → DbPostgresConfigError przy budowie: to jedyna wartość z zewnątrz
-    wstawiana w treść SQL-a."""
+    """Sprawdza, czy tabela odmawia niedozwolonej nazwy już przy budowie: nazwa pusta, z wielką
+    literą, spacją albo łącznikiem, zaczynająca się od cyfry lub niosąca fragment SQL-a kończy się
+    wyjątkiem `DbPostgresConfigError`.
+
+    Wyłapuje poluzowanie wzorca nazwy. Nazwa tabeli to jedyna wartość z zewnątrz wstawiana wprost
+    w treść SQL-a, więc przepuszczona bez kontroli mogłaby dopisać do zapytania własne polecenie."""
     with pytest.raises(DbPostgresConfigError):
         TicketsTable(StubClient(), name=name)
 
 
 async def test_the_table_is_created_with_its_searched_text_and_index() -> None:
-    """Zakładanie tabeli → jedno polecenie z `_create.sql`: tabela pod swoją nazwą, przeszukiwany
-    tekst złączony z tytułu i treści oraz indeks na wektorze słów."""
+    """Sprawdza, czy zakładanie tabeli dokumentacji wysyła do bazy, po sprawdzeniu konfiguracji
+    wyszukiwania, jedno polecenie: tabelę `docs_text`, przeszukiwany tekst i wektor słów złożone
+    z tytułu i treści sekcji oraz indeks `docs_text_search` na wektorze słów.
+
+    Wyłapuje polecenie, w którym nazwa tabeli nie została podstawiona, brakuje indeksu albo
+    przeszukiwany tekst powstaje z innych kolumn niż tytuł i treść, na przykład także z opisu
+    sekcji, który pisze model, a nie autor dokumentacji."""
     client = StubClient()
 
     await DocsTable(client).create()
@@ -148,9 +161,13 @@ async def test_the_table_is_created_with_its_searched_text_and_index() -> None:
 async def test_the_searched_text_and_the_query_collapse_whitespace_the_same_way(
     table_class: type,
 ) -> None:
-    """Kolumna `search_text` i zapytanie do podciągu → ten sam wzorzec białych znaków, zamieniany
-    na jedną spację: komunikat złamany w źródle między liniami da się znaleźć tylko wtedy, gdy
-    obie strony liczą „biały znak" tak samo."""
+    """Sprawdza, czy w obu tabelach przeszukiwany tekst (kolumna `search_text`) i zapytanie
+    szukające dosłownego ciągu zamieniają każdy ciąg odstępów na jedną spację tym samym wzorcem,
+    `WHITESPACE_RUN`.
+
+    Wyłapuje wzorzec zmieniony tylko po jednej stronie, na przykład w samym pliku `_create.sql`.
+    Komunikat złamany w źródle między liniami da się znaleźć tylko wtedy, gdy tekst i zapytanie
+    rozumieją „odstęp" tak samo."""
     creating  = StubClient()
     searching = StubClient()
 
@@ -164,8 +181,13 @@ async def test_the_searched_text_and_the_query_collapse_whitespace_the_same_way(
 
 
 async def test_a_database_without_the_search_configuration_gets_no_table() -> None:
-    """Baza bez konfiguracji `pl_search` → DbPostgresConfigError mówiący, co zrobić, i żadnego
-    polecenia zakładającego tabelę."""
+    """Sprawdza, czy w bazie bez konfiguracji wyszukiwania `pl_search` zakładanie tabeli kończy się
+    wyjątkiem `DbPostgresConfigError`, który wskazuje wolumen `postgres_data` do odtworzenia, i czy
+    poza samym sprawdzeniem do bazy nie idzie wtedy żadne polecenie.
+
+    Wyłapuje zakładanie tabeli bez tego sprawdzenia: baza ze starszego wolumenu odpowiada poprawnie,
+    ale konfiguracji nie ma, więc zakładanie kończyłoby się błędem serwera, który nie mówi, co
+    naprawić."""
     client = StubClient(value=0)
 
     with pytest.raises(DbPostgresConfigError, match="postgres_data"):
@@ -190,9 +212,13 @@ async def test_words_and_phrases_use_the_stored_vector(
     method:      str,
     function:    str,
 ) -> None:
-    """Słowa i fraza → warunek na zapisanym wektorze słów tabeli tego materiału; zapytanie agenta
-    idzie parametrem, w treści SQL-a jest tylko nazwa tabeli, a limitu nie ma: narzędzie musi
-    wiedzieć, ile wierszy pasowało w sumie."""
+    """Sprawdza, czy szukanie po słowach i po frazie w obu tabelach pyta o zapisany wektor słów
+    właściwej tabeli, a tekst zapytania (tu z apostrofem i średnikiem) idzie do bazy jako osobna
+    wartość, nie jako część SQL-a. Sprawdza też, że zapytanie nie ma limitu wyników.
+
+    Wyłapuje sklejanie tekstu agenta z treścią SQL-a, czyli furtkę do wstrzyknięcia polecenia, oraz
+    dopisany limit: narzędzie musi wiedzieć, ile wierszy pasowało w sumie, żeby policzyć
+    pominięte."""
     client = StubClient()
     table  = table_class(client)
 
@@ -215,9 +241,13 @@ async def test_each_table_orders_what_it_finds_its_own_way(
     table_class: type,
     order:       str,
 ) -> None:
-    """Szukanie w zgłoszeniach → najnowsze pierwsze; w dokumentacji → według identyfikatora.
-    Przy słowach pierwsza jest trafność, a kolejność tabeli rozstrzyga remisy: gdy pasuje więcej
-    zgłoszeń, niż narzędzie pokazuje, mają zostać najświeższe."""
+    """Sprawdza, czy każda tabela układa trafienia po swojemu: zgłoszenia od najnowszych, sekcje
+    dokumentacji według identyfikatora. Przy szukaniu dosłownego ciągu to cała kolejność, a przy
+    szukaniu po słowach pierwsza jest trafność i dopiero remisy rozstrzyga kolejność tabeli.
+
+    Wyłapuje zapytanie, które gubi tę kolejność albo stawia ją przed trafnością. Gdy pasuje więcej
+    zgłoszeń, niż narzędzie pokazuje, mają zostać najświeższe, bo nowsze zgłoszenie bywa poprawką
+    starszego."""
     client = StubClient()
     table  = table_class(client)
 
@@ -233,8 +263,12 @@ async def test_each_table_orders_what_it_finds_its_own_way(
 
 
 async def test_a_substring_query_is_escaped_before_it_is_sent() -> None:
-    """Zapytanie do podciągu ze znakami `%` i `_` → do bazy idą unieszkodliwione, a warunek stoi
-    na złączonym tekście: komunikat błędu ma być szukany dosłownie."""
+    """Sprawdza, czy przy szukaniu dosłownego ciągu znaki `%` i `_` z zapytania („100%_gotowe") idą
+    do bazy poprzedzone znakiem ucieczki, a warunek szuka w kolumnie `search_text`.
+
+    Wyłapuje zapytanie wysłane bez tej poprawki: baza czyta `%` jako „dowolny ciąg", a `_` jako
+    „dowolny znak", więc komunikat błędu z takim znakiem pasowałby do tekstów, które go wcale nie
+    zawierają."""
     client = StubClient()
 
     await TicketsTable(client).substring("100%_gotowe")
@@ -249,8 +283,13 @@ async def test_a_substring_query_is_escaped_before_it_is_sent() -> None:
 
 
 async def test_rows_are_written_in_one_statement_column_by_column() -> None:
-    """Zapis wierszy → jedno polecenie, lista wartości na kolumnę, w kolejności kolumn tabeli;
-    pusty zapis nie woła bazy."""
+    """Sprawdza, czy zapis zgłoszeń idzie do bazy jednym poleceniem, które istniejący numer
+    nadpisuje, z osobną listą wartości na każdą kolumnę, w kolejności pól wiersza, i czy zapis
+    pustej listy w ogóle nie woła bazy.
+
+    Wyłapuje zapis, w którym wartości trafiają do nie swoich kolumn (na przykład temat w miejsce
+    wątku), oraz taki, który przy powtórzonym numerze nie nadpisuje wiersza. Ponowna indeksacja ma
+    zastępować zgłoszenia, nie dokładać ich ani kończyć się błędem."""
     client = StubClient()
 
     await TicketsTable(client).upsert([])
@@ -273,8 +312,12 @@ async def test_a_search_gives_back_the_keys_of_what_matched(
     key:         str,
     method:      str,
 ) -> None:
-    """Szukanie → identyfikatory pasujących wierszy w kolejności bazy, a z bazy schodzi sama
-    kolumna klucza: treść daje dopiero odczyt. Brak wierszy → pusta lista."""
+    """Sprawdza, czy każda z trzech dróg szukania (słowa, fraza, dosłowny ciąg) w obu tabelach
+    oddaje same identyfikatory pasujących wierszy, w kolejności podanej przez bazę, a gdy nic nie
+    pasuje, pustą listę. Zapytanie pobiera z bazy tylko kolumnę identyfikatora.
+
+    Wyłapuje szukanie, które zmienia kolejność trafień, kończy się błędem przy braku wyników albo
+    ściąga z bazy całe wiersze: szukanie ma mówić tylko, co pasuje, a treść daje dopiero odczyt."""
     stored = StubClient(rows=[{key: "pierwszy"}, {key: "drugi"}])
 
     found   = await getattr(table_class(stored), method)("x")
@@ -286,8 +329,12 @@ async def test_a_search_gives_back_the_keys_of_what_matched(
 
 
 async def test_rows_read_by_id_come_back_without_the_searched_columns() -> None:
-    """Wiersz z bazy → `TicketRow` z tymi samymi polami, bez kolumn wyliczanych, które baza
-    oddaje razem z wierszem."""
+    """Sprawdza, czy odczyt zgłoszenia po numerze oddaje wiersz z tymi samymi polami, które
+    zapisano, choć baza dokłada do niego dwie kolumny wyliczane, służące tylko do szukania
+    (`search_text` i `search_vector`).
+
+    Wyłapuje odczyt, który tych dwóch kolumn nie odcina: model wiersza nie przyjmuje nieznanych pól,
+    więc każdy odczyt wątku kończyłby się błędem."""
     record = {**TICKET_ROW.model_dump(), "search_text": "…", "search_vector": "'przesyłka':4"}
 
     found = await TicketsTable(StubClient(rows=[record])).read_by_id(["90011"])
@@ -296,8 +343,12 @@ async def test_rows_read_by_id_come_back_without_the_searched_columns() -> None:
 
 
 async def test_tickets_are_read_by_their_numbers() -> None:
-    """Odczyt po numerach → wiersze z pełnym wątkiem; numery idą jedną listą, a kolejność wyniku
-    to kolejność numerów."""
+    """Sprawdza, czy odczyt zgłoszeń po dwóch numerach wysyła do bazy jedno zapytanie z oboma
+    numerami jako jedną listą, każe ułożyć wynik w kolejności tej listy i oddaje wiersz z pełnym
+    wątkiem.
+
+    Wyłapuje odczyt, który pyta bazę osobno o każdy numer albo zostawia kolejność wyniku
+    przypadkowi: wołający dostawałby wtedy zgłoszenia w innej kolejności, niż o nie prosił."""
     client = StubClient(rows=[TICKET_ROW.model_dump()])
 
     found = await TicketsTable(client).read_by_id(["90011", "90012"])
@@ -310,7 +361,11 @@ async def test_tickets_are_read_by_their_numbers() -> None:
 
 
 async def test_sections_are_listed_in_the_order_of_the_documents() -> None:
-    """Spis treści → wiersze w kolejności: dokument, wydanie, miejsce sekcji w dokumencie."""
+    """Sprawdza, czy spis sekcji dokumentacji prosi bazę o kolejność: dokument, wydanie, miejsce
+    sekcji w dokumencie, i oddaje wiersz z bazy bez zmian.
+
+    Wyłapuje spis bez ustalonej kolejności albo ułożony inaczej: agent dostałby spis treści,
+    w którym sekcje różnych dokumentów są przemieszane albo nie stoją po kolei."""
     client = StubClient(rows=[DOC_ROW.model_dump()])
 
     listed = await DocsTable(client).list_all()
@@ -321,7 +376,11 @@ async def test_sections_are_listed_in_the_order_of_the_documents() -> None:
 
 @pytest.mark.parametrize("table", TABLES)
 async def test_aclose_closes_the_client_the_table_stands_on(table: type) -> None:
-    """`aclose()` tabeli → zamknięty klient: kto dostał samą tabelę, może po sobie posprzątać."""
+    """Sprawdza, czy `aclose()` wywołane na tabeli zgłoszeń albo dokumentacji zamyka klienta bazy,
+    na którym ta tabela stoi.
+
+    Wyłapuje `aclose()`, które nic nie robi: kto dostał samą tabelę, bez klienta, nie miałby wtedy
+    jak zamknąć połączeń z bazą po skończonej pracy."""
     client = StubClient()
 
     await table(client).aclose()

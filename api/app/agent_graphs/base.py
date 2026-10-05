@@ -85,18 +85,27 @@ def merge_sources(
 def route_after_agent(
     state:             GraphState,  # np. SearchState(messages=[tool_call_turn("find_tickets_vector", …)])
     respond_tool_name: str,         # np. "respond_search"
+    max_iterations:    int,         # np. 20 — limit tur modelu z `AGENT_MAX_ITERATIONS`
 ) -> Literal["run_tools", "respond"]:
     """
     Description:
-    Rozgałęzienie po turze modelu w grafie z narzędziami: dokąd idzie przebieg, rozstrzyga to, co
-    model wywołał. Narzędzia wiedzy → `run_tools` (i z powrotem do `agent`); narzędzie odpowiedzi
-    albo brak wywołań → `respond`. Tura bez wywołań i tura łącząca odpowiedź z innym narzędziem to
-    błędy formatu — rozstrzyga je `respond` (p. 11), więc tu nie giną. Limit iteracji dochodzi
-    z węzłem `agent` (p. 9).
+    Rozgałęzienie po turze modelu w grafie z narzędziami. Dokąd idzie przebieg, rozstrzyga to, co
+    model wywołał, i limit tur:
+
+    | ostatnia tura modelu                           | dokąd                                 |
+    |------------------------------------------------|---------------------------------------|
+    | same narzędzia wiedzy, limit tur niewyczerpany | `run_tools`, a potem znowu `agent`    |
+    | narzędzie odpowiedzi                           | `respond`                             |
+    | sam tekst albo odpowiedź z innym narzędziem    | `respond` — błąd formatu              |
+    | narzędzia wiedzy w ostatniej dozwolonej turze  | `respond` — narzędzia już nie ruszają |
+
+    Błędy formatu i turę uciętą limitem rozstrzyga `respond` (p. 11), więc tu nie giną. Limit
+    liczy tury modelu (`iterations`), nie wywołania narzędzi — te mają własne limity w `run_tools`.
 
     Example args:
-        state=SearchState(messages=[tool_call_turn("find_tickets_vector", {…})], …)
+        state=SearchState(messages=[tool_call_turn("find_tickets_vector", {…})], iterations=1, …)
         respond_tool_name="respond_search"
+        max_iterations=20
 
     Example result:
         "run_tools"
@@ -106,6 +115,10 @@ def route_after_agent(
 
     # --- odpowiedź albo sam tekst: koniec pętli ---
     if not names or respond_tool_name in names:
+        return "respond"
+
+    # --- limit tur wyczerpany: model nie dostanie już kolejnej tury, więc narzędzi nie wykonujemy ---
+    if state.iterations >= max_iterations:
         return "respond"
 
     # --- same narzędzia wiedzy: kolejny obieg ---

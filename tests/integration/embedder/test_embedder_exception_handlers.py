@@ -44,7 +44,12 @@ def client() -> TestClient:
 
 
 def test_http_exception_uses_uniform_shape(client: TestClient) -> None:
-    """Raised HTTPException → declared status and the ErrorResponse shape."""
+    """Sprawdza, czy błąd zgłoszony przez trasę (`HTTPException` ze statusem 404) wraca do
+    wołającego z tym samym statusem i we wspólnym kształcie błędu: z opisem w polu `detail`
+    i z polem `request_id`.
+
+    Wyłapuje obsługę błędów, która zmienia status albo oddaje błąd w innym kształcie: wołający
+    musiałby wtedy obsługiwać kilka różnych postaci błędu."""
     response = client.get("/boom")
 
     assert response.status_code == 404
@@ -53,7 +58,11 @@ def test_http_exception_uses_uniform_shape(client: TestClient) -> None:
 
 
 def test_validation_error_returns_422_in_same_shape(client: TestClient) -> None:
-    """Missing query param → 422 in ErrorResponse shape, not FastAPI's raw error list."""
+    """Sprawdza, czy żądanie bez wymaganego parametru dostaje status 422 we wspólnym kształcie
+    błędu, z ogólnym opisem „Request validation failed".
+
+    Wyłapuje brak osobnej obsługi błędów walidacji: FastAPI oddałoby wtedy własną, surową listę
+    błędów, w innym kształcie niż pozostałe błędy usługi."""
     response = client.get("/needs-param")
 
     assert response.status_code == 422
@@ -61,7 +70,11 @@ def test_validation_error_returns_422_in_same_shape(client: TestClient) -> None:
 
 
 def test_validation_error_hides_submitted_values(client: TestClient) -> None:
-    """Bad query value → response body must not echo the submitted value (it may be ticket text)."""
+    """Sprawdza, czy odpowiedź na żądanie z błędną wartością parametru (tekst zamiast liczby) ma
+    status 422 i nie powtarza przysłanej wartości.
+
+    Wyłapuje odpowiedź, która cytuje wejście: przysłana wartość może być tekstem zgłoszenia,
+    więc nie powinna wracać w komunikacie błędu."""
     response = client.get("/needs-param", params={"limit": "not-a-number"})
 
     assert response.status_code == 422
@@ -69,7 +82,11 @@ def test_validation_error_hides_submitted_values(client: TestClient) -> None:
 
 
 def test_encoder_error_becomes_service_unavailable(client: TestClient) -> None:
-    """EncoderError during a request → 503, so an indexing run backs off instead of dropping."""
+    """Sprawdza, czy awaria liczenia wektorów w trakcie żądania (`EncoderError`) wraca jako status
+    503 z ogólnym opisem „Encoding failed".
+
+    Wyłapuje awarię oddaną jako zwykły błąd serwera: przebieg indeksacji nie wiedziałby wtedy,
+    że ma odczekać i ponowić, i porzuciłby zgłoszenie."""
     response = client.get("/encoder-down")
 
     assert response.status_code == 503
@@ -77,7 +94,12 @@ def test_encoder_error_becomes_service_unavailable(client: TestClient) -> None:
 
 
 def test_encoder_error_body_hides_the_backend_message(client: TestClient) -> None:
-    """Backend exception text → never in the body (it may quote the submitted ticket text)."""
+    """Sprawdza, czy odpowiedź po awarii liczenia wektorów nie zawiera treści wyjątku: w teście
+    wyjątek niesie komunikat biblioteki modelu i fragment tekstu wejściowego, a w odpowiedzi nie
+    ma żadnego z nich.
+
+    Wyłapuje przeciek danych klienta przez komunikat błędu: wyjątek biblioteki modelu potrafi
+    zacytować tekst, który dostała do zakodowania, czyli treść zgłoszenia."""
     response = client.get("/encoder-down")
 
     assert "CUDA" not in response.text
@@ -85,14 +107,23 @@ def test_encoder_error_body_hides_the_backend_message(client: TestClient) -> Non
 
 
 def test_config_error_is_not_dressed_up_as_a_transient_failure(client: TestClient) -> None:
-    """EncoderConfigError (an EncoderError subclass) → NOT 503; misconfiguration must stay loud."""
+    """Sprawdza, czy błąd konfiguracji embeddera (`EncoderConfigError`) kończy żądanie statusem
+    500, a nie 503, choć w kodzie jest odmianą błędu `EncoderError`, który daje 503.
+
+    Wyłapuje złą konfigurację przebraną za chwilową awarię: status 503 znaczy „spróbuj za
+    chwilę", a przy błędnej konfiguracji czekanie nic nie da, więc usterka ma być widoczna od
+    razu."""
     response = client.get("/encoder-misconfigured")
 
     assert response.status_code == 500
 
 
 def test_request_id_is_absent_without_middleware(client: TestClient) -> None:
-    """Handlers running outside the middleware → request_id is None, not a crash."""
+    """Sprawdza, czy obsługa błędu działa także w aplikacji bez warstwy nadającej identyfikator
+    żądania: odpowiedź wraca normalnie, a pole `request_id` jest puste.
+
+    Wyłapuje obsługę błędu, która zakłada, że identyfikator zawsze jest, i sama się wywraca:
+    zamiast opisu właściwego błędu wołający dostałby wtedy błąd obsługi błędu."""
     response = client.get("/boom")
 
     assert response.json()["request_id"] is None

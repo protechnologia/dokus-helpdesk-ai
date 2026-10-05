@@ -13,12 +13,13 @@ Import tego pakietu wyłącza LangSmith (niżej), więc żaden graf nie ruszy z 
 
 Atrapy wspólne dla grafów z narzędziami wiedzy leżą w `fake.py` tego pakietu.
 
-Fabryka, z której trasy biorą grafy, leży w `factory.py`. Nie jest stąd eksportowana: po p. 9
-pociągnie konfigurację i klientów, a ten plik importuje każdy graf.
+Fabryka, z której trasy biorą grafy, leży w `factory.py`. Nie jest stąd eksportowana: czyta
+konfigurację, a po p. 11 pociągnie też klientów — a ten plik importuje każdy graf.
 
-Grafy (CLAUDE.md -> „Plan", p. 5; dziś na atrapach węzłów). Bez narzędzi wiedzy przebieg
-to anonymize → agent → respond, z nimi anonymize → agent ⇄ run_tools → respond. Każdy kończy się
-wywołaniem `respond_<graf>`, poza `parse_ticket` (JSON w tekście — p. 24):
+Grafy (CLAUDE.md -> „Plan", p. 5; trasy biorą je dziś złożone z atrap węzłów). Bez narzędzi
+wiedzy przebieg to anonymize → agent → respond, z nimi anonymize → agent ⇄ run_tools → respond,
+gdzie pętlę ucina limit tur modelu (`AGENT_MAX_ITERATIONS`). Każdy kończy się wywołaniem
+`respond_<graf>`:
 
 | graf                | narzędzia                 | wynik          |
 |---------------------|---------------------------|----------------|
@@ -31,8 +32,8 @@ wywołaniem `respond_<graf>`, poza `parse_ticket` (JSON w tekście — p. 24):
 | `suggest_handoff`   | —                         | `Proposal`     |
 | `polish`            | —                         | `PolishedText` |
 
-„Zgłoszenia i dokumentacja" to wszystkie sześć narzędzi z `agent_tools/`: dwa wyszukiwania zgłoszeń
-oraz spis treści, dwa wyszukiwania i odczyt dokumentacji.
+„Zgłoszenia i dokumentacja" to wszystkie osiem narzędzi z `agent_tools/`: dwa wyszukiwania i dwa
+odczyty zgłoszeń oraz spis treści, dwa wyszukiwania i odczyt dokumentacji.
 """
 
 import langsmith

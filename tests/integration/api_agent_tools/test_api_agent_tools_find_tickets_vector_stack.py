@@ -37,8 +37,14 @@ async def test_a_ticket_asked_by_its_own_fields_comes_back_first(
     tickets_cards,
     position: int,
 ) -> None:
-    """Zapytanie polami zaindeksowanego zgłoszenia → numer tego zgłoszenia na pierwszym miejscu.
-    Asercja na ranking, nie na wysokość score."""
+    """Sprawdza, czy zapytanie złożone z opisu problemu i objawów zaindeksowanej karty stawia jej
+    numer na pierwszym miejscu — osobno dla każdej z trzech kart. Próg podobieństwa jest tu
+    wyłączony, więc wracają wszystkie trzy numery i żaden nie jest liczony jako odcięty. Liczy
+    się kolejność, nie wysokość podobieństwa.
+
+    Wyłapuje rozjazd między indeksacją a wyszukiwaniem na prawdziwym embedderze i Qdrancie:
+    gdyby karty zapisywano inaczej, niż się ich potem szuka, nawet pytanie słowami samej karty
+    nie znalazłoby jej jako pierwszej."""
     card   = tickets_cards.cards[position]
     result = await tickets_cards.find.find(
         FindTicketsVectorQuery(problem=card.problem, symptoms=card.symptoms)
@@ -50,8 +56,11 @@ async def test_a_ticket_asked_by_its_own_fields_comes_back_first(
 
 
 async def test_a_threshold_nothing_passes_counts_everything_as_dropped(tickets_cards) -> None:
-    """Próg powyżej każdego możliwego podobieństwa → pusty wynik i komplet policzony jako odcięty:
-    ostry próg nie może wyglądać jak pusty indeks."""
+    """Sprawdza, czy przy progu podobieństwa ustawionym powyżej każdej możliwej wartości (1,1)
+    wyszukiwanie nie oddaje żadnego zgłoszenia, ale liczy wszystkie trzy jako odcięte progiem.
+
+    Wyłapuje zgubienie tego licznika: zbyt ostry próg wyglądałby wtedy dokładnie tak samo jak
+    pusty indeks, a to dwie różne awarie."""
     card = tickets_cards.cards[0]
     tool = FindTicketsVectorTool(
         embedder  = tickets_cards.embedder,

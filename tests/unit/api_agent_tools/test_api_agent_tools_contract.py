@@ -103,39 +103,55 @@ def arguments_model(
 
 
 def test_every_tool_package_brings_a_tool() -> None:
-    """Pakiety narzędzi → co najmniej jedno narzędzie na pakiet: pusty katalog narzędzia oznacza,
-    że importy w jego `__init__.py` coś pominęły."""
+    """Sprawdza, czy z każdego katalogu narzędzia w `app/agent_tools/` pochodzi co najmniej jedna
+    klasa narzędzia.
+
+    Wyłapuje katalog narzędzia, którego `__init__.py` pominął import: takie narzędzie bez żadnego
+    sygnału wypadłoby z pozostałych testów tego pliku, bo znajdują one narzędzia wśród
+    zaimportowanych klas."""
     assert set(tool_packages()) <= {package_of(cls) for cls in TOOLS}
 
 
 @pytest.mark.parametrize("source", SOURCES, ids=lambda cls: cls.__name__)
 def test_every_source_declares_name_and_query_model(source: type[KnowledgeSource]) -> None:
-    """Każde źródło → niepusta `name` i `query_model` będący modelem Pydantica: `ABC` pilnuje
-    tylko metod, a bez tych dwóch pól adapter grafu nie zbuduje narzędzia."""
+    """Sprawdza, czy każde źródło wiedzy, czyli narzędzie odczytu, ma niepustą nazwę (`name`)
+    i klasę zapytania (`query_model`) będącą modelem Pydantica.
+
+    Wyłapuje źródło bez jednego z tych pól: `ABC` pilnuje tylko metod, a bez nazwy i klasy zapytania
+    graf nie zbuduje definicji narzędzia dla modelu."""
     assert isinstance(getattr(source, "name", None), str) and source.name
     assert issubclass(getattr(source, "query_model", object), BaseModel)
 
 
 @pytest.mark.parametrize("tool", AUXILIARY, ids=lambda cls: cls.__name__)
 def test_every_auxiliary_tool_declares_name_and_args_model(tool: type[AuxiliaryTool]) -> None:
-    """Każde narzędzie pomocnicze → niepusta `name` i `args_model` będący modelem Pydantica, jak
-    `query_model` u źródeł wiedzy."""
+    """Sprawdza, czy każde narzędzie pomocnicze, czyli wyszukiwanie albo spis treści, ma niepustą
+    nazwę (`name`) i klasę argumentów (`args_model`) będącą modelem Pydantica.
+
+    Wyłapuje narzędzie pomocnicze bez jednego z tych pól: graf nie zbudowałby z niego definicji
+    narzędzia dla modelu, tak samo jak ze źródła wiedzy bez `query_model`."""
     assert isinstance(getattr(tool, "name", None), str) and tool.name
     assert issubclass(getattr(tool, "args_model", object), BaseModel)
 
 
 @pytest.mark.parametrize("tool", TOOLS, ids=lambda cls: cls.__name__)
 def test_every_tool_describes_itself_to_the_model(tool: type) -> None:
-    """Każde narzędzie → niepusty `description` bez komentarza redakcyjnego: z niego graf składa
-    definicję dla modelu, a notatka dla nas nie ma prawa do niego dotrzeć."""
+    """Sprawdza, czy każde narzędzie ma niepusty opis dla modelu (`description`) i czy w tym opisie
+    nie ma komentarza redakcyjnego (`<!--`).
+
+    Wyłapuje narzędzie bez opisu, z którego graf składa definicję dla modelu, oraz notatkę pisaną
+    dla nas, która przeszła do tekstu czytanego przez model."""
     assert isinstance(getattr(tool, "description", None), str) and tool.description
     assert "<!--" not in tool.description
 
 
 @pytest.mark.parametrize("tool", TOOLS, ids=lambda cls: cls.__name__)
 def test_every_description_has_the_same_four_sections(tool: type) -> None:
-    """Każdy opis narzędzia → te same cztery sekcje w tej samej kolejności: model czyta osiem
-    opisów naraz i ma w każdym znaleźć argumenty, wynik i zasady w tym samym miejscu."""
+    """Sprawdza, czy opis każdego narzędzia ma dokładnie cztery nagłówki, zawsze w tej kolejności:
+    „Do czego służy", „Jak wywoływać", „Co zwraca" i „Zasady".
+
+    Wyłapuje opis ułożony inaczej: model czyta osiem opisów naraz i ma w każdym znaleźć argumenty,
+    wynik i zasady w tym samym miejscu."""
     headings = [line for line in tool.description.splitlines() if line.startswith("#")]
 
     assert headings == DESCRIPTION_SECTIONS
@@ -143,8 +159,11 @@ def test_every_description_has_the_same_four_sections(tool: type) -> None:
 
 @pytest.mark.parametrize("tool", TOOLS, ids=lambda cls: cls.__name__)
 def test_every_description_shows_the_result_in_one_table(tool: type) -> None:
-    """Sekcja „Co zwraca" → dokładnie jedna tabelka: pola zagnieżdżone stoją w niej pełną ścieżką
-    (`sections[].section.title`), a nie w drugiej tabelce, do której model musiałby je dopasować."""
+    """Sprawdza, czy w opisie każdego narzędzia sekcja „Co zwraca" zawiera dokładnie jedną tabelkę.
+
+    Wyłapuje opis bez tabelki wyniku albo z drugą tabelką na pola zagnieżdżone: mają one stać
+    w jednej tabelce pod pełną ścieżką (`sections[].section.title`), inaczej model musiałby sam
+    dopasować jedną tabelkę do drugiej."""
     returns    = tool.description.split("# Co zwraca")[1].split("# Zasady")[0]
     separators = [line for line in returns.splitlines() if line.startswith("|-")]
 
@@ -153,30 +172,40 @@ def test_every_description_shows_the_result_in_one_table(tool: type) -> None:
 
 @pytest.mark.parametrize("tool", AUXILIARY, ids=lambda cls: cls.__name__)
 def test_an_auxiliary_tool_has_nothing_to_cite_with(tool: type[AuxiliaryTool]) -> None:
-    """Każde narzędzie pomocnicze → bez `cite()` i bez `source`: jego wynik nie ma jak trafić na
-    listę źródeł, i ma tak zostać z samej konstrukcji."""
+    """Sprawdza, czy żadne narzędzie pomocnicze nie ma metody `cite()` ani pola `source`.
+
+    Wyłapuje wyszukiwanie albo spis treści, które dostały sposób na dopisanie czegoś do listy
+    źródeł: źródłem ma być tylko to, co model przeczytał, a nie to, co znalazł."""
     assert not hasattr(tool, "cite")
     assert not hasattr(tool, "source")
 
 
 @pytest.mark.parametrize("tool", TOOLS, ids=lambda cls: cls.__name__)
 def test_every_arguments_model_refuses_unknown_arguments(tool: type) -> None:
-    """Każdy model argumentów → `extra="forbid"`: model wymyślający argumenty ma dostać błąd,
-    a nie zostać po cichu zignorowany."""
+    """Sprawdza, czy klasa argumentów każdego narzędzia odrzuca nieznane pola (`extra="forbid"`).
+
+    Wyłapuje narzędzie, które po cichu pomija argument wymyślony przez model: model ma dostać błąd,
+    a nie zostać zignorowany bez słowa."""
     assert arguments_model(tool).model_config.get("extra") == "forbid"
 
 
 @pytest.mark.parametrize("source", SOURCES, ids=lambda cls: cls.__name__)
 def test_every_source_names_its_material(source: type[KnowledgeSource]) -> None:
-    """Każde źródło → niepusta `source` inna niż `name`: na listę źródeł trafia nazwa materiału,
-    więc to samo zgłoszenie znalezione dwoma narzędziami jest na niej raz."""
+    """Sprawdza, czy każde źródło wiedzy ma niepustą nazwę materiału (`source`), inną niż nazwa
+    samego narzędzia.
+
+    Wyłapuje źródło podpisane nazwą narzędzia zamiast materiału: to samo zgłoszenie odczytane dwoma
+    narzędziami stałoby wtedy na liście źródeł dwa razy."""
     assert isinstance(getattr(source, "source", None), str) and source.source
     assert source.source != source.name
 
 
 def test_real_and_fake_of_one_tool_share_a_material() -> None:
-    """Materiał → jeden na pakiet narzędzia: źródła z atrapy i z prawdziwego narzędzia mają ten
-    sam klucz, inaczej test na atrapie sprawdzałby inną listę źródeł niż produkcja."""
+    """Sprawdza, czy prawdziwe narzędzie i jego atrapa, czyli wszystkie źródła wiedzy z jednego
+    katalogu narzędzia, mają tę samą nazwę materiału.
+
+    Wyłapuje atrapę podpisującą źródła innym materiałem niż prawdziwe narzędzie: test na atrapie
+    sprawdzałby wtedy inną listę źródeł niż ta, która powstaje na produkcji."""
     materials_per_package: dict[str, set[str]] = {}
 
     for source in SOURCES:
@@ -187,8 +216,11 @@ def test_real_and_fake_of_one_tool_share_a_material() -> None:
 
 
 def test_real_and_fake_of_one_tool_share_a_name_and_no_two_tools_do() -> None:
-    """Nazwy → jedna na pakiet narzędzia: atrapa i prawdziwe narzędzie przedstawiają się
-    modelowi tak samo, a dwa różne narzędzia nigdy."""
+    """Sprawdza, czy prawdziwe narzędzie i jego atrapa mają jedną nazwę i czy żadne dwa różne
+    narzędzia nie mają tej samej.
+
+    Wyłapuje atrapę, która przedstawia się modelowi inaczej niż prawdziwe narzędzie, oraz dwa
+    narzędzia pod jedną nazwą, których model nie mógłby rozróżnić przy wywołaniu."""
     names_per_package: dict[str, set[str]] = {}
 
     for tool in TOOLS:
@@ -203,15 +235,20 @@ def test_real_and_fake_of_one_tool_share_a_name_and_no_two_tools_do() -> None:
 
 @pytest.mark.parametrize("tool", TOOLS, ids=lambda cls: cls.__name__)
 def test_every_description_has_one_place_for_the_call_limit(tool: type) -> None:
-    """Każdy opis narzędzia → dokładnie jedno miejsce na limit wywołań: graf wpisuje w nie
-    wartość z konfiguracji, więc model zna limit z góry."""
+    """Sprawdza, czy opis każdego narzędzia ma dokładnie jedno miejsce na limit wywołań
+    (`{{max_calls}}`).
+
+    Wyłapuje opis bez tego miejsca albo z dwoma: graf wpisuje w nie wartość z konfiguracji i tylko
+    stąd model zna limit z góry."""
     assert tool.description.count(MAX_CALLS_PLACEHOLDER) == 1
 
 
 def test_every_tool_has_a_call_limit_in_the_configuration() -> None:
-    """Nazwy narzędzi → te same co klucze limitów w `Settings`: nowe narzędzie bez pola
-    `agent_max_calls_<narzędzie>` nie złożyłoby definicji dla modelu, a pole bez narzędzia byłoby
-    martwą zmienną w `.env`."""
+    """Sprawdza, czy konfiguracja (`Settings`) ma limit wywołań dla każdego narzędzia i dla niczego
+    poza narzędziami: nazwy z limitów i nazwy narzędzi to ten sam zbiór.
+
+    Wyłapuje rozjazd w obie strony: nowe narzędzie bez pola `agent_max_calls_<narzędzie>` nie
+    złożyłoby definicji dla modelu, a pole bez narzędzia byłoby martwą zmienną w `.env`."""
     limits = Settings(_env_file=None).tool_call_limits()
 
     assert set(limits) == {tool.name for tool in TOOLS}

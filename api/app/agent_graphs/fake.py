@@ -22,6 +22,10 @@ FAKE_READ_ARGUMENTS = {
     "ticket_ids": [found.ticket_id for found in default_found()],
 }
 
+# Limit tur modelu w atrapach grafów, gdy nikt nie podał własnego. Przebieg „szukaj, czytaj,
+# odpowiedz" ma trzy tury i mieści się w nim z zapasem; trasy dostają limit z konfiguracji.
+FAKE_MAX_ITERATIONS = 10
+
 
 def fake_search_nodes(
     respond_tool_name: str,                              # np. "respond_search"

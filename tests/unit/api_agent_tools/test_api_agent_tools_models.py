@@ -32,8 +32,11 @@ def make_ref(
 
 
 def test_key_tells_sources_apart() -> None:
-    """The same id from two tools → two different keys, so de-duplicating the sources of one
-    answer never merges a ticket with a documentation fragment."""
+    """Sprawdza, czy klucz źródła składa się z materiału i identyfikatora (`tickets:33644`), więc
+    ten sam identyfikator w zgłoszeniach i w dokumentacji daje dwa różne klucze.
+
+    Wyłapuje klucz zbudowany z samego identyfikatora: usuwanie powtórzeń ze źródeł jednej odpowiedzi
+    scaliłoby wtedy zgłoszenie z fragmentem dokumentacji."""
     ticket   = make_ref(source="tickets", item_id="33644")
     fragment = make_ref(source="docs",    item_id="33644")
 
@@ -42,15 +45,20 @@ def test_key_tells_sources_apart() -> None:
 
 
 def test_a_ref_carries_no_score() -> None:
-    """A reference with a score → ValidationError: sources are what the model read by id, and a
-    read has no similarity. The score is shown to the model by the search, never to the reader."""
+    """Sprawdza, czy wpis źródła z polem `score` kończy się `ValidationError`.
+
+    Wyłapuje powrót podobieństwa na listę źródeł: źródłem jest to, co model odczytał po
+    identyfikatorze, a odczyt podobieństwa nie zna. Podobieństwo pokazuje modelowi wyszukiwanie,
+    czytelnik odpowiedzi go nie dostaje."""
     with pytest.raises(ValidationError):
         SourceRef(source="docs", item_id="doc-7", title="Instrukcja administratora", score=0.87)
 
 
 def test_a_ref_may_have_no_date() -> None:
-    """A reference without a date → accepted: a documentation section may come from a release
-    with no date stated."""
+    """Sprawdza, czy wpis źródła bez daty jest przyjmowany, a jego data to `None`.
+
+    Wyłapuje datę zamienioną w pole wymagane: sekcja dokumentacji może pochodzić z wydania bez
+    podanej daty i nie dałoby się jej wtedy zacytować."""
     ref = SourceRef(source="docs", item_id="doc-7", title="Instrukcja administratora 4.12")
 
     assert ref.date is None
@@ -58,14 +66,20 @@ def test_a_ref_may_have_no_date() -> None:
 
 @pytest.mark.parametrize("field", ["source", "item_id", "title"])
 def test_empty_identity_is_refused(field: str) -> None:
-    """An empty source, id or title → ValidationError: a source nobody can identify cannot be
-    cited, and one nobody can recognise cannot be checked."""
+    """Sprawdza, czy wpis źródła z pustym materiałem, pustym identyfikatorem albo pustym tytułem
+    kończy się `ValidationError`.
+
+    Wyłapuje wpis, którego nie da się wskazać albo rozpoznać: źródła, którego nikt nie
+    zidentyfikuje, nie można zacytować, a takiego, którego nikt nie rozpozna, nie można
+    sprawdzić."""
     with pytest.raises(ValidationError):
         make_ref(**{field: ""})
 
 
 def test_an_unknown_field_is_refused() -> None:
-    """A key outside the contract → ValidationError, the same reasoning as on ParsedTicket: drift
-    is a mistake to surface, not an extension to absorb."""
+    """Sprawdza, czy wpis źródła z polem spoza kontraktu (tu `rank`) kończy się `ValidationError`.
+
+    Wyłapuje wpis, który po cichu przyjmuje albo gubi nieznane pola: rozjazd z kontraktem ma wyjść
+    jako błąd, tak samo jak w karcie zgłoszenia, a nie zostać wchłonięty jako rozszerzenie."""
     with pytest.raises(ValidationError):
         SourceRef(source="tickets", item_id="33644", title="x", rank=1)

@@ -8,7 +8,12 @@ FOUND_IDS = ["usr-komunikat-brak-serwera", "adm-kancelaria-edoreczenia"]
 
 
 async def test_the_result_is_the_same_on_every_search() -> None:
-    """Dwa wyszukiwania → te same sekcje w tej samej kolejności, dosłowne trafienie pierwsze."""
+    """Sprawdza, czy atrapa wyszukiwania tekstowego w dokumentacji oddaje za każdym razem ten sam
+    wynik: dwa wyszukiwania dają te same dwie sekcje w tej samej kolejności, z sekcją znalezioną po
+    dosłownej frazie na pierwszym miejscu.
+
+    Wyłapuje atrapę, której wynik zmienia się między wywołaniami: testy grafów, które odwołują się
+    do jej stałych identyfikatorów, przestałyby być powtarzalne."""
     tool = FakeFindDocsTextTool()
 
     first  = await tool.find(QUERY)
@@ -19,7 +24,11 @@ async def test_the_result_is_the_same_on_every_search() -> None:
 
 
 async def test_every_query_is_recorded() -> None:
-    """Każde wyszukiwanie → zapytanie w `queries`, żeby test grafu sprawdził, o co pytał agent."""
+    """Sprawdza, czy atrapa zapisuje każde zapytanie w publicznej liście `queries`: po jednym
+    wyszukaniu jest tam dokładnie to zapytanie.
+
+    Wyłapuje atrapę, która gubi zapytania: test grafu nie mógłby wtedy sprawdzić, o co agent
+    pytał."""
     tool = FakeFindDocsTextTool()
 
     await tool.run(QUERY)
@@ -28,8 +37,11 @@ async def test_every_query_is_recorded() -> None:
 
 
 async def test_the_model_sees_how_each_section_was_found() -> None:
-    """Tekst dla modelu → JSON: przy każdej sekcji identyfikator i sposób dopasowania pod nazwą
-    pola, którym agent pytał (`exact`, `words`)."""
+    """Sprawdza, czy tekst dla modelu jest JSON-em, w którym każda sekcja ma identyfikator i pole
+    `matched_by` mówiące, czym ją znaleziono: `exact` (frazą) albo `words` (słowami).
+
+    Wyłapuje wynik bez informacji o sposobie dopasowania albo z inną nazwą niż pole, którym agent
+    pytał: model nie wiedziałby, która część jego zapytania trafiła."""
     tool = FakeFindDocsTextTool()
     body = json.loads(await tool.run(QUERY))
 
@@ -38,8 +50,11 @@ async def test_the_model_sees_how_each_section_was_found() -> None:
 
 
 async def test_the_model_gets_no_piece_of_the_content() -> None:
-    """Wynik wyszukiwania → opis sekcji bez dopasowanego fragmentu treści: fragment mógłby
-    modelowi wystarczyć zamiast odczytu, a wtedy odpowiedź niosłaby treść bez źródła."""
+    """Sprawdza, czy wynik wyszukiwania niesie przy sekcji tylko sposób dopasowania i jej opis: nie
+    ma żadnego innego pola, a w tekście dla modelu nie pada zdanie z treści sekcji.
+
+    Wyłapuje fragment treści dołożony do wyniku wyszukiwania: mógłby modelowi wystarczyć zamiast
+    odczytu sekcji, a wtedy odpowiedź niosłaby treść, której nie ma na liście źródeł."""
     tool = FakeFindDocsTextTool()
     text = await tool.run(QUERY)
     body = json.loads(text)
@@ -49,7 +64,11 @@ async def test_the_model_gets_no_piece_of_the_content() -> None:
 
 
 async def test_matches_over_the_limit_are_counted() -> None:
-    """Licznik pominiętych ponad limit → w wyniku: mówi agentowi, że zapytanie było za ogólne."""
+    """Sprawdza, czy liczba sekcji pominiętych ponad limit trafia do tekstu dla modelu: atrapa bez
+    sekcji i z licznikiem 12 oddaje pustą listę oraz `omitted_over_limit` równe 12.
+
+    Wyłapuje wynik, który gubi ten licznik: agent nie dowiedziałby się, że zapytanie było za ogólne
+    i że pasujących sekcji jest więcej, niż zobaczył."""
     tool = FakeFindDocsTextTool(matched=[], omitted_over_limit=12)
     body = json.loads(await tool.run(QUERY))
 
@@ -57,5 +76,8 @@ async def test_matches_over_the_limit_are_counted() -> None:
 
 
 def test_the_search_cannot_be_cited() -> None:
-    """Wyszukiwanie w dokumentacji → brak `cite()`: opis sekcji nie jest źródłem."""
+    """Sprawdza, czy atrapa wyszukiwania tekstowego w dokumentacji nie ma metody `cite()`.
+
+    Wyłapuje wyszukiwanie, które zaczęło cytować: na listę źródeł trafiłby opis znalezionej sekcji,
+    choć model jej treści nie przeczytał."""
     assert not hasattr(FakeFindDocsTextTool(), "cite")

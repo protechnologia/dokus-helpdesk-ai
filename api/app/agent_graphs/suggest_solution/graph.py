@@ -107,22 +107,26 @@ def model_tools(
 
 
 def build_graph(
-    anonymize: Node,  # np. AnonymizeNode(FakeAnonymizer())
-    agent:     Node,  # np. FakeAgentNode([tool_call_turn("find_tickets_vector", …), …])
-    run_tools: Node,  # np. FakeRunToolsNode(sources=[…])
-    respond:   Node,  # np. FakeRespondNode(Proposal(text="…"))
+    anonymize:      Node,  # np. AnonymizeNode(FakeAnonymizer())
+    agent:          Node,  # np. FakeAgentNode([tool_call_turn("find_tickets_vector", …), …])
+    run_tools:      Node,  # np. FakeRunToolsNode(sources=[…])
+    respond:        Node,  # np. FakeRespondNode(Proposal(text="…"))
+    max_iterations: int,   # np. 20 — limit tur modelu z `AGENT_MAX_ITERATIONS`
 ) -> CompiledStateGraph:
     """
     Description:
     Składa graf wariantu z gotowych węzłów: anonimizacja → pętla agent ⇄ run_tools → respond. Po
     każdej turze modelu `route_after_agent` decyduje: narzędzia wiedzy → kolejny obieg,
-    `respond_suggest_solution` albo sam tekst → koniec. Krawędzie idą po nazwach węzłów.
+    `respond_suggest_solution` albo sam tekst → koniec. Po `max_iterations` turach modelu
+    narzędzia nie są już wykonywane i przebieg też idzie do `respond`. Krawędzie idą po nazwach
+    węzłów.
 
     Example args:
         anonymize=AnonymizeNode(FakeAnonymizer())
         agent=FakeAgentNode([…])
         run_tools=FakeRunToolsNode(sources=[…])
         respond=FakeRespondNode(Proposal(text="…"))
+        max_iterations=20
 
     Example result:
         CompiledStateGraph: __start__ → anonymize → agent ⇄ run_tools, agent → respond → __end__
@@ -135,12 +139,18 @@ def build_graph(
     for node in (anonymize, agent, run_tools, respond):
         graph.add_node(node.name, node.run)
 
+    route = partial(
+        route_after_agent,                      # wspólne rozgałęzienie grafów z pętlą
+        respond_tool_name = RESPOND_TOOL_NAME,  # czym model odpowiada w tym grafie
+        max_iterations    = max_iterations,     # po tylu turach narzędzia nie są już wykonywane
+    )
+
     graph.add_edge(START, "anonymize")
     graph.add_edge("anonymize", "agent")
     graph.add_conditional_edges(
-        "agent",                                                          # po każdej turze modelu
-        partial(route_after_agent, respond_tool_name=RESPOND_TOOL_NAME),  # decyduje, co wywołał
-        ["run_tools", "respond"],                                         # możliwe cele
+        "agent",                   # po każdej turze modelu
+        route,                     # decyduje to, co model wywołał, i limit tur
+        ["run_tools", "respond"],  # możliwe cele
     )
     graph.add_edge("run_tools", "agent")
     graph.add_edge("respond", END)

@@ -90,8 +90,13 @@ def test_the_verdict_goes_out_with_the_override_and_the_rules_version(
     path:  str,
     body:  dict[str, str],
 ) -> None:
-    """Werdykt grafu → odpowiedź z uzasadnieniem i wskazówką, `overridable` = true (zasada 10),
-    wersją zestawu reguł, którą go wydano, i logiem przebiegu: anonimizacja, model, odpowiedź."""
+    """Sprawdza, czy obie bramki (`/gate/close` i `/gate/reply`) oddają werdykt blokujący z grafu
+    w pełnym kształcie: z uzasadnieniem, wskazówką, polem `overridable` równym `true`, wersją
+    zestawu reguł tej bramki, zużyciem modelu i logiem przebiegu (anonimizacja, model, odpowiedź).
+
+    Wyłapuje trasę, która gubi część werdyktu albo furtkę dla człowieka: helpdesk nie miałby
+    wtedy czego pokazać przy blokadzie, nie wiedziałby, że wolno ją obejść, ani którą wersją
+    reguł ją wydano."""
     graph_name = graph.__name__.split(".")[-1]
     response   = client_with(GateGraph(graph)).post(path, json=body)
     answer     = response.json()
@@ -120,7 +125,11 @@ def test_the_rules_come_from_the_rule_set_of_the_gate(
     path:  str,
     body:  dict[str, str],
 ) -> None:
-    """Żądanie → stan grafu z regułami z zestawu tej bramki, nie z żądania."""
+    """Sprawdza, czy przy żądaniu do każdej z bramek graf dostaje reguły z zestawu reguł tej
+    właśnie bramki. Żądanie reguł nie podaje, dobiera je trasa.
+
+    Wyłapuje trasę, która podaje grafowi inne reguły niż zestaw tej bramki, na przykład zestaw
+    drugiej: werdykt oceniałby wtedy tekst według niewłaściwych wymagań."""
     gate       = GateGraph(graph)
     graph_name = graph.__name__.split(".")[-1]
 
@@ -130,7 +139,12 @@ def test_the_rules_come_from_the_rule_set_of_the_gate(
 
 
 def test_the_close_gate_reads_the_whole_thread() -> None:
-    """`/gate/close` → wejście grafu to wątek zgłoszenia z id i opisem, jak przy parsowaniu."""
+    """Sprawdza, czy bramka zamknięcia (`/gate/close`) podaje grafowi cały wątek zgłoszenia: tekst,
+    który trafia do anonimizacji, zaczyna się od nagłówka „ZGŁOSZENIE 41002" i zawiera opis
+    z żądania, czyli ma ten sam układ co przy parsowaniu zgłoszeń.
+
+    Wyłapuje trasę, która przekazuje sam opis albo gubi numer zgłoszenia: bramka oceniałaby
+    wtedy inny tekst niż ten, z którego później powstaje karta zgłoszenia."""
     gate = GateGraph(gate_close)
 
     client_with(gate).post("/gate/close", json=TICKET)
@@ -140,7 +154,12 @@ def test_the_close_gate_reads_the_whole_thread() -> None:
 
 
 def test_the_reply_gate_reads_the_message_only() -> None:
-    """`/gate/reply` → wejście grafu to sama wiadomość do klienta."""
+    """Sprawdza, czy bramka wysyłki (`/gate/reply`) podaje grafowi samą wiadomość do klienta: do
+    anonimizacji trafia dokładnie jeden tekst, równy wiadomości z żądania, bez numeru zgłoszenia
+    i bez nagłówków wątku.
+
+    Wyłapuje trasę, która dokleja do wiadomości coś od siebie: bramka oceniałaby wtedy inny
+    tekst niż ten, który wdrożeniowiec chce wysłać."""
     gate = GateGraph(gate_reply)
 
     client_with(gate).post("/gate/reply", json=REPLY)
@@ -154,7 +173,11 @@ def test_the_reply_gate_reads_the_message_only() -> None:
     ids=["close-without-body", "reply-without-message"],
 )
 def test_a_request_without_content_is_refused(path: str, body: dict[str, str]) -> None:
-    """Żądanie bez treści do oceny → 422, zanim cokolwiek dotknie grafu."""
+    """Sprawdza, czy żądanie do bramki bez tekstu do oceny dostaje status 422: do `/gate/close`
+    bez opisu zgłoszenia (pola `body`), a do `/gate/reply` bez wiadomości (pola `message`).
+
+    Wyłapuje bramkę, która przyjmuje takie żądanie i uruchamia graf: werdykt wydany bez tekstu
+    wyglądałby jak prawdziwa ocena."""
     response = TestClient(create_app()).post(path, json=body)
 
     assert response.status_code == 422

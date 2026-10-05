@@ -53,7 +53,12 @@ def test_only_transport_clients_import_the_sdk(
     spellings:       tuple[str, ...],   # e.g. ("import openai", "from openai")
     allowed_modules: list[str],         # e.g. ["engine_llm/client/openai.py"]
 ):
-    """SDK dostawcy importowany wyłącznie w klientach transportowych — domena go nie zna."""
+    """Sprawdza, czy biblioteka dostawcy jest importowana wyłącznie w plikach klientów modelu:
+    `anthropic` w kliencie Claude'a, `openai` w klientach OpenAI i Ollamy. Test czyta źródła
+    wszystkich modułów aplikacji jako tekst.
+
+    Wyłapuje import biblioteki dostawcy poza klientem: reszta kodu ma rozmawiać z modelem tylko
+    przez `LLMClient`, inaczej zmiana dostawcy przestaje być zmianą jednego pliku."""
     offenders = _modules_importing(spellings)
 
     assert offenders == sorted(allowed_modules), (
@@ -68,7 +73,11 @@ def test_the_guard_actually_finds_the_import(
     spellings:       tuple[str, ...],   # e.g. ("import openai", "from openai")
     allowed_modules: list[str],         # e.g. ["engine_llm/client/openai.py"]
 ):
-    """Strażnik widzi import w dozwolonych plikach — inaczej przechodziłby też po ich usunięciu."""
+    """Sprawdza, czy wyszukiwanie, na którym opiera się test pilnujący importów bibliotek dostawców,
+    w ogóle coś znajduje: dla każdej biblioteki lista plików z jej importem nie jest pusta.
+
+    Wyłapuje zepsute wyszukiwanie, które zawsze oddaje pustą listę: strażnik importów milczałby
+    wtedy także przy prawdziwym złamaniu reguły."""
     # Bez tego asercja wyżej byłaby spełniona również przez pustą listę wynikającą z zepsutego
     # wyszukiwania, a test-strażnik milczałby o realnym złamaniu reguły.
     assert _modules_importing(spellings), f"strażnik nie znalazł importu SDK {sdk}"

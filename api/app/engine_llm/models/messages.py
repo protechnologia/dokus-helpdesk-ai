@@ -53,22 +53,28 @@ class ChatMessage(BaseModel):
     (zasada 4), a format wiadomości u konkretnego dostawcy tłumaczy jego klient (CLAUDE.md ->
     „Plan", p. 17). LangGraph nie wymaga typów LangChaina, więc stan grafu nie musi ich
     znać. Prompt systemowy nie jest wiadomością — dokłada go węzeł `agent` przy każdej turze.
+
+    `provider_items` to elementy, które dostawca każe odesłać bez zmian w następnej turze:
+    rozumowanie u OpenAI, bloki myślenia u Claude'a. Wkłada je i czyta wyłącznie klient dostawcy,
+    w swoim formacie; pętla agenta ich nie otwiera, tylko przenosi razem z wiadomością.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    role:       Literal["user", "assistant", "tool"]
-    content:    str            = Field(default="", examples=["Znalezione zgłoszenia: 3 …"])
-    tool_calls: list[ToolCall] = Field(default_factory=list)
-    call_id:    str | None     = Field(default=None, examples=["call_1"])
+    role:           Literal["user", "assistant", "tool"]
+    content:        str                  = Field(default="", examples=["Znalezione zgłoszenia: 3"])
+    tool_calls:     list[ToolCall]       = Field(default_factory=list)
+    call_id:        str | None           = Field(default=None, examples=["call_1"])
+    provider_items: list[dict[str, Any]] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def check_tool_links(self) -> "ChatMessage":
         """
         Description:
         Pilnuje powiązań z narzędziami: wynik narzędzia musi wskazywać wywołanie, na które
-        odpowiada, a wywołania narzędzi zleca wyłącznie model. Dostawcy odrzucają rozmowę
-        z zerwanym powiązaniem, więc błąd ma wyjść tutaj, a nie w środku pętli.
+        odpowiada, a wywołania narzędzi i elementy dostawcy niesie wyłącznie tura modelu.
+        Dostawcy odrzucają rozmowę z zerwanym powiązaniem, więc błąd ma wyjść tutaj, a nie
+        w środku pętli.
 
         Example args:
             (brak)
@@ -77,12 +83,16 @@ class ChatMessage(BaseModel):
             ChatMessage(role="tool", content="…", call_id="call_1")
 
         Raises:
-            ValueError: wiadomość `tool` bez `call_id` albo wywołania narzędzi spoza `assistant`
+            ValueError: wiadomość `tool` bez `call_id` albo wywołania narzędzi lub elementy
+                dostawcy spoza `assistant`
         """
         if self.role == "tool" and not self.call_id:
             raise ValueError("wiadomość tool musi wskazywać call_id wywołania")
 
         if self.tool_calls and self.role != "assistant":
             raise ValueError("wywołania narzędzi może zawierać tylko wiadomość assistant")
+
+        if self.provider_items and self.role != "assistant":
+            raise ValueError("elementy dostawcy może zawierać tylko wiadomość assistant")
 
         return self

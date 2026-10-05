@@ -37,8 +37,11 @@ pytestmark = [
 
 
 async def test_a_section_found_by_a_phrase_is_read_verbatim(docs_index) -> None:
-    """Sekcja znaleziona frazą w jednej linii → odczyt oddaje treść znak w znak, ze złamaniem
-    w środku komunikatu: wyszukiwanie widzi tekst ze spacjami, model czyta oryginał."""
+    """Sprawdza, czy sekcję znalezioną frazą wpisaną w jednej linii odczyt oddaje znak w znak tak,
+    jak ją zapisano, razem ze złamaniem linii w środku komunikatu, którego fraza szukała.
+
+    Wyłapuje odczyt, który oddaje tekst przygotowany dla wyszukiwania (ze złamaniami linii
+    zamienionymi na spacje) zamiast oryginału: model czytałby wtedy zmienioną treść instrukcji."""
     found = await docs_index.text.find(FindDocsTextQuery(exact="uruchom program odkamieniania"))
     read  = await docs_index.read.search(
         ReadDocsQuery(section_ids=[item.section.section_id for item in found.sections])
@@ -49,8 +52,12 @@ async def test_a_section_found_by_a_phrase_is_read_verbatim(docs_index) -> None:
 
 
 async def test_a_section_cut_into_fragments_is_read_whole(docs_index) -> None:
-    """Sekcja znaleziona po jednym z trzech fragmentów → odczyt oddaje ją w całości: na fragmenty
-    tnie się tylko to, co idzie do wektorów."""
+    """Sprawdza, czy sekcję pociętą przy indeksacji na trzy fragmenty i znalezioną po znaczeniu
+    odczyt oddaje w całości, a na listę źródeł trafia ona raz, pod swoim identyfikatorem.
+
+    Wyłapuje odczyt, który oddaje sam fragment albo nie przyjmuje identyfikatora z wyszukiwania
+    po znaczeniu: na fragmenty tnie się tylko to, co idzie do wektorów, a model ma dostać całą
+    sekcję."""
     # "Żyrafa wymienia żarówki w lampach pod sufitem."
     found = await docs_index.vector.find(
         FindDocsVectorQuery(text="kto wymienia żarówki pod sufitem")
@@ -64,8 +71,13 @@ async def test_a_section_cut_into_fragments_is_read_whole(docs_index) -> None:
 
 
 async def test_every_tool_describes_a_section_the_same_way(docs_index) -> None:
-    """Ta sama sekcja ze spisu, z obu wyszukiwań i z odczytu → ten sam opis z metryczki: oba
-    indeksy wskazują jeden identyfikator, a odczyt go przyjmuje."""
+    """Sprawdza, czy cztery narzędzia dokumentacji opisują tę samą sekcję identycznie: sekcja
+    o parkingu znaleziona po znaczeniu, znaleziona po słowach, wzięta ze spisu treści
+    i odczytana ma ten sam identyfikator i ten sam opis z metryczki.
+
+    Wyłapuje rozjazd między dwoma indeksami dokumentacji, wektorowym i tekstowym: narzędzia
+    mówiłyby wtedy o jednej sekcji na różne sposoby, a identyfikatora z jednego z nich nie
+    dałoby się odczytać."""
     by_meaning = await docs_index.vector.find(FindDocsVectorQuery(text="gdzie jest parking"))
     by_words   = await docs_index.text.find(FindDocsTextQuery(words="miejsce parkingowe"))
     listed     = await docs_index.listing.load()
@@ -79,9 +91,12 @@ async def test_every_tool_describes_a_section_the_same_way(docs_index) -> None:
 
 
 async def test_an_unknown_section_among_known_ones_fails_the_whole_read(docs_index) -> None:
-    """Sekcja, która jest, i sekcja, której nie ma → `UnknownSectionError` tylko z nieznaną, bez
-    treści tej znanej: baza oddaje wtedy jeden wiersz bez błędu, więc o tym, że to błąd, mówi
-    narzędzie."""
+    """Sprawdza, czy odczyt dwóch sekcji, z których jedna istnieje, a drugiej nie ma, kończy się
+    w całości błędem `UnknownSectionError`, który wymienia tylko nieznany identyfikator. Treść
+    istniejącej sekcji nie wraca.
+
+    Wyłapuje odczyt częściowy: baza oddaje wtedy bez błędu jeden wiersz zamiast dwóch, więc bez
+    sprawdzenia w narzędziu model dostałby niepełny materiał, który wygląda jak komplet."""
     with pytest.raises(UnknownSectionError) as caught:
         await docs_index.read.search(ReadDocsQuery(section_ids=["usr-parking", "usr-nie-ma"]))
 

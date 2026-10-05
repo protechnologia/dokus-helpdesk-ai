@@ -55,8 +55,11 @@ def _tool(
 
 
 async def test_the_phrase_goes_by_substring_and_the_words_by_dictionary() -> None:
-    """Fraza i słowa → jedno zapytanie o podciąg i jedno przez słownik, każde ze swoją wartością:
-    fraza ma być szukana dosłownie, a słowa w dowolnej odmianie."""
+    """Sprawdza, czy narzędzie pyta tabelę dwiema drogami, każdą raz: frazę „Przekaż bufor” wysyła
+    do szukania podciągu, a słowa „sekwencja numeracja” do szukania przez słownik.
+
+    Wyłapuje pomylenie dróg albo wartości: fraza ma być szukana dosłownie, a słowa w dowolnej
+    odmianie, więc po zamianie narzędzie bez żadnego błędu znajdowałoby inne sekcje."""
     client = _client()
 
     await _tool(client).find(FindDocsTextQuery(exact="Przekaż bufor", words="sekwencja numeracja"))
@@ -68,7 +71,11 @@ async def test_the_phrase_goes_by_substring_and_the_words_by_dictionary() -> Non
 
 
 async def test_a_field_that_was_not_given_is_not_searched() -> None:
-    """Samo `exact` → żadnego zapytania przez słownik; samo `words` → żadnego podciągu."""
+    """Sprawdza, czy narzędzie pyta tabelę tylko o to, co agent podał: przy samej frazie nie ma
+    zapytania przez słownik, a przy samych słowach nie ma szukania podciągu.
+
+    Wyłapuje narzędzie, które szuka także tą drogą, której agent nie użył: do bazy szłoby zbędne
+    zapytanie z pustą wartością."""
     only_exact = _client()
     only_words = _client()
 
@@ -80,8 +87,11 @@ async def test_a_field_that_was_not_given_is_not_searched() -> None:
 
 
 async def test_either_field_is_enough_for_a_section_to_come_back() -> None:
-    """Fraza trafia w jedną sekcję, słowa w inną → obie w wyniku, znaleziona frazą pierwsza:
-    pola szukają niezależnie, a wyniki się sumują."""
+    """Sprawdza, czy wyniki obu dróg się sumują: fraza „PDP-203” trafia w jedną sekcję, słowo
+    „numeracja” w inną, a w wyniku są obie, znaleziona frazą pierwsza, i nic nie jest pominięte.
+
+    Wyłapuje narzędzie, które wymaga dopasowania obiema drogami naraz albo miesza kolejność: sekcja
+    pasująca tylko do frazy albo tylko do słów zniknęłaby z wyniku."""
     client = _client(substring={"PDP-203": [BRAK_SERWERA]}, words={"numeracja": [W_TOKU]})
 
     result = await _tool(client).find(FindDocsTextQuery(exact="PDP-203", words="numeracja"))
@@ -94,8 +104,11 @@ async def test_either_field_is_enough_for_a_section_to_come_back() -> None:
 
 
 async def test_a_section_found_both_ways_comes_back_once_as_exact() -> None:
-    """Fraza i słowa trafiają w tę samą sekcję → sekcja w wyniku raz, z etykietą `exact`,
-    i liczona raz."""
+    """Sprawdza, czy sekcja znaleziona i frazą, i słowami jest w wyniku raz, z etykietą `exact`,
+    a druga sekcja, znaleziona tylko słowami, stoi za nią z etykietą `words`.
+
+    Wyłapuje sekcję powtórzoną w wyniku albo oznaczoną jako znaleziona słowami: model dostałby dwa
+    wpisy o tym samym albo nie wiedziałby, że trafiła w nią dosłowna fraza."""
     client = _client(substring={"PDP-203": [EPUAP]}, words={"skrzynka": [EPUAP, W_TOKU]})
 
     result = await _tool(client).find(FindDocsTextQuery(exact="PDP-203", words="skrzynka"))
@@ -108,9 +121,12 @@ async def test_a_section_found_both_ways_comes_back_once_as_exact() -> None:
 
 
 async def test_matches_over_the_limit_are_counted_and_not_read() -> None:
-    """Cztery pasujące sekcje, limit 2 → dwie pierwsze w wyniku, dwie policzone jako pominięte,
-    a z tabeli czytane są tylko te dwie: „pokazano dwie z czterech" mówi agentowi, że zapytanie
-    było zbyt ogólne."""
+    """Sprawdza, czy limit przycina wynik i liczy resztę: przy czterech pasujących sekcjach
+    i limicie 2 wracają dwie pierwsze, dwie są policzone jako pominięte, a z tabeli czytane są opisy
+    tylko tych dwóch.
+
+    Wyłapuje trzy usterki: wynik dłuższy niż limit, zgubiony licznik pominiętych (agent nie
+    wiedziałby, że zapytanie było zbyt ogólne) i czytanie z bazy sekcji, które i tak odpadają."""
     client = _client(words={"uprawnienie": [EDORECZENIA, EPUAP, W_TOKU, BRAK_SERWERA]})
 
     result = await _tool(client, limit=2).find(FindDocsTextQuery(words="uprawnienie"))
@@ -121,8 +137,11 @@ async def test_matches_over_the_limit_are_counted_and_not_read() -> None:
 
 
 async def test_the_model_gets_descriptions_and_no_content() -> None:
-    """Znaleziona sekcja → opis z metryczki pod identyfikatorem do odczytu, bez treści: tę daje
-    `read_docs` i tylko on cytuje."""
+    """Sprawdza, czy znaleziona sekcja wraca jako sam opis: w tekście dla modelu jest jej
+    identyfikator do odczytu, a nie ma treści sekcji, choć tabela oddaje ją razem z wierszem.
+
+    Wyłapuje treść sekcji przeciekającą do wyniku wyszukiwania: model mógłby oprzeć na niej
+    odpowiedź bez odczytu, a tylko odczyt trafia na listę źródeł."""
     client = _client(substring={"Nie udało się": [BRAK_SERWERA]})
     tool   = _tool(client)
 
@@ -135,8 +154,11 @@ async def test_the_model_gets_descriptions_and_no_content() -> None:
 
 
 async def test_nothing_found_is_an_empty_result_and_no_read() -> None:
-    """Żadna sekcja nie pasuje → pusty wynik bez pominiętych i bez odczytu z tabeli:
-    „dokumentacja o tym milczy" to poprawna odpowiedź."""
+    """Sprawdza, czy brak trafień daje pusty wynik: żadnych sekcji, zero pominiętych i żadnego
+    odczytu z tabeli.
+
+    Wyłapuje narzędzie, które przy braku trafień zgłasza błąd albo mimo to czyta z bazy: odpowiedź,
+    że dokumentacja o tym milczy, jest poprawna i nie wymaga kolejnego zapytania."""
     client = _client()
 
     result = await _tool(client).find(FindDocsTextQuery(exact="KSeF", words="faktura"))
@@ -147,8 +169,10 @@ async def test_nothing_found_is_an_empty_result_and_no_read() -> None:
 
 
 async def test_aclose_closes_the_database_client() -> None:
-    """`aclose()` → zamknięty klient Postgresa: sprzątający nie musi wiedzieć, z czego narzędzie
-    jest zbudowane."""
+    """Sprawdza, czy `aclose()` narzędzia zamyka klienta Postgresa, na którym stoi jego tabela.
+
+    Wyłapuje narzędzie, które po sobie nie sprząta: połączenie z bazą zostawałoby otwarte, bo
+    sprzątający woła tylko `aclose()` i nie wie, z czego narzędzie jest zbudowane."""
     client = _client()
 
     await _tool(client).aclose()

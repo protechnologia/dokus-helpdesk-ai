@@ -356,8 +356,14 @@ def _package(
 # --- wiersze tabeli -----------------------------------------------------------------------
 
 async def test_every_section_becomes_a_row_with_its_place_in_the_document() -> None:
-    """Dwa dokumenty → wiersz na sekcję, a `ordinal` liczony od zera w każdym dokumencie
-    osobno: po nim układa się spis treści."""
+    """Sprawdza, czy każda sekcja paczki staje się wierszem tabeli z numerem miejsca w swoim
+    dokumencie, liczonym od zera w każdym dokumencie osobno: dwa dokumenty, pierwszy z sekcjami `a`
+    i `b`, drugi z sekcją `c`, dają wiersze o numerach 0, 1 i 0, a wiersz sekcji `c` niesie nazwę
+    swojego dokumentu.
+
+    Wyłapuje numerację ciągnącą się przez całą paczkę albo sekcję przypisaną do cudzego dokumentu:
+    po tych numerach układa się spis treści, więc sekcje stałyby w nim w złej kolejności albo pod
+    złym dokumentem."""
     stack   = Stack()
     package = _package(_directory("administrator", ("a", "b")), _directory("uzytkownik", ("c",)))
 
@@ -372,8 +378,11 @@ async def test_every_section_becomes_a_row_with_its_place_in_the_document() -> N
 
 
 async def test_the_row_carries_the_whole_body() -> None:
-    """Sekcja dłuższa niż limit fragmentu → w wierszu cała treść, niepocięta: w tej postaci
-    czyta ją agent."""
+    """Sprawdza, czy wiersz tabeli niesie całą treść sekcji, znak w znak, także gdy sekcja jest
+    dłuższa niż limit fragmentu: tu dwa akapity przy limicie 25 znaków.
+
+    Wyłapuje pociętą albo przyciętą treść w tabeli: z tabeli agent czyta sekcję w całości, a cięcie
+    na fragmenty dotyczy tylko wektorów."""
     body  = "Pierwszy akapit sekcji.\n\nDrugi akapit sekcji.\n"
     stack = Stack(fragment_chars=25)
 
@@ -385,7 +394,12 @@ async def test_the_row_carries_the_whole_body() -> None:
 # --- punkty kolekcji ----------------------------------------------------------------------
 
 async def test_a_short_section_becomes_one_point() -> None:
-    """Sekcja krótsza niż limit → jeden punkt, o identyfikatorze fragmentu zerowego."""
+    """Sprawdza, czy sekcja krótsza niż limit fragmentu daje w kolekcji jeden punkt,
+    o identyfikatorze wyliczonym z `wstep#0`, czyli z identyfikatora sekcji i numeru fragmentu zero.
+
+    Wyłapuje sekcję, która nie dostała punktu albo dostała ich kilka, oraz identyfikator punktu
+    liczony inaczej niż z sekcji i numeru fragmentu: krótka sekcja bez punktu nie dałaby się znaleźć
+    wyszukiwaniem po znaczeniu."""
     stack = Stack()
 
     await stack.indexer.rebuild(_package(_directory("administrator")))
@@ -394,8 +408,13 @@ async def test_a_short_section_becomes_one_point() -> None:
 
 
 async def test_a_long_section_becomes_a_point_per_fragment() -> None:
-    """Sekcja z trzech akapitów przy limicie mieszczącym jeden → trzy punkty o różnych
-    identyfikatorach, każdy z tym samym opisem sekcji."""
+    """Sprawdza, czy długa sekcja daje punkt na każdy fragment: trzy akapity przy limicie
+    mieszczącym jeden dają trzy punkty o identyfikatorach z `wstep#0`, `wstep#1` i `wstep#2`,
+    wszystkie z tym samym identyfikatorem sekcji i tym samym opisem sekcji.
+
+    Wyłapuje dwie usterki: fragmenty o tym samym identyfikatorze, które nadpisałyby się w kolekcji
+    i zostawiły po sekcji jeden punkt, oraz fragment z innym opisem, przez który trafienie w niego
+    wskazywałoby inną sekcję."""
     body  = "Pierwszy akapit sekcji.\n\nDrugi akapit sekcji.\n\nTrzeci akapit sekcji."
     stack = Stack(fragment_chars=25)
 
@@ -413,7 +432,12 @@ async def test_a_long_section_becomes_a_point_per_fragment() -> None:
 
 
 async def test_the_embedded_text_is_the_title_and_the_fragment() -> None:
-    """Fragment → do embeddera idzie tytuł sekcji i sam fragment, w trybie passage."""
+    """Sprawdza, czy do embeddera, w trybie dla tekstów indeksowanych (passage), idzie tytuł sekcji
+    i sam fragment: sekcja pocięta na dwa fragmenty daje dwa teksty, każdy z tytułem „Tytuł wstep"
+    w pierwszej linii i jednym akapitem pod nim.
+
+    Wyłapuje tekst bez tytułu, z całą sekcją zamiast fragmentu albo wysłany w innym trybie: wektor
+    fragmentu nie pasowałby wtedy do zapytań, z którymi jest porównywany."""
     body  = "Pierwszy akapit sekcji.\n\nDrugi akapit sekcji."
     stack = Stack(fragment_chars=25)
 
@@ -425,8 +449,12 @@ async def test_the_embedded_text_is_the_title_and_the_fragment() -> None:
 
 
 async def test_fragments_are_embedded_in_batches() -> None:
-    """Więcej fragmentów niż jedna paczka → kilka wywołań embeddera, razem z każdym fragmentem
-    raz; jedno wielkie żądanie zależałoby od jednego timeoutu."""
+    """Sprawdza, czy fragmenty idą do embeddera paczkami: przy liczbie fragmentów o trzy większej,
+    niż mieści jedna paczka (`EMBED_BATCH_SIZE`), są dwa wywołania, pełna paczka i trzy fragmenty,
+    a punktów powstaje tyle, ile fragmentów.
+
+    Wyłapuje dwie usterki: wszystkie fragmenty wysłane jednym żądaniem, które zależałoby od jednego
+    limitu czasu embeddera, oraz fragment zgubiony albo powtórzony na granicy paczek."""
     count   = EMBED_BATCH_SIZE + 3
     stack   = Stack()
     package = _package(_directory("administrator", tuple(f"s{number}" for number in range(count))))
@@ -438,8 +466,12 @@ async def test_fragments_are_embedded_in_batches() -> None:
 
 
 async def test_two_imports_give_the_same_points() -> None:
-    """Ta sama paczka zaindeksowana dwa razy → te same identyfikatory punktów, bo wynikają
-    z sekcji i numeru fragmentu."""
+    """Sprawdza, czy ta sama paczka zaindeksowana dwa razy daje punkty o tych samych
+    identyfikatorach: identyfikator wynika z sekcji i numeru fragmentu.
+
+    Wyłapuje identyfikatory losowe albo zależne od przebiegu: ten sam fragment miałby po każdej
+    indeksacji inny identyfikator, więc dwóch przebiegów na tej samej paczce nie dałoby się
+    porównać."""
     package = _package(_directory("administrator", ("a", "b")))
     first   = Stack()
     second  = Stack()
@@ -455,8 +487,11 @@ async def test_two_imports_give_the_same_points() -> None:
 # --- zastąpienie indeksu ------------------------------------------------------------------
 
 async def test_the_old_index_is_replaced_not_extended() -> None:
-    """Indeksacja → tabela i kolekcja są kasowane i zakładane przed zapisem; inaczej zostałyby
-    sekcje usunięte z paczki i punkty dawnych fragmentów."""
+    """Sprawdza, czy indeksacja zastępuje indeks: tabela jest najpierw kasowana, potem zakładana
+    i dopiero wtedy zapisywana, a po niej w tej samej kolejności kolekcja.
+
+    Wyłapuje indeksację, która dokłada do starego indeksu: zostałyby w nim sekcje usunięte z paczki
+    i punkty dawnych fragmentów, a agent dalej by je znajdował."""
     stack = Stack()
 
     await stack.indexer.rebuild(_package(_directory("administrator")))
@@ -472,8 +507,11 @@ async def test_the_old_index_is_replaced_not_extended() -> None:
 
 
 async def test_nothing_is_dropped_when_the_embedder_fails() -> None:
-    """Embedder pada → błąd wychodzi, a tabela i kolekcja są nietknięte: stary indeks znika
-    dopiero, gdy wektory nowego są gotowe."""
+    """Sprawdza, czy awaria embeddera przerywa indeksację błędem `EmbeddingError`, zanim tabela albo
+    kolekcja dostaną jakiekolwiek wywołanie.
+
+    Wyłapuje kasowanie starego indeksu przed policzeniem wektorów nowego: po awarii embeddera
+    zostałby pusty indeks zamiast poprzedniego, działającego."""
     stack = Stack(embed_error=EmbeddingError("Embedder timed out"))
 
     with pytest.raises(EmbeddingError):
@@ -483,8 +521,11 @@ async def test_nothing_is_dropped_when_the_embedder_fails() -> None:
 
 
 async def test_aclose_closes_everything_the_importer_stands_on() -> None:
-    """`aclose()` indeksera → zamknięty embedder, tabela i kolekcja: kto dostał sam indekser,
-    może po sobie posprzątać jednym wywołaniem."""
+    """Sprawdza, czy zamknięcie indeksera zamyka wszystko, na czym on stoi: embedder, tabelę
+    i kolekcję.
+
+    Wyłapuje połączenie zostawione otwarte: kto dostał sam indekser, na przykład komenda, sprząta
+    jednym wywołaniem i nie ma jak zamknąć reszty osobno."""
     stack = Stack()
 
     await stack.indexer.aclose()
@@ -496,8 +537,12 @@ async def test_aclose_closes_everything_the_importer_stands_on() -> None:
 # --- raport -------------------------------------------------------------------------------
 
 async def test_the_report_counts_documents_sections_and_fragments() -> None:
-    """Dwa dokumenty, trzy sekcje, jedna pocięta na dwa fragmenty → takie liczby w raporcie,
-    razem z ostrzeżeniami paczki."""
+    """Sprawdza, czy raport z indeksacji podaje właściwe liczby i przenosi ostrzeżenia paczki: dwa
+    dokumenty i trzy sekcje, z których jedna jest pocięta na dwa fragmenty, dają w raporcie
+    2 dokumenty, 3 sekcje i 4 fragmenty oraz ostrzeżenie o długiej sekcji.
+
+    Wyłapuje raport z pomylonymi liczbami albo bez ostrzeżeń: człowiek, który uruchomił indeksację,
+    nie zobaczyłby, ile naprawdę trafiło do indeksu ani że paczka wymaga uwagi."""
     body    = "Pierwszy akapit sekcji.\n\nDrugi akapit sekcji."
     stack   = Stack(fragment_chars=25)
     package = _package(
@@ -556,7 +601,14 @@ def test_a_package_that_does_not_fit_is_refused(
     synthetic: bool,
     message:   str,
 ) -> None:
-    """Paczka z błędami, pusta albo niezgodna z rodzajem indeksu → odmowa mówiąca dlaczego."""
+    """Sprawdza, czy paczka, której nie wolno zaindeksować, dostaje odmowę `DocsIndexRefused`
+    z powodem w komunikacie. Sześć przypadków: błąd w katalogu dokumentu, błąd całej paczki, pusta
+    paczka, dokument zmyślony do właściwego indeksu, paczka mieszana do właściwego indeksu
+    i dokument prawdziwy do indeksu syntetycznego.
+
+    Wyłapuje przyjęcie takiej paczki albo odmowę, która nie mówi dlaczego: indeksacja zastępuje
+    indeks, więc pusta paczka skasowałaby działający, a zmyślona zmieszałaby się z dokumentacją,
+    z której odpowiada agent."""
     with pytest.raises(DocsIndexRefused, match=message):
         check_indexable(package, synthetic)
 
@@ -567,7 +619,11 @@ async def test_a_refused_import_touches_nothing(
     synthetic: bool,
     message:   str,
 ) -> None:
-    """Odmowa w `rebuild()` → ani embedder, ani tabela, ani kolekcja nie dostają wywołania."""
+    """Sprawdza, czy odmowa w `rebuild()` pada, zanim indekser cokolwiek zrobi: dla każdej z tych
+    samych sześciu paczek ani embedder, ani tabela, ani kolekcja nie dostają wywołania.
+
+    Wyłapuje sprawdzenie paczki wykonane za późno: odmowa po skasowaniu tabeli albo kolekcji
+    zostawiałaby pusty indeks, a odmowa po liczeniu wektorów marnowałaby pracę embeddera."""
     stack = Stack(synthetic=synthetic)
 
     with pytest.raises(DocsIndexRefused):
@@ -578,7 +634,11 @@ async def test_a_refused_import_touches_nothing(
 
 
 async def test_a_synthetic_package_goes_into_the_synthetic_index() -> None:
-    """Dokument zmyślony i indeks syntetyczny → indeksacja przechodzi."""
+    """Sprawdza, czy dokument zmyślony przechodzi do indeksu syntetycznego: indeksacja kończy się
+    raportem z jedną sekcją.
+
+    Wyłapuje odmowę zbyt szeroką, która odrzuca każdą paczkę zmyśloną: indeksu syntetycznego nie
+    dałoby się wtedy zbudować wcale."""
     stack = Stack(synthetic=True)
 
     report = await stack.indexer.rebuild(_package(_directory("zmyslony", synthetic=True)))

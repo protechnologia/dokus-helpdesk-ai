@@ -83,8 +83,12 @@ def _tool(
 
 
 async def test_the_read_asks_for_the_points_of_the_given_numbers() -> None:
-    """Numery zgłoszeń → na drucie identyfikatory punktów wyliczone z numerów, bez powtórzeń:
-    narzędzie nie zna identyfikatorów Qdranta, liczy je kolekcja."""
+    """Sprawdza, czy dla numerów 90001, 90002 i jeszcze raz 90001 żądanie do Qdranta niesie
+    identyfikatory punktów wyliczone z tych numerów, każdy tylko raz.
+
+    Wyłapuje odczyt po surowych numerach zgłoszeń, po których Qdrant nie znajdzie żadnej karty, bo
+    zna punkty tylko pod identyfikatorami wyliczonymi z numerów, oraz ten sam punkt pobierany dwa
+    razy."""
     seen: list = []
 
     await _tool([], seen=seen).search(ReadTicketsCardQuery(ticket_ids=["90001", "90002", "90001"]))
@@ -93,8 +97,11 @@ async def test_the_read_asks_for_the_points_of_the_given_numbers() -> None:
 
 
 async def test_a_point_comes_back_as_the_card_that_was_indexed() -> None:
-    """Payload punktu → `ParsedTicket` ze wszystkimi polami, równy zaindeksowanemu: model ma
-    dostać `cause` i `solution` jako pola, a `cite()` numer i datę samego zgłoszenia."""
+    """Sprawdza, czy punkt odczytany z Qdranta wraca jako karta równa tej, którą zaindeksowano, ze
+    wszystkimi polami, i czy lista źródeł wskazuje to zgłoszenie.
+
+    Wyłapuje pole zgubione albo zmienione między zapisem do indeksu a odczytem: model ma dostać
+    `cause` i `solution` jako pola karty, a lista źródeł numer tego samego zgłoszenia."""
     tool   = _tool([_stored("90001")])
     result = await tool.search(ReadTicketsCardQuery(ticket_ids=["90001"]))
 
@@ -104,7 +111,12 @@ async def test_a_point_comes_back_as_the_card_that_was_indexed() -> None:
 
 
 async def test_cards_follow_the_order_asked_not_the_order_stored() -> None:
-    """Qdrant oddaje punkty w swojej kolejności → karty w kolejności numerów z zapytania."""
+    """Sprawdza, czy karty wracają w kolejności numerów z zapytania, a nie w kolejności, w jakiej
+    oddał je Qdrant: baza oddaje 90001 i 90003, zapytanie prosi o 90003 i 90001, i w tej kolejności
+    wraca wynik.
+
+    Wyłapuje wynik ułożony tak, jak akurat odpowiedziała baza: ten sam odczyt dawałby modelowi karty
+    raz w jednej, raz w innej kolejności."""
     tool   = _tool([_stored("90001"), _stored("90003")])
     result = await tool.search(ReadTicketsCardQuery(ticket_ids=["90003", "90001"]))
 
@@ -112,8 +124,12 @@ async def test_cards_follow_the_order_asked_not_the_order_stored() -> None:
 
 
 async def test_a_ticket_without_a_point_is_listed_as_without_card() -> None:
-    """Numer, którego w kolekcji nie ma → `without_card`, nie błąd: do kolekcji trafiają tylko
-    zgłoszenia, które przeszły filtr jakości, a wątek ma każde."""
+    """Sprawdza, czy numery, których w kolekcji nie ma, wracają w `without_card` bez błędu:
+    z numerów 90011, 90001 i 90019 wraca jedna karta, a dwa pozostałe numery stoją osobno.
+
+    Wyłapuje odczyt, który przy braku karty kończy się błędem albo po cichu pomija numer: do
+    kolekcji trafiają tylko zgłoszenia, które przeszły filtr jakości, a wątek ma każde, więc brak
+    karty jest zwykłą sytuacją i model ma o niej wiedzieć."""
     tool   = _tool([_stored("90001")])
     result = await tool.search(ReadTicketsCardQuery(ticket_ids=["90011", "90001", "90019"]))
 
@@ -122,9 +138,14 @@ async def test_a_ticket_without_a_point_is_listed_as_without_card() -> None:
 
 
 async def test_a_payload_outside_the_contract_is_a_config_error_without_content() -> None:
-    """Payload bez wymaganego pola → `DbQdrantConfigError` z numerem zgłoszenia i nazwą pola, ale
-    bez treści: indeks z innej wersji kontraktu naprawia przebudowa, a treść zgłoszenia nie
-    trafia do logów."""
+    """Sprawdza, czy punkt, w którego danych brakuje wymaganego pola `solution`, kończy odczyt
+    wyjątkiem `DbQdrantConfigError`. Komunikat podaje numer zgłoszenia, nazwę pola i komendę
+    `tickets reindex`, ale nie zawiera treści zgłoszenia, a wyjątek nie niesie błędu walidacji,
+    z którego powstał.
+
+    Wyłapuje dwie usterki: błąd, z którego nie wynika, że indeks zbudowano inną wersją kontraktu
+    i trzeba go przebudować, oraz treść zgłoszenia trafiającą do logów, w komunikacie albo
+    w dołączonym błędzie walidacji, który cytuje wartości pól."""
     broken = dict(_stored("90001")["payload"])
     del broken["solution"]
 
@@ -143,16 +164,21 @@ async def test_a_payload_outside_the_contract_is_a_config_error_without_content(
 
 
 def test_the_tool_and_its_fake_describe_themselves_the_same() -> None:
-    """Ten sam słownik w narzędziu i w atrapie → ten sam opis dla modelu, z klasami
-    rozstrzygnięcia: test grafu na atrapie sprawdza opis, który model dostanie na produkcji."""
+    """Sprawdza, czy prawdziwe narzędzie i atrapa zbudowane na tym samym słowniku rozstrzygnięć mają
+    identyczny opis dla modelu.
+
+    Wyłapuje rozjazd opisów: test grafu na atrapie sprawdzałby wtedy inny opis niż ten, który model
+    dostanie na produkcji."""
     vocabulary = get_resolution_classes()
 
     assert _tool([]).description == FakeReadTicketsCardTool(resolution=vocabulary).description
 
 
 async def test_aclose_closes_the_qdrant_client() -> None:
-    """`aclose()` → zamknięte połączenie Qdranta: sprzątający nie musi wiedzieć, z czego
-    narzędzie jest zbudowane."""
+    """Sprawdza, czy `aclose()` narzędzia zamyka połączenie z Qdrantem.
+
+    Wyłapuje narzędzie, które po sobie nie sprząta: połączenie zostawałoby otwarte, bo sprzątający
+    woła tylko `aclose()` i nie wie, z czego narzędzie jest zbudowane."""
     tool = _tool([])
 
     await tool.aclose()

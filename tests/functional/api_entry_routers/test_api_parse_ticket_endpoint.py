@@ -14,8 +14,12 @@ TICKET = {"ticket_id": "41002", "body": "Od wczoraj nie przychodzą przesyłki z
 
 
 def test_the_card_goes_out_field_by_field() -> None:
-    """Atrapa grafu → karta z polami korpusu, zużyciem modelu i logiem przebiegu; wersja słownika
-    rozstrzygnięć zostaje w domenie."""
+    """Sprawdza, czy `POST /parse-ticket` oddaje kartę zgłoszenia z grafu pole po polu, razem ze
+    zużyciem modelu (jedno wywołanie) i logiem przebiegu (anonimizacja, model, odpowiedź), a bez
+    wersji słownika rozstrzygnięć, która jest polem wewnętrznym.
+
+    Wyłapuje trasę, która gubi albo przekręca pole karty, oraz taką, która wypuszcza na zewnątrz
+    pole wewnętrzne: odpowiedź ma mieć dokładnie te pola, które usługa obiecuje wołającemu."""
     response = TestClient(create_app()).post("/parse-ticket", json=TICKET)
     expected = parse_ticket.default_ticket().model_dump(
         mode    = "json",
@@ -30,14 +34,21 @@ def test_the_card_goes_out_field_by_field() -> None:
 
 
 def test_a_ticket_without_body_is_refused() -> None:
-    """Żądanie bez `body` → 422, zanim cokolwiek dotknie grafu."""
+    """Sprawdza, czy `POST /parse-ticket` bez opisu zgłoszenia (pola `body`) dostaje status 422.
+
+    Wyłapuje trasę, która przyjmuje zgłoszenie bez treści i uruchamia graf: karta zgłoszenia
+    powstałaby wtedy z pustego wątku."""
     response = TestClient(create_app()).post("/parse-ticket", json={"ticket_id": "41002"})
 
     assert response.status_code == 422
 
 
 def test_the_route_puts_the_ticket_identity_into_the_state() -> None:
-    """`/parse-ticket` → id i data zgłoszenia z żądania trafiają do stanu, nie do modelu."""
+    """Sprawdza, czy numer i data zgłoszenia z żądania do `/parse-ticket` (41002 i 2026-08-19)
+    trafiają do stanu grafu, z którym wołany jest model.
+
+    Wyłapuje trasę, która nie przekazuje numeru albo daty z żądania: model tych pól nie podaje,
+    do karty wpisuje je graf ze stanu, więc karta dostałaby inne niż w zgłoszeniu."""
     agent = FakeAgentNode()
     graph = parse_ticket.build_graph(
         AnonymizeNode(FakeAnonymizer()),

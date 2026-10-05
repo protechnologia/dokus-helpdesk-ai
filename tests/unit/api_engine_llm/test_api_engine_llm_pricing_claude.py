@@ -5,7 +5,11 @@ from app.engine_llm.pricing.claude import PRICES, calculate_cost_usd, price_of
 
 
 def test_known_model_has_price():
-    """Model z tabeli → zwrócony wiersz cennika ze stawkami wejścia i wyjścia."""
+    """Sprawdza, czy model z cennika (`claude-haiku-4-5`) dostaje swój wiersz: 1 USD za milion
+    tokenów wejścia i 5 USD za milion tokenów wyjścia.
+
+    Wyłapuje pomyłkę w stawkach tego modelu albo wyszukiwanie, które oddaje cudzy wiersz: koszt
+    każdego wywołania byłby wtedy policzony źle."""
     price = price_of("claude-haiku-4-5")
 
     assert price.input_per_million  == 1.00
@@ -13,14 +17,22 @@ def test_known_model_has_price():
 
 
 def test_dated_snapshot_is_priced_as_its_alias():
-    """Model z sufiksem daty → wyceniony jak alias; API odsyła snapshot, o który nie prosiliśmy."""
+    """Sprawdza, czy nazwa modelu z datą na końcu (`claude-haiku-4-5-20251001`) dostaje tę samą cenę
+    co nazwa bez daty.
+
+    Wyłapuje cennik, który szuka nazwy znak w znak: API odsyła właśnie nazwę z datą, o którą nie
+    prosiliśmy, więc model traciłby cenę przy każdym nowym wydaniu."""
     # Zaobserwowane na żywym API 2026-08-01: żądanie "claude-haiku-4-5" wraca jako
     # "claude-haiku-4-5-20251001". Wiersz per snapshot oznaczałby brak ceny przy każdym wydaniu.
     assert price_of("claude-haiku-4-5-20251001") == price_of("claude-haiku-4-5")
 
 
 def test_cost_of_dated_snapshot_matches_the_alias():
-    """Koszt liczony po snapshotcie = koszt po aliasie; sufiks nie zmienia stawek."""
+    """Sprawdza, czy koszt miliona tokenów wejścia i miliona tokenów wyjścia jest taki sam dla nazwy
+    modelu z datą i bez daty.
+
+    Wyłapuje liczenie kosztu, które dla nazwy z datą bierze inne stawki albo zgłasza błąd, choć data
+    w nazwie niczego w cenie nie zmienia."""
     dated = calculate_cost_usd("claude-haiku-4-5-20251001", 1_000_000, 1_000_000)
     alias = calculate_cost_usd("claude-haiku-4-5", 1_000_000, 1_000_000)
 
@@ -28,13 +40,21 @@ def test_cost_of_dated_snapshot_matches_the_alias():
 
 
 def test_unknown_model_with_date_suffix_still_raises():
-    """Nieznany model z datą → nadal błąd; obcięcie sufiksu nie może przemycić obcego modelu."""
+    """Sprawdza, czy nieznany model z datą na końcu (`claude-nieistniejacy-9-20260101`) nadal kończy
+    się błędem konfiguracji.
+
+    Wyłapuje obcinanie daty, które przy okazji dopasowuje obcy model do któregoś wiersza: model
+    spoza cennika dostałby wtedy cudzą cenę zamiast błędu."""
     with pytest.raises(LLMConfigError):
         price_of("claude-nieistniejacy-9-20260101")
 
 
 def test_unknown_model_raises_config_error():
-    """Model spoza tabeli → LLMConfigError, nie cichy koszt 0.00."""
+    """Sprawdza, czy model spoza cennika kończy się wyjątkiem `LLMConfigError`, a komunikat podaje
+    nazwę modelu i plik, w którym dopisuje się stawki.
+
+    Wyłapuje cennik, który dla nieznanego modelu po cichu oddaje cenę zero: raport pokazywałby wtedy
+    koszt 0,00 USD przy prawdziwym rachunku."""
     with pytest.raises(LLMConfigError) as exc:
         price_of("claude-nieistniejacy-9")
 
@@ -44,7 +64,11 @@ def test_unknown_model_raises_config_error():
 
 
 def test_cost_of_plain_call():
-    """Wywołanie bez cache → koszt = tokeny wejścia * stawka in + tokeny wyjścia * stawka out."""
+    """Sprawdza, czy koszt wywołania bez cache to tokeny wejścia razy stawka wejścia plus tokeny
+    wyjścia razy stawka wyjścia: milion wejścia po 1 USD i milion wyjścia po 5 USD daje 6 USD.
+
+    Wyłapuje błąd w podstawowym rachunku, na przykład jedną stawkę zastosowaną do obu stron albo
+    pomyłkę w przeliczeniu stawki podanej za milion tokenów."""
     # 1 000 000 wejścia po 1 USD + 1 000 000 wyjścia po 5 USD = 6 USD.
     cost = calculate_cost_usd(
         model             = "claude-haiku-4-5",
@@ -56,7 +80,11 @@ def test_cost_of_plain_call():
 
 
 def test_cached_tokens_are_billed_at_their_own_rates():
-    """Tokeny cache liczone mnożnikami (zapis 1,25x, odczyt 0,1x), nie stawką wejścia."""
+    """Sprawdza, czy tokeny cache mają własne stawki: milion zapisanych kosztuje 1,25 stawki
+    wejścia, a milion odczytanych 0,1 tej stawki, razem 1,35 USD.
+
+    Wyłapuje rachunek, który liczy tokeny cache zwykłą stawką wejścia albo wcale: koszt przebiegu
+    korzystającego z cache byłby wtedy zawyżony albo zaniżony."""
     cost = calculate_cost_usd(
         model              = "claude-haiku-4-5",
         prompt_tokens      = 0,
@@ -69,8 +97,11 @@ def test_cached_tokens_are_billed_at_their_own_rates():
 
 
 def test_cache_read_rate_follows_the_model():
-    """Odczyt z cache → mnożnik z wiersza modelu, nie jedna stała: Fable 5.1 liczy 0,025 stawki
-    wejścia, Opus 5.5 — 0,05, pozostałe 0,10."""
+    """Sprawdza, czy stawka za odczyt z cache zależy od modelu: `claude-fable-5-1` płaci 0,025
+    stawki wejścia, `claude-opus-5-5` 0,05, a `claude-sonnet-5-5` 0,10.
+
+    Wyłapuje jedną stałą stawkę odczytu dla wszystkich modeli: koszt rozmowy z cache byłby wtedy
+    zawyżony dla modeli, które mają odczyt tańszy."""
     def cached_million(model: str) -> float:
         return calculate_cost_usd(model, 0, 0, cache_read_tokens=1_000_000)
 
@@ -80,7 +111,11 @@ def test_cache_read_rate_follows_the_model():
 
 
 def test_cache_write_rate_comes_from_the_row():
-    """Zapis do cache → mnożnik z wiersza modelu (1,25 stawki wejścia), nie stała w kodzie."""
+    """Sprawdza, czy każdy model z cennika ma w swoim wierszu mnożnik zapisu do cache 1,25 i czy
+    milion zapisanych tokenów kosztuje 1,25 stawki wejścia tego modelu.
+
+    Wyłapuje wiersz z pomylonym mnożnikiem zapisu oraz rachunek, który liczy zapis zwykłą stawką
+    wejścia: nowe wejście zapisywane do cache byłoby wtedy wycenione źle."""
     for model, price in PRICES.items():
         cost = calculate_cost_usd(model, 0, 0, cache_write_tokens=1_000_000)
 
@@ -89,8 +124,11 @@ def test_cache_write_rate_comes_from_the_row():
 
 
 def test_the_strongest_model_is_priced():
-    """Najmocniejszy model z cennika → 10 USD za milion wejścia i 50 za milion wyjścia; bez
-    wiersza klient odmówiłby startu."""
+    """Sprawdza, czy najmocniejszy model z cennika (`claude-fable-5-1`) ma swój wiersz: 10 USD za
+    milion tokenów wejścia i 50 USD za milion tokenów wyjścia.
+
+    Wyłapuje usunięcie tego wiersza albo pomyłkę w jego stawkach: bez wiersza klient odmówiłby
+    startu z tym modelem, a ze złą stawką najdroższe wywołania byłyby źle policzone."""
     price = price_of("claude-fable-5-1")
 
     assert price.input_per_million  == 10.00
@@ -98,7 +136,11 @@ def test_the_strongest_model_is_priced():
 
 
 def test_cache_read_is_cheaper_than_fresh_input():
-    """Ta sama liczba tokenów odczytana z cache kosztuje mniej niż policzona od nowa."""
+    """Sprawdza, czy 100 tysięcy tokenów odczytanych z cache kosztuje mniej niż ta sama liczba
+    tokenów policzona jako świeże wejście.
+
+    Wyłapuje rachunek, który odczyt z cache liczy pełną stawką wejścia: raport zawyżałby wtedy koszt
+    przebiegu korzystającego z cache o rząd wielkości."""
     fresh  = calculate_cost_usd("claude-haiku-4-5", prompt_tokens=100_000, completion_tokens=0)
     cached = calculate_cost_usd(
         "claude-haiku-4-5", prompt_tokens=0, completion_tokens=0, cache_read_tokens=100_000
@@ -110,13 +152,19 @@ def test_cache_read_is_cheaper_than_fresh_input():
 
 
 def test_zero_usage_costs_nothing():
-    """Zero tokenów → koszt 0.0, bez dzielenia przez zero i bez stałej minimalnej."""
+    """Sprawdza, czy wywołanie z zerową liczbą tokenów kosztuje dokładnie 0,0.
+
+    Wyłapuje rachunek, który dolicza stałą opłatę minimalną albo wywraca się na zerach, na przykład
+    przez dzielenie przez zero."""
     assert calculate_cost_usd("claude-haiku-4-5", prompt_tokens=0, completion_tokens=0) == 0.0
 
 
 @pytest.mark.parametrize("model", sorted(PRICES))
 def test_every_priced_model_has_positive_rates(model: str):
-    """Każdy wiersz cennika ma dodatnie stawki — zero oznaczałoby darmowy model."""
+    """Sprawdza, czy każdy model z cennika ma stawki wejścia i wyjścia większe od zera.
+
+    Wyłapuje wiersz z zerową stawką, wpisaną przez pomyłkę: model wyglądałby wtedy na darmowy,
+    a raport pokazywałby zaniżony koszt."""
     price = PRICES[model]
 
     assert price.input_per_million  > 0
@@ -124,6 +172,9 @@ def test_every_priced_model_has_positive_rates(model: str):
 
 
 def test_output_costs_more_than_input():
-    """Dla każdego modelu wyjście jest droższe niż wejście — odwrotnie byłoby literówką w tabeli."""
+    """Sprawdza, czy u każdego modelu z cennika token wyjścia jest droższy niż token wejścia.
+
+    Wyłapuje stawki wejścia i wyjścia zamienione miejscami w wierszu: taka literówka w tabeli
+    zaniżałaby koszt odpowiedzi modelu i zawyżała koszt promptu."""
     for model, price in PRICES.items():
         assert price.output_per_million > price.input_per_million, model

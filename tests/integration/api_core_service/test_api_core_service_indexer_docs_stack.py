@@ -154,8 +154,14 @@ async def index() -> AsyncIterator[Index]:
 
 
 async def test_the_import_writes_every_section_and_fragment(tmp_path: Path, index: Index) -> None:
-    """Paczka z dwóch dokumentów → wiersz na sekcję w kolejności dokumentów i punkt na
-    fragment: sekcja z trzech akapitów ma trzy."""
+    """Sprawdza, czy po indeksacji paczki z dwóch dokumentów w obu bazach jest komplet: tabela
+    w Postgresie ma wiersz na każdą z trzech sekcji, w kolejności dokumentów, a kolekcja
+    w Qdrancie punkt na każdy z pięciu fragmentów (sekcja z trzech akapitów daje trzy). Te same
+    liczby podaje raport indeksacji.
+
+    Wyłapuje sekcję albo fragment zgubione przy zapisie do prawdziwych baz: sekcji bez wiersza
+    agent nie przeczyta, a fragmentu bez punktu nie znajdzie. Wyłapuje też spis sekcji ułożony
+    inaczej niż dokumenty, na przykład alfabetycznie."""
     report = await index.indexer.rebuild(load_doc_package(_write_package(tmp_path / "pelna")))
 
     listed = await index.table.list_all()
@@ -167,7 +173,12 @@ async def test_the_import_writes_every_section_and_fragment(tmp_path: Path, inde
 
 
 async def test_the_whole_section_reads_back_verbatim(tmp_path: Path, index: Index) -> None:
-    """Sekcja pocięta na fragmenty → z tabeli wraca cała, znak w znak jak w pliku."""
+    """Sprawdza, czy sekcję, którą indeksacja pocięła na trzy fragmenty, da się potem odczytać
+    z tabeli w całości, znak w znak tak, jak stoi w pliku.
+
+    Wyłapuje treść zmienioną po drodze do bazy: obcięty koniec, zgubione puste linie między
+    akapitami albo zapisany pojedynczy fragment zamiast całości. Agent cytuje sekcję jako źródło,
+    więc musi dostać dokładnie to, co napisano w dokumentacji."""
     await index.indexer.rebuild(load_doc_package(_write_package(tmp_path / "pelna")))
 
     rows = await index.table.read_by_id(["adm-zwierzeta"])
@@ -179,8 +190,16 @@ async def test_an_imported_section_is_found_by_word_and_by_meaning(
     tmp_path: Path,
     index:    Index,
 ) -> None:
-    """Zaindeksowana sekcja → znajdują ją słowa w innej odmianie (Postgres) i zapytanie o to
-    samo innymi słowami (Qdrant); obie drogi wskazują ten sam `section_id`."""
+    """Sprawdza, czy zaindeksowaną sekcję da się znaleźć obiema drogami. Wyszukiwanie po słowach
+    w Postgresie trafia w nią i tylko w nią, choć słowa zapytania są w innej odmianie niż
+    w treści („recepcja" wobec „w recepcji"). Wyszukiwanie po znaczeniu w Qdrancie stawia ją na
+    pierwszym miejscu dla pytania zadanego innymi słowami. Obie drogi wskazują ten sam
+    identyfikator sekcji.
+
+    Wyłapuje indeksację, po której sekcja jest zapisana, ale nie do znalezienia: wyszukiwanie
+    po słowach nie rozpoznaje odmiany albo punkt w Qdrancie wskazuje inną sekcję niż wiersz
+    w tabeli. Agent szuka jedną z dróg, a czyta po identyfikatorze, więc obie muszą prowadzić do
+    tej samej sekcji."""
     await index.indexer.rebuild(load_doc_package(_write_package(tmp_path / "pelna")))
 
     # "Miejsce parkingowe rezerwuje się w recepcji najpóźniej dzień wcześniej."
@@ -196,8 +215,13 @@ async def test_a_detail_from_the_last_paragraph_has_its_own_point(
     tmp_path: Path,
     index:    Index,
 ) -> None:
-    """Zapytanie o szczegół z ostatniego akapitu długiej sekcji → pierwsze trafienie wskazuje tę
-    sekcję: po to są fragmenty."""
+    """Sprawdza, czy pytanie o szczegół z ostatniego akapitu najdłuższej sekcji („kto wymienia
+    żarówki pod sufitem") dostaje tę sekcję jako pierwsze trafienie. Sekcja ma trzy akapity
+    o różnych sprawach i jest zaindeksowana jako trzy osobne fragmenty.
+
+    Wyłapuje indeksację, która gubi dalsze fragmenty sekcji albo zapisuje je bez powiązania
+    z sekcją: szczegółu z końca długiej sekcji nie dałoby się wtedy znaleźć, a właśnie po to
+    sekcje są cięte na fragmenty."""
     await index.indexer.rebuild(load_doc_package(_write_package(tmp_path / "pelna")))
 
     # "Żyrafa wymienia żarówki w lampach pod sufitem."
@@ -208,8 +232,13 @@ async def test_a_detail_from_the_last_paragraph_has_its_own_point(
 
 
 async def test_a_second_import_replaces_the_first(tmp_path: Path, index: Index) -> None:
-    """Po paczce z dwóch dokumentów indeksacja paczki z jednym → w tabeli i kolekcji zostaje tylko
-    on: sekcje i fragmenty usunięte z paczki nie mogą jej przeżyć."""
+    """Sprawdza, czy druga indeksacja zastępuje pierwszą: po wgraniu paczki z dwóch dokumentów,
+    a zaraz potem paczki z jednym, w tabeli zostaje tylko jego jedna sekcja, a w kolekcji jeden
+    punkt.
+
+    Wyłapuje indeksację, która dokłada do indeksu, zamiast go zastąpić: sekcje i fragmenty
+    usunięte z paczki zostałyby w bazach, a agent dalej by je znajdował i cytował jako
+    obowiązującą dokumentację."""
     await index.indexer.rebuild(load_doc_package(_write_package(tmp_path / "pelna")))
     await index.indexer.rebuild(
         load_doc_package(_write_package(tmp_path / "mniejsza", documents=("uzytkownik",)))

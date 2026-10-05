@@ -30,8 +30,12 @@ class FailingAnonymizer(Anonymizer):
 
 
 async def test_the_node_sets_the_anonymized_text() -> None:
-    """Wejście grafu → `anonymized` z wyniku anonimizatora i wpis w logu z samą długością tekstu;
-    nic innego węzeł nie zmienia."""
+    """Sprawdza, czy węzeł anonimizacji przekazuje anonimizatorowi treść wejścia, zapisuje jego
+    wynik jako tekst po anonimizacji i dopisuje do dziennika przebiegu jeden wpis z samą długością
+    tekstu (24 znaki). Niczego więcej w stanie nie zmienia.
+
+    Wyłapuje węzeł, który zmienia inne pola stanu albo wpisuje do dziennika treść zgłoszenia zamiast
+    jej długości."""
     anonymizer = FakeAnonymizer()
     node       = AnonymizeNode(anonymizer)
 
@@ -45,6 +49,10 @@ async def test_the_node_sets_the_anonymized_text() -> None:
 
 
 async def test_a_failed_anonymization_stops_the_graph() -> None:
-    """Błąd anonimizatora → wychodzi z węzła: fail-closed, surowy tekst nie idzie dalej."""
+    """Sprawdza, czy błąd anonimizatora wychodzi z węzła jako `AnonymizationError`, bez
+    przechwycenia.
+
+    Wyłapuje węzeł, który po nieudanej anonimizacji puściłby przebieg dalej: surowe zgłoszenie
+    z danymi klienta trafiłoby wtedy do modelu."""
     with pytest.raises(AnonymizationError):
         await AnonymizeNode(FailingAnonymizer()).run(GraphState(input_text="Jan Kowalski zgłasza…"))

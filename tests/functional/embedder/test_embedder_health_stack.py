@@ -9,7 +9,11 @@ pytestmark = [pytest.mark.stack, pytest.mark.stack_embedder]
 
 
 def test_health_answers_over_the_published_port(embedder_client: httpx2.Client) -> None:
-    """GET /health on the running embedder → 200 with status "ok" (image, CMD and port wired)."""
+    """Sprawdza, czy uruchomiony kontener embeddera odpowiada na `GET /health` przez port
+    wystawiony na hosta: status 200 i treść `{"status": "ok"}`.
+
+    Wyłapuje usterkę wdrożenia, której testy w procesie nie widzą: obraz się nie zbudował,
+    kontener uruchamia nie ten moduł albo port nie jest wystawiony."""
     response = embedder_client.get("/health")
 
     assert response.status_code == 200

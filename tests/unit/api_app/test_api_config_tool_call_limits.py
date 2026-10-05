@@ -29,7 +29,13 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_limits_are_a_map_from_tool_name_to_limit(clean_env: None) -> None:
-    """Pola `agent_max_calls_<narzędzie>` → mapa nazwa narzędzia → limit, bez przedrostka."""
+    """Sprawdza, czy z pól konfiguracji `agent_max_calls_<narzędzie>` powstaje mapa od nazwy
+    narzędzia do limitu wywołań: nazwy są bez przedrostka, każde takie pole ma swój wpis,
+    a wartości domyślne to między innymi 5 dla `find_tickets_vector`, 3 dla
+    `read_tickets_thread` i 1 dla `list_docs`.
+
+    Wyłapuje mapę, która gubi narzędzie albo zostawia przedrostek w nazwie: limitu takiego
+    narzędzia nie znalazłby ani węzeł wykonujący narzędzia, ani opis narzędzia dla modelu."""
     limits = Settings(_env_file=None).tool_call_limits()
 
     assert limits["find_tickets_vector"] == 5
@@ -42,17 +48,23 @@ def test_a_limit_comes_from_the_environment(
     clean_env:   None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`AGENT_MAX_CALLS_READ_DOCS=7` → limit `read_docs` równy 7: wdrożenie stroi limity bez
-    zmiany kodu."""
+    """Sprawdza, czy limit wywołań narzędzia da się ustawić zmienną środowiskową: przy
+    `AGENT_MAX_CALLS_READ_DOCS=7` limit dla `read_docs` wynosi 7.
+
+    Wyłapuje limit zaszyty w kodzie albo czytany spod innej nazwy: wdrożenie nie mogłoby stroić
+    limitów bez zmiany kodu, a ustawiona zmienna niczego by nie zmieniała."""
     monkeypatch.setenv("AGENT_MAX_CALLS_READ_DOCS", "7")
 
     assert Settings(_env_file=None).tool_call_limits()["read_docs"] == 7
 
 
 def test_default_limits_are_cautious(clean_env: None) -> None:
-    """Wartości domyślne → małe: limit ma chronić przed pętlą zużywającą tokeny, więc zaczyna
-    ostrożnie, a podnosi go wdrożenie. Odczyt wątków i sekcji oddaje tysiące tokenów, więc ma
-    najwyżej 3; wyszukiwania i krótkie karty — najwyżej 5."""
+    """Sprawdza, czy domyślne limity wywołań narzędzi są małe: każdy mieści się między 1 a 5,
+    a odczyt wątków zgłoszeń i odczyt sekcji dokumentacji mają najwyżej 3.
+
+    Wyłapuje podniesienie wartości domyślnych: limit chroni przed pętlą zużywającą tokeny, więc
+    ma zaczynać ostrożnie, a podnosić go ma wdrożenie. Odczyt wątków i sekcji oddaje tysiące
+    tokenów, dlatego ma niższy limit niż wyszukiwania i krótkie karty."""
     limits = Settings(_env_file=None).tool_call_limits()
     costly = [limits["read_tickets_thread"], limits["read_docs"]]
 
@@ -66,8 +78,11 @@ def test_a_limit_below_one_is_refused(
     monkeypatch: pytest.MonkeyPatch,
     value:       str,
 ) -> None:
-    """Limit zerowy albo ujemny → błąd konfiguracji przy starcie: narzędzie, którego nie wolno
-    wywołać ani razu, powinno zniknąć z grafu, a nie odmawiać przy pierwszym użyciu."""
+    """Sprawdza, czy limit wywołań równy zero albo ujemny (tu `AGENT_MAX_CALLS_LIST_DOCS` równe 0
+    albo -1) daje błąd konfiguracji już przy jej wczytaniu.
+
+    Wyłapuje przyjęcie takiego limitu: narzędzie, którego nie wolno wywołać ani razu, powinno
+    zniknąć z grafu, a nie odmawiać modelowi przy pierwszym użyciu."""
     monkeypatch.setenv("AGENT_MAX_CALLS_LIST_DOCS", value)
 
     with pytest.raises(ValidationError):

@@ -34,8 +34,11 @@ def _tool(
 
 
 async def test_the_listing_is_one_read_of_the_whole_table() -> None:
-    """Spis treści → jedno zapytanie o wszystkie sekcje, bez wyszukiwania i bez odczytu po
-    identyfikatorach."""
+    """Sprawdza, czy spis treści to jedno zapytanie do tabeli o wszystkie sekcje, bez wyszukiwania
+    i bez odczytu po identyfikatorach.
+
+    Wyłapuje narzędzie, które pyta tabelę więcej niż raz albo inną drogą niż spis wszystkich sekcji:
+    każde wywołanie spisu kosztowałoby zbędne zapytania do bazy."""
     client = ScriptedPostgres(key="section_id", rows=ROWS)
 
     await _tool(client).load()
@@ -44,8 +47,11 @@ async def test_the_listing_is_one_read_of_the_whole_table() -> None:
 
 
 async def test_sections_keep_the_order_the_table_gave() -> None:
-    """Tabela oddaje sekcje w swojej kolejności → spis w tej samej: o kolejności dokumentów
-    i sekcji rozstrzyga tabela, narzędzie niczego nie sortuje."""
+    """Sprawdza, czy spis zachowuje kolejność, w jakiej sekcje oddała tabela: wiersze podane od
+    końca wracają od końca.
+
+    Wyłapuje narzędzie, które samo sortuje sekcje: o kolejności dokumentów i sekcji rozstrzyga
+    tabela, więc drugie sortowanie mogłoby ten układ zepsuć."""
     client = ScriptedPostgres(key="section_id", rows=list(reversed(ROWS)))
 
     result = await _tool(client).load()
@@ -54,8 +60,11 @@ async def test_sections_keep_the_order_the_table_gave() -> None:
 
 
 async def test_the_model_gets_descriptions_and_no_content() -> None:
-    """Wiersze z treścią → w tekście dla modelu opisy sekcji pod identyfikatorem do odczytu, bez
-    treści: tę daje `read_docs` i tylko on cytuje."""
+    """Sprawdza, czy tekst dla modelu niesie opisy wszystkich sekcji z identyfikatorami do odczytu,
+    ale nie ich treść, choć tabela oddaje wiersze razem z treścią.
+
+    Wyłapuje treść sekcji przeciekającą do spisu: treść ma dawać dopiero odczyt, bo tylko on trafia
+    na listę źródeł."""
     client = ScriptedPostgres(key="section_id", rows=ROWS)
 
     text = await _tool(client).run(ListDocsArgs())
@@ -69,8 +78,11 @@ async def test_the_model_gets_descriptions_and_no_content() -> None:
 
 
 async def test_the_tool_and_its_fake_tell_the_model_the_same() -> None:
-    """Ta sama dokumentacja w tabeli i w atrapie → ten sam tekst dla modelu: test grafu na atrapie
-    sprawdza to, co model dostanie na produkcji."""
+    """Sprawdza, czy narzędzie właściwe i jego atrapa dają modelowi ten sam tekst, gdy stoją na tej
+    samej dokumentacji.
+
+    Wyłapuje rozjazd między atrapą a narzędziem: testy grafów na atrapie sprawdzałyby wtedy inny
+    tekst niż ten, który model dostanie na produkcji."""
     client = ScriptedPostgres(key="section_id", rows=ROWS)
 
     real = await _tool(client).run(ListDocsArgs())
@@ -80,7 +92,10 @@ async def test_the_tool_and_its_fake_tell_the_model_the_same() -> None:
 
 
 async def test_an_empty_table_is_an_empty_listing() -> None:
-    """Tabela bez sekcji → pusty spis, a nie błąd."""
+    """Sprawdza, czy pusta tabela dokumentacji daje modelowi pustą listę sekcji, a nie błąd.
+
+    Wyłapuje narzędzie, które przy pustej tabeli zgłasza błąd: dokumentacja, której jeszcze nie
+    wgrano, zatrzymywałaby wtedy agenta zamiast dać mu pusty spis."""
     client = ScriptedPostgres(key="section_id")
 
     body = json.loads(await _tool(client).run(ListDocsArgs()))
@@ -89,8 +104,10 @@ async def test_an_empty_table_is_an_empty_listing() -> None:
 
 
 async def test_aclose_closes_the_database_client() -> None:
-    """`aclose()` → zamknięty klient Postgresa: sprzątający nie musi wiedzieć, z czego narzędzie
-    jest zbudowane."""
+    """Sprawdza, czy `aclose()` narzędzia zamyka klienta Postgresa, na którym stoi jego tabela.
+
+    Wyłapuje narzędzie, które po sobie nie sprząta: połączenie z bazą zostawałoby otwarte, bo
+    sprzątający woła tylko `aclose()` i nie wie, z czego narzędzie jest zbudowane."""
     client = ScriptedPostgres(key="section_id")
 
     await _tool(client).aclose()

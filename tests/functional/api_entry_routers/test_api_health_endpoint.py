@@ -4,7 +4,11 @@ from app.main import create_app
 
 
 def test_health_returns_ok() -> None:
-    """GET /health on a freshly assembled app → 200 with status "ok"."""
+    """Sprawdza, czy `GET /health` w świeżo złożonej aplikacji `api` odpowiada statusem 200
+    i treścią `{"status": "ok"}`.
+
+    Wyłapuje aplikację, która się nie składa albo nie ma podpiętej trasy `/health`: na tej
+    odpowiedzi opiera się sprawdzanie, czy kontener żyje."""
     client = TestClient(create_app())
 
     response = client.get("/health")
@@ -14,7 +18,10 @@ def test_health_returns_ok() -> None:
 
 
 def test_health_body_exposes_no_configuration() -> None:
-    """Health payload → only the status key (a public probe must not leak config)."""
+    """Sprawdza, czy odpowiedź `GET /health` usługi `api` ma tylko jedno pole, `status`.
+
+    Wyłapuje dopisanie do tej odpowiedzi czegokolwiek o konfiguracji: `/health` jest dostępne dla
+    każdego, kto dosięgnie usługi, więc nie może zdradzać dostawców, adresów ani modeli."""
     client = TestClient(create_app())
 
     response = client.get("/health")

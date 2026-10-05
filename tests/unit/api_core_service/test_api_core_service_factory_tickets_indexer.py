@@ -6,7 +6,11 @@ from app.core_service.factory_tickets_indexer import build_tickets_indexer
 
 
 async def test_the_indexer_writes_to_the_configured_collection() -> None:
-    """`QDRANT_COLLECTION` w konfiguracji → indekser z kolekcją o tej nazwie."""
+    """Sprawdza, czy indekser zgłoszeń pisze do kolekcji o nazwie z konfiguracji: przy
+    `QDRANT_COLLECTION` ustawionym na `zgloszenia` jego kolekcja nazywa się `zgloszenia`.
+
+    Wyłapuje nazwę kolekcji zaszytą w kodzie albo wziętą z innego pola: indeksacja pisałaby wtedy do
+    innej kolekcji, niż wskazuje konfiguracja."""
     indexer = build_tickets_indexer(Settings(_env_file=None, qdrant_collection="zgloszenia"))
 
     try:
@@ -16,7 +20,11 @@ async def test_the_indexer_writes_to_the_configured_collection() -> None:
 
 
 async def test_the_built_indexer_closes_its_clients() -> None:
-    """`aclose()` zbudowanego indeksera → zamknięty klient embeddera i klient Qdranta."""
+    """Sprawdza, czy zamknięcie indeksera zbudowanego przez fabrykę zamyka oba połączenia, na
+    których on stoi: klienta embeddera i klienta Qdranta.
+
+    Wyłapuje połączenie zostawione otwarte: komenda dostaje z fabryki sam indekser, więc klientów,
+    których sama nie zbudowała, nie ma jak zamknąć inaczej."""
     indexer = build_tickets_indexer(Settings(_env_file=None))
 
     await indexer.aclose()

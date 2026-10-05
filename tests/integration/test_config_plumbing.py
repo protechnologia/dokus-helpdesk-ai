@@ -254,14 +254,23 @@ def _variables_interpolated_in_compose() -> set[str]:
 
 
 def test_every_settings_field_is_declared_in_env_example() -> None:
-    """(1) Settings → .env.example: field missing from the contract → fail (undocumented knob)."""
+    """Sprawdza, czy każde pole konfiguracji (`Settings`) usług `api` i `embedder` ma wpis o tej
+    samej nazwie w `.env.example` (numer 1 na mapie u góry pliku).
+
+    Wyłapuje ustawienie dodane w kodzie, ale nieopisane w `.env.example`: osoba wdrażająca nie
+    wie wtedy, że taka zmienna istnieje."""
     missing = _env_names_from_all_services() - _env_names_from_example()
 
     assert not missing, f"Missing in .env.example: {sorted(missing)}"
 
 
 def test_every_env_example_entry_is_consumed_by_a_service() -> None:
-    """(2) .env.example → Settings: entry no service reads (DOCKER_* aside) → dead contract."""
+    """Sprawdza, czy każdy wpis z `.env.example` jest czytany przez konfigurację (`Settings`)
+    którejś usługi; pomijane są zmienne `DOCKER_*`, z których korzysta sam `docker compose`
+    (numer 2 na mapie u góry pliku).
+
+    Wyłapuje martwy wpis, na przykład po zmianie nazwy pola w kodzie: ktoś ustawia zmienną
+    opisaną w `.env.example`, a żadna usługa jej nie czyta."""
     declared = _drop_compose_only(_env_names_from_example())
     unused   = declared - _env_names_from_all_services()
 
@@ -272,14 +281,23 @@ def test_every_env_example_entry_is_consumed_by_a_service() -> None:
 
 
 def test_every_variable_interpolated_by_compose_is_declared_in_env_example() -> None:
-    """(3) compose ${VAR} → .env.example: interpolated but undocumented → fail (hidden knob)."""
+    """Sprawdza, czy każda zmienna, którą `docker-compose.yml` podstawia zapisem `${NAZWA}`, ma
+    wpis w `.env.example` (numer 3 na mapie u góry pliku).
+
+    Wyłapuje ukryte ustawienie: compose czyta zmienną, o której `.env.example` nie mówi, więc
+    nikt nie wie, że da się ją ustawić i że wpływa na uruchomienie."""
     missing = _variables_interpolated_in_compose() - _env_names_from_example()
 
     assert not missing, f"Interpolated in compose, missing in .env.example: {sorted(missing)}"
 
 
 def test_every_env_example_entry_reaches_a_container_or_steers_compose() -> None:
-    """(4) .env.example → compose: entry reaching no container, not DOCKER_* → dead entry."""
+    """Sprawdza, czy każdy wpis z `.env.example`, poza zmiennymi `DOCKER_*`, jest
+    w `docker-compose.yml` przekazywany choć jednemu kontenerowi (numer 4 na mapie u góry
+    pliku).
+
+    Wyłapuje zmienną opisaną w `.env.example`, której compose nie podaje żadnej usłudze: jej
+    ustawienie niczego nie zmienia, bo do kontenera nie dociera."""
     expected = _drop_compose_only(_env_names_from_example())
     unused   = expected - _env_keys_passed_to_containers()
 
@@ -290,14 +308,23 @@ def test_every_env_example_entry_reaches_a_container_or_steers_compose() -> None
 
 
 def test_no_compose_only_variable_is_handed_to_a_container() -> None:
-    """(5) DOCKER_* → compose: prefixed key passed into a container → fail (prefix is a promise)."""
+    """Sprawdza, czy żadna zmienna o nazwie zaczynającej się od `DOCKER_` nie jest
+    w `docker-compose.yml` przekazywana do kontenera (numer 5 na mapie u góry pliku).
+
+    Wyłapuje złamanie umowy, że `DOCKER_*` to zmienne samego `docker compose`, które do
+    kontenera nie wchodzą. Kontrole wpisów `.env.example` pomijają ten przedrostek, więc zmienna
+    podana usłudze pod taką nazwą wymknęłaby się im."""
     leaked = {name for name in _env_keys_passed_to_containers() if _is_compose_only(name)}
 
     assert not leaked, f"DOCKER_* must never reach a container: {sorted(leaked)}"
 
 
 def test_no_settings_field_claims_the_compose_only_prefix() -> None:
-    """(6) DOCKER_* → Settings: field claiming the prefix → fail (it would escape every check)."""
+    """Sprawdza, czy żadna usługa nie ma w konfiguracji (`Settings`) pola o nazwie zaczynającej
+    się od `DOCKER_` (numer 6 na mapie u góry pliku).
+
+    Wyłapuje pole nazwane tak przez pomyłkę: kontrole wpisów `.env.example` pomijają ten
+    przedrostek, więc takie ustawienie wymknęłoby się im, choć usługa naprawdę je czyta."""
     claimed = {name for name in _env_names_from_all_services() if _is_compose_only(name)}
 
     assert not claimed, f"Settings must not declare DOCKER_* names: {sorted(claimed)}"
@@ -312,7 +339,12 @@ def test_no_settings_field_claims_the_compose_only_prefix() -> None:
 
 
 def test_every_env_key_in_compose_is_readable_by_the_service_it_targets() -> None:
-    """(7) compose → Settings, per service: key the service cannot read → fail (silent typo)."""
+    """Sprawdza, czy każda zmienna, którą `docker-compose.yml` podaje usłudze `api` albo
+    `embedder`, ma odpowiadające jej pole w konfiguracji (`Settings`) tej właśnie usługi (numer 7
+    na mapie u góry pliku).
+
+    Wyłapuje literówkę w nazwie zmiennej albo zmienną podaną nie tej usłudze: usługa po cichu
+    pomija nazwę, której nie zna, więc ustawiona wartość nigdy nie zaczyna działać."""
     compose = _load_compose(COMPOSE_BASE)
 
     for service_name, settings_class in SETTINGS_BY_SERVICE.items():
@@ -324,7 +356,13 @@ def test_every_env_key_in_compose_is_readable_by_the_service_it_targets() -> Non
 
 
 def test_every_settings_field_is_supplied_to_its_service() -> None:
-    """(8) Settings → compose, per service: field never supplied → fail (silent coded default)."""
+    """Sprawdza, czy każde pole konfiguracji (`Settings`) usługi `api` i usługi `embedder` jest
+    w `docker-compose.yml` podawane tej właśnie usłudze, bez żadnych wyjątków (numer 8 na mapie
+    u góry pliku).
+
+    Wyłapuje pole, którego usługa nigdy nie dostaje. Taka usterka niczym się nie objawia: każde
+    pole ma wartość domyślną, więc usługa startuje, zgłasza się jako zdrowa i po cichu działa na
+    wartości z kodu — przy `QDRANT_URL` znaczy to rozmowę z niewłaściwym adresem."""
     compose = _load_compose(COMPOSE_BASE)
 
     # No exemption list on purpose: leaving a field on its coded default must be a deliberate
@@ -341,7 +379,13 @@ def test_every_settings_field_is_supplied_to_its_service() -> None:
 
 
 def test_services_agree_on_shared_variable_names() -> None:
-    """(9) Settings ↔ Settings: variable read by two services → one name (rename must not halve)."""
+    """Sprawdza, czy zmienne wspólne dla usług `api` i `embedder`, czyli `LOG_LEVEL`
+    i `EMBEDDING_VECTOR_SIZE`, mają w konfiguracji (`Settings`) obu usług tę samą nazwę (numer 9
+    na mapie u góry pliku).
+
+    Wyłapuje zmianę nazwy zrobioną tylko w jednej usłudze: usługi czytałyby wtedy dwie różne
+    zmienne, a wymiar wektora, który musi być ten sam w obu usługach i w kolekcji Qdranta,
+    mógłby się rozjechać."""
     shared = _env_names_from_settings(ApiSettings) & _env_names_from_settings(EmbedderSettings)
 
     # LOG_LEVEL and the vector width are deliberately shared: the dimension is one contract with

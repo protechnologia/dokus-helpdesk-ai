@@ -52,8 +52,10 @@ def _tool(
 
 
 async def test_the_read_asks_the_table_for_that_one_ticket() -> None:
-    """Numer zgłoszenia → jedno zapytanie do tabeli, o ten jeden numer: jedno wywołanie to jeden
-    wątek, więc limit wywołań jest limitem wątków przeczytanych w sprawie."""
+    """Sprawdza, czy odczyt wątku 90011 to jedno zapytanie do tabeli zgłoszeń, o ten jeden numer.
+
+    Wyłapuje narzędzie, które pyta tabelę więcej razy albo o inne numery: jedno wywołanie ma być
+    jednym wątkiem, bo wtedy limit wywołań jest limitem wątków przeczytanych w sprawie."""
     client = _client()
 
     await _tool(client).search(QUERY)
@@ -62,8 +64,11 @@ async def test_the_read_asks_the_table_for_that_one_ticket() -> None:
 
 
 async def test_a_thread_comes_back_as_it_was_written() -> None:
-    """Wiersz tabeli → numer, data, temat i wątek równy zapisanemu, ze złamaniami linii
-    i etykietami komentarzy: model ma przeczytać oryginał, nie streszczenie."""
+    """Sprawdza, czy wiersz tabeli wraca jako wątek z numerem, datą, tematem i tekstem równym
+    zapisanemu, ze złamaniami linii i etykietami komentarzy.
+
+    Wyłapuje narzędzie, które po drodze skraca albo przerabia wątek: model ma przeczytać oryginał,
+    nie streszczenie."""
     thread = await _tool(_client()).search(QUERY)
 
     assert thread.ticket_id == "90011"
@@ -73,8 +78,11 @@ async def test_a_thread_comes_back_as_it_was_written() -> None:
 
 
 async def test_an_unknown_number_is_an_error() -> None:
-    """Numer, którego w tabeli nie ma → `UnknownTicketError` z tym numerem: wątek ma każde
-    zgłoszenie, więc brak znaczy zły numer, a nie pusty wynik."""
+    """Sprawdza, czy odczyt numeru, którego w tabeli nie ma (90019), kończy się wyjątkiem
+    `UnknownTicketError`, który niesie ten numer w polu `ticket_id` i w komunikacie.
+
+    Wyłapuje pusty wynik zamiast błędu: wątek ma każde zgłoszenie, więc brak znaczy zły numer, a bez
+    komunikatu agent nie wiedziałby, że ma poprawić wywołanie."""
     with pytest.raises(UnknownTicketError) as caught:
         await _tool(_client()).search(ReadTicketsThreadQuery(ticket_id="90019"))
 
@@ -83,8 +91,11 @@ async def test_an_unknown_number_is_an_error() -> None:
 
 
 async def test_the_thread_that_was_read_is_cited() -> None:
-    """Odczytany wątek → jedno źródło z materiału „tickets", z tematem zgłoszenia jako tytułem:
-    karty to narzędzie nie zna, więc tytułem nie może być `problem`."""
+    """Sprawdza, czy odczytany wątek daje jedno źródło z materiału „tickets", o numerze 90011
+    i z tematem zgłoszenia jako tytułem.
+
+    Wyłapuje odczyt, który nie trafia na listę źródeł, i źródło z tytułem innym niż temat
+    zgłoszenia: to narzędzie karty nie zna, więc tytułem nie może być jej `problem`."""
     tool = _tool(_client())
     refs = tool.cite(await tool.search(QUERY))
 
@@ -93,8 +104,11 @@ async def test_the_thread_that_was_read_is_cited() -> None:
 
 
 async def test_the_tool_and_its_fake_tell_the_model_the_same() -> None:
-    """To samo zgłoszenie w tabeli i w atrapie → ten sam tekst dla modelu i to samo źródło: test
-    grafu na atrapie sprawdza to, co model dostanie na produkcji."""
+    """Sprawdza, czy prawdziwe narzędzie i atrapa dla tego samego zgłoszenia (90011) dają identyczny
+    tekst dla modelu i identyczną listę źródeł.
+
+    Wyłapuje rozjazd między narzędziem a atrapą: test grafu na atrapie sprawdzałby wtedy coś innego
+    niż to, co model dostanie na produkcji."""
     real = _tool(_client())
     fake = FakeReadTicketsThreadTool()
 
@@ -106,8 +120,10 @@ async def test_the_tool_and_its_fake_tell_the_model_the_same() -> None:
 
 
 async def test_aclose_closes_the_database_client() -> None:
-    """`aclose()` → zamknięty klient Postgresa: sprzątający nie musi wiedzieć, z czego narzędzie
-    jest zbudowane."""
+    """Sprawdza, czy `aclose()` narzędzia zamyka klienta Postgresa.
+
+    Wyłapuje narzędzie, które po sobie nie sprząta: połączenie z bazą zostawałoby otwarte, bo
+    sprzątający woła tylko `aclose()` i nie wie, z czego narzędzie jest zbudowane."""
     client = _client()
 
     await _tool(client).aclose()

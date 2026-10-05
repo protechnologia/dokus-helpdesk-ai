@@ -134,7 +134,11 @@ def stub_run(monkeypatch: pytest.MonkeyPatch) -> StubRun:
 # --- validate -----------------------------------------------------------------------------
 
 def test_a_valid_package_exits_zero(tmp_path: Path) -> None:
-    """Poprawna paczka → kod 0, linia o dokumencie i podsumowanie."""
+    """Sprawdza, czy `helpdesk docs validate` na poprawnej paczce z jednym dokumentem i dwiema
+    sekcjami kończy się kodem 0 i wypisuje linię o tym dokumencie oraz podsumowanie bez błędów.
+
+    Wyłapuje komendę, która zgłasza błąd przy poprawnej paczce albo nie pokazuje, co wczytała:
+    operator nie mógłby wtedy sprawdzić paczki przed indeksacją."""
     _write_document(tmp_path, "administrator", ("wstep", "uprawnienia"))
 
     result = runner.invoke(cli, ["docs", "validate", str(tmp_path)])
@@ -145,7 +149,11 @@ def test_a_valid_package_exits_zero(tmp_path: Path) -> None:
 
 
 def test_a_synthetic_document_is_marked(tmp_path: Path) -> None:
-    """Dokument zmyślony → dopisek w jego linii: operator widzi to przed indeksacją."""
+    """Sprawdza, czy przy dokumencie oznaczonym jako zmyślony `helpdesk docs validate` kończy się
+    kodem 0 i wypisuje dopisek „(syntetyczny)".
+
+    Wyłapuje zniknięcie tego dopisku: operator ma zobaczyć jeszcze przed indeksacją, że paczka
+    jest zmyślona i nie nadaje się do właściwego indeksu."""
     _write_document(tmp_path, "zmyslony", synthetic=True)
 
     result = runner.invoke(cli, ["docs", "validate", str(tmp_path)])
@@ -155,8 +163,11 @@ def test_a_synthetic_document_is_marked(tmp_path: Path) -> None:
 
 
 def test_a_broken_package_exits_one(tmp_path: Path) -> None:
-    """Sekcja bez pliku → kod 1 i błąd pod nazwą katalogu, więc komenda działa jako bramka
-    przed indeksacją."""
+    """Sprawdza, czy `helpdesk docs validate` na paczce, w której sekcji z manifestu brakuje
+    pliku, kończy się kodem 1 i wypisuje błąd z nazwą katalogu dokumentu i brakującego pliku.
+
+    Wyłapuje komendę, która przy zepsutej paczce kończy się kodem 0: nie dałoby się jej użyć jako
+    bramki przed indeksacją, bo skrypt nie odróżniłby paczki dobrej od zepsutej."""
     directory = _write_document(tmp_path, "administrator")
     (directory / "wstep.md").unlink()
 
@@ -168,7 +179,12 @@ def test_a_broken_package_exits_one(tmp_path: Path) -> None:
 
 
 def test_a_package_level_error_exits_one(tmp_path: Path) -> None:
-    """Ten sam `section_id` w dwóch dokumentach → kod 1, choć każdy katalog z osobna jest OK."""
+    """Sprawdza, czy `helpdesk docs validate` kończy się kodem 1 i wypisuje błąd, gdy dwa
+    dokumenty mają sekcję o tym samym identyfikatorze (`wstep`), choć każdy z osobna jest
+    poprawny.
+
+    Wyłapuje komendę, która patrzy tylko na błędy pojedynczych dokumentów: paczka z powtórzonym
+    identyfikatorem sekcji przeszłaby sprawdzenie, a ma on być jedyny w całej paczce."""
     _write_document(tmp_path, "administrator")
     _write_document(tmp_path, "uzytkownik")
 
@@ -182,7 +198,11 @@ def test_a_warning_does_not_fail_validation(
     tmp_path:    Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Sekcja dłuższa niż próg → ostrzeżenie na ekranie i kod 0."""
+    """Sprawdza, czy sekcja dłuższa niż próg ostrzeżenia (tu obniżony do 5 znaków) daje
+    w `helpdesk docs validate` linię „UWAGA" na ekranie, a komenda i tak kończy się kodem 0.
+
+    Wyłapuje dwie usterki: ostrzeżenie, które nie dociera do operatora, oraz ostrzeżenie
+    traktowane jak błąd, przez które poprawna paczka z długą sekcją nie przeszłaby sprawdzenia."""
     monkeypatch.setattr("app.core_service.loader_doc_package.SECTION_WARN_CHARS", 5)
     _write_document(tmp_path, "administrator")
 
@@ -193,7 +213,11 @@ def test_a_warning_does_not_fail_validation(
 
 
 def test_validate_of_a_missing_directory_exits_two(tmp_path: Path) -> None:
-    """Katalog, którego nie ma → kod 2, inny niż przy zepsutej paczce."""
+    """Sprawdza, czy `helpdesk docs validate` kończy się kodem 2, gdy wskazanego katalogu nie ma —
+    to inny kod niż 1 przy zepsutej paczce.
+
+    Wyłapuje pomieszanie tych dwóch sytuacji: skrypt wołający komendę nie odróżniłby literówki
+    w ścieżce od paczki z błędami."""
     result = runner.invoke(cli, ["docs", "validate", str(tmp_path / "nie-ma")])
 
     assert result.exit_code == 2
@@ -202,7 +226,12 @@ def test_validate_of_a_missing_directory_exits_two(tmp_path: Path) -> None:
 # --- index: odmowa przed pytaniem ---------------------------------------------------------
 
 def test_index_of_a_broken_package_runs_nothing(tmp_path: Path, stub_run: StubRun) -> None:
-    """Paczka z błędami → kod 1 bez pytania o potwierdzenie i bez indeksacji."""
+    """Sprawdza, czy `helpdesk docs index` na paczce z błędem (sekcji brakuje pliku) kończy się
+    kodem 1 od razu: nie pyta o potwierdzenie i nie uruchamia indeksacji.
+
+    Wyłapuje komendę, która pyta o zgodę na zastąpienie indeksu albo zaczyna indeksację, choć
+    paczki i tak nie wolno wgrać — w najgorszym razie zepsuta paczka zastąpiłaby działający
+    indeks."""
     directory = _write_document(tmp_path, "administrator")
     (directory / "wstep.md").unlink()
 
@@ -217,8 +246,11 @@ def test_a_synthetic_package_is_refused_without_the_flag(
     tmp_path: Path,
     stub_run: StubRun,
 ) -> None:
-    """Dokument zmyślony bez `--synthetic` → kod 1 i nic nie rusza: nie trafia do właściwego
-    indeksu nawet z `--yes`."""
+    """Sprawdza, czy `helpdesk docs index` bez flagi `--synthetic` odmawia paczki z dokumentem
+    zmyślonym: kończy się kodem 1, wypisuje powód i nie uruchamia indeksacji, także z `--yes`.
+
+    Wyłapuje zmyśloną dokumentację wgraną do właściwego indeksu: czytają z niego narzędzia
+    agenta, więc wymyślone instrukcje wracałyby jako źródło odpowiedzi."""
     _write_document(tmp_path, "zmyslony", synthetic=True)
 
     result = runner.invoke(cli, ["docs", "index", str(tmp_path), "--yes"])
@@ -229,7 +261,11 @@ def test_a_synthetic_package_is_refused_without_the_flag(
 
 
 def test_a_real_package_is_refused_with_the_flag(tmp_path: Path, stub_run: StubRun) -> None:
-    """Dokument prawdziwy z `--synthetic` → kod 1 i nic nie rusza."""
+    """Sprawdza, czy `helpdesk docs index --synthetic` odmawia paczki z dokumentem, który nie jest
+    oznaczony jako zmyślony: kończy się kodem 1 i nie uruchamia indeksacji, także z `--yes`.
+
+    Wyłapuje sprawdzanie zgodności flagi z paczką tylko w jedną stronę: prawdziwa dokumentacja
+    trafiłaby wtedy do indeksu syntetycznego, przeznaczonego wyłącznie na dane zmyślone."""
     _write_document(tmp_path, "administrator")
 
     result = runner.invoke(cli, ["docs", "index", str(tmp_path), "--synthetic", "--yes"])
@@ -239,8 +275,11 @@ def test_a_real_package_is_refused_with_the_flag(tmp_path: Path, stub_run: StubR
 
 
 def test_index_of_an_empty_package_runs_nothing(tmp_path: Path, stub_run: StubRun) -> None:
-    """Pusty katalog → kod 1 i nic nie rusza: indeksacja zastępuje indeks, więc pusta paczka
-    skasowałaby działający."""
+    """Sprawdza, czy `helpdesk docs index` na pustym katalogu kończy się kodem 1 i nie uruchamia
+    indeksacji, także z `--yes`.
+
+    Wyłapuje utratę działającego indeksu: indeksacja zastępuje cały indeks zawartością paczki,
+    więc pusta paczka skasowałaby wszystko, co w nim było."""
     result = runner.invoke(cli, ["docs", "index", str(tmp_path), "--yes"])
 
     assert result.exit_code == 1
@@ -248,7 +287,11 @@ def test_index_of_an_empty_package_runs_nothing(tmp_path: Path, stub_run: StubRu
 
 
 def test_index_of_a_missing_directory_exits_two(tmp_path: Path, stub_run: StubRun) -> None:
-    """Katalog, którego nie ma → kod 2."""
+    """Sprawdza, czy `helpdesk docs index` kończy się kodem 2 i nie uruchamia indeksacji, gdy
+    wskazanego katalogu nie ma.
+
+    Wyłapuje komendę, która literówkę w ścieżce traktuje jak pustą albo zepsutą paczkę (kod 1):
+    skrypt wołający komendę nie odróżniłby wtedy złej ścieżki od błędów w paczce."""
     result = runner.invoke(cli, ["docs", "index", str(tmp_path / "nie-ma"), "--yes"])
 
     assert result.exit_code == 2
@@ -258,7 +301,11 @@ def test_index_of_a_missing_directory_exits_two(tmp_path: Path, stub_run: StubRu
 # --- index: potwierdzenie -----------------------------------------------------------------
 
 def test_index_asks_before_replacing(tmp_path: Path, stub_run: StubRun) -> None:
-    """Bez `--yes`, odpowiedź „nie" → kod 1 i nic nie rusza."""
+    """Sprawdza, czy `helpdesk docs index` bez `--yes` pyta o potwierdzenie, a po odpowiedzi „nie"
+    kończy się kodem 1 i nie uruchamia indeksacji.
+
+    Wyłapuje komendę, która zastępuje indeks bez pytania albo mimo odmowy: uruchomiona przez
+    pomyłkę na złym katalogu podmieniłaby działający indeks dokumentacji."""
     _write_document(tmp_path, "administrator")
 
     result = runner.invoke(cli, ["docs", "index", str(tmp_path)], input="n\n")
@@ -271,7 +318,11 @@ def test_the_question_names_the_table_and_the_collection(
     tmp_path: Path,
     stub_run: StubRun,
 ) -> None:
-    """Pytanie o potwierdzenie → nazywa tabelę i kolekcję, które znikną."""
+    """Sprawdza, czy pytanie o potwierdzenie w `helpdesk docs index` nazywa tabelę (`docs_text`)
+    i kolekcję (`docs`), które zostaną zastąpione.
+
+    Wyłapuje pytanie, które nie mówi, co zniknie: operator potwierdzałby wtedy w ciemno i mógłby
+    zastąpić nie ten indeks, o który mu chodziło."""
     _write_document(tmp_path, "administrator")
 
     result = runner.invoke(cli, ["docs", "index", str(tmp_path)], input="n\n")
@@ -283,7 +334,12 @@ def test_the_synthetic_flag_points_at_the_synthetic_index(
     tmp_path: Path,
     stub_run: StubRun,
 ) -> None:
-    """`--synthetic` → pytanie nazywa osobny indeks syntetyczny, a indekser dostaje tę flagę."""
+    """Sprawdza, czy z flagą `--synthetic` pytanie o potwierdzenie nazywa osobny indeks
+    syntetyczny (tabelę `docs_text_synthetic` i kolekcję `docs_synthetic`), a po odpowiedzi „tak"
+    indeksacja dostaje tę flagę i komenda kończy się kodem 0.
+
+    Wyłapuje flagę, która zmienia tylko treść pytania albo ginie po drodze: indeksacja poszłaby
+    wtedy do innego indeksu, niż operator potwierdził."""
     _write_document(tmp_path, "zmyslony", synthetic=True)
 
     result = runner.invoke(cli, ["docs", "index", str(tmp_path), "--synthetic"], input="y\n")
@@ -294,7 +350,12 @@ def test_the_synthetic_flag_points_at_the_synthetic_index(
 
 
 def test_index_proceeds_when_confirmed(tmp_path: Path, stub_run: StubRun) -> None:
-    """Potwierdzenie przyjęte → indekser dostaje wczytaną paczkę, a liczby trafiają na ekran."""
+    """Sprawdza, czy po odpowiedzi „tak" `helpdesk docs index` uruchamia indeksację wczytanej
+    paczki (jedna sekcja, właściwy indeks), kończy się kodem 0 i wypisuje liczby z raportu:
+    dokumentów 1, sekcji 1, fragmentów 3.
+
+    Wyłapuje komendę, która po potwierdzeniu nic nie robi, przekazuje dalej nie tę paczkę albo
+    nie pokazuje wyniku — operator nie wiedziałby wtedy, co trafiło do indeksu."""
     _write_document(tmp_path, "administrator")
     stub_run.report = DocsIndexReport(documents=1, sections=1, fragments=3)
 
@@ -307,7 +368,11 @@ def test_index_proceeds_when_confirmed(tmp_path: Path, stub_run: StubRun) -> Non
 
 
 def test_yes_skips_the_question(tmp_path: Path, stub_run: StubRun) -> None:
-    """`--yes` → bez pytania, więc komenda nadaje się do skryptu."""
+    """Sprawdza, czy `helpdesk docs index --yes` nie zadaje pytania o potwierdzenie, uruchamia
+    indeksację dokładnie raz i kończy się kodem 0.
+
+    Wyłapuje komendę, która mimo `--yes` czeka na odpowiedź: nie dałoby się jej uruchomić ze
+    skryptu, bo nikt by na pytanie nie odpowiedział."""
     _write_document(tmp_path, "administrator")
 
     result = runner.invoke(cli, ["docs", "index", str(tmp_path), "--yes"])
@@ -332,8 +397,12 @@ def test_an_unreachable_service_exits_two(
     stub_run: StubRun,
     error:    Exception,
 ) -> None:
-    """Leżąca zależność → kod 2: ponowienie tej samej komendy może zadziałać, inaczej niż przy
-    zepsutej paczce."""
+    """Sprawdza, czy `helpdesk docs index` kończy się kodem 2, gdy indeksacja zgłasza awarię
+    usługi. Trzy przypadki: nie odpowiada embedder, Postgres albo Qdrant.
+
+    Wyłapuje awarię usługi pomyloną z zepsutą paczką (kod 1) albo wypuszczoną jako nieobsłużony
+    wyjątek: przy leżącej usłudze ponowienie tej samej komendy może zadziałać, przy zepsutej
+    paczce nie, więc skrypt musi umieć je odróżnić."""
     _write_document(tmp_path, "administrator")
     stub_run.error = error
 
@@ -343,7 +412,11 @@ def test_an_unreachable_service_exits_two(
 
 
 def test_a_refusal_from_the_indexer_itself_exits_one(tmp_path: Path, stub_run: StubRun) -> None:
-    """Odmowa zgłoszona dopiero przez indekser → kod 1, jak przy odmowie przed pytaniem."""
+    """Sprawdza, czy odmowa zgłoszona dopiero przez sam indekser (`DocsIndexRefused`), już po
+    przyjęciu paczki przez komendę, też kończy się kodem 1.
+
+    Wyłapuje odmowę, która na tej drodze dostaje inny kod albo wychodzi jako nieobsłużony
+    wyjątek: ta sama przyczyna miałaby wtedy dwa różne kody, zależnie od tego, kto ją zauważył."""
     _write_document(tmp_path, "administrator")
     stub_run.error = DocsIndexRefused("paczka ma błędy")
 

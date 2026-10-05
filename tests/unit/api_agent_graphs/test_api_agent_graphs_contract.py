@@ -153,8 +153,12 @@ def allowed_tools(
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
 def test_every_graph_exposes_the_same_api(graph: ModuleType) -> None:
-    """Pakiet grafu → ta sama para promptów, definicje narzędzi, przebieg, atrapa i stan
-    przykładowy: trasy, CLI i węzeł `agent` sięgają po nie tak samo w każdym grafie."""
+    """Sprawdza, czy pakiet każdego grafu wystawia ten sam komplet: klasę stanu, listę narzędzi
+    wiedzy, oba prompty, definicje narzędzi dla modelu, budowę przebiegu i jego atrapy oraz stan
+    przykładowy.
+
+    Wyłapuje graf, któremu czegoś z tego kompletu brakuje: trasy, CLI i węzeł `agent` sięgają po te
+    rzeczy tak samo w każdym grafie, więc brak wyszedłby dopiero przy wywołaniu."""
     for attribute in (
         "STATE",             # klasa stanu grafu
         "TOOL_NAMES",        # narzędzia wiedzy dozwolone w grafie
@@ -170,8 +174,11 @@ def test_every_graph_exposes_the_same_api(graph: ModuleType) -> None:
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
 async def test_the_fake_graph_runs_from_anonymization_to_output(graph: ModuleType) -> None:
-    """Atrapa grafu na stanie przykładowym → wynik w typie grafu, pierwszy wpis logu od
-    `anonymize`, ostatni od `respond`."""
+    """Sprawdza, czy atrapa każdego grafu, uruchomiona na stanie przykładowym, oddaje wynik w typie
+    tego grafu, a jej przebieg zaczyna się od anonimizacji i kończy na odpowiedzi.
+
+    Wyłapuje graf, który nie dochodzi do wyniku, oddaje wynik w cudzym typie albo nie zaczyna od
+    anonimizacji, przez co surowe zgłoszenie mogłoby trafić do modelu."""
     state_type = type(graph.example_state())
     state      = state_type(**await graph.build_fake_graph().ainvoke(graph.example_state()))
 
@@ -182,8 +189,11 @@ async def test_the_fake_graph_runs_from_anonymization_to_output(graph: ModuleTyp
 
 @pytest.mark.parametrize("graph", RESPOND_GRAPHS, ids=name_of)
 async def test_the_fake_agent_answers_through_the_respond_tool(graph: ModuleType) -> None:
-    """Ostatnia tura atrapy agenta → wywołanie `respond_<graf>`, którego argumenty to wynik bez
-    pól, które wypełnia graf."""
+    """Sprawdza, czy w atrapie każdego grafu ostatnia tura modelu jest wywołaniem narzędzia
+    odpowiedzi tego grafu, a jego argumenty to wynik grafu bez pól, które graf wypełnia sam.
+
+    Wyłapuje atrapę, która odpowiada inaczej niż prawdziwy przebieg, na przykład samym tekstem:
+    trasy i testy oparte na atrapie sprawdzałyby wtedy coś, czego produkcja nie robi."""
     state = graph.STATE(**await graph.build_fake_graph().ainvoke(graph.example_state()))
     call  = state.messages[-1].tool_calls[0]
 
@@ -193,8 +203,12 @@ async def test_the_fake_agent_answers_through_the_respond_tool(graph: ModuleType
 
 @pytest.mark.parametrize("graph", RESPOND_GRAPHS, ids=name_of)
 def test_the_respond_tool_follows_the_convention(graph: ModuleType) -> None:
-    """Narzędzie odpowiedzi → `respond_<graf>`, schemat to dokładnie pola wyniku (bez `sources`,
-    bo źródła daje `cite()`), bez docstringów i komentarzy redakcyjnych."""
+    """Sprawdza, czy narzędzie odpowiedzi każdego grafu nazywa się `respond_<graf>`, a jego schemat
+    ma dokładnie te pola wyniku, które podaje model: bez listy źródeł (`sources`), bez notatki
+    z kodu pisanej dla programisty i bez komentarzy redakcyjnych w opisie.
+
+    Wyłapuje schemat rozjechany z wynikiem grafu oraz listę źródeł w odpowiedzi modelu: źródła mają
+    pochodzić z tego, co agent odczytał, a nie z jego deklaracji."""
     tool     = graph.respond_tool()
     expected = set(output_type(graph).model_fields) - set(filled_by(graph))
 
@@ -207,15 +221,22 @@ def test_the_respond_tool_follows_the_convention(graph: ModuleType) -> None:
 
 @pytest.mark.parametrize("graph", RESPOND_GRAPHS, ids=name_of)
 def test_both_prompt_turns_name_the_respond_tool(graph: ModuleType) -> None:
-    """Prompt każe odpowiedzieć narzędziem → pod jego aktualną nazwą: zmiana nazwy w kodzie bez
-    promptu nie jest widoczna w diffie promptu."""
+    """Sprawdza, czy prompt systemowy i tura użytkownika każdego grafu wymieniają narzędzie
+    odpowiedzi pod nazwą, jaką ma ono dziś w kodzie.
+
+    Wyłapuje zmianę nazwy narzędzia w kodzie bez poprawienia promptu: prompt kazałby wtedy
+    odpowiedzieć narzędziem, którego model nie dostał, a w diffie promptu nie byłoby tego widać."""
     assert graph.RESPOND_TOOL_NAME in graph.system_prompt()
     assert graph.RESPOND_TOOL_NAME in graph.user_prompt(anonymized_state(graph))
 
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
 def test_prompts_reach_the_model_clean(graph: ModuleType) -> None:
-    """Obie tury promptu → bez komentarzy redakcyjnych i bez niewypełnionego miejsca na dane."""
+    """Sprawdza, czy w obu turach promptu każdego grafu nie ma komentarzy redakcyjnych (`<!--`),
+    a w turze użytkownika nie zostaje niewypełnione miejsce na dane (`{{…}}`).
+
+    Wyłapuje prompt, w którym do modelu dotarłaby notatka pisana dla nas albo goły znacznik zamiast
+    treści zgłoszenia czy reguł."""
     user = graph.user_prompt(anonymized_state(graph))
 
     assert "<!--" not in graph.system_prompt()
@@ -225,7 +246,11 @@ def test_prompts_reach_the_model_clean(graph: ModuleType) -> None:
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
 def test_the_prompt_takes_the_text_from_anonymization_only(graph: ModuleType) -> None:
-    """Stan po anonimizacji → w prompcie tekst zanonimizowany, a surowego `input_text` nie ma."""
+    """Sprawdza, czy tura użytkownika każdego grafu zawiera tekst po anonimizacji (tu znacznik
+    wstawiony w jego miejsce) i nie zawiera surowej treści zgłoszenia.
+
+    Wyłapuje prompt, który bierze treść z wejścia sprzed anonimizacji: dane klienta wyszłyby wtedy
+    do zewnętrznego modelu."""
     state = anonymized_state(graph)
     user  = graph.user_prompt(state)
 
@@ -235,15 +260,23 @@ def test_the_prompt_takes_the_text_from_anonymization_only(graph: ModuleType) ->
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
 def test_the_prompt_refuses_a_state_before_anonymization(graph: ModuleType) -> None:
-    """Stan bez `anonymized` → błąd, a nie prompt z pustym zgłoszeniem: graf jest źle złożony."""
+    """Sprawdza, czy złożenie tury użytkownika ze stanu, który nie przeszedł jeszcze anonimizacji,
+    kończy się błędem w każdym grafie.
+
+    Wyłapuje źle złożony graf, w którym model ruszałby przed anonimizacją: zamiast błędu powstałby
+    prompt z pustym zgłoszeniem."""
     with pytest.raises(ValueError):
         graph.user_prompt(graph.example_state())
 
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
 def test_the_user_turn_carries_no_instructions(graph: ModuleType) -> None:
-    """Szablon tury użytkownika → dane i rusztowanie, bez reguł: instrukcja stoi w turze
-    systemowej i w opisie narzędzia odpowiedzi, także w prompcie parsującym."""
+    """Sprawdza, czy szablon tury użytkownika każdego grafu to same dane i krótkie rusztowanie: nie
+    ma w nim nagłówków sekcji, a po odjęciu miejsc na dane zostaje mniej niż 600 znaków.
+
+    Wyłapuje reguły, które wróciły do tury użytkownika: instrukcja ma stać w turze systemowej
+    i w opisie narzędzia odpowiedzi, także w prompcie parsującym, żeby nie mieszała się z wklejoną
+    treścią zgłoszenia."""
     template    = graph.graph.read_document(graph.graph.USER_FILE)
     scaffolding = re.sub(r"\{\{\w+\}\}", "", template)
 
@@ -253,9 +286,12 @@ def test_the_user_turn_carries_no_instructions(graph: ModuleType) -> None:
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
 def test_the_model_sees_exactly_the_allowed_tools(graph: ModuleType) -> None:
-    """Narzędzia wiedzy z listy dozwolonych → po definicji na każde (opis z katalogu narzędzia,
-    bez komentarzy redakcyjnych i bez niewypełnionych miejsc), a na końcu narzędzie odpowiedzi,
-    jeśli graf je ma."""
+    """Sprawdza, czy model w każdym grafie dostaje definicje dokładnie tych narzędzi wiedzy, które
+    graf dopuszcza, w tej samej kolejności, a po nich narzędzie odpowiedzi, jeśli graf je ma.
+    W opisach nie może być komentarzy redakcyjnych ani niewypełnionych miejsc `{{…}}`.
+
+    Wyłapuje graf, który gubi narzędzie, zmienia ich kolejność albo wysyła modelowi opis z notatką
+    dla nas czy z gołym znacznikiem zamiast limitu wywołań."""
     respond     = [graph.RESPOND_TOOL_NAME] if graph in RESPOND_GRAPHS else []
     definitions = graph.model_tools(allowed_tools(graph), LIMITS)
 
@@ -270,8 +306,11 @@ def test_the_model_sees_exactly_the_allowed_tools(graph: ModuleType) -> None:
     ids=name_of,
 )
 def test_every_tool_of_the_graph_tells_the_model_its_call_limit(graph: ModuleType) -> None:
-    """Każde narzędzie grafu → w opisie dla modelu jego limit wywołań z konfiguracji: ten sam,
-    który egzekwuje `run_tools`."""
+    """Sprawdza, czy w każdym grafie z narzędziami wiedzy opis każdego narzędzia podaje modelowi
+    jego limit wywołań z domyślnej konfiguracji.
+
+    Wyłapuje narzędzie, którego opis limitu nie podaje albo podaje inny niż konfiguracja: ten sam
+    limit egzekwuje `run_tools`, więc model dowiadywałby się o nim dopiero z odmowy."""
     definitions = graph.model_tools(allowed_tools(graph), LIMITS)
 
     for definition in definitions:
@@ -287,16 +326,40 @@ def test_every_tool_of_the_graph_tells_the_model_its_call_limit(graph: ModuleTyp
     ids=name_of,
 )
 def test_a_tool_outside_the_list_is_refused(graph: ModuleType) -> None:
-    """Graf bez `find_tickets_vector` na liście dozwolonych → podanie go to błąd składania, nie
-    cichy dostęp do indeksu (bramki i „Popraw" mają działać przy pustym indeksie)."""
+    """Sprawdza, czy graf, który nie ma wyszukiwania zgłoszeń (`find_tickets_vector`) na liście
+    dozwolonych narzędzi, odmawia złożenia definicji, gdy mimo to je dostanie.
+
+    Wyłapuje cichy dostęp do indeksu zgłoszeń w grafach, które mają działać bez niego: bramki
+    i „Popraw" muszą działać także przy pustym indeksie."""
     with pytest.raises(ValueError):
         graph.model_tools([FakeFindTicketsVectorTool()], LIMITS)
 
 
+@pytest.mark.parametrize(
+    "graph",
+    [graph for graph in GRAPHS if graph.TOOL_NAMES],
+    ids=name_of,
+)
+async def test_the_turn_limit_cuts_the_loop_of_every_tool_graph(graph: ModuleType) -> None:
+    """Sprawdza, czy każdy graf z narzędziami wiedzy, uruchomiony na atrapach z limitem jednej tury,
+    po pierwszej turze modelu nie wykonuje narzędzi, tylko idzie prosto do odpowiedzi.
+
+    Wyłapuje nowy graf z pętlą, w którym zapomniano o limicie tur: model, który ciągle woła
+    narzędzia, krążyłby w nim bez końca."""
+    compiled = graph.build_fake_graph(max_iterations=1)
+    state    = graph.STATE(**await compiled.ainvoke(graph.example_state()))
+
+    assert [entry.node for entry in state.log] == ["anonymize", "agent", "respond"]
+    assert state.iterations == 1
+
+
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
 def test_sources_exist_exactly_where_knowledge_tools_do(graph: ModuleType) -> None:
-    """Graf z narzędziami wiedzy → pole `sources` z reduktorem `merge_sources`; graf bez nich →
-    bez `sources`, bo nie ma czego cytować."""
+    """Sprawdza, czy stan każdego grafu z narzędziami wiedzy ma listę źródeł (`sources`) łączoną
+    funkcją `merge_sources`, a stan grafu bez takich narzędzi nie ma jej wcale.
+
+    Wyłapuje graf, który zadeklarował listę źródeł bez tej funkcji: każdy kolejny odczyt po cichu
+    nadpisywałby wtedy źródła z poprzednich, zamiast je doklejać."""
     hints = get_type_hints(type(graph.example_state()), include_extras=True)
 
     if not graph.TOOL_NAMES:
@@ -308,13 +371,21 @@ def test_sources_exist_exactly_where_knowledge_tools_do(graph: ModuleType) -> No
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
 def test_the_example_state_is_the_graph_state(graph: ModuleType) -> None:
-    """Stan przykładowy z atrapy → instancja `STATE`, czyli klasy, z której trasy budują stan."""
+    """Sprawdza, czy stan przykładowy każdego grafu jest obiektem klasy `STATE`, czyli tej samej,
+    z której trasy budują stan wejściowy.
+
+    Wyłapuje graf, w którym stan przykładowy i klasa stanu się rozeszły: testy na stanie
+    przykładowym sprawdzałyby wtedy inny kształt niż ten, którego używa aplikacja."""
     assert isinstance(graph.example_state(), graph.STATE)
 
 
 def test_only_the_solution_variant_requires_hits() -> None:
-    """Warianty `suggest_*` → każdy deklaruje etykietę guzika i `REQUIRES_HITS`; trafień wymaga
-    tylko `solution` (zasada 9), pytania i przekazanie działają przy pustym indeksie."""
+    """Sprawdza, czy każdy wariant propozycji (`suggest_*`) ma etykietę guzika i deklaruje, czy
+    wymaga źródeł: wymaga ich tylko rozwiązanie, a pytania i przekazanie sprawy nie.
+
+    Wyłapuje przestawioną deklarację: rozwiązanie bez wymogu źródeł mogłoby powstać „z głowy",
+    a pytania i przekazanie sprawy przestałyby działać przy pustym indeksie. Nowy wariant też trzeba
+    tu świadomie dopisać."""
     assert all(graph.LABEL for graph in GRAPHS if name_of(graph).startswith("suggest_"))
 
     declared = {

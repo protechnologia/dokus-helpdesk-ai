@@ -13,7 +13,12 @@ TICKET = {"ticket_id": "41002", "body": "Od wczoraj nie przychodzą przesyłki z
 
 
 def test_variants_list_the_registry() -> None:
-    """`GET /variants` → każdy graf `suggest_*` jako guzik: nazwa, etykieta, `requires_hits`."""
+    """Sprawdza, czy `GET /variants` wymienia każdy wariant propozycji z rejestru grafów,
+    w kolejności alfabetycznej, z nazwą, etykietą guzika i informacją, czy wariant wymaga źródeł
+    (`requires_hits`).
+
+    Wyłapuje listę, która rozjeżdża się z rejestrem, bo brakuje w niej wariantu albo ma on inną
+    etykietę: helpdesk rysuje guziki z tej odpowiedzi, więc pokazałby inne, niż usługa obsługuje."""
     response = TestClient(create_app()).get("/variants")
 
     assert response.status_code == 200
@@ -25,8 +30,13 @@ def test_variants_list_the_registry() -> None:
 
 @pytest.mark.parametrize("variant", sorted(VARIANTS))
 def test_every_variant_answers_in_one_shape(variant: str) -> None:
-    """Każdy wariant → ten sam kształt: wariant, tekst propozycji, źródła i log przebiegu od
-    anonimizacji do odpowiedzi; wariant bez narzędzi wiedzy z pustą listą źródeł."""
+    """Sprawdza, czy `POST /suggest` odpowiada w tym samym kształcie dla każdego wariantu
+    z rejestru: status 200, nazwa wariantu, niepusty tekst propozycji i log przebiegu od
+    anonimizacji do odpowiedzi. Wariant z narzędziami wiedzy wraca ze źródłami, a wariant bez
+    nich z pustą listą źródeł.
+
+    Wyłapuje wariant, którego trasa nie obsługuje albo który odpowiada inaczej niż pozostałe:
+    helpdesk musiałby wtedy pisać osobną obsługę odpowiedzi dla każdego guzika."""
     response = TestClient(create_app()).post("/suggest", json={**TICKET, "variant": variant})
     body     = response.json()
 
@@ -39,7 +49,11 @@ def test_every_variant_answers_in_one_shape(variant: str) -> None:
 
 
 def test_an_unknown_variant_is_refused() -> None:
-    """Nieznany wariant → 422 z listą dostępnych, nie cichy fallback na domyślny."""
+    """Sprawdza, czy `POST /suggest` z nieznanym wariantem (tu literówka „solutoin") dostaje status
+    422, a opis błędu nazywa przysłany wariant.
+
+    Wyłapuje ciche przejście na wariant domyślny: literówka w nazwie guzika po stronie helpdesku
+    ma być widoczna od razu, a nie skończyć się inną propozycją, niż użytkownik kliknął."""
     response = TestClient(create_app()).post("/suggest", json={**TICKET, "variant": "solutoin"})
 
     assert response.status_code == 422

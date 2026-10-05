@@ -35,8 +35,12 @@ pytestmark = [
 
 
 async def test_words_in_another_form_find_the_section(docs_index) -> None:
-    """Słowa w innej odmianie niż w treści → sekcja znaleziona słowami: odmianę zna słownik bazy,
-    nie nasz kod."""
+    """Sprawdza, czy wyszukiwanie po słowach znajduje sekcję także wtedy, gdy słowa w zapytaniu
+    mają inną odmianę niż w treści: „hipopotamy kwiaty" trafia w sekcję ze zdaniem o hipopotamie
+    podlewającym kwiaty, i tylko w nią.
+
+    Wyłapuje bazę bez polskiego słownika albo z zepsutą konfiguracją wyszukiwania: odmianę słów
+    zna słownik bazy, nie nasz kod, więc bez niego agent musiałby trafić w dokładną formę słowa."""
     # "Hipopotam odpowiada za podlewanie kwiatów w sekretariacie."
     result = await docs_index.text.find(FindDocsTextQuery(words="hipopotamy kwiaty"))
 
@@ -47,8 +51,11 @@ async def test_words_in_another_form_find_the_section(docs_index) -> None:
 
 
 async def test_a_message_broken_across_lines_is_found_as_a_phrase(docs_index) -> None:
-    """Komunikat złamany w treści po „Uruchom program" → fraza w jednej linii go znajduje,
-    także inną wielkością liter."""
+    """Sprawdza, czy komunikat zapisany w treści sekcji w dwóch liniach (złamany po „Uruchom
+    program") da się znaleźć frazą wpisaną w jednej linii i małymi literami.
+
+    Wyłapuje wyszukiwanie dosłowne, któremu przeszkadza złamanie linii albo wielkość liter:
+    agent nie znalazłby komunikatu przepisanego z ekranu, choć stoi on w dokumentacji."""
     result = await docs_index.text.find(FindDocsTextQuery(exact="uruchom program odkamieniania"))
 
     assert [(item.section.section_id, item.matched_by) for item in result.sections] == [
@@ -57,8 +64,13 @@ async def test_a_message_broken_across_lines_is_found_as_a_phrase(docs_index) ->
 
 
 async def test_a_phrase_and_words_bring_their_own_sections(docs_index) -> None:
-    """Fraza z jednej sekcji i słowa z innej → obie sekcje, znaleziona frazą pierwsza: pola
-    szukają niezależnie, a wyniki się sumują."""
+    """Sprawdza, czy fraza i słowa podane w jednym zapytaniu szukają niezależnie: kod „KAW-17"
+    trafia w jedną sekcję, słowa „recepcje parkingowe" w inną, a wynik niesie obie, z sekcją
+    znalezioną frazą na pierwszym miejscu.
+
+    Wyłapuje połączenie obu pól w jeden warunek albo pomyloną kolejność: zapytanie, w którym
+    fraza i słowa dotyczą różnych sekcji, nie zwracałoby wtedy nic albo stawiałoby trafienie
+    dosłowne za słownym."""
     result = await docs_index.text.find(
         FindDocsTextQuery(exact="KAW-17", words="recepcje parkingowe")
     )

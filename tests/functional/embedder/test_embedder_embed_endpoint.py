@@ -52,28 +52,42 @@ def _embed(
 
 
 def test_missing_mode_is_rejected(client: TestClient) -> None:
-    """POST /embed without `mode` → 422 (the caller must state the mode, never inherit one)."""
+    """Sprawdza, czy `POST /embed` bez pola `mode`, czyli bez trybu liczenia wektorów, dostaje
+    status 422.
+
+    Wyłapuje pojawienie się trybu domyślnego: wołający ma podać tryb sam, bo wektory policzone
+    w niewłaściwym trybie nie dają błędu, tylko gorsze wyniki wyszukiwania."""
     response = client.post("/embed", json={"texts": [TICKET_TEXT]})
 
     assert response.status_code == 422
 
 
 def test_unknown_mode_is_rejected(client: TestClient) -> None:
-    """POST /embed with a mode outside query/passage/sts → 422 (closed set, not free text)."""
+    """Sprawdza, czy `POST /embed` z trybem spoza trzech dozwolonych (`query`, `passage`, `sts`),
+    tu `document`, dostaje status 422.
+
+    Wyłapuje usługę, która przyjmuje dowolny tekst jako tryb: literówka albo nazwa trybu z innego
+    modelu przeszłaby wtedy bez błędu."""
     response = client.post("/embed", json={"texts": [TICKET_TEXT], "mode": "document"})
 
     assert response.status_code == 422
 
 
 def test_empty_batch_is_rejected(client: TestClient) -> None:
-    """POST /embed with an empty text list → 422 (an empty batch is a caller bug, not a no-op)."""
+    """Sprawdza, czy `POST /embed` z pustą listą tekstów dostaje status 422.
+
+    Wyłapuje usługę, która na pustą listę odpowiada pustym wynikiem: pusta paczka to błąd po
+    stronie wołającego, a odpowiedź 200 by go ukryła."""
     response = client.post("/embed", json={"texts": [], "mode": "passage"})
 
     assert response.status_code == 422
 
 
 def test_missing_texts_is_rejected(client: TestClient) -> None:
-    """POST /embed without the `texts` key → 422 (a missing batch is not an empty batch)."""
+    """Sprawdza, czy `POST /embed` bez pola `texts` dostaje status 422.
+
+    Wyłapuje pole `texts` z wartością domyślną: żądanie bez tekstów byłoby wtedy traktowane jak
+    pusta paczka, a nie jak błędne żądanie."""
     response = client.post("/embed", json={"mode": "passage"})
 
     assert response.status_code == 422
@@ -81,14 +95,22 @@ def test_missing_texts_is_rejected(client: TestClient) -> None:
 
 @pytest.mark.parametrize("mode", ["query", "passage", "sts"])
 def test_every_declared_mode_is_accepted(client: TestClient, mode: str) -> None:
-    """Each of the three declared modes → 200 (the closed set must not reject its own members)."""
+    """Sprawdza, czy `POST /embed` przyjmuje każdy z trzech dozwolonych trybów (`query`, `passage`,
+    `sts`) i odpowiada statusem 200.
+
+    Wyłapuje usługę, która odrzuca albo nie umie obsłużyć któregoś z własnych trybów, na przykład
+    po zmianie ich listy tylko w jednym miejscu."""
     response = client.post("/embed", json={"texts": [TICKET_TEXT], "mode": mode})
 
     assert response.status_code == 200
 
 
 def test_batch_preserves_input_order(client: TestClient) -> None:
-    """Batch of two texts → vectors match the ones returned for each text alone, in order."""
+    """Sprawdza, czy wektory wracają w kolejności tekstów: dla paczki dwóch tekstów pierwszy wektor
+    jest taki sam jak dla pierwszego tekstu wysłanego osobno, a drugi jak dla drugiego.
+
+    Wyłapuje usługę, która przestawia wyniki w paczce: wołający przypisuje wektory do tekstów po
+    kolejności, więc zgłoszenie dostałoby wektor innego zgłoszenia."""
     body = _embed(client, [TICKET_TEXT, OTHER_TICKET_TEXT])
 
     assert body["vectors"][0] == _embed(client, [TICKET_TEXT])["vectors"][0]
@@ -96,14 +118,22 @@ def test_batch_preserves_input_order(client: TestClient) -> None:
 
 
 def test_vector_length_matches_reported_dimension(client: TestClient) -> None:
-    """Response → every vector is exactly as long as the dimension the service reports."""
+    """Sprawdza, czy każdy wektor w odpowiedzi `/embed` ma dokładnie tyle liczb, ile usługa podaje
+    w polu `dimension`.
+
+    Wyłapuje rozjazd między podanym a faktycznym wymiarem: kto założy kolekcję wektorów według
+    tej liczby, dostanie kolekcję, do której wektory nie pasują."""
     body = _embed(client, [TICKET_TEXT, OTHER_TICKET_TEXT])
 
     assert all(len(vector) == body["dimension"] for vector in body["vectors"])
 
 
 def test_vectors_are_unit_length(client: TestClient) -> None:
-    """Response → vectors are L2-normalised, so cosine scores land in the production range."""
+    """Sprawdza, czy wektor z `/embed` ma długość 1, czyli jest znormalizowany. Test działa
+    w procesie, domyślnie na atrapie modelu.
+
+    Wyłapuje wektory nieznormalizowane: wyniki podobieństwa miałyby wtedy inną skalę niż na
+    produkcji, więc próg odcięcia wyników znaczyłby w testach co innego."""
     body = _embed(client, [TICKET_TEXT])
 
     norm = math.sqrt(sum(value * value for value in body["vectors"][0]))
@@ -112,7 +142,10 @@ def test_vectors_are_unit_length(client: TestClient) -> None:
 
 
 def test_response_names_the_model_that_produced_the_vectors(client: TestClient) -> None:
-    """Response → carries a non-empty model name (a collection is bound to it, not just to size)."""
+    """Sprawdza, czy odpowiedź `/embed` podaje niepustą nazwę modelu, który policzył wektory.
+
+    Wyłapuje odpowiedź bez nazwy modelu: kolekcja wektorów jest związana z modelem, a nie tylko
+    z wymiarem, więc bez nazwy nie da się stwierdzić, czym wektory policzono."""
     body = _embed(client, [TICKET_TEXT])
 
     assert body["model"]

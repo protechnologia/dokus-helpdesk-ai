@@ -41,15 +41,22 @@ def _find(
 
 
 def test_calls_within_the_limit_are_not_refused() -> None:
-    """Drugie wywołanie przy limicie 2 → mieści się: limit mówi, ile wywołań wolno, a nie
-    po ilu przestać."""
+    """Sprawdza, czy przy limicie dwóch wywołań drugie wyszukiwanie zgłoszeń jeszcze się mieści
+    i nie jest wskazane do odmowy.
+
+    Wyłapuje pomyłkę o jeden w liczeniu: limit mówi, ile wywołań wolno wykonać, więc odmowa już przy
+    drugim zabierałaby modelowi jedno należne wywołanie."""
     messages = [_find("call_1"), _answer("call_1"), _find("call_2")]
 
     assert calls_over_limit(messages, {"find_tickets_vector": 2}) == set()
 
 
 def test_a_call_over_the_limit_is_refused() -> None:
-    """Trzecie wywołanie przy limicie 2 → ponad limit, wskazane po `call_id`."""
+    """Sprawdza, czy przy limicie dwóch wywołań trzecie wyszukiwanie zgłoszeń jest wskazane do
+    odmowy, po swoim identyfikatorze („call_3").
+
+    Wyłapuje limit, który nie działa albo wskazuje nie to wywołanie: model mógłby szukać bez
+    ograniczeń albo dostałby odmowę zamiast wyniku, który mu się należał."""
     messages = [
         _find("call_1"), _answer("call_1"),
         _find("call_2"), _answer("call_2"),
@@ -60,8 +67,12 @@ def test_a_call_over_the_limit_is_refused() -> None:
 
 
 def test_each_tool_is_counted_on_its_own() -> None:
-    """Dwa narzędzia w rozmowie → każde liczone osobno: wyczerpany limit wyszukiwania nie
-    blokuje odczytu."""
+    """Sprawdza, czy wywołania każdego narzędzia liczą się osobno: po dwóch wyszukiwaniach, które
+    wyczerpują limit wyszukiwania, pierwszy odczyt kart przy własnym limicie 1 nie jest wskazany do
+    odmowy.
+
+    Wyłapuje wspólny licznik dla wszystkich narzędzi: wyczerpany limit wyszukiwania blokowałby wtedy
+    odczyt znalezionych zgłoszeń."""
     read     = tool_call_turn("read_tickets_card", {"ticket_ids": ["90001"]}, call_id="call_3")
     messages = [_find("call_1"), _answer("call_1"), _find("call_2"), _answer("call_2"), read]
     limits   = {"find_tickets_vector": 2, "read_tickets_card": 1}
@@ -70,8 +81,11 @@ def test_each_tool_is_counted_on_its_own() -> None:
 
 
 def test_calls_in_one_turn_are_counted_in_order() -> None:
-    """Trzy wywołania tego samego narzędzia w jednej turze przy limicie 2 → dwa pierwsze
-    przechodzą, trzecie jest ponad limit."""
+    """Sprawdza, czy trzy wywołania tego samego narzędzia zgłoszone w jednej turze modelu są liczone
+    po kolei: przy limicie 2 dwa pierwsze przechodzą, a trzecie jest wskazane do odmowy.
+
+    Wyłapuje liczenie, które patrzy tylko na wcześniejsze tury: model obszedłby wtedy limit,
+    zgłaszając wiele wywołań naraz."""
     turn = ChatMessage(
         role       = "assistant",
         tool_calls = [
@@ -85,20 +99,31 @@ def test_calls_in_one_turn_are_counted_in_order() -> None:
 
 
 def test_a_tool_without_a_limit_is_never_refused() -> None:
-    """Narzędzie bez wpisu w limitach → bez limitu: odmawia się tylko tego, co skonfigurowano."""
+    """Sprawdza, czy narzędzie, którego nie ma w limitach, nie jest ograniczane: trzecie z rzędu
+    wyszukiwanie zgłoszeń nie jest wskazane do odmowy, gdy limit ustawiono tylko dla `read_docs`.
+
+    Wyłapuje odmowę wywołań narzędzia, którego nikt nie ograniczył, na przykład przez potraktowanie
+    braku limitu jak zera."""
     messages = [_find("call_1"), _answer("call_1"), _find("call_2"), _answer("call_2"), _find("c3")]
 
     assert calls_over_limit(messages, {"read_docs": 1}) == set()
 
 
 def test_an_empty_conversation_has_nothing_to_refuse() -> None:
-    """Brak wiadomości → pusty zbiór, nie błąd."""
+    """Sprawdza, czy dla pustej rozmowy funkcja licząca wywołania oddaje pusty zbiór, a nie błąd.
+
+    Wyłapuje awarię na pustej liście wiadomości: funkcja wyjmuje z rozmowy ostatnią turę, więc bez
+    osobnej obsługi tego przypadku wywróciłaby przebieg."""
     assert calls_over_limit([], {"find_tickets_vector": 1}) == set()
 
 
 def test_the_refusal_is_json_naming_the_tool_and_the_limit() -> None:
-    """Tekst dla modelu → JSON z polem `error`, w którym stoi nazwa narzędzia, limit i co dalej:
-    model ma odpowiedzieć na podstawie tego, co już ma, a nie próbować ponownie."""
+    """Sprawdza, czy odmowa, którą model dostaje zamiast wyniku narzędzia, jest JSON-em z jednym
+    polem `error`, a w nim stoi nazwa narzędzia, wyczerpany limit (tu 2) i wskazówka, żeby
+    odpowiedzieć na podstawie tego, co już jest.
+
+    Wyłapuje odmowę w innym kształcie niż wyniki narzędzi albo bez wskazówki, co dalej: model mógłby
+    wtedy próbować tego samego wywołania ponownie."""
     body = json.loads(limit_exceeded_text("read_tickets_thread", 2))
 
     assert set(body) == {"error"}

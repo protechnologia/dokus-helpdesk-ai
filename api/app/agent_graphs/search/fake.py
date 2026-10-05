@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 from langgraph.graph.state import CompiledStateGraph
 
-from app.agent_graphs.fake import fake_search_nodes
+from app.agent_graphs.fake import FAKE_MAX_ITERATIONS, fake_search_nodes
 from app.agent_graphs.search.graph import build_graph
 from app.agent_graphs.search.models import SearchDone
 from app.agent_graphs.search.respond_tool import RESPOND_TOOL_NAME
@@ -31,7 +31,8 @@ def example_state() -> SearchState:
 
 
 def build_fake_graph(
-    limits: Mapping[str, int] | None = None,  # np. {"read_tickets_card": 3}
+    limits:         Mapping[str, int] | None = None,  # np. {"read_tickets_card": 3}
+    max_iterations: int = FAKE_MAX_ITERATIONS,        # np. 2 — limit tur modelu
 ) -> CompiledStateGraph:
     """
     Description:
@@ -42,9 +43,11 @@ def build_fake_graph(
 
     Graf jest jednorazowy: `FakeAgentNode` ma zaplanowane tury. Na każde wywołanie buduj nowy.
     `limits` to limity wywołań narzędzi; bez nich atrapa niczego nie odmawia.
+    `max_iterations` to limit tur modelu: po tylu turach narzędzia nie są już wykonywane.
 
     Example args:
         limits={"find_tickets_vector": 3, "read_tickets_card": 3}
+        max_iterations=10
 
     Example result:
         CompiledStateGraph: anonymize → agent ⇄ run_tools (szukaj, czytaj) → respond
@@ -52,10 +55,11 @@ def build_fake_graph(
     agent, run_tools = fake_search_nodes(RESPOND_TOOL_NAME, SearchDone(), limits)
 
     graph = build_graph(
-        anonymize = AnonymizeNode(FakeAnonymizer()),
-        agent     = agent,
-        run_tools = run_tools,
-        respond   = FakeRespondNode(SearchDone()),
+        anonymize      = AnonymizeNode(FakeAnonymizer()),
+        agent          = agent,
+        run_tools      = run_tools,
+        respond        = FakeRespondNode(SearchDone()),
+        max_iterations = max_iterations,
     )
 
     return graph

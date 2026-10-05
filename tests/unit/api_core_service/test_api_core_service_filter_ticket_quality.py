@@ -53,7 +53,14 @@ def _ticket(**overrides: object) -> ParsedTicket:
     ],
 )
 def test_hollow_solution_is_dropped(solution: str) -> None:
-    """Solution that admits to nothing and adds little else → dropped, with the text as evidence."""
+    """Sprawdza, czy zgłoszenie, którego rozwiązanie tylko przyznaje, że rozwiązania nie ma, jest
+    odrzucane regułą `no_resolution`, a werdykt niesie fragment tego tekstu jako dowód. Pięć
+    przypadków: samo „brak", „nie dotyczy" i trzy zdania, które poza takim przyznaniem prawie nic
+    nie dodają.
+
+    Wyłapuje dwie usterki: puste zgłoszenie przepuszczone do indeksu, gdzie przy wyszukiwaniu
+    wygląda na odpowiedź, oraz odrzucenie bez dowodu, po którym nie da się sprawdzić, czy reguła
+    miała rację."""
     verdict = evaluate_ticket(_ticket(solution=solution))
 
     assert not verdict.keep
@@ -80,12 +87,21 @@ def test_hollow_solution_is_dropped(solution: str) -> None:
     ],
 )
 def test_solution_with_content_is_kept(solution: str) -> None:
-    """Solution whose "brak" opens a real statement → kept; emptiness is short, content is not."""
+    """Sprawdza, czy zgłoszenie zostaje, gdy słowo „brak" otwiera prawdziwą treść albo jest tylko
+    częścią innego słowa. Cztery przypadki: odmowa z uzasadnieniem, „brak zmian w systemie"
+    z wyjaśnieniem dla klienta i dwa rozwiązania ze słowem „brakujące".
+
+    Wyłapuje regułę, która odrzuca po samym słowie „brak": z indeksu wypadłyby odmowy, czyli
+    najcenniejsze zgłoszenia, bo mówią, czego nie próbować, oraz opisy wykonanej pracy."""
     assert evaluate_ticket(_ticket(solution=solution)).keep
 
 
 def test_ordinary_solution_is_kept() -> None:
-    """Solution with no escape phrase at all → kept without any rule firing."""
+    """Sprawdza, czy zwykłe zgłoszenie, z rozwiązaniem opisującym wykonaną pracę, zostaje i nie
+    uruchamia żadnej reguły: werdykt jest pozytywny, a lista trafień reguł pusta.
+
+    Wyłapuje fałszywy alarm na poprawnym zgłoszeniu: filtr wycinałby wtedy z indeksu zgłoszenia,
+    które niosą wiedzę."""
     verdict = evaluate_ticket(_ticket())
 
     assert verdict.keep
@@ -95,7 +111,12 @@ def test_ordinary_solution_is_kept() -> None:
 # --- report -------------------------------------------------------------------------------
 
 def test_report_splits_kept_from_dropped() -> None:
-    """Mixed corpus → each record on the right side of the split."""
+    """Sprawdza, czy raport dzieli zgłoszenia na zachowane i odrzucone: z trzech zgłoszeń, z których
+    drugie ma w rozwiązaniu samo „brak", zachowane są pierwsze i trzecie, a odrzucone drugie.
+
+    Wyłapuje zgłoszenie po złej stronie podziału albo zgubione w raporcie: indeksacja bierze
+    z raportu listę zachowanych, więc puste zgłoszenie weszłoby do indeksu albo dobre by z niego
+    wypadło."""
     report = filter_tickets(
         [
             _ticket(ticket_id="1"),
@@ -109,22 +130,34 @@ def test_report_splits_kept_from_dropped() -> None:
 
 
 def test_report_counts_drops_per_reason() -> None:
-    """Report groups drops by rule → a rule rejecting the wrong records is visible, which a single
-    total would hide."""
+    """Sprawdza, czy raport liczy odrzucenia osobno dla każdej reguły: przy dwóch zgłoszeniach,
+    z których jedno ma w rozwiązaniu samo „brak", wynik to jedno odrzucenie regułą `no_resolution`.
+
+    Wyłapuje raport, który podaje tylko łączną liczbę odrzuconych albo liczy je źle: w jednej sumie
+    nie widać reguły, która odrzuca nie te zgłoszenia, co trzeba."""
     report = filter_tickets([_ticket(ticket_id="1", solution="brak"), _ticket(ticket_id="2")])
 
     assert report.by_reason() == {"no_resolution": 1}
 
 
 def test_report_lists_ticket_ids_per_rule() -> None:
-    """Report names the tickets a rule dropped → stage 11 needs the tickets, not a count."""
+    """Sprawdza, czy raport podaje numery zgłoszeń odrzuconych przez daną regułę: przy dwóch
+    zgłoszeniach, z których odrzucone jest 19596, lista dla reguły `no_resolution` zawiera tylko ten
+    numer.
+
+    Wyłapuje raport, który zna samą liczbę odrzuceń: bez numerów nie da się zajrzeć do odrzuconych
+    zgłoszeń i sprawdzić, czy reguła miała rację."""
     report = filter_tickets([_ticket(ticket_id="19596", solution="brak"), _ticket(ticket_id="2")])
 
     assert report.ticket_ids_for("no_resolution") == ["19596"]
 
 
 def test_empty_corpus_is_an_empty_report() -> None:
-    """No records → empty report, not an error: an unbuilt corpus is a legitimate state."""
+    """Sprawdza, czy pusta lista zgłoszeń daje pusty raport, bez werdyktów i bez odrzuceń, a nie
+    wyjątek.
+
+    Wyłapuje filtr, który wywraca się, gdy nie ma czego oceniać: korpus, którego jeszcze nie
+    zbudowano, to zwykły stan, a nie błąd."""
     report = filter_tickets([])
 
     assert report.verdicts == []
@@ -134,16 +167,24 @@ def test_empty_corpus_is_an_empty_report() -> None:
 # --- drop-rate warning: the guard against the rules going silent ---------------------------
 
 def test_silent_filter_is_reported() -> None:
-    """Large corpus with almost nothing dropped → warning. This is the failure mode the rules
-    cannot detect themselves: a changed prompt or model, and every record suddenly passes while
-    nothing turns red."""
+    """Sprawdza, czy filtr ostrzega, gdy z dużej paczki zgłoszeń nie odrzucił żadnego: paczka ma
+    tyle zgłoszeń, ile wynosi próg `MIN_RECORDS_FOR_DROP_RATE`, a ostrzeżenie każe sprawdzić reguły.
+
+    Wyłapuje zniknięcie tego ostrzeżenia. Reguły czytają tekst pisany przez model, więc po zmianie
+    promptu albo modelu mogą przestać pasować do czegokolwiek i same tego nie zauważą: każde
+    zgłoszenie przechodzi, a żaden błąd się nie pojawia."""
     report = filter_tickets([_ticket(ticket_id=str(i)) for i in range(MIN_RECORDS_FOR_DROP_RATE)])
 
     assert "reguły" in (drop_rate_warning(report) or "")
 
 
 def test_plausible_drop_rate_is_silent() -> None:
-    """Corpus dropping about as much as every measurement predicts → no warning."""
+    """Sprawdza, czy filtr nie ostrzega, gdy odrzuca mniej więcej tyle, ile przewidują pomiary:
+    w paczce o wielkości progu `MIN_RECORDS_FOR_DROP_RATE` jedna piąta zgłoszeń ma w rozwiązaniu
+    samo „brak".
+
+    Wyłapuje ostrzeżenie przy zdrowym przebiegu: alarm, który odzywa się zawsze, przestaje być
+    czytany i nie pomoże wtedy, gdy reguły naprawdę zamilkną."""
     tickets = [_ticket(ticket_id=str(i)) for i in range(MIN_RECORDS_FOR_DROP_RATE)]
     # Roughly the measured 19%, comfortably inside the tolerance.
     for i in range(MIN_RECORDS_FOR_DROP_RATE // 5):
@@ -153,8 +194,11 @@ def test_plausible_drop_rate_is_silent() -> None:
 
 
 def test_small_batch_never_warns() -> None:
-    """Handful of records, none dropped → silence. A share means nothing at this size, and the
-    single-ticket runtime call is exactly this case: 0% dropped is the CORRECT outcome there."""
+    """Sprawdza, czy przy garstce zgłoszeń filtr nie ostrzega, choć nic nie odrzucił: tu paczka to
+    jedno poprawne zgłoszenie.
+
+    Wyłapuje ostrzeżenie liczone na zbyt małej paczce: przy kilku zgłoszeniach odsetek odrzuceń nic
+    nie znaczy, a przy sprawdzaniu jednego zgłoszenia zero odrzuconych to wynik poprawny."""
     report = filter_tickets([_ticket()])
 
     assert drop_rate_warning(report) is None
@@ -163,9 +207,11 @@ def test_small_batch_never_warns() -> None:
 # --- the rule registry --------------------------------------------------------------------
 
 def test_every_rule_is_reachable_by_name() -> None:
-    """Each rule in RULES reports under its own function name → the report groups by that name, so
-    a rule that cannot be named cannot be counted. Parametrised over the registry rather than a
-    hardcoded count, because adding a rule must not mean editing this test."""
+    """Sprawdza, czy każda reguła z rejestru `RULES` ma własną nazwę funkcji i docstring. Test
+    przechodzi po całym rejestrze, więc nowa reguła jest sprawdzana bez zmian w teście.
+
+    Wyłapuje regułę bez nazwy albo bez opisu: raport grupuje odrzucenia po nazwie reguły, więc
+    reguły, której nie da się nazwać, nie dałoby się policzyć."""
     for rule in RULES:
         assert rule.__name__
         assert rule.__doc__, f"{rule.__name__} bez docstringa"

@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 from langgraph.graph.state import CompiledStateGraph
 
-from app.agent_graphs.fake import fake_search_nodes
+from app.agent_graphs.fake import FAKE_MAX_ITERATIONS, fake_search_nodes
 from app.agent_graphs.suggest_questions.graph import build_graph
 from app.agent_graphs.suggest_questions.respond_tool import RESPOND_TOOL_NAME
 from app.agent_graphs.suggest_questions.state import SuggestQuestionsState
@@ -35,8 +35,9 @@ def example_state() -> SuggestQuestionsState:
 
 
 def build_fake_graph(
-    proposal: Proposal = DEFAULT_PROPOSAL,      # np. Proposal(text="…")
-    limits:   Mapping[str, int] | None = None,  # np. {"read_tickets_card": 3}
+    proposal:       Proposal = DEFAULT_PROPOSAL,      # np. Proposal(text="…")
+    limits:         Mapping[str, int] | None = None,  # np. {"read_tickets_card": 3}
+    max_iterations: int = FAKE_MAX_ITERATIONS,        # np. 2 — limit tur modelu
 ) -> CompiledStateGraph:
     """
     Description:
@@ -47,10 +48,12 @@ def build_fake_graph(
 
     Graf jest jednorazowy: `FakeAgentNode` ma zaplanowane tury. Na każde wywołanie buduj nowy.
     `limits` to limity wywołań narzędzi; bez nich atrapa niczego nie odmawia.
+    `max_iterations` to limit tur modelu: po tylu turach narzędzia nie są już wykonywane.
 
     Example args:
         proposal=Proposal(text="…")
         limits={"find_tickets_vector": 3, "read_tickets_card": 3}
+        max_iterations=10
 
     Example result:
         CompiledStateGraph, który na dowolne zgłoszenie oddaje `output` = podaną propozycję
@@ -58,10 +61,11 @@ def build_fake_graph(
     agent, run_tools = fake_search_nodes(RESPOND_TOOL_NAME, proposal, limits)
 
     graph = build_graph(
-        anonymize = AnonymizeNode(FakeAnonymizer()),
-        agent     = agent,
-        run_tools = run_tools,
-        respond   = FakeRespondNode(proposal),
+        anonymize      = AnonymizeNode(FakeAnonymizer()),
+        agent          = agent,
+        run_tools      = run_tools,
+        respond        = FakeRespondNode(proposal),
+        max_iterations = max_iterations,
     )
 
     return graph

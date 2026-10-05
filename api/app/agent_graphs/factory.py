@@ -16,15 +16,17 @@ def build_function_graph(
     """
     Description:
     Buduje graf funkcji, o który prosi trasa. DZIŚ ZAWSZE ATRAPĘ, niezależnie od `LLM_PROVIDER`:
-    właściwych węzłów jeszcze nie ma (p. 9–11), a atrapa nie wysyła niczego poza proces — więc
-    nie ma czego chronić odmową, a odmowa położyłaby trasy na stacku dev z prawdziwym modelem.
-    Wybór po konfiguracji (klient LLM, anonimizator, narzędzia) wchodzi tu razem z p. 9.
+    właściwy jest dopiero węzeł `agent` (p. 9), a `run_tools` i `respond` to atrapy (p. 10–11).
+    Graf z prawdziwym modelem i tymi atrapami płaciłby za tury, których wynik i tak zastępuje
+    atrapa — a atrapa grafu nie wysyła niczego poza proces, więc nie ma czego chronić odmową,
+    a odmowa położyłaby trasy na stacku dev z prawdziwym modelem. Wybór po konfiguracji (klient
+    LLM, anonimizator, narzędzia) wchodzi tu z p. 11.
 
     Atrapa jest jednorazowa (`FakeAgentNode` ma zaplanowane tury), dlatego graf powstaje na każde
     żądanie, a nie raz na proces.
 
-    Graf z narzędziami dostaje limity ich wywołań z konfiguracji (`AGENT_MAX_CALLS_*`) — atrapa
-    `run_tools` egzekwuje je tak samo, jak będzie to robił węzeł właściwy.
+    Graf z narzędziami dostaje z konfiguracji limity ich wywołań (`AGENT_MAX_CALLS_*`) i limit
+    tur modelu (`AGENT_MAX_ITERATIONS`) — atrapy egzekwują je tą samą regułą co węzły właściwe.
 
     Example args:
         graph=app.agent_graphs.gate_close
@@ -32,14 +34,17 @@ def build_function_graph(
     Example result:
         CompiledStateGraph złożony z atrap węzłów
     """
-    # --- graf bez narzędzi wiedzy: nie ma czego limitować ---
+    # --- graf bez narzędzi wiedzy: jedna tura, nie ma czego limitować ---
     if not graph.TOOL_NAMES:
         return graph.build_fake_graph()
 
-    # --- graf z narzędziami: limity wywołań z konfiguracji ---
-    limits = Settings().tool_call_limits()
+    # --- graf z narzędziami: limity z konfiguracji ---
+    settings = Settings()
 
-    return graph.build_fake_graph(limits=limits)
+    return graph.build_fake_graph(
+        limits         = settings.tool_call_limits(),
+        max_iterations = settings.agent_max_iterations,
+    )
 
 
 def get_graph_builder() -> GraphBuilder:

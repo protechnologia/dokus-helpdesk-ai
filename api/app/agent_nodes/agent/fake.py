@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.agent_nodes.base import Node
+from app.agent_nodes.agent.base import AgentNodeBase
 from app.engine_llm import ChatMessage, LLMError, LLMUsage, ToolCall
 
 # Odpowiedź atrapy, gdy nikt nie zaplanował tur — stała, a nie echo wejścia, żeby test, który
@@ -35,22 +35,23 @@ def tool_call_turn(
     return turn
 
 
-class FakeAgentNode(Node):
+class FakeAgentNode(AgentNodeBase):
     """
     Description:
     Atrapa węzła `agent`: zamiast pytać model, oddaje zaplanowane tury po kolei. Domyślnie jedna
-    tura — od razu odpowiedź, bez narzędzi.
+    tura — sam tekst, bez narzędzi.
 
     Flow:
         1. Test tworzy ją z listą tur (np. najpierw `tool_call_turn(…)`, potem odpowiedź).
-        2. Każde `run()` zapisuje stan w `calls`, dokleja kolejną turę do `messages`, podbija
-           `iterations` i dokłada zużycie modelu jednej tury (`usage`) — domyślnie jedno
-           wywołanie bez tokenów i kosztu, bo atrapa niczego nie wysyła.
+        2. Każde `run()` zapisuje stan w `calls` i oddaje kolejną turę tą samą zmianą stanu co
+           węzeł właściwy (`turn_update()`); zużycie jednej tury to domyślnie jedno wywołanie
+           bez tokenów i kosztu, bo atrapa niczego nie wysyła.
         3. Brak kolejnej tury to błąd, nie powtórka: graf zawołał agenta częściej, niż test
            zakładał.
-    """
 
-    name = "agent"
+    Tury użytkownika atrapa nie dokłada — nie zna promptu grafu — więc `messages` po przebiegu na
+    atrapie zaczynają się od tury modelu.
+    """
 
     def __init__(
         self,
@@ -95,7 +96,7 @@ class FakeAgentNode(Node):
         Example result:
             {"messages": [ChatMessage(role="assistant", …)], "iterations": 1,
              "usage": LLMUsage(calls=1),
-             "log": [LogEntry(node="agent", message="tura 1: odpowiedź")]}
+             "log": [LogEntry(node="agent", message="tura 1: tekst bez narzędzi")]}
 
         Raises:
             LLMError: zaplanowane tury się skończyły
@@ -108,15 +109,4 @@ class FakeAgentNode(Node):
         turn = self._turns[self._next]
         self._next += 1
 
-        iteration = state.iterations + 1
-        tools     = ", ".join(call.name for call in turn.tool_calls)
-        action    = f"narzędzia: {tools}" if tools else "odpowiedź"
-
-        update = {
-            "messages":   [turn],
-            "iterations": iteration,
-            "usage":      self._usage,
-            "log":        [self.log_entry(f"tura {iteration}: {action}")],
-        }
-
-        return update
+        return self.turn_update(state=state, messages=[turn], usage=self._usage)

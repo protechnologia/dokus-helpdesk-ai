@@ -5,7 +5,11 @@ from embedder_app.main import create_app
 
 
 def test_response_carries_generated_request_id() -> None:
-    """Request without the header → response carries a generated, non-empty id."""
+    """Sprawdza, czy na żądanie bez nagłówka `X-Request-ID` embedder odpowiada z własnym,
+    niepustym identyfikatorem żądania w tym nagłówku.
+
+    Wyłapuje aplikację bez warstwy nadającej identyfikator żądania: wpisów logu jednego żądania
+    nie dałoby się wtedy ze sobą powiązać."""
     client = TestClient(create_app())
 
     response = client.get("/health")
@@ -14,7 +18,11 @@ def test_response_carries_generated_request_id() -> None:
 
 
 def test_upstream_request_id_is_propagated() -> None:
-    """`api` supplies an id → the same id comes back (one id spans both services)."""
+    """Sprawdza, czy embedder odsyła bez zmian identyfikator żądania, który wołający (usługa `api`)
+    podał w nagłówku `X-Request-ID`.
+
+    Wyłapuje nadpisanie przysłanego identyfikatora własnym: jeden identyfikator ma spinać logi
+    obu usług, a po podmianie wpisów embeddera nie dałoby się powiązać z żądaniem w `api`."""
     client = TestClient(create_app())
 
     response = client.get("/health", headers={REQUEST_ID_HEADER: "id-from-api"})
@@ -23,7 +31,11 @@ def test_upstream_request_id_is_propagated() -> None:
 
 
 def test_generated_ids_differ_between_requests() -> None:
-    """Two requests without the header → two different ids (correlation would be useless)."""
+    """Sprawdza, czy dwa kolejne żądania bez nagłówka `X-Request-ID` dostają dwa różne
+    identyfikatory.
+
+    Wyłapuje identyfikator stały albo powtarzający się: wpisy różnych żądań zlałyby się wtedy
+    w logach w jedno i identyfikator do niczego by nie służył."""
     client = TestClient(create_app())
 
     first  = client.get("/health").headers[REQUEST_ID_HEADER]
@@ -33,7 +45,11 @@ def test_generated_ids_differ_between_requests() -> None:
 
 
 def test_error_response_carries_the_request_id() -> None:
-    """Failing request in the real app → same id in the body and in the response header."""
+    """Sprawdza, czy odpowiedź na błędne żądanie w pełnej aplikacji embeddera (tu `/embed` bez
+    trybu, status 422) niesie ten sam identyfikator żądania w treści błędu i w nagłówku.
+
+    Wyłapuje obsługę błędów, która nie widzi identyfikatora nadanego żądaniu: w treści błędu
+    byłby wtedy pusty albo inny niż w nagłówku i w logach."""
     client = TestClient(create_app())
 
     response = client.post("/embed", json={"texts": ["Brak tonera"]})   # no `mode` → 422

@@ -6,7 +6,11 @@ QUERY = FindTicketsTextQuery(exact="Nie udało się skomunikować z serwerem")
 
 
 async def test_the_result_is_the_same_on_every_search() -> None:
-    """Dwa wyszukiwania → te same numery w tej samej kolejności: atrapa ma być przewidywalna."""
+    """Sprawdza, czy atrapa wyszukiwania tekstowego oddaje za każdym razem ten sam wynik: dwa
+    wyszukiwania dają numery zgłoszeń `90011` i `90012` w tej samej kolejności.
+
+    Wyłapuje atrapę, której wynik zależy od tego, którym z kolei wywołaniem jest wyszukiwanie:
+    test grafu oparty na niej przestałby być przewidywalny."""
     tool = FakeFindTicketsTextTool()
 
     first  = await tool.find(QUERY)
@@ -17,7 +21,11 @@ async def test_the_result_is_the_same_on_every_search() -> None:
 
 
 async def test_every_query_is_recorded() -> None:
-    """Każde wyszukiwanie → zapytanie w `queries`, żeby test grafu sprawdził, o co pytał agent."""
+    """Sprawdza, czy atrapa zapisuje zapytanie w publicznej liście `queries`: po jednym
+    wyszukiwaniu jest tam dokładnie to zapytanie.
+
+    Wyłapuje atrapę, która zapytań nie zapisuje: test grafu nie mógłby wtedy sprawdzić, o co
+    agent pytał."""
     tool = FakeFindTicketsTextTool()
 
     await tool.run(QUERY)
@@ -26,8 +34,12 @@ async def test_every_query_is_recorded() -> None:
 
 
 async def test_the_model_gets_numbers_and_how_each_was_found() -> None:
-    """Tekst dla modelu → JSON z numerem i sposobem dopasowania pod nazwą pola, którym agent
-    pytał; wątku ani jego fragmentu nie ma, więc model musi je odczytać."""
+    """Sprawdza, czy tekst dla modelu to JSON z numerem każdego zgłoszenia, z tym, czym je
+    znaleziono (`exact` albo `words`, czyli nazwa pola, którym agent pytał), i z licznikiem
+    pominiętych. Słowa „skomunikować", które jest w szukanym komunikacie, w tym tekście nie ma.
+
+    Wyłapuje wynik wyszukiwania, który niesie wątek albo jego fragment: model mógłby wtedy
+    odpowiedzieć bez odczytania wątku, a taka odpowiedź nie ma źródła."""
     text = await FakeFindTicketsTextTool().run(QUERY)
     body = json.loads(text)
 
@@ -42,7 +54,11 @@ async def test_the_model_gets_numbers_and_how_each_was_found() -> None:
 
 
 async def test_matches_over_the_limit_are_counted() -> None:
-    """Licznik pominiętych ponad limit → w wyniku: mówi agentowi, że zapytanie było za ogólne."""
+    """Sprawdza, czy liczba zgłoszeń pominiętych ponad limit trafia do tekstu dla modelu: atrapa
+    ustawiona na pusty wynik i 35 pominiętych oddaje pustą listę i liczbę 35.
+
+    Wyłapuje wynik, który gubi ten licznik: agent nie dowiedziałby się, że jego zapytanie było
+    za ogólne."""
     tool = FakeFindTicketsTextTool(tickets=[], omitted_over_limit=35)
     body = json.loads(await tool.run(QUERY))
 
@@ -50,5 +66,9 @@ async def test_matches_over_the_limit_are_counted() -> None:
 
 
 def test_the_search_cannot_be_cited() -> None:
-    """Wyszukiwanie zgłoszeń → brak `cite()`: numer zgłoszenia nie jest źródłem."""
+    """Sprawdza, czy atrapa wyszukiwania tekstowego nie ma metody `cite()`, którą narzędzia
+    odczytu podają źródła odpowiedzi.
+
+    Wyłapuje wyszukiwanie, które zaczęło cytować: sam numer znalezionego zgłoszenia trafiłby
+    wtedy na listę źródeł, choć numer zgłoszenia nie jest źródłem."""
     assert not hasattr(FakeFindTicketsTextTool(), "cite")

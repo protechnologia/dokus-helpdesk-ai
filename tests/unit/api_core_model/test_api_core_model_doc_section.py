@@ -13,8 +13,11 @@ VALID = {
 
 
 def test_a_top_level_section_needs_no_chapter_and_no_date() -> None:
-    """Sekcja bez ścieżki rozdziału i bez daty → poprawna: stoi wprost w dokumencie, a data
-    wydania bywa nieznana."""
+    """Sprawdza, czy opis sekcji bez ścieżki rozdziału i bez daty wydania jest poprawny: ścieżka
+    jest wtedy pustą listą, a data jest pusta (`None`).
+
+    Wyłapuje model, który wymaga tych pól: sekcja bywa wprost w dokumencie, poza rozdziałami,
+    a data wydania bywa nieznana, więc takich sekcji nie dałoby się opisać."""
     section = DocSection(**VALID)
 
     assert section.chapter_path == []
@@ -23,13 +26,20 @@ def test_a_top_level_section_needs_no_chapter_and_no_date() -> None:
 
 @pytest.mark.parametrize("field", ["section_id", "document", "version", "title", "description"])
 def test_an_empty_required_field_is_refused(field: str) -> None:
-    """Puste pole wymagane → ValidationError; przy `version` dlatego, że instrukcja do nieznanego
-    wydania jest nie do odróżnienia od nieaktualnej."""
+    """Sprawdza, czy pusta wartość w każdym z pól wymaganych opisu sekcji — identyfikatorze,
+    dokumencie, wydaniu, tytule i opisie — daje błąd walidacji.
+
+    Wyłapuje opis sekcji przyjęty z pustym polem. Najgroźniejsze jest puste wydanie: instrukcji
+    do nieznanej wersji nie da się odróżnić od nieaktualnej."""
     with pytest.raises(ValidationError):
         DocSection(**{**VALID, field: ""})
 
 
 def test_an_unknown_field_is_refused() -> None:
-    """Pole spoza kontraktu → ValidationError: treść sekcji nie należy do jej opisu."""
+    """Sprawdza, czy pole, którego opis sekcji nie przewiduje (tu `text` z treścią sekcji), daje
+    błąd walidacji.
+
+    Wyłapuje ciche pomijanie nadmiarowych pól: treść sekcji nie należy do jej opisu, więc
+    podana tutaj zniknęłaby bez ostrzeżenia."""
     with pytest.raises(ValidationError):
         DocSection(**VALID, text="Uprawnienie nadaje administrator…")

@@ -38,8 +38,12 @@ def _in_one_line(
 
 
 def test_the_description_explains_every_class_of_the_dictionary() -> None:
-    """Słownik domyślny → w opisie narzędzia każda klasa z jej znaczeniem: karta niesie samą
-    nazwę klasy, a „bez zmian w systemie" prowadzi do innej odpowiedzi niż „naprawione"."""
+    """Sprawdza, czy opis narzędzia zbudowanego na domyślnym słowniku rozstrzygnięć wymienia każdą
+    klasę tego słownika razem z jej znaczeniem.
+
+    Wyłapuje opis, w którym brakuje klasy albo jej objaśnienia: karta niesie samą nazwę klasy,
+    a „bez zmian w systemie" prowadzi do innej odpowiedzi niż „naprawione", więc model musi
+    wiedzieć, co która znaczy."""
     description = _in_one_line(FakeReadTicketsCardTool().description)
 
     for entry in get_resolution_classes().classes:
@@ -47,8 +51,13 @@ def test_the_description_explains_every_class_of_the_dictionary() -> None:
 
 
 def test_the_place_for_the_classes_is_filled_and_the_call_limit_waits() -> None:
-    """Opis instancji → bez miejsca na klasy, ale nadal z miejscem na limit wywołań: klasy
-    wstawia narzędzie ze słownika, a limit dopiero graf z konfiguracji."""
+    """Sprawdza, czy w opisie gotowego narzędzia nie ma już znacznika miejsca na klasy
+    rozstrzygnięcia, ale nadal jest znacznik `{{max_calls}}` na limit wywołań. Opis wspólny,
+    z którego powstają opisy poszczególnych narzędzi, zachowuje znacznik klas.
+
+    Wyłapuje narzędzie, które nie wstawia klas ze słownika albo przy okazji usuwa miejsce na limit:
+    limit wpisuje dopiero graf z konfiguracji, więc model dostałby opis z surowym znacznikiem albo
+    bez limitu."""
     description = FakeReadTicketsCardTool().description
 
     assert RESOLUTION_CLASSES_PLACEHOLDER not in description
@@ -57,8 +66,12 @@ def test_the_place_for_the_classes_is_filled_and_the_call_limit_waits() -> None:
 
 
 def test_the_description_follows_the_clients_dictionary() -> None:
-    """Słownik innego helpdesku → w opisie jego klasy, a domyślnych nie ma: słownik to dane
-    klienta i opis ma się zmieniać razem z nim, bez naszego deployu."""
+    """Sprawdza, czy narzędzie zbudowane na słowniku innego helpdesku ma w opisie jego klasy
+    (`zwrot_do_dzialu`, `zamkniete`) z ich znaczeniem, a domyślnej klasy `bez_zmian_w_systemie`
+    w opisie nie ma.
+
+    Wyłapuje opis z klasami wpisanymi na stałe: słownik to dane klienta i opis ma się zmieniać razem
+    z nim, bez naszego wdrożenia."""
     description = FakeReadTicketsCardTool(resolution=OTHER).description
 
     assert "- `zwrot_do_dzialu`: sprawę przekazano do działu merytorycznego" in description
@@ -67,8 +80,13 @@ def test_the_description_follows_the_clients_dictionary() -> None:
 
 
 def test_one_tool_does_not_change_the_description_of_another() -> None:
-    """Dwa narzędzia z różnymi słownikami → każde ma swój opis: opis wypełnia instancja, a opis
-    klasy zostaje nietknięty."""
+    """Sprawdza, czy dwa narzędzia zbudowane na różnych słownikach mają każde swój opis: klasa
+    `zwrot_do_dzialu` jest w opisie pierwszego, a w opisie drugiego, zbudowanego po nim na słowniku
+    domyślnym, jej nie ma.
+
+    Wyłapuje wypełnianie opisu wspólnego dla wszystkich egzemplarzy narzędzia zamiast opisu jednego
+    z nich: klasy rozstrzygnięcia z jednego słownika przechodziłyby wtedy do każdego kolejnego
+    narzędzia."""
     other   = FakeReadTicketsCardTool(resolution=OTHER)
     default = FakeReadTicketsCardTool()
 
@@ -77,8 +95,12 @@ def test_one_tool_does_not_change_the_description_of_another() -> None:
 
 
 def test_a_long_meaning_wraps_like_the_rest_of_the_description() -> None:
-    """Długie znaczenie klasy → zawinięte do szerokości opisu, z wcięciem dalszych linii,
-    a nazwa klasy w całości w pierwszej linii: model ma ją rozpoznać w polu `resolution`."""
+    """Sprawdza, czy długie znaczenie klasy rozstrzygnięcia jest zawijane do szerokości opisu
+    narzędzia: nazwa klasy stoi w całości w pierwszej linii, żadna linia nie przekracza szerokości,
+    a dalsze linie są wcięte.
+
+    Wyłapuje zawijanie, które dzieli nazwę klasy między linie albo gubi wcięcie: model ma rozpoznać
+    tę nazwę w polu `resolution` karty i widzieć, gdzie kończy się opis jednej klasy."""
     long_hint  = "klient działa u siebie " * 8
     vocabulary = ResolutionVocabulary(
         version = 1,
@@ -94,8 +116,11 @@ def test_a_long_meaning_wraps_like_the_rest_of_the_description() -> None:
 
 
 def test_a_dictionary_without_classes_says_so() -> None:
-    """Słownik bez klas → jedno zdanie, że klas nie ma, zamiast pustego miejsca pod nagłówkiem:
-    produkt działa też bez skonfigurowanego słownika."""
+    """Sprawdza, czy dla słownika bez żadnej klasy lista klas w opisie narzędzia to jedno zdanie:
+    „słownik nie definiuje żadnej klasy".
+
+    Wyłapuje puste miejsce pod nagłówkiem w opisie: produkt działa też bez skonfigurowanego
+    słownika, a model nie wiedziałby, czy klas nie ma, czy opis jest urwany."""
     text = render_resolution_classes(ResolutionVocabulary(version=1, classes=[]))
 
     assert text == "- słownik nie definiuje żadnej klasy"

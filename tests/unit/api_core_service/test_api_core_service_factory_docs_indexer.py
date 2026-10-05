@@ -35,13 +35,20 @@ def _settings(
 # --- nazwy indeksów -----------------------------------------------------------------------
 
 def test_the_proper_index_takes_the_configured_collection() -> None:
-    """Indeks właściwy → domyślna tabela dokumentacji i kolekcja z konfiguracji."""
+    """Sprawdza, czy indeks właściwy dostaje domyślną tabelę dokumentacji `docs_text` i kolekcję
+    o nazwie z konfiguracji, tu `docs`.
+
+    Wyłapuje dopisek albo inną nazwę przy indeksie właściwym: indeksacja pisałaby wtedy do innej
+    tabeli i kolekcji niż te, z których odpowiada agent."""
     assert docs_index_names(_settings(), synthetic=False) == ("docs_text", "docs")
 
 
 def test_the_synthetic_index_has_its_own_table_and_collection() -> None:
-    """Indeks syntetyczny → obie nazwy z dopiskiem: paczka zmyślona nie ma jak trafić do
-    tabeli ani kolekcji, z których odpowiada agent."""
+    """Sprawdza, czy indeks syntetyczny dostaje własną tabelę i własną kolekcję, obie z dopiskiem
+    `_synthetic`: `docs_text_synthetic` i `docs_synthetic`.
+
+    Wyłapuje indeks syntetyczny pod nazwami indeksu właściwego: zmyślona paczka dokumentacji
+    trafiłaby do tabeli i kolekcji, z których odpowiada agent."""
     assert docs_index_names(_settings(), synthetic=True) == (
         "docs_text_synthetic",
         "docs_synthetic",
@@ -49,8 +56,12 @@ def test_the_synthetic_index_has_its_own_table_and_collection() -> None:
 
 
 def test_the_synthetic_collection_follows_the_configured_name() -> None:
-    """Inna nazwa kolekcji w konfiguracji → indeks syntetyczny stoi obok niej, nie obok
-    domyślnej."""
+    """Sprawdza, czy nazwa kolekcji syntetycznej powstaje z nazwy ustawionej w konfiguracji: przy
+    kolekcji `instrukcje` indeks syntetyczny to `instrukcje_synthetic`.
+
+    Wyłapuje nazwę kolekcji syntetycznej zaszytą na stałe: po zmianie nazwy kolekcji w konfiguracji
+    indeks syntetyczny nadal nazywałby się `docs_synthetic`, czyli stałby obok kolekcji domyślnej,
+    a nie obok ustawionej."""
     names = docs_index_names(_settings(qdrant_docs_collection="instrukcje"), synthetic=True)
 
     assert names == ("docs_text_synthetic", "instrukcje_synthetic")
@@ -70,8 +81,12 @@ async def test_the_importer_writes_to_the_index_it_was_built_for(
     table:      str,
     collection: str,
 ) -> None:
-    """Flaga indeksu → indekser z tabelą i kolekcją tego indeksu i z tą samą flagą, którą
-    sprawdza manifesty."""
+    """Sprawdza, czy indekser zbudowany dla danego indeksu, właściwego albo syntetycznego, dostaje
+    tabelę i kolekcję tego indeksu oraz tę samą flagę, którą potem porównuje z manifestami
+    dokumentów.
+
+    Wyłapuje fabrykę, która podaje nazwy jednego indeksu, a flagę drugiego: indekser przyjąłby wtedy
+    zmyśloną paczkę do właściwego indeksu albo prawdziwą dokumentację do syntetycznego."""
     indexer = build_docs_indexer(_settings(), synthetic)
 
     try:
@@ -83,7 +98,11 @@ async def test_the_importer_writes_to_the_index_it_was_built_for(
 
 
 async def test_the_fragment_length_comes_from_the_configuration() -> None:
-    """`RAG_DOCS_FRAGMENT_CHARS` → limit długości fragmentu w indekserze."""
+    """Sprawdza, czy limit długości fragmentu w indekserze pochodzi z konfiguracji: przy
+    `RAG_DOCS_FRAGMENT_CHARS` ustawionym na 800 indekser ma limit 800.
+
+    Wyłapuje limit zaszyty w kodzie albo wzięty z innego pola: zmiana ustawienia nie zmieniałaby
+    wtedy cięcia dokumentacji i nic by tego nie pokazało."""
     indexer = build_docs_indexer(_settings(rag_docs_fragment_chars=800), synthetic=False)
 
     try:
@@ -93,7 +112,10 @@ async def test_the_fragment_length_comes_from_the_configuration() -> None:
 
 
 def test_a_missing_postgres_password_is_refused_at_build() -> None:
-    """Brak hasła do bazy → błąd konfiguracji przy budowie, nie błąd połączenia w środku
-    indeksacji."""
+    """Sprawdza, czy budowa indeksera bez hasła do bazy kończy się błędem konfiguracji
+    `DbPostgresConfigError`, który wymienia zmienną `POSTGRES_PASSWORD`.
+
+    Wyłapuje brak hasła wykryty za późno: błąd wyszedłby dopiero jako nieudane połączenie w środku
+    indeksacji i nie mówiłby, którą zmienną trzeba ustawić."""
     with pytest.raises(DbPostgresConfigError, match="POSTGRES_PASSWORD"):
         build_docs_indexer(_settings(postgres_password=None), synthetic=False)

@@ -12,8 +12,11 @@ QUERY = FindTicketsVectorQuery(
 
 
 async def test_the_result_is_the_same_on_every_search() -> None:
-    """Dwa wyszukiwania → te same numery w tej samej kolejności: atrapa ma być przewidywalna, żeby
-    test grafu nie zależał od tego, którym z kolei wywołaniem jest."""
+    """Sprawdza, czy atrapa wyszukiwania po znaczeniu oddaje za każdym razem ten sam wynik: dwa
+    wyszukiwania dają numery zgłoszeń `90001`, `90002` i `90003` w tej samej kolejności.
+
+    Wyłapuje atrapę, której wynik zależy od tego, którym z kolei wywołaniem jest wyszukiwanie:
+    test grafu oparty na niej przestałby być przewidywalny."""
     tool = FakeFindTicketsVectorTool()
 
     first  = await tool.find(QUERY)
@@ -24,7 +27,11 @@ async def test_the_result_is_the_same_on_every_search() -> None:
 
 
 async def test_every_query_is_recorded() -> None:
-    """Każde wyszukiwanie → zapytanie w `queries`, żeby test grafu sprawdził, o co pytał agent."""
+    """Sprawdza, czy atrapa zapisuje zapytanie w publicznej liście `queries`: po jednym
+    wyszukiwaniu jest tam dokładnie to zapytanie.
+
+    Wyłapuje atrapę, która zapytań nie zapisuje: test grafu nie mógłby wtedy sprawdzić, o co
+    agent pytał."""
     tool = FakeFindTicketsVectorTool()
 
     await tool.run(QUERY)
@@ -33,8 +40,11 @@ async def test_every_query_is_recorded() -> None:
 
 
 async def test_the_model_gets_numbers_and_scores_and_nothing_else() -> None:
-    """Tekst dla modelu → JSON z numerem i podobieństwem każdego zgłoszenia, od najbardziej
-    podobnego; treści karty nie ma, więc model musi ją odczytać."""
+    """Sprawdza, czy tekst dla modelu to JSON z numerem i podobieństwem każdego z trzech zgłoszeń,
+    od najbardziej podobnego, oraz z licznikiem trafień odciętych progiem — i z niczym więcej.
+
+    Wyłapuje wynik wyszukiwania, do którego trafiła treść karty: model mógłby wtedy odpowiedzieć
+    bez odczytania karty, a taka odpowiedź nie ma źródła."""
     body = json.loads(await FakeFindTicketsVectorTool().run(QUERY))
 
     assert body == {
@@ -48,8 +58,11 @@ async def test_the_model_gets_numbers_and_scores_and_nothing_else() -> None:
 
 
 async def test_an_empty_result_says_what_the_threshold_cut() -> None:
-    """Brak zgłoszeń i trzy odcięte → wynik niesie oba: „nic nie było" i „próg to wyciął" to dla
-    agenta różne sytuacje."""
+    """Sprawdza, czy pusty wynik niesie liczbę trafień odciętych progiem: atrapa ustawiona na brak
+    zgłoszeń i trzy odcięte oddaje modelowi pustą listę i liczbę 3.
+
+    Wyłapuje wynik, który gubi ten licznik: agent nie odróżniłby sytuacji „nic nie było" od
+    „próg to wyciął"."""
     tool = FakeFindTicketsVectorTool(tickets=[], dropped_below_threshold=3)
     body = json.loads(await tool.run(QUERY))
 
@@ -57,6 +70,9 @@ async def test_an_empty_result_says_what_the_threshold_cut() -> None:
 
 
 def test_the_search_cannot_be_cited() -> None:
-    """Wyszukiwanie zgłoszeń → brak `cite()`: numer zgłoszenia nie jest źródłem, źródłem jest
-    dopiero odczytana karta albo wątek."""
+    """Sprawdza, czy atrapa wyszukiwania po znaczeniu nie ma metody `cite()`, którą narzędzia
+    odczytu podają źródła odpowiedzi.
+
+    Wyłapuje wyszukiwanie, które zaczęło cytować: sam numer zgłoszenia trafiłby wtedy na listę
+    źródeł, a źródłem jest dopiero odczytana karta albo wątek."""
     assert not hasattr(FakeFindTicketsVectorTool(), "cite")

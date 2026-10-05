@@ -164,8 +164,13 @@ async def docs(
 # --- zgłoszenia ---------------------------------------------------------------------------
 
 async def test_tickets_are_created_with_both_named_vectors(tickets: TicketsCollection) -> None:
-    """Świeża kolekcja → Qdrant naprawdę przyjmuje dwa nazwane wektory, a ponowne `ensure()`
-    sprawdza PRAWDZIWY opis kolekcji i mówi „już była", zamiast ją przepisywać."""
+    """Sprawdza, czy prawdziwy Qdrant przyjmuje kolekcję zgłoszeń z dwoma nazwanymi wektorami:
+    pierwsze `ensure()` ją zakłada, a drugie czyta jej opis z Qdranta i odpowiada, że kolekcja
+    już jest, zamiast zakładać ją od nowa.
+
+    Wyłapuje żądanie założenia kolekcji, którego Qdrant nie przyjmuje, oraz odczyt opisu
+    kolekcji niezgodny z tym, co Qdrant naprawdę oddaje — indeksacja odrzucałaby wtedy własną,
+    poprawną kolekcję."""
     assert await tickets.ensure() is True
     assert await tickets.ensure() is False
 
@@ -173,8 +178,14 @@ async def test_tickets_are_created_with_both_named_vectors(tickets: TicketsColle
 async def test_a_ticket_reads_back_with_its_payload_and_both_vectors(
     tickets: TicketsCollection,
 ) -> None:
-    """Zapisany punkt → odczytany po numerze zgłoszenia, z nietkniętym payloadem i każdym
-    wektorem na swoim miejscu. Na tym stoi cała indeksacja."""
+    """Sprawdza, czy zapisane zgłoszenie da się odczytać po numerze w tym samym kształcie: pod
+    identyfikatorem wyliczonym z numeru, z niezmienionymi danymi karty i z każdym z dwóch
+    wektorów na swoim miejscu. Wektory porównuje się po kierunku, bo Qdrant przy zapisie zmienia
+    ich długość.
+
+    Wyłapuje zapis, który gubi albo zmienia dane karty, trafia pod inny identyfikator albo
+    zamienia wektory miejscami. Na tym stoi cała indeksacja: kartę zgłoszenia agent czyta
+    właśnie stąd."""
     await tickets.ensure()
 
     point = _ticket_point("33644")
@@ -197,8 +208,12 @@ async def test_a_ticket_reads_back_with_its_payload_and_both_vectors(
 async def test_tickets_read_back_in_the_order_asked_and_without_the_missing(
     tickets: TicketsCollection,
 ) -> None:
-    """Trzy numery, w tym jeden spoza kolekcji → dwa punkty w kolejności zapytania. Kolejność
-    odpowiedzi nie jest obietnicą Qdranta, a brak punktu nie jest u niego błędem."""
+    """Sprawdza, czy odczyt po trzech numerach, z których jednego w kolekcji nie ma, oddaje dwa
+    zgłoszenia w kolejności numerów z zapytania.
+
+    Wyłapuje odczyt, który oddaje zgłoszenia w kolejności Qdranta (a on jej nie obiecuje) albo
+    traktuje brakujący numer jak błąd — tymczasem zgłoszenie bez karty to zwykły stan, nie
+    awaria."""
     await tickets.ensure()
     await tickets.upsert([_ticket_point("33644"), _ticket_point("10718")])
 
@@ -208,8 +223,11 @@ async def test_tickets_read_back_in_the_order_asked_and_without_the_missing(
 
 
 async def test_reupserting_the_same_ticket_overwrites_it(tickets: TicketsCollection) -> None:
-    """To samo zgłoszenie zapisane dwa razy → jeden punkt. Dzięki temu przebudowa nadpisuje
-    korpus, zamiast go dublować."""
+    """Sprawdza, czy to samo zgłoszenie zapisane dwa razy, za drugim razem z innymi wektorami,
+    zostaje w kolekcji jako jeden punkt.
+
+    Wyłapuje zapis, który przy powtórzeniu dokłada drugi punkt: ponowna indeksacja dublowałaby
+    wtedy zgłoszenia, zamiast je nadpisywać."""
     await tickets.ensure()
 
     await tickets.upsert([_ticket_point("33644", fill=0.1)])
@@ -222,8 +240,13 @@ async def test_a_wrong_vector_size_is_refused_against_a_real_collection(
     client:  QdrantClient,
     tickets: TicketsCollection,
 ) -> None:
-    """Kolekcja w jednym wymiarze, konfiguracja mówi inny → błąd konfiguracji, sprawdzony wobec
-    PRAWDZIWEGO opisu kolekcji, którego kształtu nie my ustalamy."""
+    """Sprawdza, czy kolekcja założona z wektorami o wymiarze 4 jest odrzucana błędem
+    konfiguracji (`DbQdrantConfigError`), gdy ktoś wskaże ją z wymiarem 5. Wymiar istniejącej
+    kolekcji jest czytany z opisu, który oddaje prawdziwy Qdrant i którego kształtu nie ustala
+    nasz kod.
+
+    Wyłapuje sprawdzenie wymiaru, które nie rozumie prawdziwego opisu kolekcji i przepuszcza
+    niezgodność: wyszłaby ona dopiero w środku indeksacji, jako punkty odrzucone przez Qdranta."""
     await tickets.ensure()
 
     with pytest.raises(DbQdrantConfigError):
@@ -231,8 +254,12 @@ async def test_a_wrong_vector_size_is_refused_against_a_real_collection(
 
 
 async def test_search_ranks_the_nearest_ticket_first(tickets: TicketsCollection) -> None:
-    """Wektor zapytania → trafienia w kolejności prawdziwego podobieństwa, z payloadem.
-    Sortuje Qdrant, nie my, więc tej połowy nie dowiedzie żaden test w procesie."""
+    """Sprawdza, czy wyszukiwanie po wektorze oddaje zgłoszenia od najbardziej podobnego: z dwóch
+    zapisanych pierwsze jest to, którego wektor ma ten sam kierunek co zapytanie; ma ono wyższe
+    podobieństwo i niesie dane swojej karty.
+
+    Wyłapuje wyszukiwanie, które oddaje trafienia w złej kolejności albo bez danych karty.
+    Sortuje Qdrant, nie nasz kod, więc dowieść tego może tylko test na działającej usłudze."""
     await tickets.ensure()
 
     # Dwa punkty o różnych kierunkach, żeby o „najbliższym" rozstrzygały dane, nie kolejność
@@ -255,8 +282,13 @@ async def test_search_ranks_the_nearest_ticket_first(tickets: TicketsCollection)
 
 
 async def test_search_reads_the_named_space_it_was_asked_for(tickets: TicketsCollection) -> None:
-    """Ten sam wektor wobec `problem` i wobec `sts` → różne podobieństwa. To pomyłka, która się
-    nie ogłasza: obie przestrzenie odpowiadają, a zła oddaje wiarygodne trafienia."""
+    """Sprawdza, czy wyszukiwanie szuka w tej z dwóch przestrzeni wektorów, którą wskazano: ten
+    sam wektor zapytania daje podobieństwo 1 wobec wektora `problem` i -1 wobec wektora `sts`
+    tego samego zgłoszenia, bo w teście oba mają przeciwne kierunki.
+
+    Wyłapuje wyszukiwanie, które pomija podaną nazwę wektora i szuka w niewłaściwej przestrzeni.
+    Taka pomyłka sama się nie ujawnia: obie przestrzenie odpowiadają, a zła oddaje wiarygodnie
+    wyglądające trafienia."""
     await tickets.ensure()
 
     point = _ticket_point("33644")
@@ -277,7 +309,11 @@ async def test_search_reads_the_named_space_it_was_asked_for(tickets: TicketsCol
 
 
 async def test_search_of_an_unknown_named_vector_is_an_error(tickets: TicketsCollection) -> None:
-    """Literówka w nazwie wektora → `DbQdrantError` z PRAWDZIWEGO Qdranta, nigdy pusta lista."""
+    """Sprawdza, czy wyszukiwanie z literówką w nazwie wektora („problme" zamiast „problem")
+    kończy się błędem (`DbQdrantError`), bo tak odpowiada na nią prawdziwy Qdrant.
+
+    Wyłapuje literówkę, która wraca jako pusta lista trafień: wyglądałaby jak „nie ma podobnych
+    zgłoszeń", choć wyszukiwanie w ogóle się nie odbyło."""
     await tickets.ensure()
     await tickets.upsert([_ticket_point("33644")])
 
@@ -286,8 +322,11 @@ async def test_search_of_an_unknown_named_vector_is_an_error(tickets: TicketsCol
 
 
 async def test_reading_from_a_missing_collection_is_an_error(tickets: TicketsCollection) -> None:
-    """Odczyt i licznik na kolekcji, której nie ma → `DbQdrantError`, nie pusty wynik: pusta
-    lista wyglądałaby jak „nie ma takiego zgłoszenia"."""
+    """Sprawdza, czy odczyt zgłoszenia i liczenie punktów w kolekcji, której nie ma, kończą się
+    błędem (`DbQdrantError`), a nie pustym wynikiem.
+
+    Wyłapuje brak kolekcji przemilczany jako pusta lista albo zero: wyglądałoby to jak „nie ma
+    takiego zgłoszenia", choć w rzeczywistości nie ma całego indeksu."""
     with pytest.raises(DbQdrantError):
         await tickets.read_by_id(["33644"])
 
@@ -296,7 +335,11 @@ async def test_reading_from_a_missing_collection_is_an_error(tickets: TicketsCol
 
 
 async def test_dropping_removes_the_collection(tickets: TicketsCollection) -> None:
-    """Skasowana kolekcja → naprawdę jej nie ma, a ponowne kasowanie mówi „nie było czego"."""
+    """Sprawdza, czy kasowanie naprawdę usuwa kolekcję z Qdranta: pierwsze `drop()` odpowiada, że
+    skasowało, a drugie, że nie było już czego kasować.
+
+    Wyłapuje kasowanie, które zgłasza sukces, a kolekcję zostawia, albo pada, gdy kolekcji nie
+    ma. Przebudowa indeksu zaczyna od skasowania, więc zostałyby w nim stare zgłoszenia."""
     await tickets.ensure()
 
     assert await tickets.drop() is True
@@ -306,16 +349,26 @@ async def test_dropping_removes_the_collection(tickets: TicketsCollection) -> No
 # --- dokumentacja -------------------------------------------------------------------------
 
 async def test_docs_are_created_with_the_section_vector(docs: DocsCollection) -> None:
-    """Świeża kolekcja dokumentacji → Qdrant przyjmuje jeden nazwany wektor, a ponowne
-    `ensure()` rozpoznaje ją w prawdziwym opisie."""
+    """Sprawdza, czy prawdziwy Qdrant przyjmuje kolekcję dokumentacji z jednym nazwanym wektorem:
+    pierwsze `ensure()` ją zakłada, a drugie rozpoznaje ją w opisie z Qdranta i odpowiada, że
+    kolekcja już jest.
+
+    Wyłapuje żądanie założenia kolekcji, którego Qdrant nie przyjmuje, oraz odczyt opisu
+    kolekcji niezgodny z tym, co Qdrant naprawdę oddaje — indeksacja dokumentacji odrzucałaby
+    wtedy własną, poprawną kolekcję."""
     assert await docs.ensure() is True
     assert await docs.ensure() is False
 
 
 async def test_fragments_of_a_section_come_back_as_one_section(docs: DocsCollection) -> None:
-    """Dwa fragmenty jednej sekcji → dwa punkty w kolekcji, ale jedno trafienie: Qdrant oddaje
-    sekcję raz, z jej najbliższym fragmentem, a payload odtwarza `DocSection` z datą i ścieżką
-    rozdziału."""
+    """Sprawdza, czy sekcja zapisana jako dwa fragmenty, czyli dwa punkty w kolekcji, wraca
+    z wyszukiwania raz: jako jedno trafienie, z fragmentem najbliższym zapytaniu. Sprawdza też,
+    czy z danych trafienia da się odtworzyć opis sekcji (`DocSection`) razem z datą i ścieżką
+    rozdziału.
+
+    Wyłapuje wyszukiwanie, które oddaje tę samą sekcję kilka razy albo nie z tym fragmentem,
+    oraz zapis, po którym opisu sekcji nie da się już złożyć — agent dostałby powtórzenia
+    zamiast listy różnych sekcji."""
     await docs.ensure()
 
     section = SECTIONS[0]
@@ -332,8 +385,12 @@ async def test_fragments_of_a_section_come_back_as_one_section(docs: DocsCollect
 
 
 async def test_a_long_section_does_not_crowd_out_the_others(docs: DocsCollection) -> None:
-    """Sekcja z pięciu fragmentów bliższych zapytaniu niż jedyny fragment drugiej sekcji, limit 2
-    → obie sekcje: limit liczy sekcje, więc długa sekcja nie zajmuje całego wyniku."""
+    """Sprawdza, czy limit wyników liczy sekcje, a nie fragmenty: jedna sekcja ma tu pięć
+    fragmentów bliższych zapytaniu niż jedyny fragment drugiej sekcji, a przy limicie 2 wracają
+    obie sekcje.
+
+    Wyłapuje wyszukiwanie, w którym długa sekcja zajmuje cały wynik swoimi fragmentami, a inne
+    pasujące sekcje nie docierają do agenta."""
     await docs.ensure()
 
     long_section = [
@@ -350,8 +407,12 @@ async def test_a_long_section_does_not_crowd_out_the_others(docs: DocsCollection
 
 
 async def test_reimporting_the_same_fragment_overwrites_it(docs: DocsCollection) -> None:
-    """Ten sam fragment zapisany dwa razy → jeden punkt: identyfikator wynika z sekcji
-    i numeru fragmentu."""
+    """Sprawdza, czy ten sam fragment sekcji zapisany dwa razy, za drugim razem z innym wektorem,
+    zostaje w kolekcji jako jeden punkt, bo jego identyfikator wynika z sekcji i numeru
+    fragmentu.
+
+    Wyłapuje identyfikator punktu, który zmienia się między zapisami: powtórzony zapis
+    zostawiałby wtedy w kolekcji kilka kopii tego samego fragmentu."""
     await docs.ensure()
 
     await docs.upsert([DocPoint.from_fragment(SECTIONS[0], 0, [0.1, 0.2, 0.3, 0.4])])
@@ -361,7 +422,12 @@ async def test_reimporting_the_same_fragment_overwrites_it(docs: DocsCollection)
 
 
 async def test_doc_search_ranks_the_nearest_section_first(docs: DocsCollection) -> None:
-    """Wektor zapytania → sekcje w kolejności podobieństwa, z opisem w payloadzie."""
+    """Sprawdza, czy wyszukiwanie w dokumentacji oddaje sekcje od najbardziej podobnej: z dwóch
+    zapisanych pierwsza jest ta, której wektor ma kierunek zapytania, choć zapisano ją jako
+    drugą, i niesie w danych swój tytuł.
+
+    Wyłapuje wyszukiwanie, które przy zwijaniu fragmentów do sekcji gubi kolejność podobieństwa
+    albo opis sekcji — agent czytałby wtedy najpierw mniej pasujące sekcje."""
     await docs.ensure()
 
     near = DocPoint.from_fragment(SECTIONS[0], 0, [0.1, 0.1, 0.1, 0.1])
@@ -381,8 +447,13 @@ async def test_tickets_and_docs_share_one_client(
     tickets: TicketsCollection,
     docs:    DocsCollection,
 ) -> None:
-    """Dwie kolekcje na jednym kliencie → każda widzi tylko swoje punkty, a kolekcja zgłoszeń
-    wskazana jako dokumentacja jest odrzucana, bo nie ma wektora `section`."""
+    """Sprawdza, czy dwie kolekcje na jednym kliencie nie mieszają się ze sobą: po zapisie
+    jednego zgłoszenia kolekcja zgłoszeń ma jeden punkt, a kolekcja dokumentacji zero. Sprawdza
+    też, czy kolekcja zgłoszeń wskazana jako kolekcja dokumentacji jest odrzucana błędem
+    konfiguracji, bo nie ma wektora `section`.
+
+    Wyłapuje zapis trafiający do niewłaściwej kolekcji oraz pomyłkę w nazwie kolekcji, po której
+    dokumentacja byłaby szukana wśród zgłoszeń."""
     await tickets.ensure()
     await docs.ensure()
 

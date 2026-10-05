@@ -55,8 +55,12 @@ def _tool(
 
 
 async def test_the_read_asks_for_each_section_once() -> None:
-    """Identyfikator podany dwa razy → jedno zapytanie o sekcje bez powtórzeń, w kolejności
-    żądania, i sekcja w wyniku raz."""
+    """Sprawdza, czy identyfikator podany dwa razy idzie do tabeli raz: z trzech pozycji z jednym
+    powtórzeniem powstaje jedno zapytanie o dwie sekcje, w kolejności żądania, a w wyniku każda
+    sekcja jest raz.
+
+    Wyłapuje powtórzenie przeniesione do zapytania albo do wyniku oraz zgubioną kolejność żądania:
+    model dostałby tę samą treść dwa razy albo sekcje w innym porządku, niż prosił."""
     client = _client()
 
     result = await _tool(client).search(ReadDocsQuery(section_ids=[W_TOKU, EDORECZENIA, W_TOKU]))
@@ -66,8 +70,11 @@ async def test_the_read_asks_for_each_section_once() -> None:
 
 
 async def test_a_section_comes_back_with_its_description_and_whole_text() -> None:
-    """Wiersz tabeli → opis sekcji z metryczki i treść równa zapisanej: model ma przeczytać
-    sekcję, a nie jej skrót."""
+    """Sprawdza, czy odczytana sekcja wraca z opisem takim jak zapisany w tabeli i z treścią równą
+    zapisanej, znak w znak.
+
+    Wyłapuje narzędzie, które skraca albo zmienia treść: model ma przeczytać sekcję, a nie jej
+    skrót."""
     result = await _tool(_client()).search(ReadDocsQuery(section_ids=[BRAK_SERWERA]))
 
     assert result.sections[0].section == SECTIONS[3]
@@ -75,9 +82,12 @@ async def test_a_section_comes_back_with_its_description_and_whole_text() -> Non
 
 
 async def test_an_unknown_id_fails_the_whole_read() -> None:
-    """Nieznane identyfikatory wśród znanych → `UnknownSectionError` tylko z nieznanymi,
-    w kolejności żądania, bez wyniku częściowego: odczyt jednej sekcji zamiast trzech wyglądałby
-    jak poprawny."""
+    """Sprawdza, czy nieznane identyfikatory wśród znanych kończą cały odczyt wyjątkiem
+    `UnknownSectionError`: wyjątek wymienia tylko dwa nieznane, w kolejności żądania, a znanego nie
+    ma w komunikacie.
+
+    Wyłapuje wynik częściowy i mylący komunikat: odczyt jednej sekcji zamiast trzech wyglądałby jak
+    poprawny, a błąd wymieniający znaną sekcję kazałby agentowi poprawiać nie to, co trzeba."""
     query = ReadDocsQuery(section_ids=["adm-nie-ma", EDORECZENIA, "usr-tez-nie-ma"])
 
     with pytest.raises(UnknownSectionError) as caught:
@@ -88,8 +98,11 @@ async def test_an_unknown_id_fails_the_whole_read() -> None:
 
 
 async def test_the_tool_and_its_fake_tell_the_model_the_same() -> None:
-    """Ta sama dokumentacja w tabeli i w atrapie → ten sam tekst dla modelu i te same źródła:
-    test grafu na atrapie sprawdza to, co model dostanie na produkcji."""
+    """Sprawdza, czy narzędzie właściwe i jego atrapa dają dla tej samej dokumentacji ten sam tekst
+    dla modelu i te same źródła.
+
+    Wyłapuje rozjazd między atrapą a narzędziem: testy grafów na atrapie sprawdzałyby wtedy coś
+    innego niż to, co model dostanie na produkcji."""
     query = ReadDocsQuery(section_ids=[W_TOKU, EDORECZENIA])
     real  = _tool(_client())
     fake  = FakeReadDocsTool()
@@ -102,7 +115,11 @@ async def test_the_tool_and_its_fake_tell_the_model_the_same() -> None:
 
 
 async def test_only_sections_that_were_read_are_cited() -> None:
-    """Dwie odczytane sekcje → dwa źródła z materiału „docs", z dokumentem i wydaniem w tytule."""
+    """Sprawdza, czy dwie odczytane sekcje dają dokładnie dwa źródła z materiału „docs”,
+    w kolejności odczytu, a tytuł źródła składa się z nazwy dokumentu, wersji i tytułu sekcji.
+
+    Wyłapuje listę źródeł niezgodną z odczytanymi sekcjami albo tytuł bez wydania dokumentu:
+    człowiek nie wiedziałby, do której wersji instrukcji odpowiedź się odwołuje."""
     tool   = _tool(_client())
     result = await tool.search(ReadDocsQuery(section_ids=[W_TOKU, EDORECZENIA]))
 
@@ -113,8 +130,10 @@ async def test_only_sections_that_were_read_are_cited() -> None:
 
 
 async def test_aclose_closes_the_database_client() -> None:
-    """`aclose()` → zamknięty klient Postgresa: sprzątający nie musi wiedzieć, z czego narzędzie
-    jest zbudowane."""
+    """Sprawdza, czy `aclose()` narzędzia zamyka klienta Postgresa, na którym stoi jego tabela.
+
+    Wyłapuje narzędzie, które po sobie nie sprząta: połączenie z bazą zostawałoby otwarte, bo
+    sprzątający woła tylko `aclose()` i nie wie, z czego narzędzie jest zbudowane."""
     client = _client()
 
     await _tool(client).aclose()

@@ -54,8 +54,13 @@ def tracing_requested(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 async def test_a_graph_runs_untraced_when_env_asks_for_tracing(tracing_requested: None) -> None:
-    """LANGSMITH_TRACING=true → wewnątrz węzła tracing wyłączony: import `app.agent_graphs`
-    blokuje go globalnie, więc stan sprzed anonimizacji nie wychodzi do chmury."""
+    """Sprawdza, czy graf uruchomiony przy zmiennych środowiskowych, które proszą o śledzenie
+    przebiegu w LangSmith (`LANGSMITH_TRACING=true`, klucz i adres), i tak działa bez niego:
+    węzeł zapytany w trakcie przebiegu widzi śledzenie wyłączone, bo wyłącza je sam import
+    pakietu grafów.
+
+    Wyłapuje zniknięcie tej blokady: LangSmith wysyłałby wtedy do chmury stan każdego węzła,
+    razem z treścią zgłoszenia sprzed anonimizacji."""
     assert langsmith.utils.get_env_var("TRACING") == "true", "bez blokady ENV włączyłoby tracing"
 
     graph = StateGraph(State)

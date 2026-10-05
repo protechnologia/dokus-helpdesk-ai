@@ -13,8 +13,12 @@ pytestmark = [pytest.mark.stack, pytest.mark.stack_api]
 
 
 def test_search_validates_the_request_in_the_container(api_client: httpx2.Client) -> None:
-    """POST /search without a body on the running api → 422, not 404: the route is mounted and
-    wired to our request model, proven without any dependency being reachable."""
+    """Sprawdza, czy uruchomiony kontener `api` odrzuca `POST /search` bez opisu zgłoszenia
+    statusem 422, a nie 404. Takie żądanie odpada już na sprawdzeniu pól, więc test nie
+    potrzebuje modelu, embeddera ani Qdranta.
+
+    Wyłapuje wdrożenie, w którym trasy `/search` nie ma w zbudowanym obrazie albo nie jest
+    podpięta do naszego modelu żądania: status 404 znaczyłby, że kontener tej trasy nie zna."""
     response = api_client.post("/search", json={"ticket_id": "integration-smoke"})
 
     assert response.status_code == 422

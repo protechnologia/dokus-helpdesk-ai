@@ -46,7 +46,7 @@ class Node(ABC):
 
     def log_entry(
         self,
-        message: str,  # np. "tura 1: odpowiedź bez narzędzi"
+        message: str,  # np. "tura 1: tekst bez narzędzi"
     ) -> LogEntry:
         """
         Description:
@@ -54,9 +54,9 @@ class Node(ABC):
         modelu — tylko nazwy, liczby i identyfikatory (patrz `LogEntry`).
 
         Example args:
-            message="tura 1: odpowiedź bez narzędzi"
+            message="tura 1: tekst bez narzędzi"
 
         Example result:
-            LogEntry(node="agent", message="tura 1: odpowiedź bez narzędzi")
+            LogEntry(node="agent", message="tura 1: tekst bez narzędzi")
         """
         return LogEntry(node=self.name, message=message)

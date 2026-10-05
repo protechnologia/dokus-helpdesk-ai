@@ -36,7 +36,11 @@ async def _found_numbers() -> list[str]:
 
 
 def test_ticket_numbers_are_unique() -> None:
-    """Numery kart i wątków → bez powtórzeń: po nich idzie odczyt i klucz źródła."""
+    """Sprawdza, czy w zmyślonym zestawie zgłoszeń numery się nie powtarzają: ani wśród kart, ani
+    wśród wątków.
+
+    Wyłapuje dwa zgłoszenia o tym samym numerze: po numerze idzie odczyt i klucz źródła, więc
+    jedno z nich przesłoniłoby drugie."""
     cards   = [card.ticket_id for card in default_cards()]
     threads = [row.ticket_id for row in default_threads()]
 
@@ -45,8 +49,11 @@ def test_ticket_numbers_are_unique() -> None:
 
 
 def test_every_card_has_its_thread_but_not_every_thread_a_card() -> None:
-    """Każda karta ma wątek, a jedno zgłoszenie ma sam wątek: tak jest w bazach — wątek ma każde
-    zgłoszenie, kartę tylko to, które przeszło parsowanie i filtr jakości."""
+    """Sprawdza, czy każda zmyślona karta ma swój wątek i czy dokładnie jedno zgłoszenie (`90011`)
+    ma sam wątek, bez karty.
+
+    Wyłapuje zestaw, który przestał przypominać prawdziwe bazy: tam wątek ma każde zgłoszenie,
+    a kartę tylko to, które przeszło parsowanie i filtr jakości."""
     cards   = {card.ticket_id for card in default_cards()}
     threads = {row.ticket_id for row in default_threads()}
 
@@ -55,16 +62,22 @@ def test_every_card_has_its_thread_but_not_every_thread_a_card() -> None:
 
 
 def test_every_thread_names_its_own_ticket_and_subject() -> None:
-    """Wątek → zaczyna się od numeru swojego zgłoszenia i niesie linię z tematem, który trafił
-    do wiersza: z niej bierze się tytuł źródła."""
+    """Sprawdza, czy każdy zmyślony wątek zaczyna się od numeru i daty swojego zgłoszenia i czy
+    temat zapisany w wierszu jest tym samym, który stoi w linii „Temat:" wątku.
+
+    Wyłapuje wątek podpięty pod cudzy numer albo datę oraz temat w wierszu inny niż w wątku:
+    z tego tematu bierze się tytuł źródła, więc atrapy podawałyby źródła z błędnym tytułem."""
     for row in default_threads():
         assert row.thread.startswith(f"ZGŁOSZENIE {row.ticket_id} z {row.ticket_date.isoformat()}")
         assert RawTicket.subject_of_thread(row.thread) == row.subject
 
 
 async def test_whatever_a_search_fake_finds_the_thread_fake_can_read() -> None:
-    """Numery z atrap obu wyszukiwań → do odczytania atrapą wątków, wszystkie: graf na atrapach
-    może przejść całą drogę od wyszukania do źródła."""
+    """Sprawdza, czy każdy numer zgłoszenia, który oddają atrapy obu wyszukiwań, da się odczytać
+    atrapą odczytu wątków: na każdy numer wraca wątek tego zgłoszenia.
+
+    Wyłapuje numer znany atrapie wyszukiwania, a nieznany atrapie odczytu: graf na atrapach nie
+    przeszedłby wtedy drogi od wyszukania zgłoszenia do źródła."""
     found = await _found_numbers()
     tool  = FakeReadTicketsThreadTool()
 
@@ -74,8 +87,11 @@ async def test_whatever_a_search_fake_finds_the_thread_fake_can_read() -> None:
 
 
 async def test_whatever_a_search_fake_finds_the_card_fake_answers_for() -> None:
-    """Numery z atrap obu wyszukiwań → atrapa kart odpowiada na każdy: kartą albo wpisem „bez
-    karty", nigdy błędem."""
+    """Sprawdza, czy atrapa odczytu kart odpowiada na każdy numer z atrap obu wyszukiwań: kartą
+    albo wpisem „bez karty", który dostaje tylko zgłoszenie `90011`.
+
+    Wyłapuje numer, na który atrapa kart nie odpowiada wcale albo odpowiada błędem: brak karty
+    to zwykły stan zgłoszenia, a nie usterka."""
     found  = await _found_numbers()
     result = await FakeReadTicketsCardTool().search(ReadTicketsCardQuery(ticket_ids=found))
 

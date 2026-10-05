@@ -59,8 +59,11 @@ def test_a_graph_without_rules_refuses_to_start(
     title: str,
     rules: list[str] | None,
 ) -> None:
-    """Stan bez reguł albo z pustą listą → błąd walidacji: bez reguł nie ma czego sprawdzać,
-    a przepuszczenie wyglądałoby jak „wszystko OK"."""
+    """Sprawdza, czy stanu grafu opartego na regułach klienta (bramka zamknięcia, bramka wysyłki
+    i „Popraw") nie da się zbudować bez reguł ani z pustą ich listą: kończy się to błędem walidacji.
+
+    Wyłapuje graf, który ruszyłby bez reguł: nie miałby czego sprawdzać, a przepuszczenie
+    wyglądałoby jak „wszystko OK"."""
     fields = graph.example_state().model_dump(include={"input_text"})
 
     if rules is not None:
@@ -72,7 +75,11 @@ def test_a_graph_without_rules_refuses_to_start(
 
 @pytest.mark.parametrize("graph, title", RULE_GRAPHS, ids=case_id)
 def test_the_rules_land_in_their_own_section(graph: ModuleType, title: str) -> None:
-    """Reguły klienta → lista punktów we własnej sekcji danych, oddzielonej od wejścia."""
+    """Sprawdza, czy w bramce zamknięcia, bramce wysyłki i „Popraw" dwie reguły klienta trafiają do
+    tury użytkownika jako lista punktów we własnej sekcji, podpisanej jako dane, nie polecenia.
+
+    Wyłapuje reguły wklejone poza swoją sekcją albo zmieszane z treścią zgłoszenia: reguły pisze
+    klient, więc mają dotrzeć do modelu jako dane, a nie jako nasze polecenia."""
     state  = graph.example_state().model_copy(
         update={"rules": RULES, "anonymized": AnonymizedText(text="treść po anonimizacji")},
     )

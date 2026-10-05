@@ -93,8 +93,10 @@ def _tool(
 
 
 async def test_the_query_is_embedded_in_query_mode_as_it_was_asked() -> None:
-    """Zapytanie agenta → jego tekst bez zmian, w trybie query: w kolekcji leżą wektory passage,
-    a pomyłka trybu nie pada, tylko daje trochę gorsze wyniki."""
+    """Sprawdza, czy do embeddera idzie tekst zapytania agenta bez zmian i w trybie `query`.
+
+    Wyłapuje zmieniony tekst albo pomylony tryb: w kolekcji leżą wektory liczone w trybie `passage`,
+    a pomyłka trybu nie kończy się błędem, tylko trochę gorszymi wynikami."""
     seen: list = []
 
     await _tool([], embedder_seen=seen).find(QUERY)
@@ -103,8 +105,11 @@ async def test_the_query_is_embedded_in_query_mode_as_it_was_asked() -> None:
 
 
 async def test_the_search_asks_for_top_k_sections_in_the_section_space() -> None:
-    """Wyszukanie → wektor z embeddera, przestrzeń `section`, grupy po sekcji i limit
-    z konfiguracji: limit liczy sekcje, a liczby wyników nie ustala agent."""
+    """Sprawdza, czy do Qdranta idzie właściwe zapytanie: wektor zapytania z embeddera, nazwa
+    wektora `section`, grupowanie po `section_id` i limit z konfiguracji (tu 7).
+
+    Wyłapuje zapytanie po niewłaściwym wektorze, bez grupowania albo z innym limitem: limit ma
+    liczyć sekcje, nie ich fragmenty, a liczby wyników nie ustala agent."""
     seen: list = []
 
     await _tool([], top_k=7, qdrant_seen=seen).find(QUERY)
@@ -116,8 +121,11 @@ async def test_the_search_asks_for_top_k_sections_in_the_section_space() -> None
 
 
 async def test_sections_below_the_threshold_are_dropped_and_counted() -> None:
-    """Cztery sekcje, próg 0.37 → dwie zwrócone i dwie policzone jako odcięte: „próg to wyciął"
-    i „dokumentacja o tym milczy" to różne odpowiedzi."""
+    """Sprawdza, czy próg podobieństwa dzieli trafienia: z czterech sekcji o podobieństwie 0.58,
+    0.37, 0.36 i 0.31 przy progu 0.37 wracają dwie pierwsze, a dwie są policzone jako odcięte.
+
+    Wyłapuje próg, który odcina sekcję stojącą dokładnie na nim albo przepuszcza słabsze, oraz
+    zgubiony licznik: bez niego „próg to wyciął” wygląda jak „dokumentacja o tym milczy”."""
     groups = [
         _hit(SECTIONS[0], 0.58),
         _hit(SECTIONS[1], 0.37),
@@ -135,8 +143,12 @@ async def test_sections_below_the_threshold_are_dropped_and_counted() -> None:
 
 
 async def test_a_section_comes_back_as_its_description_and_a_rounded_score() -> None:
-    """Trafienie → opis sekcji odtworzony z payloadu i podobieństwo zaokrąglone do trzech miejsc;
-    w tekście dla modelu identyfikator stoi tam, gdzie poda go `read_docs`."""
+    """Sprawdza, czy trafienie z Qdranta wraca jako opis sekcji odtworzony z payloadu,
+    z podobieństwem zaokrąglonym do trzech miejsc (0.58123456 daje 0.581), i czy tekst dla modelu to
+    ten sam wynik zapisany jako JSON.
+
+    Wyłapuje opis sekcji zmieniony po drodze z indeksu albo inny kształt JSON-u: model nie znalazłby
+    identyfikatora w polu, z którego bierze go do odczytu sekcji."""
     tool = _tool([_hit(SECTIONS[0], 0.58123456)])
 
     result = await tool.find(QUERY)
@@ -151,7 +163,10 @@ async def test_a_section_comes_back_as_its_description_and_a_rounded_score() -> 
 
 
 async def test_no_hits_is_an_empty_result_not_an_error() -> None:
-    """Qdrant nic nie zwrócił → pusty wynik bez odciętych: pusta kolekcja to nie awaria."""
+    """Sprawdza, czy pusta odpowiedź Qdranta daje pusty wynik: żadnych sekcji i zero odciętych.
+
+    Wyłapuje narzędzie, które przy braku trafień zgłasza błąd: pusta kolekcja to nie awaria, tylko
+    odpowiedź, że niczego nie znaleziono."""
     result = await _tool([]).find(QUERY)
 
     assert result.sections                == []
@@ -159,9 +174,12 @@ async def test_no_hits_is_an_empty_result_not_an_error() -> None:
 
 
 async def test_a_payload_that_is_not_a_section_is_a_config_error_naming_the_fields() -> None:
-    """Payload bez tytułu sekcji → `DbQdrantConfigError` z identyfikatorem punktu, nazwą pola
-    i komendą przebudowy: indeks zbudowany inną wersją kontraktu naprawia przebudowa, nie
-    czekanie."""
+    """Sprawdza, czy trafienie, którego payload nie ma tytułu sekcji, kończy się wyjątkiem
+    `DbQdrantConfigError`, a komunikat podaje identyfikator punktu, nazwę brakującego pola i komendę
+    przebudowy indeksu, ale nie cytuje zawartości payloadu.
+
+    Wyłapuje błąd, z którego nie wynika, co jest zepsute i jak to naprawić: indeks zbudowany inną
+    wersją kontraktu naprawia przebudowa, a nie czekanie."""
     broken = SECTIONS[0].model_dump(mode="json")
     del broken["title"]
 
@@ -177,8 +195,11 @@ async def test_a_payload_that_is_not_a_section_is_a_config_error_naming_the_fiel
 
 
 async def test_a_dropped_hit_is_never_looked_at() -> None:
-    """Zepsuty payload poniżej progu → brak błędu: odcięte trafienie nie trafia do wyniku, więc
-    nie ma czego sprawdzać."""
+    """Sprawdza, czy trafienie poniżej progu nie jest w ogóle sprawdzane: zepsuty payload przy
+    podobieństwie 0.20 nie daje błędu, tylko pusty wynik z jednym odciętym trafieniem.
+
+    Wyłapuje sprawdzanie payloadu przed odcięciem progiem: zepsuty punkt, który i tak nie trafiłby
+    do wyniku, zatrzymywałby całe wyszukiwanie."""
     result = await _tool([_hit(SECTIONS[0], 0.20, payload={})]).find(QUERY)
 
     assert result.sections                == []
@@ -186,8 +207,10 @@ async def test_a_dropped_hit_is_never_looked_at() -> None:
 
 
 async def test_aclose_closes_both_clients() -> None:
-    """`aclose()` → zamknięte połączenia embeddera i Qdranta: sprzątający nie musi wiedzieć,
-    z czego narzędzie jest zbudowane."""
+    """Sprawdza, czy `aclose()` narzędzia zamyka oba połączenia: z embedderem i z Qdrantem.
+
+    Wyłapuje narzędzie, które zamyka tylko jedno z nich albo żadnego: połączenia zostawałyby
+    otwarte, bo sprzątający woła tylko `aclose()` i nie wie, z czego narzędzie jest zbudowane."""
     tool = _tool([])
 
     await tool.aclose()

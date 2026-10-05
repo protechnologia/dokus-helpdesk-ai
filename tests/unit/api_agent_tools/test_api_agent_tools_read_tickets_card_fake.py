@@ -7,7 +7,11 @@ QUERY = ReadTicketsCardQuery(ticket_ids=["90002", "90011", "90001"])
 
 
 async def test_cards_come_back_in_the_order_asked() -> None:
-    """Trzy numery, jeden bez karty → dwie karty w kolejności żądania i numer bez karty osobno."""
+    """Sprawdza, czy atrapa oddaje karty w kolejności numerów z zapytania: dla numerów 90002, 90011
+    i 90001 wracają karty 90002 i 90001, a numer 90011, który karty nie ma, stoi osobno.
+
+    Wyłapuje atrapę, która układa karty po swojemu albo gubi numer bez karty, czyli odpowiada
+    inaczej niż prawdziwy odczyt, który zastępuje w testach."""
     result = await FakeReadTicketsCardTool().search(QUERY)
 
     assert [card.ticket_id for card in result.cards] == ["90002", "90001"]
@@ -15,7 +19,10 @@ async def test_cards_come_back_in_the_order_asked() -> None:
 
 
 async def test_a_number_asked_twice_is_read_once() -> None:
-    """Numer podany dwa razy → jedna karta: model nie ma dostać tego samego rekordu dwukrotnie."""
+    """Sprawdza, czy numer podany w zapytaniu dwa razy jest w wyniku raz: dla numerów 90001, 90001,
+    90011 i 90011 wraca jedna karta i jeden numer bez karty.
+
+    Wyłapuje powtórzenia w wyniku: model dostałby ten sam rekord dwukrotnie."""
     query  = ReadTicketsCardQuery(ticket_ids=["90001", "90001", "90011", "90011"])
     result = await FakeReadTicketsCardTool().search(query)
 
@@ -24,7 +31,10 @@ async def test_a_number_asked_twice_is_read_once() -> None:
 
 
 async def test_every_query_is_recorded() -> None:
-    """Każdy odczyt → zapytanie w `queries`, żeby test grafu sprawdził, co agent przeczytał."""
+    """Sprawdza, czy po odczycie zapytanie jest zapisane na liście `queries` atrapy.
+
+    Wyłapuje atrapę, która zapytań nie zapisuje: test grafu nie miałby jak sprawdzić, które karty
+    agent przeczytał."""
     tool = FakeReadTicketsCardTool()
 
     await tool.search(QUERY)
@@ -33,8 +43,12 @@ async def test_every_query_is_recorded() -> None:
 
 
 async def test_the_model_sees_every_card_field_under_its_schema_name() -> None:
-    """Tekst dla modelu → JSON z polami karty pod nazwami ze schematu: prompty grafów odwołują
-    się do nich po nazwie (`cause`, `solution`, `questions_summary`)."""
+    """Sprawdza, czy tekst dla modelu to JSON, w którym karta ma wszystkie dziesięć pól pod nazwami
+    ze schematu (między innymi `cause`, `solution`, `questions_summary`), z datą zapisaną jako
+    `2026-04-22`, a numer bez karty stoi w `without_card`.
+
+    Wyłapuje pole zgubione albo nazwane inaczej po drodze do modelu: prompty grafów odwołują się do
+    pól karty po nazwie, więc model nie znalazłby tego, o czym prompt mówi."""
     tool = FakeReadTicketsCardTool()
     body = json.loads(tool.render_for_model(await tool.search(QUERY)))
 
@@ -59,8 +73,11 @@ async def test_the_model_sees_every_card_field_under_its_schema_name() -> None:
 
 
 async def test_the_model_does_not_see_artifact_metadata() -> None:
-    """Tekst dla modelu → bez wersji słownika rozstrzygnięć: to metadane artefaktu, nie treść
-    zgłoszenia, a model potraktowałby je jak fakt o sprawie."""
+    """Sprawdza, czy w tekście dla modelu nie ma wersji słownika rozstrzygnięć
+    (`resolution_vocabulary_version`).
+
+    Wyłapuje przeciek metadanych artefaktu do modelu: to informacja dla nas, nie treść zgłoszenia,
+    a model potraktowałby ją jak fakt o sprawie."""
     tool = FakeReadTicketsCardTool()
     text = tool.render_for_model(await tool.search(QUERY))
 
@@ -68,8 +85,12 @@ async def test_the_model_does_not_see_artifact_metadata() -> None:
 
 
 async def test_the_three_default_cards_share_a_symptom_and_differ_in_cause() -> None:
-    """Zestaw wbudowany → jeden objaw, trzy przyczyny: najczęstszy kształt trafień w korpusie,
-    na którym agent ma przeczytać wszystkie karty, zamiast poprzestać na pierwszej."""
+    """Sprawdza, czy trzy karty z wbudowanego zestawu atrapy (90001, 90002, 90003) mają ten sam
+    `problem` i trzy różne przyczyny.
+
+    Wyłapuje zmianę zestawu, po której karty przestają być jednym objawem o kilku przyczynach: to
+    najczęstszy kształt trafień w korpusie, na którym agent ma przeczytać wszystkie karty, zamiast
+    poprzestać na pierwszej."""
     query  = ReadTicketsCardQuery(ticket_ids=["90001", "90002", "90003"])
     result = await FakeReadTicketsCardTool().search(query)
 
@@ -78,8 +99,12 @@ async def test_the_three_default_cards_share_a_symptom_and_differ_in_cause() -> 
 
 
 async def test_cite_gives_one_source_per_card_read() -> None:
-    """Każda odczytana karta → jeden SourceRef z materiału „tickets", z `problem` jako tytułem
-    i datą zgłoszenia; numer bez karty źródłem nie jest."""
+    """Sprawdza, czy lista źródeł ma jeden wpis na każdą odczytaną kartę: dla kart 90002 i 90001 dwa
+    wpisy z materiału „tickets", z `problem` karty jako tytułem i z datą zgłoszenia. Numeru 90011,
+    który karty nie ma, na liście nie ma.
+
+    Wyłapuje źródło przypisane zgłoszeniu, którego karty model nie dostał, oraz wpis, w którym tytuł
+    albo data nie pochodzą z karty."""
     tool   = FakeReadTicketsCardTool()
     result = await tool.search(QUERY)
 
@@ -92,8 +117,10 @@ async def test_cite_gives_one_source_per_card_read() -> None:
 
 
 async def test_reading_only_tickets_without_cards_cites_nothing() -> None:
-    """Sam numer bez karty → pusty wynik i pusta lista źródeł: `requires_hits` nie przepuści
-    wtedy propozycji opartej na niczym."""
+    """Sprawdza, czy odczyt samego numeru bez karty (90011) daje pusty wynik i pustą listę źródeł.
+
+    Wyłapuje źródło powstające z niczego: graf wymagający źródeł przepuściłby wtedy propozycję,
+    która nie opiera się na żadnym przeczytanym materiale."""
     tool   = FakeReadTicketsCardTool()
     result = await tool.search(ReadTicketsCardQuery(ticket_ids=["90011"]))
 

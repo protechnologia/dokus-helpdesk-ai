@@ -53,7 +53,12 @@ def client() -> TestClient:
 
 
 def test_http_exception_uses_uniform_shape(client: TestClient) -> None:
-    """HTTPException → zadeklarowany status i kształt ErrorResponse."""
+    """Sprawdza, czy błąd zgłoszony przez trasę (`HTTPException` ze statusem 404) wraca do
+    wołającego z tym samym statusem i we wspólnym kształcie błędu: z opisem w polu `detail`
+    i z polem `request_id`.
+
+    Wyłapuje obsługę błędów, która zmienia status albo oddaje błąd w innym kształcie: wołający
+    musiałby wtedy obsługiwać kilka różnych postaci błędu."""
     response = client.get("/boom")
 
     assert response.status_code == 404
@@ -62,7 +67,11 @@ def test_http_exception_uses_uniform_shape(client: TestClient) -> None:
 
 
 def test_validation_error_returns_422_in_same_shape(client: TestClient) -> None:
-    """Brak parametru → 422 w kształcie ErrorResponse, nie surowa lista błędów FastAPI."""
+    """Sprawdza, czy żądanie bez wymaganego parametru dostaje status 422 we wspólnym kształcie
+    błędu, z ogólnym opisem „Request validation failed".
+
+    Wyłapuje brak osobnej obsługi błędów walidacji: FastAPI oddałoby wtedy własną, surową listę
+    błędów, w innym kształcie niż pozostałe błędy usługi."""
     response = client.get("/needs-param")
 
     assert response.status_code == 422
@@ -70,7 +79,11 @@ def test_validation_error_returns_422_in_same_shape(client: TestClient) -> None:
 
 
 def test_validation_error_hides_submitted_values(client: TestClient) -> None:
-    """Zła wartość parametru → treść odpowiedzi jej nie cytuje (może to być dana klienta)."""
+    """Sprawdza, czy odpowiedź na żądanie z błędną wartością parametru (tekst zamiast liczby) ma
+    status 422 i nie powtarza przysłanej wartości.
+
+    Wyłapuje odpowiedź, która cytuje wejście: przysłana wartość może być daną klienta, więc nie
+    powinna wracać w komunikacie błędu."""
     response = client.get("/needs-param", params={"limit": "not-a-number"})
 
     assert response.status_code == 422
@@ -90,8 +103,12 @@ def test_a_dependency_failure_becomes_service_unavailable(
     path:   str,
     detail: str,
 ) -> None:
-    """Awaria modelu albo anonimizatora w trakcie żądania → 503: wołający ponawia albo decyduje
-    sam, zamiast winić własne wejście."""
+    """Sprawdza, czy awaria modelu językowego albo anonimizatora w trakcie żądania wraca jako
+    status 503 z ogólnym opisem, osobnym dla każdej z tych dwóch zależności.
+
+    Wyłapuje awarię zależności oddaną jako zwykły błąd serwera: taki błąd nie mówi wołającemu,
+    czy zawiniło jego żądanie, czy usługa chwilowo nie działa i można ponowić albo zdecydować
+    samemu."""
     response = client.get(path)
 
     assert response.status_code     == 503
@@ -100,7 +117,12 @@ def test_a_dependency_failure_becomes_service_unavailable(
 
 @pytest.mark.parametrize("path", ["/llm-down", "/anonymization-down"], ids=["llm", "anonymization"])
 def test_a_dependency_failure_hides_its_message(client: TestClient, path: str) -> None:
-    """Treść wyjątku zależności → nigdy w odpowiedzi: może cytować prompt albo dane klienta."""
+    """Sprawdza, czy odpowiedź po awarii modelu językowego albo anonimizatora nie zawiera treści
+    wyjątku: w teście wyjątki cytują fragment promptu i zmyślone nazwisko, a w odpowiedzi nie ma
+    żadnego z nich.
+
+    Wyłapuje przeciek danych klienta przez komunikat błędu: wyjątek zależności potrafi zacytować
+    prompt albo tekst zgłoszenia."""
     response = client.get(path)
 
     assert "Drukarka" not in response.text
@@ -116,14 +138,23 @@ def test_config_error_is_not_dressed_up_as_a_transient_failure(
     client: TestClient,
     path:   str,
 ) -> None:
-    """Błąd konfiguracji (podklasa błędu zależności) → NIE 503; zła konfiguracja ma być głośna."""
+    """Sprawdza, czy błąd konfiguracji modelu językowego albo anonimizatora kończy żądanie statusem
+    500, a nie 503, choć w kodzie jest odmianą błędu zależności, który daje 503.
+
+    Wyłapuje złą konfigurację przebraną za chwilową awarię: status 503 znaczy „spróbuj za
+    chwilę", a przy błędnej konfiguracji czekanie nic nie da, więc usterka ma być widoczna od
+    razu."""
     response = client.get(path)
 
     assert response.status_code == 500
 
 
 def test_request_id_is_absent_without_middleware(client: TestClient) -> None:
-    """Handler poza middleware → request_id to None, nie wywrotka."""
+    """Sprawdza, czy obsługa błędu działa także w aplikacji bez warstwy nadającej identyfikator
+    żądania: odpowiedź wraca normalnie, a pole `request_id` jest puste.
+
+    Wyłapuje obsługę błędu, która zakłada, że identyfikator zawsze jest, i sama się wywraca:
+    zamiast opisu właściwego błędu wołający dostałby wtedy błąd obsługi błędu."""
     response = client.get("/boom")
 
     assert response.json()["request_id"] is None

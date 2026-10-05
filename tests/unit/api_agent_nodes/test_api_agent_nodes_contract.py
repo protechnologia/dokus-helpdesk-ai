@@ -54,8 +54,11 @@ def package_of(
 
 
 def test_every_node_package_brings_a_node() -> None:
-    """Pakiety węzłów → co najmniej jeden węzeł na pakiet: pusty katalog węzła oznacza, że importy
-    w jego `__init__.py` coś pominęły."""
+    """Sprawdza, czy każdy katalog w `app/agent_nodes/` wnosi co najmniej jeden węzeł, widoczny po
+    zaimportowaniu tego katalogu.
+
+    Wyłapuje katalog węzła, którego `__init__.py` nie importuje swoich klas: taki węzeł wypadłby
+    z pozostałych testów kontraktu i nikt by tego nie zauważył."""
     modules  = pkgutil.iter_modules(app.agent_nodes.__path__)
     packages = {module.name for module in modules if module.ispkg}
 
@@ -64,14 +67,19 @@ def test_every_node_package_brings_a_node() -> None:
 
 @pytest.mark.parametrize("node", NODES, ids=lambda cls: cls.__name__)
 def test_every_node_is_named_after_its_package(node: type[Node]) -> None:
-    """Nazwa węzła = nazwa jego katalogu: atrapa i węzeł właściwy wpinają się do grafu pod tą samą
-    nazwą, a test grafów rozpoznaje je po niej."""
+    """Sprawdza, czy każdy węzeł, właściwy i atrapa, nosi nazwę swojego katalogu: węzły z `agent/`
+    nazywają się „agent", z `run_tools/` „run_tools" i tak dalej.
+
+    Wyłapuje węzeł o innej nazwie niż katalog: atrapa i węzeł właściwy mają wpinać się do grafu pod
+    tą samą nazwą, a po tej nazwie rozpoznają je też testy grafów."""
     assert node.name == package_of(node)
 
 
 def test_anonymize_has_no_fake_node() -> None:
-    """W `anonymize/` jest wyłącznie węzeł właściwy: atrapa węzła byłaby drugą drogą obok
-    anonimizacji, nieodróżnialną od prawdziwej w teście grafów."""
+    """Sprawdza, czy w katalogu `anonymize/` jest wyłącznie węzeł właściwy, bez atrapy.
+
+    Wyłapuje dodanie atrapy węzła anonimizacji: byłaby drugą drogą obok anonimizacji, której
+    w testach grafów nie da się odróżnić od prawdziwej."""
     anonymize_nodes = [node for node in NODES if package_of(node) == "anonymize"]
 
     assert [node.__module__ for node in anonymize_nodes] == ["app.agent_nodes.anonymize.node"]

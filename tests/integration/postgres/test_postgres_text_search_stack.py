@@ -193,7 +193,17 @@ def test_text_search_matches_what_the_tools_assume(
     case:     Case,             # np. Case("odmiana: narzędnik", "words", "…", "serwer", True)
     outcomes: dict[str, bool],  # np. {"odmiana: narzędnik": True, …}
 ) -> None:
-    """Zapytanie daną drogą → tekst znaleziony albo nie, zgodnie z tabelą przypadków."""
+    """Sprawdza, czy wyszukiwanie tekstowe w bazie zachowuje się tak, jak zakładają narzędzia
+    agenta. Każdy przypadek z tabeli `CASES` to zmyślony tekst zapisany w bazie, zapytanie i jedna
+    z trzech dróg szukania (słowa, fraza albo podciąg); test porównuje, czy zapytanie znalazło
+    ten tekst, z tym, co przypadek przewiduje — ma znaleźć wtedy, gdy powinno, i nie znaleźć, gdy
+    nie powinno. Przypadki obejmują odmianę słów, zaprzeczenia z „nie-", nazwy własne, wyrazy
+    z łącznikiem, kody błędów, kolejność słów we frazie oraz znaki `%` i `_` w zapytaniu.
+
+    Wyłapuje obraz bazy, w którym polski słownik albo jego poprawki nie działają: wyszukiwanie
+    dalej odpowiada, ale gubi albo dokłada trafienia — na przykład „widoczne" znajduje
+    „niewidoczne", nazwa „eNadawca" nie znajduje się w odmianie, a fragmentu kodu błędu nie
+    znajduje nawet szukanie podciągiem."""
     assert outcomes[case.name] is case.expected, (
         f"{case.mode}: zapytanie „{case.query}” wobec „{case.text}”"
     )

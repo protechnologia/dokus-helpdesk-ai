@@ -33,9 +33,13 @@ pytestmark = [pytest.mark.stack, pytest.mark.stack_postgres]
 
 
 async def test_a_ticket_found_by_a_broken_phrase_is_read_verbatim(tickets_threads) -> None:
-    """Zdanie złamane w wątku po „zaległe" → fraza w jednej linii znajduje zgłoszenie, a odczyt
-    tego numeru oddaje wątek znak w znak, ze złamaniem: wyszukiwanie widzi tekst ze spacjami,
-    model czyta oryginał."""
+    """Sprawdza, czy zdanie zapisane w wątku w dwóch liniach (złamane po słowie „zaległe") da się
+    znaleźć frazą wpisaną w jednej linii i czy odczyt znalezionego numeru oddaje wątek znak
+    w znak tak, jak go zapisano: ze złamaniem linii, z tematem i z datą zgłoszenia.
+
+    Wyłapuje dwie usterki: wyszukiwanie, któremu złamanie linii zasłania zdanie, oraz odczyt,
+    który oddaje tekst przygotowany dla wyszukiwania (ze spacjami zamiast złamań) zamiast
+    oryginalnego wątku."""
     found = await tickets_threads.find.find(
         FindTicketsTextQuery(exact="zaległe przesyłki pobrały się same")
     )
@@ -54,8 +58,11 @@ async def test_a_ticket_found_by_a_broken_phrase_is_read_verbatim(tickets_thread
 
 
 async def test_a_number_the_table_does_not_have_is_an_error(tickets_threads) -> None:
-    """Numer, którego w tabeli nie ma → `UnknownTicketError` z tym numerem: baza oddaje wtedy
-    zero wierszy bez błędu, więc o tym, że to błąd, mówi narzędzie."""
+    """Sprawdza, czy odczyt wątku o numerze, którego w tabeli nie ma (99999), kończy się błędem
+    `UnknownTicketError` z tym numerem.
+
+    Wyłapuje pusty wynik w miejscu błędu: baza oddaje wtedy zero wierszy i sama niczego nie
+    zgłasza, więc bez sprawdzenia w narzędziu model nie dowiedziałby się, że podał zły numer."""
     with pytest.raises(UnknownTicketError) as caught:
         await tickets_threads.read.search(ReadTicketsThreadQuery(ticket_id="99999"))
 

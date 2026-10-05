@@ -143,7 +143,11 @@ def stub_run(monkeypatch: pytest.MonkeyPatch) -> StubRun:
 # --- build --------------------------------------------------------------------------------
 
 def test_build_reports_counts(tmp_path: Path, stub_run: StubRun) -> None:
-    """Successful build → exit 0 and a line stating what was read, indexed and dropped."""
+    """Sprawdza, czy udane `helpdesk tickets index` kończy się kodem 0 i wypisuje podsumowanie
+    z liczbą zgłoszeń wczytanych i zaindeksowanych.
+
+    Wyłapuje komendę, która kończy się błędem mimo udanego przebiegu albo nie pokazuje
+    podsumowania — operator nie wiedziałby wtedy, ile zgłoszeń trafiło do indeksu."""
     result = runner.invoke(cli, ["tickets", "index", str(_corpus(tmp_path))])
 
     assert result.exit_code == 0
@@ -152,16 +156,21 @@ def test_build_reports_counts(tmp_path: Path, stub_run: StubRun) -> None:
 
 
 def test_build_does_not_drop_the_collection(tmp_path: Path, stub_run: StubRun) -> None:
-    """`build` → the run is asked NOT to delete first; that is the whole difference from
-    `rebuild`."""
+    """Sprawdza, czy `helpdesk tickets index` uruchamia indeksację bez kasowania kolekcji.
+
+    Wyłapuje pomylenie tej komendy z `helpdesk tickets reindex`, od której różni ją tylko to:
+    zwykłe dołożenie zgłoszeń kasowałoby wtedy cały indeks, i to bez pytania."""
     runner.invoke(cli, ["tickets", "index", str(_corpus(tmp_path))])
 
     assert stub_run.calls[0]["drop_first"] is False
 
 
 def test_build_lists_reasons_for_drops(tmp_path: Path, stub_run: StubRun) -> None:
-    """Dropped records → the report names the rule and the tickets. A filter that silently halves
-    the index looks exactly like one that works, and this output is where the difference shows."""
+    """Sprawdza, czy przy odrzuconym zgłoszeniu `helpdesk tickets index` wypisuje nazwę reguły,
+    która je odrzuciła (`no_resolution`), i numer tego zgłoszenia (19596).
+
+    Wyłapuje raport, który przemilcza odrzucenia: filtr, który po cichu wyrzuca połowę zgłoszeń,
+    wygląda dokładnie jak działający, a różnicę widać tylko w tym wypisie."""
     stub_run.report = _report(indexed=1, dropped_ids=("19596",))
 
     result = runner.invoke(cli, ["tickets", "index", str(_corpus(tmp_path))])
@@ -171,8 +180,11 @@ def test_build_lists_reasons_for_drops(tmp_path: Path, stub_run: StubRun) -> Non
 
 
 def test_empty_index_is_a_failure(tmp_path: Path, stub_run: StubRun) -> None:
-    """Nothing indexed → exit 1. An empty index is never a success: a zero code would let a
-    scheduled rebuild destroy a working index unnoticed."""
+    """Sprawdza, czy `helpdesk tickets index` kończy się kodem 1, gdy przebieg nie zaindeksował
+    żadnego zgłoszenia.
+
+    Wyłapuje pusty indeks zgłoszony jako sukces: przy kodzie 0 zaplanowana przebudowa mogłaby
+    zniszczyć działający indeks i nikt by tego nie zauważył."""
     stub_run.report = _report(indexed=0)
 
     result = runner.invoke(cli, ["tickets", "index", str(_corpus(tmp_path))])
@@ -181,7 +193,11 @@ def test_empty_index_is_a_failure(tmp_path: Path, stub_run: StubRun) -> None:
 
 
 def test_missing_directory_exits_two(tmp_path: Path, stub_run: StubRun) -> None:
-    """Directory that does not exist → exit 2, apart from "the run produced nothing" (exit 1)."""
+    """Sprawdza, czy `helpdesk tickets index` kończy się kodem 2, gdy indeksacja zgłasza, że
+    wskazanego katalogu nie ma (`NotADirectoryError`).
+
+    Wyłapuje pomylenie złej ścieżki z przebiegiem, który nic nie zaindeksował (kod 1): potok nie
+    odróżniłby wtedy błędu w konfiguracji od rzeczywiście pustego wyniku."""
     stub_run.error = NotADirectoryError("nie jest katalogiem: /nie-ma")
 
     result = runner.invoke(cli, ["tickets", "index", str(tmp_path / "nie-ma")])
@@ -190,8 +206,12 @@ def test_missing_directory_exits_two(tmp_path: Path, stub_run: StubRun) -> None:
 
 
 def test_unreachable_service_exits_two(tmp_path: Path, stub_run: StubRun) -> None:
-    """Qdrant down → exit 2, because retrying the same command may well work — unlike an empty
-    corpus, which will not fix itself."""
+    """Sprawdza, czy `helpdesk tickets index` kończy się kodem 2, gdy indeksacja zgłasza, że
+    Qdrant nie odpowiada (`DbQdrantError`).
+
+    Wyłapuje awarię usługi pomyloną z pustym korpusem (kod 1) albo wypuszczoną jako nieobsłużony
+    wyjątek: przy leżącej usłudze ponowienie tej samej komendy może zadziałać, a pusty korpus sam
+    się nie naprawi."""
     stub_run.error = DbQdrantError("Could not reach Qdrant")
 
     result = runner.invoke(cli, ["tickets", "index", str(_corpus(tmp_path))])
@@ -200,8 +220,11 @@ def test_unreachable_service_exits_two(tmp_path: Path, stub_run: StubRun) -> Non
 
 
 def test_warnings_are_printed(tmp_path: Path, stub_run: StubRun) -> None:
-    """Run carrying a warning → it reaches the operator. The drop-rate check is worthless if the
-    output swallows it."""
+    """Sprawdza, czy ostrzeżenie z raportu indeksacji (tu: filtr odrzucił 2% korpusu zamiast
+    oczekiwanych około 19%) trafia na ekran w linii „UWAGA".
+
+    Wyłapuje komendę, która gubi ostrzeżenia: kontrola odsetka odrzuconych zgłoszeń nic nie daje,
+    jeśli operator nie zobaczy jej wyniku."""
     report = _report()
     report.warnings = ["filtr odrzucił 2.0% korpusu, oczekiwane ~19%"]
     stub_run.report = report
@@ -214,7 +237,11 @@ def test_warnings_are_printed(tmp_path: Path, stub_run: StubRun) -> None:
 # --- rebuild ------------------------------------------------------------------------------
 
 def test_rebuild_asks_before_destroying(tmp_path: Path, stub_run: StubRun) -> None:
-    """`rebuild` without --yes, answered "no" → exit 1 and nothing runs."""
+    """Sprawdza, czy `helpdesk tickets reindex` bez `--yes` pyta o potwierdzenie, a po odpowiedzi
+    „nie" kończy się kodem 1 i nie uruchamia indeksacji.
+
+    Wyłapuje komendę, która kasuje kolekcję bez pytania albo mimo odmowy: uruchomiona przez
+    pomyłkę na pustym albo złym katalogu nie zostawiłaby nic do przeszukania."""
     result = runner.invoke(cli, ["tickets", "reindex", str(_corpus(tmp_path))], input="n\n")
 
     assert result.exit_code == 1
@@ -222,15 +249,22 @@ def test_rebuild_asks_before_destroying(tmp_path: Path, stub_run: StubRun) -> No
 
 
 def test_rebuild_names_the_collection_in_the_prompt(tmp_path: Path, stub_run: StubRun) -> None:
-    """Confirmation prompt names the collection → confirming a destructive action without saying
-    WHAT it destroys is how the wrong index gets wiped."""
+    """Sprawdza, czy pytanie o potwierdzenie w `helpdesk tickets reindex` zawiera nazwę kolekcji,
+    która ma zostać skasowana (`tickets`).
+
+    Wyłapuje pytanie, które nie mówi, co zniknie: potwierdzając w ciemno, łatwo skasować nie ten
+    indeks, o który chodziło."""
     result = runner.invoke(cli, ["tickets", "reindex", str(_corpus(tmp_path))], input="n\n")
 
     assert "tickets" in result.stdout
 
 
 def test_rebuild_proceeds_when_confirmed(tmp_path: Path, stub_run: StubRun) -> None:
-    """Confirmation accepted → the run is asked to delete first."""
+    """Sprawdza, czy po odpowiedzi „tak" `helpdesk tickets reindex` kończy się kodem 0 i uruchamia
+    indeksację z kasowaniem kolekcji.
+
+    Wyłapuje przebudowę, która po potwierdzeniu nie rusza albo nie kasuje starej kolekcji:
+    zamiast indeksu zbudowanego od zera zostałyby w nim stare punkty."""
     result = runner.invoke(cli, ["tickets", "reindex", str(_corpus(tmp_path))], input="y\n")
 
     assert result.exit_code == 0
@@ -238,7 +272,11 @@ def test_rebuild_proceeds_when_confirmed(tmp_path: Path, stub_run: StubRun) -> N
 
 
 def test_rebuild_with_yes_skips_the_prompt(tmp_path: Path, stub_run: StubRun) -> None:
-    """`--yes` → no question asked, so the command is usable from a script."""
+    """Sprawdza, czy `helpdesk tickets reindex --yes` kończy się kodem 0 i uruchamia indeksację
+    z kasowaniem kolekcji, nie czekając na odpowiedź operatora.
+
+    Wyłapuje komendę, która mimo `--yes` czeka na potwierdzenie: nie dałoby się jej uruchomić ze
+    skryptu, bo nikt by na pytanie nie odpowiedział."""
     result = runner.invoke(cli, ["tickets", "reindex", str(_corpus(tmp_path)), "--yes"])
 
     assert result.exit_code == 0

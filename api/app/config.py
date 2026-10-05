@@ -123,6 +123,16 @@ class Settings(BaseSettings):
     agent_max_calls_find_docs_text:      int = Field(default=5, ge=1)
     agent_max_calls_read_docs:           int = Field(default=3, ge=1)
 
+    # --- agent: limit tur modelu w jednym przebiegu grafu ---
+    # Ile razy model może odpowiedzieć przy jednej sprawie w grafie z narzędziami. Gdy w ostatniej
+    # dozwolonej turze nadal woła narzędzia, przebieg ich nie wykonuje, tylko idzie do odpowiedzi.
+    # Domyka to, czego limity narzędzi nie domykają: wywołanie ponad limit narzędzia dostaje
+    # odmowę, ale turę zużywa, więc model wołający w kółko zużywałby tokeny bez końca.
+    # 20 to zapas, nie cel: sprawa w sondach z 2026-10-04 to 4–7 tur, a limity narzędzi pozwalają
+    # na 32 wywołania, które model zwykle grupuje po kilka na turę. Ucięcie sprawy kosztuje
+    # więcej niż kilka tur zapasu.
+    agent_max_iterations: int = Field(default=20, ge=1)
+
     @model_validator(mode="before")
     @classmethod
     def _drop_blank_values(cls, values: Any) -> Any:    # e.g. {"llm_model": "  "}

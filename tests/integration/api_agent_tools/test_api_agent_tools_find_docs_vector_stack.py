@@ -32,8 +32,13 @@ pytestmark = [
 
 
 async def test_a_question_in_other_words_finds_the_section_first(docs_index) -> None:
-    """Pytanie innymi słowami niż treść sekcji → ta sekcja na pierwszym miejscu. Asercja na
-    ranking, nie na wysokość podobieństwa."""
+    """Sprawdza, czy pytanie zadane innymi słowami niż treść sekcji („gdzie zarezerwować parking")
+    stawia sekcję o rezerwacji miejsca parkingowego na pierwszym miejscu wyniku. Liczy się
+    kolejność, nie wysokość podobieństwa.
+
+    Wyłapuje rozjazd między indeksacją a wyszukiwaniem na prawdziwym embedderze i Qdrancie:
+    gdyby sekcje zapisywano inaczej, niż się ich potem szuka, na pierwszym miejscu stanęłaby
+    sekcja bez związku z pytaniem."""
     # "Miejsce parkingowe rezerwuje się w recepcji najpóźniej dzień wcześniej."
     result = await docs_index.vector.find(FindDocsVectorQuery(text="gdzie zarezerwować parking"))
 
@@ -41,8 +46,12 @@ async def test_a_question_in_other_words_finds_the_section_first(docs_index) -> 
 
 
 async def test_a_section_of_several_fragments_comes_back_once(docs_index) -> None:
-    """Sekcja pocięta na trzy fragmenty → w wyniku raz, a pozostałe sekcje obok niej: jednostką
-    wyniku jest sekcja, którą da się odczytać, nie fragment."""
+    """Sprawdza, czy sekcja pocięta przy indeksacji na trzy fragmenty wraca w wyniku raz, na
+    pierwszym miejscu, a obok niej stoją dwie pozostałe sekcje.
+
+    Wyłapuje wynik liczony we fragmentach zamiast w sekcjach: jedna sekcja zajęłaby wtedy kilka
+    miejsc i wypchnęła z wyniku inne, a agent ma dostać sekcję, którą da się odczytać, nie jej
+    fragment."""
     # "Żyrafa wymienia żarówki w lampach pod sufitem."
     result = await docs_index.vector.find(
         FindDocsVectorQuery(text="kto wymienia żarówki pod sufitem")

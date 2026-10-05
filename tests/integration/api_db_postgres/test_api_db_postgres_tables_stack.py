@@ -119,16 +119,26 @@ async def docs(client: PostgresClient) -> AsyncIterator[DocsTable]:
 
 
 async def test_tickets_are_read_back_as_they_were_written(tickets: TicketsTable) -> None:
-    """Zapis i odczyt po numerach → te same wiersze, z wątkiem, w kolejności numerów z żądania;
-    nieznanego numeru w wyniku nie ma."""
+    """Sprawdza, czy zgłoszenia zapisane w tabeli wracają z niej bez zmian: odczyt po trzech
+    numerach, z których jednego w tabeli nie ma, oddaje dwa wiersze (numer, data, temat i cały
+    wątek) w kolejności numerów z żądania.
+
+    Wyłapuje zapis albo odczyt, który zmienia dane po drodze przez bazę (na przykład datę albo
+    treść wątku), miesza kolejność albo kończy się błędem przy nieznanym numerze — a z tych
+    wierszy agent czyta wątki zgłoszeń."""
     read = await tickets.read_by_id(["90012", "nie-ma-takiego", "90011"])
 
     assert read == [ROWS[1], ROWS[0]]
 
 
 async def test_a_ticket_is_found_by_a_word_of_its_thread(tickets: TicketsTable) -> None:
-    """Słowo z wątku w innej odmianie → to jedno zgłoszenie; słowo, którego nie ma w żadnym
-    wątku → nic."""
+    """Sprawdza, czy zgłoszenie da się znaleźć po słowie z jego wątku podanym w innej odmianie:
+    „załączniki" znajduje to jedno zgłoszenie, w którym mowa o załączniku, a słowo, którego nie
+    ma w żadnym wątku („hipopotam"), nie znajduje nic.
+
+    Wyłapuje tabelę, w której słowa wątku nie przechodzą przez polski słownik albo przeszukiwany
+    jest inny tekst niż wątek: wyszukiwanie po słowach gubiłoby wtedy zgłoszenia albo oddawało
+    niepasujące."""
     by_thread = await tickets.words("załączniki")
     nothing   = await tickets.words("hipopotam")
 
@@ -137,14 +147,23 @@ async def test_a_ticket_is_found_by_a_word_of_its_thread(tickets: TicketsTable) 
 
 
 async def test_a_message_is_found_as_a_substring_of_the_thread(tickets: TicketsTable) -> None:
-    """Fragment komunikatu inną wielkością liter → oba zgłoszenia, w których wątku padł."""
+    """Sprawdza, czy fragment komunikatu błędu wpisany wielkimi literami („SKOMUNIKOWAĆ
+    Z SERWEREM") znajduje oba zgłoszenia, w których wątku ten komunikat padł, choć tam jest
+    zapisany małymi literami.
+
+    Wyłapuje wyszukiwanie dosłowne, które zależy od wielkości liter albo nie obejmuje całego
+    wątku: agent nie znalazłby wtedy zgłoszeń po komunikacie przepisanym z ekranu."""
     found = await tickets.substring("SKOMUNIKOWAĆ Z SERWEREM")
 
     assert found == [row.ticket_id for row in ROWS]
 
 
 async def test_writing_the_same_tickets_twice_duplicates_nothing(tickets: TicketsTable) -> None:
-    """Ten sam zapis drugi raz → nadal dwa zgłoszenia: ponowna indeksacja nadpisuje, nie dokłada."""
+    """Sprawdza, czy drugi zapis tych samych dwóch zgłoszeń niczego nie dokłada: po nim
+    wyszukiwanie komunikatu nadal oddaje dokładnie dwa numery.
+
+    Wyłapuje zapis, który przy powtórzonym numerze kończy się błędem bazy albo dubluje wiersze —
+    a ponowna indeksacja ma nadpisywać zgłoszenia, nie dokładać ich drugi raz."""
     await tickets.upsert(ROWS)
 
     found = await tickets.substring("skomunikować z serwerem")
@@ -153,16 +172,26 @@ async def test_writing_the_same_tickets_twice_duplicates_nothing(tickets: Ticket
 
 
 async def test_the_listing_follows_the_documents(docs: DocsTable) -> None:
-    """Sekcje zapisane w odwrotnej kolejności → spis treści dokument po dokumencie, sekcje według
-    miejsca w dokumencie."""
+    """Sprawdza, czy spis sekcji wychodzi z tabeli dokument po dokumencie, a w dokumencie według
+    miejsca sekcji: cztery sekcje z dwóch dokumentów są tu zapisane w odwrotnej kolejności,
+    a spis oddaje je we właściwej, z niezmienionymi danymi.
+
+    Wyłapuje spis ułożony w kolejności zapisu albo przypadkowej: agent dostałby spis treści,
+    w którym sekcje jednego dokumentu są przemieszane z sekcjami drugiego albo stoją nie po
+    kolei."""
     listed = await docs.list_all()
 
     assert listed == DOC_ROWS
 
 
 async def test_sections_are_read_in_the_order_asked(docs: DocsTable) -> None:
-    """Odczyt po identyfikatorach → sekcje z treścią w kolejności żądania; nieznanego
-    identyfikatora w wyniku nie ma, o błędzie rozstrzyga narzędzie."""
+    """Sprawdza, czy odczyt po trzech identyfikatorach, z których jednego w tabeli nie ma, oddaje
+    dwie sekcje z treścią w kolejności żądania i czy z odczytanego wiersza da się odtworzyć opis
+    sekcji taki sam jak przed zapisem.
+
+    Wyłapuje odczyt, który miesza kolejność, pada na nieznanym identyfikatorze albo gubi po
+    drodze przez bazę datę wydania czy ścieżkę rozdziału. O tym, czy brak sekcji jest błędem, ma
+    rozstrzygać narzędzie, a nie tabela."""
     wanted = ["usr-wysylka-status-w-toku", "nie-ma-takiej", "adm-kancelaria-edoreczenia"]
 
     read = await docs.read_by_id(wanted)
@@ -172,8 +201,11 @@ async def test_sections_are_read_in_the_order_asked(docs: DocsTable) -> None:
 
 
 async def test_the_title_is_searched_and_the_description_is_not(docs: DocsTable) -> None:
-    """Słowo tylko z tytułu → sekcja znaleziona; słowo tylko z opisu z metryczki → nic: opis pisze
-    model przy przygotowaniu plików, a trafienie ma wynikać z oryginału."""
+    """Sprawdza, czy sekcję da się znaleźć po słowie, które jest tylko w jej tytule
+    („jednorożec"), a nie da się po słowie, które jest tylko w jej opisie („hipopotam").
+
+    Wyłapuje tabelę, która przeszukuje także opis sekcji albo pomija tytuł. Opis pisze model przy
+    przygotowaniu plików, więc trafienie po nim nie wynikałoby z oryginalnej dokumentacji."""
     row = DocRow(
         section_id   = "probna-sekcja",
         ordinal      = 9,
@@ -224,8 +256,13 @@ def _probe_row(
 async def test_a_message_broken_across_lines_is_found_and_the_body_stays_verbatim(
     docs: DocsTable,
 ) -> None:
-    """Komunikat złamany w pliku po „Zaloguj się", z wcięciem następnej linii → znajduje go
-    zapytanie w jednej linii i zapytanie złamane inaczej; treść sekcji wraca znak w znak."""
+    """Sprawdza, czy komunikat, który w treści sekcji jest złamany między liniami (po „Zaloguj
+    się", z wcięciem następnej linii), znajduje zarówno zapytanie pisane w jednej linii, jak
+    i zapytanie złamane w innym miejscu, oraz czy treść sekcji wraca z odczytu znak w znak.
+
+    Wyłapuje wyszukiwanie dosłowne, które potyka się o znak nowej linii albo wcięcie, przez co
+    agent nie znajduje komunikatu przepisanego z ekranu, oraz takie wyrównywanie odstępów, które
+    zmienia samą treść sekcji."""
     row = _probe_row("Pojawia się komunikat „Zaloguj się\n   ponownie, aby kontynuować pracę”.")
 
     await docs.upsert([row])
@@ -240,8 +277,12 @@ async def test_a_message_broken_across_lines_is_found_and_the_body_stays_verbati
 
 
 async def test_a_hard_space_in_the_body_matches_a_plain_space(docs: DocsTable) -> None:
-    """Twarda spacja w treści → znajduje ją zapytanie ze zwykłą spacją: `\\s` bazy jej nie
-    obejmuje, więc wzorzec wymienia ją osobno."""
+    """Sprawdza, czy nazwę opcji zapisaną w treści sekcji z twardą spacją („Przekaż bufor")
+    znajduje zapytanie ze zwykłą spacją.
+
+    Wyłapuje wzorzec odstępów, który twardej spacji nie obejmuje: `\\s` tej bazy jej nie łapie,
+    więc wzorzec musi wymieniać ją osobno. Bez tego tekstu z twardą spacją nie da się znaleźć
+    zapytaniem wpisanym z klawiatury."""
     row = _probe_row("Opcja „Przekaż\u00a0bufor” wysyła przesyłki do operatora.")
 
     await docs.upsert([row])

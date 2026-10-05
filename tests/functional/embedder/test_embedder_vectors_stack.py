@@ -100,14 +100,23 @@ def passage_body(embedder_client: httpx2.Client) -> dict:
 
 
 def test_vectors_are_unit_length(passage_body: dict) -> None:
-    """Real model → unit-length vectors, so RAG_SCORE_MIN means the same as it does on the fake."""
+    """Sprawdza, czy uruchomiony embedder z prawdziwym modelem oddaje wektor o długości 1, czyli
+    znormalizowany. Gdy usługa działa na atrapie modelu, test kończy się błędem.
+
+    Wyłapuje wdrożenie, w którym model oddaje wektory nieznormalizowane: próg odcięcia wyników
+    (`RAG_SCORE_MIN`) znaczyłby wtedy na produkcji co innego niż w testach na atrapie."""
     vector = passage_body["vectors"][0]
 
     assert _cosine(vector, vector) == pytest.approx(1.0, abs=1e-4)
 
 
 def test_reported_dimension_matches_the_vectors(passage_body: dict) -> None:
-    """Reported `dimension` equals the actual width → the Qdrant collection can trust the header."""
+    """Sprawdza, czy uruchomiony embedder z prawdziwym modelem podaje w polu `dimension` tyle, ile
+    liczb ma faktycznie zwrócony wektor. Gdy usługa działa na atrapie modelu, test kończy się
+    błędem.
+
+    Wyłapuje wdrożenie, w którym podany wymiar rozjeżdża się z wektorami modelu: kolekcja
+    w Qdrancie założona według tej liczby odrzucałaby wektory."""
     assert len(passage_body["vectors"][0]) == passage_body["dimension"]
 
 
@@ -123,8 +132,13 @@ def test_mode_changes_the_vector(
     passage_body:    dict,
     mode:            str,
 ) -> None:
-    """Same text under another mode → a different vector, because the model was TRAINED on the
-    prefix; equality here would mean the second named vector is storage spent on nothing."""
+    """Sprawdza, czy prawdziwy model w uruchomionym embedderze daje dla tego samego tekstu inny
+    wektor w trybie `query` i w trybie `sts` niż w trybie `passage`: podobieństwo obu wektorów
+    jest poniżej 0,98. Gdy usługa działa na atrapie modelu, test kończy się błędem.
+
+    Wyłapuje model, który nie reaguje na tryb, choć powinien, bo był uczony z przedrostkami
+    trybów: drugi wektor zapisywany przy każdym zgłoszeniu byłby wtedy kopią pierwszego, czyli
+    miejscem zajętym na nic."""
     other = _embed(embedder_client, TICKET_TEXT, mode)["vectors"][0]
 
     assert _cosine(other, passage_body["vectors"][0]) < MAX_COSINE_BETWEEN_MODES

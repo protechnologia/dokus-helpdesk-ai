@@ -54,8 +54,11 @@ def _tool(
 
 
 async def test_the_phrase_goes_by_substring_and_the_words_by_dictionary() -> None:
-    """Fraza i słowa → jedno zapytanie o podciąg i jedno przez słownik, każde ze swoją wartością:
-    kod ma być szukany dosłownie, a słowa w dowolnej odmianie."""
+    """Sprawdza, czy zapytanie z frazą `SQLSTATE[23000]` i słowami „załącznik limit" daje dwa
+    zapytania do tabeli: frazę szukaną jako dosłowny podciąg i słowa szukane przez słownik.
+
+    Wyłapuje zamianę dróg albo wartości: kod błędu ma być szukany dosłownie, a słowa w dowolnej
+    odmianie, więc po zamianie oba wyszukiwania gubiłyby trafienia."""
     client = _client()
 
     await _tool(client).find(FindTicketsTextQuery(exact="SQLSTATE[23000]", words="załącznik limit"))
@@ -67,7 +70,11 @@ async def test_the_phrase_goes_by_substring_and_the_words_by_dictionary() -> Non
 
 
 async def test_a_field_that_was_not_given_is_not_searched() -> None:
-    """Samo `exact` → żadnego zapytania przez słownik; samo `words` → żadnego podciągu."""
+    """Sprawdza, czy narzędzie pyta tabelę tylko o to pole, które agent podał: sama fraza daje
+    jedno zapytanie o podciąg, a same słowa jedno zapytanie przez słownik.
+
+    Wyłapuje narzędzie, które pyta bazę także o pole puste: do tabeli szłoby wtedy zapytanie bez
+    wartości, zamiast pominięcia tej drogi."""
     only_exact = _client()
     only_words = _client()
 
@@ -79,8 +86,11 @@ async def test_a_field_that_was_not_given_is_not_searched() -> None:
 
 
 async def test_either_field_is_enough_for_a_ticket_to_come_back() -> None:
-    """Fraza trafia w dwa zgłoszenia, słowa w trzecie → wszystkie w wyniku, znalezione frazą
-    pierwsze: pola szukają niezależnie, a wyniki się sumują."""
+    """Sprawdza, czy wyniki obu pól się sumują: fraza trafia w zgłoszenia `90011` i `90012`,
+    słowa w `90003`, a w wyniku są wszystkie trzy, znalezione frazą pierwsze.
+
+    Wyłapuje narzędzie, które oddaje tylko zgłoszenia pasujące do obu pól naraz: pola szukają
+    niezależnie, więc zgłoszenie znalezione jedną drogą nie może zniknąć z wyniku."""
     client = _client(substring={MESSAGE: ["90011", "90012"]}, words={"załącznik": ["90003"]})
 
     result = await _tool(client).find(FindTicketsTextQuery(exact=MESSAGE, words="załącznik"))
@@ -94,8 +104,11 @@ async def test_either_field_is_enough_for_a_ticket_to_come_back() -> None:
 
 
 async def test_a_ticket_found_both_ways_comes_back_once_as_exact() -> None:
-    """Fraza i słowa trafiają w to samo zgłoszenie → numer w wyniku raz, z etykietą `exact`,
-    i liczony raz."""
+    """Sprawdza, czy zgłoszenie znalezione i frazą, i słowami (tu `90011`) jest w wyniku raz,
+    z etykietą `exact`, a licznik pominiętych zostaje na zerze.
+
+    Wyłapuje zgłoszenie powtórzone w wyniku albo policzone dwa razy: zajmowałoby dwa miejsca
+    w limicie i zawyżało liczbę pominiętych."""
     client = _client(substring={MESSAGE: ["90011"]}, words={"załącznik": ["90003", "90011"]})
 
     result = await _tool(client).find(FindTicketsTextQuery(exact=MESSAGE, words="załącznik"))
@@ -108,8 +121,11 @@ async def test_a_ticket_found_both_ways_comes_back_once_as_exact() -> None:
 
 
 async def test_matches_over_the_limit_are_counted() -> None:
-    """Pięć pasujących zgłoszeń, limit 2 → dwa pierwsze w wyniku, trzy policzone jako pominięte:
-    „pokazano dwa z pięciu" mówi agentowi, że zapytanie było zbyt ogólne."""
+    """Sprawdza, czy przy pięciu pasujących zgłoszeniach i limicie 2 wynik ma dwa pierwsze numery,
+    a pozostałe trzy są policzone jako pominięte.
+
+    Wyłapuje wynik ucięty bez śladu: „pokazano dwa z pięciu" mówi agentowi, że zapytanie było
+    zbyt ogólne, a bez licznika wyglądałoby, że pasują tylko dwa zgłoszenia."""
     numbers = ["90001", "90002", "90003", "90011", "90012"]
     client  = _client(words={"zgłoszenie": numbers})
 
@@ -120,8 +136,11 @@ async def test_matches_over_the_limit_are_counted() -> None:
 
 
 async def test_the_model_gets_numbers_and_nothing_is_read() -> None:
-    """Znalezione zgłoszenie → sam numer i to, czym je znaleziono; wątku narzędzie w ogóle nie
-    czyta z tabeli: treść dają odczyty i tylko one cytują."""
+    """Sprawdza, czy model dostaje sam numer znalezionego zgłoszenia i to, czym je znaleziono,
+    a narzędzie zadaje tabeli tylko jedno zapytanie, o podciąg — wątku w ogóle nie czyta.
+
+    Wyłapuje wyszukiwanie, które czyta wątki i dokłada ich treść do wyniku: treść mają dawać
+    narzędzia odczytu, bo tylko one podają źródła odpowiedzi."""
     client = _client(substring={MESSAGE: ["90011"]})
 
     text = await _tool(client).run(FindTicketsTextQuery(exact=MESSAGE))
@@ -134,8 +153,11 @@ async def test_the_model_gets_numbers_and_nothing_is_read() -> None:
 
 
 async def test_nothing_found_is_an_empty_result() -> None:
-    """Żaden wątek nie pasuje → pusty wynik bez pominiętych: „niczego takiego nie było" to
-    poprawna odpowiedź."""
+    """Sprawdza, czy zapytanie, do którego nie pasuje żaden wątek, daje pusty wynik: bez zgłoszeń
+    i z zerem pominiętych.
+
+    Wyłapuje narzędzie, które brak trafień zgłasza jako błąd: „niczego takiego nie było" to
+    poprawna odpowiedź wyszukiwania."""
     result = await _tool(_client()).find(FindTicketsTextQuery(exact="KSeF-500", words="faktura"))
 
     assert result.tickets            == []
@@ -143,8 +165,11 @@ async def test_nothing_found_is_an_empty_result() -> None:
 
 
 async def test_the_tool_and_its_fake_tell_the_model_the_same() -> None:
-    """Te same trafienia z tabeli i z atrapy → ten sam tekst dla modelu: test grafu na atrapie
-    sprawdza to, co model dostanie na produkcji."""
+    """Sprawdza, czy narzędzie i jego atrapa dają modelowi ten sam tekst, gdy mają te same
+    trafienia: zgłoszenie `90011` znalezione frazą i `90012` znalezione słowami.
+
+    Wyłapuje rozjazd między narzędziem a atrapą: testy grafów na atrapie sprawdzałyby wtedy inny
+    tekst niż ten, który model dostaje na produkcji."""
     client = _client(substring={MESSAGE: ["90011"]}, words={"sekwencja": ["90012"]})
     query  = FindTicketsTextQuery(exact=MESSAGE, words="sekwencja")
 
@@ -155,8 +180,10 @@ async def test_the_tool_and_its_fake_tell_the_model_the_same() -> None:
 
 
 async def test_aclose_closes_the_database_client() -> None:
-    """`aclose()` → zamknięty klient Postgresa: sprzątający nie musi wiedzieć, z czego narzędzie
-    jest zbudowane."""
+    """Sprawdza, czy `aclose()` narzędzia zamyka klienta Postgresa, na którym ono stoi.
+
+    Wyłapuje połączenie z bazą zostawione otwarte: sprzątający woła tylko `aclose()` narzędzia
+    i nie wie, z czego jest ono zbudowane, więc sam klienta nie zamknie."""
     client = _client()
 
     await _tool(client).aclose()

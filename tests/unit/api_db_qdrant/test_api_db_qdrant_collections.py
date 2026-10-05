@@ -149,8 +149,13 @@ def _stored(
 @pytest.mark.parametrize("kind, vectors", COLLECTIONS)
 @pytest.mark.parametrize("name", ["", "   ", "tickets/points", "tickets test", "1tickets"])
 def test_a_name_outside_the_pattern_is_refused(kind: type, vectors: tuple, name: str) -> None:
-    """Nazwa pusta, ze spacją, z ukośnikiem albo od cyfry → błąd przy budowie: nazwa trafia do
-    ścieżki żądania, a pusta (tak compose podstawia brak zmiennej) pisałaby pod inny adres."""
+    """Sprawdza, czy obie kolekcje (zgłoszeń i dokumentacji) odmawiają budowy z niedozwoloną nazwą:
+    pustą, z samych spacji, z ukośnikiem, ze spacją w środku albo zaczynającą się od cyfry. Błąd
+    konfiguracji (`DbQdrantConfigError`) mówi, że chodzi o nazwę kolekcji.
+
+    Wyłapuje kolekcję, która przyjmuje każdą nazwę: nazwa trafia do ścieżki żądania, więc pusta (tak
+    Docker Compose podstawia brakującą zmienną) albo z ukośnikiem kierowałaby żądania pod inny
+    adres."""
     with pytest.raises(DbQdrantConfigError, match="nazwa kolekcji"):
         kind(QdrantClient(base_url=BASE_URL), name, SIZE)
 
@@ -158,21 +163,32 @@ def test_a_name_outside_the_pattern_is_refused(kind: type, vectors: tuple, name:
 @pytest.mark.parametrize("kind, vectors", COLLECTIONS)
 @pytest.mark.parametrize("size", [0, -768])
 def test_a_vector_size_below_one_is_refused(kind: type, vectors: tuple, size: int) -> None:
-    """Wymiar zerowy albo ujemny → błąd przy budowie, a nie odmowa Qdranta przy zakładaniu
-    kolekcji."""
+    """Sprawdza, czy obie kolekcje odmawiają budowy z wymiarem wektora równym 0 albo ujemnym (-768):
+    błąd konfiguracji nazywa zmienną `EMBEDDING_VECTOR_SIZE`.
+
+    Wyłapuje kolekcję, która przyjmuje taki wymiar: pomyłka w konfiguracji wyszłaby dopiero jako
+    odmowa Qdranta przy zakładaniu kolekcji, bez wskazania zmiennej do poprawienia."""
     with pytest.raises(DbQdrantConfigError, match="EMBEDDING_VECTOR_SIZE"):
         kind(QdrantClient(base_url=BASE_URL), NAME, size)
 
 
 @pytest.mark.parametrize("kind, vectors", COLLECTIONS)
 def test_the_collection_declares_its_named_vectors(kind: type, vectors: tuple) -> None:
-    """Klasa kolekcji → jej nazwane wektory w `VECTORS`: to cały schemat poza wymiarem."""
+    """Sprawdza, czy każda klasa kolekcji wymienia w `VECTORS` swoje nazwane wektory: kolekcja
+    zgłoszeń `problem` i `sts`, a kolekcja dokumentacji `section`.
+
+    Wyłapuje zmienioną nazwę albo liczbę wektorów: to cały schemat kolekcji poza wymiarem, więc po
+    takiej zmianie kod przestaje pasować do kolekcji już zbudowanych."""
     assert kind.VECTORS == vectors
 
 
 @pytest.mark.parametrize("kind, vectors", COLLECTIONS)
 def test_the_collection_reports_its_name(kind: type, vectors: tuple) -> None:
-    """Kolekcja → oddaje nazwę, którą dostała; wołający wypisuje ją w raporcie i logach."""
+    """Sprawdza, czy kolekcja oddaje w `name` dokładnie tę nazwę, z którą ją zbudowano (tutaj
+    „docs-2026_test").
+
+    Wyłapuje nazwę zmienioną po drodze: wołający wypisuje ją w raporcie i w logach, więc pokazywałby
+    inną kolekcję niż ta, na której naprawdę pracuje."""
     collection = kind(QdrantClient(base_url=BASE_URL), "docs-2026_test", SIZE)
 
     assert collection.name == "docs-2026_test"
@@ -185,9 +201,13 @@ async def test_a_missing_collection_is_created_with_its_named_vectors(
     kind:    type,
     vectors: tuple,
 ) -> None:
-    """Brak kolekcji → założona z dokładnie tymi nazwanymi wektorami, które deklaruje klasa,
-    każdy w wymiarze podanym przy budowie i z metryką Cosine — na niej mierzono
-    `RAG_SCORE_MIN`."""
+    """Sprawdza, czy `ensure()` zakłada kolekcję, której w Qdrancie nie ma, i oddaje `True`. Żądanie
+    założenia wymienia dokładnie te nazwane wektory, które deklaruje klasa, każdy o wymiarze podanym
+    przy budowie (768) i z miarą podobieństwa `Cosine`.
+
+    Wyłapuje kolekcję założoną z innymi wektorami, wymiarem albo miarą: punkty by do niej nie
+    pasowały, a próg `RAG_SCORE_MIN` zmierzono na mierze `Cosine`, więc przy innej znaczyłby co
+    innego."""
     seen: list = []
     collection = _collection(kind, capturing(seen, {("GET", PATH): httpx.Response(404)}))
 
@@ -205,7 +225,11 @@ async def test_a_missing_collection_is_created_with_its_named_vectors(
 
 @pytest.mark.parametrize("kind, vectors", COLLECTIONS)
 async def test_a_matching_collection_is_left_alone(kind: type, vectors: tuple) -> None:
-    """Kolekcja zgodna → „już była" i żadnego zapisu."""
+    """Sprawdza, czy `ensure()` dla kolekcji, która już istnieje i ma właściwe wektory, oddaje
+    `False` i poza odczytem jej opisu nie wysyła żadnego żądania.
+
+    Wyłapuje `ensure()`, które zakłada od nowa albo zmienia istniejącą kolekcję: zwykłe sprawdzenie
+    przed indeksacją naruszałoby wtedy gotowy indeks."""
     seen: list = []
     collection = _collection(kind, capturing(seen, {("GET", PATH): _description(SIZE, vectors)}))
 
@@ -220,8 +244,12 @@ async def test_a_wrong_vector_size_is_refused_with_both_numbers(
     kind:    type,
     vectors: tuple,
 ) -> None:
-    """Kolekcja zbudowana pod inny model → błąd konfiguracji z OBIEMA liczbami: jedna z nich
-    nie mówi, którą stronę poprawić. Cicha naprawa dałaby indeks nieporównywalny z niczym."""
+    """Sprawdza, czy `ensure()` odrzuca istniejącą kolekcję o wektorach wymiaru 1024, gdy oczekiwany
+    wymiar to 768, a błąd konfiguracji podaje obie liczby.
+
+    Wyłapuje sprawdzenie, które kolekcję zbudowaną pod inny model przepuszcza albo po cichu
+    dopasowuje (powstałby indeks nieporównywalny z niczym), oraz komunikat z jedną liczbą, z którego
+    nie widać, którą stronę poprawić."""
     collection = _collection(kind, routed({("GET", PATH): _description(1024, vectors)}))
 
     with pytest.raises(DbQdrantConfigError, match="1024") as excinfo:
@@ -231,7 +259,11 @@ async def test_a_wrong_vector_size_is_refused_with_both_numbers(
 
 
 async def test_tickets_refuse_a_collection_without_sts() -> None:
-    """Kolekcja zgłoszeń z samym `problem` → błąd konfiguracji nazywający brakujący wektor."""
+    """Sprawdza, czy kolekcja zgłoszeń odrzuca istniejącą kolekcję, która ma tylko wektor `problem`:
+    błąd konfiguracji nazywa brakujący wektor `sts`.
+
+    Wyłapuje sprawdzenie, które pomija brak jednego z wektorów: zgłoszenia z dwoma wektorami Qdrant
+    odrzuciłby dopiero przy zapisie, w środku indeksacji."""
     collection = _collection(
         TicketsCollection,
         routed({("GET", PATH): _description(SIZE, (VECTOR_PROBLEM,))}),
@@ -242,8 +274,12 @@ async def test_tickets_refuse_a_collection_without_sts() -> None:
 
 
 async def test_docs_refuse_a_collection_built_for_tickets() -> None:
-    """Kolekcja dokumentacji wskazująca kolekcję zgłoszeń → błąd konfiguracji: nie ma w niej
-    wektora `section`, a komunikat wymienia te, które są."""
+    """Sprawdza, czy kolekcja dokumentacji odrzuca istniejącą kolekcję zbudowaną dla zgłoszeń: błąd
+    konfiguracji nazywa brakujący wektor `section` i wymienia wektory, które kolekcja ma (`problem`
+    i `sts`).
+
+    Wyłapuje pomyłkę w nazwie kolekcji, po której dokumentacja byłaby zapisywana i szukana wśród
+    zgłoszeń, oraz komunikat, z którego nie widać, na jaką kolekcję naprawdę trafiono."""
     collection = _collection(
         DocsCollection,
         routed({("GET", PATH): _description(SIZE, (VECTOR_PROBLEM, VECTOR_STS))}),
@@ -260,8 +296,11 @@ async def test_an_unrecognised_description_fails_with_our_message(
     kind:    type,
     vectors: tuple,
 ) -> None:
-    """Opis kolekcji w nieznanym kształcie → nasz błąd konfiguracji z nazwą kolekcji, nigdy
-    `KeyError` z trzeciego poziomu odpowiedzi."""
+    """Sprawdza, czy `ensure()` kończy się naszym błędem konfiguracji z nazwą kolekcji, gdy Qdrant
+    oddaje jej opis w nieznanym kształcie (tutaj pusty, bez listy wektorów).
+
+    Wyłapuje odczyt opisu, który na takiej odpowiedzi pada wyjątkiem `KeyError` z głębi kodu:
+    z takiego błędu nie widać ani kolekcji, ani tego, że zawiódł jej opis."""
     collection = _collection(
         kind, routed({("GET", PATH): httpx.Response(200, json={"result": {}})})
     )
@@ -273,8 +312,13 @@ async def test_an_unrecognised_description_fails_with_our_message(
 # --- upsert -------------------------------------------------------------------------------
 
 async def test_ticket_upsert_sends_named_vectors_and_waits() -> None:
-    """Punkty zgłoszeń → na drucie nazwane wektory i `wait=true`: zapis zgłoszony to zapis
-    wykonany, bo przebieg raportuje, co zapisał, a kolejny krok to czyta."""
+    """Sprawdza, czy zapis jednego zgłoszenia wysyła żądanie `PUT` na ścieżkę punktów kolekcji,
+    z punktem w kształcie Qdranta (z nazwanymi wektorami) i z parametrem `wait=true`, a jako wynik
+    oddaje 1.
+
+    Wyłapuje zapis, który nie czeka na wykonanie albo wysyła punkt w innym kształcie: indeksacja
+    raportuje, ile zapisała, a następny krok od razu to czyta, więc zapis zgłoszony ma być zapisem
+    wykonanym."""
     seen: list = []
     collection = _collection(TicketsCollection, capturing(seen))
 
@@ -290,7 +334,11 @@ async def test_ticket_upsert_sends_named_vectors_and_waits() -> None:
 
 
 async def test_doc_upsert_sends_the_section_vector() -> None:
-    """Punkt fragmentu → na drucie wektor pod nazwą `section` i opis sekcji w payloadzie."""
+    """Sprawdza, czy zapis fragmentu sekcji wysyła punkt z wektorem pod nazwą `section`
+    i z identyfikatorem sekcji w danych, a jako wynik oddaje 1.
+
+    Wyłapuje zapis dokumentacji, który wysyła wektor bez nazwy albo gubi opis sekcji: punkt nie
+    pasowałby do kolekcji albo trafienia nie dałoby się przypisać do sekcji."""
     seen: list = []
     collection = _collection(DocsCollection, capturing(seen))
 
@@ -304,8 +352,11 @@ async def test_doc_upsert_sends_the_section_vector() -> None:
 
 @pytest.mark.parametrize("kind, vectors", COLLECTIONS)
 async def test_upsert_of_nothing_writes_nothing(kind: type, vectors: tuple) -> None:
-    """Pusta lista → zero zapisanych i żadnego żądania: filtr, który odrzucił wszystko, to
-    poprawny wynik, a wołający ma go odróżnić od awarii."""
+    """Sprawdza, czy zapis pustej listy punktów oddaje 0 i nie wysyła żadnego żądania, w obu
+    kolekcjach.
+
+    Wyłapuje zapis, który przy pustej liście pada albo wysyła puste żądanie: filtr jakości, który
+    odrzucił wszystko, to poprawny wynik, a wołający ma go odróżnić od awarii."""
     seen: list = []
     collection = _collection(kind, capturing(seen))
 
@@ -314,8 +365,11 @@ async def test_upsert_of_nothing_writes_nothing(kind: type, vectors: tuple) -> N
 
 
 async def test_upsert_splits_into_batches() -> None:
-    """Więcej punktów niż jedna partia → kilka żądań, razem niosących każdy punkt dokładnie
-    raz. Jedno wielkie żądanie oddawałoby pracę całego przebiegu jednej porażce."""
+    """Sprawdza, czy zapis 150 punktów idzie w kilku żądaniach, które razem niosą każdy punkt
+    dokładnie raz i w kolejności podania, a wynik to 150.
+
+    Wyłapuje zapis jednym wielkim żądaniem, przy którym jedna porażka gubi pracę całej indeksacji,
+    oraz podział na partie, który gubi albo powtarza punkty."""
     seen: list = []
     collection = _collection(TicketsCollection, capturing(seen))
     points     = [
@@ -333,7 +387,12 @@ async def test_upsert_splits_into_batches() -> None:
 
 
 async def test_a_rejected_upsert_carries_qdrants_explanation() -> None:
-    """Qdrant odrzuca zapis (zły wymiar, nieznana nazwa wektora) → błąd niesie jego powód."""
+    """Sprawdza, czy zapis odrzucony przez Qdranta (status 400) kończy się błędem `DbQdrantError`,
+    który niesie wyjaśnienie Qdranta, tutaj „Vector dimension error".
+
+    Wyłapuje odrzucony zapis, który przechodzi bez błędu albo bez podania powodu: indeksacja
+    zgłosiłaby zapisane zgłoszenia, których w kolekcji nie ma, albo nie byłoby wiadomo, że zawinił
+    np. zły wymiar wektora."""
     collection = _collection(
         TicketsCollection,
         routed({("PUT", PATH_POINTS): httpx.Response(400, text="Vector dimension error")}),
@@ -347,7 +406,11 @@ async def test_a_rejected_upsert_carries_qdrants_explanation() -> None:
 
 @pytest.mark.parametrize("kind, vectors", COLLECTIONS)
 async def test_drop_reports_that_a_collection_was_removed(kind: type, vectors: tuple) -> None:
-    """Istniejąca kolekcja → skasowana, wynik True."""
+    """Sprawdza, czy `drop()` dla istniejącej kolekcji najpierw pyta, czy ona jest, potem wysyła
+    żądanie jej skasowania i oddaje `True`.
+
+    Wyłapuje kasowanie, które zgłasza sukces bez wysłania żądania: przebudowa indeksu zaczyna od
+    skasowania kolekcji, więc zostałyby w niej stare punkty."""
     seen: list = []
     collection = _collection(kind, capturing(seen, {("GET", PATH): _description(SIZE, vectors)}))
 
@@ -357,7 +420,11 @@ async def test_drop_reports_that_a_collection_was_removed(kind: type, vectors: t
 
 @pytest.mark.parametrize("kind, vectors", COLLECTIONS)
 async def test_drop_of_a_missing_collection_is_not_an_error(kind: type, vectors: tuple) -> None:
-    """Brak kolekcji → False i żadnego DELETE: to zwykły stan początkowy przebudowy."""
+    """Sprawdza, czy `drop()` dla kolekcji, której nie ma, oddaje `False` i nie wysyła żądania
+    skasowania.
+
+    Wyłapuje kasowanie, które przy braku kolekcji pada albo mimo to próbuje ją skasować: brak
+    kolekcji to zwykły stan początkowy przebudowy indeksu, a nie awaria."""
     seen: list = []
     collection = _collection(kind, capturing(seen, {("GET", PATH): httpx.Response(404)}))
 
@@ -367,8 +434,11 @@ async def test_drop_of_a_missing_collection_is_not_an_error(kind: type, vectors:
 
 @pytest.mark.parametrize("kind, vectors", COLLECTIONS)
 async def test_count_asks_for_an_exact_number(kind: type, vectors: tuple) -> None:
-    """`count()` → `exact: true` na drucie; liczba przybliżona rozchwiałaby asercję „dwie
-    przebudowy dają ten sam stan"."""
+    """Sprawdza, czy `count()` prosi Qdranta o dokładną liczbę punktów (`exact: true` w żądaniu)
+    i oddaje liczbę z odpowiedzi, tutaj 171.
+
+    Wyłapuje liczenie przybliżone: liczba punktów mogłaby się wtedy różnić między wywołaniami i nie
+    dałoby się nią sprawdzić, że dwie przebudowy indeksu dają ten sam stan."""
     seen: list = []
     collection = _collection(
         kind,
@@ -383,7 +453,11 @@ async def test_count_asks_for_an_exact_number(kind: type, vectors: tuple) -> Non
 
 
 async def test_count_with_an_unrecognised_body_fails_with_our_message() -> None:
-    """200 bez licznika → `DbQdrantError` z nazwą kolekcji, a nie `KeyError`."""
+    """Sprawdza, czy `count()` kończy się błędem `DbQdrantError` z nazwą kolekcji, gdy Qdrant
+    odpowiada statusem 200, ale bez licznika.
+
+    Wyłapuje liczenie, które na takiej odpowiedzi pada wyjątkiem `KeyError`: z takiego błędu nie
+    widać, że zawiodła odpowiedź Qdranta ani której kolekcji dotyczy."""
     collection = _collection(
         TicketsCollection,
         routed({("POST", PATH_COUNT): httpx.Response(200, json={"result": {}})}),
@@ -397,9 +471,13 @@ async def test_count_with_an_unrecognised_body_fails_with_our_message() -> None:
 
 @pytest.mark.parametrize("vector_name", [VECTOR_PROBLEM, VECTOR_STS])
 async def test_ticket_search_asks_the_named_space_it_was_given(vector_name: str) -> None:
-    """`search(vector_name=…)` → ta sama nazwa w `using` na drucie. Kolekcja ma dwie przestrzenie,
-    a szukanie po niewłaściwej oddaje wiarygodne bzdury zamiast błędu, więc nazwa musi dojść
-    dokładnie taka, jak ją podano — i z payloadem, bo z niego powstaje karta."""
+    """Sprawdza, czy wyszukiwanie zgłoszeń wysyła do Qdranta dokładnie to, co dostało: wektor
+    zapytania, limit 5 i nazwę przestrzeni wektorów w polu `using` (raz `problem`, raz `sts`), a do
+    tego prosi o dane karty (`with_payload`).
+
+    Wyłapuje wyszukiwanie, które podmienia albo pomija nazwę przestrzeni: kolekcja ma dwie,
+    a szukanie w niewłaściwej nie kończy się błędem, tylko wiarygodnie wyglądającymi złymi
+    trafieniami. Wyłapuje też brak prośby o dane, z których powstaje karta zgłoszenia."""
     seen: list = []
     collection = _collection(TicketsCollection, capturing(seen, {("POST", PATH_QUERY): _hits()}))
 
@@ -414,8 +492,12 @@ async def test_ticket_search_asks_the_named_space_it_was_given(vector_name: str)
 
 
 async def test_ticket_search_returns_hits_in_the_order_qdrant_gave_them() -> None:
-    """Odpowiedź wyszukiwania → trafienia z podobieństwem, identyfikatorem i payloadem,
-    w kolejności Qdranta: próg dalej czyta od najlepszego."""
+    """Sprawdza, czy z odpowiedzi wyszukiwania powstają trafienia z numerem zgłoszenia,
+    podobieństwem i identyfikatorem punktu, w tej samej kolejności, w jakiej oddał je Qdrant (tutaj
+    0.91 przed 0.42).
+
+    Wyłapuje odczyt, który przestawia trafienia albo myli ich pola: dalszy kod zakłada, że lista
+    idzie od najbardziej podobnego, i tak przykłada do niej próg."""
     collection = _collection(
         TicketsCollection,
         routed(
@@ -436,9 +518,12 @@ async def test_ticket_search_returns_hits_in_the_order_qdrant_gave_them() -> Non
 
 
 async def test_doc_search_asks_for_sections_not_fragments() -> None:
-    """`search()` dokumentacji → wyszukiwanie grup po `section_id`, po jednym punkcie z grupy,
-    w przestrzeni `section`: w kolekcji leżą fragmenty, a `limit` ma znaczyć liczbę sekcji —
-    inaczej jedna długa sekcja zajęłaby cały wynik."""
+    """Sprawdza, czy wyszukiwanie w dokumentacji prosi Qdranta o grupy punktów po `section_id`, po
+    jednym punkcie z grupy, w przestrzeni `section` i z limitem 3, oraz czy z odpowiedzi powstaje
+    jedno trafienie na sekcję, z jej identyfikatorem i podobieństwem.
+
+    Wyłapuje wyszukiwanie, które pyta o pojedyncze fragmenty: w kolekcji leżą fragmenty, więc limit
+    liczyłby je zamiast sekcji i jedna długa sekcja zajęłaby cały wynik."""
     seen: list = []
     collection = _collection(
         DocsCollection,
@@ -467,8 +552,12 @@ async def test_doc_search_asks_for_sections_not_fragments() -> None:
 
 
 async def test_doc_search_with_an_unrecognised_body_fails_with_our_message() -> None:
-    """200 bez grup → `DbQdrantError` z nazwą kolekcji, a nie `KeyError` gdzieś dalej
-    w narzędziu."""
+    """Sprawdza, czy wyszukiwanie w dokumentacji kończy się błędem `DbQdrantError` z nazwą kolekcji,
+    gdy Qdrant odpowiada statusem 200, ale bez listy grup.
+
+    Wyłapuje odczyt odpowiedzi, który na nieznanym kształcie pada wyjątkiem `KeyError` dopiero
+    dalej, w narzędziu agenta, albo oddaje pustą listę, która wyglądałaby jak brak pasujących
+    sekcji."""
     collection = _collection(
         DocsCollection,
         routed({("POST", PATH_GROUPS): httpx.Response(200, json={"result": {}})}),
@@ -479,15 +568,22 @@ async def test_doc_search_with_an_unrecognised_body_fails_with_our_message() -> 
 
 
 async def test_search_finding_nothing_is_an_answer() -> None:
-    """Pusty wynik → pusta lista, nie błąd: „nowy typ problemu" to poprawna odpowiedź."""
+    """Sprawdza, czy wyszukiwanie zgłoszeń, na które Qdrant odpowiada pustą listą, oddaje pustą
+    listę trafień, bez wyjątku.
+
+    Wyłapuje wyszukiwanie, które brak trafień traktuje jak błąd: „nie ma podobnych zgłoszeń" to
+    poprawna odpowiedź przy nowym typie problemu, a nie awaria."""
     collection = _collection(TicketsCollection, routed({("POST", PATH_QUERY): _hits()}))
 
     assert await collection.search(vector=[0.1], vector_name=VECTOR_PROBLEM, limit=5) == []
 
 
 async def test_search_of_an_unknown_named_vector_fails_loudly() -> None:
-    """Qdrant odrzuca nieznaną nazwę wektora → `DbQdrantError` z jego wyjaśnieniem, nigdy pusta
-    lista: ta wyglądałaby jak „nic podobnego" i ukryła błąd okablowania."""
+    """Sprawdza, czy wyszukiwanie z literówką w nazwie wektora („problme"), które Qdrant odrzuca
+    statusem 400, kończy się błędem `DbQdrantError` z jego wyjaśnieniem („does not exist").
+
+    Wyłapuje odrzucone wyszukiwanie, które wraca jako pusta lista trafień: wyglądałaby jak „nie ma
+    podobnych zgłoszeń" i ukryła pomyłkę w konfiguracji wyszukiwania."""
     collection = _collection(
         TicketsCollection,
         routed(
@@ -504,8 +600,12 @@ async def test_search_of_an_unknown_named_vector_fails_loudly() -> None:
 
 
 async def test_search_with_an_unrecognised_body_fails_with_our_message() -> None:
-    """200 w nieznanym kształcie → `DbQdrantError` z nazwą kolekcji, a nie `KeyError` gdzieś
-    dalej w narzędziu."""
+    """Sprawdza, czy wyszukiwanie zgłoszeń kończy się błędem `DbQdrantError` z nazwą kolekcji, gdy
+    Qdrant odpowiada statusem 200, ale bez listy trafień.
+
+    Wyłapuje odczyt odpowiedzi, który na nieznanym kształcie pada wyjątkiem `KeyError` dopiero
+    dalej, w narzędziu agenta, albo oddaje pustą listę, która wyglądałaby jak brak podobnych
+    zgłoszeń."""
     collection = _collection(
         TicketsCollection,
         routed({("POST", PATH_QUERY): httpx.Response(200, json={"result": {}})}),
@@ -518,8 +618,12 @@ async def test_search_with_an_unrecognised_body_fails_with_our_message() -> None
 # --- read_by_id ---------------------------------------------------------------------------
 
 async def test_ticket_read_asks_by_point_ids_with_payload_and_vectors() -> None:
-    """Numery zgłoszeń → na drucie identyfikatory punktów wyliczone z numerów, z prośbą
-    o payload i wektory: odczyt oddaje cały punkt."""
+    """Sprawdza, czy odczyt zgłoszenia po numerze „33644" pyta Qdranta o identyfikator punktu
+    wyliczony z tego numeru, prosi o dane karty i o wektory, a z odpowiedzi składa cały punkt, taki
+    sam jak zapisany.
+
+    Wyłapuje odczyt, który pyta o sam numer zgłoszenia (pod takim identyfikatorem punktu nie ma)
+    albo nie prosi o dane karty lub wektory, bez których punktu nie da się złożyć."""
     seen: list = []
     collection = _collection(
         TicketsCollection,
@@ -537,8 +641,13 @@ async def test_ticket_read_asks_by_point_ids_with_payload_and_vectors() -> None:
 
 
 async def test_read_returns_points_in_the_order_they_were_asked_for() -> None:
-    """Qdrant oddaje punkty w swojej kolejności → wynik w kolejności numerów z zapytania,
-    a numer podany dwa razy wraca raz."""
+    """Sprawdza, czy odczyt po numerach „10718", „33644" i jeszcze raz „10718" oddaje dwa zgłoszenia
+    w kolejności numerów z zapytania, choć Qdrant zwrócił je odwrotnie, a powtórzony numer idzie do
+    Qdranta i wraca tylko raz.
+
+    Wyłapuje odczyt, który oddaje zgłoszenia w kolejności Qdranta (a on jej nie obiecuje) albo
+    powtarza zgłoszenie podane dwa razy: wołający nie mógłby polegać na kolejności, w której
+    pytał."""
     other      = TICKET_POINT.model_copy(
         update={"point_id": point_id_for("10718"), "payload": {"ticket_id": "10718"}}
     )
@@ -558,8 +667,11 @@ async def test_read_returns_points_in_the_order_they_were_asked_for() -> None:
 
 
 async def test_a_ticket_missing_from_the_collection_is_missing_from_the_result() -> None:
-    """Numer, którego w kolekcji nie ma → po prostu brak go w wyniku; o tym, czy to błąd,
-    rozstrzyga wołający."""
+    """Sprawdza, czy odczyt po dwóch numerach, z których jednego („99999") w kolekcji nie ma, oddaje
+    samo znalezione zgłoszenie, bez wyjątku.
+
+    Wyłapuje odczyt, który brakujący numer traktuje jak błąd: zgłoszenie bez karty to zwykły stan,
+    a o tym, czy brak jest błędem, ma rozstrzygać wołający."""
     collection = _collection(
         TicketsCollection,
         routed({("POST", PATH_POINTS): _stored(TICKET_POINT.to_qdrant())}),
@@ -571,7 +683,11 @@ async def test_a_ticket_missing_from_the_collection_is_missing_from_the_result()
 
 
 async def test_reading_nothing_asks_nothing() -> None:
-    """Pusta lista identyfikatorów → pusty wynik bez żądania."""
+    """Sprawdza, czy odczyt po pustej liście numerów oddaje pustą listę i nie wysyła żadnego
+    żądania.
+
+    Wyłapuje odczyt, który przy pustej liście mimo to pyta Qdranta: zbędne żądanie mogłoby skończyć
+    się błędem (np. gdy kolekcji jeszcze nie ma), choć nie było czego czytać."""
     seen: list = []
     collection = _collection(TicketsCollection, capturing(seen))
 
@@ -580,14 +696,21 @@ async def test_reading_nothing_asks_nothing() -> None:
 
 
 def test_docs_are_not_read_by_id() -> None:
-    """Kolekcja dokumentacji → bez odczytu po identyfikatorze: sekcja ma kilka punktów, a jej
-    treść czyta się z Postgresa."""
+    """Sprawdza, czy kolekcja dokumentacji nie ma metody odczytu po identyfikatorze (`read_by_id`).
+
+    Wyłapuje dopisanie takiej metody, np. do wspólnej klasy bazowej: sekcja ma w kolekcji kilka
+    punktów i z jej identyfikatora nie da się policzyć ile, a treść sekcji czyta się z Postgresa."""
     assert not hasattr(DocsCollection, "read_by_id")
 
 
 async def test_read_of_a_point_built_otherwise_is_a_config_error() -> None:
-    """Kolekcja dokumentacji czytana jak zgłoszenia → błąd konfiguracji: punkt nie ma wektorów
-    `problem` i `sts`."""
+    """Sprawdza, czy odczyt zgłoszenia kończy się błędem konfiguracji (`DbQdrantConfigError`)
+    nazywającym wektor `problem`, gdy Qdrant oddaje punkt zbudowany jak fragment dokumentacji, czyli
+    z wektorem `section` zamiast `problem` i `sts`.
+
+    Wyłapuje kolekcję dokumentacji wskazaną przez pomyłkę jako kolekcja zgłoszeń, która przechodzi
+    bez błędu albo pada niejasnym wyjątkiem: taką pomyłkę naprawia zmiana konfiguracji, a nie
+    ponowienie odczytu."""
     collection = _collection(
         TicketsCollection,
         routed(
@@ -604,7 +727,11 @@ async def test_read_of_a_point_built_otherwise_is_a_config_error() -> None:
 
 
 async def test_read_with_an_unrecognised_body_fails_with_our_message() -> None:
-    """200 w nieznanym kształcie → `DbQdrantError` z nazwą kolekcji."""
+    """Sprawdza, czy odczyt zgłoszenia kończy się błędem `DbQdrantError` z nazwą kolekcji, gdy
+    Qdrant odpowiada statusem 200, ale zamiast listy punktów oddaje co innego.
+
+    Wyłapuje odczyt, który taką odpowiedź bierze za brak zgłoszenia albo pada niejasnym wyjątkiem:
+    z błędu ma być widać, że zawiodła odpowiedź Qdranta i której kolekcji dotyczy."""
     collection = _collection(
         TicketsCollection,
         routed({("POST", PATH_POINTS): httpx.Response(200, json={"result": {}})}),
@@ -618,7 +745,11 @@ async def test_read_with_an_unrecognised_body_fails_with_our_message() -> None:
 
 @pytest.mark.parametrize("kind, vectors", COLLECTIONS)
 async def test_an_unreachable_qdrant_becomes_our_error(kind: type, vectors: tuple) -> None:
-    """Odmowa połączenia → `DbQdrantError` z każdej metody kolekcji, nigdy typ `httpx`."""
+    """Sprawdza, czy przy odmowie połączenia z Qdrantem metody `ensure()` i `count()` obu kolekcji
+    kończą się naszym błędem `DbQdrantError`.
+
+    Wyłapuje wyjątek biblioteki `httpx` wydostający się z kolekcji: wołający łapią tylko nasz błąd,
+    więc niedostępny Qdrant kończyłby się nieobsłużonym wyjątkiem zamiast czytelnego komunikatu."""
     collection = _collection(kind, raising(httpx.ConnectError("connection refused")))
 
     with pytest.raises(DbQdrantError):
@@ -633,8 +764,11 @@ async def test_aclose_closes_the_client_the_collection_stands_on(
     kind:    type,
     vectors: tuple,
 ) -> None:
-    """`aclose()` kolekcji → zamknięty klient: kto dostał samą kolekcję, może po sobie
-    posprzątać."""
+    """Sprawdza, czy `aclose()` kolekcji zamyka klienta Qdranta, na którym kolekcja stoi, w obu
+    kolekcjach.
+
+    Wyłapuje zamknięcie kolekcji, które zostawia otwarte połączenia: kto dostał samą kolekcję, bez
+    klienta, nie miałby jak po sobie posprzątać."""
     collection = _collection(kind, capturing([]))
 
     await collection.aclose()

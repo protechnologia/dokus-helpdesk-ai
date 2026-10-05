@@ -32,9 +32,13 @@ pytestmark = [
 
 
 async def test_found_numbers_read_back_as_the_cards_that_were_indexed(tickets_cards) -> None:
-    """Numery z wyszukiwania podane odczytowi → karty równe zaindeksowanym, w kolejności
-    wyszukania: payload z Qdranta wraca do `ParsedTicket` bez strat, a oba narzędzia mówią o tych
-    samych numerach."""
+    """Sprawdza, czy numery zgłoszeń oddane przez wyszukiwanie po znaczeniu da się odczytać jako
+    karty: odczyt oddaje trzy karty równe zaindeksowanym, w kolejności wyszukania, żadnego
+    numeru nie zgłasza jako pozbawionego karty, a na listę źródeł trafiają te same numery.
+
+    Wyłapuje kartę, która wraca z Qdranta zmieniona albo niepełna, oraz wyszukiwanie i odczyt,
+    które nie zgadzają się co do numerów: model czytałby wtedy inną treść, niż zapisała
+    indeksacja."""
     first = tickets_cards.cards[0]
 
     found  = await tickets_cards.find.find(
@@ -51,8 +55,12 @@ async def test_found_numbers_read_back_as_the_cards_that_were_indexed(tickets_ca
 
 
 async def test_a_number_outside_the_collection_comes_back_without_a_card(tickets_cards) -> None:
-    """Numer, którego w kolekcji nie ma → lista „bez karty", a karta znanego numeru wraca
-    normalnie: Qdrant nie zgłasza błędu przy brakującym punkcie, więc narzędzie mówi o tym samo."""
+    """Sprawdza, czy odczyt numeru, którego w kolekcji nie ma (99999), razem z numerem istniejącym
+    nie kończy się błędem: karta istniejącego zgłoszenia wraca normalnie, a nieznany numer
+    trafia na osobną listę zgłoszeń bez karty.
+
+    Wyłapuje brakującą kartę pominiętą bez śladu: Qdrant nie zgłasza błędu, gdy punktu nie ma,
+    więc bez tej listy model nie wiedziałby, że o jednym ze zgłoszeń nic nie przeczytał."""
     known  = tickets_cards.cards[1]
     result = await tickets_cards.read.search(
         ReadTicketsCardQuery(ticket_ids=["99999", known.ticket_id])

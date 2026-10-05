@@ -125,8 +125,13 @@ def _tool(
 
 
 async def test_the_query_is_embedded_in_query_mode_from_problem_and_symptoms() -> None:
-    """Zapytanie agenta → jeden tekst `problem` + `symptoms` w trybie query: ten sam tekst, który
-    dla rekordu o tych polach składa indeksacja, inaczej wektory nie byłyby porównywalne."""
+    """Sprawdza, czy do embeddera idzie jeden tekst złożony z pól `problem` i `symptoms`
+    zapytania, w trybie `query`, i czy jest to ten sam tekst, który indeksacja składa dla
+    zgłoszenia o tych samych polach.
+
+    Wyłapuje tekst zapytania sklejany inaczej niż tekst zgłoszeń w indeksie albo wysłany w innym
+    trybie: wektory nie byłyby wtedy porównywalne, a wyszukiwanie dawałoby gorsze wyniki bez
+    żadnego błędu."""
     seen: list = []
 
     await _tool([], embedder_seen=seen).find(QUERY)
@@ -138,8 +143,12 @@ async def test_the_query_is_embedded_in_query_mode_from_problem_and_symptoms() -
 
 
 async def test_the_search_goes_to_the_problem_vectors_with_top_k() -> None:
-    """Wyszukanie → wektor z embeddera, przestrzeń `problem`, limit z konfiguracji: wektor query
-    wolno porównywać wyłącznie z wektorami `problem`, a liczby trafień nie ustala agent."""
+    """Sprawdza, czy zapytanie do Qdranta niesie wektor policzony przez embedder, nazwę wektorów
+    `problem` i limit trafień z konfiguracji (tu 7).
+
+    Wyłapuje szukanie po innych wektorach niż `problem`: wektor zapytania wolno porównywać tylko
+    z nimi, a pomyłka nie kończy się błędem, tylko gorszymi wynikami. Wyłapuje też limit trafień
+    inny niż ustawiony w konfiguracji."""
     seen: list = []
 
     await _tool([], top_k=7, qdrant_seen=seen).find(QUERY)
@@ -150,8 +159,11 @@ async def test_the_search_goes_to_the_problem_vectors_with_top_k() -> None:
 
 
 async def test_hits_below_the_threshold_are_dropped_and_counted() -> None:
-    """Pięć trafień, próg 0.48 → dwa zwrócone i trzy policzone jako odcięte: „próg to wyciął"
-    i „nic nie było" to różne odpowiedzi."""
+    """Sprawdza, czy z pięciu trafień przy progu 0.48 wracają dwa (podobieństwo 0.71 i 0.52),
+    a trzy słabsze są policzone jako odcięte.
+
+    Wyłapuje próg, który nie odcina słabych trafień, i licznik, który gubi odcięte: bez niego
+    agent nie odróżni sytuacji „nic nie było" od „próg to wyciął"."""
     hits = [
         _hit("90001", 0.71),
         _hit("90003", 0.52),
@@ -168,8 +180,12 @@ async def test_hits_below_the_threshold_are_dropped_and_counted() -> None:
 
 
 async def test_a_hit_comes_back_as_its_number_and_a_rounded_score() -> None:
-    """Trafienie → numer zgłoszenia z payloadu i podobieństwo zaokrąglone do trzech miejsc: dalsze
-    cyfry to szum, a treść karty model ma odczytać osobnym narzędziem."""
+    """Sprawdza, czy trafienie wraca jako numer zgłoszenia i podobieństwo zaokrąglone do trzech
+    miejsc po przecinku (0.71234567 daje 0.712), tak samo w wyniku i w tekście dla modelu. Słowa
+    „kolejkę" z rozwiązania zapisanego w karcie w tym tekście nie ma.
+
+    Wyłapuje podobieństwo z dalszymi cyframi, które są tylko szumem, oraz treść karty przepuszczoną
+    do wyniku wyszukiwania: kartę model ma odczytać osobnym narzędziem."""
     tool = _tool([_hit("90001", 0.71234567)])
 
     result = await tool.find(QUERY)
@@ -184,8 +200,10 @@ async def test_a_hit_comes_back_as_its_number_and_a_rounded_score() -> None:
 
 
 async def test_no_hits_is_an_empty_result_not_an_error() -> None:
-    """Qdrant nic nie zwrócił → pusty wynik bez odciętych: „nowy typ problemu" to poprawna
-    odpowiedź dla blisko połowy korpusu."""
+    """Sprawdza, czy brak trafień z Qdranta daje pusty wynik: bez zgłoszeń i z zerem odciętych.
+
+    Wyłapuje narzędzie, które brak trafień zgłasza jako błąd: „nowy typ problemu" to poprawna
+    odpowiedź dla blisko połowy zgłoszeń w korpusie."""
     result = await _tool([]).find(QUERY)
 
     assert result.tickets == []
@@ -193,8 +211,13 @@ async def test_no_hits_is_an_empty_result_not_an_error() -> None:
 
 
 async def test_a_hit_without_a_ticket_number_is_a_config_error_without_content() -> None:
-    """Payload bez numeru zgłoszenia → `DbQdrantConfigError` z identyfikatorem punktu, ale bez
-    treści: indeks zbudowany inaczej naprawia przebudowa, a treść zgłoszenia nie trafia do logów."""
+    """Sprawdza, czy trafienie bez numeru zgłoszenia kończy się wyjątkiem `DbQdrantConfigError`,
+    którego komunikat podaje identyfikator punktu (`p-90001`) i komendę przebudowy indeksu
+    (`tickets reindex`), ale nie cytuje treści zgłoszenia.
+
+    Wyłapuje dwie usterki: indeks zbudowany inaczej potraktowany jak chwilowa awaria, choć
+    naprawia go tylko przebudowa, oraz treść zgłoszenia, która przez komunikat błędu trafiłaby
+    do logów."""
     broken = _payload("90001")
     del broken["ticket_id"]
 
@@ -209,16 +232,22 @@ async def test_a_hit_without_a_ticket_number_is_a_config_error_without_content()
 
 
 async def test_the_search_does_not_check_the_rest_of_the_payload() -> None:
-    """Payload z samym numerem zgłoszenia → poprawne trafienie: wyszukiwanie oddaje numery,
-    a kontrakt karty sprawdza dopiero odczyt (`read_tickets_card`)."""
+    """Sprawdza, czy trafienie, które poza numerem zgłoszenia nie niesie żadnego pola karty, jest
+    poprawnym wynikiem wyszukiwania.
+
+    Wyłapuje wyszukiwanie, które odrzuca trafienie z niepełną kartą: jemu wystarcza sam numer,
+    a zgodność karty z kontraktem sprawdza dopiero jej odczyt (`read_tickets_card`)."""
     result = await _tool([_hit("90001", 0.71, payload={"ticket_id": "90001"})]).find(QUERY)
 
     assert [found.ticket_id for found in result.tickets] == ["90001"]
 
 
 async def test_a_dropped_hit_is_never_looked_at() -> None:
-    """Trafienie bez numeru poniżej progu → brak błędu: odcięte trafienie nie trafia do wyniku,
-    więc nie ma czego sprawdzać."""
+    """Sprawdza, czy trafienie bez numeru zgłoszenia, które jest poniżej progu (podobieństwo
+    0.20), nie powoduje błędu: wynik jest pusty, a trafienie policzone jako odcięte.
+
+    Wyłapuje sprawdzanie trafień, które i tak nie wejdą do wyniku: jedno uszkodzone, słabe
+    trafienie wywracałoby wtedy całe wyszukiwanie."""
     result = await _tool([_hit("90001", 0.20, payload={})]).find(QUERY)
 
     assert result.tickets == []
@@ -226,8 +255,11 @@ async def test_a_dropped_hit_is_never_looked_at() -> None:
 
 
 async def test_aclose_closes_both_clients() -> None:
-    """`aclose()` → zamknięte połączenia embeddera i Qdranta: sprzątający nie musi wiedzieć,
-    z czego narzędzie jest zbudowane."""
+    """Sprawdza, czy `aclose()` narzędzia zamyka oba połączenia, na których ono stoi:
+    z embedderem i z Qdrantem.
+
+    Wyłapuje połączenie zostawione otwarte: sprzątający woła tylko `aclose()` narzędzia i nie
+    wie, z czego jest ono zbudowane, więc sam tych połączeń nie zamknie."""
     tool = _tool([])
 
     await tool.aclose()

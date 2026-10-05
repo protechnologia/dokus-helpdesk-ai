@@ -33,16 +33,24 @@ pytestmark = [
 
 
 async def test_the_listing_follows_the_manifest_not_the_alphabet(docs_index) -> None:
-    """Metryczka z sekcjami nie po alfabecie → spis w kolejności metryczki: miejsce sekcji
-    w dokumencie zapisuje indeksacja, a układa po nim baza."""
+    """Sprawdza, czy spis treści podaje sekcje w kolejności, w jakiej stoją w metryczce dokumentu,
+    a nie alfabetycznie: w teście metryczka wymienia je celowo nie po alfabecie.
+
+    Wyłapuje zgubienie kolejności po drodze: miejsce sekcji w dokumencie zapisuje indeksacja,
+    a układa według niego baza, więc gdyby któraś z nich przestała to robić, agent dostałby spis
+    treści w innym porządku niż dokument."""
     result = await docs_index.listing.load()
 
     assert [section.section_id for section in result.sections] == list(docs_index.bodies)
 
 
 async def test_every_listed_section_carries_its_release_and_chapter(docs_index) -> None:
-    """Metryczka dokumentu → każda sekcja spisu z dokumentem, wydaniem, datą i rozdziałem jako
-    listą: data i ścieżka rozdziału przechodzą przez kolumny bazy i wracają w swoich typach."""
+    """Sprawdza, czy każda sekcja w spisie treści niesie dane z metryczki dokumentu: jego nazwę,
+    wydanie, datę i ścieżkę rozdziału — datę jako datę, a ścieżkę jako listę.
+
+    Wyłapuje dane, które po drodze przez kolumny bazy giną albo wracają w innym typie, na
+    przykład data jako napis: agent nie wiedziałby wtedy, do którego wydania instrukcji należy
+    sekcja."""
     result = await docs_index.listing.load()
 
     for section in result.sections:

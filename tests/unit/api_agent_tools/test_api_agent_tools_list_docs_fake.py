@@ -5,8 +5,11 @@ from app.agent_tools.docs.list_docs import FakeListDocsTool, ListDocsArgs
 
 
 async def test_the_listing_describes_every_section() -> None:
-    """Spis treści → JSON z opisem każdej sekcji, w kolejności dokumentów, z identyfikatorem do
-    odczytu w tym samym polu co w wyszukiwaniach."""
+    """Sprawdza, czy spis treści z atrapy to JSON z opisem każdej sekcji, w kolejności dokumentów,
+    z identyfikatorem w polu `section_id` i ze ścieżką rozdziałów.
+
+    Wyłapuje spis niepełny, w innej kolejności albo z identyfikatorem pod inną nazwą niż
+    w wyszukiwaniach: agent nie wiedziałby, co podać narzędziu odczytu."""
     tool = FakeListDocsTool()
     body = json.loads(await tool.run(ListDocsArgs()))
 
@@ -17,7 +20,10 @@ async def test_the_listing_describes_every_section() -> None:
 
 
 async def test_the_listing_carries_no_content() -> None:
-    """Spis treści → opisy sekcji, ale nie ich treść: spis mówi, gdzie co jest, nie co tam stoi."""
+    """Sprawdza, czy spis treści niesie opisy sekcji, ale nie ich treść: w tekście dla modelu jest
+    opis pierwszej sekcji, a nie ma zdania z jej treści.
+
+    Wyłapuje treść sekcji dołożoną do spisu: spis ma mówić, gdzie co jest, a nie co tam stoi."""
     tool = FakeListDocsTool()
     text = await tool.run(ListDocsArgs())
 
@@ -26,7 +32,11 @@ async def test_the_listing_carries_no_content() -> None:
 
 
 async def test_every_call_is_counted() -> None:
-    """Każde wywołanie → licznik `calls`, żeby test grafu sprawdził, czy agent sięgnął po spis."""
+    """Sprawdza, czy atrapa liczy wywołania w publicznym polu `calls`: po dwóch wywołaniach licznik
+    wynosi 2.
+
+    Wyłapuje atrapę, która nie liczy wywołań: test grafu nie mógłby sprawdzić, czy agent sięgnął po
+    spis treści."""
     tool = FakeListDocsTool()
 
     await tool.run(ListDocsArgs())
@@ -36,12 +46,18 @@ async def test_every_call_is_counted() -> None:
 
 
 async def test_an_empty_documentation_is_an_empty_list() -> None:
-    """Pusta dokumentacja → pusta lista sekcji, a nie błąd."""
+    """Sprawdza, czy atrapa zbudowana z pustą listą sekcji oddaje modelowi pustą listę, a nie błąd.
+
+    Wyłapuje atrapę, która przy pustej liście zgłasza błąd albo podstawia wbudowane sekcje: nie
+    dałoby się wtedy przetestować grafu na pustej dokumentacji."""
     body = json.loads(await FakeListDocsTool(sections=[]).run(ListDocsArgs()))
 
     assert body == {"sections": []}
 
 
 def test_the_listing_cannot_be_cited() -> None:
-    """Spis treści → brak `cite()`: źródłem jest dopiero odczytana sekcja."""
+    """Sprawdza, czy atrapa spisu treści nie ma metody `cite()`.
+
+    Wyłapuje spis, który zaczął cytować: na listę źródeł trafiłyby sekcje, których model nie
+    przeczytał, a źródłem jest dopiero odczytana sekcja."""
     assert not hasattr(FakeListDocsTool(), "cite")

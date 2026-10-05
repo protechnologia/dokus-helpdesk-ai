@@ -51,7 +51,11 @@ def _write_export(tmp_path: Path, **overrides) -> Path:
 
 
 def test_loads_identity_from_the_source(tmp_path: Path):
-    """Plik eksportu → ticket_id i data ze źródła, nie z treści."""
+    """Sprawdza, czy numer zgłoszenia i data są brane z pól pliku eksportu: z `id` 33644 powstaje
+    napis `"33644"`, a ze znacznika czasu utworzenia data 2026-06-23.
+
+    Wyłapuje czytnik, który źle odczytuje numer albo datę: obie wartości idą dalej wprost do
+    karty zgłoszenia, więc błąd przypisałby kartę do innego zgłoszenia albo innego dnia."""
     raw = load_raw_ticket(_write_export(tmp_path))
 
     assert raw.ticket_id == "33644"
@@ -59,14 +63,22 @@ def test_loads_identity_from_the_source(tmp_path: Path):
 
 
 def test_drops_the_time_of_day(tmp_path: Path):
-    """Znacznik czasu MySQL → sama data; godzina nie trafia do artefaktu."""
+    """Sprawdza, czy ze znacznika czasu z bazy zostaje sama data: zgłoszenie utworzone
+    2026-06-23 o 23:59:59 ma datę 2026-06-23.
+
+    Wyłapuje czytnik, który potyka się o godzinę w znaczniku albo przesuwa zgłoszenie z końca
+    dnia na dzień następny; do karty zgłoszenia ma trafić tylko data."""
     raw = load_raw_ticket(_write_export(tmp_path, created_at="2026-06-23 23:59:59"))
 
     assert raw.date == Date(2026, 6, 23)
 
 
 def test_strips_html_from_every_text_field(tmp_path: Path):
-    """Pola tekstowe → bez tagów już na wejściu, zanim zobaczy je prompt."""
+    """Sprawdza, czy znaczniki HTML znikają z każdego pola tekstowego: z tematu, z opisu
+    i z treści komentarza zostaje sam tekst.
+
+    Wyłapuje pole, w którym zapomniano usunąć HTML: znaczniki trafiłyby wtedy do tekstu wątku,
+    który czyta model parsujący zgłoszenie."""
     raw = load_raw_ticket(
         _write_export(tmp_path, czego_dotyczy="<b>Błąd</b>", szczegolowy_opis="<p>Opis</p>")
     )
@@ -77,14 +89,22 @@ def test_strips_html_from_every_text_field(tmp_path: Path):
 
 
 def test_keeps_the_source_category(tmp_path: Path):
-    """Kategoria ze źródła — nie trafia do artefaktu, ale wskazuje rekordy do czyszczenia."""
+    """Sprawdza, czy kategoria zgłoszenia ze źródła (tu `Automat mailowy`) zostaje zachowana we
+    wczytanym zgłoszeniu.
+
+    Wyłapuje czytnik, który gubi kategorię: do karty zgłoszenia ona nie trafia, ale po niej
+    rozpoznaje się zgłoszenia z automatu mailowego, które trzeba oczyścić przed parsowaniem."""
     raw = load_raw_ticket(_write_export(tmp_path))
 
     assert raw.category == "Automat mailowy"
 
 
 def test_missing_optional_fields_become_empty(tmp_path: Path):
-    """Brakujące pole tekstowe → pusty string, nie None i nie wyjątek."""
+    """Sprawdza, czy temat i opis, które w pliku mają wartość `null`, są wczytywane jako pusty
+    tekst.
+
+    Wyłapuje czytnik, który na brakującym polu kończy się wyjątkiem albo przepuszcza dalej `None`
+    zamiast tekstu — zgłoszenia bez tematu albo opisu nie dałoby się wtedy wczytać."""
     raw = load_raw_ticket(_write_export(tmp_path, czego_dotyczy=None, szczegolowy_opis=None))
 
     assert raw.subject == ""
@@ -92,7 +112,12 @@ def test_missing_optional_fields_become_empty(tmp_path: Path):
 
 
 def test_null_comments_are_read_as_empty(tmp_path: Path):
-    """`komentarze: null` → pusta lista, nie wywrotka; 29 zgłoszeń w korpusie tak wygląda."""
+    """Sprawdza, czy zgłoszenie, które w pliku ma `"komentarze": null`, jest wczytywane z pustą
+    listą komentarzy, a tekst wątku mówi wprost, że komentarzy nie ma.
+
+    Wyłapuje wyjątek przy czytaniu takiego pliku: tak wygląda 29 zgłoszeń w korpusie, a klucz
+    z wartością `null` to co innego niż brak klucza, więc zwykła wartość domyślna tu nie
+    zadziała."""
     # Wartość domyślna w `get()` działa tylko przy BRAKU klucza — tu klucz jest, a wartość to null.
     payload = json.loads(_write_export(tmp_path).read_text(encoding="utf-8"))
     payload["komentarze"] = None
@@ -107,7 +132,10 @@ def test_null_comments_are_read_as_empty(tmp_path: Path):
 
 
 def test_broken_json_is_reported(tmp_path: Path):
-    """Uszkodzony plik → ValueError, nie cicho pominięte zgłoszenie."""
+    """Sprawdza, czy plik, który nie jest poprawnym JSON-em, kończy się wyjątkiem `ValueError`.
+
+    Wyłapuje czytnik, który połyka błąd i idzie dalej: uszkodzone zgłoszenie zostałoby po cichu
+    pominięte i nikt by nie wiedział, że brakuje go w korpusie."""
     path = tmp_path / "zgloszenie-1.json"
     path.write_text("{nie jestem", encoding="utf-8")
 

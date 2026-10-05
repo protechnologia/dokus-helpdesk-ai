@@ -77,6 +77,8 @@ services:
       AGENT_MAX_CALLS_FIND_DOCS_VECTOR:    ${AGENT_MAX_CALLS_FIND_DOCS_VECTOR:-5}
       AGENT_MAX_CALLS_FIND_DOCS_TEXT:      ${AGENT_MAX_CALLS_FIND_DOCS_TEXT:-5}
       AGENT_MAX_CALLS_READ_DOCS:           ${AGENT_MAX_CALLS_READ_DOCS:-3}
+      # Limit tur modelu w jednym przebiegu grafu z narzędziami — opis w .env.example.
+      AGENT_MAX_ITERATIONS:                ${AGENT_MAX_ITERATIONS:-20}
     # --reload belongs to the dev layer, not to the image: the shipped CMD has no reloader.
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     healthcheck:

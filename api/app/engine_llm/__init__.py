@@ -10,7 +10,7 @@ a ta powierzchnia to wszystko, co domena może wiedzieć o modelu.
 | `factory.py` | `get_llm_client()` — klient po `LLM_PROVIDER`, z fail-fast        |
 | `client/`    | klienci dostawców, plik na dostawcę; jedyne miejsce na ich SDK    |
 | `pricing/`   | cenniki modeli i liczenie kosztu wywołania                        |
-| `models/`    | wiadomości, wynik wywołania i zużycie w przebiegu                 |
+| `models/`    | wiadomości, wynik wywołania, tura rozmowy i zużycie w przebiegu   |
 | `errors.py`  | `LLMError`, `LLMConfigError`                                      |
 """
 
@@ -21,6 +21,7 @@ from app.engine_llm.factory import get_llm_client
 from app.engine_llm.models import (
     ChatMessage,
     LLMCompletion,
+    LLMTurn,
     LLMUsage,
     ToolCall,
     ToolDefinition,
@@ -33,6 +34,7 @@ __all__ = [
     "LLMCompletion",
     "LLMConfigError",
     "LLMError",
+    "LLMTurn",
     "LLMUsage",
     "ToolCall",
     "ToolDefinition",

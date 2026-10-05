@@ -6,19 +6,28 @@ from app.agent_tools.docs.find_docs_vector import FindDocsVectorQuery, FoundSect
 
 
 def test_an_empty_query_is_refused() -> None:
-    """Zapytanie bez tekstu → ValidationError: nie ma czego dopasować do sekcji."""
+    """Sprawdza, czy zapytanie z pustym tekstem kończy się wyjątkiem `ValidationError`.
+
+    Wyłapuje model, który przepuszcza puste zapytanie: do wyszukiwania poszedłby tekst, w którym nie
+    ma czego dopasować do sekcji."""
     with pytest.raises(ValidationError):
         FindDocsVectorQuery(text="")
 
 
 def test_an_unknown_argument_is_refused() -> None:
-    """Argument spoza schematu → ValidationError: liczbę trafień i próg ustawia konfiguracja."""
+    """Sprawdza, czy argument spoza schematu (tu `limit=20`) kończy się wyjątkiem `ValidationError`.
+
+    Wyłapuje model, który po cichu ignoruje nieznane argumenty: agent myślałby, że sam ustawił
+    liczbę trafień, a ją i próg podobieństwa ustawia konfiguracja."""
     with pytest.raises(ValidationError):
         FindDocsVectorQuery(text="uprawnienia", limit=20)
 
 
 def test_a_found_section_carries_no_content() -> None:
-    """Znaleziona sekcja → podobieństwo i opis z metryczki, bez pola na treść: treść daje dopiero
-    odczyt, a tylko odczyt jest źródłem."""
+    """Sprawdza, czy znalezionej sekcji nie da się zbudować z dodatkowym polem na treść (`text`):
+    taka próba kończy się wyjątkiem `ValidationError`.
+
+    Wyłapuje treść dołożoną do wyniku wyszukiwania: treść ma dawać dopiero odczyt sekcji, bo tylko
+    odczytana sekcja jest źródłem odpowiedzi."""
     with pytest.raises(ValidationError):
         FoundSection(score=0.74, section=default_sections()[0], text="Uprawnienie nadaje…")

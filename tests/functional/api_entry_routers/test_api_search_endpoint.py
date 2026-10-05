@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from app.agent_graphs import search
 from app.agent_graphs.factory import get_graph_builder
 from app.agent_graphs.fake import (
+    FAKE_MAX_ITERATIONS,
     FAKE_READ_ARGUMENTS,
     FAKE_SEARCH_ARGUMENTS,
     fake_search_nodes,
@@ -21,8 +22,13 @@ TICKET = {"ticket_id": "41002", "body": "Od wczoraj nie przychodzą przesyłki z
 
 
 def test_sources_and_agent_queries_go_out() -> None:
-    """Atrapa grafu `search` → źródła z odczytu kart i wywołania narzędzi agenta: wyszukanie
-    i odczyt; wywołanie `respond_search` niczego nie szuka, więc go w odpowiedzi nie ma."""
+    """Sprawdza, czy `POST /search` oddaje źródła i zapytania agenta z przebiegu grafu: trzy
+    przeczytane zgłoszenia (90001, 90002, 90003) oraz dwa wywołania narzędzi z argumentami,
+    wyszukanie i odczyt kart. Wywołania narzędzia odpowiedzi na tej liście nie ma, bo ono niczego
+    nie szuka.
+
+    Wyłapuje trasę, która gubi źródła albo zapytania, lub dopisuje do zapytań wywołanie
+    odpowiedzi: wołający nie widziałby, na czym stoi wynik ani o co agent pytał."""
     response = TestClient(create_app()).post("/search", json=TICKET)
 
     assert response.status_code == 200
@@ -34,8 +40,12 @@ def test_sources_and_agent_queries_go_out() -> None:
 
 
 def test_the_response_carries_the_model_usage_of_the_run() -> None:
-    """Odpowiedź → zużycie modelu z całego przebiegu: trzy wywołania (szukaj, czytaj, odpowiedz),
-    a na atrapach zero tokenów i zerowy koszt. Wołający widzi koszt sprawy bez sięgania do logów."""
+    """Sprawdza, czy odpowiedź `/search` niesie zużycie modelu z całego przebiegu: trzy wywołania
+    (szukaj, czytaj, odpowiedz), a przy atrapie modelu zero tokenów każdego rodzaju i zerowy
+    koszt.
+
+    Wyłapuje odpowiedź bez zużycia albo z licznikiem tylko jednej tury: wołający ma widzieć
+    koszt całej sprawy bez sięgania do logów."""
     response = TestClient(create_app()).post("/search", json=TICKET)
 
     assert response.json()["usage"] == {
@@ -49,9 +59,12 @@ def test_the_response_carries_the_model_usage_of_the_run() -> None:
 
 
 def test_the_response_carries_the_log_of_the_run() -> None:
-    """Odpowiedź → log przebiegu grafu, wpis na wywołanie węzła, w kolejności: anonimizacja,
-    dwie tury z narzędziami (szukaj, czytaj), tura z odpowiedzią. Wołający widzi przebieg sprawy
-    bez sięgania do logów."""
+    """Sprawdza, czy odpowiedź `/search` niesie log przebiegu grafu, po jednym wpisie na każdy
+    krok i w kolejności wykonania: anonimizacja, dwie tury modelu z narzędziami (wyszukanie,
+    potem odczyt kart) i tura z odpowiedzią. Wpisy tych dwóch tur nazywają wywołane narzędzie.
+
+    Wyłapuje log, który ginie po drodze, ma pomieszaną kolejność albo nie mówi, które narzędzie
+    wywołano: wołający ma widzieć przebieg sprawy bez sięgania do logów usługi."""
     log = TestClient(create_app()).post("/search", json=TICKET).json()["log"]
 
     assert [entry["node"] for entry in log] == [
@@ -65,8 +78,12 @@ def test_the_response_carries_the_log_of_the_run() -> None:
 
 
 def test_the_log_carries_no_ticket_text() -> None:
-    """Log w odpowiedzi → same nazwy, liczby i identyfikatory; treść zgłoszenia do niego nie
-    trafia, także we fragmencie."""
+    """Sprawdza, czy log w odpowiedzi `/search` nie zawiera treści zgłoszenia: każdy wpis ma tylko
+    pola `node` i `message`, a w `message` nie ma ani całego opisu z żądania, ani jego fragmentu
+    (słowa „przesyłki").
+
+    Wyłapuje przeciek danych klienta przez log przebiegu: log wraca w każdej odpowiedzi, więc ma
+    nieść same nazwy, liczby i identyfikatory."""
     log = TestClient(create_app()).post("/search", json=TICKET).json()["log"]
 
     for entry in log:
@@ -76,7 +93,11 @@ def test_the_log_carries_no_ticket_text() -> None:
 
 
 def test_the_cost_of_the_run_goes_out_rounded() -> None:
-    """Trzy tury po 0,002 USD → koszt 0,006 w odpowiedzi, bez szumu sumowania ułamków."""
+    """Sprawdza, czy koszt przebiegu wraca w odpowiedzi `/search` zaokrąglony: po trzech turach
+    modelu po 0,002 USD odpowiedź podaje trzy wywołania, 300 tokenów wejścia i koszt równo 0,006.
+
+    Wyłapuje koszt oddany wprost z sumowania ułamków, z ogonem w rodzaju 0,006000000000000001,
+    oraz zużycie, które nie sumuje się z kolejnych tur."""
     agent, run_tools = fake_search_nodes(search.RESPOND_TOOL_NAME, search.SearchDone())
     agent._usage     = LLMUsage(calls=1, prompt_tokens=100, completion_tokens=10, cost_usd=0.002)
     graph            = search.build_graph(
@@ -84,6 +105,7 @@ def test_the_cost_of_the_run_goes_out_rounded() -> None:
         agent,
         run_tools,
         FakeRespondNode(search.SearchDone()),
+        FAKE_MAX_ITERATIONS,
     )
 
     app = create_app()
@@ -97,15 +119,23 @@ def test_the_cost_of_the_run_goes_out_rounded() -> None:
 
 
 def test_a_source_carries_no_score() -> None:
-    """Źródło w odpowiedzi → materiał, numer, tytuł i data, bez podobieństwa: źródłem jest to,
-    co agent odczytał, a odczyt po numerze podobieństwa nie zna."""
+    """Sprawdza, czy źródło w odpowiedzi `/search` ma dokładnie cztery pola: materiał (`source`),
+    identyfikator (`item_id`), tytuł i datę, bez liczby podobieństwa.
+
+    Wyłapuje powrót pola `score` albo innego pola wewnętrznego do odpowiedzi: źródłem jest to, co
+    agent odczytał po numerze, a taki odczyt podobieństwa nie zna."""
     response = TestClient(create_app()).post("/search", json=TICKET)
 
     assert set(response.json()["sources"][0]) == {"source", "item_id", "title", "date"}
 
 
 def test_the_graph_reads_the_whole_thread() -> None:
-    """Żądanie → wejście grafu to wątek zgłoszenia z id i opisem, w formacie parsera korpusu."""
+    """Sprawdza, czy `/search` podaje grafowi cały wątek zgłoszenia: tekst, który trafia do
+    anonimizacji, zaczyna się od nagłówka „ZGŁOSZENIE 41002" i zawiera opis z żądania, czyli ma
+    ten sam układ, w jakim zgłoszenia czyta parser korpusu.
+
+    Wyłapuje trasę, która przekazuje sam opis albo gubi numer zgłoszenia: agent szukałby wtedy
+    na podstawie innego tekstu niż ten, z jakiego powstały karty w indeksie."""
     anonymizer       = FakeAnonymizer()
     agent, run_tools = fake_search_nodes(search.RESPOND_TOOL_NAME, search.SearchDone())
     graph            = search.build_graph(
@@ -113,6 +143,7 @@ def test_the_graph_reads_the_whole_thread() -> None:
         agent,
         run_tools,
         FakeRespondNode(search.SearchDone()),
+        FAKE_MAX_ITERATIONS,
     )
 
     app = create_app()
@@ -125,7 +156,10 @@ def test_the_graph_reads_the_whole_thread() -> None:
 
 
 def test_a_ticket_without_body_is_refused() -> None:
-    """Żądanie bez `body` → 422, zanim cokolwiek dotknie grafu."""
+    """Sprawdza, czy `POST /search` bez opisu zgłoszenia (pola `body`) dostaje status 422.
+
+    Wyłapuje trasę, która przyjmuje zgłoszenie bez treści i uruchamia graf: wyszukiwanie ruszyłoby
+    bez opisu problemu, a wołający nie dowiedziałby się, że jego żądanie było niepełne."""
     response = TestClient(create_app()).post("/search", json={"ticket_id": "41002"})
 
     assert response.status_code == 422

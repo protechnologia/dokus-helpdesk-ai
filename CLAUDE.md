@@ -103,8 +103,9 @@ aplikacji i dostęp do instancji testowej, na której agent sprawdzi opisany obj
 pierwszym narzędziem, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzji
 o granicach.
 
-**Stan na dziś.** Szkielet stoi w całości, a część jednostek to atrapy: pętla agenta, wykonanie
-narzędzi i odpowiedź oraz anonimizator. Wszystkie osiem narzędzi ma wersję właściwą; dwa, które
+**Stan na dziś.** Szkielet stoi w całości, a część jednostek to atrapy: wykonanie narzędzi
+i odpowiedź, anonimizator oraz model w turze z narzędziami. Węzeł agenta jest właściwy, ale trasy
+biorą jeszcze grafy złożone z atrap. Wszystkie osiem narzędzi ma wersję właściwą; dwa, które
 czytają wątki zgłoszeń, czekają na dane, bo tabela wątków napełni się dopiero po anonimizacji.
 
 ### Zasady produktu
@@ -1222,10 +1223,12 @@ Wspólne:
   to nowy katalog bez zmiany routera. Wariant bez narzędzi wiedzy nie ma `sources` w stanie i wraca
   z pustą listą.
 - **Trasy biorą graf z `agent_graphs/factory.py` (`get_graph_builder()`, zależność FastAPI),
-  budowany na każde żądanie** — atrapa jest jednorazowa. Do p. 9 `build_function_graph()` zawsze
+  budowany na każde żądanie** — atrapa jest jednorazowa. Do p. 11 `build_function_graph()` zawsze
   oddaje atrapę, także przy prawdziwym `LLM_PROVIDER`: nic nie wychodzi z procesu, a odmowa
-  położyłaby trasy na stacku dev. Test podmienia zależność przez `dependency_overrides`, wstawiając
-  graf z atrap, do których ma dostęp.
+  położyłaby trasy na stacku dev. Właściwy węzeł `agent` wejdzie do tras razem z `run_tools`
+  i `respond`: z samymi ich atrapami prawdziwy model liczyłby tury, których wynik zastępuje atrapa.
+  Test podmienia zależność przez `dependency_overrides`, wstawiając graf z atrap, do których ma
+  dostęp.
 
 ### Warstwa embeddera
 
@@ -1635,11 +1638,29 @@ czasu jest pusta.
   wypełnia `tool_definitions()`, więc narzędzie bez limitu to błąd składania. Ile jedno
   wywołanie może pobrać (20 kart, 5 sekcji), zostaje stałą w modelu zapytania; wątek jest zawsze
   jeden. Wartości od 2026-10-05: wyszukiwania i karty po 5, sekcje i wątki po 3, spis treści 1.
+- **Limit tur modelu: `AGENT_MAX_ITERATIONS` = 20 (2026-10-05).** Liczy odpowiedzi modelu
+  w grafie z narzędziami, nie wywołania. Gdy w ostatniej dozwolonej turze model nadal woła
+  narzędzia wiedzy, `route_after_agent()` prowadzi do `respond` i narzędzia nie są wykonywane.
+  Domyka to, czego limity narzędzi nie domykają: wywołanie ponad limit narzędzia dostaje odmowę,
+  ale turę zużywa. 20 to zapas, nie cel: sprawa w sondach to 4–7 tur, a limity narzędzi pozwalają
+  na 32 wywołania, czyli do 33 tur przy jednym wywołaniu na turę (do przeliczenia w p. 23). Cena:
+  sprawa ucięta limitem jest opłacona, a co z nią zrobi `respond`, rozstrzyga p. 11.
 - **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `engine_llm/models/messages.py`), żadnych typów
   LangChaina (2026-10-02).** Pętla rozmawia z modelem przez `LLMClient`, a format wiadomości
   u dostawcy tłumaczy jego klient (p. 17). Skoro i model, i narzędzia idą przez nasze kontrakty,
   LangGraph jest **wyłącznie maszyną stanów** — `StructuredTool` z wcześniejszego planu okazał się
   zbędny. Prompt systemowy nie jest wiadomością; dokłada go węzeł `agent` przy każdej turze.
+  Tura modelu niesie też `provider_items` (2026-10-05): elementy, które dostawca każe odesłać bez
+  zmian w następnej turze — rozumowanie u OpenAI, bloki myślenia u Claude'a. Wkłada je i czyta
+  wyłącznie klient dostawcy, w swoim formacie; pętla tylko je przenosi.
+- **Węzeł `agent` jest właściwy (`AgentNode`, 2026-10-05) i nie ocenia tury.** Wysyła modelowi
+  prompt systemowy grafu, rozmowę ze stanu i definicje narzędzi (`LLMClient.complete_turn()`),
+  a turę modelu dokleja do `messages`. Pierwsza tura otwiera rozmowę turą użytkownika
+  z `user_prompt(state)` i zostawia ją w `messages`; atrapa węzła jej nie dokłada, bo nie zna
+  promptu grafu. Dokąd idzie przebieg, rozstrzyga graf; czy narzędzie jest dozwolone — `run_tools`
+  (p. 10); czy odpowiedź ma poprawny kształt, także gdy model odpowiedział samym tekstem —
+  `respond` (p. 11). Zapis tury w stanie (licznik, zużycie, wpis w logu) jest wspólny z atrapą
+  (`agent/base.py`).
 - **`AnonymizedText` mieszka w `engine_anonymization/`** — pakiecie na usługę anonimizatora, jak
   `engine_embedding/` (kontrakt `Anonymizer`, `FakeAnonymizer`, fabryka `build_anonymizer`). Osobny
   typ zamiast `str`, żeby granica była widoczna w sygnaturach: kod przyjmujący `AnonymizedText` nie
@@ -1652,7 +1673,7 @@ czasu jest pusta.
   anonimizatora** (fail-closed). Atrapa węzła byłaby drugą drogą obok anonimizacji; test kontraktu
   węzłów pilnuje, że w `anonymize/` jest tylko `node.py`.
 - **Atrapy pozostałych węzłów odtwarzają ustalony fragment stanu i zapisują stan w publicznym
-  `calls`.** `FakeAgentNode` oddaje zaplanowane tury po kolei (domyślnie jedna: odpowiedź bez
+  `calls`.** `FakeAgentNode` oddaje zaplanowane tury po kolei (domyślnie jedna: sam tekst, bez
   narzędzi; `tool_call_turn()` buduje turę z wywołaniem), a brak kolejnej tury to błąd, nie
   powtórka. `FakeRunToolsNode` odpowiada stałym tekstem na każde wywołanie z ostatniej tury, z jego
   `call_id`, i dokłada `sources` tylko wtedy, gdy je podano. `FakeRespondNode` ustawia `output` na
@@ -1686,8 +1707,9 @@ nowe zgłoszenie (surowy tekst)
 - **`build_graph()` przyjmuje gotowe węzły, a krawędzie prowadzi po nazwach** — węzły zamienione
   w argumentach dają ten sam graf, dwa o jednej nazwie to błąd przy składaniu.
 - **Fabryka grafów leży w `agent_graphs/factory.py`, jak fabryki innych pakietów, ale
-  `agent_graphs/__init__.py` jej nie eksportuje** — po p. 9 pociągnie `Settings` i klientów, a ten
-  `__init__` importuje każdy graf. Bierze się ją pełną ścieżką `app.agent_graphs.factory`.
+  `agent_graphs/__init__.py` jej nie eksportuje** — czyta `Settings`, a po p. 11 pociągnie
+  klientów, a ten `__init__` importuje każdy graf. Bierze się ją pełną ścieżką
+  `app.agent_graphs.factory`.
 - **Prompt grafu składa `graph.py`: `system_prompt()` i `user_prompt(state)`**; treść zgłoszenia
   bierze wyłącznie z `anonymized`, a stan przed anonimizacją to błąd, nie pusty prompt.
 - **Odpowiedź grafu przychodzi narzędziem `respond_<graf>`, nie tekstem (2026-10-02).** Definicja w
@@ -1709,7 +1731,9 @@ nowe zgłoszenie (surowy tekst)
   wszystkie, więc nowy graf jest objęty bez dopisywania.
 - **Dwa kształty przebiegu.** Bez narzędzi wiedzy: anonymize → agent → respond. Z nimi: pętla
   agent ⇄ run_tools, a o kierunku po turze modelu decyduje wspólne `route_after_agent()` z
-  `agent_graphs/base.py` — tylko po tym, CO model wywołał (limit iteracji dochodzi w p. 9).
+  `agent_graphs/base.py` — po tym, CO model wywołał, i po limicie tur: narzędzia wiedzy →
+  `run_tools`; narzędzie odpowiedzi, sam tekst albo wyczerpany limit → `respond`. Limit dostaje
+  `build_graph()` grafu z pętlą argumentem `max_iterations`.
 - **Każda funkcja ma własną pętlę i sama dociąga materiał (2026-10-02)** — `/suggest` bierze
   zgłoszenie, nie identyfikatory trafień. Cena: człowiek nie odznacza trafień przed generacją,
   więc ginie też etykieta do feedbacku, a każdy guzik szuka od nowa.
@@ -1796,8 +1820,14 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   promptu/odpowiedzi **nigdy na INFO** (dane użytkownika) — tylko DEBUG.
 - **Pakiet `engine_llm/` ma trzy foldery (2026-10-04):** `client/` (plik na dostawcę: `claude`,
   `openai`, `ollama`, `fake`), `pricing/` (cenniki i wspólny `ModelPrice`) i `models/`
-  (`messages`, `completion`, `usage`). `client/__init__.py` celowo niczego nie importuje — SDK
-  ładują się sekundami, więc klienta bierze się pełną ścieżką.
+  (`messages`, `completion`, `turn`, `usage`). `client/__init__.py` celowo niczego nie importuje
+  — SDK ładują się sekundami, więc klienta bierze się pełną ścieżką.
+- **`LLMClient` ma dwie metody: `complete()` (prompt → tekst) i `complete_turn()` (prompt
+  systemowy, rozmowa, narzędzia → jedna tura; 2026-10-05).** Wynik tury to `LLMTurn`: wiadomość
+  modelu w naszym kształcie i zużycie od razu w `LLMUsage`. Klient wykonuje jedno wywołanie
+  i niczego nie pamięta — pętla żyje w grafie. Do p. 17 turę umie tylko `FakeLLMClient`
+  (scenariusz `turns`); klient bez niej zgłasza `LLMError`, a metoda stanie się abstrakcyjna
+  razem z p. 17.
 - **Koszt przebiegu jest w stanie grafu i w odpowiedzi każdej trasy (2026-10-04).** Węzeł `agent`
   zwraca zużycie SWOJEJ tury (`LLMUsage`: wywołania, cztery klasy tokenów, `cost_usd`), a reduktor
   `add_usage` w `GraphState` je sumuje; trasy oddają to jako `usage`. Na atrapach wywołania są
@@ -2204,16 +2234,16 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1029 (0)           | 18 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 192 (79)           | 68 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1062 (0)           | 18 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 211 (79)           | 68 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 98 (9)             | 11 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 53 s |
 
 Liczby i czasy z 2026-10-05: każdy folder osobno, w komplecie (`pytest tests/<folder>/ -m ""`) na
 działającym stacku. Bez testów na stacku integracyjne trwają 8 s, a ewaluacyjne poniżej sekundy —
 całe 53 s to 207 wyszukań golden setów przez prawdziwy embedder (178 w zgłoszeniach, 29
-w dokumentacji). Komplet jednym poleceniem (`pytest -m ""`): 1359 testów, 140 s; domyślny
-`pytest`, bez stacku: 1233 testy, 27 s.
+w dokumentacji). Komplet jednym poleceniem (`pytest -m ""`): 1411 testów, 149 s; domyślny
+`pytest`, bez stacku: 1285 testów, 26 s.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
@@ -2235,8 +2265,11 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   `<usługa>_<pakiet>` (`api_agent_tools/`, `api_core_service/`…; `api_app/` dla modułów z korzenia
   `app/`, `embedder/` w całości), a ponadusługowe zostają w korzeniu folderu rodzaju; `evaluation/`
   jest płaski, dopóki ma kilka plików. Test wymagający stacku ma w nazwie sufiks `_stack`.
-- **Każdy test ma docstring** — jedna linia „scenariusz → oczekiwanie", spójnie we wszystkich
-  testach pliku (nie część z docstringiem, część bez).
+- **Każdy test ma docstring z dwóch prostych akapitów (od 2026-10-05, wcześniej jedna linia
+  „scenariusz → oczekiwanie"):** „Sprawdza, czy…" — co test sprawdza, i „Wyłapuje…" — jaką usterkę
+  złapie i czym ona grozi. Pisane tak, żeby zrozumiał je ktoś, kto pliku nie otworzył: bez
+  strzałek, skrótów myślowych i żargonu pliku, a w teście jednostkowym zwykle po jednym–dwóch
+  zdaniach na akapit. Akapit „Wyłapuje" nazywa tylko to, co asercje naprawdę złapią.
 - **Ewaluacyjne mierzą skuteczność na golden setach, nie poprawność (2026-10-05):** ile zapytań
   dostaje właściwy materiał, ile pustych rekordów odsiewa filtr — z progiem obok zmierzonej
   liczby. Dziś na paczce syntetycznej i golden200, gdzie liczby pilnują głównie tego, że ścieżka
@@ -2244,8 +2277,8 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   niezależnie od modelu i zapytań (odczyt po identyfikatorze, spis treści), jest integracyjny,
   także gdy czyta dane z zestawu. To, czy indeks syntetyczny odpowiada plikom paczki, jest
   warunkiem pomiaru, nie testem: sprawdzają to fixture'y z `tests/evaluation/conftest.py`,
-  a nieaktualny indeks kończy pomiar błędem. Docstring testu ewaluacyjnego to dwa proste zdania
-  zamiast strzałki: co test sprawdza, z liczbami progu, i jaką usterkę wyłapuje.
+  a nieaktualny indeks kończy pomiar błędem. W docstringu testu ewaluacyjnego akapit „Sprawdza,
+  czy…" podaje liczby progu.
 - **Bez obronnego boilerplate'u bez uzasadnienia.** Zadeklarowanych zależności (runtime i dev)
   **nie** guardujemy `pytest.importorskip` — brak zadeklarowanej zależności ma być głośnym
   `ImportError`, nie cichym skipem. `importorskip` zostaje tylko dla zależności faktycznie
@@ -2616,14 +2649,10 @@ punkty niżej to narzędzia właściwe.
 Właściwe węzły na atrapach zależności. Grafy już działają na atrapach węzłów, więc właściwe
 wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
 
-- [ ] **9. `agent`** — tura modelu z narzędziami: kontrakt nowej metody `LLMClient` obok
-  `complete()` i `FakeLLMClient` ze scenariuszem powstają tu; definicje narzędzi dla modelu
-  (`ToolDefinition`) z `name`, opisu `.md` i `query_model`; limit iteracji i rozgałęzienie po
-  wywołaniu: narzędzie wiedzy → `run_tools`, `respond_<graf>` → `respond`, sam tekst → błąd
-  formatu; wiadomość w stanie grafu musi umieć przenieść nieprzezroczysty element dostawcy
-  (rozumowanie u OpenAI, blok myślenia u Claude'a), który trzeba odesłać w następnej turze.
-  *Dlaczego:* pętla to logika domeny i żyje w grafie, nie w kliencie — inaczej wyniki narzędzi
-  omijałyby granicę anonimizacji, a zmiana dostawcy zmieniałaby zachowanie pętli.
+- [x] **9. `agent`** (2026-10-05) — `AgentNode` na `LLMClient.complete_turn()`, `FakeLLMClient`
+  ze scenariuszem tur, `provider_items` w wiadomości, limit tur `AGENT_MAX_ITERATIONS`
+  w rozgałęzieniu grafów; trasy zostają na atrapach grafów do p. 11; reguły — „Warstwa węzłów",
+  „Warstwa grafów", „Warstwa LLM".
 - [ ] **10. `run_tools`** — wywołania wyłącznie z listy dozwolonych, argumenty walidowane
   `query_model` (błąd wraca do modelu jako wiadomość `tool`, żeby mógł poprawić wywołanie), tekst
   z `render_for_model()` do `messages`, źródła z `cite()` do `sources`; licznik
@@ -2634,15 +2663,18 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
   lista źródeł powstaje z wywołań narzędzi, nigdy z deklaracji modelu (zasada 9).
 - [ ] **11. `respond`** — walidacja argumentów `respond_<graf>` do typu wyniku grafu; błąd wraca
   do modelu jako wiadomość `tool` (jak w p. 10), z jednym retry; `requires_hits`: graf wymagający
-  źródeł bez źródeł nie oddaje propozycji. *Dlaczego:*
+  źródeł bez źródeł nie oddaje propozycji; do rozstrzygnięcia, co z turą bez poprawnej odpowiedzi
+  — sam tekst, odpowiedź razem z innym narzędziem, narzędzia wiedzy ucięte limitem tur; z tym
+  punktem fabryka grafów przechodzi z atrap na węzły właściwe. *Dlaczego:*
   „bez trafień nie ma rozwiązania" ma wynikać z kodu, nie z posłuszeństwa modelu.
 - [ ] **12. Test przechodzący po wszystkich grafach** — `test_api_agent_graphs_contract.py` już
   sprawdza na atrapach: anonimizacja pierwsza, prompty bez komentarzy redakcyjnych i z tekstem
   wyłącznie po anonimizacji, model widzi tylko narzędzia z `TOOL_NAMES`, `sources` z
-  `merge_sources`. Zostaje to, co wymaga właściwych węzłów: limit iteracji, `run_tools` odrzucający
-  narzędzie spoza listy, złośliwy zestaw reguł nie przestawia formatu. *Dlaczego:* przy katalogu na
-  graf da się zapomnieć anonimizacji albo reduktora, a jeden test łapie to dla każdego przyszłego
-  grafu; stoi po p. 9–11, bo limit i lista dozwolonych to zachowanie właściwych węzłów.
+  `merge_sources`, limit tur ucina pętlę. Zostaje to, co wymaga właściwych węzłów: `run_tools`
+  odrzucający narzędzie spoza listy, złośliwy zestaw reguł nie przestawia formatu. *Dlaczego:* przy
+  katalogu na graf da się zapomnieć anonimizacji albo reduktora, a jeden test łapie to dla każdego
+  przyszłego grafu; stoi po p. 10–11, bo lista dozwolonych i format odpowiedzi to zachowanie
+  właściwych węzłów.
 - [ ] **46. CLI dla grafów** (dopisany 2026-10-02, numer spoza kolejności) — `helpdesk gate
   close|reply`, `helpdesk suggest <wariant>`, „Popraw" i karta zgłoszenia na tej samej fabryce
   grafów co trasy; także wyszukiwanie i parsowanie zgłoszeń do korpusu (dawne `rag search`
@@ -2669,7 +2701,8 @@ wchodzą po jednym, a przebieg grafu się przy tym nie zmienia.
 #### D. Model — zastępuje atrapę modelu z p. 9
 
 - [ ] **17. Tura z narzędziami u prawdziwych dostawców** — implementacja kontraktu z p. 9
-  w klientach Claude / OpenAI / Ollama; pętla zostaje w grafie. U OpenAI przez API Responses
+  (`complete_turn()`, która staje się wtedy abstrakcyjna) w klientach Claude / OpenAI / Ollama;
+  pętla zostaje w grafie. U OpenAI przez API Responses
   (klient już na nim stoi), bez przechowywania u dostawcy: elementy rozumowania wracają do modelu
   w następnej turze w postaci zaszyfrowanej. Wywołanie narzędzia WYMUSZONE tam, gdzie dostawca
   pozwala łączyć je z rozumowaniem (każda tura ma być wywołaniem), w przeciwnym razie `auto`
@@ -2716,7 +2749,8 @@ każdy mierzy się osobno.
   narzędzi `_text` liczony osobno — czy znajdują coś, czego wektor nie znajduje, jest dziś
   niezmierzone; do tego czy model czyta karty WSZYSTKICH znalezionych numerów, czy tylko
   pierwszego, i ile kosztuje dodatkowa tura odczytu; na prawdziwych wątkach także: ile wątków
-  na sprawę (dziś 3), limit długości wątku i czy wątek ma nieść etykiety z `as_thread()`
+  na sprawę (dziś 3), ile tur na sprawę (limit dziś 20, do ustawienia z rozkładu tur
+  w przebiegach), limit długości wątku i czy wątek ma nieść etykiety z `as_thread()`
   („KOMENTARZ", rola, data). *Dlaczego:*
   najgroźniejszy błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach
   (e-Doręczenia: 6 zgłoszeń, 6 przyczyn), a zapytanie agenta nie powstaje już promptem korpusu.
@@ -2792,7 +2826,8 @@ każdy mierzy się osobno.
 - [ ] **36. Uwierzytelnianie API i własne hasło Postgresa.** *Dlaczego:* endpointy są otwarte,
   reguły bramek będą edytowalne, a compose ma dla bazy hasło dev-owe.
 - [ ] **37. Budżet i limity wywołań zewnętrznych** — limity wywołań narzędzi na przebieg
-  (`AGENT_MAX_CALLS_*`), koszt przebiegu w odpowiedzi (`usage`) i cache promptu już są; zostaje
+  (`AGENT_MAX_CALLS_*`), limit tur modelu (`AGENT_MAX_ITERATIONS`), koszt przebiegu w odpowiedzi
+  (`usage`) i cache promptu już są; zostaje
   budżet na okres i jego egzekwowanie oraz wyniesienie do ENV tego, ile jedno wywołanie może
   pobrać. *Dlaczego:* bramki dają ruch proporcjonalny do całej pracy
   helpdesku, pętla mnoży wywołania, a model zewnętrzny to koszt per wywołanie.

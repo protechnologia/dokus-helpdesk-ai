@@ -27,7 +27,12 @@ pytestmark = [pytest.mark.stack, pytest.mark.stack_postgres]
 
 
 async def test_a_query_reaches_the_database() -> None:
-    """Poprawna konfiguracja → zapytanie dochodzi do bazy i wraca z odpowiedzią."""
+    """Sprawdza, czy klient z poprawną konfiguracją łączy się z prawdziwą bazą: najprostsze
+    zapytanie (`SELECT 1`) dochodzi do serwera i wraca z wynikiem 1.
+
+    Wyłapuje klienta, który nie umie połączyć się z działającą bazą albo nie oddaje jej
+    odpowiedzi — wtedy nie działa wyszukiwanie tekstowe ani odczyt wątków zgłoszeń i sekcji
+    dokumentacji."""
     client = build_postgres_client()
 
     try:
@@ -37,8 +42,12 @@ async def test_a_query_reaches_the_database() -> None:
 
 
 async def test_a_wrong_password_is_a_config_error() -> None:
-    """Złe hasło → DbPostgresConfigError: serwer odrzuca je błędem, który klient rozpoznaje jako
-    konfigurację, a nie awarię."""
+    """Sprawdza, czy przy złym haśle klient zgłasza błąd konfiguracji (`DbPostgresConfigError`)
+    wskazujący zmienną `POSTGRES_PASSWORD`: prawdziwy serwer odrzuca hasło błędem, który klient
+    rozpoznaje.
+
+    Wyłapuje serwer, który na złe hasło odpowiada innym błędem, niż klient zakłada: pomyłka
+    w konfiguracji wyglądałaby wtedy jak awaria bazy, a komunikat nie mówiłby, co poprawić."""
     client = build_postgres_client(password="na-pewno-nie-to-haslo")
 
     try:
@@ -49,7 +58,11 @@ async def test_a_wrong_password_is_a_config_error() -> None:
 
 
 async def test_a_missing_database_is_a_config_error() -> None:
-    """Baza o nieistniejącej nazwie → DbPostgresConfigError z tą nazwą."""
+    """Sprawdza, czy przy nazwie bazy, której na serwerze nie ma, klient zgłasza błąd konfiguracji
+    (`DbPostgresConfigError`) i podaje w nim tę nazwę.
+
+    Wyłapuje serwer, który brak bazy zgłasza innym błędem, niż klient zakłada: literówka w nazwie
+    bazy wyglądałaby wtedy jak awaria usługi, bez wskazania, która nazwa jest zła."""
     client = build_postgres_client(database="nie_ma_takiej_bazy")
 
     try:

@@ -36,13 +36,22 @@ def _client(handler: httpx.MockTransport) -> EmbeddingClient:
 
 
 def test_empty_base_url_is_refused_at_build_time() -> None:
-    """EMBEDDING_BASE_URL="" (what compose substitutes for an unset var) → error at construction."""
+    """Sprawdza, czy klient embeddera budowany z pustym adresem kończy się błędem konfiguracji,
+    który wymienia zmienną `EMBEDDING_BASE_URL`.
+
+    Wyłapuje klienta przyjmującego pusty adres: `docker compose` wstawia pusty tekst za
+    nieustawioną zmienną, a błąd wyszedłby dopiero przy pierwszym żądaniu, z niejasnym
+    komunikatem."""
     with pytest.raises(EmbeddingConfigError, match="EMBEDDING_BASE_URL"):
         EmbeddingClient(base_url="")
 
 
 def test_whitespace_base_url_is_refused_at_build_time() -> None:
-    """Base URL of blanks → treated as missing, not as a URL made of spaces."""
+    """Sprawdza, czy adres embeddera złożony z samych spacji jest traktowany jak brak adresu
+    i kończy się błędem konfiguracji przy budowie klienta.
+
+    Wyłapuje kontrolę, która odsiewa tylko dokładnie pusty tekst: klient powstałby z adresem ze
+    spacji i padłby dopiero przy pierwszym żądaniu."""
     with pytest.raises(EmbeddingConfigError):
         EmbeddingClient(base_url="   ")
 
@@ -58,8 +67,11 @@ def test_whitespace_base_url_is_refused_at_build_time() -> None:
     ],
 )
 async def test_each_method_sends_its_own_mode(method_name: str, expected_mode: str) -> None:
-    """embed_<mode>() → that mode on the wire; a method wired to the wrong space is undetectable
-    later, because the vectors still look valid."""
+    """Sprawdza, czy każda z trzech metod klienta wysyła do embeddera swój tryb: `embed_query`
+    tryb `query`, `embed_passage` tryb `passage`, a `embed_sts` tryb `sts`.
+
+    Wyłapuje metodę podpiętą pod niewłaściwy tryb: wektory nadal wyglądają poprawnie, więc
+    później pomyłki nie da się zauważyć, a wyszukiwanie po cichu daje gorsze wyniki."""
     seen: list = []
     client     = _client(capturing(seen, EMBED_ROUTE))
 
@@ -69,7 +81,11 @@ async def test_each_method_sends_its_own_mode(method_name: str, expected_mode: s
 
 
 async def test_texts_are_sent_as_submitted() -> None:
-    """Texts reach the embedder unchanged → prefixing is the model's business, not the client's."""
+    """Sprawdza, czy teksty docierają do embeddera bez zmian: tekst „Brak tonera" jest w wysłanym
+    żądaniu dokładnie w tej postaci.
+
+    Wyłapuje klienta, który sam dokleja coś do tekstu, na przykład przedrostek trybu:
+    przedrostki dodaje usługa embeddera, bo zależą od modelu, a nie od klienta."""
     seen: list = []
     client     = _client(capturing(seen, EMBED_ROUTE))
 
@@ -79,9 +95,12 @@ async def test_texts_are_sent_as_submitted() -> None:
 
 
 async def test_the_batch_goes_to_the_embed_path() -> None:
-    """One POST to /embed → the route is part of the contract between two services we ship
-    together. Newly assertable: the shared capturing helper records the path, which the old
-    body-only double could not."""
+    """Sprawdza, czy jedno wywołanie klienta to dokładnie jedno żądanie `POST` pod ścieżkę
+    `/embed`.
+
+    Wyłapuje zmianę ścieżki albo metody żądania oraz żądania nadmiarowe: ścieżka jest częścią
+    umowy między dwiema usługami, które wydajemy razem, więc klient z inną ścieżką nie
+    dogadałby się z embedderem."""
     seen: list = []
     client     = _client(capturing(seen, EMBED_ROUTE))
 
@@ -91,7 +110,11 @@ async def test_the_batch_goes_to_the_embed_path() -> None:
 
 
 async def test_vectors_are_returned_in_submission_order() -> None:
-    """Batch of three → three vectors in the order sent, because retrieval zips them back."""
+    """Sprawdza, czy dla trzech tekstów klient oddaje trzy wektory w tej samej kolejności,
+    w jakiej przyszły w odpowiedzi embeddera.
+
+    Wyłapuje klienta, który przestawia albo gubi wektory: wołający przypisuje je do tekstów po
+    kolei, więc zgłoszenie dostałoby wektor innego zgłoszenia."""
     client = _client(always({"vectors": [[1.0], [2.0], [3.0]]}))
 
     vectors = await client.embed_passage(["a", "b", "c"])
@@ -100,7 +123,12 @@ async def test_vectors_are_returned_in_submission_order() -> None:
 
 
 async def test_vector_count_mismatch_is_an_error() -> None:
-    """Two texts, one vector back → error, because silently zipping them would misattribute."""
+    """Sprawdza, czy odpowiedź z jednym wektorem na dwa wysłane teksty kończy się błędem
+    `EmbeddingError`, który podaje liczbę otrzymanych wektorów.
+
+    Wyłapuje brak kontroli liczby wektorów: wołający przypisuje wektory do zgłoszeń po kolei,
+    więc przy rozjeździe zgłoszenie dostałoby cudzy wektor, a wyszukiwanie dawałoby złe wyniki
+    zamiast błędu."""
     client = _client(always(ONE_VECTOR))
 
     with pytest.raises(EmbeddingError, match="1 vector"):
@@ -108,7 +136,11 @@ async def test_vector_count_mismatch_is_an_error() -> None:
 
 
 async def test_missing_vectors_field_is_an_error() -> None:
-    """200 whose body has no `vectors` → EmbeddingError, not a KeyError from the domain."""
+    """Sprawdza, czy odpowiedź ze statusem 200, w której nie ma pola `vectors`, kończy się błędem
+    `EmbeddingError` wymieniającym to pole.
+
+    Wyłapuje klienta, który sięga po pole bez sprawdzenia: wołający dostałby przypadkowy
+    wyjątek Pythona, na przykład `KeyError`, zamiast błędu warstwy embeddera."""
     client = _client(always({"model": "fake"}))
 
     with pytest.raises(EmbeddingError, match="vectors"):
@@ -116,7 +148,11 @@ async def test_missing_vectors_field_is_an_error() -> None:
 
 
 async def test_server_error_becomes_a_layer_error() -> None:
-    """Embedder answers 503 → EmbeddingError; callers never see an httpx type (rule 4)."""
+    """Sprawdza, czy odpowiedź embeddera ze statusem 503 kończy się błędem `EmbeddingError`, który
+    podaje ten status.
+
+    Wyłapuje wyjątek biblioteki `httpx` wypuszczony do wołającego: reszta kodu ma znać tylko
+    błędy warstwy embeddera, a nie biblioteki, którą klient się łączy (zasada 4)."""
     client = _client(always({"detail": "model down"}, status=503))
 
     with pytest.raises(EmbeddingError, match="503"):
@@ -124,7 +160,11 @@ async def test_server_error_becomes_a_layer_error() -> None:
 
 
 async def test_connection_failure_becomes_a_layer_error() -> None:
-    """Embedder unreachable → EmbeddingError naming the reach failure, not a raw transport error."""
+    """Sprawdza, czy brak połączenia z embedderem (tu odmowa połączenia) kończy się błędem
+    `EmbeddingError`, który mówi, że nie udało się do niego dotrzeć.
+
+    Wyłapuje surowy błąd transportu wypuszczony do wołającego albo komunikat, z którego nie
+    wynika, że embedder jest nieosiągalny."""
     client = _client(raising(httpx.ConnectError("connection refused")))
 
     with pytest.raises(EmbeddingError, match="reach"):
@@ -132,7 +172,11 @@ async def test_connection_failure_becomes_a_layer_error() -> None:
 
 
 async def test_timeout_becomes_a_layer_error() -> None:
-    """Embedder exceeds the timeout → EmbeddingError saying so, so indexing can decide to retry."""
+    """Sprawdza, czy przekroczenie czasu oczekiwania na odpowiedź embeddera kończy się błędem
+    `EmbeddingError`, który mówi o przekroczeniu czasu.
+
+    Wyłapuje błąd, z którego nie widać, że chodziło o czas: indeksacja nie mogłaby wtedy
+    zdecydować, czy ponowić wywołanie."""
     client = _client(raising(httpx.ReadTimeout("too slow")))
 
     with pytest.raises(EmbeddingError, match="timed out"):
@@ -140,7 +184,12 @@ async def test_timeout_becomes_a_layer_error() -> None:
 
 
 async def test_non_json_body_becomes_a_layer_error() -> None:
-    """200 carrying a proxy's HTML error page → EmbeddingError, not a JSON decode error."""
+    """Sprawdza, czy odpowiedź ze statusem 200, której treścią jest strona HTML zamiast JSON-a
+    (tak wygląda strona błędu pośrednika sieciowego), kończy się błędem `EmbeddingError`
+    mówiącym, że treść nie jest JSON-em.
+
+    Wyłapuje błąd dekodowania JSON-a wypuszczony do wołającego: z takiego wyjątku nie widać, że
+    zawiódł embedder albo coś po drodze do niego."""
     client = _client(always(text="<html>oops</html>"))
 
     with pytest.raises(EmbeddingError, match="non-JSON"):

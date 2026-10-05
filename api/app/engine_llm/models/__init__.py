@@ -7,6 +7,7 @@ od dostawcy. Klient każdego dostawcy tłumaczy je na swój format i z powrotem.
 |-----------------|---------------------------------------------|----------------------------------|
 | `messages.py`   | `ChatMessage`, `ToolCall`, `ToolDefinition` | rozmowa z modelem i narzędzia    |
 | `completion.py` | `LLMCompletion`                             | jedna odpowiedź z rozliczeniem   |
+| `turn.py`       | `LLMTurn`                                   | jedna tura rozmowy z narzędziami |
 | `usage.py`      | `LLMUsage`                                  | zużycie modelu w całym przebiegu |
 
 Modele leżą tutaj, a nie w `core_model/`: opisują rozmowę z jedną usługą zewnętrzną
@@ -15,11 +16,13 @@ Modele leżą tutaj, a nie w `core_model/`: opisują rozmowę z jedną usługą 
 
 from app.engine_llm.models.completion import LLMCompletion
 from app.engine_llm.models.messages import ChatMessage, ToolCall, ToolDefinition
+from app.engine_llm.models.turn import LLMTurn
 from app.engine_llm.models.usage import LLMUsage
 
 __all__ = [
     "ChatMessage",
     "LLMCompletion",
+    "LLMTurn",
     "LLMUsage",
     "ToolCall",
     "ToolDefinition",
