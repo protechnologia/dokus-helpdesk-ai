@@ -20,6 +20,7 @@
 - [Dane](#dane)
   - [Historyczne zgłoszenia](#historyczne-zgłoszenia)
   - [Instrukcje](#instrukcje)
+  - [Kod aplikacji](#kod-aplikacji)
 - [Architektura](#architektura)
   - [Domena: kontrakt sparsowanego zgłoszenia](#domena-kontrakt-sparsowanego-zgłoszenia)
   - [Bramki jakości i asysta pisania (noga 2)](#bramki-jakości-i-asysta-pisania-noga-2)
@@ -99,10 +100,11 @@ z deklaracji modelu, a wariant wymagający źródeł bez źródeł nie oddaje pr
 jest człowiek: dostaje propozycję albo werdykt ze źródłami i sam decyduje.
 
 **Rozwój to dokładanie narzędzi.** Narzędzie jest katalogiem z kontraktem, więc kolejne źródło
-wiedzy nie zmienia grafów ani węzłów. Kandydaci, jeszcze bez decyzji (p. 58): czytanie kodu
-aplikacji i dostęp do instancji testowej, na której agent sprawdzi opisany objaw. To drugie byłoby
-pierwszym narzędziem, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzji
-o granicach.
+wiedzy nie zmienia grafów ani węzłów. Następne jest czytanie kodu aplikacji (p. 60–66): pięć
+narzędzi tylko do odczytu, które mają pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają,
+przede wszystkim gdy zgłoszenie niesie komunikat albo kod błędu. Kandydat bez decyzji (p. 58):
+dostęp do instancji testowej, na której agent sprawdzi opisany objaw. Byłoby to pierwsze
+narzędzie, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzji o granicach.
 
 **Stan na dziś.** Szkielet stoi w całości, a atrapą jest już tylko anonimizator. Wszystkie węzły
 są właściwe i każdy graf przeszedł na prawdziwym modelu (OpenAI), na zmyślonych zgłoszeniach
@@ -273,6 +275,7 @@ dokus-helpdesk-ai/
 │       ├── parsed/               # sparsowane JSON-y (trwały artefakt, zasada 7)
 │       ├── golden/               # zestawy do ewaluacji: zgłoszenia, dystraktory
 │       ├── instruction/          # właściwa dokumentacja (p. 55)
+│       ├── code/                 # paczka kodu aplikacji z czystego checkoutu (p. 60)
 │       └── docs/                 # raporty z pomiarów i dokumenty projektu
 ├── api/                          # folder = usługa z compose, nazwany tak samo
 │   ├── Dockerfile
@@ -893,6 +896,51 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — indeksacja i narzędzia powstają
   o szczegół z końca najdłuższej sekcji wygrywa o 0,058; przy 1500 znakach przegrywa o 0,004, przy
   jednym wektorze na sekcję wypada poza pierwszą piątkę, a przy samym tytule i opisie ląduje na
   19. miejscu. Paczka ma jedną długą sekcję, więc między 400 a 1000 znaków nie rozstrzyga.
+
+### Kod aplikacji
+
+Trzeci materiał obok zgłoszeń i instrukcji: kod źródłowy Dokusa, czytany narzędziami agenta
+(p. 60–66). Ma pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają, przede wszystkim gdy
+zgłoszenie niesie komunikat albo kod błędu. Narzędzi jeszcze nie ma; niżej decyzje i liczby
+z rozpoznania 2026-10-06 na kopii roboczej gałęzi jednego klienta, do przeliczenia na czystym
+checkoucie (p. 60).
+
+- **Kod może wyjść do modelu zewnętrznego (decyzja 2026-10-06).** Nie przechodzi przez
+  anonimizację: wynik narzędzia idzie do modelu wprost. Otwarte zostaje, którą gałąź indeksuje
+  instancja: klienci mają własne gałęzie obok głównej, a odpowiedź z kodu opisuje tylko tę, którą
+  wczytano (p. 60).
+- **Narzędzia powstają na prawdziwym kodzie Dokusa, nie na zmyślonej mini-aplikacji (decyzja
+  2026-10-06).** Kodu nie ma w repo, więc testy na nim pomijają się bez paczki w `data/`;
+  zmyślone zostają dane atrap narzędzi i pliki tworzone w testach.
+- **PHP 7.4 na dwóch warstwach: Symfony 1 z Doctrine 1 (główna) i Symfony 2 (pomocnicza),
+  z własnym frontendem JS.** Kod własny to ok. 7 tys. plików PHP (685 tys. linii; górna granica,
+  bo w katalogach własnych leży kilka wklejonych bibliotek) i 576 plików JS (233 tys. linii).
+  Repozytorium to PlasticSCM, więc wersją paczki jest gałąź i numer changesetu.
+- **Paczka powstaje z czystego checkoutu, nie z katalogu programisty.** Kopia robocza trzyma
+  pliki z hasłami, klucze i logi, których w repozytorium nie ma. Biblioteki są w repozytorium
+  (ponad 630 tys. linii) i skrypt paczki je odcina. Klas generowanych `Base*` w checkoucie nie
+  ma; ich źródłem są schematy YAML.
+- **Skrypt paczki rozkodowuje polskie litery zapisane jako `\uXXXX` — tylko w plikach JS i tylko
+  litery.** Taki zapis ma 120 z 576 własnych plików JS: dosłowne szukanie „skomunikować" znalazło
+  3 linie z 4, a pominięta leży w głównej obsłudze błędów frontendu. W PHP w pojedynczych
+  cudzysłowach ten zapis jest dosłowny, a rozkodowany znak sterujący zepsułby składnię albo
+  przesunął linie. Cena: kod w paczce nie jest znak w znak kodem z repozytorium; ścieżki i numery
+  linii zostają.
+- **Kod zostaje w folderze, bez bazy, a szuka w nim ripgrep (decyzja 2026-10-06).** Na 7424
+  plikach (57 MB) dosłowne szukanie trwa 0,05 s, a czystym Pythonem 0,7 s; przy częstym słowie
+  0,14 s wobec 3,3 s. Folder musi leżeć na dysku linuksowym: to samo szukanie w katalogu Windows
+  przez WSL trwało 14 s.
+- **Jeden komunikat ma w kodzie kilka brzmień** — „Nie udało się skomunikować z serwerem" trzy,
+  w tym jedno z innym szykiem słów — a komunikat składany z części nie istnieje w kodzie
+  w całości. Stąd szukanie po słowach obok frazy i szukanie stałego fragmentu, bez numerów
+  i nazw.
+- **Sama nazwa nie wskazuje symbolu:** 3022 akcje mają 1081 różnych nazw, a najczęstsza powtarza
+  się 172 razy. Symbol wskazuje ścieżka pliku z nazwą.
+- **89% plików PHP ma do 200 linii, ale główne kontrolery po 3–4 tys.** Odczyt pliku ma limit
+  linii, a odczyt symbolu daje najwięcej właśnie w nich.
+- **Opis projektu szkicuje model z kodu, a poprawia programista aplikacji.** Leży w paczce
+  i mówi, gdzie zacząć szukać: wejścia do aplikacji, droga od adresu do akcji i od zdarzenia JS
+  do handlera.
 
 ## Architektura
 
@@ -1627,6 +1675,11 @@ czasu jest pusta.
   kliencie embeddera, Qdranta i Postgresa, wspólnym dla ośmiu narzędzi, w kolejności `TOOL_NAMES`
   grafów. Powstają wszystkie osiem; czy instancja bez dokumentacji ma pomijać jej narzędzia,
   rozstrzyga p. 15.
+- **Kod aplikacji liczy się jako źródło jak zgłoszenie i instrukcja, także w wariancie
+  wymagającym źródeł (decyzja 2026-10-06, narzędzia w p. 62–66).** Odpowiedź opartą wyłącznie na
+  kodzie wołający rozpoznaje po rodzaju źródła (`code`). Cena: plik zawsze da się przeczytać, więc
+  taki wariant prawie nigdy nie powie „nie mam z czego zaproponować"; czy model powstrzyma się
+  przy szukaniu na ślepo, sprawdza p. 59.
 - **Każde narzędzie jest tylko do odczytu** — wstrzyknięcie przez treść zgłoszenia może co
   najwyżej skierować agenta do nietrafionego materiału, nie zmienić indeksu.
 
@@ -2671,6 +2724,20 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   komentarza przestaje być wiarygodny.
 - **Załączniki zgłoszeń** — tabela `zalacznik` trzyma tylko ścieżki, samych plików w zrzucie nie
   ma; treść zgłoszenia i wątku wystarcza.
+- **Kod aplikacji w Postgresie (tabele plików i symboli)** — ripgrep szuka w folderze w 0,05 s
+  bez wczytywania kodu do bazy, a narzędzia na folderze testuje się bez stacku. Cena: ścieżka
+  podana przez model trafia do systemu plików i trzeba jej pilnować, a szukania z odmianą słów
+  nie ma.
+- **Zmyślona mini-aplikacja jako paczka kodu** — narzędzia powstają od razu na prawdziwym kodzie
+  Dokusa. Cena: testy na kodzie pomijają się bez paczki w `data/`.
+- **Blokada źródła `code` w wariancie wymagającym źródeł** — zatrzymywałaby sprawę bez podobnych
+  zgłoszeń i instrukcji, czyli tę, dla której narzędzia kodu powstają. Wraca w węższej postaci
+  (liczy się tylko plik znaleziony dosłownym trafieniem), gdy pomiar pokaże odpowiedzi z luźno
+  powiązanych plików (p. 59).
+- **Druga wersja linii kodu, tylko do szukania** — model mógłby przepisać z odczytanego pliku
+  zapis, którego szukanie nie zna; skrypt paczki rozkodowuje litery raz i wersja jest jedna.
+- **Tabela komunikatów z parsowania napisów w kodzie** — wymaga osobnego tokenizera PHP i JS.
+  Wraca, gdy szukanie po liniach da za dużo nietrafionych wyników.
 
 ### Plan
 
@@ -2799,7 +2866,9 @@ Właściwe węzły na atrapach zależności. Grafy już działają na atrapach w
 wchodzą po jednym, a przebieg grafu się przy tym nie zmienia. Prawdziwy model (p. 18 i 17) stoi
 tu od 2026-10-05, zaraz po `run_tools`, a przed `respond`: pierwszy przebieg pętli na prawdziwym
 modelu ma być jak najwcześniej, bo jego wynik przestawi limity, opisy narzędzi i prompty taniej
-niż zgadywanie.
+niż zgadywanie. Narzędzia kodu aplikacji (p. 60–66) stoją tu od 2026-10-06, przed scenariuszami
+z p. 59, żeby te objęły też sprawę, w której komunikat jest tylko w kodzie; każde wchodzi
+z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_solution`.
 
 - [x] **9. `agent`** (2026-10-05) — `AgentNode` na `LLMClient.complete_turn()`, `FakeLLMClient`
   ze scenariuszem tur, `provider_items` w wiadomości, limit tur `AGENT_MAX_ITERATIONS`
@@ -2830,6 +2899,40 @@ niż zgadywanie.
   odpowiedź, poprawka, porażka i narzędzie spoza listy, które nie jest wykonywane; złośliwy zestaw
   reguł w grafach z regułami; bez osobnych plików testów na graf; reguły — „Warstwa grafów",
   „Prompty", „Testy".
+- [ ] **60. Paczka z kodu Dokusa** (p. 60–66 dopisane 2026-10-06, numery spoza kolejności) —
+  skrypt w `scripts/` buduje ją z czystego checkoutu do `data/unsafe/code/`: lista dozwolonych
+  katalogów i rozszerzeń, bez bibliotek, polskie litery z `\uXXXX` rozkodowane w plikach JS,
+  końce linii LF, metryczka z gałęzią, changesetem i liczbą zmienionych linii; jednorazowy
+  przegląd checkoutu wykrywaczem sekretów; folder montowany do `api` tylko do odczytu, także
+  w warstwie prod; do rozstrzygnięcia, którą gałąź indeksuje instancja. *Dlaczego:* biblioteki to
+  ponad 630 tys. linii obok niecałego miliona własnych, a dosłowne szukanie gubi komunikaty
+  zapisane sekwencjami (120 z 576 plików JS).
+- [ ] **61. Zestaw zapytań do kodu Dokusa** — w `data/unsafe/golden/`: komunikat albo kod błędu
+  i plik, w którym pada, osobno zapytania bez dosłownego tropu i zapytania bez odpowiedzi;
+  w zestawie komunikat zapisany sekwencjami, komunikat składany z części, akcja o powtarzającej
+  się nazwie i długi kontroler. *Dlaczego:* narzędzia powstają na prawdziwym kodzie, bez
+  zmyślonej mini-aplikacji, więc zestaw jest jedynym miejscem, które pilnuje, że znane pułapki
+  tego kodu są pokryte.
+- [ ] **62. `find_code_text`** — fraza dosłowna albo słowa w jednej linii, ripgrep w obrazie
+  `api` w trybie dosłownym; oddaje ścieżkę i numer linii, bez treści, z limitem pozycji
+  i licznikiem pominiętych; opis każe szukać stałego fragmentu komunikatu, bez numerów i nazw.
+  *Dlaczego:* od niego zaczyna się sprawa z komunikatem albo kodem błędu, a częste słowo trafia
+  w dziesiątki tysięcy linii.
+- [ ] **63. `read_code_file`** — plik albo zakres linii, z limitem linii na wywołanie
+  i informacją o ucięciu; cytuje (`source` „code", `item_id` to ścieżka); ścieżka spoza paczki
+  to błąd wracający do modelu. *Dlaczego:* po trafieniu trzeba zobaczyć, w jakiej klasie
+  i metodzie leży linia, a główne kontrolery mają po 3–4 tys. linii.
+- [ ] **64. `list_code_files`** — drzewo katalogu z opcjonalną głębokością, z limitem pozycji.
+  *Dlaczego:* szukanie bez komunikatu i bez kodu błędu, po wskazówkach z opisu projektu.
+- [ ] **65. `describe_code`** — opis projektu w całości, raz na sprawę; szkic pisze model
+  z kodu, poprawia programista Dokusa, plik leży w paczce. *Dlaczego:* mówi, gdzie zacząć:
+  wejścia do aplikacji, droga od adresu do akcji i od zdarzenia JS do handlera.
+- [ ] **66. Mapa symboli i `read_code_symbol`** — mapa budowana komendą do pliku obok paczki,
+  narzędziem wybranym po próbie na kodzie Dokusa (linia końca metody PHP, handlery JS
+  definiowane przypisaniem); symbol wskazuje ścieżka z nazwą, przy kilku kandydatach narzędzie
+  oddaje ich listę bez treści; `find_code_text` dostaje pole z nazwą symbolu, w którym leży
+  linia. *Dlaczego:* 3022 akcje mają 1081 nazw, a w długim kontrolerze odczyt symbolu zastępuje
+  odczyt pliku.
 - [ ] **59. Scenariusze ewaluacyjne grafów na zmyślonych danych** (dopisany 2026-10-05, numer
   spoza kolejności) — testy w `tests/evaluation/` za markerem `llm_live`: grafy na węzłach
   właściwych i modelu generującym, scenariusze jako dane w `data/safe/golden/`, materiał podawany
@@ -2843,7 +2946,9 @@ niż zgadywanie.
   i progiem ustawianym z pierwszego pomiaru; potem bramki (para „łamie / poprawna" na regułę,
   fałszywe alarmy osobno), „Popraw" (potoczne słowa znikają, nie przybywa liczb ani nazw)
   i grafy z narzędziami (`suggest_solution`: czy zastrzeżenie i krok nieodwracalny z karty
-  trafiają do odpowiedzi). *Dlaczego:* da się je uruchomić przed anonimizatorem, więc prompty
+  trafiają do odpowiedzi; para dla narzędzi kodu: komunikat jest tylko w kodzie, a w parze
+  kontrolnej nie ma go nigdzie — czy model powstrzymuje się wtedy od rozwiązania z luźno
+  powiązanego pliku). *Dlaczego:* da się je uruchomić przed anonimizatorem, więc prompty
   dostają sygnał z modelu docelowego wcześniej niż z p. 21–28; tamtych pomiarów nie zastępują,
   bo scenariusze pisze autor promptów; stoi po p. 11, bo ocenia odpowiedź przepuszczoną przez
   właściwy `respond`.
@@ -2931,10 +3036,14 @@ każdy mierzy się osobno.
   także po zaostrzeniu zdania w prompcie), czy „instrukcje zawsze" nie dokłada do źródeł sekcji,
   z których odpowiedź nie korzysta, i jak ważyć instrukcję wobec zgłoszeń (od 2026-10-04 prompt
   bierze fakty z obu na równi; w sondzie krok z instrukcji stanął pierwszy, choć żadne
-  zgłoszenie go nie potwierdzało); ewaluacja
+  zgłoszenie go nie potwierdzało); reguła dla odpowiedzi opartej wyłącznie na kodzie: przy jakim
+  warunku pada komunikat i co sprawdzić, wprost, że nie potwierdza tego żadna sprawa, a nazwy
+  klas i ścieżki w `[dla serwisanta: …]`; ewaluacja
   wariantu. *Dlaczego:* ostrzeżenie nie padło w żadnym z czterech pomiarów, a bez reguły zgodności
   model kazał wygasić duplikat kontrahenta przy zgłoszeniu o przenoszeniu zasobów.
-- [ ] **27. `suggest_handoff`** — prompt niosący, co sprawdzono i czego brakuje; ewaluacja
+- [ ] **27. `suggest_handoff`** — prompt niosący, co sprawdzono i czego brakuje; do
+  rozstrzygnięcia, czy wariant dostaje narzędzia kodu (namiar na plik i warunek w przekazaniu),
+  bo dziś nie ma pętli narzędzi; ewaluacja
   wariantu. *Dlaczego:* grzeczna formułka bez treści to udokumentowana patologia korpusu (ten sam
   tekst ≥12× w jednej turze).
 - [ ] **28. `polish`** — zasady stylu jako dane, pomiar braku nowych faktów (porównanie wejścia
@@ -3018,8 +3127,8 @@ Rzeczy odłożone świadomie, bez miejsca w kolejności planu. Każdy punkt: cel
 - [ ] **45. Rozszerzenia** — reranker, frontend,
   rozbicie wątków-projektów, kolejność diagnostyczna w `questions`. *Dlaczego:* każde czeka na
   pomiar, który pokaże, że jest potrzebne.
-- [ ] **58. Narzędzia: kod aplikacji i instancja testowa** — czytanie kodu aplikacji jako kolejne
-  źródło wiedzy i dostęp do instancji testowej, na której agent sprawdzi opisany objaw.
-  *Dlaczego:* kandydaci bez decyzji; narzędzie jest katalogiem z kontraktem, więc dojdą bez zmian
-  w grafach i węzłach, ale instancja testowa byłaby pierwszym narzędziem, które coś wykonuje,
-  a nie tylko czyta — wymaga osobnej decyzji o granicach.
+- [ ] **58. Narzędzie: instancja testowa** — dostęp do instancji testowej, na której agent
+  sprawdzi opisany objaw; czytanie kodu aplikacji przeszło 2026-10-06 do p. 60–66.
+  *Dlaczego:* kandydat bez decyzji; narzędzie jest katalogiem z kontraktem, więc dojdzie bez zmian
+  w grafach i węzłach, ale byłoby pierwszym narzędziem, które coś wykonuje, a nie tylko czyta —
+  wymaga osobnej decyzji o granicach.
