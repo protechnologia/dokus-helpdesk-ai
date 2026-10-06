@@ -1,0 +1,16 @@
+# Schemat tabel pism; z niego powstają klasy modeli.
+Pismo:
+  tableName: pismo
+  columns:
+    id:             { type: integer, primary: true, autoincrement: true }
+    numer:          { type: string(32) }
+    rok:            { type: integer, notnull: true }
+    temat:          { type: string(255) }
+    kanal_wysylki:  { type: string(16) }
+    status_wysylki: { type: string(16), default: nowe }
+
+SekwencjaNumeracji:
+  tableName: sekwencja_numeracji
+  columns:
+    rok:      { type: integer, primary: true }
+    nastepny: { type: integer, notnull: true, default: 1 }

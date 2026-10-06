@@ -1,0 +1,23 @@
+# Droga od adresu do akcji: url -> moduł i akcja (metoda execute<Akcja> w actions.class.php).
+pisma_zapisz:
+  url:   /pisma/zapisz
+  param: { module: pisma, action: zapisz }
+
+pisma_wyslij:
+  url:   /pisma/wyslij
+  param: { module: pisma, action: wyslij }
+
+sprawy_lista:
+  url:   /sprawy
+  param: { module: sprawy, action: lista }
+
+sprawy_zapisz:
+  url:   /sprawy/zapisz
+  param: { module: sprawy, action: zapisz }
+
+kontrahenci_zapisz:
+  url:   /kontrahenci/zapisz
+  param: { module: kontrahenci, action: zapisz }
+
+default:
+  url:   /:module/:action/*

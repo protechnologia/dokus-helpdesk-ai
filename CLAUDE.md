@@ -268,14 +268,15 @@ dokus-helpdesk-ai/
 ├── data/
 │   ├── safe/                     # dane zmyślone — W repo
 │   │   ├── instruction/          # syntetyczna dokumentacja: manifest.json + pliki .md
-│   │   └── golden/               # zestaw zapytań do niej
+│   │   ├── golden/               # zestaw zapytań do niej
+│   │   └── code/                 # zmyślona aplikacja: source/ i rules.json (p. 60)
 │   └── unsafe/                   # dane klientów (PII) — NIE w repo
 │       ├── db/                   # zrzuty bazy źródłowej
 │       ├── raw/                  # zgłoszenia źródłowe jak przyszły
 │       ├── parsed/               # sparsowane JSON-y (trwały artefakt, zasada 7)
 │       ├── golden/               # zestawy do ewaluacji: zgłoszenia, dystraktory
 │       ├── instruction/          # właściwa dokumentacja (p. 55)
-│       ├── code/                 # paczka kodu aplikacji z czystego checkoutu (p. 60)
+│       ├── code/                 # paczka kodu aplikacji: rules.json, manifest.json, repo/ (p. 60)
 │       └── docs/                 # raporty z pomiarów i dokumenty projektu
 ├── api/                          # folder = usługa z compose, nazwany tak samo
 │   ├── Dockerfile
@@ -901,31 +902,62 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — indeksacja i narzędzia powstają
 
 Trzeci materiał obok zgłoszeń i instrukcji: kod źródłowy Dokusa, czytany narzędziami agenta
 (p. 60–66). Ma pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają, przede wszystkim gdy
-zgłoszenie niesie komunikat albo kod błędu. Narzędzi jeszcze nie ma; niżej decyzje i liczby
-z rozpoznania 2026-10-06 na kopii roboczej gałęzi jednego klienta, do przeliczenia na czystym
-checkoucie (p. 60).
+zgłoszenie niesie komunikat albo kod błędu. Narzędzi jeszcze nie ma, paczka kodu jest (p. 60);
+niżej decyzje i liczby z 2026-10-06. Liczby bez dopisku „w paczce" pochodzą z rozpoznania na
+kopii roboczej gałęzi jednego klienta, a paczka powstała z innej gałęzi.
 
 - **Kod może wyjść do modelu zewnętrznego (decyzja 2026-10-06).** Nie przechodzi przez
   anonimizację: wynik narzędzia idzie do modelu wprost. Otwarte zostaje, którą gałąź indeksuje
   instancja: klienci mają własne gałęzie obok głównej, a odpowiedź z kodu opisuje tylko tę, którą
-  wczytano (p. 60).
-- **Narzędzia powstają na prawdziwym kodzie Dokusa, nie na zmyślonej mini-aplikacji (decyzja
-  2026-10-06).** Kodu nie ma w repo, więc testy na nim pomijają się bez paczki w `data/`;
-  zmyślone zostają dane atrap narzędzi i pliki tworzone w testach.
+  wczytano (p. 62).
+- **Są dwie paczki: prawdziwy kod Dokusa i zmyślona aplikacja (2026-10-06, wcześniej tylko
+  prawdziwy kod).** Paczka z Dokusa leży w `data/unsafe/code/` i na niej mierzy się skuteczność
+  (p. 61). Aplikacja syntetyczna leży w `data/safe/code/source/`: 29 plików w kształcie
+  Symfony 1, w tym samym zmyślonym świecie co syntetyczna dokumentacja i zgłoszenia atrap.
+  Pilnuje okablowania narzędzi bez danych klienta i ma wstawione celowo pułapki prawdziwego
+  kodu: komunikat zapisany sekwencjami, trzy brzmienia jednego komunikatu, komunikat składany
+  z części, tę samą nazwę akcji w trzech modułach, długi kontroler i pliki, które mają nie
+  wejść. Paczkę z niej buduje się tym samym skryptem przed testami; `repo/` i `manifest.json`
+  są poza commitem.
 - **PHP 7.4 na dwóch warstwach: Symfony 1 z Doctrine 1 (główna) i Symfony 2 (pomocnicza),
   z własnym frontendem JS.** Kod własny to ok. 7 tys. plików PHP (685 tys. linii; górna granica,
   bo w katalogach własnych leży kilka wklejonych bibliotek) i 576 plików JS (233 tys. linii).
-  Repozytorium to PlasticSCM, więc wersją paczki jest gałąź i numer changesetu.
-- **Paczka powstaje z czystego checkoutu, nie z katalogu programisty.** Kopia robocza trzyma
-  pliki z hasłami, klucze i logi, których w repozytorium nie ma. Biblioteki są w repozytorium
-  (ponad 630 tys. linii) i skrypt paczki je odcina. Klas generowanych `Base*` w checkoucie nie
-  ma; ich źródłem są schematy YAML.
+  Repozytorium to PlasticSCM, więc wersję kodu wyznacza gałąź i numer changesetu.
+- **Paczka powstaje z folderu roboczego programisty, według listy włączeń (decyzja 2026-10-06,
+  wcześniej: z czystego checkoutu).** `scripts/build_code_package.py` kopiuje z folderu
+  wejściowego do `repo/` w katalogu paczki to, co wymieniają reguły `rules.json`: rozszerzenia
+  (`php`, `js`, `twig`) w wymienionych folderach, pliki wskazane wprost (schematy Doctrine,
+  pliki `routing`) i wyjątki na biblioteki leżące w folderach własnych. Reguły leżą w katalogu
+  paczki, w `data/unsafe/`, bo opisują układ kodu klienta. Plik, którego reguły nie wymieniają,
+  nie wchodzi, więc YAML-e z hasłami, klucze, logi i pliki binarne odpadają bez wypisywania.
+  Z 35 tys. plików i 565 MB w `src` w paczce zostaje 11 416 plików i 1,18 mln linii, w tym 1401
+  generowanych klas `Base*`. Cena: skrypt kopiuje to, co leży na dysku, więc plik prywatny albo
+  lokalnie zmieniony wchodzi, jeśli pasuje do reguł, a metryczka nie zna gałęzi ani changesetu
+  (paczka z 2026-10-06 powstała z gałęzi zadaniowej pod `stage-gminy`, changeset 51962). Katalog
+  cache Symfony 2 leży w folderze z listy i trzeba go było wyłączyć: 305 plików PHP ze
+  skompilowanym kontenerem.
+- **Wpis, który nie zmienia wyniku, do reguł nie trafia (2026-10-06).** Nazwy plików z hasłami
+  w wyłączeniach niczego nie zmieniały, bo YAML i tak nie wchodzi, a taki bezpiecznik pilnowałby
+  pięciu nazw ze 187 pominiętych YAML-i. Efekt wpisu liczy się na plikach przed dopisaniem.
+- **Metryczka (`manifest.json`) ma trzy sekcje:** `package` (pliki, linie, rozszerzenia),
+  `changes` (co skrypt zmienił w treści) i `skipped` (pliki nie w UTF-8 oraz pliki z folderów
+  z listy, których reguły nie biorą). Po tej ostatniej liście widać, czego model nie dostaje.
+- **Przegląd paczki wykrywaczem sekretów (gitleaks, 2026-10-06): 8 tokenów JWT w komentarzu
+  jednego zadania technicznego; zostają w paczce świadomie.** Wśród 107 przypisań hasła, tokenu
+  albo klucza nie ma prawdziwej wartości: to nazwy ustawień, kolumn i klas. Wykrywacz nie
+  zobaczy hasła słownikowego, a reguły nie widzą sekretu wpisanego w kod, więc przegląd
+  powtarza się po zmianie reguł albo folderu wejściowego.
+- **Folder paczki jest montowany do `api` tylko do odczytu, w obu warstwach compose
+  (2026-10-06).** W dev wpis nakłada się na montowane do zapisu `./data`, w prod jest jedynym
+  montowaniem `api`. Narzędzia dostają ścieżki od modelu, więc kontener nie może mieć jak
+  zmienić paczki.
 - **Skrypt paczki rozkodowuje polskie litery zapisane jako `\uXXXX` — tylko w plikach JS i tylko
   litery.** Taki zapis ma 120 z 576 własnych plików JS: dosłowne szukanie „skomunikować" znalazło
   3 linie z 4, a pominięta leży w głównej obsłudze błędów frontendu. W PHP w pojedynczych
   cudzysłowach ten zapis jest dosłowny, a rozkodowany znak sterujący zepsułby składnię albo
   przesunął linie. Cena: kod w paczce nie jest znak w znak kodem z repozytorium; ścieżki i numery
-  linii zostają.
+  linii zostają. W paczce rozkodowanie zmieniło 456 linii w 116 plikach, a końce linii CRLF
+  zamienione na LF miało 6280 plików.
 - **Kod zostaje w folderze, bez bazy, a szuka w nim ripgrep (decyzja 2026-10-06).** Na 7424
   plikach (57 MB) dosłowne szukanie trwa 0,05 s, a czystym Pythonem 0,7 s; przy częstym słowie
   0,14 s wobec 3,3 s. Folder musi leżeć na dysku linuksowym: to samo szukanie w katalogu Windows
@@ -2202,6 +2234,11 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
 - Eksport zgłoszeń ze zrzutu do `data/unsafe/raw/`: `python scripts/export_raw_tickets.py export
   --module-id 116` (wymaga kontenera z zaimportowanym zrzutem; kontrola liczb wobec bazy na końcu
   przebiegu)
+- Paczka kodu aplikacji: `python scripts/build_code_package.py build <folder z kodem>
+  data/unsafe/code` (reguły z `rules.json` w katalogu paczki albo z `--rules`; zastępuje `repo/`
+  i `manifest.json`)
+- Paczka z aplikacji syntetycznej, budowana przed testami narzędzi kodu:
+  `python scripts/build_code_package.py build data/safe/code/source data/safe/code`
 
 **Pipeline danych (CLI `helpdesk`)**
 - Walidacja artefaktów: `helpdesk tickets validate data/unsafe/parsed/`
@@ -2290,8 +2327,9 @@ w p. 46.
 
 **Dev vs prod (kod):**
 - **Baza montuje kod z hosta** (bind-mount) — zmiany `.py` żywe bez rebuildu.
-- **Prod zdejmuje mount** — `docker-compose.prod.yml` kasuje wolumen przez `volumes: !reset []`
-  (uruchamiamy kod z obrazu, nie z hosta).
+- **Prod zdejmuje mount kodu** — `docker-compose.prod.yml` kasuje wolumeny embeddera przez
+  `volumes: !reset []`, a listę `api` zastępuje przez `!override` jednym wpisem: paczką kodu
+  aplikacji, tylko do odczytu (uruchamiamy kod z obrazu, nie z hosta).
 
 **Trwałość danych:**
 - **Wolumen Qdranta to wygoda, nie kopia zapasowa** — źródłem prawdy jest `data/unsafe/parsed/`
@@ -2323,7 +2361,8 @@ w p. 46.
   **weryfikuj `docker compose config`, nie `.env`**.
 - **Listy się SKLEJAJĄ, nie nadpisują** (`ports`, `volumes`) — warstwa nie „poprawi" wpisu
   z bazy, dostaniesz dwa. Zdjęcie: `!reset []` (Compose ≥ 2.24) — tak prod kasuje mount i tak
-  zdejmujesz stary port. Zmiana adresu nasłuchu: ENV **w bazie** (`${DOCKER_BIND_ADDR:-127.0.0.1}`).
+  zdejmujesz stary port; zastąpienie listy inną: `!override`. Zmiana adresu nasłuchu: ENV
+  **w bazie** (`${DOCKER_BIND_ADDR:-127.0.0.1}`).
 - **Prefiks `DOCKER_` = zmienna rozwiązywana przez `docker compose`, która NIE wchodzi do
   kontenera.** To jest cała umowa i jedyne kryterium: `DOCKER_*` interpoluje się w pliku compose
   i tam się kończy, więc **żaden `Settings` nie ma prawa jej deklarować**; wszystko bez tego
@@ -2728,8 +2767,18 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   bez wczytywania kodu do bazy, a narzędzia na folderze testuje się bez stacku. Cena: ścieżka
   podana przez model trafia do systemu plików i trzeba jej pilnować, a szukania z odmianą słów
   nie ma.
-- **Zmyślona mini-aplikacja jako paczka kodu** — narzędzia powstają od razu na prawdziwym kodzie
-  Dokusa. Cena: testy na kodzie pomijają się bez paczki w `data/`.
+- **Czysty checkout i kontrola plików wobec repozytorium** (sumy MD5 z PlasticSCM, dociąganie
+  zmienionych plików z serwera) — skrypt paczki kopiuje folder programisty według listy włączeń
+  i nie rozmawia z repozytorium. Cena: plik prywatny albo lokalnie zmieniony wchodzi, jeśli
+  pasuje do reguł, a metryczka nie zna gałęzi ani changesetu.
+- **Lista wyłączeń zamiast listy włączeń w regułach paczki kodu** — przepuszcza wszystko, czego
+  na niej nie ma, a w `src` jest ponad 40 typów plików.
+- **Wykrywanie i maskowanie sekretów w skrypcie paczki** — przegląd wykrywaczem zostaje ręczny,
+  po zbudowaniu paczki. Wraca, gdy przegląd znajdzie coś, czego nie da się wyłączyć jednym
+  wpisem w regułach.
+- **Paczka syntetyczna budowana w teście** — buduje się ją skryptem przed testami, a zbudowana
+  leży obok źródła, poza commitem. Cena: test narzędzia kodu bez zbudowanej paczki nie ma na
+  czym stanąć.
 - **Blokada źródła `code` w wariancie wymagającym źródeł** — zatrzymywałaby sprawę bez podobnych
   zgłoszeń i instrukcji, czyli tę, dla której narzędzia kodu powstają. Wraca w węższej postaci
   (liczy się tylko plik znaleziony dosłownym trafieniem), gdy pomiar pokaże odpowiedzi z luźno
@@ -2899,25 +2948,28 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   odpowiedź, poprawka, porażka i narzędzie spoza listy, które nie jest wykonywane; złośliwy zestaw
   reguł w grafach z regułami; bez osobnych plików testów na graf; reguły — „Warstwa grafów",
   „Prompty", „Testy".
-- [ ] **60. Paczka z kodu Dokusa** (p. 60–66 dopisane 2026-10-06, numery spoza kolejności) —
-  skrypt w `scripts/` buduje ją z czystego checkoutu do `data/unsafe/code/`: lista dozwolonych
-  katalogów i rozszerzeń, bez bibliotek, polskie litery z `\uXXXX` rozkodowane w plikach JS,
-  końce linii LF, metryczka z gałęzią, changesetem i liczbą zmienionych linii; jednorazowy
-  przegląd checkoutu wykrywaczem sekretów; folder montowany do `api` tylko do odczytu, także
-  w warstwie prod; do rozstrzygnięcia, którą gałąź indeksuje instancja. *Dlaczego:* biblioteki to
-  ponad 630 tys. linii obok niecałego miliona własnych, a dosłowne szukanie gubi komunikaty
-  zapisane sekwencjami (120 z 576 plików JS).
-- [ ] **61. Zestaw zapytań do kodu Dokusa** — w `data/unsafe/golden/`: komunikat albo kod błędu
-  i plik, w którym pada, osobno zapytania bez dosłownego tropu i zapytania bez odpowiedzi;
-  w zestawie komunikat zapisany sekwencjami, komunikat składany z części, akcja o powtarzającej
-  się nazwie i długi kontroler. *Dlaczego:* narzędzia powstają na prawdziwym kodzie, bez
-  zmyślonej mini-aplikacji, więc zestaw jest jedynym miejscem, które pilnuje, że znane pułapki
-  tego kodu są pokryte.
+- [x] **60. Paczka z kodu Dokusa** (2026-10-06) — `scripts/build_code_package.py` kopiuje pliki
+  z folderu roboczego według listy włączeń (`rules.json`), rozkodowuje polskie litery w JS,
+  zamienia końce linii i zapisuje metryczkę; paczka w `data/unsafe/code/` (11 416 plików),
+  montowana do `api` tylko do odczytu w obu warstwach compose; aplikacja syntetyczna
+  w `data/safe/code/`; przegląd wykrywaczem sekretów zrobiony; bez czystego checkoutu i bez
+  gałęzi w metryczce; reguły — „Kod aplikacji", „Konfiguracja i deploy".
+- [ ] **61. Zestaw zapytań do kodu Dokusa** (p. 60–66 dopisane 2026-10-06, numery spoza
+  kolejności) — w `data/unsafe/golden/`: komunikat albo kod błędu i plik, w którym pada, osobno
+  zapytania bez dosłownego tropu i zapytania bez odpowiedzi; w zestawie komunikat zapisany
+  sekwencjami, komunikat składany z części, akcja o powtarzającej się nazwie i długi kontroler;
+  osobny, mały zestaw do aplikacji syntetycznej w `data/safe/golden/`, dopisywany razem
+  z narzędziami. *Dlaczego:* skuteczność narzędzi mierzy się na prawdziwym kodzie, a aplikacja
+  syntetyczna pilnuje tylko okablowania, więc ten zestaw jest jedynym miejscem, które pilnuje,
+  że znane pułapki kodu Dokusa są pokryte.
 - [ ] **62. `find_code_text`** — fraza dosłowna albo słowa w jednej linii, ripgrep w obrazie
-  `api` w trybie dosłownym; oddaje ścieżkę i numer linii, bez treści, z limitem pozycji
-  i licznikiem pominiętych; opis każe szukać stałego fragmentu komunikatu, bez numerów i nazw.
-  *Dlaczego:* od niego zaczyna się sprawa z komunikatem albo kodem błędu, a częste słowo trafia
-  w dziesiątki tysięcy linii.
+  `api` w trybie dosłownym, z opcjonalnym zawężeniem do katalogu; oddaje ścieżkę i numer linii,
+  bez treści, z limitem pozycji i licznikiem pominiętych; opis każe szukać stałego fragmentu
+  komunikatu, bez numerów i nazw; ścieżka paczki jako zmienna w `Settings`; do rozstrzygnięcia,
+  którą gałąź indeksuje instancja i czy metryczka ma ją zapisywać. *Dlaczego:* od niego zaczyna się sprawa z komunikatem albo
+  kodem błędu, a częste słowo trafia w dziesiątki tysięcy linii; bez zawężenia ginie też rzadkie
+  trafienie wśród częstych: nazwa zdarzenia błędu stoi w 513 liniach w 177 plikach, a jego
+  rejestracja w dwóch.
 - [ ] **63. `read_code_file`** — plik albo zakres linii, z limitem linii na wywołanie
   i informacją o ucięciu; cytuje (`source` „code", `item_id` to ścieżka); ścieżka spoza paczki
   to błąd wracający do modelu. *Dlaczego:* po trafieniu trzeba zobaczyć, w jakiej klasie
@@ -2925,8 +2977,11 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
 - [ ] **64. `list_code_files`** — drzewo katalogu z opcjonalną głębokością, z limitem pozycji.
   *Dlaczego:* szukanie bez komunikatu i bez kodu błędu, po wskazówkach z opisu projektu.
 - [ ] **65. `describe_code`** — opis projektu w całości, raz na sprawę; szkic pisze model
-  z kodu, poprawia programista Dokusa, plik leży w paczce. *Dlaczego:* mówi, gdzie zacząć:
-  wejścia do aplikacji, droga od adresu do akcji i od zdarzenia JS do handlera.
+  z kodu, poprawia programista Dokusa, plik leży w paczce; opis nazywa wprost połączenia idące
+  przez napis, których mapa symboli nie zna (które zdarzenie obsługuje która funkcja).
+  *Dlaczego:* mówi, gdzie zacząć: wejścia do aplikacji, droga od adresu do akcji i od zdarzenia
+  JS do handlera; w sondzie z 2026-10-06 na komunikacie „Nie udało się skomunikować z serwerem"
+  przejście od zdarzenia błędu do funkcji, która je obsługuje, zajęło 6 z 10 wywołań.
 - [ ] **66. Mapa symboli i `read_code_symbol`** — mapa budowana komendą do pliku obok paczki,
   narzędziem wybranym po próbie na kodzie Dokusa (linia końca metody PHP, handlery JS
   definiowane przypisaniem); symbol wskazuje ścieżka z nazwą, przy kilku kandydatach narzędzie

@@ -1,0 +1,7 @@
+# Konfiguracja aplikacji. Plik zmyślony: hasło poniżej nie działa nigdzie.
+all:
+  edoreczenia:
+    adres_uslugi: https://edoreczenia.example.test/api
+    login:        urzad-testowy
+    haslo:        zmyslone-haslo-edoreczen
+    limit_zalacznika_mb: 12

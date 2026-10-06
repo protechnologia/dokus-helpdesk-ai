@@ -9,14 +9,15 @@ include:
 services:
 
   api:
-    # !reset (Compose >= 2.24) is the ONLY way to drop an inherited list entry: lists MERGE,
-    # so re-declaring `volumes` here would add a second mount rather than replace the first.
-    # Emptying it is the whole point of this layer — prod runs the code baked into the image,
-    # which is exactly the artifact we built and tested.
+    # Listy w compose się SKLEJAJĄ, więc zwykłe `volumes:` dołożyłoby wpis do tych z bazy.
+    # `!override` (Compose >= 2.24) zastępuje całą listę tą poniżej. Znika montowanie kodu
+    # z hosta, bo prod uruchamia kod z obrazu, czyli dokładnie to, co zbudowaliśmy
+    # i przetestowaliśmy. Znika też ./data: katalog artefaktów dostarcza na prod wdrożenie.
     #
-    # Note this also drops the ./data mount: on prod the artifact directory is supplied by the
-    # deployment (a real volume or a host path), not by the developer's checkout.
-    volumes: !reset []
+    # Zostaje jeden wpis: paczka kodu aplikacji dla narzędzi agenta (p. 60), tylko do odczytu.
+    # Nie da się jej wpiec w obraz, bo to dane klienta spoza repo.
+    volumes: !override
+      - ./data/unsafe/code:/code/data/unsafe/code:ro
     # No --reload: the reloader watches the filesystem and restarts the worker on every write,
     # which is a development convenience and a liability in production.
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

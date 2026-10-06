@@ -1,0 +1,21 @@
+{
+  "extensions": ["php", "js", "twig"],
+  "folders": [
+    "src/apps",
+    "src/lib",
+    "src/web/js"
+  ],
+  "files": [
+    "src/web/*.php",
+    "src/config/doctrine/schema_*.yml",
+    "src/apps/*/config/routing.yml"
+  ],
+  "excluded_folders": [
+    "vendor",
+    "_vendor",
+    "src/apps/frontend/cache"
+  ],
+  "excluded_files": [
+    "*.min.js"
+  ]
+}

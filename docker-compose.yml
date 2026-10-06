@@ -30,6 +30,10 @@ services:
       # Parsed tickets are the durable artifact (rule 7) and must survive `down -v`, so they
       # stay a host directory rather than a named volume.
       - ./data:/code/data
+      # Paczka kodu aplikacji dla narzędzi agenta (p. 60). Leży w ./data montowanym wyżej do
+      # zapisu, więc ten wpis nakłada na sam jej folder tryb tylko do odczytu: narzędzia kodu
+      # dostają ścieżki od modelu i nie mogą mieć jak niczego w paczce zmienić.
+      - ./data/unsafe/code:/code/data/unsafe/code:ro
     # Sześć wartości LLM niżej (BASE_URL, API_KEY i MODEL obu ról) interpoluje się do PUSTEGO
     # TEKSTU, dopóki dostawcą jest `fake` — celowo: są opcjonalne i wypełnia je dopiero prawdziwy
     # dostawca. Pusty tekst nie dociera do klienta, bo `_drop_blank_values` w Settings zamienia go

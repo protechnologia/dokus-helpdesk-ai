@@ -1,0 +1,8 @@
+# Połączenie z bazą. Plik zmyślony: hasło poniżej nie działa nigdzie.
+all:
+  doctrine:
+    class: sfDoctrineDatabase
+    param:
+      dsn:      pgsql:host=localhost;dbname=urzad
+      username: urzad
+      password: zmyslone-haslo-bazy

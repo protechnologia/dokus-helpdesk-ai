@@ -10,6 +10,10 @@
 # W data/safe/ leżą wyłącznie dane zmyślone; dane klientów trzymamy w data/unsafe/.
 data/*
 !data/safe/
+# Paczka kodu zbudowana z aplikacji syntetycznej: powstaje skryptem z data/safe/code/source/,
+# więc w repo jest tylko źródło i reguły.
+data/safe/code/repo/
+data/safe/code/manifest.json
 
 # --- Python ---
 .venv/
