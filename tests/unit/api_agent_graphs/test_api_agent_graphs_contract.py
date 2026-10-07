@@ -17,6 +17,7 @@ from app.agent_nodes.agent import FakeAgentNode
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
 from app.agent_nodes.run_tools import FakeRunToolsNode
+from app.agent_tools.code.quote_code.fake import FakeQuoteCodeTool
 from app.agent_tools.docs.find_docs_text.fake import FakeFindDocsTextTool
 from app.agent_tools.docs.find_docs_vector.fake import FakeFindDocsVectorTool
 from app.agent_tools.docs.list_docs.fake import FakeListDocsTool
@@ -67,6 +68,7 @@ AGENT_TOOLS = [
     FakeFindDocsVectorTool(),
     FakeFindDocsTextTool(),
     FakeReadDocsTool(),
+    FakeQuoteCodeTool(),
 ]
 
 # Limity wywołań narzędzi, jakie daje konfiguracja domyślna.

@@ -46,9 +46,10 @@ class TicketRequest(BaseModel):
 class SourceItem(BaseModel):
     """
     Description:
-    Jedno źródło odpowiedzi: z jakiego materiału pochodzi („tickets", „docs"), co to jest i kiedy
-    powstało. To materiał, który agent odczytał; powstaje z `cite()` narzędzi, nigdy z deklaracji
-    modelu (zasada 9).
+    Jedno źródło odpowiedzi: z jakiego materiału pochodzi („tickets", „docs", „code"), co to jest
+    i kiedy powstało. To zgłoszenie albo sekcja, które agent odczytał, albo fragment kodu, który
+    zacytował jako przyczynę; powstaje z `cite()` narzędzi, nigdy z deklaracji modelu (zasada 9).
+    Źródło z kodu ma w `item_id` ścieżkę pliku z zakresem linii i nie ma daty.
     """
 
     source:  str         = Field(examples=["tickets"])

@@ -4,15 +4,18 @@ Wszystko, co może wywołać pętla agenta. Wspólne kontrakty i `SourceRef` imp
 (`from app.agent_tools import KnowledgeSource`); to, co należy do jednego narzędzia — jego modele —
 z pakietu tego narzędzia (`from app.agent_tools.tickets.find_tickets_vector import FoundTicket`).
 
-Oba materiały idą dwustopniowo. Wyszukiwanie — `_vector` po znaczeniu (Qdrant), `_text` po
-dosłownym brzmieniu (Postgres) — oddaje identyfikatory: numery zgłoszeń albo opisy sekcji
-dokumentacji. Treść dają dopiero odczyty i tylko one cytują, więc na liście źródeł jest to, co
-model przeczytał. Wynik każdego narzędzia trafia do modelu jako JSON (`result_as_json()`).
+Zgłoszenia i dokumentacja idą dwustopniowo. Wyszukiwanie — `_vector` po znaczeniu (Qdrant),
+`_text` po dosłownym brzmieniu (Postgres) — oddaje identyfikatory: numery zgłoszeń albo opisy
+sekcji dokumentacji. Treść dają dopiero odczyty i tylko one cytują, więc na liście źródeł jest
+to, co model przeczytał. Kod aplikacji idzie inaczej: model przechodzi przez wiele więcej
+plików, niż potrzebuje do odpowiedzi, więc źródłem jest dopiero fragment, który wskazał jako
+przyczynę osobnym narzędziem (`quote_code`). Wynik każdego narzędzia trafia do modelu jako JSON
+(`result_as_json()`).
 
 Do czego:
 Dwa rodzaje narzędzi, rozdzielone kontraktem (patrz `base.py`):
-    * `KnowledgeSource` — odczyt: zwraca materiał, który odpowiedź może cytować, i sam mówi
-      który (`cite()`);
+    * `KnowledgeSource` — odczyt albo cytowanie kodu: z jego wyniku powstają źródła
+      odpowiedzi, a które, mówi samo narzędzie (`cite()`);
     * `AuxiliaryTool`   — wyszukiwanie i spis: zwraca wyłącznie tekst, więc jego wynik nigdy
       nie zostanie źródłem.
 
@@ -29,7 +32,8 @@ Trzy poziomy, na każdym `base.py` z tym, co wspólne poziom niżej:
     agent_tools/<materiał>/<narzędzie>/   narzędzie: `tool.py`, `fake.py`, `base.py`, `models.py`
                                     i `description.md`
 
-Materiały są dwa — `tickets/` i `docs/` — i nazywają się tak jak `SourceRef.source`. W katalogu
+Materiały są trzy — `tickets/`, `docs/` i `code/` — i nazywają się tak jak `SourceRef.source`.
+W katalogu
 narzędzia: implementacja (`tool.py`), jej atrapa (`fake.py`), ich część wspólna (`base.py`: nazwa
 i — w odczytach — lista źródeł) i `models.py` z własnym zapytaniem i wynikiem — bez wspólnej
 bazy — oraz `errors.py`, gdy narzędzie ma własne błędy do zgłoszenia. Taki błąd dziedziczy po
@@ -49,12 +53,13 @@ narzędzie i co ono oddaje. Po co wyniki w danej funkcji, mówi prompt grafu.
 | `find_docs_vector`    | pomocnicze    | `text`                | opisy sekcji z podobieństwem     |
 | `find_docs_text`      | pomocnicze    | `exact`, `words`      | opisy sekcji, czym znaleziono    |
 | `read_docs`           | źródło wiedzy | `section_ids`         | treść sekcji; cytuje             |
+| `quote_code`          | źródło wiedzy | ścieżka, linie, rola  | potwierdzenie; cytuje przyczynę  |
 
 Każde ma narzędzie właściwe i atrapę. Wyszukiwanie po znaczeniu i karty stoją na Qdrancie,
-reszta na Postgresie. Tabela zgłoszeń w Postgresie dostanie prawdziwe wątki po anonimizacji
-(p. 19) i masowym imporcie (p. 31), więc `find_tickets_text` i `read_tickets_thread` są
-sprawdzone na zmyślonych. Narzędzia dokumentacji są opcjonalne: bez dokumentacji nie trafiają do
-rejestru.
+pozostałe narzędzia zgłoszeń i dokumentacji na Postgresie, a `quote_code` na paczce kodu na
+dysku. Tabela zgłoszeń w Postgresie dostanie prawdziwe wątki po anonimizacji (p. 19) i masowym
+imporcie (p. 31), więc `find_tickets_text` i `read_tickets_thread` są sprawdzone na zmyślonych.
+Narzędzia dokumentacji są opcjonalne: bez dokumentacji nie trafiają do rejestru.
 """
 
 from app.agent_tools.base import AgentTool, AuxiliaryTool, KnowledgeSource

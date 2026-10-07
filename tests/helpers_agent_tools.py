@@ -4,7 +4,7 @@ Narzędzia agenta dla testów węzłów, grafów i tras.
 
 | helper                                     | co oddaje                                          |
 |--------------------------------------------|----------------------------------------------------|
-| `fake_agent_tools()`                       | atrapy wszystkich ośmiu narzędzi                   |
+| `fake_agent_tools()`                       | atrapy wszystkich narzędzi agenta                  |
 | `find_tickets_vector_with_dead_embedder()` | narzędzie właściwe, którego embedder nie odpowiada |
 
 O czym pamiętać przy zmianach:
@@ -18,6 +18,7 @@ O czym pamiętać przy zmianach:
 import httpx
 
 from app.agent_tools import AgentTool
+from app.agent_tools.code.quote_code.fake import FakeQuoteCodeTool
 from app.agent_tools.docs.find_docs_text.fake import FakeFindDocsTextTool
 from app.agent_tools.docs.find_docs_vector.fake import FakeFindDocsVectorTool
 from app.agent_tools.docs.list_docs.fake import FakeListDocsTool
@@ -38,7 +39,7 @@ VECTOR_SIZE = 4
 def fake_agent_tools() -> list[AgentTool]:
     """
     Description:
-    Atrapy wszystkich ośmiu narzędzi agenta, w kolejności z `TOOL_NAMES` grafów — te same, które
+    Atrapy wszystkich narzędzi agenta, w kolejności z `TOOL_NAMES` grafów — te same, które
     model widziałby w produkcie, tylko na zmyślonym materiale. Świeże na każde wywołanie, bo
     zapisują zapytania, o które je pytano.
 
@@ -57,6 +58,7 @@ def fake_agent_tools() -> list[AgentTool]:
         FakeFindDocsVectorTool(),
         FakeFindDocsTextTool(),
         FakeReadDocsTool(),
+        FakeQuoteCodeTool(),
     ]
 
     return tools

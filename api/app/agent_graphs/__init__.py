@@ -22,19 +22,20 @@ run_tools → respond, gdzie pętlę ucina limit tur modelu (`AGENT_MAX_ITERATIO
 się wywołaniem `respond_<graf>`; odpowiedź, której nie da się przyjąć, `respond` odsyła modelowi
 do poprawki, raz (respond → agent):
 
-| graf                | narzędzia                 | wynik          |
-|---------------------|---------------------------|----------------|
-| `gate_close`        | —                         | `Verdict`      |
-| `gate_reply`        | —                         | `Verdict`      |
-| `search`            | zgłoszenia i dokumentacja | `SearchDone`   |
-| `parse_ticket`      | —                         | `ParsedTicket` |
-| `suggest_questions` | zgłoszenia i dokumentacja | `Proposal`     |
-| `suggest_solution`  | zgłoszenia i dokumentacja | `Proposal`     |
-| `suggest_handoff`   | —                         | `Proposal`     |
-| `polish`            | —                         | `PolishedText` |
+| graf                | narzędzia                      | wynik          |
+|---------------------|--------------------------------|----------------|
+| `gate_close`        | —                              | `Verdict`      |
+| `gate_reply`        | —                              | `Verdict`      |
+| `search`            | zgłoszenia, dokumentacja i kod | `SearchDone`   |
+| `parse_ticket`      | —                              | `ParsedTicket` |
+| `suggest_questions` | zgłoszenia, dokumentacja i kod | `Proposal`     |
+| `suggest_solution`  | zgłoszenia, dokumentacja i kod | `Proposal`     |
+| `suggest_handoff`   | —                              | `Proposal`     |
+| `polish`            | —                              | `PolishedText` |
 
-„Zgłoszenia i dokumentacja" to wszystkie osiem narzędzi z `agent_tools/`: dwa wyszukiwania i dwa
-odczyty zgłoszeń oraz spis treści, dwa wyszukiwania i odczyt dokumentacji.
+„Zgłoszenia, dokumentacja i kod" to wszystkie narzędzia z `agent_tools/`: dwa wyszukiwania i dwa
+odczyty zgłoszeń, spis treści, dwa wyszukiwania i odczyt dokumentacji oraz cytowanie fragmentu
+kodu aplikacji. Z narzędzi kodu jest na razie samo cytowanie; szukanie i odczyt dojdą osobno.
 """
 
 import langsmith

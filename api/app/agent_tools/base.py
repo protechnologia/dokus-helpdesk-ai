@@ -139,16 +139,19 @@ def label_matches(
 class KnowledgeSource(ABC):
     """
     Description:
-    Narzędzie, które agent woła, żeby przeczytać materiał, z którego może powstać odpowiedź.
+    Narzędzie, które agent woła, żeby przeczytać materiał, z którego może powstać odpowiedź,
+    albo wskazać w nim miejsce, na którym odpowiedź stoi.
 
     Do czego:
     Pierwszy z dwóch rodzajów narzędzi agenta (drugi to `AuxiliaryTool`). Wyróżnia go to, że jego
-    wyniki stają się ŹRÓDŁAMI odpowiedzi — które, mówi `cite()`. Źródłami są wyłącznie odczyty
-    (`read_tickets_card`, `read_tickets_thread`, `read_docs`): na listę źródeł trafia to, co model
-    przeczytał, a nie to, co tylko znalazł. Nowe źródło to nowy katalog w folderze swojego
-    materiału (`app/agent_tools/tickets/`, `app/agent_tools/docs/`): implementacja, jej atrapa
-    i `models.py` z własnym zapytaniem i wynikiem. Źródło woła węzeł `run_tools`, więc ten plik
-    nie wie nic o LangGraphie ani LangChainie.
+    wyniki stają się ŹRÓDŁAMI odpowiedzi — które, mówi `cite()`. W zgłoszeniach i dokumentacji
+    źródłami są odczyty (`read_tickets_card`, `read_tickets_thread`, `read_docs`): na listę źródeł
+    trafia to, co model przeczytał, a nie to, co tylko znalazł. W kodzie aplikacji źródłem jest
+    fragment, który model zacytował jako przyczynę (`quote_code`), a nie każdy odczytany plik.
+    Nowe źródło to nowy katalog w folderze swojego materiału (`app/agent_tools/tickets/`,
+    `app/agent_tools/docs/`, `app/agent_tools/code/`): implementacja, jej atrapa i `models.py`
+    z własnym zapytaniem i wynikiem. Źródło woła węzeł `run_tools`, więc ten plik nie wie nic
+    o LangGraphie ani LangChainie.
 
     Flow:
         1. Agent woła `search()` z argumentami zgodnymi z `query_model` — identyfikatorami, które
@@ -170,8 +173,9 @@ class KnowledgeSource(ABC):
     # Opis dla modelu: jak pytać narzędzie i co ono oddaje. Ten sam w każdym grafie.
     description: ClassVar[str]
 
-    # Nazwa MATERIAŁU („tickets", „docs"); trafia do `SourceRef.source`. Narzędzia szukające w tym
-    # samym materiale różnymi drogami mają ją wspólną, więc to samo zgłoszenie jest źródłem raz.
+    # Nazwa MATERIAŁU („tickets", „docs", „code"); trafia do `SourceRef.source`. Narzędzia
+    # czytające ten sam materiał różnymi drogami mają ją wspólną, więc to samo zgłoszenie jest
+    # źródłem raz.
     source: ClassVar[str]
 
     # Klasa zapytania: graf robi z niej schemat argumentów dla modelu, `run_tools` nią je waliduje.
@@ -218,8 +222,9 @@ class KnowledgeSource(ABC):
     ) -> list[SourceRef]:
         """
         Description:
-        Wymienia, co z wyniku odpowiedź może zacytować — jeden wpis na każdy element, który
-        model zobaczył w `render_for_model()`, z tytułem, po którym człowiek rozpozna źródło.
+        Wymienia, co z wyniku odpowiedź może zacytować — w odczycie jeden wpis na każdy element,
+        który model zobaczył w `render_for_model()`, z tytułem, po którym człowiek rozpozna
+        źródło. Lista może być pusta: cytowanie kodu w roli „wykluczone" źródła nie tworzy.
         Lista źródeł powstaje stąd, nigdy z tego, co model deklaruje, że wykorzystał.
 
         Example args:

@@ -38,6 +38,7 @@ TOOL_NAMES: tuple[str, ...] = (
     "find_docs_vector",     # sekcje dokumentacji po znaczeniu
     "find_docs_text",       # sekcje dokumentacji po dosłownym brzmieniu
     "read_docs",            # treść sekcji po identyfikatorach — cytuje
+    "quote_code",           # fragment kodu aplikacji — cytuje tylko wskazaną przyczynę
 )
 
 # Wariant wymaga trafień: bez źródeł węzeł `respond` nie odda propozycji (zasada 9).

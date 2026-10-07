@@ -15,6 +15,7 @@ from app.agent_nodes.agent import tool_call_turn
 from app.agent_nodes.respond import RespondError
 from app.agent_tools import AgentTool
 from app.agent_tools.base import is_error_json
+from app.agent_tools.code.fake_code import ERRORS_PATH, GENERATOR_PATH
 from app.config import Settings
 from app.core_model.graphs.verdict import Verdict
 from app.engine_anonymization import FakeAnonymizer
@@ -394,6 +395,48 @@ async def test_a_solution_without_read_sources_ends_without_a_proposal(
     assert final.respond_retries == 0
     assert "brak źródeł" in final.log[-1].message
     assert len(llm.turn_calls)   == len(before_the_answer) + 1
+
+
+async def test_a_solution_can_stand_on_a_quoted_cause_in_the_code_alone() -> None:
+    """Sprawdza, czy wariant z rozwiązaniem oddaje propozycję, gdy jedynym źródłem jest fragment
+    kodu zacytowany jako przyczyna: żadnego zgłoszenia ani sekcji agent nie odczytał, a lista
+    źródeł ma jeden wpis z materiałem „code".
+
+    Wyłapuje wariant, który nie liczy kodu jako źródła: sprawa bez podobnych zgłoszeń i bez
+    instrukcji, czyli ta, dla której narzędzia kodu powstają, kończyłaby zawsze bez propozycji."""
+    answer, output = await expected_answer(suggest_solution)
+    cause          = {"path": GENERATOR_PATH, "from_line": 8, "to_line": 10, "role": "cause"}
+    llm            = FakeLLMClient(turns=[
+        tool_call_turn("quote_code", cause, call_id="call_quote"),
+        answer,
+    ])
+
+    final = await run_graph(real_graph(suggest_solution, llm), suggest_solution.example_state())
+
+    assert final.output                       == output
+    assert [ref.key for ref in final.sources] == [f"code:{GENERATOR_PATH}:8-10"]
+
+
+async def test_a_solution_with_only_excluded_code_ends_without_a_proposal() -> None:
+    """Sprawdza, czy wariant z rozwiązaniem nie oddaje propozycji, gdy agent zacytował kod
+    wyłącznie jako miejsce wykluczone: lista źródeł jest pusta, przebieg kończy się bez wyniku
+    i bez poprawki, z wpisem o braku źródeł w dzienniku.
+
+    Wyłapuje rozwiązanie, które wychodzi do wdrożeniowca jako oparte na kodzie, choć model sam
+    napisał, że sprawdzone miejsce przyczyną nie jest."""
+    answer, _ = await expected_answer(suggest_solution)
+    excluded  = {"path": ERRORS_PATH, "from_line": 7, "to_line": 7, "role": "excluded"}
+    llm       = FakeLLMClient(turns=[
+        tool_call_turn("quote_code", excluded, call_id="call_quote"),
+        answer,
+    ])
+
+    final = await run_graph(real_graph(suggest_solution, llm), suggest_solution.example_state())
+
+    assert final.output          is None
+    assert final.sources         == []
+    assert final.respond_retries == 0
+    assert "brak źródeł" in final.log[-1].message
 
 
 async def test_the_card_gets_its_identity_from_the_graph() -> None:

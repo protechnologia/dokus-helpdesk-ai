@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -118,6 +119,13 @@ class Settings(BaseSettings):
     postgres_password:        str | None = None         # np. "helpdesk"
     postgres_timeout_seconds: float      = 30.0         # sekundy: łączenie i każde zapytanie
 
+    # --- kod aplikacji: paczka dla narzędzi agenta ---
+    # Katalog paczki zbudowanej przez `scripts/build_code_package.py` (kod w `repo/`, obok
+    # `manifest.json`), po stronie kontenera. Montuje go compose, tylko do odczytu; zmiana tej
+    # wartości montowania nie przestawia. Nie jest sprawdzany przy starcie: brak paczki wychodzi
+    # przy pierwszym użyciu narzędzia kodu.
+    code_package_dir: Path = Path("/code/data/unsafe/code")
+
     # --- retrieval: tuning, NOT business logic ---
     # These two are knobs a deployment turns; the rules that read them are not. Scoring the hits
     # and mapping a score onto a suggested variant stay in code, because that is a judgement about
@@ -166,6 +174,8 @@ class Settings(BaseSettings):
     agent_max_calls_find_docs_vector:    int = Field(default=5, ge=1)
     agent_max_calls_find_docs_text:      int = Field(default=5, ge=1)
     agent_max_calls_read_docs:           int = Field(default=3, ge=1)
+    # Cytowanie kodu: jedno wywołanie to jeden fragment, więc limit jest liczbą cytowań w sprawie.
+    agent_max_calls_quote_code:          int = Field(default=5, ge=1)
 
     # --- agent: limit tur modelu w jednym przebiegu grafu ---
     # Ile razy model może odpowiedzieć przy jednej sprawie w grafie z narzędziami. Gdy w ostatniej

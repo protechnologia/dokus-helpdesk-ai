@@ -1,7 +1,8 @@
 """
 Description:
-Buduje narzędzia agenta na prawdziwych bazach, z konfiguracji: jeden klient embeddera, jeden
-Qdranta i jeden Postgresa, a na nich osiem narzędzi.
+Buduje narzędzia agenta na prawdziwych zależnościach, z konfiguracji: jeden klient embeddera,
+jeden Qdranta i jeden Postgresa, a na nich osiem narzędzi, oraz paczka kodu aplikacji na dysku
+z narzędziem, które ją cytuje.
 
 | narzędzie             | na czym stoi                                         |
 |-----------------------|------------------------------------------------------|
@@ -13,6 +14,7 @@ Qdranta i jeden Postgresa, a na nich osiem narzędzi.
 | `find_docs_vector`    | embedder i kolekcja `QDRANT_DOCS_COLLECTION`         |
 | `find_docs_text`      | tabela dokumentacji w Postgresie                     |
 | `read_docs`           | tabela dokumentacji w Postgresie                     |
+| `quote_code`          | paczka kodu aplikacji na dysku (`CODE_PACKAGE_DIR`)  |
 
 Do czego:
 Fabryka grafów (`agent_graphs/factory.py`) bierze stąd narzędzia, gdy model generujący nie jest
@@ -23,16 +25,18 @@ O czym pamiętać przy zmianach:
 
 - Narzędzia buduje się raz na proces, nie na żądanie. Postgres ładuje słownik w każdej sesji
   (około 0,6 s), więc klient musi trzymać pulę połączeń między żądaniami.
-- Budowa nie łączy się z niczym — połączenia powstają przy pierwszym użyciu narzędzia.
+- Budowa nie łączy się z niczym i nie dotyka dysku — połączenia powstają przy pierwszym użyciu
+  narzędzia, a brak paczki kodu wychodzi przy pierwszym cytowaniu.
 - Kolejność listy jest kolejnością `TOOL_NAMES` grafów. Model dostaje definicje narzędzi w tej
   kolejności w każdej turze, a stały początek żądania to warunek cache promptu.
 - Kto zbudował narzędzia, ten je zamyka: `aclose()` każdego z nich. Klienci są wspólni, więc
   zamykają się po kilka razy; powtórne zamknięcie nic nie robi.
-- Powstają wszystkie osiem. Czy instancja bez dokumentacji ma pomijać jej narzędzia, rozstrzyga
+- Powstają wszystkie. Czy instancja bez dokumentacji ma pomijać jej narzędzia, rozstrzyga
   p. 15 (CLAUDE.md -> „Plan").
 """
 
 from app.agent_tools.base import AgentTool
+from app.agent_tools.code.quote_code import QuoteCodeTool
 from app.agent_tools.docs.find_docs_text import FindDocsTextTool
 from app.agent_tools.docs.find_docs_vector import FindDocsVectorTool
 from app.agent_tools.docs.list_docs import ListDocsTool
@@ -42,6 +46,7 @@ from app.agent_tools.tickets.find_tickets_vector import FindTicketsVectorTool
 from app.agent_tools.tickets.read_tickets_card import ReadTicketsCardTool
 from app.agent_tools.tickets.read_tickets_thread import ReadTicketsThreadTool
 from app.config import Settings
+from app.core_service.loader_code_package import CodePackage
 from app.core_service.loader_dict_resolution import get_resolution_classes
 from app.db_postgres import DocsTable, PostgresClient, TicketsTable
 from app.db_qdrant import DocsCollection, QdrantClient, TicketsCollection
@@ -53,8 +58,8 @@ def build_agent_tools(
 ) -> list[AgentTool]:
     """
     Description:
-    Buduje wszystkie narzędzia agenta na klientach z konfiguracji, w kolejności `TOOL_NAMES`
-    grafów. Nie łączy się z niczym — połączenia powstają przy pierwszym użyciu.
+    Buduje wszystkie narzędzia agenta na klientach i paczce kodu z konfiguracji, w kolejności
+    `TOOL_NAMES` grafów. Nie łączy się z niczym — połączenia powstają przy pierwszym użyciu.
 
     Example args:
         settings=Settings()
@@ -62,7 +67,7 @@ def build_agent_tools(
     Example result:
         [FindTicketsVectorTool(…), FindTicketsTextTool(…), ReadTicketsCardTool(…),
          ReadTicketsThreadTool(…), ListDocsTool(…), FindDocsVectorTool(…), FindDocsTextTool(…),
-         ReadDocsTool(…)]
+         ReadDocsTool(…), QuoteCodeTool(…)]
 
     Raises:
         EmbeddingConfigError: pusty adres embeddera
@@ -101,6 +106,9 @@ def build_agent_tools(
     tickets_threads = TicketsTable(postgres)
     docs_sections   = DocsTable(postgres)
 
+    # --- kod aplikacji: folder paczki, bez bazy ---
+    code = CodePackage(settings.code_package_dir)
+
     tools: list[AgentTool] = [
         FindTicketsVectorTool(
             embedder  = embedder,
@@ -120,6 +128,7 @@ def build_agent_tools(
         ),
         FindDocsTextTool(docs=docs_sections, limit=settings.rag_top_k),
         ReadDocsTool(docs=docs_sections),
+        QuoteCodeTool(package=code),
     ]
 
     return tools

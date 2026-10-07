@@ -13,6 +13,8 @@ from app.agent_nodes.respond import FakeRespondNode
 from app.agent_nodes.run_tools import RunToolsNode
 from app.agent_tools import AgentTool
 from app.agent_tools.base import is_error_json
+from app.agent_tools.code.fake_code import ERRORS_PATH, GENERATOR_PATH
+from app.agent_tools.code.quote_code.fake import FakeQuoteCodeTool
 from app.agent_tools.docs.find_docs_text.fake import FakeFindDocsTextTool
 from app.agent_tools.docs.find_docs_vector.fake import FakeFindDocsVectorTool
 from app.agent_tools.docs.list_docs.fake import FakeListDocsTool
@@ -24,7 +26,7 @@ from app.agent_tools.tickets.read_tickets_thread.fake import FakeReadTicketsThre
 from app.config import Settings
 from app.engine_anonymization import FakeAnonymizer
 from app.engine_embedding import EmbeddingError
-from app.engine_llm import ChatMessage, FakeLLMClient
+from app.engine_llm import ChatMessage, FakeLLMClient, ToolCall
 from tests.helpers_agent_tools import find_tickets_vector_with_dead_embedder
 
 # Prawdziwy węzeł `run_tools` wpięty w grafy z pętlą i uruchomiony przez LangGraph, razem
@@ -59,7 +61,7 @@ def name_of(
 def fake_tools() -> list[AgentTool]:
     """
     Description:
-    Atrapy wszystkich ośmiu narzędzi agenta, w kolejności z `TOOL_NAMES` grafów. Świeże na każdy
+    Atrapy wszystkich narzędzi agenta, w kolejności z `TOOL_NAMES` grafów. Świeże na każdy
     graf, bo zapisują zapytania, o które je pytano.
 
     Example args:
@@ -77,6 +79,7 @@ def fake_tools() -> list[AgentTool]:
         FakeFindDocsVectorTool(),
         FakeFindDocsTextTool(),
         FakeReadDocsTool(),
+        FakeQuoteCodeTool(),
     ]
 
     return tools
@@ -209,6 +212,39 @@ async def test_a_ticket_read_twice_is_one_source() -> None:
 
     assert [ref.key for ref in final.sources]   == ["tickets:90001"]
     assert [ref.title for ref in final.sources] == ["Nie przychodzą przesyłki z e-Doręczeń"]
+
+
+@pytest.mark.parametrize("graph", LOOP_GRAPHS, ids=name_of)
+async def test_of_the_quoted_code_only_the_cause_is_a_source(graph: ModuleType) -> None:
+    """Sprawdza, czy w każdym grafie z narzędziami wiedzy z dwóch cytowań kodu zgłoszonych w jednej
+    turze — przyczyny i miejsca wykluczonego — na listę źródeł trafia tylko przyczyna, z kluczem
+    ze ścieżki i zakresu linii. Model dostaje potwierdzenie obu cytowań.
+
+    Wyłapuje graf, w którym źródłem staje się też miejsce wykluczone albo cytowanie w ogóle nie
+    dociera do listy źródeł: odpowiedź powoływałaby się na kod, który model odrzucił, albo
+    wracała bez źródła mimo wskazanej przyczyny."""
+    cause    = {"path": GENERATOR_PATH, "from_line": 8, "to_line": 10, "role": "cause"}
+    excluded = {"path": ERRORS_PATH, "from_line": 7, "to_line": 7, "role": "excluded"}
+    quotes   = ChatMessage(
+        role       = "assistant",
+        tool_calls = [
+            ToolCall(call_id="call_1", name="quote_code", arguments=cause),
+            ToolCall(call_id="call_2", name="quote_code", arguments=excluded),
+        ],
+    )
+    llm = FakeLLMClient(turns=[
+        quotes,
+        tool_call_turn(graph.RESPOND_TOOL_NAME, {}, call_id="call_3"),
+    ])
+
+    final   = await run_graph(await loop_graph(graph, llm), graph.example_state())
+    results = [json.loads(text) for text in tool_results(final.messages)]
+
+    assert [ref.key for ref in final.sources] == [f"code:{GENERATOR_PATH}:8-10"]
+    assert [result["role"] for result in results] == ["cause", "excluded"]
+    assert [entry.message for entry in final.log if entry.node == "run_tools"] == [
+        "wywołania: quote_code, quote_code; źródła: 1",
+    ]
 
 
 async def test_after_an_error_the_model_gets_another_turn() -> None:

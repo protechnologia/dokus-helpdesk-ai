@@ -20,7 +20,7 @@ class SourceRef(BaseModel):
     """
     Description:
     Jeden wpis na liście źródeł, które cytuje odpowiedź: z jakiego materiału pochodzi („tickets",
-    „docs"), co to jest i kiedy powstało.
+    „docs", „code"), co to jest i kiedy powstało.
 
     Do czego:
     JEDYNY model wspólny dla wszystkich narzędzi agenta (obok stoją tylko dwa proste typy
@@ -40,15 +40,18 @@ class SourceRef(BaseModel):
     (`model_dump()` po cichu gubi resztę, sprawdzone na Pydanticu 2.10).
 
     `title` to jedna linia, po której człowiek rozpozna źródło — `problem` karty, temat wątku,
-    nazwa i wersja dokumentu — więc listę źródeł da się czytać bez otwierania czegokolwiek. Przy
+    nazwa i wersja dokumentu, ścieżka pliku z zakresem linii — więc listę źródeł da się czytać
+    bez otwierania czegokolwiek. Przy
     zgłoszeniu wystarczyłoby samo id (helpdesk otworzy je we własnej bazie), ale nie przy
     fragmencie dokumentacji, którego helpdesk nie ma. Pełnej treści świadomie tu nie ma: model
     przeczytał ją już jako tekst, a jej kopia niosłaby każde źródło dwa razy przez stan grafu.
-    `date` jest zawsze, bo od niej zależą dezaktualizacja, sprzeczności i sezonowość (CLAUDE.md ->
-    „Twarde reguły promptu generacji").
+    `date` niesie każde zgłoszenie i każda sekcja dokumentacji, bo od niej zależą dezaktualizacja,
+    sprzeczności i sezonowość (CLAUDE.md -> „Twarde reguły promptu generacji"). Fragment kodu
+    daty nie ma: jego wersję wyznacza gałąź, z której zbudowano paczkę.
 
-    Podobieństwa tu nie ma: źródłem jest to, co model odczytał po identyfikatorze, a odczyt nie
-    zna podobieństwa. Widzi je tylko model, w wyniku wyszukiwania.
+    Podobieństwa tu nie ma: źródłem jest to, co model odczytał po identyfikatorze albo zacytował
+    z kodu, a ani odczyt, ani cytowanie nie zna podobieństwa. Widzi je tylko model, w wyniku
+    wyszukiwania.
     """
 
     model_config = ConfigDict(extra="forbid")

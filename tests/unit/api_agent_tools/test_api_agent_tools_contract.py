@@ -147,8 +147,8 @@ def test_every_tool_package_brings_a_tool() -> None:
 
 @pytest.mark.parametrize("source", SOURCES, ids=lambda cls: cls.__name__)
 def test_every_source_declares_name_and_query_model(source: type[KnowledgeSource]) -> None:
-    """Sprawdza, czy każde źródło wiedzy, czyli narzędzie odczytu, ma niepustą nazwę (`name`)
-    i klasę zapytania (`query_model`) będącą modelem Pydantica.
+    """Sprawdza, czy każde źródło wiedzy, czyli narzędzie odczytu albo cytowania kodu, ma niepustą
+    nazwę (`name`) i klasę zapytania (`query_model`) będącą modelem Pydantica.
 
     Wyłapuje źródło bez jednego z tych pól: `ABC` pilnuje tylko metod, a bez nazwy i klasy zapytania
     graf nie zbuduje definicji narzędzia dla modelu."""
@@ -183,8 +183,8 @@ def test_every_description_has_the_same_four_sections(tool: type) -> None:
     """Sprawdza, czy opis każdego narzędzia ma dokładnie cztery nagłówki, zawsze w tej kolejności:
     „Do czego służy", „Jak wywoływać", „Co zwraca" i „Zasady".
 
-    Wyłapuje opis ułożony inaczej: model czyta osiem opisów naraz i ma w każdym znaleźć argumenty,
-    wynik i zasady w tym samym miejscu."""
+    Wyłapuje opis ułożony inaczej: model czyta wszystkie opisy naraz i ma w każdym znaleźć
+    argumenty, wynik i zasady w tym samym miejscu."""
     headings = [line for line in tool.description.splitlines() if line.startswith("#")]
 
     assert headings == DESCRIPTION_SECTIONS
@@ -289,7 +289,7 @@ def test_every_tool_has_a_call_limit_in_the_configuration() -> None:
 
 def test_some_tool_brings_its_own_errors() -> None:
     """Sprawdza, czy zbieranie błędów własnych narzędzi cokolwiek znajduje: dziś mają je odczyt
-    wątku i odczyt sekcji dokumentacji.
+    wątku, odczyt sekcji dokumentacji i cytowanie kodu.
 
     Wyłapuje zbieranie, które po zmianie układu katalogów nie widzi żadnego modułu `errors.py`:
     test niżej przechodziłby wtedy na pustej liście i niczego nie sprawdzał."""

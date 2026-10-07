@@ -11,7 +11,7 @@ SETTINGS = Settings(_env_file=None, postgres_password="helpdesk")
 
 
 async def test_the_factory_builds_every_tool_in_the_order_of_the_graphs() -> None:
-    """Sprawdza, czy fabryka narzędzi buduje z konfiguracji wszystkie osiem narzędzi właściwych,
+    """Sprawdza, czy fabryka narzędzi buduje z konfiguracji wszystkie narzędzia właściwe,
     w tej samej kolejności, w jakiej wymieniają je grafy z narzędziami wiedzy.
 
     Wyłapuje narzędzie pominięte przy budowie albo zastąpione atrapą oraz zmienioną kolejność:
