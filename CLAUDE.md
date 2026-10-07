@@ -100,7 +100,7 @@ z deklaracji modelu, a wariant wymagający źródeł bez źródeł nie oddaje pr
 jest człowiek: dostaje propozycję albo werdykt ze źródłami i sam decyduje.
 
 **Rozwój to dokładanie narzędzi.** Narzędzie jest katalogiem z kontraktem, więc kolejne źródło
-wiedzy nie zmienia grafów ani węzłów. Następne jest czytanie kodu aplikacji (p. 60–66): pięć
+wiedzy nie zmienia grafów ani węzłów. Następne jest czytanie kodu aplikacji (p. 60–67): sześć
 narzędzi tylko do odczytu, które mają pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają,
 przede wszystkim gdy zgłoszenie niesie komunikat albo kod błędu. Kandydat bez decyzji (p. 58):
 dostęp do instancji testowej, na której agent sprawdzi opisany objaw. Byłoby to pierwsze
@@ -901,10 +901,11 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — indeksacja i narzędzia powstają
 ### Kod aplikacji
 
 Trzeci materiał obok zgłoszeń i instrukcji: kod źródłowy Dokusa, czytany narzędziami agenta
-(p. 60–66). Ma pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają, przede wszystkim gdy
-zgłoszenie niesie komunikat albo kod błędu. Narzędzi jeszcze nie ma, paczka kodu jest (p. 60);
-niżej decyzje i liczby z 2026-10-06. Liczby bez dopisku „w paczce" pochodzą z rozpoznania na
-kopii roboczej gałęzi jednego klienta, a paczka powstała z innej gałęzi.
+(p. 60–67). Ma pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają, przede wszystkim gdy
+zgłoszenie niesie komunikat albo kod błędu. Narzędzi jeszcze nie ma; są paczka kodu (p. 60)
+i zestaw przypadków (p. 61). Niżej decyzje i liczby z 2026-10-06 oraz z prób z 2026-10-07.
+Liczby bez dopisku „w paczce" pochodzą z rozpoznania na kopii roboczej gałęzi jednego klienta,
+a paczka powstała z innej gałęzi.
 
 - **Kod może wyjść do modelu zewnętrznego (decyzja 2026-10-06).** Nie przechodzi przez
   anonimizację: wynik narzędzia idzie do modelu wprost. Otwarte zostaje, którą gałąź indeksuje
@@ -927,15 +928,15 @@ kopii roboczej gałęzi jednego klienta, a paczka powstała z innej gałęzi.
   wcześniej: z czystego checkoutu).** `scripts/build_code_package.py` kopiuje z folderu
   wejściowego do `repo/` w katalogu paczki to, co wymieniają reguły `rules.json`: rozszerzenia
   (`php`, `js`, `twig`) w wymienionych folderach, pliki wskazane wprost (schematy Doctrine,
-  pliki `routing`) i wyjątki na biblioteki leżące w folderach własnych. Reguły leżą w katalogu
-  paczki, w `data/unsafe/`, bo opisują układ kodu klienta. Plik, którego reguły nie wymieniają,
-  nie wchodzi, więc YAML-e z hasłami, klucze, logi i pliki binarne odpadają bez wypisywania.
-  Z 35 tys. plików i 565 MB w `src` w paczce zostaje 11 416 plików i 1,18 mln linii, w tym 1401
-  generowanych klas `Base*`. Cena: skrypt kopiuje to, co leży na dysku, więc plik prywatny albo
-  lokalnie zmieniony wchodzi, jeśli pasuje do reguł, a metryczka nie zna gałęzi ani changesetu
-  (paczka z 2026-10-06 powstała z gałęzi zadaniowej pod `stage-gminy`, changeset 51962). Katalog
-  cache Symfony 2 leży w folderze z listy i trzeba go było wyłączyć: 305 plików PHP ze
-  skompilowanym kontenerem.
+  pliki `routing` i `filters`) i wyjątki na biblioteki leżące w folderach własnych. Reguły leżą
+  w katalogu paczki, w `data/unsafe/`, bo opisują układ kodu klienta. Plik, którego reguły nie
+  wymieniają, nie wchodzi, więc YAML-e z hasłami, klucze, logi i pliki binarne odpadają bez
+  wypisywania. Z 35 tys. plików i 565 MB w `src` w paczce zostają 11 424 pliki i 1,18 mln linii,
+  w tym 1401 generowanych klas `Base*`. Cena: skrypt kopiuje to, co leży na dysku, więc plik
+  prywatny albo lokalnie zmieniony wchodzi, jeśli pasuje do reguł, a metryczka nie zna gałęzi
+  ani changesetu (paczka z 2026-10-07 powstała z gałęzi zadaniowej pod `stage-gminy`, changeset
+  51962). Katalog cache Symfony 2 leży w folderze z listy i trzeba go było wyłączyć: 305 plików
+  PHP ze skompilowanym kontenerem.
 - **Wpis, który nie zmienia wyniku, do reguł nie trafia (2026-10-06).** Nazwy plików z hasłami
   w wyłączeniach niczego nie zmieniały, bo YAML i tak nie wchodzi, a taki bezpiecznik pilnowałby
   pięciu nazw ze 187 pominiętych YAML-i. Efekt wpisu liczy się na plikach przed dopisaniem.
@@ -973,6 +974,35 @@ kopii roboczej gałęzi jednego klienta, a paczka powstała z innej gałęzi.
 - **Opis projektu szkicuje model z kodu, a poprawia programista aplikacji.** Leży w paczce
   i mówi, gdzie zacząć szukać: wejścia do aplikacji, droga od adresu do akcji i od zdarzenia JS
   do handlera.
+- **`filters.yml` jest w paczce od 2026-10-07 (`src/apps/*/config/filters.yml`, 8 plików, same
+  nazwy klas).** Bez niego nie dało się wskazać, który z czterech filtrów sesji jest wpięty;
+  z nim świeży agent wskazał jeden i rozpoznał bliźniaczą klasę jako martwą.
+- **Zestaw przypadków powstaje z kodu, nie ze zgłoszeń (p. 61, 2026-10-07).** Przypadek to
+  wybrane miejsce w kodzie i zgłoszenie napisane pod nie słowami zgłaszającego: komunikat
+  z ekranu, fragment logu albo opis zachowania, bez nazw z kodu. Wymagane są miejsca, bez
+  których nie da się odpowiedzieć na pytanie ze zgłoszenia; obok zapisane są miejsca pokrewne
+  i pułapki. Zestaw na kodzie Dokusa ma 9 przypadków (`data/unsafe/golden/code-dokus.json`).
+  Opisy zachowania zatwierdza osoba znająca Dokusa; do tego czasu przypadek ma
+  `behaviour_confirmed: false`.
+- **Zestaw do aplikacji syntetycznej ma inny kształt, bo służy testom bez modelu (2026-10-07).**
+  `data/safe/golden/code-synthetic.json` trzyma sekcję na narzędzie: 33 zapytania w kształcie
+  narzędzia z oczekiwanym wynikiem, oraz listę plików, których paczka nie może zawierać.
+  Zgłoszeń w nim nie ma: testowi bez modelu nic nie dają, bo zamiana zgłoszenia na wywołania
+  narzędzi to praca modelu. Kształty zapytań pochodzą z planu i prototypów, więc sekcję
+  narzędzia dopasowuje się przy jego budowie.
+- **Przypadek trafia do zestawu po próbie na świeżym agencie, który zna tylko zgłoszenie
+  i folder paczki.** W próbach z 2026-10-07 miejsce wybrane przez autora było błędne albo
+  niepełne w 3 przypadkach z 8, a w 2 kolejnych błędny był opis albo rodzaj przypadku. Cena:
+  około 120 tys. tokenów i kilka minut na przypadek.
+- **Kod ma martwe ścieżki, które wyglądają na właściwe:** starą obsługę zdarzenia obok nowej,
+  bliźniaczą klasę filtra, której nic nie wpina, akcję bez przycisku. Zestaw zapisuje je jako
+  pułapki.
+- **Zacytowany komunikat daje wejście jednym szukaniem; trudność leży w przejściu na drugi
+  koniec łańcucha PHP → JS.** W sondzie na `claude-sonnet-5-5` z prototypami narzędzi
+  (2026-10-07, pojedyncze przebiegi, raport `data/unsafe/docs/proby-zestawu-kodu-2026-10-07.md`)
+  sprawa zajmowała 6–20 tur i średnio 0,13 USD, a łańcuch 8–15 tur. Limit 10 szukań wyczerpał
+  się w 5 sprawach z 9, a jedna przeszła dopiero przy 20. Model odczytywał 2–9 plików na
+  sprawę, a cytował 2–5 fragmentów.
 
 ## Architektura
 
@@ -1708,10 +1738,12 @@ czasu jest pusta.
   grafów. Powstają wszystkie osiem; czy instancja bez dokumentacji ma pomijać jej narzędzia,
   rozstrzyga p. 15.
 - **Kod aplikacji liczy się jako źródło jak zgłoszenie i instrukcja, także w wariancie
-  wymagającym źródeł (decyzja 2026-10-06, narzędzia w p. 62–66).** Odpowiedź opartą wyłącznie na
-  kodzie wołający rozpoznaje po rodzaju źródła (`code`). Cena: plik zawsze da się przeczytać, więc
-  taki wariant prawie nigdy nie powie „nie mam z czego zaproponować"; czy model powstrzyma się
-  przy szukaniu na ślepo, sprawdza p. 59.
+  wymagającym źródeł (decyzja 2026-10-06, narzędzia w p. 62–67).** Odpowiedź opartą wyłącznie na
+  kodzie wołający rozpoznaje po rodzaju źródła (`code`). Źródłem jest fragment, który model
+  zacytował jako przyczynę (p. 67), a nie każdy odczytany plik: plik zawsze da się przeczytać,
+  więc przy zasadzie „odczyt cytuje" taki wariant prawie nigdy nie powiedziałby „nie mam z czego
+  zaproponować". Czy model powstrzyma się od wskazania przyczyny przy szukaniu na ślepo,
+  sprawdza p. 59.
 - **Każde narzędzie jest tylko do odczytu** — wstrzyknięcie przez treść zgłoszenia może co
   najwyżej skierować agenta do nietrafionego materiału, nie zmienić indeksu.
 
@@ -1985,10 +2017,13 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
     strict, a nasze schematy go nie spełniają; `store: False` z prośbą o zaszyfrowane
     rozumowanie (`include`). Do `provider_items` idą wszystkie elementy odpowiedzi. Elementu
     rozumowania w podejrzanej turze nie było, więc jego odsyłania na żywo nie widzieliśmy.
-  - **Claude (Messages API), NIESPRAWDZONE na żywo:** wymuszenie przez `tool_choice: any`; to API
-    nie łączy go z rozszerzonym myśleniem, którego klient nie włącza. Wyniki narzędzi jednej
-    tury idą w JEDNEJ wiadomości `user`, a bloki odpowiedzi są przepisywane pole po polu, bo
-    odpowiedź niesie pola, których żądanie nie przyjmuje.
+  - **Claude (Messages API), sprawdzone 2026-10-07 w sondzie na żywym `claude-sonnet-5-5`
+    (8 tur z narzędziami), bez testu `llm_live`:** wymuszenie (`tool_choice: any`) dostają tylko
+    rodziny z listy przyjmujących (`claude-sonnet-5`, `claude-opus-5`, `claude-haiku-4-5`), bo
+    modele 5.5 odpowiadają na nie błędem 400; pozostałe dostają `auto`, a turę z samym tekstem
+    odsyła do poprawki węzeł `respond`. Wyniki narzędzi jednej tury idą w JEDNEJ wiadomości
+    `user`, a bloki odpowiedzi są przepisywane pole po polu, bo odpowiedź niesie pola, których
+    żądanie nie przyjmuje.
   - **Ollama (Chat Completions), NIESPRAWDZONE na żywo:** bez wymuszenia, bo serwery zgodne
     z OpenAI różnie je traktują; tura z samym tekstem jest tam zwykłym wynikiem, a węzeł
     `respond` odsyła ją do poprawki, raz. Strażniki okna kontekstu z `complete()` pilnują też tury.
@@ -2480,6 +2515,16 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   warunkiem pomiaru, nie testem: sprawdzają to fixture'y z `tests/evaluation/conftest.py`,
   a nieaktualny indeks kończy pomiar błędem. W docstringu testu ewaluacyjnego akapit „Sprawdza,
   czy…" podaje liczby progu.
+- **Narzędzia kodu: integracyjne na aplikacji syntetycznej, ewaluacyjne na kodzie Dokusa
+  (ustalenia 2026-10-07; testy dochodzą z narzędziami, p. 62–67).** Integracyjne idą bez modelu:
+  pojedyncze narzędzia, z zapytaniami i oczekiwanymi wynikami z zestawu syntetycznego, oraz graf
+  z modelem ze scenariusza, który sprawdza, że na listę źródeł trafia tylko cytowanie przyczyny.
+  Ewaluacyjne idą na prawdziwym modelu, co najmniej jeden przypadek na narzędzie: przypadek
+  zalicza, gdy plik każdego wymaganego miejsca jest wśród cytowań przyczyny, a przypadek bez
+  odpowiedzi, gdy takich cytowań nie ma. Fragment linii z zestawu nie jest warunkiem zaliczenia:
+  przed wywołaniem modelu test sprawdza po nim, że miejsce nadal stoi w paczce. Przypadek ma
+  dwie próby; druga rusza tylko po nieudanej pierwszej i jest wypisana w podsumowaniu. Treści
+  odpowiedzi test nie ocenia.
 - **Bez obronnego boilerplate'u bez uzasadnienia.** Zadeklarowanych zależności (runtime i dev)
   **nie** guardujemy `pytest.importorskip` — brak zadeklarowanej zależności ma być głośnym
   `ImportError`, nie cichym skipem. `importorskip` zostaje tylko dla zależności faktycznie
@@ -2787,6 +2832,15 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   zapis, którego szukanie nie zna; skrypt paczki rozkodowuje litery raz i wersja jest jedna.
 - **Tabela komunikatów z parsowania napisów w kodzie** — wymaga osobnego tokenizera PHP i JS.
   Wraca, gdy szukanie po liniach da za dużo nietrafionych wyników.
+- **Zapytania do zestawu kodu brane ze zgłoszeń** — cudzysłów w zgłoszeniu łapie głównie nazwy
+  przycisków i pól: z 602 cytowanych fragmentów 170 stoi dosłownie w paczce, a tylko 52 w jednym
+  miejscu; pułapki są cechą kodu, więc przypadek powstaje z wybranego miejsca w kodzie.
+- **Fragment linii jako warunek zaliczenia przypadku kodu** — jeden plik ma kilka właściwych
+  miejsc (warunek, ustawienie, treść komunikatu), więc zalicza plik wśród cytowań przyczyny.
+  Wraca, gdy model zacytuje właściwy plik w złym miejscu.
+- **Drugi koniec łańcucha PHP → JS zawsze wymagany** — gdy pytanie ze zgłoszenia rozstrzyga
+  sama strona serwera, model po stronę przeglądarki nie sięga i ma rację; wymagane są tylko
+  miejsca, bez których nie da się odpowiedzieć.
 
 ### Plan
 
@@ -2915,7 +2969,7 @@ Właściwe węzły na atrapach zależności. Grafy już działają na atrapach w
 wchodzą po jednym, a przebieg grafu się przy tym nie zmienia. Prawdziwy model (p. 18 i 17) stoi
 tu od 2026-10-05, zaraz po `run_tools`, a przed `respond`: pierwszy przebieg pętli na prawdziwym
 modelu ma być jak najwcześniej, bo jego wynik przestawi limity, opisy narzędzi i prompty taniej
-niż zgadywanie. Narzędzia kodu aplikacji (p. 60–66) stoją tu od 2026-10-06, przed scenariuszami
+niż zgadywanie. Narzędzia kodu aplikacji (p. 60–67) stoją tu od 2026-10-06, przed scenariuszami
 z p. 59, żeby te objęły też sprawę, w której komunikat jest tylko w kodzie; każde wchodzi
 z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_solution`.
 
@@ -2954,14 +3008,48 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   montowana do `api` tylko do odczytu w obu warstwach compose; aplikacja syntetyczna
   w `data/safe/code/`; przegląd wykrywaczem sekretów zrobiony; bez czystego checkoutu i bez
   gałęzi w metryczce; reguły — „Kod aplikacji", „Konfiguracja i deploy".
-- [ ] **61. Zestaw zapytań do kodu Dokusa** (p. 60–66 dopisane 2026-10-06, numery spoza
-  kolejności) — w `data/unsafe/golden/`: komunikat albo kod błędu i plik, w którym pada, osobno
-  zapytania bez dosłownego tropu i zapytania bez odpowiedzi; w zestawie komunikat zapisany
-  sekwencjami, komunikat składany z części, akcja o powtarzającej się nazwie i długi kontroler;
-  osobny, mały zestaw do aplikacji syntetycznej w `data/safe/golden/`, dopisywany razem
-  z narzędziami. *Dlaczego:* skuteczność narzędzi mierzy się na prawdziwym kodzie, a aplikacja
-  syntetyczna pilnuje tylko okablowania, więc ten zestaw jest jedynym miejscem, które pilnuje,
-  że znane pułapki kodu Dokusa są pokryte.
+- [x] **61. Zestaw przypadków do kodu Dokusa** (2026-10-07) — 9 przypadków na paczce z Dokusa
+  w `data/unsafe/golden/code-dokus.json`, budowanych z kodu i sprawdzonych świeżym agentem,
+  oraz zestaw do aplikacji syntetycznej w `data/safe/golden/code-synthetic.json` (33 zapytania
+  w sekcjach na narzędzie); `filters.yml` dopisany do paczki; sonda na `claude-sonnet-5-5`
+  z prototypami narzędzi; testów jeszcze nie ma, dochodzą z narzędziami, a opisy zachowania
+  czekają na zatwierdzenie; reguły — „Kod aplikacji", „Testy".
+- [ ] **67. `quote_code` — osobne narzędzie cytujące kod** (dopisany 2026-10-07, numer spoza
+  kolejności) — przyjmuje fragment pliku (ścieżka, od linii, do linii), z limitem długości
+  i limitem wywołań, i tylko ono dokłada kod do listy źródeł (`source` „code", `item_id` to
+  ścieżka z zakresem linii); modelowi oddaje samo potwierdzenie, bez treści linii, którą daje
+  wyłącznie odczyt; każde cytowanie niesie rolę: `cause` (miejsce powoduje opisane
+  zachowanie) albo `excluded` (sprawdzone i wykluczone), źródłem odpowiedzi jest tylko `cause`,
+  a wykluczenia idą do uwag dla wdrożeniowca (p. 68); odczyt pliku (p. 63) i symbolu (p. 66)
+  służy do chodzenia po kodzie i źródeł nie tworzy; do rozstrzygnięcia: limit długości
+  fragmentu, limit wywołań, czy wolno cytować linie wcześniej nieodczytane i co robi wariant
+  wymagający źródeł, gdy model nie wskazał żadnej przyczyny. *Dlaczego:* w próbach
+  z 2026-10-07 agent otwierał po kilkanaście plików na sprawę, a rozstrzygały 1–3, więc lista
+  źródeł tonęłaby w plikach, przez które model tylko przechodził; źródłem staje się fragment,
+  a nie plik na 4 tys. linii, i czytanie na ślepo przestaje tworzyć źródła; role są potrzebne,
+  bo w sondzie na `claude-sonnet-5-5` model cytował też miejsca wykluczone, jako dowód: sprawa
+  bez odpowiedzi miała wtedy dwa źródła, a po dodaniu ról żadnej przyczyny i jedno wykluczenie;
+  treść w zwrocie cytowania kusiła do cytowania linii nieodczytanych, zwłaszcza po wyczerpaniu
+  limitu odczytów, a bez niej model w dwóch przebiegach nie zrobił tego ani razu i sam napisał,
+  czego nie przeczytał (pojedyncze przebiegi).
+- [ ] **68. Uwagi dla wdrożeniowca osobno od treści dla klienta** (dopisany 2026-10-07, numer
+  spoza kolejności) — `Proposal` dostaje drugie pole: `text` zostaje treścią dla klienta,
+  a uwagi dla wdrożeniowca (wnioski z kodu, ostrzeżenia, czego materiał nie rozstrzyga) idą
+  osobno, z jawnym wyjściem; zmienia się odpowiedź `/suggest`, opisy narzędzi odpowiedzi i wzory
+  w promptach trzech wariantów `suggest_*`; zasada 9 obowiązuje oba pola; do rozstrzygnięcia:
+  czy wariant wymagający źródeł bez źródeł oddaje same uwagi i czy linie `[dla serwisanta: …]`
+  i `[UWAGA: …]` znikają z treści dla klienta w całości. *Dlaczego:* jedno pole miesza dwóch
+  odbiorców, a analiza z kodu niesie nazwy klas, ścieżki i ustawienia, które nie mogą wyjść do
+  klienta; linia `[UWAGA: …]` nie padła w żadnym z czterech pomiarów, więc osobne pole jest
+  pewniejsze niż nawias; stoi przed p. 59 i p. 25–27, bo one sprawdzają kształt odpowiedzi.
+- [ ] **69. Testy skryptu paczki kodu** (dopisany 2026-10-07, numer spoza kolejności) —
+  jednostkowe dla doboru plików według reguł i dla rozkodowania polskich liter; jeden
+  integracyjny, który buduje paczkę z aplikacji syntetycznej do katalogu tymczasowego i sprawdza,
+  że pliki spoza reguł (cache, pliki z hasłami, biblioteki zewnętrzne, plik zminifikowany) nie
+  weszły, trzy linie są rozkodowane, a metryczka zgadza się z zawartością; lista `absent_paths`
+  przechodzi do tego testu z zestawu syntetycznego. *Dlaczego:* skrypt ma 594 linie i żadnego
+  testu, a od jego reguł zależy, czy do modelu nie wychodzą pliki z hasłami; dziś pilnuje tego
+  ręczne porównanie metryczki.
 - [ ] **62. `find_code_text`** — fraza dosłowna albo słowa w jednej linii, ripgrep w obrazie
   `api` w trybie dosłownym, z opcjonalnym zawężeniem do katalogu; oddaje ścieżkę i numer linii,
   bez treści, z limitem pozycji i licznikiem pominiętych; opis każe szukać stałego fragmentu
@@ -2971,7 +3059,7 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   trafienie wśród częstych: nazwa zdarzenia błędu stoi w 513 liniach w 177 plikach, a jego
   rejestracja w dwóch.
 - [ ] **63. `read_code_file`** — plik albo zakres linii, z limitem linii na wywołanie
-  i informacją o ucięciu; cytuje (`source` „code", `item_id` to ścieżka); ścieżka spoza paczki
+  i informacją o ucięciu; źródeł nie tworzy, robi to `quote_code` (p. 67); ścieżka spoza paczki
   to błąd wracający do modelu. *Dlaczego:* po trafieniu trzeba zobaczyć, w jakiej klasie
   i metodzie leży linia, a główne kontrolery mają po 3–4 tys. linii.
 - [ ] **64. `list_code_files`** — drzewo katalogu z opcjonalną głębokością, z limitem pozycji.
@@ -3093,7 +3181,7 @@ każdy mierzy się osobno.
   bierze fakty z obu na równi; w sondzie krok z instrukcji stanął pierwszy, choć żadne
   zgłoszenie go nie potwierdzało); reguła dla odpowiedzi opartej wyłącznie na kodzie: przy jakim
   warunku pada komunikat i co sprawdzić, wprost, że nie potwierdza tego żadna sprawa, a nazwy
-  klas i ścieżki w `[dla serwisanta: …]`; ewaluacja
+  klas i ścieżki w uwagach dla wdrożeniowca (p. 68); ewaluacja
   wariantu. *Dlaczego:* ostrzeżenie nie padło w żadnym z czterech pomiarów, a bez reguły zgodności
   model kazał wygasić duplikat kontrahenta przy zgłoszeniu o przenoszeniu zasobów.
 - [ ] **27. `suggest_handoff`** — prompt niosący, co sprawdzono i czego brakuje; do

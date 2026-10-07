@@ -1,12 +1,17 @@
 import pytest
 
 from app.engine_llm import ChatMessage, LLMError, ToolCall, ToolDefinition
-from app.engine_llm.client.claude import ClaudeLLMClient
-from app.engine_llm.pricing.claude import calculate_cost_usd
+from app.engine_llm.client.claude import (
+    MODELS_ACCEPTING_FORCED_TOOL_CALL,
+    ClaudeLLMClient,
+    belongs_to_family,
+)
+from app.engine_llm.pricing.claude import PRICES, calculate_cost_usd
 
 # Tura z narzędziami w kliencie Claude'a (Messages API): jak rozmowa i narzędzia stają się
 # żądaniem i jak odpowiedź dostawcy staje się turą modelu. Bez sieci — testy wołają
-# `_build_turn_request()` i `_to_turn()` wprost. Na żywym API tura Claude'a nie była sprawdzana.
+# `_build_turn_request()` i `_to_turn()` wprost. Na żywym API turę Claude'a sprawdziła tylko sonda
+# z 2026-10-07 na `claude-sonnet-5-5`, nie test.
 
 API_KEY = "sk-ant-test-key"
 MODEL   = "claude-sonnet-5"
@@ -272,6 +277,53 @@ def test_the_turn_request_sends_temperature_only_where_accepted(
     request = make_client(model)._build_turn_request(SYSTEM, [USER], TOOLS)
 
     assert ("temperature" in request) is sends_temperature
+
+
+@pytest.mark.parametrize(
+    "model, tool_choice",
+    [
+        ("claude-sonnet-5",           "any"),
+        ("claude-opus-5",             "any"),
+        ("claude-haiku-4-5",          "any"),
+        ("claude-haiku-4-5-20251001", "any"),
+        ("claude-sonnet-5-5",         "auto"),
+        ("claude-opus-5-5",           "auto"),
+        ("claude-fable-5-1",          "auto"),
+    ],
+)
+def test_the_tool_call_is_forced_only_where_the_model_accepts_it(
+    model:       str,
+    tool_choice: str,
+) -> None:
+    """Sprawdza, czy żądanie tury wymusza wywołanie narzędzia (`any`) tylko dla modeli z rodzin,
+    które wymuszenie przyjmują, także pod nazwą z datą wydania, a modelom 5.5 i Fable 5.1 zostawia
+    wybór (`auto`).
+
+    Wyłapuje wymuszenie wysłane do modelu, który odpowiada na nie błędem 400: przy takim modelu
+    nie przeszłaby żadna tura z narzędziami, czyli żaden graf."""
+    request = make_client(model)._build_turn_request(SYSTEM, [USER], TOOLS)
+
+    assert request["tool_choice"] == {"type": tool_choice}
+
+
+def test_a_newer_family_is_not_taken_for_the_older_one_its_name_starts_with() -> None:
+    """Sprawdza, czy `claude-sonnet-5-5` i `claude-opus-5-5` nie są zaliczane do rodzin
+    `claude-sonnet-5` i `claude-opus-5`, od których nazw się zaczynają, oraz czy zmyślona nazwa
+    `claude-przyszly-7` nie pasuje do żadnej rodziny z listy.
+
+    Wyłapuje dopasowanie po samym początku nazwy: model 5.5 dostałby wtedy wymuszenie, które
+    odrzuca, a nowy model spoza listy nie trafiłby na bezpieczne `auto`."""
+    assert not belongs_to_family("claude-sonnet-5-5", ("claude-sonnet-5",))
+    assert not belongs_to_family("claude-opus-5-5", ("claude-opus-5",))
+    assert not belongs_to_family("claude-przyszly-7", MODELS_ACCEPTING_FORCED_TOOL_CALL)
+
+
+def test_every_family_that_takes_a_forced_tool_call_has_a_price() -> None:
+    """Sprawdza, czy każda rodzina z listy przyjmujących wymuszenie ma wiersz w cenniku Claude'a.
+
+    Wyłapuje literówkę w nazwie rodziny na liście: taki wpis nie pasowałby do żadnego modelu,
+    więc model, który wymuszenie przyjmuje, po cichu dostawałby `auto`."""
+    assert set(MODELS_ACCEPTING_FORCED_TOOL_CALL) <= set(PRICES)
 
 
 # --- odpowiedź ------------------------------------------------------------------------------

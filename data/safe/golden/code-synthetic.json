@@ -1,0 +1,517 @@
+{
+  "meta": {
+    "name": "code-synthetic-v1",
+    "created": "2026-10-07",
+    "purpose": "Okablowanie narzędzi kodu na zmyślonej aplikacji (data/safe/code), w testach bez modelu. NIE mierzy skuteczności: aplikację i zapytania pisał ten sam autor.",
+    "package": {
+      "dir": "data/safe/code",
+      "source": "data/safe/code/source"
+    },
+    "rules": [
+      "Aplikacja jest ZMYŚLONA; każda pułapka odpowiada czemuś widzianemu w prawdziwym kodzie.",
+      "Sekcja na narzędzie: zapytanie w kształcie narzędzia i oczekiwany wynik. Kształty pochodzą z planu (p. 62–67) i z prototypów sondy z 2026-10-07; przy budowie każdego narzędzia jego sekcję dopasowuje się do modelu zapytania.",
+      "Miejsce w kodzie to ścieżka i stały fragment linii, bez numeru linii. Pola z końcówką _at (offset_at, from_at, to_at) niosą fragment, z którego test wylicza numer linii.",
+      "find_code_text: expected to komplet trafień; pusta lista znaczy brak trafień. expected_total i expected_files opisują zapytanie, które przekracza limit pozycji.",
+      "read_code_file i read_code_symbol: contains i lacks to fragmenty, które wynik ma zawierać albo których ma nie zawierać; error: true znaczy błąd wracający do modelu.",
+      "list_code_files: includes i lacks to nazwy pozycji katalogu.",
+      "quote_code: source mówi, czy cytowanie trafia na listę źródeł (tylko rola cause); returns_text: false znaczy, że narzędzie nie oddaje treści linii.",
+      "absent_paths: pliki ze źródła, których paczka nie może zawierać; odczyt oddaje błąd.",
+      "Zestaw stoi na paczce zbudowanej ze źródła skryptem; test bez zbudowanej paczki nie ma na czym stanąć."
+    ]
+  },
+  "find_code_text": [
+    {
+      "id": "f01",
+      "phenomenon": "komunikat zapisany w źródle sekwencjami \\uXXXX",
+      "query": {
+        "exact": "Nie udało się skomunikować z serwerem"
+      },
+      "expected": [
+        {
+          "path": "src/web/js/_global/bledy.js",
+          "fragment": "tresc: 'Nie udało się skomunikować z serwerem' }"
+        },
+        {
+          "path": "src/web/js/archiwum/archiwum.js",
+          "fragment": "Nie udało się skomunikować z serwerem."
+        }
+      ]
+    },
+    {
+      "id": "f02",
+      "phenomenon": "trzy brzmienia jednego komunikatu, jedno o innym szyku słów",
+      "query": {
+        "words": [
+          "skomunikować",
+          "serwerem"
+        ]
+      },
+      "expected": [
+        {
+          "path": "src/web/js/_global/bledy.js",
+          "fragment": "Nie udało się skomunikować z serwerem"
+        },
+        {
+          "path": "src/web/js/archiwum/archiwum.js",
+          "fragment": "Nie udało się skomunikować z serwerem"
+        },
+        {
+          "path": "src/lib/Urzad/Http/KlientUslugi.php",
+          "fragment": "Z serwerem usługi nie udało się skomunikować: "
+        }
+      ]
+    },
+    {
+      "id": "f03",
+      "phenomenon": "stały fragment komunikatu składanego z części",
+      "query": {
+        "exact": "przekracza limit"
+      },
+      "expected": [
+        {
+          "path": "src/lib/Urzad/Wysylka/LimitZalacznika.php",
+          "fragment": "' MB i przekracza limit '"
+        },
+        {
+          "path": "src/lib/Urzad/Wysylka/Edoreczenia/PobieranieSkrzynki.php",
+          "fragment": "przekracza limit pobierania"
+        }
+      ]
+    },
+    {
+      "id": "f04",
+      "phenomenon": "słowa w innej kolejności niż w kodzie",
+      "query": {
+        "words": [
+          "limit",
+          "przekracza"
+        ]
+      },
+      "expected": [
+        {
+          "path": "src/lib/Urzad/Wysylka/LimitZalacznika.php",
+          "fragment": "' MB i przekracza limit '"
+        },
+        {
+          "path": "src/lib/Urzad/Wysylka/Edoreczenia/PobieranieSkrzynki.php",
+          "fragment": "przekracza limit pobierania"
+        }
+      ]
+    },
+    {
+      "id": "f05",
+      "phenomenon": "cały tekst z ekranu nie istnieje w kodzie",
+      "query": {
+        "exact": "Załącznik umowa-najmu.pdf ma 12.4 MB i przekracza limit 10 MB"
+      },
+      "expected": []
+    },
+    {
+      "id": "f06",
+      "phenomenon": "ta sama nazwa akcji w trzech modułach",
+      "query": {
+        "exact": "function executeZapisz("
+      },
+      "expected": [
+        {
+          "path": "src/apps/frontend/modules/kontrahenci/actions/actions.class.php",
+          "fragment": "public function executeZapisz("
+        },
+        {
+          "path": "src/apps/frontend/modules/pisma/actions/actions.class.php",
+          "fragment": "public function executeZapisz("
+        },
+        {
+          "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php",
+          "fragment": "public function executeZapisz("
+        }
+      ]
+    },
+    {
+      "id": "f07",
+      "phenomenon": "zawężenie do katalogu",
+      "query": {
+        "exact": "function executeZapisz(",
+        "path": "src/apps/frontend/modules/kontrahenci"
+      },
+      "expected": [
+        {
+          "path": "src/apps/frontend/modules/kontrahenci/actions/actions.class.php",
+          "fragment": "public function executeZapisz("
+        }
+      ]
+    },
+    {
+      "id": "f08",
+      "phenomenon": "wpis logu z doklejoną ścieżką",
+      "query": {
+        "exact": "Pobieranie pominięte: istnieje plik blokady"
+      },
+      "expected": [
+        {
+          "path": "src/lib/Urzad/Wysylka/Edoreczenia/PobieranieSkrzynki.php",
+          "fragment": "Pobieranie pominięte: istnieje plik blokady "
+        }
+      ]
+    },
+    {
+      "id": "f09",
+      "phenomenon": "więcej trafień niż limit pozycji",
+      "query": {
+        "exact": "public function executeSlownik"
+      },
+      "expected_total": 28,
+      "expected_files": [
+        "src/apps/frontend/modules/sprawy/actions/actions.class.php"
+      ]
+    },
+    {
+      "id": "f10",
+      "phenomenon": "bez odpowiedzi: komunikat spoza aplikacji",
+      "query": {
+        "exact": "TWAIN"
+      },
+      "expected": []
+    },
+    {
+      "id": "f11",
+      "phenomenon": "napis tylko w pliku cache, który nie wchodzi do paczki",
+      "query": {
+        "exact": "zmyslone-haslo-edoreczen"
+      },
+      "expected": []
+    },
+    {
+      "id": "f12",
+      "phenomenon": "napis tylko w bibliotece zewnętrznej, która nie wchodzi do paczki",
+      "query": {
+        "exact": "%PDF-zmyslony"
+      },
+      "expected": []
+    }
+  ],
+  "read_code_file": [
+    {
+      "id": "r01",
+      "phenomenon": "mały plik w całości",
+      "query": {
+        "path": "src/web/js/_global/bledy.js"
+      },
+      "expected": {
+        "contains": [
+          "odpowiedz.status === 401"
+        ],
+        "truncated": false
+      }
+    },
+    {
+      "id": "r02",
+      "phenomenon": "litery rozkodowane z \\uXXXX",
+      "query": {
+        "path": "src/web/js/_global/okna.js"
+      },
+      "expected": {
+        "contains": [
+          "parametry.tytul || 'Błąd'"
+        ],
+        "truncated": false
+      }
+    },
+    {
+      "id": "r03",
+      "phenomenon": "długi kontroler od początku: odczyt ucięty przed końcem",
+      "query": {
+        "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php",
+        "limit": 150
+      },
+      "expected": {
+        "contains": [
+          "public function executeLista("
+        ],
+        "lacks": [
+          "Sprawa jest już zamknięta"
+        ],
+        "truncated": true
+      }
+    },
+    {
+      "id": "r04",
+      "phenomenon": "zakres linii w długim kontrolerze",
+      "query": {
+        "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php",
+        "offset_at": "public function executeZamknij(",
+        "limit": 12
+      },
+      "expected": {
+        "contains": [
+          "Sprawa jest już zamknięta"
+        ],
+        "truncated": false
+      }
+    },
+    {
+      "id": "r05",
+      "phenomenon": "ścieżka wychodząca poza paczkę",
+      "query": {
+        "path": "../../../../.env"
+      },
+      "expected": {
+        "error": true
+      }
+    },
+    {
+      "id": "r06",
+      "phenomenon": "katalog zamiast pliku",
+      "query": {
+        "path": "src/web/js/_global"
+      },
+      "expected": {
+        "error": true
+      }
+    }
+  ],
+  "read_code_symbol": [
+    {
+      "id": "s01",
+      "phenomenon": "ta sama nazwa akcji w trzech modułach: wskazuje ją ścieżka",
+      "query": {
+        "path": "src/apps/frontend/modules/kontrahenci/actions/actions.class.php",
+        "name": "executeZapisz"
+      },
+      "expected": {
+        "contains": [
+          "Nazwa kontrahenta może mieć najwyżej "
+        ]
+      }
+    },
+    {
+      "id": "s02",
+      "phenomenon": "akcja na końcu długiego kontrolera",
+      "query": {
+        "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php",
+        "name": "executeZamknij"
+      },
+      "expected": {
+        "contains": [
+          "Sprawa jest już zamknięta"
+        ],
+        "lacks": [
+          "public function executeLista("
+        ]
+      }
+    },
+    {
+      "id": "s03",
+      "phenomenon": "metoda klasy w bibliotece aplikacji",
+      "query": {
+        "path": "src/lib/Urzad/Numeracja/GeneratorNumeru.php",
+        "name": "nastepnyNumer"
+      },
+      "expected": {
+        "contains": [
+          "Brak sekwencji numeracji dla roku "
+        ]
+      }
+    },
+    {
+      "id": "s04",
+      "phenomenon": "funkcja JS zapisana jako pole obiektu",
+      "query": {
+        "path": "src/web/js/pisma/pisma.js",
+        "name": "wyslijHandler"
+      },
+      "expected": {
+        "contains": [
+          "$.post('/pisma/wyslij'"
+        ],
+        "lacks": [
+          "$.post('/pisma/zapisz'"
+        ]
+      }
+    },
+    {
+      "id": "s05",
+      "phenomenon": "symbol, którego w pliku nie ma",
+      "query": {
+        "path": "src/web/js/pisma/pisma.js",
+        "name": "anulujHandler"
+      },
+      "expected": {
+        "error": true
+      }
+    }
+  ],
+  "list_code_files": [
+    {
+      "id": "l01",
+      "phenomenon": "katalog z biblioteką zewnętrzną i plikiem zminifikowanym obok",
+      "query": {
+        "path": "src/web/js"
+      },
+      "expected": {
+        "includes": [
+          "_global",
+          "archiwum",
+          "pisma",
+          "sprawy"
+        ],
+        "lacks": [
+          "_vendor",
+          "kalendarz.min.js"
+        ]
+      }
+    },
+    {
+      "id": "l02",
+      "phenomenon": "katalog z biblioteką zewnętrzną",
+      "query": {
+        "path": "src/lib"
+      },
+      "expected": {
+        "includes": [
+          "Urzad",
+          "task"
+        ],
+        "lacks": [
+          "vendor"
+        ]
+      }
+    },
+    {
+      "id": "l03",
+      "phenomenon": "katalog z cache obok",
+      "query": {
+        "path": "src/apps/frontend"
+      },
+      "expected": {
+        "includes": [
+          "config",
+          "modules",
+          "templates"
+        ],
+        "lacks": [
+          "cache"
+        ]
+      }
+    },
+    {
+      "id": "l04",
+      "phenomenon": "katalog konfiguracji: wchodzi routing, nie wchodzi plik z hasłem",
+      "query": {
+        "path": "src/apps/frontend/config"
+      },
+      "expected": {
+        "includes": [
+          "routing.yml"
+        ],
+        "lacks": [
+          "app.yml"
+        ]
+      }
+    },
+    {
+      "id": "l05",
+      "phenomenon": "katalog, którego nie ma",
+      "query": {
+        "path": "src/nie-ma-takiego"
+      },
+      "expected": {
+        "error": true
+      }
+    }
+  ],
+  "quote_code": [
+    {
+      "id": "q01",
+      "phenomenon": "cytowanie przyczyny tworzy źródło i nie oddaje treści",
+      "query": {
+        "path": "src/lib/Urzad/Numeracja/GeneratorNumeru.php",
+        "from_at": "if (!$sekwencja) {",
+        "to_at": "Brak sekwencji numeracji dla roku ",
+        "role": "cause"
+      },
+      "expected": {
+        "source": true,
+        "returns_text": false
+      }
+    },
+    {
+      "id": "q02",
+      "phenomenon": "cytowanie wykluczenia nie tworzy źródła",
+      "query": {
+        "path": "src/web/js/archiwum/archiwum.js",
+        "from_at": "Nie udało się skomunikować z serwerem.",
+        "to_at": "Nie udało się skomunikować z serwerem.",
+        "role": "excluded"
+      },
+      "expected": {
+        "source": false,
+        "returns_text": false
+      }
+    },
+    {
+      "id": "q03",
+      "phenomenon": "cytowanie bez roli",
+      "query": {
+        "path": "src/web/js/_global/bledy.js",
+        "from_at": "Nie udało się skomunikować z serwerem",
+        "to_at": "Nie udało się skomunikować z serwerem"
+      },
+      "expected": {
+        "error": true
+      }
+    },
+    {
+      "id": "q04",
+      "phenomenon": "fragment dłuższy niż limit cytowania",
+      "query": {
+        "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php",
+        "from_at": "public function executeLista(",
+        "to_at": "public function executeZamknij(",
+        "role": "cause"
+      },
+      "expected": {
+        "error": true
+      }
+    },
+    {
+      "id": "q05",
+      "phenomenon": "ścieżka wychodząca poza paczkę",
+      "query": {
+        "path": "../../../../.env",
+        "from_line": 1,
+        "to_line": 2,
+        "role": "cause"
+      },
+      "expected": {
+        "error": true
+      }
+    }
+  ],
+  "absent_paths": [
+    {
+      "path": "src/apps/frontend/cache/konfiguracja.php",
+      "reason": "katalog cache, wyłączony w regułach"
+    },
+    {
+      "path": "src/apps/frontend/config/app.yml",
+      "reason": "konfiguracja z hasłem, YAML spoza listy"
+    },
+    {
+      "path": "src/config/databases.yml",
+      "reason": "połączenie z bazą, plik spoza listy"
+    },
+    {
+      "path": "src/lib/vendor/pdfmaker/PdfMaker.php",
+      "reason": "biblioteka zewnętrzna"
+    },
+    {
+      "path": "src/web/js/_vendor/wykresy.js",
+      "reason": "biblioteka zewnętrzna"
+    },
+    {
+      "path": "src/web/js/kalendarz.min.js",
+      "reason": "plik zminifikowany"
+    }
+  ]
+}

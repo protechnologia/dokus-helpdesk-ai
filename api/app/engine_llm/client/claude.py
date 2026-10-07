@@ -1,3 +1,4 @@
+import re
 import time
 from collections.abc import Sequence
 from typing import Any
@@ -46,16 +47,44 @@ PROMPT_CACHE = {"type": "ephemeral"}
 
 # Tura z narzędziami: model MA wywołać któreś narzędzie, nie odpowiedzieć tekstem. Każdy graf
 # kończy się wywołaniem `respond_<graf>`, więc tura bez wywołania jest zawsze błędem formatu.
-# NIESPRAWDZONE na żywym API (p. 17 zweryfikował na żywo tylko OpenAI): to API nie pozwala łączyć
-# wymuszenia z rozszerzonym myśleniem, którego ten klient nie włącza — gdyby model myślał
-# domyślnie, dostawca odpowie 400 i wymuszenie trzeba będzie zamienić na `auto`.
-TOOL_CHOICE_ANY = {"type": "any"}
+# Wymuszenie (`any`) przyjmują tylko starsze rodziny. Modele 5.5 odpowiadają na nie błędem
+# `400 tool_choice: type "tool" and "any" are not supported for this model`, a `claude-sonnet-5`
+# i `claude-opus-5` je przyjmują — sprawdzone na żywym API 2026-10-07. Modele spoza listy dostają
+# `auto`: mogą wtedy odpowiedzieć samym tekstem, a taką turę odsyła do poprawki węzeł `respond`.
+#
+# Lista trzyma rodziny PRZYJMUJĄCE wymuszenie, jak `MODELS_ACCEPTING_TEMPERATURE`: `auto` przyjmuje
+# każdy model, a odrzucone wymuszenie zatrzymuje każdą turę, więc nowy model domyślnie go nie
+# dostaje. `claude-haiku-4-5` jest na liście za dokumentacją dostawcy, bez sprawdzenia na żywo.
+MODELS_ACCEPTING_FORCED_TOOL_CALL = ("claude-haiku-4-5", "claude-sonnet-5", "claude-opus-5")
+
+TOOL_CHOICE_ANY  = {"type": "any"}
+TOOL_CHOICE_AUTO = {"type": "auto"}
 
 # Rodzaje bloków odpowiedzi, które klient czyta albo odsyła w ustalonym kształcie.
 BLOCK_TEXT              = "text"
 BLOCK_TOOL_USE          = "tool_use"
 BLOCK_THINKING          = "thinking"
 BLOCK_REDACTED_THINKING = "redacted_thinking"
+
+
+def belongs_to_family(
+    model:    str,              # np. "claude-haiku-4-5-20251001"
+    families: tuple[str, ...],  # np. ("claude-haiku-4-5", "claude-sonnet-5")
+) -> bool:
+    """
+    Description:
+    Sprawdza, czy model należy do jednej z rodzin: nosi nazwę rodziny albo nazwę rodziny z datą
+    wydania na końcu. Sam początek nazwy nie wystarcza, bo `claude-sonnet-5-5` zaczyna się od
+    `claude-sonnet-5`, a to inna rodzina.
+
+    Example args:
+        model="claude-haiku-4-5-20251001"
+        families=("claude-haiku-4-5", "claude-sonnet-5")
+
+    Example result:
+        True
+    """
+    return any(re.fullmatch(rf"{re.escape(family)}(-\d{{8}})?", model) for family in families)
 
 
 class ClaudeLLMClient(LLMClient):
@@ -109,6 +138,9 @@ class ClaudeLLMClient(LLMClient):
         Whether `temperature` is sent at all is settled here too, because newer models reject the
         parameter with a 400 instead of ignoring it — see `MODELS_ACCEPTING_TEMPERATURE`.
 
+        Tak samo rozstrzyga się tu, czy tura z narzędziami wymusza wywołanie narzędzia: nowsze
+        modele odrzucają wymuszenie błędem 400 — patrz `MODELS_ACCEPTING_FORCED_TOOL_CALL`.
+
         Example args:
             api_key="sk-ant-api03-...KLUCZ"
             model="claude-haiku-4-5"
@@ -131,6 +163,11 @@ class ClaudeLLMClient(LLMClient):
         # Decided once. A dated snapshot ("claude-haiku-4-5-20251001") must match its family, so
         # this is a prefix test rather than an exact membership check.
         self._accepts_temperature = model.startswith(MODELS_ACCEPTING_TEMPERATURE)
+
+        # Też rozstrzygane raz. Tu początek nazwy nie wystarcza: `claude-sonnet-5-5` zaczyna się od
+        # `claude-sonnet-5`, a wymuszenie przyjmuje tylko ten drugi.
+        forces_tool_call  = belongs_to_family(model, MODELS_ACCEPTING_FORCED_TOOL_CALL)
+        self._tool_choice = TOOL_CHOICE_ANY if forces_tool_call else TOOL_CHOICE_AUTO
 
     async def complete(
         self,
@@ -173,7 +210,8 @@ class ClaudeLLMClient(LLMClient):
         """
         Description:
         Wykonuje jedną turę modelu w rozmowie z narzędziami i oddaje ją w naszym kształcie, ze
-        zużyciem i kosztem. Model musi wywołać narzędzie (`tool_choice: any`).
+        zużyciem i kosztem. Wywołanie narzędzia jest wymuszane (`tool_choice: any`) tam, gdzie
+        model to przyjmuje; pozostałe modele dostają `auto` i mogą odpowiedzieć samym tekstem.
 
         Example args:
             system="Jesteś asystentem wdrożeniowca helpdesku…"
@@ -311,7 +349,7 @@ class ClaudeLLMClient(LLMClient):
             "system":        system,
             "messages":      self._turn_messages(messages),
             "tools":         [self._tool_param(tool) for tool in tools],
-            "tool_choice":   TOOL_CHOICE_ANY,
+            "tool_choice":   self._tool_choice,
         }
 
         # Wysyłane tylko tam, gdzie nadal jest przyjmowane — gdzie indziej to twarde 400.
