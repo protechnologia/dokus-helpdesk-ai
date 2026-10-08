@@ -183,7 +183,7 @@ class Settings(BaseSettings):
     # Domyka to, czego limity narzędzi nie domykają: wywołanie ponad limit narzędzia dostaje
     # odmowę, ale turę zużywa, więc model wołający w kółko zużywałby tokeny bez końca.
     # 20 to zapas, nie cel: sprawa w sondach z 2026-10-04 to 4–7 tur, a limity narzędzi pozwalają
-    # na 32 wywołania, które model zwykle grupuje po kilka na turę. Ucięcie sprawy kosztuje
+    # na 37 wywołań, które model zwykle grupuje po kilka na turę. Ucięcie sprawy kosztuje
     # więcej niż kilka tur zapasu.
     agent_max_iterations: int = Field(default=20, ge=1)
 

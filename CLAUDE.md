@@ -110,7 +110,8 @@ narzędzie, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzj
 są właściwe i każdy graf przeszedł na prawdziwym modelu (OpenAI), na zmyślonych zgłoszeniach
 i atrapach narzędzi. Trasy biorą graf z węzłów właściwych, gdy model generujący nie jest atrapą,
 ale bez prawdziwego anonimizatora taka konfiguracja odmawia, więc na danych klientów nic jeszcze
-nie rusza. Wszystkie osiem narzędzi ma wersję właściwą; dwa, które czytają wątki zgłoszeń,
+nie rusza. Wszystkie dziewięć narzędzi ma wersję właściwą: osiem na zgłoszeniach i instrukcjach
+oraz cytowanie fragmentu kodu, pierwsze z narzędzi kodu. Dwa, które czytają wątki zgłoszeń,
 czekają na dane, bo tabela wątków napełni się dopiero po anonimizacji.
 
 ### Zasady produktu
@@ -902,8 +903,9 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — indeksacja i narzędzia powstają
 
 Trzeci materiał obok zgłoszeń i instrukcji: kod źródłowy Dokusa, czytany narzędziami agenta
 (p. 60–67). Ma pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają, przede wszystkim gdy
-zgłoszenie niesie komunikat albo kod błędu. Narzędzi jeszcze nie ma; są paczka kodu (p. 60)
-i zestaw przypadków (p. 61). Niżej decyzje i liczby z 2026-10-06 oraz z prób z 2026-10-07.
+zgłoszenie niesie komunikat albo kod błędu. Z narzędzi jest cytowanie fragmentu (`quote_code`,
+p. 67); szukanie i odczyt jeszcze nie powstały (p. 62–66). Są też paczka kodu (p. 60) i zestaw
+przypadków (p. 61). Niżej decyzje i liczby z 2026-10-06 oraz z prób z 2026-10-07.
 Liczby bez dopisku „w paczce" pochodzą z rozpoznania na kopii roboczej gałęzi jednego klienta,
 a paczka powstała z innej gałęzi.
 
@@ -952,6 +954,13 @@ a paczka powstała z innej gałęzi.
   (2026-10-06).** W dev wpis nakłada się na montowane do zapisu `./data`, w prod jest jedynym
   montowaniem `api`. Narzędzia dostają ścieżki od modelu, więc kontener nie może mieć jak
   zmienić paczki.
+- **Paczkę czyta `CodePackage` z `core_service/loader_code_package.py`, a jej katalog podaje
+  `CODE_PACKAGE_DIR` (2026-10-07).** To ścieżka po stronie kontenera; montowania nie przestawia.
+  Ścieżkę od modelu sprawdza się po zdjęciu `..` i dowiązań: ma leżeć w `repo/`, inaczej
+  narzędzie odmawia. Linie dzieli wyłącznie znak nowej linii, jak w ripgrepie, więc numery
+  z szukania, odczytu i cytowania znaczą to samo. Brak paczki wychodzi przy pierwszym użyciu
+  narzędzia, nie przy starcie, jako błąd konfiguracji: do modelu nie wraca, bo inaczej każde
+  pytanie o kod kończyłoby się odpowiedzią „nie ma takiego pliku".
 - **Skrypt paczki rozkodowuje polskie litery zapisane jako `\uXXXX` — tylko w plikach JS i tylko
   litery.** Taki zapis ma 120 z 576 własnych plików JS: dosłowne szukanie „skomunikować" znalazło
   3 linie z 4, a pominięta leży w głównej obsłudze błędów frontendu. W PHP w pojedynczych
@@ -1328,7 +1337,9 @@ Wspólne:
   `/search`).
 - **Źródła w odpowiedzi to materiał, który agent ODCZYTAŁ, i nie mają `score` (2026-10-04).**
   Odczyt po numerze nie zna podobieństwa; widzi je tylko model, w wyniku wyszukiwania. `/search`
-  oddaje więc karty przeczytane przez agenta, a nie wszystko, co wyszukiwanie znalazło.
+  oddaje więc karty przeczytane przez agenta, a nie wszystko, co wyszukiwanie znalazło. Źródło
+  z kodu (`source` „code") to fragment zacytowany jako przyczyna: `item_id` niesie ścieżkę pliku
+  z zakresem linii, a daty nie ma (2026-10-07).
 - **Wspólne żądanie `TicketRequest` dla `/search`, `/gate/close`, `/parse-ticket` i `/suggest`**;
   trasa robi z niego `RawTicket.as_thread()`, czyli ten sam tekst wątku, który widzi parser
   korpusu. `/gate/reply` i `/polish` biorą samą wiadomość albo notatki.
@@ -1607,7 +1618,7 @@ czasu jest pusta.
   odpowiedzi grafu (`respond_<graf>`) tu nie trafia — nic go nie wykonuje, to kontrakt wyjścia
   grafu. Anonimizator i model też nie: anonimizacja to stały węzeł, którego agent nie może pominąć,
   a model jest wołającym, nie narzędziem. Tabela narzędzi stoi na górze `agent_tools/__init__.py`.
-- **Osiem narzędzi, dwa materiały, oba dwustopniowo (2026-10-04).** Wyszukiwanie oddaje
+- **Zgłoszenia i dokumentacja: osiem narzędzi, dwustopniowo (2026-10-04).** Wyszukiwanie oddaje
   identyfikatory, treść daje odczyt, i tylko odczyt cytuje — lista źródeł pokazuje to, co model
   przeczytał, a nie to, co znalazł. Zgłoszenia: `find_tickets_vector` (po znaczeniu, numer
   i `score`) i `find_tickets_text` (pola `exact` i `words`, numer i `matched_by`), a treść przez
@@ -1652,10 +1663,10 @@ czasu jest pusta.
   Karty zostają listą: są krótkie, a przy jednym objawie i różnych przyczynach model ma je
   przeczytać razem.
 - **Narzędzia leżą w folderze swojego materiału: `agent_tools/tickets/` i `agent_tools/docs/`
-  (2026-10-03)**, nazwanym jak `SourceRef.source`; katalog narzędzia zachowuje pełną nazwę
-  narzędzia. Atrapy narzędzi jednego materiału stoją na jednym zmyślonym zestawie
-  (`tickets/fake_tickets.py`, `docs/fake_docs.py`), żeby identyfikator z atrapy wyszukiwania dało
-  się odczytać atrapą odczytu.
+  (2026-10-03) oraz `agent_tools/code/` (2026-10-07)**, nazwanym jak `SourceRef.source`; katalog
+  narzędzia zachowuje pełną nazwę narzędzia. Atrapy narzędzi jednego materiału stoją na jednym
+  zmyślonym zestawie (`tickets/fake_tickets.py`, `docs/fake_docs.py`, `code/fake_code.py`), żeby
+  identyfikator z atrapy wyszukiwania dało się odczytać atrapą odczytu.
 - **Opis narzędzia dla modelu leży w katalogu narzędzia (`description.md`) i jest ten sam
   w każdym grafie (2026-10-03)** — mówi, jak pytać narzędzie i co ono oddaje; po co wyniki
   w danej funkcji, mówi prompt grafu. Wcześniej leżał w każdym grafie osobno: 18 plików, w których
@@ -1686,7 +1697,9 @@ czasu jest pusta.
   materiał, który odpowiedź może cytować, i sam mówi który (`cite()`). `AuxiliaryTool` to
   wyszukiwanie i spis: zwraca **wyłącznie tekst** i nie ma `cite()`, więc jego wynik **nie ma jak**
   trafić na listę źródeł. Dzięki temu `requires_hits` wymusza przeczytanie materiału przed
-  propozycją, a nie samo jego znalezienie.
+  propozycją, a nie samo jego znalezienie. Cytowanie kodu (`quote_code`) też jest
+  `KnowledgeSource`, choć niczego nie odczytuje: jego `cite()` oddaje źródło tylko dla fragmentu
+  wskazanego jako przyczyna.
 - **`item_id` w `SourceRef` identyfikuje odczytany element; klucz to `source:item_id`**, bo id są
   unikalne tylko w obrębie materiału, a deduplikacja po samym id scaliłaby zgłoszenie z sekcją
   dokumentacji. **`source` nazywa materiał („tickets", „docs"), nie narzędzie (2026-10-03):** to
@@ -1734,9 +1747,9 @@ czasu jest pusta.
   na pakiet i brak `cite()` w narzędziach pomocniczych. Nowe narzędzie jest objęte testem bez
   dopisywania go do żadnej listy.
 - **Narzędzia właściwe buduje `agent_tools/factory.py`, z konfiguracji (2026-10-05):** po jednym
-  kliencie embeddera, Qdranta i Postgresa, wspólnym dla ośmiu narzędzi, w kolejności `TOOL_NAMES`
-  grafów. Powstają wszystkie osiem; czy instancja bez dokumentacji ma pomijać jej narzędzia,
-  rozstrzyga p. 15.
+  kliencie embeddera, Qdranta i Postgresa, wspólnym dla ośmiu narzędzi, oraz paczka kodu dla
+  `quote_code`, w kolejności `TOOL_NAMES` grafów. Powstają wszystkie dziewięć; czy instancja bez
+  dokumentacji ma pomijać jej narzędzia, rozstrzyga p. 15.
 - **Kod aplikacji liczy się jako źródło jak zgłoszenie i instrukcja, także w wariancie
   wymagającym źródeł (decyzja 2026-10-06, narzędzia w p. 62–67).** Odpowiedź opartą wyłącznie na
   kodzie wołający rozpoznaje po rodzaju źródła (`code`). Źródłem jest fragment, który model
@@ -1744,6 +1757,23 @@ czasu jest pusta.
   więc przy zasadzie „odczyt cytuje" taki wariant prawie nigdy nie powiedziałby „nie mam z czego
   zaproponować". Czy model powstrzyma się od wskazania przyczyny przy szukaniu na ślepo,
   sprawdza p. 59.
+- **Kod cytuje osobne narzędzie, `quote_code` (2026-10-07): jeden fragment na wywołanie, z rolą.**
+  Przyjmuje ścieżkę pliku, pierwszą i ostatnią linię oraz wymaganą rolę: `cause` (fragment
+  powoduje opisane zachowanie) albo `excluded` (sprawdzony i wykluczony). Źródłem jest tylko
+  `cause`: `source` to „code", `item_id` to ścieżka z zakresem linii (`ścieżka:17-19`), tytuł to
+  ta sama ścieżka z zakresem słowami, daty nie ma. Fragment ma najwyżej 40 linii (stała w modelu
+  zapytania), a limit to 5 cytowań na sprawę, przyczyn i wykluczeń razem; obie liczby pochodzą
+  z sondy i wracają do pomiaru w p. 59. Wykluczenie nie cofa źródła zacytowanego wcześniej jako
+  przyczyna i do człowieka dziś nie trafia: zostaje w rozmowie, a w odpowiedzi `/search`
+  w `queries` (p. 68).
+- **`quote_code` oddaje samo potwierdzenie i nie sprawdza, czy model cytowane linie czytał
+  (2026-10-07).** Wynik to ścieżka, zakres i rola, bez treści linii: z treścią w zwrocie model
+  w sondzie używał cytowania zamiast odczytu. Narzędzie nie widzi rozmowy, a narzędzi odczytu
+  kodu jeszcze nie ma, więc regułę „cytuj tylko to, co przeczytałeś" niesie opis dla modelu,
+  a liczy pomiar (p. 59). Jako błąd do modelu wracają: ścieżka spoza paczki, katalog albo brak
+  pliku, fragment za końcem pliku, a z modelu zapytania brak roli, odwrócony zakres i fragment
+  ponad limit. Cena: do czasu p. 62–66 model ma w trzech grafach narzędzie, którym może cytować
+  tylko na ślepo.
 - **Każde narzędzie jest tylko do odczytu** — wstrzyknięcie przez treść zgłoszenia może co
   najwyżej skierować agenta do nietrafionego materiału, nie zmienić indeksu.
 
@@ -1777,14 +1807,15 @@ czasu jest pusta.
   model wywołanie poprawił, a limit wątków ma być liczbą wątków przeczytanych. Ten
   sam limit stoi w opisie narzędzia dla modelu: miejsce `{{max_calls}}` w `description.md`
   wypełnia `tool_definitions()`, więc narzędzie bez limitu to błąd składania. Ile jedno
-  wywołanie może pobrać (20 kart, 5 sekcji), zostaje stałą w modelu zapytania; wątek jest zawsze
-  jeden. Wartości od 2026-10-05: wyszukiwania i karty po 5, sekcje i wątki po 3, spis treści 1.
+  wywołanie może pobrać (20 kart, 5 sekcji, 40 linii cytowanego kodu), zostaje stałą w modelu
+  zapytania; wątek jest zawsze jeden. Wartości od 2026-10-05: wyszukiwania i karty po 5, sekcje
+  i wątki po 3, spis treści 1; od 2026-10-07 cytowanie kodu 5.
 - **Limit tur modelu: `AGENT_MAX_ITERATIONS` = 20 (2026-10-05).** Liczy odpowiedzi modelu
   w grafie z narzędziami, nie wywołania. Gdy w ostatniej dozwolonej turze model nadal woła
   narzędzia wiedzy, `route_after_agent()` prowadzi do `respond` i narzędzia nie są wykonywane.
   Domyka to, czego limity narzędzi nie domykają: wywołanie ponad limit narzędzia dostaje odmowę,
   ale turę zużywa. 20 to zapas, nie cel: sprawa w sondach to 4–7 tur, a limity narzędzi pozwalają
-  na 32 wywołania, czyli do 33 tur przy jednym wywołaniu na turę (do przeliczenia w p. 23).
+  na 37 wywołań, czyli do 38 tur przy jednym wywołaniu na turę (do przeliczenia w p. 23).
   Sprawa ucięta limitem dostaje od `respond` jedną turę ponad limit, na samą odpowiedź: jest już
   opłacona, a narzędzia w tej turze nadal nie ruszają.
 - **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `engine_llm/models/messages.py`), żadnych typów
@@ -1822,7 +1853,10 @@ czasu jest pusta.
 - **Graf wymagający źródeł bez źródeł kończy bez wyniku i bez poprawki.** Węzeł sprawdza `sources`
   w stanie, zanim przeczyta odpowiedź: brak źródeł nie jest błędem formatu, więc model nie ma
   czego poprawić. Liczy się to, co agent odczytał; zgłoszenie znalezione, ale nieprzeczytane,
-  źródłem nie jest. Cena: model, który skończył za wcześnie, nie dostaje drugiej szansy.
+  źródłem nie jest. W kodzie liczy się fragment zacytowany jako przyczyna: sam odczyt pliku ani
+  samo wykluczenie źródła nie dają, więc sprawa bez wskazanej przyczyny i bez innych źródeł
+  kończy bez propozycji (2026-10-07). Cena: model, który skończył za wcześnie, nie dostaje
+  drugiej szansy.
 - **Węzeł odpowiedzi buduje `respond_node()` z pakietu grafu**: graf zna swoje narzędzie
   odpowiedzi, model wyniku, wymóg źródeł i pola, które wypełnia sam. W `parse_ticket` pola od
   grafu (`filled_by_graph()`) wygrywają z tym, co podał model.
@@ -2298,6 +2332,7 @@ w p. 46.
 **Testy i jakość**
 - Lint: `ruff check .`
 - Wszystko, co nie potrzebuje stacku ani płatnego modelu (każdy rodzaj testu): `pytest`
+  (wymaga zbudowanej paczki z aplikacji syntetycznej — polecenie w „Przygotowanie danych")
 - Wszystko naraz: `pytest -m "not llm_live"` — **jedno polecenie na cały przebieg**; wymaga
   stacku. **Nie `pytest -m ""`** — ono wybiera też testy na żywym modelu, a te bez jawnego
   `llm_live` kończą się błędem
@@ -2326,7 +2361,7 @@ w p. 46.
 - Cała konfiguracja przez ENV (pydantic-settings) — żadnych sekretów/endpointów na sztywno.
 - **Jeden `.env` w korzeniu** (nie per usługa; wartości rozdzielamy prefiksami
   `LLM_GENERATION_*`, `LLM_ANONYMIZATION_*`, `EMBEDDING_*`, `QDRANT_*`, `POSTGRES_*`, `RAG_*`,
-  `AGENT_*`). `.env` w `.gitignore`, **`.env.example` w repo =
+  `CODE_*`, `AGENT_*`). `.env` w `.gitignore`, **`.env.example` w repo =
   kontrakt** — każda zmienna z compose i `Settings` musi tam być. Bez `.env.prod`/`.env.dev` —
   różnice środowisk przez warstwy compose i ENV na maszynie docelowej.
 - **Progi i parametry retrievalu (`RAG_TOP_K`, `RAG_SCORE_MIN`…) idą do ENV** — to strojenie,
@@ -2467,17 +2502,17 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1218 (0)           | 27 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 320 (79)           | 73 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1292 (0)           | 22 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 333 (79)           | 79 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 105 (9)            | 10 s |
-| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 48 s |
+| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 59 s |
 
-Liczby i czasy z 2026-10-05: każdy folder osobno, w komplecie
+Liczby i czasy z 2026-10-07: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku. Bez testów na stacku
-integracyjne trwają 10 s, a ewaluacyjne poniżej sekundy — całe 48 s to 207 wyszukań golden setów
+integracyjne trwają 10 s, a ewaluacyjne poniżej sekundy — całe 59 s to 207 wyszukań golden setów
 przez prawdziwy embedder (178 w zgłoszeniach, 29 w dokumentacji). Komplet jednym poleceniem
-(`pytest -m "not llm_live"`): 1649 testów, 128 s; domyślny `pytest`, bez stacku: 1523 testy,
-27 s. Trzydzieści cztery testy integracyjne na żywym modelu (`llm_live`) są w liczbie testów
+(`pytest -m "not llm_live"`): 1736 testów, 142 s; domyślny `pytest`, bez stacku: 1610 testów,
+26 s. Trzydzieści cztery testy integracyjne na żywym modelu (`llm_live`) są w liczbie testów
 folderu, ale poza oboma przebiegami.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
@@ -2524,7 +2559,11 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   odpowiedzi, gdy takich cytowań nie ma. Fragment linii z zestawu nie jest warunkiem zaliczenia:
   przed wywołaniem modelu test sprawdza po nim, że miejsce nadal stoi w paczce. Przypadek ma
   dwie próby; druga rusza tylko po nieudanej pierwszej i jest wypisana w podsumowaniu. Treści
-  odpowiedzi test nie ocenia.
+  odpowiedzi test nie ocenia. Testy `quote_code` już są (2026-10-07): zapytania z zestawu idą
+  przez prawdziwy węzeł `run_tools`, bo odmowa bywa dziełem modelu zapytania albo narzędzia,
+  a model ma w obu przypadkach dostać błąd w miejscu wyniku. Cena: to jedyny test bez markera,
+  który potrzebuje czegoś spoza commita — bez zbudowanej paczki syntetycznej domyślny `pytest`
+  kończy się błędem z poleceniem budowy.
 - **Bez obronnego boilerplate'u bez uzasadnienia.** Zadeklarowanych zależności (runtime i dev)
   **nie** guardujemy `pytest.importorskip` — brak zadeklarowanej zależności ma być głośnym
   `ImportError`, nie cichym skipem. `importorskip` zostaje tylko dla zależności faktycznie
@@ -2687,11 +2726,16 @@ tylko klient, który na spis, odczyt, podciąg i słowa oddaje ustalone odpowied
 zapytania. Treść SQL-a tabel sprawdza osobna atrapa w `test_api_db_postgres_tables.py`.
 
 **Komplet atrap narzędzi i narzędzie z padniętą zależnością bierz z
-`tests/helpers_agent_tools.py`** — `fake_agent_tools()` oddaje atrapy wszystkich ośmiu narzędzi,
+`tests/helpers_agent_tools.py`** — `fake_agent_tools()` oddaje atrapy wszystkich narzędzi,
 a `find_tickets_vector_with_dead_embedder()` narzędzie właściwe na kliencie z transportem, który
 nie odpowiada. Nie definiuj w teście podklasy narzędzia: test
 kontraktu narzędzi znajduje wszystkie klasy narzędzi w procesie i policzy ją jako drugie
 narzędzie o tej samej nazwie.
+
+**Paczkę syntetycznej aplikacji i zapytania do niej bierz z `tests/helpers_code_package.py`** —
+`synthetic_code_package()` oddaje czytnik zbudowanej paczki, `synthetic_code_cases()` sekcję
+narzędzia z zestawu, a `line_of()` zamienia fragment linii z zestawu na numer linii. Bez
+zbudowanej paczki helper kończy test błędem, nie pominięciem.
 
 ## Zakres i plan
 
@@ -2841,6 +2885,14 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Drugi koniec łańcucha PHP → JS zawsze wymagany** — gdy pytanie ze zgłoszenia rozstrzyga
   sama strona serwera, model po stronę przeglądarki nie sięga i ma rację; wymagane są tylko
   miejsca, bez których nie da się odpowiedzieć.
+- **Treść linii w wyniku `quote_code`** — z treścią w zwrocie model używał cytowania zamiast
+  odczytu i cytował linie, których nie przeczytał; treść daje wyłącznie odczyt.
+- **Cytowanie kodu bez ról** — model cytował też miejsca wykluczone, jako dowód, więc sprawa bez
+  odpowiedzi miała dwa źródła; z rolą `excluded` nie ma żadnego.
+- **Blokada cytowania linii, których model nie odczytał** — narzędzie nie widzi rozmowy,
+  a sprawdzanie w węźle wiązałoby go z nazwami narzędzi odczytu, których jeszcze nie ma; bez
+  treści w zwrocie model w dwóch przebiegach nie cytował na ślepo. Wraca, gdy pomiar pokaże
+  takie cytowania (p. 59).
 
 ### Plan
 
@@ -3014,29 +3066,18 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   w sekcjach na narzędzie); `filters.yml` dopisany do paczki; sonda na `claude-sonnet-5-5`
   z prototypami narzędzi; testów jeszcze nie ma, dochodzą z narzędziami, a opisy zachowania
   czekają na zatwierdzenie; reguły — „Kod aplikacji", „Testy".
-- [ ] **67. `quote_code` — osobne narzędzie cytujące kod** (dopisany 2026-10-07, numer spoza
-  kolejności) — przyjmuje fragment pliku (ścieżka, od linii, do linii), z limitem długości
-  i limitem wywołań, i tylko ono dokłada kod do listy źródeł (`source` „code", `item_id` to
-  ścieżka z zakresem linii); modelowi oddaje samo potwierdzenie, bez treści linii, którą daje
-  wyłącznie odczyt; każde cytowanie niesie rolę: `cause` (miejsce powoduje opisane
-  zachowanie) albo `excluded` (sprawdzone i wykluczone), źródłem odpowiedzi jest tylko `cause`,
-  a wykluczenia idą do uwag dla wdrożeniowca (p. 68); odczyt pliku (p. 63) i symbolu (p. 66)
-  służy do chodzenia po kodzie i źródeł nie tworzy; do rozstrzygnięcia: limit długości
-  fragmentu, limit wywołań, czy wolno cytować linie wcześniej nieodczytane i co robi wariant
-  wymagający źródeł, gdy model nie wskazał żadnej przyczyny. *Dlaczego:* w próbach
-  z 2026-10-07 agent otwierał po kilkanaście plików na sprawę, a rozstrzygały 1–3, więc lista
-  źródeł tonęłaby w plikach, przez które model tylko przechodził; źródłem staje się fragment,
-  a nie plik na 4 tys. linii, i czytanie na ślepo przestaje tworzyć źródła; role są potrzebne,
-  bo w sondzie na `claude-sonnet-5-5` model cytował też miejsca wykluczone, jako dowód: sprawa
-  bez odpowiedzi miała wtedy dwa źródła, a po dodaniu ról żadnej przyczyny i jedno wykluczenie;
-  treść w zwrocie cytowania kusiła do cytowania linii nieodczytanych, zwłaszcza po wyczerpaniu
-  limitu odczytów, a bez niej model w dwóch przebiegach nie zrobił tego ani razu i sam napisał,
-  czego nie przeczytał (pojedyncze przebiegi).
+- [x] **67. `quote_code`** (2026-10-07) — `QuoteCodeTool` na paczce kodu: fragment pliku do 40
+  linii z rolą `cause` albo `excluded`, potwierdzenie bez treści, źródłem tylko przyczyna; czytnik
+  paczki `CodePackage`, `CODE_PACKAGE_DIR` i limit 5 cytowań na sprawę; wpięte w `search`,
+  `suggest_questions` i `suggest_solution` przed narzędziami odczytu; linii nieodczytanych kod
+  nie blokuje, a `respond` zostaje bez zmian; reguły — „Kod aplikacji", „Warstwa narzędzi
+  agenta", „Warstwa węzłów", „Testy".
 - [ ] **68. Uwagi dla wdrożeniowca osobno od treści dla klienta** (dopisany 2026-10-07, numer
   spoza kolejności) — `Proposal` dostaje drugie pole: `text` zostaje treścią dla klienta,
-  a uwagi dla wdrożeniowca (wnioski z kodu, ostrzeżenia, czego materiał nie rozstrzyga) idą
-  osobno, z jawnym wyjściem; zmienia się odpowiedź `/suggest`, opisy narzędzi odpowiedzi i wzory
-  w promptach trzech wariantów `suggest_*`; zasada 9 obowiązuje oba pola; do rozstrzygnięcia:
+  a uwagi dla wdrożeniowca (wnioski z kodu, miejsca zacytowane w `quote_code` jako wykluczone,
+  ostrzeżenia, czego materiał nie rozstrzyga) idą osobno, z jawnym wyjściem; zmienia się
+  odpowiedź `/suggest`, opisy narzędzi odpowiedzi i wzory w promptach trzech wariantów
+  `suggest_*`; zasada 9 obowiązuje oba pola; do rozstrzygnięcia:
   czy wariant wymagający źródeł bez źródeł oddaje same uwagi i czy linie `[dla serwisanta: …]`
   i `[UWAGA: …]` znikają z treści dla klienta w całości. *Dlaczego:* jedno pole miesza dwóch
   odbiorców, a analiza z kodu niesie nazwy klas, ścieżki i ustawienia, które nie mogą wyjść do
@@ -3053,15 +3094,16 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
 - [ ] **62. `find_code_text`** — fraza dosłowna albo słowa w jednej linii, ripgrep w obrazie
   `api` w trybie dosłownym, z opcjonalnym zawężeniem do katalogu; oddaje ścieżkę i numer linii,
   bez treści, z limitem pozycji i licznikiem pominiętych; opis każe szukać stałego fragmentu
-  komunikatu, bez numerów i nazw; ścieżka paczki jako zmienna w `Settings`; do rozstrzygnięcia,
-  którą gałąź indeksuje instancja i czy metryczka ma ją zapisywać. *Dlaczego:* od niego zaczyna się sprawa z komunikatem albo
+  komunikatu, bez numerów i nazw; do rozstrzygnięcia, którą gałąź indeksuje instancja i czy
+  metryczka ma ją zapisywać. *Dlaczego:* od niego zaczyna się sprawa z komunikatem albo
   kodem błędu, a częste słowo trafia w dziesiątki tysięcy linii; bez zawężenia ginie też rzadkie
   trafienie wśród częstych: nazwa zdarzenia błędu stoi w 513 liniach w 177 plikach, a jego
   rejestracja w dwóch.
 - [ ] **63. `read_code_file`** — plik albo zakres linii, z limitem linii na wywołanie
-  i informacją o ucięciu; źródeł nie tworzy, robi to `quote_code` (p. 67); ścieżka spoza paczki
-  to błąd wracający do modelu. *Dlaczego:* po trafieniu trzeba zobaczyć, w jakiej klasie
-  i metodzie leży linia, a główne kontrolery mają po 3–4 tys. linii.
+  i informacją o ucięciu; źródeł nie tworzy, robi to `quote_code` (p. 67), którego opis dostaje
+  wtedy nazwy narzędzi odczytu; ścieżka spoza paczki to błąd wracający do modelu. *Dlaczego:*
+  po trafieniu trzeba zobaczyć, w jakiej klasie i metodzie leży linia, a główne kontrolery mają
+  po 3–4 tys. linii.
 - [ ] **64. `list_code_files`** — drzewo katalogu z opcjonalną głębokością, z limitem pozycji.
   *Dlaczego:* szukanie bez komunikatu i bez kodu błędu, po wskazówkach z opisu projektu.
 - [ ] **65. `describe_code`** — opis projektu w całości, raz na sprawę; szkic pisze model
@@ -3091,8 +3133,9 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   i grafy z narzędziami (`suggest_solution`: czy zastrzeżenie i krok nieodwracalny z karty
   trafiają do odpowiedzi; para dla narzędzi kodu: komunikat jest tylko w kodzie, a w parze
   kontrolnej nie ma go nigdzie — czy model powstrzymuje się wtedy od rozwiązania z luźno
-  powiązanego pliku). *Dlaczego:* da się je uruchomić przed anonimizatorem, więc prompty
-  dostają sygnał z modelu docelowego wcześniej niż z p. 21–28; tamtych pomiarów nie zastępują,
+  powiązanego pliku i ile cytowań wskazuje linie, których nie odczytał). *Dlaczego:* da się je
+  uruchomić przed anonimizatorem, więc prompty dostają sygnał z modelu docelowego wcześniej niż
+  z p. 21–28; tamtych pomiarów nie zastępują,
   bo scenariusze pisze autor promptów; stoi po p. 11, bo ocenia odpowiedź przepuszczoną przez
   właściwy `respond`.
 - [ ] **46. CLI dla grafów** (dopisany 2026-10-02, numer spoza kolejności) — `helpdesk gate
