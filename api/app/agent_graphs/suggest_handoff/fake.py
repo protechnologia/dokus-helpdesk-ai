@@ -11,7 +11,10 @@ from app.engine_anonymization import FakeAnonymizer
 
 # Propozycja atrapy, gdy nikt nie podał własnej — stała, żeby test, który przypadkiem na niej
 # polega, padł głośno.
-DEFAULT_PROPOSAL = Proposal(text="fake-suggest-handoff-proposal")
+DEFAULT_PROPOSAL = Proposal(
+    text           = "fake-suggest-handoff-proposal",
+    internal_notes = "fake-suggest-handoff-notes",
+)
 
 
 def example_state() -> SuggestHandoffState:
@@ -33,7 +36,7 @@ def example_state() -> SuggestHandoffState:
 
 
 def build_fake_graph(
-    proposal: Proposal = DEFAULT_PROPOSAL,  # np. Proposal(text="Przekazujemy sprawę…")
+    proposal: Proposal = DEFAULT_PROPOSAL,  # np. Proposal(text="Przekazujemy…", …)
 ) -> CompiledStateGraph:
     """
     Description:
@@ -43,7 +46,7 @@ def build_fake_graph(
     Graf jest jednorazowy: `FakeAgentNode` ma jedną turę. Na każde wywołanie buduj nowy.
 
     Example args:
-        proposal=Proposal(text="Przekazujemy sprawę do serwisu…")
+        proposal=Proposal(text="Przekazujemy sprawę do serwisu…", internal_notes="")
 
     Example result:
         CompiledStateGraph, który na dowolne zgłoszenie oddaje `output` = podaną propozycję

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.agent_graphs import run_graph
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
 from app.agent_graphs.registry import variant_graphs
+from app.core_model.graphs.proposal import Proposal
 from app.entry_routers.mapping import (
     to_log_items,
     to_raw_ticket,
@@ -58,11 +59,12 @@ async def suggest_answer(
         request=SuggestRequest(ticket_id="41002", body="Nie przychodzą przesyłki…",
                                variant="questions")
 
-    Wariant, który wymaga źródeł, bez odczytanych źródeł wraca bez propozycji: `text` jest puste,
-    a lista źródeł pusta.
+    Wariant, który wymaga źródeł, bez odczytanych źródeł wraca bez treści dla klienta: `text` jest
+    puste, lista źródeł pusta, a uwagi dla wdrożeniowca zostają.
 
     Example result:
-        SuggestResponse(variant="questions", text="1. Od kiedy…", sources=[SourceItem(…), …])
+        SuggestResponse(variant="questions", text="1. Od kiedy…",
+                        internal_notes="1: odcina zacięcie kolejki…", sources=[SourceItem(…), …])
 
     Raises:
         HTTPException: 422 przy nieznanym wariancie — literówka w nazwie guzika ma być widoczna
@@ -81,23 +83,28 @@ async def suggest_answer(
     # Wariant bez narzędzi wiedzy nie ma pola `sources` — wraca z pustą listą, i to jest informacja.
     sources = getattr(final, "sources", [])
 
-    # Graf kończy bez wyniku tylko wtedy, gdy wymaga źródeł, a agent żadnego nie odczytał.
-    text = final.output.text if final.output is not None else None
+    # Bez odczytanych źródeł wariant, który ich wymaga, oddaje same uwagi (`ProposalNotes`), a gdy
+    # jego graf nie zostawia nawet ich — nic. Treść dla klienta jest tylko w pełnej propozycji.
+    output         = final.output
+    text           = output.text if isinstance(output, Proposal) else None
+    internal_notes = output.internal_notes if output is not None else ""
 
     response = SuggestResponse(
-        variant = request.variant,
-        text    = text,
-        sources = to_source_items(sources),
-        usage   = to_usage_item(final.usage),
-        log     = to_log_items(final.log),
+        variant        = request.variant,
+        text           = text,
+        internal_notes = internal_notes,
+        sources        = to_source_items(sources),
+        usage          = to_usage_item(final.usage),
+        log            = to_log_items(final.log),
     )
 
     logger.info(
-        "suggest ticket_id=%s variant=%s sources=%d proposal=%s",
+        "suggest ticket_id=%s variant=%s sources=%d proposal=%s notes=%s",
         request.ticket_id,
         request.variant,
         len(response.sources),
         response.text is not None,
+        bool(response.internal_notes),
     )
 
     return response

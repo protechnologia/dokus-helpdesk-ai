@@ -1,7 +1,7 @@
 import asyncio
 import importlib
 import pkgutil
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from types import ModuleType
 from typing import get_args
 
@@ -9,13 +9,15 @@ import pytest
 from pydantic import BaseModel
 
 import app.agent_graphs
-from app.agent_graphs import run_graph
+from app.agent_graphs import run_graph, suggest_solution
 from app.agent_graphs.factory import build_real_graph
+from app.agent_tools import AgentTool
 from app.config import LLMSettings, Settings
+from app.core_model.graphs.proposal_notes import ProposalNotes
 from app.engine_anonymization import FakeAnonymizer
 from app.engine_llm import get_llm_client
 from tests.conftest import live_generation_llm
-from tests.helpers_agent_tools import fake_agent_tools
+from tests.helpers_agent_tools import fake_agent_tools, fake_agent_tools_without_material
 
 pytestmark = pytest.mark.llm_live
 
@@ -29,9 +31,10 @@ pytestmark = pytest.mark.llm_live
 # Jakości odpowiedzi nie sprawdzają: to pomiary grafów (CLAUDE.md -> „Plan", p. 21–28).
 #
 # KOSZTUJE: jeden przebieg pliku to jedna sprawa na graf, czyli osiem spraw — pięć po jednej turze
-# i trzy w pętli po kilka tur z ośmioma narzędziami (razem rząd kilkunastu centów na mocnym
-# modelu). Sprawa każdego grafu liczy się raz, dopiero gdy potrzebuje jej test, i jest wspólna dla
-# jego testów — więc `-k gate_close` uruchamia i opłaca tylko ten jeden graf.
+# i trzy w pętli po kilka tur z dziewięcioma narzędziami — oraz dziewiąta: `suggest_solution`
+# na narzędziach, które nic nie znajdują (razem rząd kilkunastu centów na mocnym modelu). Sprawa
+# każdego grafu liczy się raz, dopiero gdy potrzebuje jej test, i jest wspólna dla jego testów —
+# więc `-k gate_close` uruchamia i opłaca tylko ten jeden graf.
 
 GRAPHS = [
     importlib.import_module(f"app.agent_graphs.{module.name}")
@@ -85,8 +88,9 @@ def output_type(
 
 
 async def _run_the_graph(
-    graph: ModuleType,   # np. <module app.agent_graphs.search>
-    llm:   LLMSettings,  # np. Settings().llm_generation()
+    graph: ModuleType,           # np. <module app.agent_graphs.search>
+    llm:   LLMSettings,          # np. Settings().llm_generation()
+    tools: Sequence[AgentTool],  # np. fake_agent_tools()
 ) -> BaseModel:
     """
     Description:
@@ -97,6 +101,7 @@ async def _run_the_graph(
     Example args:
         graph=<module app.agent_graphs.search>
         llm=LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", model="gpt-5.4-mini", …)
+        tools=fake_agent_tools()
 
     Example result:
         SearchState(sources=[SourceRef(item_id="90001", …), …], iterations=4,
@@ -112,7 +117,7 @@ async def _run_the_graph(
         graph          = graph,
         llm            = get_llm_client(llm),
         anonymizer     = FakeAnonymizer(),
-        tools          = fake_agent_tools(),
+        tools          = tools,
         limits         = settings.tool_call_limits(),
         max_iterations = settings.agent_max_iterations,
     )
@@ -150,7 +155,7 @@ def live_run(
         # --- pierwsza prośba o ten graf: jedna sprawa na prawdziwym modelu ---
         if name not in done:
             try:
-                done[name] = asyncio.run(_run_the_graph(graph, llm))
+                done[name] = asyncio.run(_run_the_graph(graph, llm, fake_agent_tools()))
             except Exception as error:  # noqa: BLE001 — zapamiętany i zgłoszony każdemu testowi
                 done[name] = error
 
@@ -163,6 +168,29 @@ def live_run(
     return run
 
 
+@pytest.fixture(scope="module")
+def solution_without_material(
+    request: pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór testów z `-m`
+) -> BaseModel:
+    """
+    Description:
+    Stan końcowy sprawy `suggest_solution` na prawdziwym modelu, w której narzędzia nic nie
+    znajdują (`fake_agent_tools_without_material()`). Osobna sprawa obok tej z `live_run`, liczona
+    dopiero, gdy poprosi o nią test. Konfigurację bierze przez `live_generation_llm()`, tak jak
+    `live_run`.
+
+    Example args:
+        (wstrzykiwane przez pytest)
+
+    Example result:
+        SuggestSolutionState(sources=[], output=ProposalNotes(internal_notes="Szukałem…"), …)
+    """
+    llm   = live_generation_llm(request.config)
+    tools = fake_agent_tools_without_material()
+
+    return asyncio.run(_run_the_graph(suggest_solution, llm, tools))
+
+
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
 def test_the_model_answers_with_the_respond_tool_and_the_answer_is_accepted(
     graph:    ModuleType,
@@ -171,7 +199,8 @@ def test_the_model_answers_with_the_respond_tool_and_the_answer_is_accepted(
     """Sprawdza, czy w każdym grafie prawdziwy model kończy sprawę wywołaniem narzędzia odpowiedzi
     tego grafu, zanim wyczerpie limit tur, a węzeł odpowiedzi przyjmuje tę odpowiedź — najwyżej
     po jednej poprawce — i zapisuje wynik w typie grafu: werdykt, kartę, tekst albo propozycję.
-    Wariant wymagający źródeł, w którym model niczego nie odczytał, kończy bez wyniku.
+    Wariant wymagający źródeł, w którym model niczego nie odczytał, kończy z samymi uwagami dla
+    wdrożeniowca.
 
     Wyłapuje graf, którego narzędzia odpowiedzi dostawca nie przyjmuje albo w którego pola model
     nie trafia: na atrapie modelu taki graf działa, a na prawdziwym każda sprawa kończy się
@@ -181,14 +210,14 @@ def test_the_model_answers_with_the_respond_tool_and_the_answer_is_accepted(
 
     assert final.log[-1].node == "respond"
     assert final.iterations   <= Settings().agent_max_iterations
+    assert [call.name for call in model_turns[-1].tool_calls] == [graph.RESPOND_TOOL_NAME]
 
-    # --- wariant wymagający źródeł bez źródeł: wyniku ma nie być, i to jest poprawny przebieg ---
+    # --- wariant wymagający źródeł bez źródeł: zostają same uwagi, i to jest poprawny przebieg ---
     if getattr(graph, "REQUIRES_HITS", False) and not final.sources:
-        assert final.output is None
+        assert isinstance(final.output, ProposalNotes)
 
         return
 
-    assert [call.name for call in model_turns[-1].tool_calls] == [graph.RESPOND_TOOL_NAME]
     assert isinstance(final.output, output_type(graph))
 
 
@@ -230,11 +259,34 @@ def test_the_cost_of_the_run_is_the_sum_of_its_turns(graph: ModuleType, live_run
 @pytest.mark.parametrize("graph", LOOP_GRAPHS, ids=name_of)
 def test_the_model_reads_what_it_found(graph: ModuleType, live_run: LiveRun) -> None:
     """Sprawdza, czy w każdym grafie z narzędziami wiedzy sprawa kończy się listą źródeł: model
-    nie tylko wyszukał materiał, ale też odczytał choć jedno zgłoszenie albo sekcję dokumentacji.
+    nie tylko wyszukał materiał, ale też odczytał choć jedno zgłoszenie albo sekcję dokumentacji,
+    albo zacytował fragment kodu jako przyczynę.
 
     Wyłapuje pętlę, w której model szuka i od razu kończy albo w której wyniki naszych narzędzi
     do niego nie docierają: odpowiedź wróciłaby wtedy bez żadnego źródła."""
     final = live_run(graph)
 
     assert final.sources
-    assert {ref.source for ref in final.sources} <= {"tickets", "docs"}
+    assert {ref.source for ref in final.sources} <= {"tickets", "docs", "code"}
+
+
+def test_suggest_solution_without_material_ends_with_notes_only(
+    solution_without_material: BaseModel,
+) -> None:
+    """Sprawdza, czy w wariancie z rozwiązaniem, w którym narzędzia nic nie znajdują, prawdziwy
+    model kończy sprawę wywołaniem narzędzia odpowiedzi, a węzeł odpowiedzi przyjmuje je najwyżej
+    po jednej poprawce. Lista źródeł jest pusta, a wynikiem są same uwagi dla wdrożeniowca, bez
+    treści dla klienta. Treści uwag test nie ocenia.
+
+    Wyłapuje model, który po pustym wyszukaniu odpowiada zwykłym tekstem. Węzeł odpowiedzi czyta
+    odpowiedź także w sprawie bez źródeł, więc taki model dostaje poprawkę, a za drugim razem
+    sprawa kończy się błędem 503 zamiast odpowiedzią „nie mam z czego zaproponować". Grozi to
+    zwłaszcza przy modelach, którym nie wymuszamy wywołania narzędzia."""
+    final       = solution_without_material
+    model_turns = [message for message in final.messages if message.role == "assistant"]
+
+    assert final.sources == []
+    assert [call.name for call in model_turns[-1].tool_calls] == [
+        suggest_solution.RESPOND_TOOL_NAME,
+    ]
+    assert isinstance(final.output, ProposalNotes)

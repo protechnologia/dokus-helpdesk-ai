@@ -29,7 +29,7 @@ FAKE_MAX_ITERATIONS = 10
 
 def fake_search_nodes(
     respond_tool_name: str,                              # np. "respond_search"
-    output:            BaseModel,                        # np. Proposal(text="1. Od kiedy…")
+    output:            BaseModel,                        # np. Proposal(text="1. Od kiedy…", …)
     limits:            Mapping[str, int] | None = None,  # np. {"read_tickets_card": 3}
 ) -> tuple[FakeAgentNode, FakeRunToolsNode]:
     """
@@ -43,7 +43,7 @@ def fake_search_nodes(
 
     Example args:
         respond_tool_name="respond_suggest_questions"
-        output=Proposal(text="1. Od kiedy…")
+        output=Proposal(text="1. Od kiedy…", internal_notes="1: …")
         limits={"find_tickets_vector": 3, "read_tickets_card": 3}
 
     Example result:

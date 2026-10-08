@@ -139,7 +139,7 @@ def build_graph(
     anonymize:      Node,  # np. AnonymizeNode(FakeAnonymizer())
     agent:          Node,  # np. FakeAgentNode([tool_call_turn("find_tickets_vector", …), …])
     run_tools:      Node,  # np. FakeRunToolsNode(sources=[…])
-    respond:        Node,  # np. FakeRespondNode(Proposal(text="…"))
+    respond:        Node,  # np. FakeRespondNode(Proposal(text="…", internal_notes="…"))
     max_iterations: int,   # np. 20 — limit tur modelu z `AGENT_MAX_ITERATIONS`
 ) -> CompiledStateGraph:
     """
@@ -157,7 +157,7 @@ def build_graph(
         anonymize=AnonymizeNode(FakeAnonymizer())
         agent=FakeAgentNode([…])
         run_tools=FakeRunToolsNode(sources=[…])
-        respond=FakeRespondNode(Proposal(text="…"))
+        respond=FakeRespondNode(Proposal(text="…", internal_notes="…"))
         max_iterations=20
 
     Example result:

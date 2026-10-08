@@ -5,6 +5,7 @@ Narzędzia agenta dla testów węzłów, grafów i tras.
 | helper                                     | co oddaje                                          |
 |--------------------------------------------|----------------------------------------------------|
 | `fake_agent_tools()`                       | atrapy wszystkich narzędzi agenta                  |
+| `fake_agent_tools_without_material()`      | te same atrapy, ale wyszukiwania nic nie znajdują  |
 | `find_tickets_vector_with_dead_embedder()` | narzędzie właściwe, którego embedder nie odpowiada |
 
 O czym pamiętać przy zmianach:
@@ -59,6 +60,38 @@ def fake_agent_tools() -> list[AgentTool]:
         FakeFindDocsTextTool(),
         FakeReadDocsTool(),
         FakeQuoteCodeTool(),
+    ]
+
+    return tools
+
+
+def fake_agent_tools_without_material() -> list[AgentTool]:
+    """
+    Description:
+    Atrapy wszystkich narzędzi agenta, w których nic nie ma do znalezienia: wyszukiwania zgłoszeń
+    i dokumentacji oddają puste listy, spis dokumentacji jest pusty, a cytowanie kodu nie zna
+    żadnego pliku. Odczyty zgłoszeń i dokumentacji zostają takie same, ale model nie ma skąd
+    wziąć identyfikatora, więc sprawa kończy się bez źródeł. Kolejność jak w `fake_agent_tools()`.
+
+    Cytowanie kodu jest puste, bo przykład ścieżki w opisie `quote_code` to plik z wbudowanego
+    zestawu atrapy: model mógłby go zacytować na ślepo i dostać źródło.
+
+    Example args:
+        (brak)
+
+    Example result:
+        [FakeFindTicketsVectorTool(tickets=[]), FakeFindTicketsTextTool(tickets=[]), …]
+    """
+    tools: list[AgentTool] = [
+        FakeFindTicketsVectorTool(tickets=[]),
+        FakeFindTicketsTextTool(tickets=[]),
+        FakeReadTicketsCardTool(),
+        FakeReadTicketsThreadTool(),
+        FakeListDocsTool(sections=[]),
+        FakeFindDocsVectorTool(found=[]),
+        FakeFindDocsTextTool(matched=[]),
+        FakeReadDocsTool(),
+        FakeQuoteCodeTool(files={}),
     ]
 
     return tools

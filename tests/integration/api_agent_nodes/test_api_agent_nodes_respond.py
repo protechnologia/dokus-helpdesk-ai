@@ -17,6 +17,7 @@ from app.agent_tools import AgentTool
 from app.agent_tools.base import is_error_json
 from app.agent_tools.code.fake_code import ERRORS_PATH, GENERATOR_PATH
 from app.config import Settings
+from app.core_model.graphs.proposal_notes import ProposalNotes
 from app.core_model.graphs.verdict import Verdict
 from app.engine_anonymization import FakeAnonymizer
 from app.engine_llm import ChatMessage, FakeLLMClient
@@ -376,21 +377,23 @@ async def test_an_answer_together_with_a_search_runs_nothing() -> None:
     ],
     ids=["odpowiedź od razu", "znalezione, ale nieprzeczytane"],
 )
-async def test_a_solution_without_read_sources_ends_without_a_proposal(
+async def test_a_solution_without_read_sources_keeps_only_the_notes(
     before_the_answer: list[ChatMessage],
 ) -> None:
-    """Sprawdza, czy wariant z rozwiązaniem nie oddaje propozycji, gdy agent nie odczytał żadnego
-    zgłoszenia ani sekcji — także wtedy, gdy zgłoszenia znalazł, ale ich nie przeczytał. Przebieg
-    kończy się bez wyniku i bez poprawki, z wpisem o braku źródeł w dzienniku.
+    """Sprawdza, czy wariant z rozwiązaniem nie oddaje treści dla klienta, gdy agent nie odczytał
+    żadnego zgłoszenia ani sekcji — także wtedy, gdy zgłoszenia znalazł, ale ich nie przeczytał.
+    Wynikiem są same uwagi dla wdrożeniowca z odpowiedzi modelu, bez poprawki, z wpisem o braku
+    źródeł w dzienniku.
 
     Wyłapuje rozwiązanie napisane „z głowy", które wyszłoby do wdrożeniowca jako oparte na bazie,
-    oraz dodatkową turę modelu w sprawie, w której i tak nie ma z czego odpowiedzieć."""
-    answer, _ = await expected_answer(suggest_solution)
-    llm       = FakeLLMClient(turns=[*before_the_answer, answer])
+    uwagi zgubione razem z nim oraz dodatkową turę modelu w sprawie, w której i tak nie ma z czego
+    odpowiedzieć."""
+    answer, output = await expected_answer(suggest_solution)
+    llm            = FakeLLMClient(turns=[*before_the_answer, answer])
 
     final = await run_graph(real_graph(suggest_solution, llm), suggest_solution.example_state())
 
-    assert final.output          is None
+    assert final.output          == ProposalNotes(internal_notes=output.internal_notes)
     assert final.sources         == []
     assert final.respond_retries == 0
     assert "brak źródeł" in final.log[-1].message
@@ -417,23 +420,23 @@ async def test_a_solution_can_stand_on_a_quoted_cause_in_the_code_alone() -> Non
     assert [ref.key for ref in final.sources] == [f"code:{GENERATOR_PATH}:8-10"]
 
 
-async def test_a_solution_with_only_excluded_code_ends_without_a_proposal() -> None:
-    """Sprawdza, czy wariant z rozwiązaniem nie oddaje propozycji, gdy agent zacytował kod
-    wyłącznie jako miejsce wykluczone: lista źródeł jest pusta, przebieg kończy się bez wyniku
-    i bez poprawki, z wpisem o braku źródeł w dzienniku.
+async def test_a_solution_with_only_excluded_code_keeps_only_the_notes() -> None:
+    """Sprawdza, czy wariant z rozwiązaniem nie oddaje treści dla klienta, gdy agent zacytował kod
+    wyłącznie jako miejsce wykluczone: lista źródeł jest pusta, wynikiem są same uwagi dla
+    wdrożeniowca, bez poprawki, z wpisem o braku źródeł w dzienniku.
 
     Wyłapuje rozwiązanie, które wychodzi do wdrożeniowca jako oparte na kodzie, choć model sam
     napisał, że sprawdzone miejsce przyczyną nie jest."""
-    answer, _ = await expected_answer(suggest_solution)
-    excluded  = {"path": ERRORS_PATH, "from_line": 7, "to_line": 7, "role": "excluded"}
-    llm       = FakeLLMClient(turns=[
+    answer, output = await expected_answer(suggest_solution)
+    excluded       = {"path": ERRORS_PATH, "from_line": 7, "to_line": 7, "role": "excluded"}
+    llm            = FakeLLMClient(turns=[
         tool_call_turn("quote_code", excluded, call_id="call_quote"),
         answer,
     ])
 
     final = await run_graph(real_graph(suggest_solution, llm), suggest_solution.example_state())
 
-    assert final.output          is None
+    assert final.output          == ProposalNotes(internal_notes=output.internal_notes)
     assert final.sources         == []
     assert final.respond_retries == 0
     assert "brak źródeł" in final.log[-1].message

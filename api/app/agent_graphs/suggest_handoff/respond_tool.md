@@ -3,7 +3,9 @@
      Szkielet z p. 5; treść stroi się z promptem w p. 27.
 
      Komentarze redakcyjne jak ten są wycinane przed wysłaniem. -->
-Oddaje tekst informacji o przekazaniu zgłoszenia do dalszych prac po stronie serwisu. Wywołaj je
-raz, jako jedyne wywołanie w turze.
+Oddaje tekst informacji o przekazaniu zgłoszenia do dalszych prac po stronie serwisu i osobno
+uwagi dla wdrożeniowca. Wywołaj je raz, jako jedyne wywołanie w turze.
 
 - `text` — gotowa treść dla klienta po polsku, bez wstępu od siebie.
+- `internal_notes` — uwagi dla wdrożeniowca, których klient nie dostaje; pusty napis, gdy uwag
+  nie masz.

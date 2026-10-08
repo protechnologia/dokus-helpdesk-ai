@@ -45,10 +45,15 @@ Co węzeł robi z ostatnią turą modelu:
 | sam tekst, bez wywołań                                 | odsyła do poprawki                  |
 | cokolwiek, a graf wymaga źródeł i nie ma ani jednego   | kończy bez wyniku, bez poprawki     |
 
+Graf, który wymaga źródeł, może podać funkcję `without_sources`. Wtedy bez źródeł węzeł czyta
+odpowiedź tak jak zawsze, razem z poprawką, a w `output` zapisuje to, co z niej zostawi ta
+funkcja. W `suggest_solution` zostają same uwagi dla wdrożeniowca, a treść dla klienta odpada.
+
 Co się dzieje po drodze:
 
-1. Graf, który wymaga źródeł (`requires_sources`), bez źródeł w stanie kończy bez wyniku:
-   `output` zostaje puste, a odpowiedzi modelu węzeł w ogóle nie czyta.
+1. Graf, który wymaga źródeł (`requires_sources`), bez źródeł w stanie i bez funkcji
+   `without_sources` kończy bez wyniku: `output` zostaje puste, a odpowiedzi modelu węzeł
+   w ogóle nie czyta.
 2. Ostatnia tura modelu musi być jednym wywołaniem narzędzia odpowiedzi.
 3. Do argumentów od modelu dochodzą pola, które wypełnia graf (`filled_by_graph`), a całość
    waliduje model wyniku grafu.
@@ -57,6 +62,8 @@ Co się dzieje po drodze:
    rośnie i graf prowadzi z powrotem do `agent` (`route_after_respond`).
 5. Druga odpowiedź nie do przyjęcia w tej samej sprawie to `RespondError`: przebieg staje,
    a trasa oddaje 503.
+6. Gdy źródeł nie ma, a graf podał funkcję `without_sources`, przyjęta odpowiedź przechodzi
+   przez nią, zanim trafi do `output`.
 
 O czym pamiętać przy zmianach:
 
@@ -68,7 +75,10 @@ O czym pamiętać przy zmianach:
   przyjmie rozmowy z wywołaniem bez odpowiedzi. Te wiadomości to błędy (`{"error": …}`), więc
   nie zużywają limitów narzędzi.
 - Źródeł węzeł nie liczy sam: czyta `sources` ze stanu, a te powstają z odczytów w `run_tools`.
-  Brak źródeł nie jest błędem modelu, więc nie ma na co odsyłać poprawki.
+  Brak źródeł nie jest błędem modelu, więc sam nie wywołuje poprawki. Przy funkcji
+  `without_sources` poprawkę wywołuje tylko odpowiedź nie do przyjęcia, jak w każdej sprawie.
+- Węzeł nie zna pól wyniku: co zostaje bez źródeł, wie graf, który ten wynik zna. Tak samo jak
+  przy `filled_by_graph`.
 - Pola od grafu wygrywają z tym, co podał model: tożsamości zgłoszenia model nie ustala.
 - W logu przebiegu i na INFO jest sam rodzaj błędu. Komunikat dla modelu cytuje wartości
   argumentów, czyli dane klienta, więc idzie tylko na DEBUG.
@@ -94,6 +104,9 @@ MAX_RETRIES = 1
 
 # Funkcja grafu oddająca pola wyniku, które wypełnia graf ze stanu, a nie model.
 FilledByGraph = Callable[[BaseModel], Mapping[str, Any]]
+
+# Funkcja grafu oddająca to, co z przyjętego wyniku zostaje, gdy agent nie odczytał żadnego źródła.
+WithoutSources = Callable[[BaseModel], BaseModel]
 
 
 def text_instead_of_answer_message(
@@ -174,15 +187,18 @@ class RespondNode(RespondNodeBase):
     Jedyne miejsce, w którym odpowiedź modelu staje się wynikiem, który trasa oddaje wołającemu.
     Dzięki temu dwie reguły wynikają z kodu, a nie z posłuszeństwa modelu: wynik ma zawsze kształt
     modelu wyniku grafu (na przykład blokada bramki zawsze niesie uzasadnienie i wskazówkę),
-    a wariant wymagający źródeł bez źródeł nie oddaje propozycji (zasada 9). Węzeł jest ten sam
-    w każdym grafie; graf podaje mu nazwę swojego narzędzia odpowiedzi i model wyniku
-    (`respond_node()` w pakiecie grafu).
+    a wariant wymagający źródeł bez źródeł nie oddaje treści napisanej „z głowy" (zasada 9) —
+    najwyżej to, co graf uznał za niezależne od źródeł. Węzeł jest ten sam w każdym grafie; graf
+    podaje mu nazwę swojego narzędzia odpowiedzi i model wyniku (`respond_node()` w pakiecie
+    grafu).
 
     Flow:
         1. Konstruktor przyjmuje nazwę narzędzia odpowiedzi, model wyniku, informację, czy graf
-           wymaga źródeł, i funkcję oddającą pola, które wypełnia graf.
+           wymaga źródeł, funkcję oddającą to, co zostaje bez źródeł, i funkcję oddającą pola,
+           które wypełnia graf.
         2. `run()` najpierw sprawdza źródła (`_has_sources()`), potem czyta odpowiedź
-           (`_read_answer()`) i zapisuje wynik (`output_update()` z klasy wspólnej z atrapą).
+           (`_read_answer()`) i zapisuje wynik (`output_update()` z klasy wspólnej z atrapą,
+           a bez źródeł `_unsourced_update()`).
         3. Odpowiedź nie do przyjęcia `_read_answer()` zgłasza jako `InvalidAnswerError`,
            a `_send_back()` zamienia ją na poprawkę dla modelu albo — gdy poprawka już była —
            na `RespondError`.
@@ -190,34 +206,47 @@ class RespondNode(RespondNodeBase):
 
     def __init__(
         self,
-        respond_tool_name: str,                          # np. "respond_gate_close"
-        output_model:      type[BaseModel],              # np. Verdict
-        requires_sources:  bool = False,                 # np. True w `suggest_solution`
-        filled_by_graph:   FilledByGraph | None = None,  # np. parse_ticket.filled_by_graph
+        respond_tool_name: str,                           # np. "respond_gate_close"
+        output_model:      type[BaseModel],               # np. Verdict
+        requires_sources:  bool = False,                  # np. True w `suggest_solution`
+        without_sources:   WithoutSources | None = None,  # np. suggest_solution.without_sources
+        filled_by_graph:   FilledByGraph | None = None,   # np. parse_ticket.filled_by_graph
     ):
         """
         Description:
         Przyjmuje to, co o odpowiedzi wie graf: czym model odpowiada, w jakim kształcie, czy
-        odpowiedź wymaga źródeł i które pola wyniku graf wypełnia sam ze stanu.
+        odpowiedź wymaga źródeł, co z niej zostaje, gdy źródeł nie ma, i które pola wyniku graf
+        wypełnia sam ze stanu.
 
         Example args:
-            respond_tool_name="respond_parse_ticket"
-            output_model=ParsedTicket
-            requires_sources=False
-            filled_by_graph=parse_ticket.filled_by_graph
+            respond_tool_name="respond_suggest_solution"
+            output_model=Proposal
+            requires_sources=True
+            without_sources=suggest_solution.without_sources
+            filled_by_graph=None
 
         Example result:
-            RespondNode walidujący argumenty `respond_parse_ticket` do `ParsedTicket`
+            RespondNode walidujący argumenty `respond_suggest_solution` do `Proposal`, który bez
+            źródeł zapisuje same uwagi (`ProposalNotes`)
 
         Raises:
-            ValueError: pusta nazwa narzędzia odpowiedzi
+            ValueError: pusta nazwa narzędzia odpowiedzi albo funkcja `without_sources` w grafie,
+                który źródeł nie wymaga
         """
         if not respond_tool_name:
             raise ValueError("węzeł respond bez nazwy narzędzia odpowiedzi — graf źle złożony")
 
+        # Bez wymogu źródeł funkcja nie miałaby kiedy zadziałać — to pomyłka przy składaniu.
+        if without_sources is not None and not requires_sources:
+            raise ValueError(
+                "węzeł respond z funkcją without_sources w grafie, który źródeł nie wymaga — "
+                "graf źle złożony"
+            )
+
         self._respond_tool_name = respond_tool_name
         self._output_model      = output_model
         self._requires_sources  = requires_sources
+        self._without_sources   = without_sources
         self._filled_by_graph   = filled_by_graph
 
     async def run(
@@ -239,8 +268,10 @@ class RespondNode(RespondNodeBase):
             RespondError: odpowiedzi nie da się przyjąć, a poprawka w tej sprawie już była
             ValueError: graf źle złożony — brak tury modelu albo pola `sources` w stanie
         """
-        # --- graf wymagający źródeł bez źródeł: wyniku nie ma, cokolwiek model napisał ---
-        if self._requires_sources and not self._has_sources(state):
+        unsourced = self._requires_sources and not self._has_sources(state)
+
+        # --- graf wymagający źródeł bez źródeł i bez funkcji od grafu: wyniku nie ma ---
+        if unsourced and self._without_sources is None:
             update = {
                 "log": [self.log_entry("brak źródeł: graf wymaga źródeł, wyniku nie ma")],
             }
@@ -255,7 +286,37 @@ class RespondNode(RespondNodeBase):
         except InvalidAnswerError as invalid:  # nie do przyjęcia: poprawka albo porażka
             return self._send_back(state, turn, invalid)
 
+        # --- bez źródeł: zostaje to, co graf uznał za niezależne od źródeł ---
+        if unsourced:
+            return self._unsourced_update(output)
+
         return self.output_update(output)
+
+    def _unsourced_update(
+        self,
+        output: BaseModel,  # np. Proposal(text="Prosimy o restart usługi.", internal_notes="…")
+    ) -> dict[str, Any]:
+        """
+        Description:
+        Składa zmianę stanu po przyjęciu odpowiedzi w sprawie bez źródeł: w `output` trafia to,
+        co z wyniku zostawia funkcja grafu `without_sources`, a w logu — że źródeł nie było
+        i jaki typ wyniku został.
+
+        Example args:
+            output=Proposal(text="Prosimy o restart usługi.", internal_notes="Szukałem…")
+
+        Example result:
+            {"output": ProposalNotes(internal_notes="Szukałem…"),
+             "log": [LogEntry(node="respond", message="brak źródeł: output: ProposalNotes")]}
+        """
+        kept = self._without_sources(output)
+
+        update = {
+            "output": kept,
+            "log":    [self.log_entry(f"brak źródeł: output: {type(kept).__name__}")],
+        }
+
+        return update
 
     def _has_sources(
         self,

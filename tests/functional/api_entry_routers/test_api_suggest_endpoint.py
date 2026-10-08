@@ -41,18 +41,20 @@ def test_variants_list_the_registry() -> None:
 @pytest.mark.parametrize("variant", sorted(VARIANTS))
 def test_every_variant_answers_in_one_shape(variant: str) -> None:
     """Sprawdza, czy `POST /suggest` odpowiada w tym samym kształcie dla każdego wariantu
-    z rejestru: status 200, nazwa wariantu, niepusty tekst propozycji i log przebiegu od
-    anonimizacji do odpowiedzi. Wariant z narzędziami wiedzy wraca ze źródłami, a wariant bez
-    nich z pustą listą źródeł.
+    z rejestru: status 200, nazwa wariantu, niepusty tekst propozycji, uwagi dla wdrożeniowca
+    z wyniku grafu i log przebiegu od anonimizacji do odpowiedzi. Wariant z narzędziami wiedzy
+    wraca ze źródłami, a wariant bez nich z pustą listą źródeł.
 
-    Wyłapuje wariant, którego trasa nie obsługuje albo który odpowiada inaczej niż pozostałe:
-    helpdesk musiałby wtedy pisać osobną obsługę odpowiedzi dla każdego guzika."""
+    Wyłapuje wariant, którego trasa nie obsługuje albo który odpowiada inaczej niż pozostałe,
+    oraz uwagi zgubione po drodze: helpdesk musiałby pisać osobną obsługę odpowiedzi dla każdego
+    guzika, a wdrożeniowiec nie dostałby tego, czego nie wolno wysłać klientowi."""
     response = TestClient(create_app()).post("/suggest", json={**TICKET, "variant": variant})
     body     = response.json()
 
     assert response.status_code == 200
     assert body["variant"] == variant
     assert body["text"]
+    assert body["internal_notes"] == f"fake-suggest-{variant}-notes"
     assert bool(body["sources"]) == bool(VARIANTS[variant].TOOL_NAMES)
     assert body["log"][0]["node"]  == "anonymize"
     assert body["log"][-1]["node"] == "respond"
@@ -74,16 +76,20 @@ def test_an_unknown_variant_is_refused() -> None:
     "variant",
     sorted(name for name, graph in VARIANTS.items() if graph.REQUIRES_HITS),
 )
-def test_a_variant_that_requires_sources_gives_no_proposal_without_them(variant: str) -> None:
+def test_a_variant_that_requires_sources_gives_only_notes_without_them(variant: str) -> None:
     """Sprawdza, czy wariant wymagający źródeł, w którym model odpowiada od razu, bez przeczytania
-    czegokolwiek, wraca ze statusem 200, bez propozycji (`text` równe `null`) i z pustą listą
-    źródeł, a log przebiegu kończy się wpisem o braku źródeł.
+    czegokolwiek, wraca ze statusem 200, bez treści dla klienta (`text` równe `null`), z uwagami
+    dla wdrożeniowca z odpowiedzi modelu i z pustą listą źródeł, a log przebiegu kończy się wpisem
+    o braku źródeł.
 
     Wyłapuje rozwiązanie napisane przez model „z głowy", które wyszłoby do wdrożeniowca jako
-    oparte na bazie, oraz brak źródeł oddany jako błąd: dla sprawy bez podobnych zgłoszeń to
-    poprawna odpowiedź, nie awaria."""
+    oparte na bazie, uwagi zgubione razem z nim oraz brak źródeł oddany jako błąd: dla sprawy bez
+    podobnych zgłoszeń to poprawna odpowiedź, nie awaria."""
     graph    = VARIANTS[variant]
-    answer   = tool_call_turn(graph.RESPOND_TOOL_NAME, {"text": "Proszę zrestartować usługę."})
+    answer   = tool_call_turn(graph.RESPOND_TOOL_NAME, {
+        "text":           "Proszę zrestartować usługę.",
+        "internal_notes": "Szukałem po objawie — brak podobnych spraw.",
+    })
     compiled = build_real_graph(
         graph          = graph,
         llm            = FakeLLMClient(turns=[answer]),
@@ -100,7 +106,8 @@ def test_a_variant_that_requires_sources_gives_no_proposal_without_them(variant:
     body     = response.json()
 
     assert response.status_code == 200
-    assert body["text"]    is None
-    assert body["sources"] == []
+    assert body["text"]           is None
+    assert body["internal_notes"] == "Szukałem po objawie — brak podobnych spraw."
+    assert body["sources"]        == []
     assert body["log"][-1]["node"] == "respond"
     assert "brak źródeł" in body["log"][-1]["message"]

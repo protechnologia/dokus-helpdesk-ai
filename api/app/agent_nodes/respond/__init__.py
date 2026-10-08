@@ -5,7 +5,7 @@ modelu wyniku grafu (werdykt, propozycja, karta zgłoszenia, tekst) i zapisuje w
 Odpowiedź, której nie da się przyjąć — sam tekst, odpowiedź razem z innym wywołaniem, błędne
 argumenty, narzędzia wiedzy ucięte limitem tur — wraca do modelu do poprawki, jeden raz; druga
 taka odpowiedź to `RespondError` i 503 z trasy. Graf, który wymaga źródeł, bez źródeł kończy bez
-wyniku (zasada 9).
+wyniku albo z tym, co z wyniku zostawia jego funkcja `without_sources` (zasada 9).
 
 | plik        | co zawiera                                                                  |
 |-------------|-----------------------------------------------------------------------------|

@@ -92,9 +92,15 @@ GIVEN_OUTPUTS: dict[str, BaseModel] = {
     "gate_reply":        BLOCK,
     "parse_ticket":      parse_ticket.default_ticket().model_copy(update={"cause": "brak"}),
     "polish":            PolishedText(text="Dzień dobry, przesyłki już docierają."),
-    "suggest_handoff":   Proposal(text="Przekazujemy sprawę do dalszych prac."),
-    "suggest_questions": Proposal(text="1. Od kiedy nie przychodzą przesyłki?"),
-    "suggest_solution":  Proposal(text="Kroki do wykonania: 1. Prosimy o restart usługi."),
+    "suggest_handoff":   Proposal(text="Przekazujemy sprawę do dalszych prac.", internal_notes=""),
+    "suggest_questions": Proposal(
+        text           = "1. Od kiedy nie przychodzą przesyłki?",
+        internal_notes = "1: odcina zacięcie kolejki",
+    ),
+    "suggest_solution":  Proposal(
+        text           = "Kroki do wykonania: 1. Prosimy o restart usługi.",
+        internal_notes = "- Odpowiedź stoi na jednym zgłoszeniu.",
+    ),
 }
 
 
@@ -452,8 +458,9 @@ async def test_a_variant_without_sources_answers_only_if_it_does_not_require_the
     graph: ModuleType,
 ) -> None:
     """Sprawdza, czy węzeł odpowiedzi każdego wariantu propozycji stosuje jego deklarację
-    `REQUIRES_HITS`: gdy agent nie odczytał żadnego źródła, wariant wymagający źródeł kończy bez
-    propozycji, a pozostałe oddają ją normalnie.
+    `REQUIRES_HITS`: gdy agent nie odczytał żadnego źródła, wariant wymagający źródeł oddaje
+    wynik bez treści dla klienta, a pozostałe oddają całą propozycję. Uwagi dla wdrożeniowca są
+    w wyniku zawsze.
 
     Wyłapuje deklarację, której nikt nie egzekwuje: rozwiązanie bez źródeł wyszłoby do
     wołającego, albo pytania i przekazanie sprawy przestałyby działać przy pustym indeksie."""
@@ -462,7 +469,8 @@ async def test_a_variant_without_sources_answers_only_if_it_does_not_require_the
 
     update = await graph.respond_node().run(final.model_copy(update=cleared))
 
-    assert ("output" in update) == (not graph.REQUIRES_HITS)
+    assert isinstance(update["output"], Proposal) == (not graph.REQUIRES_HITS)
+    assert update["output"].internal_notes        == final.output.internal_notes
 
 
 @pytest.mark.parametrize("graph", RESPOND_GRAPHS, ids=name_of)

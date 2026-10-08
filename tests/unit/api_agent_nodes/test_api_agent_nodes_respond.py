@@ -10,6 +10,8 @@ from app.agent_nodes.respond import MAX_RETRIES, RespondError, RespondNode
 from app.agent_nodes.run_tools import calls_over_limit
 from app.agent_tools import SourceRef
 from app.agent_tools.base import is_error_json
+from app.core_model.graphs.proposal import Proposal
+from app.core_model.graphs.proposal_notes import ProposalNotes
 from app.core_model.graphs.verdict import Verdict
 from app.engine_llm import ChatMessage, ToolCall
 
@@ -34,6 +36,13 @@ BLOCK_WITHOUT_HINT = {"verdict": "block", "reasons": [CLIENT_TEXT]}
 
 SEARCH = ToolCall(call_id="call_7", name="find_tickets_vector", arguments={"problem": "x"})
 READ   = ToolCall(call_id="call_8", name="read_tickets_card", arguments={"ticket_ids": ["90001"]})
+
+# Propozycja w kształcie wariantu z rozwiązaniem: treść dla klienta i uwagi dla wdrożeniowca.
+SOLUTION_TOOL = "respond_suggest_solution"
+PROPOSAL      = {"text": "Prosimy o restart usługi.", "internal_notes": "Szukałem po komunikacie."}
+
+# Źródło odczytane przez agenta — wystarczy jedno, żeby graf wymagający źródeł je miał.
+CARD_REF = SourceRef(source="tickets", item_id="90001", title="Brak przesyłek")
 
 
 class State(GraphState):
@@ -67,6 +76,44 @@ def gate_node() -> RespondNode:
         RespondNode(respond_tool_name="respond_gate_close", output_model=Verdict)
     """
     return RespondNode(respond_tool_name=RESPOND_TOOL, output_model=Verdict)
+
+
+def notes_only(
+    proposal: Proposal,  # np. Proposal(text="Prosimy o restart usługi.", internal_notes="…")
+) -> ProposalNotes:
+    """
+    Description:
+    Funkcja grafu na sprawę bez źródeł: z propozycji zostają same uwagi.
+
+    Example args:
+        proposal=Proposal(text="Prosimy o restart usługi.", internal_notes="Szukałem…")
+
+    Example result:
+        ProposalNotes(internal_notes="Szukałem…")
+    """
+    return ProposalNotes(internal_notes=proposal.internal_notes)
+
+
+def solution_node() -> RespondNode:
+    """
+    Description:
+    Węzeł odpowiedzi w kształcie wariantu z rozwiązaniem: czyta `respond_suggest_solution` jako
+    `Proposal`, wymaga źródeł, a bez nich zostawia same uwagi.
+
+    Example args:
+        (brak)
+
+    Example result:
+        RespondNode(respond_tool_name="respond_suggest_solution", output_model=Proposal, …)
+    """
+    node = RespondNode(
+        respond_tool_name = SOLUTION_TOOL,
+        output_model      = Proposal,
+        requires_sources  = True,
+        without_sources   = notes_only,
+    )
+
+    return node
 
 
 def state_after(
@@ -236,9 +283,9 @@ async def test_the_log_names_the_kind_of_error_only() -> None:
 
 
 async def test_a_graph_that_requires_sources_gives_no_output_without_them() -> None:
-    """Sprawdza, czy węzeł grafu wymagającego źródeł, gdy agent żadnego nie odczytał, kończy bez
-    wyniku i bez poprawki — także wtedy, gdy model oddał poprawną odpowiedź. W dzienniku zostaje
-    wpis o braku źródeł.
+    """Sprawdza, czy węzeł grafu wymagającego źródeł, który nie dostał od grafu funkcji na sprawę
+    bez źródeł, kończy bez wyniku i bez poprawki, gdy agent żadnego źródła nie odczytał — także
+    wtedy, gdy model oddał poprawną odpowiedź. W dzienniku zostaje wpis o braku źródeł.
 
     Wyłapuje propozycję rozwiązania napisaną „z głowy", która przeszłaby do wołającego, oraz
     poprawkę odsyłaną modelowi, choć nie on jest winien braku źródeł."""
@@ -257,11 +304,65 @@ async def test_a_graph_that_requires_sources_accepts_the_answer_when_it_has_them
     Wyłapuje wymóg źródeł, który blokuje każdą odpowiedź: wariant z rozwiązaniem nie oddawałby
     wtedy propozycji nigdy."""
     node   = RespondNode(RESPOND_TOOL, Verdict, requires_sources=True)
-    ref    = SourceRef(source="tickets", item_id="90001", title="Brak przesyłek")
-    state  = SourcesState(input_text="x", messages=[answer(PASS)], sources=[ref])
+    state  = SourcesState(input_text="x", messages=[answer(PASS)], sources=[CARD_REF])
     update = await node.run(state)
 
     assert update["output"] == Verdict(verdict="pass")
+
+
+async def test_without_sources_the_graph_function_decides_what_stays() -> None:
+    """Sprawdza, czy węzeł grafu wymagającego źródeł, który dostał funkcję na sprawę bez źródeł,
+    czyta odpowiedź modelu także wtedy, gdy źródeł nie ma, i zapisuje w wyniku to, co zostawi ta
+    funkcja: z propozycji same uwagi, bez treści dla klienta. Dziennik mówi o braku źródeł i nazywa
+    typ wyniku.
+
+    Wyłapuje treść dla klienta napisaną „z głowy", która przeszłaby do wołającego, oraz uwagi
+    zgubione razem z nią: wdrożeniowiec nie wiedziałby, czego agent szukał i co wykluczył."""
+    state  = SourcesState(input_text="x", messages=[answer(PROPOSAL, name=SOLUTION_TOOL)])
+    update = await solution_node().run(state)
+
+    assert update["output"]         == ProposalNotes(internal_notes="Szukałem po komunikacie.")
+    assert update["log"][0].message == "brak źródeł: output: ProposalNotes"
+
+
+async def test_without_sources_an_invalid_answer_still_goes_back_to_the_model() -> None:
+    """Sprawdza, czy w sprawie bez źródeł odpowiedź, której nie da się przyjąć (tu bez pola
+    z uwagami), wraca do modelu do poprawki tak samo jak w każdej innej sprawie.
+
+    Wyłapuje sprawę bez źródeł, która kończy się bez uwag albo błędem, choć model mógł jeszcze
+    poprawić odpowiedź."""
+    turn   = answer({"text": "Prosimy o restart usługi."}, name=SOLUTION_TOOL)
+    update = await solution_node().run(SourcesState(input_text="x", messages=[turn]))
+
+    assert "output" not in update
+    assert update["respond_retries"] == 1
+
+
+async def test_with_sources_the_graph_function_is_not_used() -> None:
+    """Sprawdza, czy węzeł z funkcją na sprawę bez źródeł zapisuje całą propozycję, gdy agent
+    odczytał choć jedno źródło.
+
+    Wyłapuje funkcję wołaną zawsze: wariant z rozwiązaniem nie oddawałby wtedy treści dla klienta
+    nigdy, także przy przeczytanych zgłoszeniach."""
+    turn   = answer(PROPOSAL, name=SOLUTION_TOOL)
+    state  = SourcesState(input_text="x", messages=[turn], sources=[CARD_REF])
+    update = await solution_node().run(state)
+
+    assert update["output"] == Proposal(**PROPOSAL)
+
+
+def test_a_function_for_missing_sources_without_requiring_them_is_refused() -> None:
+    """Sprawdza, czy węzła odpowiedzi nie da się zbudować z funkcją na sprawę bez źródeł, gdy graf
+    źródeł nie wymaga.
+
+    Wyłapuje źle złożony graf, w którym ta funkcja nie zadziałałaby nigdy, a autor grafu byłby
+    przekonany, że treść bez źródeł jest odrzucana."""
+    with pytest.raises(ValueError):
+        RespondNode(
+            respond_tool_name = SOLUTION_TOOL,
+            output_model      = Proposal,
+            without_sources   = notes_only,
+        )
 
 
 async def test_requiring_sources_without_the_field_is_a_build_error() -> None:

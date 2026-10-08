@@ -13,7 +13,10 @@ from app.engine_anonymization import FakeAnonymizer
 
 # Propozycja atrapy, gdy nikt nie podał własnej — stała, żeby test, który przypadkiem na niej
 # polega, padł głośno.
-DEFAULT_PROPOSAL = Proposal(text="fake-suggest-solution-proposal")
+DEFAULT_PROPOSAL = Proposal(
+    text           = "fake-suggest-solution-proposal",
+    internal_notes = "fake-suggest-solution-notes",
+)
 
 
 def example_state() -> SuggestSolutionState:
@@ -35,7 +38,7 @@ def example_state() -> SuggestSolutionState:
 
 
 def build_fake_graph(
-    proposal:       Proposal = DEFAULT_PROPOSAL,      # np. Proposal(text="…")
+    proposal:       Proposal = DEFAULT_PROPOSAL,      # np. Proposal(text="…", internal_notes="…")
     limits:         Mapping[str, int] | None = None,  # np. {"read_tickets_card": 3}
     max_iterations: int = FAKE_MAX_ITERATIONS,        # np. 2 — limit tur modelu
 ) -> CompiledStateGraph:
@@ -51,7 +54,7 @@ def build_fake_graph(
     `max_iterations` to limit tur modelu: po tylu turach narzędzia nie są już wykonywane.
 
     Example args:
-        proposal=Proposal(text="…")
+        proposal=Proposal(text="…", internal_notes="…")
         limits={"find_tickets_vector": 3, "read_tickets_card": 3}
         max_iterations=10
 

@@ -16,6 +16,7 @@ from app.agent_nodes import Node
 from app.agent_nodes.respond import RespondNode
 from app.agent_tools import AgentTool
 from app.core_model.graphs.proposal import Proposal
+from app.core_model.graphs.proposal_notes import ProposalNotes
 from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition
 
@@ -113,23 +114,45 @@ def model_tools(
     return definitions
 
 
+def without_sources(
+    proposal: Proposal,  # np. Proposal(text="Prosimy o restart usługi.", internal_notes="…")
+) -> ProposalNotes:
+    """
+    Description:
+    To, co z propozycji zostaje, gdy agent nie odczytał żadnego źródła: same uwagi dla
+    wdrożeniowca. Treść dla klienta odpada, bo bez źródeł byłaby napisana „z głowy" (zasada 9),
+    a uwagi mówią wdrożeniowcowi, czego agent szukał i co wykluczył. Węzeł `respond` woła tę
+    funkcję po przyjęciu odpowiedzi.
+
+    Example args:
+        proposal=Proposal(text="Prosimy o restart usługi.",
+                          internal_notes="Szukałem po komunikacie — brak podobnych spraw.")
+
+    Example result:
+        ProposalNotes(internal_notes="Szukałem po komunikacie — brak podobnych spraw.")
+    """
+    return ProposalNotes(internal_notes=proposal.internal_notes)
+
+
 def respond_node() -> RespondNode:
     """
     Description:
     Węzeł odpowiedzi tego grafu: waliduje argumenty `respond_suggest_solution` do `Proposal`
-    i egzekwuje `REQUIRES_HITS`: gdy agent nie odczytał żadnego źródła, graf kończy bez
-    propozycji, cokolwiek model napisał (zasada 9).
+    i egzekwuje `REQUIRES_HITS`: gdy agent nie odczytał żadnego źródła, treść dla klienta odpada,
+    cokolwiek model napisał, a zostają same uwagi (`without_sources()`, zasada 9).
 
     Example args:
         (brak)
 
     Example result:
-        RespondNode czytający wywołanie `respond_suggest_solution` jako `Proposal`
+        RespondNode czytający wywołanie `respond_suggest_solution` jako `Proposal`, a bez źródeł
+        zapisujący `ProposalNotes`
     """
     node = RespondNode(
         respond_tool_name = RESPOND_TOOL_NAME,
         output_model      = Proposal,
         requires_sources  = REQUIRES_HITS,
+        without_sources   = without_sources,
     )
 
     return node
@@ -139,7 +162,7 @@ def build_graph(
     anonymize:      Node,  # np. AnonymizeNode(FakeAnonymizer())
     agent:          Node,  # np. FakeAgentNode([tool_call_turn("find_tickets_vector", …), …])
     run_tools:      Node,  # np. FakeRunToolsNode(sources=[…])
-    respond:        Node,  # np. FakeRespondNode(Proposal(text="…"))
+    respond:        Node,  # np. FakeRespondNode(Proposal(text="…", internal_notes="…"))
     max_iterations: int,   # np. 20 — limit tur modelu z `AGENT_MAX_ITERATIONS`
 ) -> CompiledStateGraph:
     """
@@ -157,7 +180,7 @@ def build_graph(
         anonymize=AnonymizeNode(FakeAnonymizer())
         agent=FakeAgentNode([…])
         run_tools=FakeRunToolsNode(sources=[…])
-        respond=FakeRespondNode(Proposal(text="…"))
+        respond=FakeRespondNode(Proposal(text="…", internal_notes="…"))
         max_iterations=20
 
     Example result:

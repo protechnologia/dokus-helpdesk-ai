@@ -1350,9 +1350,15 @@ Wspólne:
   `agent_graphs/suggest_<wariant>` to guzik (`LABEL`, `REQUIRES_HITS`, `STATE`), więc nowy wariant
   to nowy katalog bez zmiany routera. Wariant bez narzędzi wiedzy nie ma `sources` w stanie i wraca
   z pustą listą.
+- **`/suggest` oddaje uwagi dla wdrożeniowca osobno od treści dla klienta (2026-10-08):**
+  `internal_notes` obok `text`, pusty napis, gdy uwag nie ma. `text` ma dać się wysłać klientowi
+  bez wycinania, a w uwagach stoją nazwy klas i ścieżki z kodu, notatki przy pytaniach i to,
+  czego materiał nie rozstrzyga. Pusty napis, a nie „brak", bo uwag nikt nie filtruje, a helpdesk
+  musiałby rozpoznawać „brak" po treści.
 - **Wariant wymagający źródeł bez odczytanych źródeł to 200 bez propozycji (2026-10-05):** `text`
   jest `null`, a lista źródeł pusta. To ta sama odpowiedź co „nowy typ problemu", nie błąd; log
-  przebiegu kończy się wpisem o braku źródeł.
+  przebiegu kończy się wpisem o braku źródeł. Uwagi dla wdrożeniowca zostają (2026-10-08): mówią,
+  czego agent szukał i co wykluczył.
 - **Model, który mimo poprawki nie oddał poprawnej odpowiedzi, to 503 (2026-10-05)** — jak każda
   awaria modelu, więc przy bramkach decyduje helpdesk. Cena: zużycie takiej sprawy jest tylko
   w logu usługi, nie w odpowiedzi.
@@ -1764,8 +1770,8 @@ czasu jest pusta.
   ta sama ścieżka z zakresem słowami, daty nie ma. Fragment ma najwyżej 40 linii (stała w modelu
   zapytania), a limit to 5 cytowań na sprawę, przyczyn i wykluczeń razem; obie liczby pochodzą
   z sondy i wracają do pomiaru w p. 59. Wykluczenie nie cofa źródła zacytowanego wcześniej jako
-  przyczyna i do człowieka dziś nie trafia: zostaje w rozmowie, a w odpowiedzi `/search`
-  w `queries` (p. 68).
+  przyczyna i źródłem nie jest: do człowieka trafia przez uwagi dla wdrożeniowca, jeśli model je
+  tam opisze (2026-10-08), a w odpowiedzi `/search` w `queries`.
 - **`quote_code` oddaje samo potwierdzenie i nie sprawdza, czy model cytowane linie czytał
   (2026-10-07).** Wynik to ścieżka, zakres i rola, bez treści linii: z treścią w zwrocie model
   w sondzie używał cytowania zamiast odczytu. Narzędzie nie widzi rozmowy, a narzędzi odczytu
@@ -1857,6 +1863,13 @@ czasu jest pusta.
   samo wykluczenie źródła nie dają, więc sprawa bez wskazanej przyczyny i bez innych źródeł
   kończy bez propozycji (2026-10-07). Cena: model, który skończył za wcześnie, nie dostaje
   drugiej szansy.
+- **Graf może podać węzłowi funkcję `without_sources`: co z wyniku zostaje bez źródeł
+  (2026-10-08).** Wtedy bez źródeł węzeł czyta odpowiedź jak zawsze, z jedną poprawką, i zapisuje
+  w `output` to, co oddała funkcja. Podaje ją tylko `suggest_solution`: treść dla klienta odpada,
+  a zostają uwagi dla wdrożeniowca (`ProposalNotes`). Funkcję podaje graf, jak `filled_by_graph`,
+  bo węzeł nie zna pól wyniku; funkcja bez `requires_sources` to błąd składania. Cena: sprawa bez
+  źródeł może zużyć turę poprawki, a uwagi w niej nie stoją na odczytanym materiale — ogranicza je
+  tylko prompt.
 - **Węzeł odpowiedzi buduje `respond_node()` z pakietu grafu**: graf zna swoje narzędzie
   odpowiedzi, model wyniku, wymóg źródeł i pola, które wypełnia sam. W `parse_ticket` pola od
   grafu (`filled_by_graph()`) wygrywają z tym, co podał model.
@@ -1947,7 +1960,8 @@ nowe zgłoszenie (surowy tekst)
 - **Graf decyduje, które narzędzia model widzi (`TOOL_NAMES`), ale nie trzyma ich opisów** — te
   leżą przy narzędziach; definicję składa `tool_definitions()` z `agent_graphs/base.py`, a narzędzie
   spoza `TOOL_NAMES` to błąd składania.
-- **Model wyniku wspólny dla kilku grafów — w `core_model/graphs/` (`Verdict`, `Proposal`);
+- **Model wyniku wspólny dla kilku grafów — w `core_model/graphs/` (`Verdict`, `Proposal`,
+  `ProposalNotes`);
   używany przez jeden graf — w `agent_graphs/<graf>/models.py`** (`SearchDone`, `PolishedText`),
   jak modele narzędzi.
 - **`search` kończy się pustym `respond_search`** — wynikiem są źródła z `cite()` i zapytania
@@ -1974,10 +1988,17 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   Zysk: zasada 9 obowiązuje każdy wariant, bo piszemy je my.
 - **Wariant deklaruje, czy potrzebuje źródeł (`requires_hits`), a egzekwuje to kod węzła
   odpowiedzi, nie posłuszeństwo modelu.** `questions` i `handoff` działają przy pustym indeksie,
-  `solution` bez odczytanych źródeł kończy bez propozycji, cokolwiek model napisał (zasada 9).
-  Wariant bez narzędzi wiedzy wraca z pustą listą źródeł, i to jest informacja, nie brak danych.
-- **Wszystkie warianty zwracają ten sam kształt:** tekst propozycji albo jego brak, źródła
-  i wariant, którym powstał.
+  `solution` bez odczytanych źródeł oddaje same uwagi dla wdrożeniowca, bez treści dla klienta,
+  cokolwiek model napisał (zasada 9). Wariant bez narzędzi wiedzy wraca z pustą listą źródeł,
+  i to jest informacja, nie brak danych.
+- **Wszystkie warianty zwracają ten sam kształt:** tekst propozycji albo jego brak, uwagi dla
+  wdrożeniowca, źródła i wariant, którym powstał.
+- **Uwagi dla wdrożeniowca to osobne pole wyniku, `internal_notes` (2026-10-08).** Model musi je
+  podać, ale może zostawić puste. Bez osobnego pola treść dla klienta niosłaby notatki
+  i analizę z kodu, a nawias w treści model gubi: linia `[UWAGA: …]` nie padła w żadnym
+  z czterech pomiarów. Ostrzeżenie o kroku nieodwracalnym zostaje w treści dla klienta:
+  w `solution` w „Uwagach dla klienta", w `questions` jako linia w nawiasie pod pytaniami.
+  Notatki przy pytaniach idą do uwag, z numerem pytania. Zasada 9 obowiązuje oba pola.
 - **`questions` działa dwutorowo:** bez trafień pyta na podstawie samego zgłoszenia,
   z trafieniami dokłada `questions_summary` z podobnych spraw. Ryzykiem nie jest puste pole, tylko
   sentinel w przebraniu („Brak pytań ze strony prowadzącego sprawę.") — 28 na 200 rekordów.
@@ -2170,7 +2191,8 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   zasięg zmiany, zakres czasowy, kompletność naprawy wstecznej. Model streszczający rekord jednym
   zdaniem gubi część z nich.
 - **Brakujące dane jako placeholdery** (`{IMIĘ}`, `{NR_URZĄDZENIA}`), instrukcje dla człowieka
-  w nawiasach kwadratowych (`[dla serwisanta: sprawdź wersję firmware]`).
+  w uwagach dla wdrożeniowca (`internal_notes`), nie w treści dla klienta (2026-10-08, wcześniej
+  w nawiasach kwadratowych, `[dla serwisanta: sprawdź wersję firmware]`).
 
 #### Wnioski ze strojenia promptów
 
@@ -2512,7 +2534,7 @@ Liczby i czasy z 2026-10-07: każdy folder osobno, w komplecie
 integracyjne trwają 10 s, a ewaluacyjne poniżej sekundy — całe 59 s to 207 wyszukań golden setów
 przez prawdziwy embedder (178 w zgłoszeniach, 29 w dokumentacji). Komplet jednym poleceniem
 (`pytest -m "not llm_live"`): 1736 testów, 142 s; domyślny `pytest`, bez stacku: 1610 testów,
-26 s. Trzydzieści cztery testy integracyjne na żywym modelu (`llm_live`) są w liczbie testów
+26 s. Trzydzieści pięć testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
 folderu, ale poza oboma przebiegami.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
@@ -2606,7 +2628,10 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   i około 0,11 USD na `gpt-6.1-sol`). Sprawa grafu liczy się dopiero, gdy potrzebuje jej test,
   więc `-k <graf>` opłaca jeden graf. Testy grafów sprawdzają okablowanie: czy model odpowiada
   narzędziem grafu i czy odpowiedź przechodzi przez `respond`. Jakość odpowiedzi to p. 59
-  i p. 21–28.
+  i p. 21–28. Dziewiąta sprawa (2026-10-08) to `suggest_solution` na narzędziach, które nic nie
+  znajdują: węzeł `respond` czyta odpowiedź także bez źródeł, więc model, który wtedy odpowie
+  zwykłym tekstem, kończy sprawę błędem 503. Grozi to modelom bez wymuszonego wywołania
+  narzędzia, a pokazuje tylko żywy model.
 - **Poza testami `llm_live` oba modele są atrapą, cokolwiek stoi w `.env` (2026-10-05)** —
   ustawia to fixture `fake_models_outside_live_tests` z `tests/conftest.py`. Fabryka grafów przy
   prawdziwym dostawcy składa graf na prawdziwym modelu, więc bez tego zwykły test trasy zależałby
@@ -2893,6 +2918,11 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   a sprawdzanie w węźle wiązałoby go z nazwami narzędzi odczytu, których jeszcze nie ma; bez
   treści w zwrocie model w dwóch przebiegach nie cytował na ślepo. Wraca, gdy pomiar pokaże
   takie cytowania (p. 59).
+- **`text` z wartością `null` w `Proposal` zamiast osobnego modelu na same uwagi** — schemat dla
+  modelu pozwoliłby wtedy oddać propozycję bez treści także w sprawie ze źródłami; `ProposalNotes`
+  zapisuje tylko węzeł `respond`.
+- **Sprawa bez źródeł bez uwag dla wdrożeniowca** — tak było do 2026-10-08: węzeł nie czytał
+  odpowiedzi, więc ginęło, czego agent szukał i co wykluczył.
 
 ### Plan
 
@@ -3072,17 +3102,12 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   `suggest_questions` i `suggest_solution` przed narzędziami odczytu; linii nieodczytanych kod
   nie blokuje, a `respond` zostaje bez zmian; reguły — „Kod aplikacji", „Warstwa narzędzi
   agenta", „Warstwa węzłów", „Testy".
-- [ ] **68. Uwagi dla wdrożeniowca osobno od treści dla klienta** (dopisany 2026-10-07, numer
-  spoza kolejności) — `Proposal` dostaje drugie pole: `text` zostaje treścią dla klienta,
-  a uwagi dla wdrożeniowca (wnioski z kodu, miejsca zacytowane w `quote_code` jako wykluczone,
-  ostrzeżenia, czego materiał nie rozstrzyga) idą osobno, z jawnym wyjściem; zmienia się
-  odpowiedź `/suggest`, opisy narzędzi odpowiedzi i wzory w promptach trzech wariantów
-  `suggest_*`; zasada 9 obowiązuje oba pola; do rozstrzygnięcia:
-  czy wariant wymagający źródeł bez źródeł oddaje same uwagi i czy linie `[dla serwisanta: …]`
-  i `[UWAGA: …]` znikają z treści dla klienta w całości. *Dlaczego:* jedno pole miesza dwóch
-  odbiorców, a analiza z kodu niesie nazwy klas, ścieżki i ustawienia, które nie mogą wyjść do
-  klienta; linia `[UWAGA: …]` nie padła w żadnym z czterech pomiarów, więc osobne pole jest
-  pewniejsze niż nawias; stoi przed p. 59 i p. 25–27, bo one sprawdzają kształt odpowiedzi.
+- [x] **68. Uwagi dla wdrożeniowca osobno** (2026-10-08) — `internal_notes` w `Proposal`
+  i w `/suggest`, pusty napis bez uwag; bez źródeł `suggest_solution` oddaje same uwagi
+  (`ProposalNotes`, funkcja `without_sources` w węźle `respond`); notatki przy pytaniach i nazwy
+  z kodu w uwagach, ostrzeżenie zostaje w treści; prompty trzech wariantów i opisy narzędzi
+  odpowiedzi; reguły — „Warstwa API", „Warstwa węzłów", „Warianty generacji", „Twarde reguły
+  promptu generacji".
 - [ ] **69. Testy skryptu paczki kodu** (dopisany 2026-10-07, numer spoza kolejności) —
   jednostkowe dla doboru plików według reguł i dla rozkodowania polskich liter; jeden
   integracyjny, który buduje paczkę z aplikacji syntetycznej do katalogu tymczasowego i sprawdza,
