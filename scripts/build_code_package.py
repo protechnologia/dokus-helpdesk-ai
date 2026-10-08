@@ -23,7 +23,8 @@ klienta, więc leżą w `data/unsafe/`, poza repo. Ścieżki liczą się od fold
     |                    | katalog na każdej głębokości, wpis z ukośnikiem to jedna ścieżka   |
     | `excluded_files`   | pliki pomijane po samej nazwie, w dowolnym katalogu                |
 
-    Wyłączenie wygrywa ze wszystkim, także z `files`. Plik, którego reguły nie wymieniają, do
+    Wyłączenie wygrywa ze wszystkim, także z `files`, i nie rozróżnia wielkości liter: `*.min.js`
+    obejmuje też `A.MIN.JS`, a `vendor` katalog `Vendor`. Plik, którego reguły nie wymieniają, do
     paczki nie wchodzi; lista takich plików z folderów z listy trafia do metryczki.
 
 Co skrypt zmienia w treści (przykład linii z pliku JS, przed i po):
@@ -46,7 +47,8 @@ O czym pamiętać przy zmianach:
       paczki, jeśli pasuje do reguł; katalogi z plikami generowanymi w trakcie pracy aplikacji
       (cache, logi) trzeba wyłączyć w regułach.
     - Paczka powstaje w `repo.building/` i zastępuje `repo/` dopiero w komplecie, więc przerwany
-      przebieg nie zostawia połowy kodu.
+      przebieg nie zostawia połowy kodu. Przebieg, po którym paczka byłaby pusta, kończy się
+      błędem i poprzedniej paczki nie rusza.
     - Narzędzia czytają paczkę jako UTF-8. Wybrany plik w innym kodowaniu nie wchodzi do
       paczki, a jego ścieżka trafia do metryczki (`skipped.not_utf8`).
     - Sekretu wpisanego w kod PHP albo JS reguły nie widzą; po zmianie reguł trzeba powtórzyć
@@ -163,7 +165,7 @@ def is_in_excluded_folder(
 ) -> bool:
     """
     Description:
-    Mówi, czy plik leży w katalogu z `excluded_folders`.
+    Mówi, czy plik leży w katalogu z `excluded_folders`. Wielkości liter nie rozróżnia.
 
     Example args:
         path="src/lib/vendor/symfony/lib/util/sfFinder.class.php"
@@ -172,10 +174,14 @@ def is_in_excluded_folder(
     Example result:
         True
     """
-    directories = path.split("/")[:-1]
+    # Kod leży na dysku Windows, gdzie `Vendor` i `vendor` to ten sam katalog; rozróżnianie
+    # wielkości liter wpuszczałoby do paczki plik, który reguły wyłączają.
+    lowered     = path.lower()
+    directories = lowered.split("/")[:-1]
     for entry in rules.excluded_folders:
+        entry = entry.lower()
         # wpis z ukośnikiem: jedna ścieżka od korzenia, razem ze wszystkim w środku
-        if "/" in entry and path.startswith(f"{entry}/"):
+        if "/" in entry and lowered.startswith(f"{entry}/"):
             return True
         # wpis bez ukośnika: katalog o tej nazwie na każdej głębokości
         if "/" not in entry and entry in directories:
@@ -190,7 +196,8 @@ def is_excluded(
 ) -> bool:
     """
     Description:
-    Mówi, czy plik leży w wyłączonym katalogu albo ma nazwę z `excluded_files`.
+    Mówi, czy plik leży w wyłączonym katalogu albo ma nazwę z `excluded_files`. Wielkości liter
+    nie rozróżnia, jak rozszerzenia: `*.min.js` obejmuje też `A.MIN.JS`.
 
     Example args:
         path="src/web/js/jquery.blockUI.js"
@@ -201,9 +208,9 @@ def is_excluded(
     """
     if is_in_excluded_folder(path, rules):
         return True
-    name = path.rsplit("/", 1)[-1]
+    name = path.rsplit("/", 1)[-1].lower()
 
-    return any(fnmatch.fnmatchcase(name, pattern) for pattern in rules.excluded_files)
+    return any(fnmatch.fnmatchcase(name, pattern.lower()) for pattern in rules.excluded_files)
 
 
 def is_listed_file(
@@ -439,7 +446,8 @@ def build_package(
         Manifest(source="/mnt/c/.../dokus", built_on="2026-10-06", package=PackageSize(...), ...)
 
     Raises:
-        ValueError: gdy folderu z reguł nie ma albo katalog docelowy nie jest paczką
+        ValueError: gdy folderu z reguł nie ma, katalog docelowy nie jest paczką albo do paczki
+            nie wszedł żaden plik
     """
     code_dir      = output_dir / CODE_DIR
     building_dir  = output_dir / BUILDING_DIR
@@ -467,6 +475,14 @@ def build_package(
         _add_file(building_dir, path, (input_dir / path).read_bytes(), manifest)
         if index % 2000 == 0 or index == len(taken):
             typer.echo(f"  {index}/{len(taken)}")
+
+    # --- pusta paczka to błąd reguł albo kodowania, nie wynik: poprzedniej nie ruszamy ---
+    if manifest.package.files == 0:
+        not_utf8 = len(manifest.skipped.not_utf8)
+        raise ValueError(
+            f"Do paczki nie wszedł żaden plik (wybranych regułami: {len(taken)}, "
+            f"nie w UTF-8: {not_utf8}); {code_dir} zostaje bez zmian."
+        )
 
     # --- podmiana dopiero z kompletem plików w ręku ---
     if code_dir.exists():

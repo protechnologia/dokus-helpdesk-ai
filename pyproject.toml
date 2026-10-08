@@ -31,7 +31,9 @@ testpaths = ["tests"]
 # `api` is importable through the editable install (package-dir above); the other services are not
 # packaged at all — they only ship inside their own image. Adding their folder here lets a unit
 # test import their pure logic (e.g. `embedder_app.vectors`) without installing them.
-pythonpath = ["embedder"]
+# `scripts` is here for the same reason: the repo scripts are plain files, not a package, and
+# their tests import them by module name (`import build_code_package`).
+pythonpath = ["embedder", "scripts"]
 
 # importlib mode is required: the same file name may exist in two test folders, which makes the
 # default prepend mode fail with "import file mismatch".

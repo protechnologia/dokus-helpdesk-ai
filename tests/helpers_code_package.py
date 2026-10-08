@@ -8,6 +8,7 @@ commitem — test jej nie buduje (CLAUDE.md -> „Świadomie pominięte").
 |----------------------------|-------------------------------------------------------------|
 | `synthetic_code_package()` | czytnik zbudowanej paczki syntetycznej                      |
 | `synthetic_code_cases()`   | sekcję jednego narzędzia z `code-synthetic.json`            |
+| `synthetic_absent_paths()` | pliki ze źródła, których paczka nie może zawierać           |
 | `line_of()`                | numer linii, w której stoi fragment zapisany w zestawie     |
 
 Przykład — przypadek z zestawu zamieniony na argumenty narzędzia:
@@ -25,6 +26,8 @@ O czym pamiętać przy zmianach:
   helper nie porównuje jej ze źródłem.
 - Zestaw trzyma miejsce w kodzie jako stały fragment linii, bez numeru, więc dopisanie linii
   w źródle nie psuje przypadków. Numer wylicza `line_of()` na zbudowanej paczce.
+- Test samego skryptu paczki buduje własną paczkę w katalogu tymczasowym, ze źródła i reguł
+  wskazanych tu stałymi; zbudowanej paczki obok źródła nie czyta ani nie zmienia.
 """
 
 import json
@@ -37,6 +40,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # Katalog paczki syntetycznej: kod w `repo/`, obok metryczka.
 SYNTHETIC_PACKAGE_DIR = REPO_ROOT / "data" / "safe" / "code"
+
+# Źródło aplikacji syntetycznej i reguły, według których skrypt buduje z niego paczkę.
+SYNTHETIC_SOURCE_DIR = SYNTHETIC_PACKAGE_DIR / "source"
+SYNTHETIC_RULES_FILE = SYNTHETIC_PACKAGE_DIR / "rules.json"
 
 # Zapytania do aplikacji syntetycznej, sekcja na narzędzie.
 SYNTHETIC_CASES_FILE = REPO_ROOT / "data" / "safe" / "golden" / "code-synthetic.json"
@@ -86,6 +93,23 @@ def synthetic_code_cases(
     return cases[tool_name]
 
 
+def synthetic_absent_paths() -> list[str]:
+    """
+    Description:
+    Ścieżki plików ze źródła aplikacji syntetycznej, których paczka nie może zawierać: cache,
+    pliki z hasłami, biblioteki zewnętrzne, plik zminifikowany. Powód każdej stoi w zestawie.
+
+    Example args:
+        (brak)
+
+    Example result:
+        ["src/apps/frontend/cache/konfiguracja.php", "src/apps/frontend/config/app.yml", …]
+    """
+    cases = json.loads(SYNTHETIC_CASES_FILE.read_text(encoding="utf-8"))
+
+    return [entry["path"] for entry in cases["absent_paths"]]
+
+
 def line_of(
     package:  CodePackage,  # np. synthetic_code_package()
     path:     str,          # np. "src/lib/Urzad/Numeracja/GeneratorNumeru.php"
@@ -93,8 +117,14 @@ def line_of(
 ) -> int:
     """
     Description:
-    Numer pierwszej linii pliku z paczki, w której stoi podany fragment — liczony od 1, jak
-    w narzędziach kodu.
+    Zamienia fragment linii zapisany w zestawie na numer linii, który test podaje narzędziu.
+    Zestaw nie trzyma numerów, żeby dopisanie linii w pliku źródła nie przesuwało przypadków,
+    a narzędzia kodu przyjmują numery — więc test wylicza numer tuż przed wywołaniem.
+
+    Oddaje numer pierwszej linii pliku, w której stoi fragment, liczony od 1, jak w narzędziach
+    kodu. Fragment w zestawie musi być na tyle charakterystyczny, żeby pierwsze trafienie
+    w pliku było tym właściwym. Numer liczy się na zbudowanej paczce, nie na źródle: po zmianie
+    źródła paczkę trzeba przebudować, inaczej numer wyjdzie ze starej wersji pliku.
 
     Example args:
         package=synthetic_code_package()

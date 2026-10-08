@@ -938,7 +938,10 @@ a paczka powstała z innej gałęzi.
   prywatny albo lokalnie zmieniony wchodzi, jeśli pasuje do reguł, a metryczka nie zna gałęzi
   ani changesetu (paczka z 2026-10-07 powstała z gałęzi zadaniowej pod `stage-gminy`, changeset
   51962). Katalog cache Symfony 2 leży w folderze z listy i trzeba go było wyłączyć: 305 plików
-  PHP ze skompilowanym kontenerem.
+  PHP ze skompilowanym kontenerem. Wyłączenia nie rozróżniają wielkości liter, jak rozszerzenia
+  (2026-10-08): kod leży na dysku Windows, a wcześniej `A.MIN.JS` i katalog `Vendor` wchodziły
+  mimo wpisów `*.min.js` i `vendor`; doboru z folderu Dokusa to nie zmieniło. Budowa, po której
+  paczka byłaby pusta, kończy się błędem i poprzedniej paczki nie rusza.
 - **Wpis, który nie zmienia wyniku, do reguł nie trafia (2026-10-06).** Nazwy plików z hasłami
   w wyłączeniach niczego nie zmieniały, bo YAML i tak nie wchodzi, a taki bezpiecznik pilnowałby
   pięciu nazw ze 187 pominiętych YAML-i. Efekt wpisu liczy się na plikach przed dopisaniem.
@@ -2524,17 +2527,17 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1292 (0)           | 22 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 333 (79)           | 79 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 105 (9)            | 10 s |
-| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 59 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1370 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 356 (79)           | 76 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 105 (9)            | 11 s |
+| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 49 s |
 
-Liczby i czasy z 2026-10-07: każdy folder osobno, w komplecie
+Liczby i czasy z 2026-10-08: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku. Bez testów na stacku
-integracyjne trwają 10 s, a ewaluacyjne poniżej sekundy — całe 59 s to 207 wyszukań golden setów
+integracyjne trwają 12 s, a ewaluacyjne poniżej sekundy — całe 49 s to 207 wyszukań golden setów
 przez prawdziwy embedder (178 w zgłoszeniach, 29 w dokumentacji). Komplet jednym poleceniem
-(`pytest -m "not llm_live"`): 1736 testów, 142 s; domyślny `pytest`, bez stacku: 1610 testów,
-26 s. Trzydzieści pięć testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
+(`pytest -m "not llm_live"`): 1836 testów, 154 s; domyślny `pytest`, bez stacku: 1710 testów,
+30 s. Trzydzieści pięć testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
 folderu, ale poza oboma przebiegami.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
@@ -2551,7 +2554,8 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   kilka z nich, budują fixture'y z `conftest.py` ich folderu, a test łańcucha „znalezione →
   odczytane" leży w pliku odczytu.
 - **Nazwa pliku zaczyna się od usługi, której test dotyczy** (`test_api_*`, `test_embedder_*`) —
-  przy kilku usługach sama nazwa mówi, co się psuje. **Bez prefiksu zostają testy ponadusługowe**
+  przy kilku usługach sama nazwa mówi, co się psuje. Testy skryptów z `scripts/` mają prefiks
+  `test_scripts_` i podfolder `scripts/` (2026-10-08). **Bez prefiksu zostają testy ponadusługowe**
   (`test_config_plumbing.py` sprawdza `.env.example` wobec `Settings` wszystkich usług) — doklejenie
   im nazwy jednej usługi kłamałoby o zakresie. W folderze każdego rodzaju pliki leżą w podfolderach
   `<usługa>_<pakiet>` (`api_agent_tools/`, `api_core_service/`…; `api_app/` dla modułów z korzenia
@@ -2586,6 +2590,11 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   a model ma w obu przypadkach dostać błąd w miejscu wyniku. Cena: to jedyny test bez markera,
   który potrzebuje czegoś spoza commita — bez zbudowanej paczki syntetycznej domyślny `pytest`
   kończy się błędem z poleceniem budowy.
+- **Skrypt paczki kodu ma testy jednostkowe i integracyjne (2026-10-08).** Jednostkowe
+  sprawdzają dobór jednej ścieżki według reguł i poprawki treści. Integracyjne budują paczkę
+  z aplikacji syntetycznej do katalogu tymczasowego i pilnują, że źródło to dokładnie paczka plus
+  lista `absent_paths` z zestawu syntetycznego: nowy plik źródła trzeba zaliczyć do jednej
+  z grup. Zbudowanej paczki obok źródła nie potrzebują.
 - **Bez obronnego boilerplate'u bez uzasadnienia.** Zadeklarowanych zależności (runtime i dev)
   **nie** guardujemy `pytest.importorskip` — brak zadeklarowanej zależności ma być głośnym
   `ImportError`, nie cichym skipem. `importorskip` zostaje tylko dla zależności faktycznie
@@ -2649,7 +2658,8 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   decydowałaby, którą usługę faktycznie testujesz). W kontenerze nazwa nie ma znaczenia — ta
   decyzja istnieje wyłącznie po to, żeby o testach jednostkowych nie rozstrzygała nazwa katalogu.
 - **Usługa nieopakowana jako pakiet dochodzi przez `pythonpath` w `pyproject.toml`** — tylko
-  `api` jest instalowane (`pip install -e .`), reszta jedzie wyłącznie w swoim obrazie.
+  `api` jest instalowane (`pip install -e .`), reszta jedzie wyłącznie w swoim obrazie. Tą samą
+  drogą dochodzi folder `scripts/` (2026-10-08): test importuje skrypt po nazwie modułu.
 - **Podział testów usługi: kontrakt w procesie, wdrożenie po HTTP.** Linia podziału biegnie po
   tym, CO test może udowodnić — nie po tym, której usługi dotyczy (obie mają być traktowane
   tak samo):
@@ -2890,6 +2900,12 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Wykrywanie i maskowanie sekretów w skrypcie paczki** — przegląd wykrywaczem zostaje ręczny,
   po zbudowaniu paczki. Wraca, gdy przegląd znajdzie coś, czego nie da się wyłączyć jednym
   wpisem w regułach.
+- **Sprawdzanie kształtu wpisów w regułach paczki kodu** — wpis `excluded_folders` z ukośnikiem
+  na końcu nic nie wyłącza i nie daje błędu; w regułach Dokusa takiego wpisu nie ma. Wraca, gdy
+  taki wpis się zdarzy.
+- **Odrzucanie dowiązań symbolicznych w skrypcie paczki** — skrypt kopiuje treść pliku
+  wskazanego dowiązaniem, także spoza folderu wejściowego; w folderze roboczym z Windows
+  dowiązań nie ma.
 - **Paczka syntetyczna budowana w teście** — buduje się ją skryptem przed testami, a zbudowana
   leży obok źródła, poza commitem. Cena: test narzędzia kodu bez zbudowanej paczki nie ma na
   czym stanąć.
@@ -3108,14 +3124,11 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   z kodu w uwagach, ostrzeżenie zostaje w treści; prompty trzech wariantów i opisy narzędzi
   odpowiedzi; reguły — „Warstwa API", „Warstwa węzłów", „Warianty generacji", „Twarde reguły
   promptu generacji".
-- [ ] **69. Testy skryptu paczki kodu** (dopisany 2026-10-07, numer spoza kolejności) —
-  jednostkowe dla doboru plików według reguł i dla rozkodowania polskich liter; jeden
-  integracyjny, który buduje paczkę z aplikacji syntetycznej do katalogu tymczasowego i sprawdza,
-  że pliki spoza reguł (cache, pliki z hasłami, biblioteki zewnętrzne, plik zminifikowany) nie
-  weszły, trzy linie są rozkodowane, a metryczka zgadza się z zawartością; lista `absent_paths`
-  przechodzi do tego testu z zestawu syntetycznego. *Dlaczego:* skrypt ma 594 linie i żadnego
-  testu, a od jego reguł zależy, czy do modelu nie wychodzą pliki z hasłami; dziś pilnuje tego
-  ręczne porównanie metryczki.
+- [x] **69. Testy skryptu paczki kodu** (2026-10-08) — jednostkowe doboru plików według reguł
+  i poprawek treści, integracyjne na aplikacji syntetycznej (źródło to paczka plus
+  `absent_paths`, która zostaje w zestawie) i na małych drzewach plików; dwie poprawki skryptu:
+  wyłączenia bez rozróżniania wielkości liter i błąd zamiast pustej paczki; reguły — „Kod
+  aplikacji", „Testy".
 - [ ] **62. `find_code_text`** — fraza dosłowna albo słowa w jednej linii, ripgrep w obrazie
   `api` w trybie dosłownym, z opcjonalnym zawężeniem do katalogu; oddaje ścieżkę i numer linii,
   bez treści, z limitem pozycji i licznikiem pominiętych; opis każe szukać stałego fragmentu
