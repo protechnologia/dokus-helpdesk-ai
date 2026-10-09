@@ -11,6 +11,7 @@ prawdziwy węzeł `run_tools`, tak jak wywołanie modelu. Bez stacku i bez model
 | cytowanie bez roli                         | błąd wracający do modelu                 |
 | fragment dłuższy niż limit cytowania       | błąd wracający do modelu                 |
 | ścieżka wychodząca poza paczkę             | błąd wracający do modelu                 |
+| linia znaleziona przez `find_code_text`    | daje się zacytować wprost                |
 
 Paczkę i zestaw dają helpery z `tests/helpers_code_package.py`; paczkę buduje się skryptem przed
 testami.
@@ -32,8 +33,10 @@ from app.agent_graphs import suggest_solution
 from app.agent_nodes.agent import tool_call_turn
 from app.agent_nodes.run_tools import RunToolsNode
 from app.agent_tools.base import is_error_json
-from app.agent_tools.code.quote_code import QuoteCodeTool
+from app.agent_tools.code.find_code_text import FindCodeTextQuery, FindCodeTextTool
+from app.agent_tools.code.quote_code import QuoteCodeQuery, QuoteCodeTool
 from app.config import Settings
+from app.engine_process.ripgrep import RipgrepClient
 from tests.helpers_code_package import line_of, synthetic_code_cases, synthetic_code_package
 
 CASES    = synthetic_code_cases("quote_code")
@@ -154,3 +157,27 @@ async def test_a_refused_quote_goes_back_to_the_model_as_an_error(case: dict[str
 
     assert is_error_json(update["messages"][0].content)
     assert "sources" not in update
+
+
+async def test_a_line_found_by_the_search_can_be_quoted_as_it_came() -> None:
+    """Sprawdza, czy ścieżkę i numer linii z wyniku `find_code_text` da się podać `quote_code`
+    bez żadnej przeróbki: cytowanie każdej znalezionej linii jako przyczyny przechodzi i daje
+    źródło z tą samą ścieżką i tym samym numerem.
+
+    Wyłapuje rozjazd między narzędziami kodu: ścieżkę liczoną od innego katalogu albo linie
+    numerowane inaczej. Model cytowałby wtedy miejsce, które szukanie mu wskazało, i dostawał
+    błąd albo źródło wskazujące inną linię."""
+    package = synthetic_code_package()
+    find    = FindCodeTextTool(package=package, ripgrep=RipgrepClient(timeout=10.0))
+    quote   = QuoteCodeTool(package=package)
+
+    found = await find.find(FindCodeTextQuery(exact="przekracza limit"))
+
+    assert found.lines
+
+    for line in found.lines:
+        query = QuoteCodeQuery(path=line.path, from_line=line.line, to_line=line.line, role="cause")
+
+        [ref] = quote.cite(await quote.search(query))
+
+        assert ref.key == f"code:{line.path}:{line.line}-{line.line}"

@@ -13,18 +13,10 @@ from app.agent_nodes.agent import AgentNode, tool_call_turn
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
 from app.agent_nodes.run_tools import FakeRunToolsNode
-from app.agent_tools.code.quote_code.fake import FakeQuoteCodeTool
-from app.agent_tools.docs.find_docs_text.fake import FakeFindDocsTextTool
-from app.agent_tools.docs.find_docs_vector.fake import FakeFindDocsVectorTool
-from app.agent_tools.docs.list_docs.fake import FakeListDocsTool
-from app.agent_tools.docs.read_docs.fake import FakeReadDocsTool
-from app.agent_tools.tickets.find_tickets_text.fake import FakeFindTicketsTextTool
-from app.agent_tools.tickets.find_tickets_vector.fake import FakeFindTicketsVectorTool
-from app.agent_tools.tickets.read_tickets_card.fake import FakeReadTicketsCardTool
-from app.agent_tools.tickets.read_tickets_thread.fake import FakeReadTicketsThreadTool
 from app.config import Settings
 from app.engine_anonymization import AnonymizedText, FakeAnonymizer
 from app.engine_llm import ChatMessage, FakeLLMClient
+from tests.helpers_agent_tools import fake_agent_tools
 
 # Prawdziwy węzeł agenta wpięty w grafy i uruchomiony przez LangGraph. Model to atrapa, która
 # oddaje zaplanowane tury; wykonanie narzędzi i odpowiedź to też atrapy. Te testy sprawdzają to,
@@ -37,18 +29,9 @@ GRAPHS = [
     if module.ispkg
 ]
 
-# Każde narzędzie agenta, jakie dziś istnieje — test wybiera z nich dozwolone dla grafu.
-AGENT_TOOLS = [
-    FakeFindTicketsVectorTool(),
-    FakeFindTicketsTextTool(),
-    FakeReadTicketsCardTool(),
-    FakeReadTicketsThreadTool(),
-    FakeListDocsTool(),
-    FakeFindDocsVectorTool(),
-    FakeFindDocsTextTool(),
-    FakeReadDocsTool(),
-    FakeQuoteCodeTool(),
-]
+# Każde narzędzie agenta, jakie dziś istnieje — test wybiera z nich dozwolone dla grafu. Jedna
+# lista dla wszystkich testów: `tests/helpers_agent_tools.py`.
+AGENT_TOOLS = fake_agent_tools()
 
 # Limity wywołań narzędzi, jakie daje konfiguracja domyślna.
 LIMITS = Settings(_env_file=None).tool_call_limits()

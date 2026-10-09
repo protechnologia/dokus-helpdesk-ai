@@ -9,6 +9,7 @@ from app.db_qdrant import DbQdrantConfigError, DbQdrantError
 from app.engine_anonymization import AnonymizationConfigError, AnonymizationError
 from app.engine_embedding import EmbeddingConfigError, EmbeddingError
 from app.engine_llm import LLMConfigError, LLMError
+from app.engine_process import ProcessConfigError, ProcessError
 from app.entry_routers.models import ErrorResponse
 
 logger = logging.getLogger(__name__)
@@ -22,11 +23,12 @@ REQUEST_ID_HEADER = "X-Request-ID"
 DEPENDENCY_FAILURE_STATUS = 503
 
 # Zależności narzędzi agenta: błąd warstwy → jego odmiana konfiguracyjna i opis dla wołającego.
-# Jeden handler dla trzech, bo różni je tylko ten wiersz.
+# Jeden handler dla wszystkich, bo różni je tylko ten wiersz.
 TOOL_DEPENDENCIES: dict[type[Exception], tuple[type[Exception], str]] = {
     EmbeddingError:  (EmbeddingConfigError,  "Embedding service call failed"),
     DbQdrantError:   (DbQdrantConfigError,   "Vector index call failed"),
     DbPostgresError: (DbPostgresConfigError, "Text index call failed"),
+    ProcessError:    (ProcessConfigError,    "Code search call failed"),
 }
 
 
@@ -203,9 +205,10 @@ async def _handle_tool_dependency_error(
 ) -> JSONResponse:
     """
     Description:
-    Obsługuje awarię zależności, na których stoją narzędzia agenta: embeddera, Qdranta
-    i Postgresa. Węzeł `run_tools` takiego błędu nie łapie, więc przebieg grafu staje, a wołający
-    dostaje 503 zamiast gołego 500 — z opisem, która zależność zawiodła.
+    Obsługuje awarię zależności, na których stoją narzędzia agenta: embeddera, Qdranta,
+    Postgresa i programu, którym szuka się w kodzie. Węzeł `run_tools` takiego błędu nie łapie,
+    więc przebieg grafu staje, a wołający dostaje 503 zamiast gołego 500 — z opisem, która
+    zależność zawiodła.
 
     Example args:
         request=Request(scope={...})
@@ -215,21 +218,21 @@ async def _handle_tool_dependency_error(
         JSONResponse(status_code=503, content={"detail": "Vector index call failed", …})
 
     Raises:
-        EmbeddingConfigError, DbQdrantConfigError, DbPostgresConfigError: puszczane dalej bez
-            zmian — z tego samego powodu co przy LLM
+        EmbeddingConfigError, DbQdrantConfigError, DbPostgresConfigError, ProcessConfigError:
+            puszczane dalej bez zmian — z tego samego powodu co przy LLM
     """
     config_error, detail = next(
         entry for error, entry in TOOL_DEPENDENCIES.items() if isinstance(exc, error)
     )
 
-    # Błąd konfiguracji (pusty adres, złe hasło, indeks z innej wersji kontraktu) to nie stan
-    # przejściowy: czekanie go nie naprawi, więc kończy żądanie głośno.
+    # Błąd konfiguracji (pusty adres, złe hasło, indeks z innej wersji kontraktu, brak programu
+    # w obrazie) to nie stan przejściowy: czekanie go nie naprawi, więc kończy żądanie głośno.
     if isinstance(exc, config_error):
         raise exc
 
     request_id = _request_id_of(request)
-    # Treść wyjątku tylko na DEBUG: Qdrant i Postgres potrafią zacytować w błędzie fragment
-    # zapytania, czyli dane klienta.
+    # Treść wyjątku tylko na DEBUG: Qdrant, Postgres i ripgrep potrafią zacytować w błędzie
+    # fragment zapytania, czyli dane klienta.
     logger.error(
         "tool_dependency_error path=%s error_type=%s request_id=%s",
         request.url.path,

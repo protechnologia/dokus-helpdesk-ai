@@ -19,7 +19,8 @@ Przykład zapytania i wyniku — w opisie `tool.py`; przykład tekstu, który cz
 w opisie `base.py`.
 
 Narzędzie nie oddaje treści linii i nie sprawdza, czy model je wcześniej przeczytał. Narzędzi,
-którymi model czyta kod, jeszcze nie ma (CLAUDE.md -> p. 62–66).
+którymi model czyta kod, jeszcze nie ma (CLAUDE.md -> p. 63–66); szukanie (`find_code_text`)
+pokazuje samą trafioną linię.
 """
 
 from app.agent_tools.code.quote_code.base import QuoteCodeToolBase, check_lines_and_build_result

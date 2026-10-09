@@ -39,15 +39,21 @@ O czym pamiętać przy zmianach:
   potrzebuje podmiany; powielona w plikach rozjeżdżała się po zmianie portu w jednym miejscu.
 - Każdy adres da się nadpisać zmienną środowiskową (`EMBEDDER_TEST_URL`, `QDRANT_TEST_URL`,
   `API_TEST_URL`, `POSTGRES_TEST_DSN`).
+- Testy `llm_live` zgłaszają zużycie każdej sprawy przez fixture `live_usage`, a na końcu
+  przebiegu pytest wypisuje je z sumą kosztu (`pytest_terminal_summary()`). Sam raport leży
+  w `tests/helpers_live_usage.py`; tu zostają fixture i funkcja wypisująca, bo pytest szuka ich
+  tylko w `conftest.py`.
 """
 
 import os
 from urllib.parse import urlsplit
 
 import pytest
+from _pytest.terminal import TerminalReporter  # pytest 8.3 nie wystawia tego typu pod `pytest.`
 
 from app.config import LLMSettings, Settings
 from app.db_postgres import PostgresClient
+from tests.helpers_live_usage import LiveUsageReport
 
 EMBEDDER_URL_ENV     = "EMBEDDER_TEST_URL"
 EMBEDDER_URL_DEFAULT = "http://localhost:8001"
@@ -136,6 +142,63 @@ def fake_models_outside_live_tests(
 
     monkeypatch.setenv("LLM_GENERATION_PROVIDER", "fake")
     monkeypatch.setenv("LLM_ANONYMIZATION_PROVIDER", "fake")
+
+
+# Miejsce raportu w konfiguracji przebiegu: fixture go tam wkłada, a podsumowanie stamtąd bierze.
+LIVE_USAGE_KEY = pytest.StashKey[LiveUsageReport]()
+
+
+@pytest.fixture(scope="session")
+def live_usage(
+    pytestconfig: pytest.Config,  # wstrzykiwane przez pytest; trzyma raport na cały przebieg
+) -> LiveUsageReport:
+    """
+    Description:
+    Raport zużycia żywego modelu, jeden na cały przebieg pytesta. Test `llm_live` zgłasza w nim
+    każdą sprawę, a po przebiegu pytest wypisuje podsumowanie z sumą kosztu.
+
+    Raport bierze się wyłącznie przez tę fixture: klasę wolno zaimportować do opisu typu, ale
+    obiekt zbudowany w teście byłby innym niż ten, z którego pytest wypisuje podsumowanie.
+
+    Example args:
+        (wstrzykiwane przez pytest)
+
+    Example result:
+        LiveUsageReport wspólny dla wszystkich testów przebiegu
+    """
+    if LIVE_USAGE_KEY not in pytestconfig.stash:
+        pytestconfig.stash[LIVE_USAGE_KEY] = LiveUsageReport()
+
+    return pytestconfig.stash[LIVE_USAGE_KEY]
+
+
+def pytest_terminal_summary(
+    terminalreporter: TerminalReporter,  # wstrzykiwane przez pytest; pisze na ekran
+    config:           pytest.Config,     # wstrzykiwane przez pytest; trzyma raport
+) -> None:
+    """
+    Description:
+    Po przebiegu wypisuje zużycie żywego modelu: sprawy zgłoszone przez testy `llm_live`
+    i sumę kosztu. Pytest woła tę funkcję sam, po nazwie. Gdy żaden test niczego nie zgłosił —
+    czyli w każdym przebiegu bez żywego modelu — nie wypisuje nic.
+
+    Example args:
+        (wstrzykiwane przez pytest)
+
+    Example result:
+        None — na końcu wyjścia pytesta stoi sekcja „zużycie żywego modelu"
+    """
+    report = config.stash.get(LIVE_USAGE_KEY, None)
+    lines  = report.lines() if report is not None else []
+
+    # --- przebieg bez żywego modelu ---
+    if not lines:
+        return
+
+    terminalreporter.write_sep("=", "zużycie żywego modelu")
+
+    for line in lines:
+        terminalreporter.write_line(line)
 
 
 def embedder_url() -> str:

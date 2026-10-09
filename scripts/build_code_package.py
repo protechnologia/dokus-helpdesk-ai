@@ -40,7 +40,8 @@ Flow:
     2. Przechodzi po folderach z listy i po plikach wskazanych wprost (`find_files`).
     3. Każdy wybrany plik czyta, poprawia jego treść (`transform`) i zapisuje do katalogu
        tymczasowego (`_add_file`).
-    4. Na końcu podmienia `repo/` i zapisuje metryczkę (`build_package`).
+    4. Na końcu podmienia `repo/` i zapisuje metryczkę (`build_package`), a w niej gałąź, na
+       której stoi folder wejściowy (`read_branch`).
 
 O czym pamiętać przy zmianach:
     - Skrypt kopiuje to, co leży na dysku. Plik prywatny albo lokalnie zmieniony wchodzi do
@@ -53,6 +54,9 @@ O czym pamiętać przy zmianach:
       paczki, a jego ścieżka trafia do metryczki (`skipped.not_utf8`).
     - Sekretu wpisanego w kod PHP albo JS reguły nie widzą; po zmianie reguł trzeba powtórzyć
       przegląd paczki wykrywaczem sekretów.
+    - Gałąź w metryczce pochodzi z pliku `.plastic/plastic.selector` folderu wejściowego, czyli
+      z kopii roboczej PlasticSCM; skrypt nie rozmawia z repozytorium. Folder bez tego pliku
+      (aplikacja syntetyczna) daje metryczkę bez gałęzi. Numeru changesetu metryczka nie ma.
 """
 
 import dataclasses
@@ -70,6 +74,11 @@ CODE_DIR      = "repo"
 BUILDING_DIR  = "repo.building"
 RULES_NAME    = "rules.json"
 MANIFEST_NAME = "manifest.json"
+
+# Plik kopii roboczej PlasticSCM, w którym stoi gałąź: linia `smartbranch "/main/…"` albo
+# `branch "/main/…"`.
+SELECTOR_PATH   = ".plastic/plastic.selector"
+SELECTOR_BRANCH = re.compile(r'^\s*(?:smart)?branch\s+"([^"]+)"', re.MULTILINE)
 
 POLISH_LETTERS   = "ąćęłńóśźżĄĆĘŁŃÓŚŹŻ"
 ESCAPE_TO_LETTER = {f"{ord(letter):04x}": letter for letter in POLISH_LETTERS}
@@ -121,10 +130,53 @@ class Manifest:
     """Metryczka paczki: skąd pochodzi kod, ile go jest, co skrypt zmienił i co pominął."""
 
     source:   str          # np. "/mnt/c/Apache24/htdocs/php74/dokus"
+    branch:   str | None   # np. "/main/stage-gminy"; None, gdy folder nie jest kopią roboczą
     built_on: str          # np. "2026-10-06"
     package:  PackageSize
     changes:  Changes
     skipped:  Skipped
+
+
+def branch_of_selector(
+    text: str,  # np. 'repository "dokus@serwer"\n  path "/"\n    smartbranch "/main/stage-gminy"\n'
+) -> str | None:
+    """
+    Description:
+    Wyjmuje nazwę gałęzi z treści pliku `plastic.selector`. Oddaje `None`, gdy plik gałęzi nie
+    wskazuje: kopia robocza bywa ustawiona na etykietę albo na changeset.
+
+    Example args:
+        text='repository "dokus@serwer"\n  path "/"\n    smartbranch "/main/stage-gminy"\n'
+
+    Example result:
+        "/main/stage-gminy"
+    """
+    found = SELECTOR_BRANCH.search(text)
+
+    return found.group(1) if found else None
+
+
+def read_branch(
+    input_dir: pathlib.Path,  # np. Path("/mnt/c/Apache24/htdocs/php74/dokus")
+) -> str | None:
+    """
+    Description:
+    Odczytuje gałąź, na której stoi folder wejściowy, z pliku kopii roboczej PlasticSCM. Oddaje
+    `None`, gdy folder takiego pliku nie ma — jak źródło aplikacji syntetycznej. Czyta plik
+    z dysku i nie rozmawia z repozytorium.
+
+    Example args:
+        input_dir=Path("/mnt/c/Apache24/htdocs/php74/dokus")
+
+    Example result:
+        "/main/stage-gminy"
+    """
+    selector = input_dir / SELECTOR_PATH
+    if not selector.is_file():
+        return None
+
+    # Plik pisze klient PlasticSCM; bajt spoza UTF-8 nie może zatrzymać budowy paczki.
+    return branch_of_selector(selector.read_text(encoding="utf-8", errors="replace"))
 
 
 def load_rules(
@@ -443,7 +495,8 @@ def build_package(
         rules=Rules(...)
 
     Example result:
-        Manifest(source="/mnt/c/.../dokus", built_on="2026-10-06", package=PackageSize(...), ...)
+        Manifest(source="/mnt/c/.../dokus", branch="/main/stage-gminy", built_on="2026-10-06",
+                 package=PackageSize(...), ...)
 
     Raises:
         ValueError: gdy folderu z reguł nie ma, katalog docelowy nie jest paczką albo do paczki
@@ -461,6 +514,7 @@ def build_package(
     typer.echo(f"Wybranych regułami: {len(taken)} plików")
     manifest = Manifest(
         source   = str(input_dir),
+        branch   = read_branch(input_dir),
         built_on = datetime.date.today().isoformat(),
         package  = PackageSize(),
         changes  = Changes(),
@@ -598,6 +652,7 @@ def build(
     package = manifest.package
     changes = manifest.changes
     typer.echo(f"Paczka: {package.files} plików, {package.lines} linii w {output_dir / CODE_DIR}")
+    typer.echo(f"  gałąź folderu wejściowego: {manifest.branch or 'brak (nie kopia robocza)'}")
     typer.echo(f"  wg rozszerzeń: {package.by_extension}")
     typer.echo(f"  końce linii zamienione w plikach: {changes.line_endings_files}")
     typer.echo(f"  litery z \\uXXXX rozkodowane: {changes.escapes_lines} linii "

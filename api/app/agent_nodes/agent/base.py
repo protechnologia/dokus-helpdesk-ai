@@ -26,8 +26,12 @@ class AgentNodeBase(Node):
         """
         Description:
         Składa zmianę stanu po jednej turze modelu: nowe wiadomości, licznik tur podbity o jeden,
-        zużycie tej tury i wpis w logu. W logu są same nazwy wywołanych narzędzi — argumenty
-        i tekst modelu to dane klienta.
+        zużycie tej tury i wpis w logu. W logu są nazwy wywołanych narzędzi i koszt tury —
+        argumenty i tekst modelu to dane klienta.
+
+        Koszt we wpisie jest dla czytającego człowieka: widać, która tura ile kosztowała. Do
+        liczenia służy `usage`, które graf sumuje po turach; z tekstu logu nikt liczb nie
+        wyciąga.
 
         Example args:
             state=SearchState(input_text="…", iterations=0)
@@ -37,17 +41,19 @@ class AgentNodeBase(Node):
         Example result:
             {"messages": [ChatMessage(role="assistant", …)], "iterations": 1,
              "usage": LLMUsage(calls=1, prompt_tokens=4820, cost_usd=0.0321),
-             "log": [LogEntry(node="agent", message="tura 1: narzędzia: read_docs")]}
+             "log": [LogEntry(node="agent", message="tura 1: narzędzia: read_docs; 0,0321 USD")]}
         """
         iteration = state.iterations + 1
         tools     = ", ".join(call.name for call in messages[-1].tool_calls)
         action    = f"narzędzia: {tools}" if tools else "tekst bez narzędzi"
+        # Przecinek dziesiętny, bo wpis to polski tekst; liczba z kropką stoi w `usage`.
+        cost      = f"{usage.cost_usd:.4f}".replace(".", ",")
 
         update = {
             "messages":   list(messages),
             "iterations": iteration,
             "usage":      usage,
-            "log":        [self.log_entry(f"tura {iteration}: {action}")],
+            "log":        [self.log_entry(f"tura {iteration}: {action}; {cost} USD")],
         }
 
         return update

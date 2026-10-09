@@ -10,6 +10,7 @@ plików w katalogu tymczasowym: co skrypt robi z katalogiem paczki i kiedy odmaw
 | plik zniknął ze źródła                              | po ponownej budowie znika z paczki   |
 | pozostałość `repo.building/` po przerwanej budowie  | nie trafia do paczki                 |
 | plik nie w UTF-8                                    | pominięty i wypisany w metryczce     |
+| folder wejściowy jest kopią roboczą PlasticSCM      | gałąź trafia do metryczki            |
 | folder z reguł nie istnieje, zły klucz w regułach   | błąd                                 |
 
 Dobór plików na regułach aplikacji syntetycznej sprawdza sąsiedni plik testów; tu reguły są
@@ -25,6 +26,7 @@ from build_code_package import (
     BUILDING_DIR,
     CODE_DIR,
     MANIFEST_NAME,
+    SELECTOR_PATH,
     Rules,
     build_package,
     load_rules,
@@ -199,6 +201,41 @@ def test_a_file_that_is_not_utf8_is_skipped_and_reported(tmp_path: Path) -> None
     assert _package_files(package_dir) == {NUMER}
     assert manifest.skipped.not_utf8   == [STARY]
     assert manifest.package.files      == 1
+
+
+def test_the_branch_of_the_working_copy_goes_to_the_manifest(tmp_path: Path) -> None:
+    """Sprawdza, czy przy folderze wejściowym z plikiem kopii roboczej PlasticSCM metryczka
+    niesie nazwę gałęzi z tego pliku — w obiekcie oddanym przez skrypt i w `manifest.json` —
+    a sam plik kopii roboczej do paczki nie wchodzi.
+
+    Wyłapuje metryczkę bez gałęzi: po przebudowie z innej gałęzi nie byłoby po czym poznać,
+    który kod jest w paczce, a odpowiedź z kodu opisuje tylko tę gałąź, którą wczytano."""
+    selector = 'repository "aplikacja@serwer"\n  path "/"\n    smartbranch "/main/stage-gminy"\n'
+    source   = _source(tmp_path, {NUMER: b"<?php\n", SELECTOR_PATH: selector.encode("utf-8")})
+    package_dir = tmp_path / "paczka"
+
+    manifest = build_package(source, package_dir, RULES)
+    on_disk  = json.loads((package_dir / MANIFEST_NAME).read_text(encoding="utf-8"))
+
+    assert manifest.branch          == "/main/stage-gminy"
+    assert on_disk["branch"]        == "/main/stage-gminy"
+    assert _package_files(package_dir) == {NUMER}
+
+
+def test_a_source_that_is_not_a_working_copy_has_no_branch(tmp_path: Path) -> None:
+    """Sprawdza, czy folder wejściowy bez pliku kopii roboczej daje metryczkę z pustą gałęzią
+    i budowa przechodzi.
+
+    Wyłapuje skrypt, który wymaga kopii roboczej: paczka z aplikacji syntetycznej, budowana
+    przed testami, przestałaby się budować."""
+    source      = _source(tmp_path, {NUMER: b"<?php\n"})
+    package_dir = tmp_path / "paczka"
+
+    manifest = build_package(source, package_dir, RULES)
+    on_disk  = json.loads((package_dir / MANIFEST_NAME).read_text(encoding="utf-8"))
+
+    assert manifest.branch   is None
+    assert on_disk["branch"] is None
 
 
 def test_a_folder_from_the_rules_missing_in_the_source_is_an_error(tmp_path: Path) -> None:

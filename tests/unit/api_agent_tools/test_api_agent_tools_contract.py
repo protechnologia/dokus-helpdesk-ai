@@ -1,13 +1,15 @@
 import importlib
 import pkgutil
+from collections.abc import Callable
 
 import pytest
 from pydantic import BaseModel
 
 import app.agent_tools
 from app.agent_graphs.base import MAX_CALLS_PLACEHOLDER
-from app.agent_tools import AuxiliaryTool, KnowledgeSource, ToolCallError
+from app.agent_tools import AgentTool, AuxiliaryTool, KnowledgeSource, ToolCallError
 from app.config import Settings
+from tests.helpers_agent_tools import fake_agent_tools, fake_agent_tools_without_material
 
 
 def tool_packages() -> list[str]:
@@ -285,6 +287,26 @@ def test_every_tool_has_a_call_limit_in_the_configuration() -> None:
     limits = Settings(_env_file=None).tool_call_limits()
 
     assert set(limits) == {tool.name for tool in TOOLS}
+
+
+@pytest.mark.parametrize(
+    "helper",
+    [fake_agent_tools, fake_agent_tools_without_material],
+    ids=lambda helper: helper.__name__,
+)
+def test_the_test_helper_has_one_fake_of_every_tool(
+    helper: Callable[[], list[AgentTool]],
+) -> None:
+    """Sprawdza, czy każdy z dwóch helperów z kompletem atrap narzędzi (`fake_agent_tools()`
+    i `fake_agent_tools_without_material()`) oddaje dokładnie jedną atrapę na każde narzędzie
+    znalezione w `app/agent_tools/`.
+
+    Wyłapuje nowe narzędzie, o którym helper nie wie: testy węzłów, grafów i tras biorą komplet
+    atrap z tego jednego miejsca, więc bez wpisu przechodziłyby dalej, tylko bez nowego narzędzia,
+    i nikt by tego nie zauważył."""
+    names = [tool.name for tool in helper()]
+
+    assert sorted(names) == sorted({tool.name for tool in TOOLS})
 
 
 def test_some_tool_brings_its_own_errors() -> None:

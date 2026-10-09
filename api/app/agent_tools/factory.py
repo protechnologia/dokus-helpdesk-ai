@@ -2,7 +2,7 @@
 Description:
 Buduje narzędzia agenta na prawdziwych zależnościach, z konfiguracji: jeden klient embeddera,
 jeden Qdranta i jeden Postgresa, a na nich osiem narzędzi, oraz paczka kodu aplikacji na dysku
-z narzędziem, które ją cytuje.
+z dwoma: jedno w niej szuka programem ripgrep, drugie ją cytuje.
 
 | narzędzie             | na czym stoi                                         |
 |-----------------------|------------------------------------------------------|
@@ -14,6 +14,7 @@ z narzędziem, które ją cytuje.
 | `find_docs_vector`    | embedder i kolekcja `QDRANT_DOCS_COLLECTION`         |
 | `find_docs_text`      | tabela dokumentacji w Postgresie                     |
 | `read_docs`           | tabela dokumentacji w Postgresie                     |
+| `find_code_text`      | paczka kodu aplikacji i program ripgrep              |
 | `quote_code`          | paczka kodu aplikacji na dysku (`CODE_PACKAGE_DIR`)  |
 
 Do czego:
@@ -26,7 +27,7 @@ O czym pamiętać przy zmianach:
 - Narzędzia buduje się raz na proces, nie na żądanie. Postgres ładuje słownik w każdej sesji
   (około 0,6 s), więc klient musi trzymać pulę połączeń między żądaniami.
 - Budowa nie łączy się z niczym i nie dotyka dysku — połączenia powstają przy pierwszym użyciu
-  narzędzia, a brak paczki kodu wychodzi przy pierwszym cytowaniu.
+  narzędzia, a brak paczki kodu albo ripgrepa wychodzi przy pierwszym szukaniu lub cytowaniu.
 - Kolejność listy jest kolejnością `TOOL_NAMES` grafów. Model dostaje definicje narzędzi w tej
   kolejności w każdej turze, a stały początek żądania to warunek cache promptu.
 - Kto zbudował narzędzia, ten je zamyka: `aclose()` każdego z nich. Klienci są wspólni, więc
@@ -36,6 +37,7 @@ O czym pamiętać przy zmianach:
 """
 
 from app.agent_tools.base import AgentTool
+from app.agent_tools.code.find_code_text import FindCodeTextTool
 from app.agent_tools.code.quote_code import QuoteCodeTool
 from app.agent_tools.docs.find_docs_text import FindDocsTextTool
 from app.agent_tools.docs.find_docs_vector import FindDocsVectorTool
@@ -51,6 +53,7 @@ from app.core_service.loader_dict_resolution import get_resolution_classes
 from app.db_postgres import DocsTable, PostgresClient, TicketsTable
 from app.db_qdrant import DocsCollection, QdrantClient, TicketsCollection
 from app.engine_embedding import EmbeddingClient
+from app.engine_process.ripgrep import RipgrepClient
 
 
 def build_agent_tools(
@@ -67,7 +70,7 @@ def build_agent_tools(
     Example result:
         [FindTicketsVectorTool(…), FindTicketsTextTool(…), ReadTicketsCardTool(…),
          ReadTicketsThreadTool(…), ListDocsTool(…), FindDocsVectorTool(…), FindDocsTextTool(…),
-         ReadDocsTool(…), QuoteCodeTool(…)]
+         ReadDocsTool(…), FindCodeTextTool(…), QuoteCodeTool(…)]
 
     Raises:
         EmbeddingConfigError: pusty adres embeddera
@@ -106,8 +109,9 @@ def build_agent_tools(
     tickets_threads = TicketsTable(postgres)
     docs_sections   = DocsTable(postgres)
 
-    # --- kod aplikacji: folder paczki, bez bazy ---
-    code = CodePackage(settings.code_package_dir)
+    # --- kod aplikacji: folder paczki, bez bazy; szuka w nim program uruchamiany procesem ---
+    code    = CodePackage(settings.code_package_dir)
+    ripgrep = RipgrepClient(timeout=settings.code_search_timeout_seconds)
 
     tools: list[AgentTool] = [
         FindTicketsVectorTool(
@@ -128,6 +132,7 @@ def build_agent_tools(
         ),
         FindDocsTextTool(docs=docs_sections, limit=settings.rag_top_k),
         ReadDocsTool(docs=docs_sections),
+        FindCodeTextTool(package=code, ripgrep=ripgrep),
         QuoteCodeTool(package=code),
     ]
 

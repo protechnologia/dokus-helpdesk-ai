@@ -13,13 +13,17 @@ Po — ścieżka w paczce i linie pliku:
     package.locate(…)      →  "src/lib/Urzad/Numeracja/GeneratorNumeru.php"
     package.read_lines(…)  →  ["<?php", "", "namespace Urzad\\Numeracja;", …]
 
+Szukanie w kodzie przyjmuje też katalog, więc `locate()` ma flagę `allow_dir`:
+
+    package.locate("src/web/../web/js", allow_dir=True)  →  "src/web/js"
+
 Co jest sprawdzane:
 
 | co                                                     | wynik                    |
 |--------------------------------------------------------|--------------------------|
 | katalogu paczki albo jej `repo/` nie ma                | `CodePackageConfigError` |
 | ścieżka wychodzi poza `repo/` (`..`, dowiązanie)       | `CodePathError`          |
-| pod ścieżką jest katalog                               | `CodePathError`          |
+| pod ścieżką jest katalog, a flagi `allow_dir` nie ma   | `CodePathError`          |
 | pod ścieżką nic nie ma albo nie da się jej odczytać    | `CodePathError`          |
 
 O czym pamiętać przy zmianach:
@@ -34,6 +38,8 @@ O czym pamiętać przy zmianach:
   liczą linie atrapy narzędzi kodu, żeby numery znaczyły to samo w testach i na paczce.
 - Paczka jest w UTF-8 i ma końce linii LF: skrypt paczki pomija pliki w innym kodowaniu
   i zamienia CRLF.
+- Samo szukanie tu nie mieszka: robi je program ripgrep, uruchamiany przez `engine_process/`.
+  Stąd dostaje katalog z kodem (`repo_dir()`) i ścieżkę już sprawdzoną (`locate()`).
 """
 
 from pathlib import Path
@@ -102,6 +108,7 @@ class CodePackage:
         1. Konstruktor zapamiętuje katalog paczki; dysku nie dotyka.
         2. `locate()` sprawdza ścieżkę i oddaje ją w postaci względnej wobec `repo/`.
         3. `read_lines()` oddaje linie znalezionego pliku, bez znaków końca linii.
+        4. `repo_dir()` oddaje katalog z kodem temu, kto w nim szuka.
     """
 
     def __init__(
@@ -123,7 +130,9 @@ class CodePackage:
 
     def locate(
         self,
-        path: str,  # np. "src/lib/Urzad/Numeracja/GeneratorNumeru.php"
+        path:      str,          # np. "src/lib/Urzad/Numeracja/GeneratorNumeru.php"
+        *,                       # flagę podaje się wyłącznie po nazwie
+        allow_dir: bool = False, # True: ścieżka może wskazywać także katalog
     ) -> str:
         """
         Description:
@@ -131,17 +140,24 @@ class CodePackage:
         wobec `repo/`, bez `..` i podwójnych ukośników. W tej postaci ścieżka służy za
         identyfikator, więc dwa zapisy tego samego pliku dają ten sam.
 
+        Z `allow_dir=True` przyjmuje też katalog — do zawężania szukania, które bierze jedno
+        i drugie. Wynikiem bywa wtedy ścieżka katalogu, a sam katalog z kodem wraca jako `"."`,
+        więc takiego wyniku nie podaje się do `read_lines()`.
+
         Example args:
             path="src/lib/Urzad/Sesja/../Numeracja/GeneratorNumeru.php"
+            allow_dir=False
 
         Example result:
             "src/lib/Urzad/Numeracja/GeneratorNumeru.php"
 
         Raises:
-            CodePathError: ścieżka wychodzi poza paczkę, wskazuje katalog albo nic nie wskazuje
+            CodePathError: ścieżka wychodzi poza paczkę, wskazuje katalog (bez `allow_dir`)
+                albo nic nie wskazuje
             CodePackageConfigError: paczki nie ma pod skonfigurowaną ścieżką
         """
-        repo = self._repo_dir()
+        repo    = self.repo_dir()
+        missing = "nie ma takiego pliku ani katalogu" if allow_dir else "nie ma takiego pliku"
 
         # --- rozwiązanie ścieżki: po zdjęciu `..` i dowiązań widać, dokąd naprawdę prowadzi ---
         try:
@@ -153,19 +169,19 @@ class CodePackage:
             ValueError,  # znak zerowy w ścieżce
             OSError,     # np. nazwa dłuższa, niż przyjmuje system plików
         ):
-            raise CodePathError(f"nie ma takiego pliku w kodzie aplikacji: {path!r}") from None
+            raise CodePathError(f"{missing} w kodzie aplikacji: {path!r}") from None
 
         # --- poza paczką: nie mówimy, czy pod ścieżką coś jest ---
         if not inside:
             raise CodePathError(f"ścieżka wychodzi poza kod aplikacji: {path}")
 
-        # --- katalog: cytuje się i czyta pliki ---
-        if is_dir:
+        # --- katalog: cytuje się i czyta pliki; przyjmuje go tylko szukanie ---
+        if is_dir and not allow_dir:
             raise CodePathError(f"to katalog, nie plik: {path}")
 
-        # --- nic albo coś, co nie jest zwykłym plikiem ---
-        if not is_file:
-            raise CodePathError(f"nie ma takiego pliku w kodzie aplikacji: {path}")
+        # --- nic albo coś, co nie jest zwykłym plikiem ani katalogiem ---
+        if not is_dir and not is_file:
+            raise CodePathError(f"{missing} w kodzie aplikacji: {path}")
 
         return target.relative_to(repo).as_posix()
 
@@ -189,14 +205,15 @@ class CodePackage:
             CodePackageConfigError: paczki nie ma pod skonfigurowaną ścieżką
         """
         located = self.locate(path)
-        text    = (self._repo_dir() / located).read_text(encoding="utf-8")
+        text    = (self.repo_dir() / located).read_text(encoding="utf-8")
 
         return split_lines(text)
 
-    def _repo_dir(self) -> Path:
+    def repo_dir(self) -> Path:
         """
         Description:
-        Oddaje katalog `repo/` paczki w postaci rozwiązanej, do porównań ze ścieżkami plików.
+        Oddaje katalog `repo/` paczki w postaci rozwiązanej: do porównań ze ścieżkami plików
+        i jako katalog, w którym szuka program uruchamiany przez `engine_process/`.
         Sprawdzany przy każdym użyciu, bo paczkę podmienia się przebudową, bez restartu usługi.
 
         Example args:

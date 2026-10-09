@@ -110,9 +110,9 @@ narzędzie, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzj
 są właściwe i każdy graf przeszedł na prawdziwym modelu (OpenAI), na zmyślonych zgłoszeniach
 i atrapach narzędzi. Trasy biorą graf z węzłów właściwych, gdy model generujący nie jest atrapą,
 ale bez prawdziwego anonimizatora taka konfiguracja odmawia, więc na danych klientów nic jeszcze
-nie rusza. Wszystkie dziewięć narzędzi ma wersję właściwą: osiem na zgłoszeniach i instrukcjach
-oraz cytowanie fragmentu kodu, pierwsze z narzędzi kodu. Dwa, które czytają wątki zgłoszeń,
-czekają na dane, bo tabela wątków napełni się dopiero po anonimizacji.
+nie rusza. Wszystkie dziesięć narzędzi ma wersję właściwą: osiem na zgłoszeniach i instrukcjach
+oraz dwa pierwsze narzędzia kodu, szukanie i cytowanie fragmentu. Dwa, które czytają wątki
+zgłoszeń, czekają na dane, bo tabela wątków napełni się dopiero po anonimizacji.
 
 ### Zasady produktu
 
@@ -293,11 +293,12 @@ dokus-helpdesk-ai/
 │       ├── core_model/           # tickets/, docs/, dicts/, graphs/ — folder na temat, plik nazwany jak model
 │       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, indexer_*, factory_*
 │       ├── core_text/            # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
-│       ├── core_util/            # html, validation_text, time
+│       ├── core_util/            # html, validation_text, time, text
 │       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
 │       ├── engine_llm/           # LLMClient + fabryka; client/, pricing/, models/
 │       ├── engine_embedding/     # EmbeddingClient (HTTP do `embedder`) + prefiksy
 │       ├── engine_anonymization/ # AnonymizedText; atrapa i klient usługi `anonymizer` (p. 4, p. 19)
+│       ├── engine_process/       # programy uruchamiane procesem: run_program(), ripgrep/ (p. 62)
 │       ├── db_qdrant/            # Qdrant: client.py, collection/ point/, hit/
 │       ├── db_postgres/          # Postgres: client.py, table/<tabela>/ (klasa + .sql), row/
 │       │                         # --- agent: katalog na jednostkę, właściwa + fake.py ---
@@ -341,9 +342,9 @@ dokus-helpdesk-ai/
   techniczną (`core_model` / `core_service` / `core_text` / `core_util`).
 - **Każdy pakiet w `app/` ma przedrostek swojej grupy (2026-10-04):** `agent_` to przebieg
   (grafy, węzły, narzędzia), `core_` nasza strona (`core_model/`, `core_service/`, `core_text/`,
-  `core_util/`), `db_` magazyny, `engine_` klienci usług liczących (`engine_llm/`,
-  `engine_embedding/`, `engine_anonymization/`), a `entry_` wejścia (`entry_routers/`,
-  `entry_cli/`). Bez przedrostka zostają pliki spinające całość: `main.py`, `config.py`,
+  `core_util/`), `db_` magazyny, `engine_` klienci usług liczących i programów (`engine_llm/`,
+  `engine_embedding/`, `engine_anonymization/`, `engine_process/`), a `entry_` wejścia
+  (`entry_routers/`, `entry_cli/`). Bez przedrostka zostają pliki spinające całość: `main.py`, `config.py`,
   `errors.py`. Przedrostek nazywa rolę, nie bibliotekę: nie `langgraph_`, bo LangGrapha importuje
   tylko `agent_graphs/`, a narzędzia mają od niego nie zależeć.
 - **Pakiety baz nazywają się od bazy: `db_qdrant/` i `db_postgres/` (2026-10-04, wcześniej
@@ -352,6 +353,14 @@ dokus-helpdesk-ai/
   dostawców; te dwa pakiety mają po jednej implementacji i piszą w języku swojej bazy. Błędy:
   `DbQdrantError` i `DbPostgresError` z wariantami `…ConfigError`; nie `PostgresError`, bo tak
   nazywa się klasa sterownika `asyncpg`.
+- **Programy uruchamiane jako osobny proces mają jeden pakiet, `engine_process/` (2026-10-09).**
+  Uruchomienie programu przekracza granicę procesu, więc nie leży przy serwisie, który z niego
+  korzysta. Na górze pakietu jest to, co wspólne (`run_program()`, błędy, `ProgramOutput`),
+  a każdy program ma podfolder z klientem i jego modelami; pierwszy to `ripgrep/`. Nazwa mówi
+  o mechanizmie, nie o roli, inaczej niż pozostałe silniki, bo pakiet ma przyjąć każdy program
+  uruchamiany procesem (następny to budowa mapy symboli, p. 66). Program rusza bez powłoki,
+  z argumentami jako osobnymi napisami i z limitem czasu. Błędy: `ProcessError`
+  i `ProcessConfigError`. Cena: nazwa od mechanizmu nie mówi, do czego pakiet służy.
 - **Transport vs domena.** Transport = rozmowa z usługą zewnętrzną (LLM, embedder, Qdrant); domena =
   logika, nieświadoma tego, co pod spodem. Domena dostaje klienta transportowego przez
   konstruktor, nigdy nie sięga po SDK.
@@ -389,6 +398,9 @@ dokus-helpdesk-ai/
   i przetestować, ani razu nie mówiąc „zgłoszenie". Stąd `strip_html()` i
   `describe_validation_error()` są tam, a nie przy swoich wywołujących; drugi powód jest
   praktyczny — czytnik SQL z masowego importu (p. 31) potrzebuje tego samego strippera.
+  `contains_all()` trafiło tam z jednym wołającym (2026-10-09), żeby następny go użył, zamiast
+  pisać od nowa; argument, od którego zależy wynik (wielkość liter), podaje się tam zawsze
+  wprost, bez wartości domyślnej.
 - **Funkcja czy klasa — rozstrzyga stan, nie symetria.** Implementacja z cyklem życia (wagi
   modelu, sesja HTTP) to obiekt budowany raz; obliczenie bezstanowe zostaje funkcją modułową
   wołaną przez tę implementację (`deterministic_vector` wewnątrz `FakeEncoder`).
@@ -407,7 +419,7 @@ dokus-helpdesk-ai/
 **Gdzie to położyć — pięć pytań, po kolei:**
 
 1. **Rozmawia z usługą zewnętrzną?** → pakiet tej usługi (`engine_llm/`, `engine_embedding/`), razem
-   z jej modelami transportu.
+   z jej modelami transportu. Uruchamia program jako osobny proces → `engine_process/<program>/`.
 2. **Da się to opisać i przetestować, ani razu nie nazywając dziedziny?** → `core_util/`.
 3. **Model danych czy operacja na nich?** → `core_model/` albo `core_service/`.
 4. **Dane klienta, które klient zmienia bez deployu** (słownik, zestaw reguł)? → `core_text/`.
@@ -903,16 +915,17 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — indeksacja i narzędzia powstają
 
 Trzeci materiał obok zgłoszeń i instrukcji: kod źródłowy Dokusa, czytany narzędziami agenta
 (p. 60–67). Ma pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają, przede wszystkim gdy
-zgłoszenie niesie komunikat albo kod błędu. Z narzędzi jest cytowanie fragmentu (`quote_code`,
-p. 67); szukanie i odczyt jeszcze nie powstały (p. 62–66). Są też paczka kodu (p. 60) i zestaw
-przypadków (p. 61). Niżej decyzje i liczby z 2026-10-06 oraz z prób z 2026-10-07.
+zgłoszenie niesie komunikat albo kod błędu. Z narzędzi są szukanie (`find_code_text`, p. 62)
+i cytowanie fragmentu (`quote_code`, p. 67); odczyt jeszcze nie powstał (p. 63–66). Są też paczka
+kodu (p. 60) i zestaw przypadków (p. 61). Niżej decyzje i liczby z 2026-10-06, z prób
+z 2026-10-07 i z budowy szukania z 2026-10-09.
 Liczby bez dopisku „w paczce" pochodzą z rozpoznania na kopii roboczej gałęzi jednego klienta,
 a paczka powstała z innej gałęzi.
 
 - **Kod może wyjść do modelu zewnętrznego (decyzja 2026-10-06).** Nie przechodzi przez
   anonimizację: wynik narzędzia idzie do modelu wprost. Otwarte zostaje, którą gałąź indeksuje
   instancja: klienci mają własne gałęzie obok głównej, a odpowiedź z kodu opisuje tylko tę, którą
-  wczytano (p. 62).
+  wczytano (p. 65).
 - **Są dwie paczki: prawdziwy kod Dokusa i zmyślona aplikacja (2026-10-06, wcześniej tylko
   prawdziwy kod).** Paczka z Dokusa leży w `data/unsafe/code/` i na niej mierzy się skuteczność
   (p. 61). Aplikacja syntetyczna leży w `data/safe/code/source/`: 29 plików w kształcie
@@ -935,8 +948,8 @@ a paczka powstała z innej gałęzi.
   wymieniają, nie wchodzi, więc YAML-e z hasłami, klucze, logi i pliki binarne odpadają bez
   wypisywania. Z 35 tys. plików i 565 MB w `src` w paczce zostają 11 424 pliki i 1,18 mln linii,
   w tym 1401 generowanych klas `Base*`. Cena: skrypt kopiuje to, co leży na dysku, więc plik
-  prywatny albo lokalnie zmieniony wchodzi, jeśli pasuje do reguł, a metryczka nie zna gałęzi
-  ani changesetu (paczka z 2026-10-07 powstała z gałęzi zadaniowej pod `stage-gminy`, changeset
+  prywatny albo lokalnie zmieniony wchodzi, jeśli pasuje do reguł, a metryczka nie zna
+  changesetu (paczka z 2026-10-07 powstała z gałęzi zadaniowej pod `stage-gminy`, changeset
   51962). Katalog cache Symfony 2 leży w folderze z listy i trzeba go było wyłączyć: 305 plików
   PHP ze skompilowanym kontenerem. Wyłączenia nie rozróżniają wielkości liter, jak rozszerzenia
   (2026-10-08): kod leży na dysku Windows, a wcześniej `A.MIN.JS` i katalog `Vendor` wchodziły
@@ -948,6 +961,10 @@ a paczka powstała z innej gałęzi.
 - **Metryczka (`manifest.json`) ma trzy sekcje:** `package` (pliki, linie, rozszerzenia),
   `changes` (co skrypt zmienił w treści) i `skipped` (pliki nie w UTF-8 oraz pliki z folderów
   z listy, których reguły nie biorą). Po tej ostatniej liście widać, czego model nie dostaje.
+  Obok stoją folder wejściowy, data budowy i gałąź (od 2026-10-09): skrypt czyta ją z pliku
+  kopii roboczej PlasticSCM (`.plastic/plastic.selector`), bez rozmowy z serwerem, a folder bez
+  tego pliku daje metryczkę bez gałęzi. Gałąź służy człowiekowi: żaden kod jej nie czyta
+  (p. 65). Do metryczki paczki z 2026-10-07 dopisano ją ręcznie, w tym samym kształcie.
 - **Przegląd paczki wykrywaczem sekretów (gitleaks, 2026-10-06): 8 tokenów JWT w komentarzu
   jednego zadania technicznego; zostają w paczce świadomie.** Wśród 107 przypisań hasła, tokenu
   albo klucza nie ma prawdziwej wartości: to nazwy ustawień, kolumn i klas. Wykrywacz nie
@@ -975,6 +992,26 @@ a paczka powstała z innej gałęzi.
   plikach (57 MB) dosłowne szukanie trwa 0,05 s, a czystym Pythonem 0,7 s; przy częstym słowie
   0,14 s wobec 3,3 s. Folder musi leżeć na dysku linuksowym: to samo szukanie w katalogu Windows
   przez WSL trwało 14 s.
+- **Ripgrep stoi w obrazie `api` z apt i rusza jako osobny proces, bez powłoki (2026-10-09).**
+  Wersję wyznacza wydanie Debiana z obrazu bazowego (14.1.1); testy na hoście wymagają własnego
+  (`apt install ripgrep`, w Ubuntu 24.04 to 14.1.0). Szuka dosłownie i bez względu na wielkość
+  liter, a wynik nie zależy od plików `.gitignore` i `.ignore`, plików ukrytych ani konfiguracji
+  ripgrepa na maszynie. Kolejność plików z ripgrepa zmienia się między przebiegami, więc wynik
+  układa klient: po ścieżce i numerze linii. Limit czasu jednego szukania to
+  `CODE_SEARCH_TIMEOUT_SECONDS` (10 s). Na paczce Dokusa zwykłe szukanie trwa 0,05–0,1 s,
+  a fraza trafiająca w 85 tys. linii to 0,15 s ripgrepa i 0,7 s rozbioru 11 MB wyjścia.
+- **Przy szukaniu słowami ripgrep dostaje jedno słowo, najdłuższe, a komplet sprawdza nasz kod
+  na treści linii (2026-10-09).** Tryb dosłowny ripgrepa zna jedną frazę. Które słowo dostanie,
+  nie zmienia wyniku, tylko czas: najdłuższe było najrzadsze w 3 parach z 5, a przy „function
+  execute" kosztowało 0,42 s zamiast 0,11 s. Słowa nie mają odmiany: to ciągi znaków, więc
+  „limit" znajdzie „limitu", ale nie odwrotnie.
+- **Model nie sięga po narzędzia kodu, dopóki prompt o nich nie mówi (2026-10-09).** W przebiegu
+  testów `llm_live` na `gpt-6.1-sol` w czterech sprawach z pętlą nie padło ani jedno wywołanie
+  `find_code_text` ani `quote_code`, także w sprawie, w której zgłoszenia i instrukcje nic nie
+  dały: model szukał w zgłoszeniach jeszcze raz i odpowiedział. Prompty grafów opisują drogę
+  przez zgłoszenia i instrukcje, a o kodzie nie mówią, a zgłoszenia z testów nie niosą
+  komunikatu ani kodu błędu. Kiedy sięgać po kod, to treść promptów (p. 23, 25, 26). To jeden
+  przebieg na atrapach narzędzi, nie pomiar.
 - **Jeden komunikat ma w kodzie kilka brzmień** — „Nie udało się skomunikować z serwerem" trzy,
   w tym jedno z innym szykiem słów — a komunikat składany z części nie istnieje w kodzie
   w całości. Stąd szukanie po słowach obok frazy i szukanie stałego fragmentu, bez numerów
@@ -997,11 +1034,12 @@ a paczka powstała z innej gałęzi.
   Opisy zachowania zatwierdza osoba znająca Dokusa; do tego czasu przypadek ma
   `behaviour_confirmed: false`.
 - **Zestaw do aplikacji syntetycznej ma inny kształt, bo służy testom bez modelu (2026-10-07).**
-  `data/safe/golden/code-synthetic.json` trzyma sekcję na narzędzie: 33 zapytania w kształcie
+  `data/safe/golden/code-synthetic.json` trzyma sekcję na narzędzie: 39 zapytań w kształcie
   narzędzia z oczekiwanym wynikiem, oraz listę plików, których paczka nie może zawierać.
   Zgłoszeń w nim nie ma: testowi bez modelu nic nie dają, bo zamiana zgłoszenia na wywołania
   narzędzi to praca modelu. Kształty zapytań pochodzą z planu i prototypów, więc sekcję
-  narzędzia dopasowuje się przy jego budowie.
+  narzędzia dopasowuje się przy jego budowie; sekcja `find_code_text` jest dopasowana
+  (2026-10-09, 18 zapytań, `words` jako tekst).
 - **Przypadek trafia do zestawu po próbie na świeżym agencie, który zna tylko zgłoszenie
   i folder paczki.** W próbach z 2026-10-07 miejsce wybrane przez autora było błędne albo
   niepełne w 3 przypadkach z 8, a w 2 kolejnych błędny był opis albo rodzaj przypadku. Cena:
@@ -1653,6 +1691,20 @@ czasu jest pusta.
 - **Wynik wyszukiwania nie niesie żadnej treści, także dopasowanego fragmentu.** Fragment mógłby
   modelowi wystarczyć zamiast odczytu, a wtedy odpowiedź niosłaby treść bez źródła. Opis sekcji
   z metryczki zostaje: mówi, o czym sekcja jest, nie co w niej stoi.
+- **Szukanie w kodzie, `find_code_text` (2026-10-09), ma `exact`, `words` i opcjonalne `path`,
+  a w wyniku treść trafionej linii.** Fraza i słowa znaczą to samo co w wyszukiwaniach
+  tekstowych zgłoszeń i dokumentacji: szukają niezależnie, wyniki się sumują, a `matched_by`
+  mówi, czym linię znaleziono; `words` to tekst, nie lista, bo w sondzie model podał tekst
+  i stracił dwa szukania. Fraza i słowa muszą stać w jednej linii kodu, a `path` zawęża szukanie
+  do katalogu albo pliku. Wynik to płaska lista najwyżej 20 linii (ścieżka, numer, etykieta,
+  treść), po ścieżce i numerze linii, z licznikiem pominiętych; treść jest bez wcięcia i ucięta
+  po 200 znakach. Treść linii to wyjątek wśród wyszukiwań: bez niej model nie odróżni definicji
+  od setek użyć tej samej nazwy („raiseError" stoi w 550 liniach w 197 plikach), a źródła
+  w kodzie nie tworzy ani szukanie, ani odczyt, tylko cytowanie przyczyny. Dwadzieścia linii
+  z treścią to około 1,4 tys. znaków. Jako błąd do modelu wracają: ścieżka zawężenia spoza
+  paczki albo donikąd, zapytanie bez frazy i słów oraz same słowa krótsze niż trzy znaki. Cena:
+  model może wskazać przyczynę po jednej linii, której otoczenia nie czytał; mówi o tym opis
+  dla modelu, a liczy pomiar (p. 59).
 - **Wynik każdego narzędzia trafia do modelu jako JSON (`result_as_json()` w `base.py`)** — model
   wyniku zapisany wprost, z polami pod nazwami ze schematu. Identyfikatory wracają w kształcie,
   w jakim model poda je następnemu narzędziu, a treść pisana przez klienta siedzi w polu
@@ -1756,9 +1808,9 @@ czasu jest pusta.
   na pakiet i brak `cite()` w narzędziach pomocniczych. Nowe narzędzie jest objęte testem bez
   dopisywania go do żadnej listy.
 - **Narzędzia właściwe buduje `agent_tools/factory.py`, z konfiguracji (2026-10-05):** po jednym
-  kliencie embeddera, Qdranta i Postgresa, wspólnym dla ośmiu narzędzi, oraz paczka kodu dla
-  `quote_code`, w kolejności `TOOL_NAMES` grafów. Powstają wszystkie dziewięć; czy instancja bez
-  dokumentacji ma pomijać jej narzędzia, rozstrzyga p. 15.
+  kliencie embeddera, Qdranta i Postgresa, wspólnym dla ośmiu narzędzi, oraz paczka kodu
+  i klient ripgrepa dla dwóch narzędzi kodu, w kolejności `TOOL_NAMES` grafów. Powstaje
+  wszystkie dziesięć; czy instancja bez dokumentacji ma pomijać jej narzędzia, rozstrzyga p. 15.
 - **Kod aplikacji liczy się jako źródło jak zgłoszenie i instrukcja, także w wariancie
   wymagającym źródeł (decyzja 2026-10-06, narzędzia w p. 62–67).** Odpowiedź opartą wyłącznie na
   kodzie wołający rozpoznaje po rodzaju źródła (`code`). Źródłem jest fragment, który model
@@ -1781,8 +1833,8 @@ czasu jest pusta.
   kodu jeszcze nie ma, więc regułę „cytuj tylko to, co przeczytałeś" niesie opis dla modelu,
   a liczy pomiar (p. 59). Jako błąd do modelu wracają: ścieżka spoza paczki, katalog albo brak
   pliku, fragment za końcem pliku, a z modelu zapytania brak roli, odwrócony zakres i fragment
-  ponad limit. Cena: do czasu p. 62–66 model ma w trzech grafach narzędzie, którym może cytować
-  tylko na ślepo.
+  ponad limit. Cena: do czasu p. 63–66 model widzi z kodu tylko linie trafione szukaniem, więc
+  cytuje po jednej linii albo na ślepo.
 - **Każde narzędzie jest tylko do odczytu** — wstrzyknięcie przez treść zgłoszenia może co
   najwyżej skierować agenta do nietrafionego materiału, nie zmienić indeksu.
 
@@ -1806,7 +1858,9 @@ czasu jest pusta.
 - **Każde wywołanie węzła dopisuje jeden wpis do `log`** (`LogEntry(node, message)` z
   `agent_nodes/models.py`, budowany przez `Node.log_entry()`) — przebieg grafu do odczytania bez
   zewnętrznego tracingu. W `message` wyłącznie nazwy, liczby i identyfikatory, nigdy treść
-  zgłoszenia ani odpowiedzi modelu: log wraca w stanie razem z wynikiem.
+  zgłoszenia ani odpowiedzi modelu: log wraca w stanie razem z wynikiem. Wpis węzła `agent`
+  niesie też koszt swojej tury (2026-10-09): `tura 3: narzędzia: read_docs; 0,0041 USD`, żeby
+  było widać, która tura ile kosztowała. To tekst dla czytającego; sumę liczy się z `usage`.
 - **Limity wywołań narzędzi w jednym przebiegu grafu (2026-10-04): `AGENT_MAX_CALLS_<NARZĘDZIE>`
   w ENV, pole na narzędzie.** Wywołanie ponad limit dostaje błąd jako wynik narzędzia
   (`{"error": …}`), bez źródeł, a przebieg idzie dalej — model ma odpowiedzieć z tego, co ma.
@@ -1816,15 +1870,17 @@ czasu jest pusta.
   model wywołanie poprawił, a limit wątków ma być liczbą wątków przeczytanych. Ten
   sam limit stoi w opisie narzędzia dla modelu: miejsce `{{max_calls}}` w `description.md`
   wypełnia `tool_definitions()`, więc narzędzie bez limitu to błąd składania. Ile jedno
-  wywołanie może pobrać (20 kart, 5 sekcji, 40 linii cytowanego kodu), zostaje stałą w modelu
-  zapytania; wątek jest zawsze jeden. Wartości od 2026-10-05: wyszukiwania i karty po 5, sekcje
-  i wątki po 3, spis treści 1; od 2026-10-07 cytowanie kodu 5.
+  wywołanie może pobrać (20 kart, 5 sekcji, 20 linii z szukania w kodzie, 40 linii cytowanego
+  kodu), zostaje stałą w modelu zapytania; wątek jest zawsze jeden. Wartości od 2026-10-05:
+  wyszukiwania i karty po 5, sekcje i wątki po 3, spis treści 1; od 2026-10-07 cytowanie kodu 5;
+  od 2026-10-09 szukanie w kodzie 10, bo od komunikatu do miejsca, które go wywołuje, idzie się
+  kilkoma szukaniami z rzędu (w sondzie limit 10 wyczerpał się w 5 sprawach z 9).
 - **Limit tur modelu: `AGENT_MAX_ITERATIONS` = 20 (2026-10-05).** Liczy odpowiedzi modelu
   w grafie z narzędziami, nie wywołania. Gdy w ostatniej dozwolonej turze model nadal woła
   narzędzia wiedzy, `route_after_agent()` prowadzi do `respond` i narzędzia nie są wykonywane.
   Domyka to, czego limity narzędzi nie domykają: wywołanie ponad limit narzędzia dostaje odmowę,
   ale turę zużywa. 20 to zapas, nie cel: sprawa w sondach to 4–7 tur, a limity narzędzi pozwalają
-  na 37 wywołań, czyli do 38 tur przy jednym wywołaniu na turę (do przeliczenia w p. 23).
+  na 47 wywołań, czyli do 48 tur przy jednym wywołaniu na turę (do przeliczenia w p. 23).
   Sprawa ucięta limitem dostaje od `respond` jedną turę ponad limit, na samą odpowiedź: jest już
   opłacona, a narzędzia w tej turze nadal nie ruszają.
 - **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `engine_llm/models/messages.py`), żadnych typów
@@ -2090,8 +2146,9 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 - **Koszt przebiegu jest w stanie grafu i w odpowiedzi każdej trasy (2026-10-04).** Węzeł `agent`
   zwraca zużycie SWOJEJ tury (`LLMUsage`: wywołania, cztery klasy tokenów, `cost_usd`), a reduktor
   `add_usage` w `GraphState` je sumuje; trasy oddają to jako `usage`. Na atrapach wywołania są
-  policzone, a tokeny i koszt wynoszą zero — prawdziwe zero, nie brak danych. CLI wypisze to samo
-  razem z komendami grafów (p. 46).
+  policzone, a tokeny i koszt wynoszą zero — prawdziwe zero, nie brak danych. Koszt każdej tury
+  stoi też we wpisie logu węzła `agent` (2026-10-09). CLI wypisze to samo razem z komendami
+  grafów (p. 46).
 - **Cache promptu: u Claude'a włączony w każdym żądaniu (`cache_control` na górnym poziomie),
   u OpenAI działa bez naszego udziału.** Obejmuje początek żądania w kolejności narzędzia →
   prompt systemowy → wiadomości, więc w pętli z narzędziami cała dotychczasowa rozmowa jest
@@ -2357,7 +2414,8 @@ w p. 46.
 **Testy i jakość**
 - Lint: `ruff check .`
 - Wszystko, co nie potrzebuje stacku ani płatnego modelu (każdy rodzaj testu): `pytest`
-  (wymaga zbudowanej paczki z aplikacji syntetycznej — polecenie w „Przygotowanie danych")
+  (wymaga zbudowanej paczki z aplikacji syntetycznej — polecenie w „Przygotowanie danych" —
+  i programu ripgrep na hoście: `apt install ripgrep`)
 - Wszystko naraz: `pytest -m "not llm_live"` — **jedno polecenie na cały przebieg**; wymaga
   stacku. **Nie `pytest -m ""`** — ono wybiera też testy na żywym modelu, a te bez jawnego
   `llm_live` kończą się błędem
@@ -2504,7 +2562,8 @@ w p. 46.
   to **nie** `HTTPException` — potrzebuje osobnego handlera (najczęstsze 422).
 - **Awaria zależności ma własny handler i status „spróbuj później".** Wyjątek warstwy
   transportowej (`EncoderError` w embedderze; w `api` `LLMError`, `AnonymizationError` oraz
-  zależności narzędzi agenta: `EmbeddingError`, `DbQdrantError`, `DbPostgresError`) łapiemy
+  zależności narzędzi agenta: `EmbeddingError`, `DbQdrantError`, `DbPostgresError`,
+  `ProcessError`) łapiemy
   osobno i zwracamy **503** we wspólnym kształcie `ErrorResponse` — surowy 500 nie odróżnia
   „model chwilowo padł" od „zapytanie jest błędne", a to decyduje, czy przebieg indeksacji ma
   ponowić, czy porzucić zgłoszenie. **Treść wyjątku zostaje w logu, nie w odpowiedzi** —
@@ -2513,7 +2572,8 @@ w p. 46.
   zapytania. `RespondError` z węzła `respond` dziedziczy po `LLMError`, więc też daje 503.
 - **Błąd konfiguracji NIGDY nie zamienia się w status HTTP.** `LLMConfigError`,
   `EncoderConfigError` i `AnonymizationConfigError`, a w `api` także `EmbeddingConfigError`,
-  `DbQdrantConfigError` i `DbPostgresConfigError`, dziedziczą po błędzie swojej warstwy, więc
+  `DbQdrantConfigError`, `DbPostgresConfigError` i `ProcessConfigError`, dziedziczą po błędzie
+  swojej warstwy, więc
   wpadłyby w handler 503 — handler **wyrzuca je z powrotem**. Powód: 503 znaczy „spróbuj za
   chwilę", a przy złym dostawcy LLM czekanie nic nie da; zielony kontener oddający uprzejme
   503 na każde żądanie jest gorszy niż głośna śmierć.
@@ -2527,21 +2587,22 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1370 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 356 (79)           | 76 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 105 (9)            | 11 s |
-| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 49 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1441 (0)           | 23 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 425 (79)           | 73 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 105 (9)            | 9 s  |
+| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 37 s |
 
-Liczby i czasy z 2026-10-08: każdy folder osobno, w komplecie
+Liczby i czasy z 2026-10-09: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku. Bez testów na stacku
-integracyjne trwają 12 s, a ewaluacyjne poniżej sekundy — całe 49 s to 207 wyszukań golden setów
+integracyjne trwają 16 s, a ewaluacyjne poniżej sekundy — całe 37 s to 207 wyszukań golden setów
 przez prawdziwy embedder (178 w zgłoszeniach, 29 w dokumentacji). Komplet jednym poleceniem
-(`pytest -m "not llm_live"`): 1836 testów, 154 s; domyślny `pytest`, bez stacku: 1710 testów,
-30 s. Trzydzieści pięć testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
+(`pytest -m "not llm_live"`): 1976 testów, 160 s; domyślny `pytest`, bez stacku: 1850 testów,
+35 s. Trzydzieści pięć testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
 folderu, ale poza oboma przebiegami.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
-(Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik grafów.
+(Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik
+grafów, program uruchamiany jako proces (ripgrep).
 
 **Rodzaj testu to jego folder; marker mówi, czego test potrzebuje do uruchomienia.** Marker nosi
 tylko test, który potrzebuje działającej usługi albo płatnego modelu: jednostkowe nigdy,
@@ -2587,9 +2648,17 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   dwie próby; druga rusza tylko po nieudanej pierwszej i jest wypisana w podsumowaniu. Treści
   odpowiedzi test nie ocenia. Testy `quote_code` już są (2026-10-07): zapytania z zestawu idą
   przez prawdziwy węzeł `run_tools`, bo odmowa bywa dziełem modelu zapytania albo narzędzia,
-  a model ma w obu przypadkach dostać błąd w miejscu wyniku. Cena: to jedyny test bez markera,
-  który potrzebuje czegoś spoza commita — bez zbudowanej paczki syntetycznej domyślny `pytest`
-  kończy się błędem z poleceniem budowy.
+  a model ma w obu przypadkach dostać błąd w miejscu wyniku. Testy `find_code_text` są od
+  2026-10-09: zapytania z zestawu idą przez prawdziwy `run_tools` i prawdziwego ripgrepa, a test
+  w pliku `quote_code` sprawdza, że linię znalezioną szukaniem da się zacytować bez przeróbki.
+  Cena: to jedyne testy bez markera, które potrzebują czegoś spoza commita — zbudowanej paczki
+  syntetycznej i programu ripgrep na hoście. Bez paczki domyślny `pytest` kończy się błędem
+  z poleceniem budowy, a bez ripgrepa błędem z poleceniem instalacji.
+- **Programy uruchamiane procesem mają testy na prawdziwych procesach (2026-10-09).**
+  Uruchamianie (`run_program()`) sprawdzają małe programy systemu (`echo`, `sh`, `sleep`): kod
+  wyjścia, brak powłoki, limit czasu. Klient ripgrepa szuka na małych drzewach plików
+  w katalogu tymczasowym; brak programu i limit czasu test odtwarza, podmieniając nazwę
+  programu. Rozbiór wyjścia ripgrepa jest jednostkowy, bez programu.
 - **Skrypt paczki kodu ma testy jednostkowe i integracyjne (2026-10-08).** Jednostkowe
   sprawdzają dobór jednej ścieżki według reguł i poprawki treści. Integracyjne budują paczkę
   z aplikacji syntetycznej do katalogu tymczasowego i pilnują, że źródło to dokładnie paczka plus
@@ -2614,7 +2683,8 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   zależności. Handlery wyjątków na nagiej aplikacji są integracyjne, nie funkcjonalne: testują
   jeden moduł razem z rusztowaniem FastAPI, a nie wejście do prawdziwej aplikacji.
 - **Integracyjne też dzielą się po wymaganiach.** Bez markera: system plików (`tmp_path`, pliki
-  repo), rusztowanie FastAPI, silnik LangGraph na atrapach węzłów — chodzą w domyślnym `pytest`.
+  repo), rusztowanie FastAPI, silnik LangGraph na atrapach węzłów, programy z hosta (ripgrep) —
+  chodzą w domyślnym `pytest`.
   Z markerem `stack`: prawdziwy Qdrant i embedder.
 - **Test czytający compose musi tolerować tagi Compose'a** — `volumes: !reset []` jest poprawnym
   Compose'em, ale nieznanym tagiem dla `yaml.safe_load`, więc gołe wczytanie pliku wywala się
@@ -2633,14 +2703,19 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   Odmawia błędem, gdy wybór testów nie wymienia `llm_live` (płatne wywołanie nie może być
   skutkiem ubocznym `-m ""`) i gdy dostawcą jest `fake`. Odpowiedzi modelu plik liczy raz
   i dzieli między testy. Trzy pliki: `complete()` (dwa wywołania), tura z narzędziami (dwie
-  tury na zmyślonych narzędziach) i każdy graf na węzłach właściwych (osiem spraw, 19 tur
-  i około 0,11 USD na `gpt-6.1-sol`). Sprawa grafu liczy się dopiero, gdy potrzebuje jej test,
+  tury na zmyślonych narzędziach) i każdy graf na węzłach właściwych (dziewięć spraw, 20–25 tur
+  i 0,07–0,14 USD na `gpt-6.1-sol`, dwa przebiegi z 2026-10-09; różnicę robi głównie zapis do
+  cache promptu, 32,7 tys. tokenów w pierwszym i 6,3 tys. w drugim). Sprawa grafu liczy się dopiero, gdy potrzebuje jej test,
   więc `-k <graf>` opłaca jeden graf. Testy grafów sprawdzają okablowanie: czy model odpowiada
   narzędziem grafu i czy odpowiedź przechodzi przez `respond`. Jakość odpowiedzi to p. 59
   i p. 21–28. Dziewiąta sprawa (2026-10-08) to `suggest_solution` na narzędziach, które nic nie
   znajdują: węzeł `respond` czyta odpowiedź także bez źródeł, więc model, który wtedy odpowie
   zwykłym tekstem, kończy sprawę błędem 503. Grozi to modelom bez wymuszonego wywołania
   narzędzia, a pokazuje tylko żywy model.
+- **Przebieg testów `llm_live` kończy się raportem zużycia (2026-10-09).** Każda sprawa zgłasza
+  swoje `usage`, a grafy także `log`, przez fixture `live_usage`; pytest wypisuje na końcu linię
+  na sprawę, pod nią wpisy przebiegu, i sumę kosztu. Z wpisów widać, które narzędzia model wołał
+  w której turze. Sprawa zakończona błędem nie oddaje stanu, więc w raporcie jej nie ma.
 - **Poza testami `llm_live` oba modele są atrapą, cokolwiek stoi w `.env` (2026-10-05)** —
   ustawia to fixture `fake_models_outside_live_tests` z `tests/conftest.py`. Fabryka grafów przy
   prawdziwym dostawcy składa graf na prawdziwym modelu, więc bez tego zwykły test trasy zależałby
@@ -2763,9 +2838,16 @@ zapytania. Treść SQL-a tabel sprawdza osobna atrapa w `test_api_db_postgres_ta
 **Komplet atrap narzędzi i narzędzie z padniętą zależnością bierz z
 `tests/helpers_agent_tools.py`** — `fake_agent_tools()` oddaje atrapy wszystkich narzędzi,
 a `find_tickets_vector_with_dead_embedder()` narzędzie właściwe na kliencie z transportem, który
-nie odpowiada. Nie definiuj w teście podklasy narzędzia: test
+nie odpowiada. To jedyne miejsce w testach z listą wszystkich atrap (2026-10-09, wcześniej cztery
+kopie, z których jedna po dojściu narzędzia została nieaktualna bez czerwonego testu); test
+kontraktu narzędzi pilnuje, że helper ma atrapę każdego narzędzia z `app/agent_tools/`. Nie definiuj w teście podklasy narzędzia: test
 kontraktu narzędzi znajduje wszystkie klasy narzędzi w procesie i policzy ją jako drugie
 narzędzie o tej samej nazwie.
+
+**Raport zużycia żywego modelu leży w `tests/helpers_live_usage.py`** (`LiveUsageReport`),
+a test dostaje go przez fixture `live_usage` z `tests/conftest.py`. Fixture i funkcja wypisująca
+podsumowanie zostają w `conftest.py`, bo pytest szuka ich tylko tam; obiekt raportu zbudowany
+w teście nie trafiłby do podsumowania.
 
 **Paczkę syntetycznej aplikacji i zapytania do niej bierz z `tests/helpers_code_package.py`** —
 `synthetic_code_package()` oddaje czytnik zbudowanej paczki, `synthetic_code_cases()` sekcję
@@ -2934,6 +3016,30 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   a sprawdzanie w węźle wiązałoby go z nazwami narzędzi odczytu, których jeszcze nie ma; bez
   treści w zwrocie model w dwóch przebiegach nie cytował na ślepo. Wraca, gdy pomiar pokaże
   takie cytowania (p. 59).
+- **Wynik `find_code_text` bez treści linii** — tak stało w planie z 2026-10-06, gdy odczyt pliku
+  miał tworzyć źródło; odkąd tworzy je tylko cytowanie przyczyny, treść w szukaniu źródeł nie
+  omija, a bez niej każde trafienie trzeba odczytać.
+- **Wynik `find_code_text` pogrupowany po pliku** — płaska lista ma ten sam kształt co pozostałe
+  wyszukiwania tekstowe i tnie się limitem jednym wycięciem. Cena: ścieżka powtarza się przy
+  każdej linii, około 0,8 tys. znaków na typowy wynik.
+- **`words` jako lista w `find_code_text`** — pozostałe wyszukiwania tekstowe biorą tekst, a model
+  w sondzie podał tekst także prototypowi z listą.
+- **Ripgrep z koła na PyPI** (`ripgrep==14.1.0`) — jedna wersja dla hosta i obrazu, ale nie da się
+  potwierdzić, kto tę paczkę publikuje; program pochodzi z apt.
+- **Ripgrep w czytniku paczki albo jako osobna usługa compose** — w czytniku mieszałby odczyt
+  plików z uruchamianiem programu, a usługa to REST i drugi kontener dla programu, który
+  odpowiada w 0,1 s; ma własny pakiet w `app/`.
+- **Szukanie słowami łańcuchem dwóch ripgrepów albo wyrażeniem z warunkami (PCRE2)** — drugi
+  ripgrep filtruje wyjście pierwszego razem ze ścieżką, więc słowo „js" pasowałoby do każdej
+  linii pliku `.js`; PCRE2 wymaga zamiany tekstu od modelu na wzorzec i było ponad dwa razy
+  wolniejsze.
+- **Liczenie trafień każdego słowa przed szukaniem, żeby wybrać najrzadsze** — to dodatkowe
+  uruchomienie ripgrepa na słowo, zwykle droższe niż zysk; ripgrep dostaje najdłuższe.
+- **Changeset w metryczce paczki kodu** — w kopii roboczej stoi tylko w nagłówku pliku binarnego
+  o nieudokumentowanym formacie, a klient `cm` to program Windows, który może łączyć się
+  z serwerem; metryczka niesie gałąź i datę budowy.
+- **Flagi `--branch` i `--changeset` w skrypcie paczki** — wartość wpisana z ręki może być
+  błędna albo nieaktualna; gałąź skrypt czyta sam z pliku kopii roboczej.
 - **`text` z wartością `null` w `Proposal` zamiast osobnego modelu na same uwagi** — schemat dla
   modelu pozwoliłby wtedy oddać propozycję bez treści także w sprawie ze źródłami; `ProposalNotes`
   zapisuje tylko węzeł `respond`.
@@ -3129,24 +3235,27 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   `absent_paths`, która zostaje w zestawie) i na małych drzewach plików; dwie poprawki skryptu:
   wyłączenia bez rozróżniania wielkości liter i błąd zamiast pustej paczki; reguły — „Kod
   aplikacji", „Testy".
-- [ ] **62. `find_code_text`** — fraza dosłowna albo słowa w jednej linii, ripgrep w obrazie
-  `api` w trybie dosłownym, z opcjonalnym zawężeniem do katalogu; oddaje ścieżkę i numer linii,
-  bez treści, z limitem pozycji i licznikiem pominiętych; opis każe szukać stałego fragmentu
-  komunikatu, bez numerów i nazw; do rozstrzygnięcia, którą gałąź indeksuje instancja i czy
-  metryczka ma ją zapisywać. *Dlaczego:* od niego zaczyna się sprawa z komunikatem albo
-  kodem błędu, a częste słowo trafia w dziesiątki tysięcy linii; bez zawężenia ginie też rzadkie
-  trafienie wśród częstych: nazwa zdarzenia błędu stoi w 513 liniach w 177 plikach, a jego
-  rejestracja w dwóch.
+- [x] **62. `find_code_text`** (2026-10-09) — `FindCodeTextTool` na paczce kodu i kliencie
+  ripgrepa: fraza i słowa w jednej linii, opcjonalne zawężenie do katalogu albo pliku, wynik
+  z treścią linii, do 20 linii i licznik pominiętych; pakiet `engine_process/` na programy
+  uruchamiane procesem, ripgrep z apt w obrazie `api`, `CODE_SEARCH_TIMEOUT_SECONDS` i limit 10
+  wywołań na sprawę; wpięte w `search`, `suggest_questions` i `suggest_solution`; skrypt paczki
+  zapisuje w metryczce gałąź z pliku kopii roboczej; którą gałąź indeksuje instancja, przechodzi
+  do p. 65; reguły — „Kod aplikacji", „Warstwy kodu", „Warstwa narzędzi agenta", „Warstwa
+  węzłów", „Logi i obserwowalność", „Testy".
 - [ ] **63. `read_code_file`** — plik albo zakres linii, z limitem linii na wywołanie
-  i informacją o ucięciu; źródeł nie tworzy, robi to `quote_code` (p. 67), którego opis dostaje
-  wtedy nazwy narzędzi odczytu; ścieżka spoza paczki to błąd wracający do modelu. *Dlaczego:*
+  i informacją o ucięciu; źródeł nie tworzy, robi to `quote_code` (p. 67); opisy `quote_code`
+  i `find_code_text` dostają wtedy nazwy narzędzi odczytu; ścieżka spoza paczki to błąd
+  wracający do modelu. *Dlaczego:*
   po trafieniu trzeba zobaczyć, w jakiej klasie i metodzie leży linia, a główne kontrolery mają
   po 3–4 tys. linii.
 - [ ] **64. `list_code_files`** — drzewo katalogu z opcjonalną głębokością, z limitem pozycji.
   *Dlaczego:* szukanie bez komunikatu i bez kodu błędu, po wskazówkach z opisu projektu.
 - [ ] **65. `describe_code`** — opis projektu w całości, raz na sprawę; szkic pisze model
   z kodu, poprawia programista Dokusa, plik leży w paczce; opis nazywa wprost połączenia idące
-  przez napis, których mapa symboli nie zna (które zdarzenie obsługuje która funkcja).
+  przez napis, których mapa symboli nie zna (które zdarzenie obsługuje która funkcja); do
+  rozstrzygnięcia, którą gałąź indeksuje instancja, i pokazanie jej modelowi i człowiekowi
+  (metryczka paczki niesie gałąź od p. 62).
   *Dlaczego:* mówi, gdzie zacząć: wejścia do aplikacji, droga od adresu do akcji i od zdarzenia
   JS do handlera; w sondzie z 2026-10-06 na komunikacie „Nie udało się skomunikować z serwerem"
   przejście od zdarzenia błędu do funkcji, która je obsługuje, zajęło 6 z 10 wywołań.
@@ -3171,7 +3280,8 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   i grafy z narzędziami (`suggest_solution`: czy zastrzeżenie i krok nieodwracalny z karty
   trafiają do odpowiedzi; para dla narzędzi kodu: komunikat jest tylko w kodzie, a w parze
   kontrolnej nie ma go nigdzie — czy model powstrzymuje się wtedy od rozwiązania z luźno
-  powiązanego pliku i ile cytowań wskazuje linie, których nie odczytał). *Dlaczego:* da się je
+  powiązanego pliku i ile cytowań wskazuje linie, których nie odczytał; linia widziana tylko
+  w wyniku szukania liczy się jako nieodczytana). *Dlaczego:* da się je
   uruchomić przed anonimizatorem, więc prompty dostają sygnał z modelu docelowego wcześniej niż
   z p. 21–28; tamtych pomiarów nie zastępują,
   bo scenariusze pisze autor promptów; stoi po p. 11, bo ocenia odpowiedź przepuszczoną przez
@@ -3230,7 +3340,8 @@ każdy mierzy się osobno.
 - [ ] **22. `gate_reply`** — reguły wysyłki jako dane (prośba o hasło, potoczne słownictwo, forma
   zwrotu), ewaluacja per reguła, złośliwy zestaw reguł w teście-strażniku. *Dlaczego:* fałszywy
   alarm uczy obchodzić bramkę odruchowo, a „bramka ma 90%" nie mówi, która reguła się sypie.
-- [ ] **23. `search`** — prompt pętli (jak pytać każde narzędzie, kiedy materiał wystarcza);
+- [ ] **23. `search`** — prompt pętli (jak pytać każde narzędzie, kiedy materiał wystarcza
+  i kiedy sięgać po kod aplikacji — dziś prompt o nim nie mówi i model po niego nie sięga);
   pomiar pętli wobec wszystkich narzędzi naraz (tryb bez pętli zostaje jako odniesienie i tryb
   awaryjny), w zestawie klastry wieloprzyczynowe; osobna oś — trafność zapytań pisanych przez
   agenta wobec zapytań z parsera korpusu (golden set, `recall@1` i MRR; punkt odniesienia to pola

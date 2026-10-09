@@ -9,6 +9,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /code
 
+# ripgrep: programem `rg` narzędzie agenta `find_code_text` szuka w paczce kodu aplikacji
+# (app/engine_process/ripgrep/). Z apt, bo wersję wyznacza wtedy wydanie Debiana z obrazu
+# bazowego, przypiętego wyżej. Przed zależnościami Pythona: ta warstwa zmienia się najrzadziej.
+# Listy apt kasujemy w tej samej warstwie, żeby nie zostały w obrazie.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ripgrep \
+ && rm -rf /var/lib/apt/lists/*
+
 # Dependencies are copied and installed BEFORE the code: this layer is cached, so editing a .py
 # file does not reinstall FastAPI. Reversing the two lines would rebuild the world on every edit.
 COPY requirements.txt .

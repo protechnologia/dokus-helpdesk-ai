@@ -96,7 +96,7 @@ class FakeAgentNode(AgentNodeBase):
         Example result:
             {"messages": [ChatMessage(role="assistant", …)], "iterations": 1,
              "usage": LLMUsage(calls=1),
-             "log": [LogEntry(node="agent", message="tura 1: tekst bez narzędzi")]}
+             "log": [LogEntry(node="agent", message="tura 1: tekst bez narzędzi; 0,0000 USD")]}
 
         Raises:
             LLMError: zaplanowane tury się skończyły

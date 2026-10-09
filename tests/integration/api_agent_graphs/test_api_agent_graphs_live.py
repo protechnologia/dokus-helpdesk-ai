@@ -18,6 +18,7 @@ from app.engine_anonymization import FakeAnonymizer
 from app.engine_llm import get_llm_client
 from tests.conftest import live_generation_llm
 from tests.helpers_agent_tools import fake_agent_tools, fake_agent_tools_without_material
+from tests.helpers_live_usage import LiveUsageReport
 
 pytestmark = pytest.mark.llm_live
 
@@ -127,7 +128,8 @@ async def _run_the_graph(
 
 @pytest.fixture(scope="module")
 def live_run(
-    request: pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór testów z `-m`
+    request:    pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór testów z `-m`
+    live_usage: LiveUsageReport,        # wstrzykiwane przez pytest; raport zużycia przebiegu
 ) -> LiveRun:
     """
     Description:
@@ -136,7 +138,8 @@ def live_run(
     zapamiętana na cały plik — razem z błędem, jeśli się nim skończyła, żeby nieudana sprawa nie
     była opłacana od nowa w każdym teście tego grafu. Konfigurację bierze przez
     `live_generation_llm()`, które odmawia, gdy testy wybrano bez jawnego `llm_live` albo gdy
-    modelem jest atrapa.
+    modelem jest atrapa. Zużycie i przebieg każdej udanej sprawy zgłasza do raportu przebiegu;
+    sprawa zakończona błędem nie oddaje stanu, więc jej zużycia w raporcie nie ma.
 
     Example args:
         (wstrzykiwane przez pytest)
@@ -158,6 +161,8 @@ def live_run(
                 done[name] = asyncio.run(_run_the_graph(graph, llm, fake_agent_tools()))
             except Exception as error:  # noqa: BLE001 — zapamiętany i zgłoszony każdemu testowi
                 done[name] = error
+            else:
+                live_usage.record(f"graf {name}", done[name].usage, done[name].log)
 
         # --- sprawa skończyła się błędem: każdy test tego grafu dostaje ten sam błąd ---
         if isinstance(done[name], Exception):
@@ -170,7 +175,8 @@ def live_run(
 
 @pytest.fixture(scope="module")
 def solution_without_material(
-    request: pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór testów z `-m`
+    request:    pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór testów z `-m`
+    live_usage: LiveUsageReport,        # wstrzykiwane przez pytest; raport zużycia przebiegu
 ) -> BaseModel:
     """
     Description:
@@ -187,8 +193,11 @@ def solution_without_material(
     """
     llm   = live_generation_llm(request.config)
     tools = fake_agent_tools_without_material()
+    final = asyncio.run(_run_the_graph(suggest_solution, llm, tools))
 
-    return asyncio.run(_run_the_graph(suggest_solution, llm, tools))
+    live_usage.record("graf suggest_solution bez materiału", final.usage, final.log)
+
+    return final
 
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)

@@ -185,14 +185,15 @@ async def test_the_usage_of_the_turn_goes_to_the_state() -> None:
 @pytest.mark.parametrize(
     "turn, message",
     [
-        (SEARCH, "tura 1: narzędzia: find_tickets_vector"),
-        (TEXT,   "tura 1: tekst bez narzędzi"),
+        (SEARCH, "tura 1: narzędzia: find_tickets_vector; 0,0000 USD"),
+        (TEXT,   "tura 1: tekst bez narzędzi; 0,0000 USD"),
     ],
     ids=["tool-call", "text-only"],
 )
 async def test_the_log_names_tools_and_quotes_nothing(turn: ChatMessage, message: str) -> None:
     """Sprawdza, czy po turze modelu w dzienniku przebiegu jest dokładnie jeden wpis węzła `agent`:
-    z nazwą wywołanego narzędzia albo z informacją, że model odpowiedział samym tekstem.
+    z nazwą wywołanego narzędzia albo z informacją, że model odpowiedział samym tekstem, i z kosztem
+    tury, który na atrapie modelu wynosi zero.
 
     Wyłapuje wpis, który cytuje argumenty wywołania albo tekst modelu: to dane klienta, a dziennik
     wraca do wołającego razem z odpowiedzią."""

@@ -39,6 +39,7 @@ TOOL_NAMES: tuple[str, ...] = (
     "find_docs_vector",     # sekcje dokumentacji po znaczeniu
     "find_docs_text",       # sekcje dokumentacji po dosłownym brzmieniu
     "read_docs",            # treść sekcji po identyfikatorach — cytuje
+    "find_code_text",       # linie kodu aplikacji po dosłownym brzmieniu
     "quote_code",           # fragment kodu aplikacji — cytuje tylko wskazaną przyczynę
 )
 

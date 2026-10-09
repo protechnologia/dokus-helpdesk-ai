@@ -14,20 +14,11 @@ from app.agent_nodes.run_tools import RunToolsNode
 from app.agent_tools import AgentTool
 from app.agent_tools.base import is_error_json
 from app.agent_tools.code.fake_code import ERRORS_PATH, GENERATOR_PATH
-from app.agent_tools.code.quote_code.fake import FakeQuoteCodeTool
-from app.agent_tools.docs.find_docs_text.fake import FakeFindDocsTextTool
-from app.agent_tools.docs.find_docs_vector.fake import FakeFindDocsVectorTool
-from app.agent_tools.docs.list_docs.fake import FakeListDocsTool
-from app.agent_tools.docs.read_docs.fake import FakeReadDocsTool
-from app.agent_tools.tickets.find_tickets_text.fake import FakeFindTicketsTextTool
-from app.agent_tools.tickets.find_tickets_vector.fake import FakeFindTicketsVectorTool
-from app.agent_tools.tickets.read_tickets_card.fake import FakeReadTicketsCardTool
-from app.agent_tools.tickets.read_tickets_thread.fake import FakeReadTicketsThreadTool
 from app.config import Settings
 from app.engine_anonymization import FakeAnonymizer
 from app.engine_embedding import EmbeddingError
 from app.engine_llm import ChatMessage, FakeLLMClient, ToolCall
-from tests.helpers_agent_tools import find_tickets_vector_with_dead_embedder
+from tests.helpers_agent_tools import fake_agent_tools, find_tickets_vector_with_dead_embedder
 
 # Prawdziwy węzeł `run_tools` wpięty w grafy z pętlą i uruchomiony przez LangGraph, razem
 # z prawdziwym węzłem agenta. Model to atrapa, która oddaje zaplanowane tury, narzędzia to atrapy
@@ -58,33 +49,6 @@ def name_of(
     return graph.__name__.split(".")[-1]
 
 
-def fake_tools() -> list[AgentTool]:
-    """
-    Description:
-    Atrapy wszystkich narzędzi agenta, w kolejności z `TOOL_NAMES` grafów. Świeże na każdy
-    graf, bo zapisują zapytania, o które je pytano.
-
-    Example args:
-        (brak)
-
-    Example result:
-        [FakeFindTicketsVectorTool(), FakeFindTicketsTextTool(), FakeReadTicketsCardTool(), …]
-    """
-    tools = [
-        FakeFindTicketsVectorTool(),
-        FakeFindTicketsTextTool(),
-        FakeReadTicketsCardTool(),
-        FakeReadTicketsThreadTool(),
-        FakeListDocsTool(),
-        FakeFindDocsVectorTool(),
-        FakeFindDocsTextTool(),
-        FakeReadDocsTool(),
-        FakeQuoteCodeTool(),
-    ]
-
-    return tools
-
-
 async def loop_graph(
     graph:  ModuleType,                         # np. <module app.agent_graphs.search>
     llm:    FakeLLMClient,                      # np. FakeLLMClient(turns=[…])
@@ -106,7 +70,7 @@ async def loop_graph(
     Example result:
         CompiledStateGraph: anonymize → agent ⇄ run_tools (oba właściwe) → respond
     """
-    tools  = list(tools) if tools is not None else fake_tools()
+    tools  = list(tools) if tools is not None else fake_agent_tools()
     output = (await run_graph(graph.build_fake_graph(), graph.example_state())).output
 
     compiled = graph.build_graph(
@@ -299,7 +263,7 @@ async def test_the_call_limit_holds_across_turns() -> None:
 
     Wyłapuje graf, w którym węzeł narzędzi nie widzi wcześniejszych tur i liczy limit od nowa
     w każdej: model czytałby wtedy dowolnie wiele wątków, po jednym na turę."""
-    tools  = fake_tools()
+    tools  = fake_agent_tools()
     reader = next(tool for tool in tools if tool.name == "read_tickets_thread")
     limits = {**LIMITS, "read_tickets_thread": 1}
     llm    = FakeLLMClient(turns=[

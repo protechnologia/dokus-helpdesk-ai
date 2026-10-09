@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from app.config import LLMSettings
 from app.engine_llm import ChatMessage, LLMTurn, ToolDefinition, get_llm_client
 from tests.conftest import live_generation_llm
+from tests.helpers_live_usage import LiveUsageReport
 
 pytestmark = pytest.mark.llm_live
 
@@ -117,13 +118,15 @@ async def _run_two_turns(
 
 @pytest.fixture(scope="module")
 def turns(
-    request: pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór testów z `-m`
+    request:    pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór testów z `-m`
+    live_usage: LiveUsageReport,        # wstrzykiwane przez pytest; raport zużycia przebiegu
 ) -> LiveTurns:
     """
     Description:
     Dwie tury prawdziwego modelu, policzone raz na plik (`_run_two_turns()`), żeby każdy test nie
     płacił za własne wywołania. Konfigurację bierze przez `live_generation_llm()`, które odmawia,
-    gdy testy wybrano bez jawnego `llm_live` albo gdy modelem jest atrapa.
+    gdy testy wybrano bez jawnego `llm_live` albo gdy modelem jest atrapa. Zużycie obu tur
+    zgłasza do raportu przebiegu.
 
     Example args:
         (wstrzykiwane przez pytest)
@@ -131,7 +134,12 @@ def turns(
     Example result:
         LiveTurns(provider="openai", first=LLMTurn(…), second=LLMTurn(…))
     """
-    return asyncio.run(_run_two_turns(live_generation_llm(request.config)))
+    made = asyncio.run(_run_two_turns(live_generation_llm(request.config)))
+
+    live_usage.record("tura z narzędziami: wywołanie narzędzia", made.first.usage)
+    live_usage.record("tura z narzędziami: odpowiedź po wyniku", made.second.usage)
+
+    return made
 
 
 def test_the_first_turn_calls_the_tool_with_its_arguments(turns: LiveTurns) -> None:

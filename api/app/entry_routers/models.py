@@ -91,7 +91,7 @@ class LogItem(BaseModel):
     """
 
     node:    str = Field(examples=["agent"])
-    message: str = Field(examples=["tura 1: narzędzia: find_tickets_vector"])
+    message: str = Field(examples=["tura 1: narzędzia: find_tickets_vector; 0,0041 USD"])
 
 
 class ErrorResponse(BaseModel):

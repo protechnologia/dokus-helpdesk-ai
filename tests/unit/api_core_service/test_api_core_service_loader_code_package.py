@@ -108,6 +108,66 @@ def test_a_path_that_is_not_a_file_is_refused(tmp_path: Path, path: str) -> None
         _package(tmp_path).locate(path)
 
 
+def test_a_directory_is_accepted_only_when_the_caller_allows_it(tmp_path: Path) -> None:
+    """Sprawdza, czy ścieżka katalogu jest przyjmowana wyłącznie z flagą `allow_dir=True`, wraca
+    wtedy w jednej postaci także przy zapisie przez `..`, a sam katalog z kodem wraca jako `.`;
+    plik przechodzi z flagą tak samo jak bez niej.
+
+    Wyłapuje flagę, która niczego nie zmienia, oraz katalog przyjmowany bez niej: cytowanie
+    i odczyt dostałyby ścieżkę katalogu i skończyły się błędem systemu plików zamiast odpowiedzią
+    dla modelu."""
+    package = _package(tmp_path)
+
+    with pytest.raises(CodePathError, match="to katalog"):
+        package.locate("src/lib/Numeracja")
+
+    assert package.locate("src/lib/Numeracja", allow_dir=True)          == "src/lib/Numeracja"
+    assert package.locate("src/lib/Sesja/../Numeracja", allow_dir=True) == "src/lib/Numeracja"
+    assert package.locate(".", allow_dir=True)                          == "."
+    assert package.locate(GENERATOR, allow_dir=True)                    == GENERATOR
+
+
+@pytest.mark.parametrize("path", ["..", "../..", "/etc", "src/../../.."])
+def test_a_directory_outside_the_package_is_refused_even_when_allowed(
+    tmp_path: Path,
+    path:     str,
+) -> None:
+    """Sprawdza, czy katalog leżący poza kodem, podany przez `..` albo ścieżką bezwzględną, kończy
+    się wyjątkiem `CodePathError` także z flagą `allow_dir=True`.
+
+    Wyłapuje flagę, która razem z katalogami wpuszcza wyjście poza paczkę: szukanie zawężone do
+    takiej ścieżki przeszukiwałoby pliki kontenera, na przykład z hasłami."""
+    with pytest.raises(CodePathError):
+        _package(tmp_path).locate(path, allow_dir=True)
+
+
+def test_a_missing_path_is_named_after_what_was_allowed(tmp_path: Path) -> None:
+    """Sprawdza, czy komunikat o ścieżce, pod którą nic nie ma, mówi o pliku, a z flagą
+    `allow_dir=True` o pliku albo katalogu, i w obu przypadkach powtarza ścieżkę od wołającego.
+
+    Wyłapuje jeden komunikat na oba przypadki: model, który zawęził szukanie do katalogu,
+    czytałby „nie ma takiego pliku" i szukał literówki w nazwie pliku, której nie podał."""
+    package = _package(tmp_path)
+
+    with pytest.raises(CodePathError, match="nie ma takiego pliku w kodzie aplikacji: src/brak"):
+        package.locate("src/brak")
+
+    with pytest.raises(CodePathError, match="nie ma takiego pliku ani katalogu.*src/brak"):
+        package.locate("src/brak", allow_dir=True)
+
+
+def test_the_code_directory_is_given_resolved(tmp_path: Path) -> None:
+    """Sprawdza, czy `repo_dir()` oddaje katalog `repo/` paczki jako ścieżkę bezwzględną, bez
+    dowiązań, także gdy paczkę podano przez dowiązanie do jej katalogu.
+
+    Wyłapuje katalog oddawany w zapisie od wołającego: program szukający w kodzie ruszałby wtedy
+    w innym katalogu niż ten, wobec którego czytnik sprawdza ścieżki."""
+    _package(tmp_path)
+    (tmp_path / "skrot").symlink_to(tmp_path / "paczka")
+
+    assert CodePackage(tmp_path / "skrot").repo_dir() == (tmp_path / "paczka" / "repo").resolve()
+
+
 def test_the_refusal_does_not_say_where_the_package_lies(tmp_path: Path) -> None:
     """Sprawdza, czy komunikat odmowy powtarza ścieżkę w brzmieniu od wołającego i nie zawiera
     położenia paczki na dysku.

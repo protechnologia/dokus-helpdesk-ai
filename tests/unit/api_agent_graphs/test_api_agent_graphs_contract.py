@@ -17,20 +17,13 @@ from app.agent_nodes.agent import FakeAgentNode
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
 from app.agent_nodes.run_tools import FakeRunToolsNode
-from app.agent_tools.code.quote_code.fake import FakeQuoteCodeTool
-from app.agent_tools.docs.find_docs_text.fake import FakeFindDocsTextTool
-from app.agent_tools.docs.find_docs_vector.fake import FakeFindDocsVectorTool
-from app.agent_tools.docs.list_docs.fake import FakeListDocsTool
-from app.agent_tools.docs.read_docs.fake import FakeReadDocsTool
-from app.agent_tools.tickets.find_tickets_text.fake import FakeFindTicketsTextTool
 from app.agent_tools.tickets.find_tickets_vector.fake import FakeFindTicketsVectorTool
-from app.agent_tools.tickets.read_tickets_card.fake import FakeReadTicketsCardTool
-from app.agent_tools.tickets.read_tickets_thread.fake import FakeReadTicketsThreadTool
 from app.config import Settings
 from app.core_model.graphs.proposal import Proposal
 from app.core_model.graphs.verdict import Verdict
 from app.engine_anonymization import AnonymizedText, FakeAnonymizer
 from app.engine_llm import LLMError
+from tests.helpers_agent_tools import fake_agent_tools
 
 
 def all_graphs() -> list[ModuleType]:
@@ -58,18 +51,8 @@ GRAPHS         = all_graphs()
 RESPOND_GRAPHS = [graph for graph in GRAPHS if hasattr(graph, "RESPOND_TOOL_NAME")]
 
 # Każde narzędzie agenta, jakie dziś istnieje, w kolejności z `TOOL_NAMES` grafów — test wybiera
-# z nich dozwolone dla grafu.
-AGENT_TOOLS = [
-    FakeFindTicketsVectorTool(),
-    FakeFindTicketsTextTool(),
-    FakeReadTicketsCardTool(),
-    FakeReadTicketsThreadTool(),
-    FakeListDocsTool(),
-    FakeFindDocsVectorTool(),
-    FakeFindDocsTextTool(),
-    FakeReadDocsTool(),
-    FakeQuoteCodeTool(),
-]
+# z nich dozwolone dla grafu. Jedna lista dla wszystkich testów: `tests/helpers_agent_tools.py`.
+AGENT_TOOLS = fake_agent_tools()
 
 # Limity wywołań narzędzi, jakie daje konfiguracja domyślna.
 LIMITS = Settings(_env_file=None).tool_call_limits()

@@ -19,4 +19,4 @@ class LogEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     node:    str = Field(min_length=1, examples=["agent"])
-    message: str = Field(min_length=1, examples=["tura 1: narzędzia: find_tickets_vector"])
+    message: str = Field(min_length=1, examples=["tura 1: narzędzia: read_docs; 0,0041 USD"])

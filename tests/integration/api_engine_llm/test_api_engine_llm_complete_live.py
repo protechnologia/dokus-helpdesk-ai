@@ -4,8 +4,9 @@ import pytest
 from pydantic import BaseModel
 
 from app.config import LLMSettings
-from app.engine_llm import LLMCompletion, get_llm_client
+from app.engine_llm import LLMCompletion, LLMUsage, get_llm_client
 from tests.conftest import live_generation_llm
+from tests.helpers_live_usage import LiveUsageReport
 
 pytestmark = pytest.mark.llm_live
 
@@ -71,13 +72,15 @@ async def _ask_the_model(
 
 @pytest.fixture(scope="module")
 def answers(
-    request: pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór testów z `-m`
+    request:    pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór testów z `-m`
+    live_usage: LiveUsageReport,        # wstrzykiwane przez pytest; raport zużycia przebiegu
 ) -> LiveAnswers:
     """
     Description:
     Odpowiedzi prawdziwego modelu, policzone raz na plik (`_ask_the_model()`), żeby każdy test
     nie płacił za własne wywołanie. Konfigurację bierze przez `live_generation_llm()`, które
-    odmawia, gdy testy wybrano bez jawnego `llm_live` albo gdy modelem jest atrapa.
+    odmawia, gdy testy wybrano bez jawnego `llm_live` albo gdy modelem jest atrapa. Zużycie obu
+    wywołań zgłasza do raportu przebiegu.
 
     Example args:
         (wstrzykiwane przez pytest)
@@ -85,7 +88,12 @@ def answers(
     Example result:
         LiveAnswers(provider="openai", plain=LLMCompletion(…), password=LLMCompletion(…))
     """
-    return asyncio.run(_ask_the_model(live_generation_llm(request.config)))
+    found = asyncio.run(_ask_the_model(live_generation_llm(request.config)))
+
+    live_usage.record("complete: zwykłe pytanie", LLMUsage.from_completion(found.plain))
+    live_usage.record("complete: z promptem systemowym", LLMUsage.from_completion(found.password))
+
+    return found
 
 
 def test_the_configured_model_answers(answers: LiveAnswers) -> None:

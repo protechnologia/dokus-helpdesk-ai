@@ -7,6 +7,7 @@ from app.db_qdrant import DbQdrantConfigError, DbQdrantError
 from app.engine_anonymization import AnonymizationConfigError, AnonymizationError
 from app.engine_embedding import EmbeddingConfigError, EmbeddingError
 from app.engine_llm import LLMConfigError, LLMError
+from app.engine_process import ProcessConfigError, ProcessError
 from app.errors import register_exception_handlers
 
 # Trasy, które prowokują awarię zależności, i opis, jaki wołający ma wtedy dostać.
@@ -16,6 +17,7 @@ DOWN = {
     "/embedder-down":      "Embedding service call failed",
     "/qdrant-down":        "Vector index call failed",
     "/postgres-down":      "Text index call failed",
+    "/process-down":       "Code search call failed",
 }
 
 # Trasy, które prowokują błąd konfiguracji tych samych zależności.
@@ -25,6 +27,7 @@ MISCONFIGURED = [
     "/embedder-misconfigured",
     "/qdrant-misconfigured",
     "/postgres-misconfigured",
+    "/process-misconfigured",
 ]
 
 
@@ -92,6 +95,14 @@ def client() -> TestClient:
     async def postgres_misconfigured() -> None:
         raise DbPostgresConfigError("POSTGRES_PASSWORD nie może być puste")
 
+    @app.get("/process-down")
+    async def process_down() -> None:
+        raise ProcessError("program `rg` zakończył szukanie błędem (kod 2): 'Jan Kowalski'")
+
+    @app.get("/process-misconfigured")
+    async def process_misconfigured() -> None:
+        raise ProcessConfigError("nie ma programu `rg`")
+
     # raise_server_exceptions=False: odpowiadają handlery, zamiast wyjątku wpadającego do testu.
     return TestClient(app, raise_server_exceptions=False)
 
@@ -141,8 +152,8 @@ def test_a_dependency_failure_becomes_service_unavailable(
     detail: str,
 ) -> None:
     """Sprawdza, czy awaria zależności w trakcie żądania — modelu językowego, anonimizatora,
-    embeddera, Qdranta albo Postgresa — wraca jako status 503 z ogólnym opisem, osobnym dla każdej
-    z nich.
+    embeddera, Qdranta, Postgresa albo programu, którym szuka się w kodzie — wraca jako status
+    503 z ogólnym opisem, osobnym dla każdej z nich.
 
     Wyłapuje awarię zależności oddaną jako zwykły błąd serwera: taki błąd nie mówi wołającemu,
     czy zawiniło jego żądanie, czy usługa chwilowo nie działa i można ponowić albo zdecydować

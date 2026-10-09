@@ -60,16 +60,21 @@ def test_a_limit_comes_from_the_environment(
 
 def test_default_limits_are_cautious(clean_env: None) -> None:
     """Sprawdza, czy domyślne limity wywołań narzędzi są małe: każdy mieści się między 1 a 5,
-    a odczyt wątków zgłoszeń i odczyt sekcji dokumentacji mają najwyżej 3.
+    odczyt wątków zgłoszeń i odczyt sekcji dokumentacji mają najwyżej 3, a jedyny wyższy limit,
+    szukanie w kodzie aplikacji, wynosi 10.
 
     Wyłapuje podniesienie wartości domyślnych: limit chroni przed pętlą zużywającą tokeny, więc
     ma zaczynać ostrożnie, a podnosić go ma wdrożenie. Odczyt wątków i sekcji oddaje tysiące
-    tokenów, dlatego ma niższy limit niż wyszukiwania i krótkie karty."""
+    tokenów, dlatego ma niższy limit niż wyszukiwania i krótkie karty. Szukanie w kodzie ma
+    wyższy, bo od komunikatu do miejsca, które go wywołuje, idzie się kilkoma szukaniami
+    z rzędu; każdy kolejny wyjątek ma być dopisany tu świadomie."""
     limits = Settings(_env_file=None).tool_call_limits()
     costly = [limits["read_tickets_thread"], limits["read_docs"]]
+    others = [limit for name, limit in limits.items() if name != "find_code_text"]
 
-    assert all(1 <= limit <= 5 for limit in limits.values())
+    assert all(1 <= limit <= 5 for limit in others)
     assert all(limit <= 3 for limit in costly)
+    assert limits["find_code_text"] == 10
 
 
 @pytest.mark.parametrize("value", ["0", "-1"])

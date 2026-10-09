@@ -10,7 +10,7 @@ from app.agent_nodes.agent import FakeAgentNode, tool_call_turn
 from app.agent_nodes.respond import FakeRespondNode
 from app.agent_nodes.run_tools import FakeRunToolsNode, FakeToolAnswer
 from app.agent_tools import SourceRef
-from app.engine_llm import ChatMessage, LLMError
+from app.engine_llm import ChatMessage, LLMError, LLMUsage
 
 
 class State(GraphState):
@@ -172,11 +172,27 @@ async def test_every_fake_node_logs_one_entry_under_its_name(node: Node) -> None
 
 async def test_the_agent_logs_which_tools_it_called() -> None:
     """Sprawdza, czy po turze z wywołaniem narzędzia atrapa węzła `agent` zapisuje w dzienniku
-    przebiegu numer tury i nazwę narzędzia („tura 1: narzędzia: find_tickets_vector"), bez
-    argumentów.
+    przebiegu numer tury, nazwę narzędzia i koszt tury („tura 1: narzędzia: find_tickets_vector;
+    0,0000 USD"), bez argumentów.
 
     Wyłapuje wpis, który cytuje argumenty wywołania: to dane klienta, a dziennik wraca do wołającego
     razem z odpowiedzią."""
     update = await FakeAgentNode([SEARCH]).run(State(input_text="x"))
 
-    assert update["log"][0].message == "tura 1: narzędzia: find_tickets_vector"
+    assert update["log"][0].message == "tura 1: narzędzia: find_tickets_vector; 0,0000 USD"
+
+
+def test_the_log_entry_of_a_turn_carries_its_cost() -> None:
+    """Sprawdza, czy wpis w dzienniku po turze, która kosztowała 0,03214 USD, kończy się kosztem
+    zaokrąglonym do czterech miejsc i zapisanym z przecinkiem („0,0321 USD"), a zużycie tej tury
+    wraca w zmianie stanu bez zmian, jako liczba.
+
+    Wyłapuje wpis bez kosztu albo z kosztem całej sprawy zamiast tury: czytający przebieg nie
+    widziałby, która tura była droga. Wyłapuje też zapis, w którym liczba trafia do logu, a ginie
+    z pola `usage`, po którym graf sumuje koszt sprawy."""
+    usage = LLMUsage(calls=1, prompt_tokens=4820, cost_usd=0.03214)
+
+    update = FakeAgentNode([SEARCH]).turn_update(State(input_text="x"), [SEARCH], usage)
+
+    assert update["log"][0].message == "tura 1: narzędzia: find_tickets_vector; 0,0321 USD"
+    assert update["usage"]          == usage

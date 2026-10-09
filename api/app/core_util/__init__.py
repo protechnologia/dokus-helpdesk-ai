@@ -1,8 +1,9 @@
 """
 Description:
-Stateless helpers shared across the application, split by the KIND of value they work on
-(`time.py`, and whatever follows) rather than by which layer calls them.
+Funkcje bezstanowe wspólne dla całej aplikacji, podzielone według RODZAJU wartości, na której
+pracują (`time.py`, `text.py`, `html.py` i kolejne), a nie według tego, która warstwa je woła.
 
-Nothing here decides anything or touches I/O: a helper lands in this package precisely because it
-has no place in the domain, no transport to talk to, and more than one caller.
+Nic tutaj niczego nie rozstrzyga i nie dotyka wejścia ani wyjścia. Funkcja trafia do tego pakietu,
+gdy nie należy do dziedziny, nie rozmawia z żadną usługą i jest na tyle ogólna, że następny
+wołający ma jej użyć, zamiast pisać ją od nowa — także wtedy, gdy dziś woła ją jedno miejsce.
 """

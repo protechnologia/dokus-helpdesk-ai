@@ -5,14 +5,16 @@ i dokumentację: model chodzi po plikach, a przechodzi przez wiele więcej, niż
 odpowiedzi. Dlatego odczyt kodu źródeł nie tworzy — robi to osobne narzędzie cytujące, którym
 model wskazuje fragment powodujący opisane zachowanie.
 
-| co             | co zawiera                                                             |
-|----------------|------------------------------------------------------------------------|
-| `fake_code.py` | zmyślone pliki, na których stoją atrapy narzędzi kodu                  |
-| `quote_code/`  | cytowanie fragmentu pliku: przyczyna trafia na listę źródeł odpowiedzi |
+| co                | co zawiera                                                             |
+|-------------------|------------------------------------------------------------------------|
+| `fake_code.py`    | zmyślone pliki, na których stoją atrapy narzędzi kodu                  |
+| `find_code_text/` | szukanie linii z podanym tekstem: ścieżka, numer i treść linii         |
+| `quote_code/`     | cytowanie fragmentu pliku: przyczyna trafia na listę źródeł odpowiedzi |
 
 Narzędzia właściwe stoją na paczce kodu na dysku (`CodePackage` z
-`core_service/loader_code_package.py`), bez bazy. Szukanie, odczyt pliku i symbolu, spis katalogu
-i opis projektu dojdą jako kolejne katalogi (CLAUDE.md -> p. 62–66).
+`core_service/loader_code_package.py`), bez bazy; szuka w niej program ripgrep, uruchamiany
+przez `engine_process/`. Odczyt pliku i symbolu, spis katalogu i opis projektu dojdą jako kolejne
+katalogi (CLAUDE.md -> p. 63–66).
 
 Narzędzie importuje się z jego pakietu
 (`from app.agent_tools.code.quote_code import QuoteCodeTool`), nie stąd.

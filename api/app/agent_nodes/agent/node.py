@@ -22,7 +22,7 @@ tokenów i nic nie kosztuje):
                                                         name="find_tickets_vector", …)])],
         "iterations": 1,
         "usage":      LLMUsage(calls=1, prompt_tokens=246, completion_tokens=13, cost_usd=0.0),
-        "log":        [LogEntry(node="agent", message="tura 1: narzędzia: find_tickets_vector")],
+        "log":        [LogEntry(node="agent", message="tura 1: narzędzia: read_docs; 0,0000 USD")],
     }
 
 Co się dzieje po drodze:
@@ -121,7 +121,7 @@ class AgentNode(AgentNodeBase):
         Example result:
             {"messages": [ChatMessage(role="user", …), ChatMessage(role="assistant", …)],
              "iterations": 1, "usage": LLMUsage(calls=1, …),
-             "log": [LogEntry(node="agent", message="tura 1: narzędzia: find_tickets_vector")]}
+             "log": [LogEntry(node="agent", message="tura 1: narzędzia: read_docs; 0,0041 USD")]}
 
         Raises:
             ValueError: stan jeszcze nie przeszedł anonimizacji (zgłasza `user_prompt` grafu)

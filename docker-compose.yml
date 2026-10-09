@@ -83,6 +83,7 @@ services:
       POSTGRES_TIMEOUT_SECONDS:  ${POSTGRES_TIMEOUT_SECONDS:-30}
       # Paczka kodu aplikacji: ścieżka po stronie KONTENERA, pod którą stoi montowanie wyżej.
       CODE_PACKAGE_DIR:          ${CODE_PACKAGE_DIR:-/code/data/unsafe/code}
+      CODE_SEARCH_TIMEOUT_SECONDS: ${CODE_SEARCH_TIMEOUT_SECONDS:-10}
       # Limity wywołań narzędzi agenta w jednym przebiegu grafu — opis w .env.example.
       AGENT_MAX_CALLS_FIND_TICKETS_VECTOR: ${AGENT_MAX_CALLS_FIND_TICKETS_VECTOR:-5}
       AGENT_MAX_CALLS_FIND_TICKETS_TEXT:   ${AGENT_MAX_CALLS_FIND_TICKETS_TEXT:-5}
@@ -92,6 +93,7 @@ services:
       AGENT_MAX_CALLS_FIND_DOCS_VECTOR:    ${AGENT_MAX_CALLS_FIND_DOCS_VECTOR:-5}
       AGENT_MAX_CALLS_FIND_DOCS_TEXT:      ${AGENT_MAX_CALLS_FIND_DOCS_TEXT:-5}
       AGENT_MAX_CALLS_READ_DOCS:           ${AGENT_MAX_CALLS_READ_DOCS:-3}
+      AGENT_MAX_CALLS_FIND_CODE_TEXT:      ${AGENT_MAX_CALLS_FIND_CODE_TEXT:-10}
       AGENT_MAX_CALLS_QUOTE_CODE:          ${AGENT_MAX_CALLS_QUOTE_CODE:-5}
       # Limit tur modelu w jednym przebiegu grafu z narzędziami — opis w .env.example.
       AGENT_MAX_ITERATIONS:                ${AGENT_MAX_ITERATIONS:-20}

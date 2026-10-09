@@ -9,8 +9,9 @@ Zgłoszenia i dokumentacja idą dwustopniowo. Wyszukiwanie — `_vector` po znac
 sekcji dokumentacji. Treść dają dopiero odczyty i tylko one cytują, więc na liście źródeł jest
 to, co model przeczytał. Kod aplikacji idzie inaczej: model przechodzi przez wiele więcej
 plików, niż potrzebuje do odpowiedzi, więc źródłem jest dopiero fragment, który wskazał jako
-przyczynę osobnym narzędziem (`quote_code`). Wynik każdego narzędzia trafia do modelu jako JSON
-(`result_as_json()`).
+przyczynę osobnym narzędziem (`quote_code`). Dlatego szukanie w kodzie (`find_code_text`) może
+pokazać treść trafionej linii: źródła nie tworzy ani ono, ani odczyt. Wynik każdego narzędzia
+trafia do modelu jako JSON (`result_as_json()`).
 
 Do czego:
 Dwa rodzaje narzędzi, rozdzielone kontraktem (patrz `base.py`):
@@ -53,12 +54,14 @@ narzędzie i co ono oddaje. Po co wyniki w danej funkcji, mówi prompt grafu.
 | `find_docs_vector`    | pomocnicze    | `text`                | opisy sekcji z podobieństwem     |
 | `find_docs_text`      | pomocnicze    | `exact`, `words`      | opisy sekcji, czym znaleziono    |
 | `read_docs`           | źródło wiedzy | `section_ids`         | treść sekcji; cytuje             |
+| `find_code_text`      | pomocnicze    | fraza, słowa, ścieżka | linie kodu z treścią             |
 | `quote_code`          | źródło wiedzy | ścieżka, linie, rola  | potwierdzenie; cytuje przyczynę  |
 
 Każde ma narzędzie właściwe i atrapę. Wyszukiwanie po znaczeniu i karty stoją na Qdrancie,
-pozostałe narzędzia zgłoszeń i dokumentacji na Postgresie, a `quote_code` na paczce kodu na
-dysku. Tabela zgłoszeń w Postgresie dostanie prawdziwe wątki po anonimizacji (p. 19) i masowym
-imporcie (p. 31), więc `find_tickets_text` i `read_tickets_thread` są sprawdzone na zmyślonych.
+pozostałe narzędzia zgłoszeń i dokumentacji na Postgresie, a narzędzia kodu na paczce kodu na
+dysku: `find_code_text` szuka w niej programem ripgrep (`engine_process/`). Tabela zgłoszeń
+w Postgresie dostanie prawdziwe wątki po anonimizacji (p. 19) i masowym imporcie (p. 31), więc
+`find_tickets_text` i `read_tickets_thread` są sprawdzone na zmyślonych.
 Narzędzia dokumentacji są opcjonalne: bez dokumentacji nie trafiają do rejestru.
 """
 

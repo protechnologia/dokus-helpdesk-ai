@@ -44,8 +44,8 @@ O czym pamiętać przy zmianach:
   model zacytuje go potem jako wykluczony.
 - Tytuł to pełna ścieżka, nie sama nazwa pliku: w aplikacji na Symfony dziesiątki kontrolerów
   nazywają się `actions.class.php`.
-- Źródło nie ma daty. Wersję kodu wyznacza gałąź, z której zbudowano paczkę, a tej metryczka
-  paczki jeszcze nie zapisuje (CLAUDE.md -> p. 62).
+- Źródło nie ma daty. Wersję kodu wyznacza gałąź, z której zbudowano paczkę; zapisuje ją
+  metryczka paczki (`manifest.json`), a narzędzia jej nie czytają (CLAUDE.md -> p. 65).
 """
 
 from app.agent_tools.base import KnowledgeSource, read_description

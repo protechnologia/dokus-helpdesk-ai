@@ -49,8 +49,8 @@ class Settings(BaseSettings):
 
     Field names map to ENV names by upper-casing: `qdrant_url` <- `QDRANT_URL`. The prefixes
     (`LLM_GENERATION_`, `LLM_ANONYMIZATION_`, `EMBEDDING_`, `QDRANT_`, `POSTGRES_`, `RAG_`,
-    `AGENT_`) are the only namespacing — there is one `.env` for the whole compose project, not
-    one per service.
+    `CODE_`, `AGENT_`) are the only namespacing — there is one `.env` for the whole compose
+    project, not one per service.
     """
 
     # Przedrostek pól z limitami wywołań narzędzi; reszta nazwy pola to nazwa narzędzia.
@@ -125,6 +125,10 @@ class Settings(BaseSettings):
     # wartości montowania nie przestawia. Nie jest sprawdzany przy starcie: brak paczki wychodzi
     # przy pierwszym użyciu narzędzia kodu.
     code_package_dir: Path = Path("/code/data/unsafe/code")
+    # Najdłużej tyle trwa jedno szukanie w paczce programem ripgrep. Najwolniejsze zmierzone na
+    # paczce z 11 tys. plików zajęło 0,4 s; dłużej trwa tylko na dysku, na którym paczka leżeć
+    # nie powinna (katalog Windows przez WSL: 14 s).
+    code_search_timeout_seconds: float = 10.0           # sekundy
 
     # --- retrieval: tuning, NOT business logic ---
     # These two are knobs a deployment turns; the rules that read them are not. Scoring the hits
@@ -174,6 +178,10 @@ class Settings(BaseSettings):
     agent_max_calls_find_docs_vector:    int = Field(default=5, ge=1)
     agent_max_calls_find_docs_text:      int = Field(default=5, ge=1)
     agent_max_calls_read_docs:           int = Field(default=3, ge=1)
+    # Szukanie w kodzie ma 10, dwa razy więcej niż pozostałe wyszukiwania: od komunikatu do
+    # miejsca, które go wywołuje, idzie się po nazwach, kilkoma szukaniami z rzędu. W sondzie
+    # z 2026-10-07 limit 10 wyczerpał się w 5 sprawach z 9.
+    agent_max_calls_find_code_text:      int = Field(default=10, ge=1)
     # Cytowanie kodu: jedno wywołanie to jeden fragment, więc limit jest liczbą cytowań w sprawie.
     agent_max_calls_quote_code:          int = Field(default=5, ge=1)
 
@@ -183,7 +191,7 @@ class Settings(BaseSettings):
     # Domyka to, czego limity narzędzi nie domykają: wywołanie ponad limit narzędzia dostaje
     # odmowę, ale turę zużywa, więc model wołający w kółko zużywałby tokeny bez końca.
     # 20 to zapas, nie cel: sprawa w sondach z 2026-10-04 to 4–7 tur, a limity narzędzi pozwalają
-    # na 37 wywołań, które model zwykle grupuje po kilka na turę. Ucięcie sprawy kosztuje
+    # na 47 wywołań, które model zwykle grupuje po kilka na turę. Ucięcie sprawy kosztuje
     # więcej niż kilka tur zapasu.
     agent_max_iterations: int = Field(default=20, ge=1)
 

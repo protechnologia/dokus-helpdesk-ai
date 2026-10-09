@@ -10,6 +10,9 @@ Narzędzia agenta dla testów węzłów, grafów i tras.
 
 O czym pamiętać przy zmianach:
 
+- To jedyne miejsce w testach z listą wszystkich atrap. Nowe narzędzie dopisuje się w obu
+  helperach; pilnuje tego test kontraktu narzędzi, który porównuje je z narzędziami znalezionymi
+  w `app/agent_tools/`.
 - Atrapa narzędzia (`Fake…Tool`) zawsze odpowiada. Stan, którego nie umie odtworzyć — padniętą
   zależność — daje narzędzie właściwe z zepsutym transportem, a nie podklasa atrapy: błąd ma
   zgłosić prawdziwy klient zależności, swoim typem, a klasa narzędzia zdefiniowana w teście
@@ -19,6 +22,7 @@ O czym pamiętać przy zmianach:
 import httpx
 
 from app.agent_tools import AgentTool
+from app.agent_tools.code.find_code_text.fake import FakeFindCodeTextTool
 from app.agent_tools.code.quote_code.fake import FakeQuoteCodeTool
 from app.agent_tools.docs.find_docs_text.fake import FakeFindDocsTextTool
 from app.agent_tools.docs.find_docs_vector.fake import FakeFindDocsVectorTool
@@ -59,6 +63,7 @@ def fake_agent_tools() -> list[AgentTool]:
         FakeFindDocsVectorTool(),
         FakeFindDocsTextTool(),
         FakeReadDocsTool(),
+        FakeFindCodeTextTool(),
         FakeQuoteCodeTool(),
     ]
 
@@ -69,12 +74,14 @@ def fake_agent_tools_without_material() -> list[AgentTool]:
     """
     Description:
     Atrapy wszystkich narzędzi agenta, w których nic nie ma do znalezienia: wyszukiwania zgłoszeń
-    i dokumentacji oddają puste listy, spis dokumentacji jest pusty, a cytowanie kodu nie zna
-    żadnego pliku. Odczyty zgłoszeń i dokumentacji zostają takie same, ale model nie ma skąd
-    wziąć identyfikatora, więc sprawa kończy się bez źródeł. Kolejność jak w `fake_agent_tools()`.
+    i dokumentacji oddają puste listy, spis dokumentacji jest pusty, szukanie w kodzie nic nie
+    znajduje, a cytowanie kodu nie zna żadnego pliku. Odczyty zgłoszeń i dokumentacji zostają
+    takie same, ale model nie ma skąd wziąć identyfikatora, więc sprawa kończy się bez źródeł.
+    Kolejność jak w `fake_agent_tools()`.
 
     Cytowanie kodu jest puste, bo przykład ścieżki w opisie `quote_code` to plik z wbudowanego
-    zestawu atrapy: model mógłby go zacytować na ślepo i dostać źródło.
+    zestawu atrapy: model mógłby go zacytować na ślepo i dostać źródło. Szukanie w kodzie jest
+    puste z tego samego powodu: jego wbudowany wynik wskazuje linie tych samych plików.
 
     Example args:
         (brak)
@@ -91,6 +98,7 @@ def fake_agent_tools_without_material() -> list[AgentTool]:
         FakeFindDocsVectorTool(found=[]),
         FakeFindDocsTextTool(matched=[]),
         FakeReadDocsTool(),
+        FakeFindCodeTextTool(lines=[]),
         FakeQuoteCodeTool(files={}),
     ]
 
