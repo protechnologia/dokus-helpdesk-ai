@@ -13,11 +13,16 @@ from app.agent_graphs import run_graph, suggest_solution
 from app.agent_graphs.factory import build_real_graph
 from app.agent_tools import AgentTool
 from app.config import LLMSettings, Settings
+from app.core_model.graphs.proposal import Proposal
 from app.core_model.graphs.proposal_notes import ProposalNotes
 from app.engine_anonymization import FakeAnonymizer
 from app.engine_llm import get_llm_client
 from tests.conftest import live_generation_llm
-from tests.helpers_agent_tools import fake_agent_tools, fake_agent_tools_without_material
+from tests.helpers_agent_tools import (
+    fake_agent_tools,
+    fake_agent_tools_with_code_only,
+    fake_agent_tools_without_material,
+)
 from tests.helpers_live_usage import LiveUsageReport
 
 pytestmark = pytest.mark.llm_live
@@ -32,8 +37,9 @@ pytestmark = pytest.mark.llm_live
 # Jakości odpowiedzi nie sprawdzają: to pomiary grafów (CLAUDE.md -> „Plan", p. 21–28).
 #
 # KOSZTUJE: jeden przebieg pliku to jedna sprawa na graf, czyli osiem spraw — pięć po jednej turze
-# i trzy w pętli po kilka tur z dziewięcioma narzędziami — oraz dziewiąta: `suggest_solution`
-# na narzędziach, które nic nie znajdują (razem rząd kilkunastu centów na mocnym modelu). Sprawa
+# i trzy w pętli po kilka tur z dziesięcioma narzędziami — oraz dwie sprawy `suggest_solution`:
+# na narzędziach, które nic nie znajdują, i ze zgłoszeniem, którego komunikat stoi tylko w kodzie
+# aplikacji (razem rząd kilkunastu centów na mocnym modelu). Sprawa
 # każdego grafu liczy się raz, dopiero gdy potrzebuje jej test, i jest wspólna dla jego testów —
 # więc `-k gate_close` uruchamia i opłaca tylko ten jeden graf.
 
@@ -51,6 +57,13 @@ PROVIDER_SELFHOSTED = "ollama"
 
 # Sprawa jednego grafu przeprowadzona na prawdziwym modelu: z grafu robi stan końcowy.
 LiveRun = Callable[[ModuleType], BaseModel]
+
+# Zmyślone zgłoszenie z komunikatem z ekranu. Ten komunikat stoi w zmyślonym kodzie atrap
+# (`agent_tools/code/fake_code.py`), a nie ma go w żadnym zgłoszeniu ani instrukcji.
+TICKET_WITH_MESSAGE = (
+    "Od rana przy rejestracji pisma przychodzącego wyskakuje komunikat "
+    "„Brak sekwencji numeracji dla roku 2026\". Wczoraj rejestracja działała bez problemu."
+)
 
 
 def name_of(
@@ -89,20 +102,23 @@ def output_type(
 
 
 async def _run_the_graph(
-    graph: ModuleType,           # np. <module app.agent_graphs.search>
-    llm:   LLMSettings,          # np. Settings().llm_generation()
-    tools: Sequence[AgentTool],  # np. fake_agent_tools()
+    graph:  ModuleType,           # np. <module app.agent_graphs.search>
+    llm:    LLMSettings,          # np. Settings().llm_generation()
+    tools:  Sequence[AgentTool],  # np. fake_agent_tools()
+    ticket: str | None = None,    # np. TICKET_WITH_MESSAGE; None to przykładowe zgłoszenie grafu
 ) -> BaseModel:
     """
     Description:
     Składa graf tą samą funkcją, której używa fabryka grafów (`build_real_graph()`) — z limitami
-    wywołań i limitem tur z konfiguracji — i przepuszcza przez niego przykładowe zgłoszenie tego
-    grafu na prawdziwym modelu. To jedyne miejsce w pliku, które woła model.
+    wywołań i limitem tur z konfiguracji — i przepuszcza przez niego zgłoszenie na prawdziwym
+    modelu: przykładowe zgłoszenie tego grafu albo podane w `ticket`. To jedyne miejsce w pliku,
+    które woła model.
 
     Example args:
         graph=<module app.agent_graphs.search>
         llm=LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", model="gpt-5.4-mini", …)
         tools=fake_agent_tools()
+        ticket=None
 
     Example result:
         SearchState(sources=[SourceRef(item_id="90001", …), …], iterations=4,
@@ -123,7 +139,13 @@ async def _run_the_graph(
         max_iterations = settings.agent_max_iterations,
     )
 
-    return await run_graph(compiled, graph.example_state())
+    state = graph.example_state()
+
+    # --- własne zgłoszenie zamiast przykładowego: reszta stanu zostaje jak w przykładzie ---
+    if ticket is not None:
+        state = state.model_copy(update={"input_text": ticket})
+
+    return await run_graph(compiled, state)
 
 
 @pytest.fixture(scope="module")
@@ -196,6 +218,34 @@ def solution_without_material(
     final = asyncio.run(_run_the_graph(suggest_solution, llm, tools))
 
     live_usage.record("graf suggest_solution bez materiału", final.usage, final.log)
+
+    return final
+
+
+@pytest.fixture(scope="module")
+def solution_with_message_in_code(
+    request:    pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór testów z `-m`
+    live_usage: LiveUsageReport,        # wstrzykiwane przez pytest; raport zużycia przebiegu
+) -> BaseModel:
+    """
+    Description:
+    Stan końcowy sprawy `suggest_solution` na prawdziwym modelu, w której zgłoszenie niesie
+    komunikat z ekranu (`TICKET_WITH_MESSAGE`), a materiał jest tylko w kodzie aplikacji
+    (`fake_agent_tools_with_code_only()`): zgłoszenia i instrukcje nic nie znajdują. Para do
+    sprawy bez materiału — różni je zgłoszenie z komunikatem — liczona dopiero, gdy poprosi
+    o nią test.
+
+    Example args:
+        (wstrzykiwane przez pytest)
+
+    Example result:
+        SuggestSolutionState(sources=[SourceRef(source="code", …)], output=Proposal(…), …)
+    """
+    llm   = live_generation_llm(request.config)
+    tools = fake_agent_tools_with_code_only()
+    final = asyncio.run(_run_the_graph(suggest_solution, llm, tools, TICKET_WITH_MESSAGE))
+
+    live_usage.record("graf suggest_solution: komunikat tylko w kodzie", final.usage, final.log)
 
     return final
 
@@ -299,3 +349,26 @@ def test_suggest_solution_without_material_ends_with_notes_only(
         suggest_solution.RESPOND_TOOL_NAME,
     ]
     assert isinstance(final.output, ProposalNotes)
+
+
+def test_suggest_solution_with_a_message_only_in_the_code_ends_cleanly(
+    solution_with_message_in_code: BaseModel,
+) -> None:
+    """Sprawdza, czy sprawa, w której zgłoszenie niesie komunikat z ekranu, a materiał jest tylko
+    w kodzie aplikacji, kończy się na prawdziwym modelu wywołaniem narzędzia odpowiedzi. Jedynym
+    możliwym źródłem jest kod: gdy model zacytował fragment jako przyczynę, wynikiem jest
+    propozycja, a gdy nie, same uwagi dla wdrożeniowca. Czy model w ogóle sięga po szukanie
+    w kodzie, test nie rozstrzyga: to widać w raporcie zużycia po przebiegu, a oczekiwanie
+    z progiem należy do scenariuszy ewaluacyjnych (p. 59).
+
+    Wyłapuje sprawę, w której wyniki narzędzi kodu psują rozmowę z dostawcą albo w której
+    propozycja powstaje bez żadnego źródła: przy komunikacie, którego nie tłumaczy żadne
+    zgłoszenie, klient dostałby rozwiązanie wzięte znikąd."""
+    final       = solution_with_message_in_code
+    model_turns = [message for message in final.messages if message.role == "assistant"]
+
+    assert [call.name for call in model_turns[-1].tool_calls] == [
+        suggest_solution.RESPOND_TOOL_NAME,
+    ]
+    assert {ref.source for ref in final.sources} <= {"code"}
+    assert isinstance(final.output, Proposal if final.sources else ProposalNotes)

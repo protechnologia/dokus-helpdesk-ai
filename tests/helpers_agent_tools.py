@@ -6,13 +6,14 @@ Narzędzia agenta dla testów węzłów, grafów i tras.
 |--------------------------------------------|----------------------------------------------------|
 | `fake_agent_tools()`                       | atrapy wszystkich narzędzi agenta                  |
 | `fake_agent_tools_without_material()`      | te same atrapy, ale wyszukiwania nic nie znajdują  |
+| `fake_agent_tools_with_code_only()`        | materiał jest tylko w kodzie aplikacji             |
 | `find_tickets_vector_with_dead_embedder()` | narzędzie właściwe, którego embedder nie odpowiada |
 
 O czym pamiętać przy zmianach:
 
-- To jedyne miejsce w testach z listą wszystkich atrap. Nowe narzędzie dopisuje się w obu
-  helperach; pilnuje tego test kontraktu narzędzi, który porównuje je z narzędziami znalezionymi
-  w `app/agent_tools/`.
+- To jedyne miejsce w testach z listą wszystkich atrap. Nowe narzędzie dopisuje się w każdym
+  z trzech helperów; pilnuje tego test kontraktu narzędzi, który porównuje je z narzędziami
+  znalezionymi w `app/agent_tools/`.
 - Atrapa narzędzia (`Fake…Tool`) zawsze odpowiada. Stan, którego nie umie odtworzyć — padniętą
   zależność — daje narzędzie właściwe z zepsutym transportem, a nie podklasa atrapy: błąd ma
   zgłosić prawdziwy klient zależności, swoim typem, a klasa narzędzia zdefiniowana w teście
@@ -100,6 +101,36 @@ def fake_agent_tools_without_material() -> list[AgentTool]:
         FakeReadDocsTool(),
         FakeFindCodeTextTool(lines=[]),
         FakeQuoteCodeTool(files={}),
+    ]
+
+    return tools
+
+
+def fake_agent_tools_with_code_only() -> list[AgentTool]:
+    """
+    Description:
+    Atrapy wszystkich narzędzi agenta, w których materiał jest tylko w kodzie aplikacji:
+    wyszukiwania zgłoszeń i dokumentacji oddają puste listy, a szukanie w kodzie i cytowanie
+    stoją na wbudowanych zmyślonych plikach. Do sprawy, w której zgłoszenie niesie komunikat,
+    a nie tłumaczy go żadne zgłoszenie ani instrukcja. Kolejność jak w `fake_agent_tools()`.
+
+    Example args:
+        (brak)
+
+    Example result:
+        [FakeFindTicketsVectorTool(tickets=[]), …, FakeFindCodeTextTool(), FakeQuoteCodeTool()]
+    """
+    tools: list[AgentTool] = [
+        FakeFindTicketsVectorTool(tickets=[]),
+        FakeFindTicketsTextTool(tickets=[]),
+        FakeReadTicketsCardTool(),
+        FakeReadTicketsThreadTool(),
+        FakeListDocsTool(sections=[]),
+        FakeFindDocsVectorTool(found=[]),
+        FakeFindDocsTextTool(matched=[]),
+        FakeReadDocsTool(),
+        FakeFindCodeTextTool(),
+        FakeQuoteCodeTool(),
     ]
 
     return tools

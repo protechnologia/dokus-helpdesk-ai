@@ -1005,13 +1005,17 @@ a paczka powstała z innej gałęzi.
   nie zmienia wyniku, tylko czas: najdłuższe było najrzadsze w 3 parach z 5, a przy „function
   execute" kosztowało 0,42 s zamiast 0,11 s. Słowa nie mają odmiany: to ciągi znaków, więc
   „limit" znajdzie „limitu", ale nie odwrotnie.
-- **Model nie sięga po narzędzia kodu, dopóki prompt o nich nie mówi (2026-10-09).** W przebiegu
-  testów `llm_live` na `gpt-6.1-sol` w czterech sprawach z pętlą nie padło ani jedno wywołanie
-  `find_code_text` ani `quote_code`, także w sprawie, w której zgłoszenia i instrukcje nic nie
-  dały: model szukał w zgłoszeniach jeszcze raz i odpowiedział. Prompty grafów opisują drogę
-  przez zgłoszenia i instrukcje, a o kodzie nie mówią, a zgłoszenia z testów nie niosą
-  komunikatu ani kodu błędu. Kiedy sięgać po kod, to treść promptów (p. 23, 25, 26). To jeden
-  przebieg na atrapach narzędzi, nie pomiar.
+- **Model nie sięga po narzędzia kodu, dopóki prompt o nich nie mówi (2026-10-09).** W testach
+  `llm_live` na `gpt-6.1-sol` w czterech sprawach z pętlą nie padło ani jedno wywołanie
+  `find_code_text` ani `quote_code`. Nie pomogło też zgłoszenie z komunikatem, który stoi tylko
+  w kodzie: model poszukał go w zgłoszeniach i instrukcjach i oddał same uwagi. Po dopisaniu
+  wstępnej reguły do promptów `suggest_solution` i `suggest_questions` w tej samej sprawie
+  zawołał `find_code_text`, a w sprawach bez komunikatu nadal nie. Reguła każe szukać, ale nie
+  cytować znalezionej linii jako przyczyny, bo model nie ma czym przeczytać jej otoczenia; pełna
+  reguła i prompt `search` czekają na odczyt pliku (p. 63). Model szukał stałego fragmentu
+  komunikatu, bez roku, a w uwagach dla wdrożeniowca podał plik, numer linii i treść linii
+  z dopiskiem, że sama linia nie mówi, kiedy błąd występuje. To pojedyncze przebiegi na atrapach
+  narzędzi, nie pomiar.
 - **Jeden komunikat ma w kodzie kilka brzmień** — „Nie udało się skomunikować z serwerem" trzy,
   w tym jedno z innym szykiem słów — a komunikat składany z części nie istnieje w kodzie
   w całości. Stąd szukanie po słowach obok frazy i szukanie stałego fragmentu, bez numerów
@@ -2587,8 +2591,8 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1441 (0)           | 23 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 425 (79)           | 73 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1442 (0)           | 23 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 426 (79)           | 73 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 105 (9)            | 9 s  |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 37 s |
 
@@ -2596,8 +2600,8 @@ Liczby i czasy z 2026-10-09: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku. Bez testów na stacku
 integracyjne trwają 16 s, a ewaluacyjne poniżej sekundy — całe 37 s to 207 wyszukań golden setów
 przez prawdziwy embedder (178 w zgłoszeniach, 29 w dokumentacji). Komplet jednym poleceniem
-(`pytest -m "not llm_live"`): 1976 testów, 160 s; domyślny `pytest`, bez stacku: 1850 testów,
-35 s. Trzydzieści pięć testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
+(`pytest -m "not llm_live"`): 1977 testów, 160 s; domyślny `pytest`, bez stacku: 1851 testów,
+35 s. Trzydzieści sześć testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
 folderu, ale poza oboma przebiegami.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
@@ -2705,13 +2709,17 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   i dzieli między testy. Trzy pliki: `complete()` (dwa wywołania), tura z narzędziami (dwie
   tury na zmyślonych narzędziach) i każdy graf na węzłach właściwych (dziewięć spraw, 20–25 tur
   i 0,07–0,14 USD na `gpt-6.1-sol`, dwa przebiegi z 2026-10-09; różnicę robi głównie zapis do
-  cache promptu, 32,7 tys. tokenów w pierwszym i 6,3 tys. w drugim). Sprawa grafu liczy się dopiero, gdy potrzebuje jej test,
+  cache promptu, 32,7 tys. tokenów w pierwszym i 6,3 tys. w drugim). Po zmianie promptu pierwsza
+  tura grafu zapisuje początek żądania do cache od nowa: około 0,02 USD zamiast 0,002. Sprawa grafu liczy się dopiero, gdy potrzebuje jej test,
   więc `-k <graf>` opłaca jeden graf. Testy grafów sprawdzają okablowanie: czy model odpowiada
   narzędziem grafu i czy odpowiedź przechodzi przez `respond`. Jakość odpowiedzi to p. 59
   i p. 21–28. Dziewiąta sprawa (2026-10-08) to `suggest_solution` na narzędziach, które nic nie
   znajdują: węzeł `respond` czyta odpowiedź także bez źródeł, więc model, który wtedy odpowie
   zwykłym tekstem, kończy sprawę błędem 503. Grozi to modelom bez wymuszonego wywołania
-  narzędzia, a pokazuje tylko żywy model.
+  narzędzia, a pokazuje tylko żywy model. Dziesiąta sprawa (2026-10-09) to `suggest_solution` ze
+  zgłoszeniem, którego komunikat stoi tylko w kodzie atrap: test sprawdza, że jedynym źródłem
+  może być kod i że propozycja nie powstaje bez źródła, a to, czy model sięga po szukanie
+  w kodzie, czyta się z raportu zużycia.
 - **Przebieg testów `llm_live` kończy się raportem zużycia (2026-10-09).** Każda sprawa zgłasza
   swoje `usage`, a grafy także `log`, przez fixture `live_usage`; pytest wypisuje na końcu linię
   na sprawę, pod nią wpisy przebiegu, i sumę kosztu. Z wpisów widać, które narzędzia model wołał
@@ -2836,7 +2844,8 @@ tylko klient, który na spis, odczyt, podciąg i słowa oddaje ustalone odpowied
 zapytania. Treść SQL-a tabel sprawdza osobna atrapa w `test_api_db_postgres_tables.py`.
 
 **Komplet atrap narzędzi i narzędzie z padniętą zależnością bierz z
-`tests/helpers_agent_tools.py`** — `fake_agent_tools()` oddaje atrapy wszystkich narzędzi,
+`tests/helpers_agent_tools.py`** — `fake_agent_tools()` oddaje atrapy wszystkich narzędzi
+(obok stoją dwa warianty: bez materiału i z materiałem tylko w kodzie),
 a `find_tickets_vector_with_dead_embedder()` narzędzie właściwe na kliencie z transportem, który
 nie odpowiada. To jedyne miejsce w testach z listą wszystkich atrap (2026-10-09, wcześniej cztery
 kopie, z których jedna po dojściu narzędzia została nieaktualna bez czerwonego testu); test
@@ -3245,8 +3254,9 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   węzłów", „Logi i obserwowalność", „Testy".
 - [ ] **63. `read_code_file`** — plik albo zakres linii, z limitem linii na wywołanie
   i informacją o ucięciu; źródeł nie tworzy, robi to `quote_code` (p. 67); opisy `quote_code`
-  i `find_code_text` dostają wtedy nazwy narzędzi odczytu; ścieżka spoza paczki to błąd
-  wracający do modelu. *Dlaczego:*
+  i `find_code_text` dostają wtedy nazwy narzędzi odczytu, a prompty trzech grafów pełną regułę
+  „znajdź, przeczytaj, zacytuj" (dziś wstępna w dwóch, bez cytowania); ścieżka spoza paczki to
+  błąd wracający do modelu. *Dlaczego:*
   po trafieniu trzeba zobaczyć, w jakiej klasie i metodzie leży linia, a główne kontrolery mają
   po 3–4 tys. linii.
 - [ ] **64. `list_code_files`** — drzewo katalogu z opcjonalną głębokością, z limitem pozycji.
@@ -3341,7 +3351,9 @@ każdy mierzy się osobno.
   zwrotu), ewaluacja per reguła, złośliwy zestaw reguł w teście-strażniku. *Dlaczego:* fałszywy
   alarm uczy obchodzić bramkę odruchowo, a „bramka ma 90%" nie mówi, która reguła się sypie.
 - [ ] **23. `search`** — prompt pętli (jak pytać każde narzędzie, kiedy materiał wystarcza
-  i kiedy sięgać po kod aplikacji — dziś prompt o nim nie mówi i model po niego nie sięga);
+  i kiedy sięgać po kod aplikacji — dziś prompt o nim nie mówi i model po niego nie sięga;
+  reguła ma zachęcać do kodu częściej niż wstępna z 2026-10-09: także wtedy, gdy sprawa wygląda
+  na związaną z działaniem kodu albo z logiką biznesową, nie tylko gdy niesie komunikat);
   pomiar pętli wobec wszystkich narzędzi naraz (tryb bez pętli zostaje jako odniesienie i tryb
   awaryjny), w zestawie klastry wieloprzyczynowe; osobna oś — trafność zapytań pisanych przez
   agenta wobec zapytań z parsera korpusu (golden set, `recall@1` i MRR; punkt odniesienia to pola
@@ -3360,13 +3372,14 @@ każdy mierzy się osobno.
   masowym imporcie (p. 31) i przy powrocie zamkniętych zgłoszeń (p. 30), więc jego jakość na modelu
   docelowym rozstrzyga o jakości indeksu.
 - [ ] **25. `suggest_questions`** — prompt z 6.3 przemierzony na modelu docelowym z placeholderami,
-  z regułą zgodności przyczyny z objawem; do sprawdzenia, czy długi tekst w JSON-ie (wątek, sekcja
+  z regułą zgodności przyczyny z objawem i z szerszą regułą sięgania po kod, tą samą co w p. 23; do sprawdzenia, czy długi tekst w JSON-ie (wątek, sekcja
   instrukcji) czyta się modelowi gorzej niż goły;
   ewaluacja wariantu; sentinele `questions_summary` rozpoznaje `no_questions()` dopisane
   do `normalizer_ticket_sentinel.py`. *Dlaczego:* prompt z 6.3 powstał pod słabszy model, a znana
   dziura (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
 - [ ] **26. `suggest_solution`** — prompt z 6.4 przemierzony na modelu docelowym, z regułą
-  zgodności trafienia z objawem i osobną regułą ostrzeżenia o kroku nieodwracalnym; do
+  zgodności trafienia z objawem, osobną regułą ostrzeżenia o kroku nieodwracalnym i szerszą
+  regułą sięgania po kod, tą samą co w p. 23; do
   rozstrzygnięcia pomiarem: kiedy model ma czytać wątki (w sondzie `gpt-6.1-sol` brał wszystkie,
   także po zaostrzeniu zdania w prompcie), czy „instrukcje zawsze" nie dokłada do źródeł sekcji,
   z których odpowiedź nie korzysta, i jak ważyć instrukcję wobec zgłoszeń (od 2026-10-04 prompt

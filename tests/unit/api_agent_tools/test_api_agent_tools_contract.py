@@ -9,7 +9,11 @@ import app.agent_tools
 from app.agent_graphs.base import MAX_CALLS_PLACEHOLDER
 from app.agent_tools import AgentTool, AuxiliaryTool, KnowledgeSource, ToolCallError
 from app.config import Settings
-from tests.helpers_agent_tools import fake_agent_tools, fake_agent_tools_without_material
+from tests.helpers_agent_tools import (
+    fake_agent_tools,
+    fake_agent_tools_with_code_only,
+    fake_agent_tools_without_material,
+)
 
 
 def tool_packages() -> list[str]:
@@ -291,15 +295,15 @@ def test_every_tool_has_a_call_limit_in_the_configuration() -> None:
 
 @pytest.mark.parametrize(
     "helper",
-    [fake_agent_tools, fake_agent_tools_without_material],
+    [fake_agent_tools, fake_agent_tools_without_material, fake_agent_tools_with_code_only],
     ids=lambda helper: helper.__name__,
 )
 def test_the_test_helper_has_one_fake_of_every_tool(
     helper: Callable[[], list[AgentTool]],
 ) -> None:
-    """Sprawdza, czy każdy z dwóch helperów z kompletem atrap narzędzi (`fake_agent_tools()`
-    i `fake_agent_tools_without_material()`) oddaje dokładnie jedną atrapę na każde narzędzie
-    znalezione w `app/agent_tools/`.
+    """Sprawdza, czy każdy helper z kompletem atrap narzędzi (zwykły, bez materiału i z materiałem
+    tylko w kodzie) oddaje dokładnie jedną atrapę na każde narzędzie znalezione
+    w `app/agent_tools/`.
 
     Wyłapuje nowe narzędzie, o którym helper nie wie: testy węzłów, grafów i tras biorą komplet
     atrap z tego jednego miejsca, więc bez wpisu przechodziłyby dalej, tylko bez nowego narzędzia,
