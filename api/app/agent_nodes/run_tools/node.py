@@ -31,8 +31,9 @@ Co się dzieje po drodze, dla każdego wywołania po kolei:
 1. Wywołanie ponad limit swojego narzędzia dostaje odmowę (`limits.py`) i nie jest wykonywane.
 2. Nazwa musi wskazywać narzędzie, które węzeł dostał — czyli dozwolone w tym grafie.
 3. Argumenty waliduje klasa argumentów narzędzia (`query_model` albo `args_model`).
-4. Narzędzie się wykonuje: odczyt oddaje tekst dla modelu (`render_for_model()`) i źródła
-   (`cite()`), wyszukiwanie i spis sam tekst.
+4. Narzędzie się wykonuje: źródło wiedzy oddaje tekst dla modelu (`render_for_model()`)
+   i źródła (`cite()`), a narzędzie pomocnicze — wyszukiwanie, spis, odczyt pliku kodu —
+   sam tekst.
 5. Gdy krok 2, 3 albo 4 skończy się `ToolCallError`, model dostaje w miejscu wyniku
    `{"error": …}` i może poprawić wywołanie w następnej turze.
 
@@ -42,8 +43,8 @@ O czym pamiętać przy zmianach:
   dostawca nie przyjmie rozmowy z wywołaniem bez odpowiedzi.
 - Do modelu wraca wyłącznie `ToolCallError`. Awarii embeddera, Qdranta albo Postgresa węzeł nie
   łapie: zatrzymuje przebieg, a trasa oddaje 503 — poprawione wywołanie nic by tam nie zmieniło.
-- Źródła powstają tylko z wykonanych odczytów. Wyszukiwanie nie ma `cite()`, a wywołanie
-  zakończone błędem niczego nie dokłada.
+- Źródła powstają tylko z wykonanych wywołań źródeł wiedzy. Narzędzie pomocnicze nie ma
+  `cite()`, a wywołanie zakończone błędem niczego nie dokłada.
 - Narzędzia idą po kolei, w kolejności z tury modelu — tak też są liczone wobec limitów.
 - Węzeł wykonuje to, co dostał w konstruktorze. Że są to narzędzia dozwolone w grafie, pilnuje
   składający: tę samą listę podaje `model_tools()` grafu, które odrzuca narzędzie spoza

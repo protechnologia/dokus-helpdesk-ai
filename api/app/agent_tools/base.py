@@ -253,8 +253,8 @@ class KnowledgeSource(ABC):
 class AuxiliaryTool(ABC):
     """
     Description:
-    Narzędzie, które agent woła po coś innego niż materiał do cytowania: wyszukiwarki zgłoszeń
-    i dokumentacji, spis treści dokumentacji, a później notatki agenta.
+    Narzędzie, które agent woła po coś innego niż materiał do cytowania: wyszukiwarki zgłoszeń,
+    dokumentacji i kodu, spis treści dokumentacji, odczyt pliku kodu, a później notatki agenta.
 
     Do czego:
     Drugi rodzaj narzędzia agenta, oddzielony od `KnowledgeSource` z samej konstrukcji: zwraca
@@ -262,7 +262,9 @@ class AuxiliaryTool(ABC):
     Tylko po to ten rodzaj istnieje. Wyszukiwanie mówi, GDZIE jest materiał — numer zgłoszenia,
     identyfikator sekcji — a nie co w nim stoi. Odpowiedź oparta na samym wyniku wyszukiwania
     nie ma źródła, i kontrakt sprawia, że nie da się go jej przypisać przez pomyłkę. Źródłem
-    jest dopiero to, co model odczytał.
+    jest dopiero to, co model odczytał. Odczyt pliku kodu (`read_code_file`) jest tu z tego
+    samego powodu, choć pokazuje treść: w kodzie model przechodzi przez wiele więcej plików,
+    niż potrzebuje do odpowiedzi, więc źródłem jest dopiero fragment zacytowany jako przyczyna.
 
     Flow:
         1. Agent woła narzędzie z argumentami zgodnymi z `args_model`.

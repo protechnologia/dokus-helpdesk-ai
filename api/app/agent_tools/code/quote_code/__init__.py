@@ -18,9 +18,8 @@ Jedno wywołanie to jeden fragment, więc limit wywołań jest limitem cytowań 
 Przykład zapytania i wyniku — w opisie `tool.py`; przykład tekstu, który czyta model, i źródła —
 w opisie `base.py`.
 
-Narzędzie nie oddaje treści linii i nie sprawdza, czy model je wcześniej przeczytał. Narzędzi,
-którymi model czyta kod, jeszcze nie ma (CLAUDE.md -> p. 63–66); szukanie (`find_code_text`)
-pokazuje samą trafioną linię.
+Narzędzie nie oddaje treści linii i nie sprawdza, czy model je wcześniej przeczytał. Kod model
+czyta narzędziem `read_code_file`; szukanie (`find_code_text`) pokazuje samą trafioną linię.
 """
 
 from app.agent_tools.code.quote_code.base import QuoteCodeToolBase, check_lines_and_build_result

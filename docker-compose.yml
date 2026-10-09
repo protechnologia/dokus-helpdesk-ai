@@ -94,6 +94,7 @@ services:
       AGENT_MAX_CALLS_FIND_DOCS_TEXT:      ${AGENT_MAX_CALLS_FIND_DOCS_TEXT:-5}
       AGENT_MAX_CALLS_READ_DOCS:           ${AGENT_MAX_CALLS_READ_DOCS:-3}
       AGENT_MAX_CALLS_FIND_CODE_TEXT:      ${AGENT_MAX_CALLS_FIND_CODE_TEXT:-10}
+      AGENT_MAX_CALLS_READ_CODE_FILE:      ${AGENT_MAX_CALLS_READ_CODE_FILE:-10}
       AGENT_MAX_CALLS_QUOTE_CODE:          ${AGENT_MAX_CALLS_QUOTE_CODE:-5}
       # Limit tur modelu w jednym przebiegu grafu z narzędziami — opis w .env.example.
       AGENT_MAX_ITERATIONS:                ${AGENT_MAX_ITERATIONS:-20}

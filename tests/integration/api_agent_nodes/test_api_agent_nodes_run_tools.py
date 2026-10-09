@@ -211,6 +211,41 @@ async def test_of_the_quoted_code_only_the_cause_is_a_source(graph: ModuleType) 
     ]
 
 
+@pytest.mark.parametrize("graph", LOOP_GRAPHS, ids=name_of)
+async def test_of_code_found_read_and_quoted_only_the_quote_is_a_source(graph: ModuleType) -> None:
+    """Sprawdza w każdym grafie z narzędziami wiedzy przebieg „znajdź, przeczytaj, zacytuj" na
+    kodzie aplikacji: model dostaje w następnej turze linie odczytanego pliku z numerami, a na
+    listę źródeł trafia tylko fragment zacytowany jako przyczyna — szukanie i odczyt nie
+    dokładają żadnego.
+
+    Wyłapuje graf, w którym odczyt pliku tworzy źródło albo jego wynik nie wraca do modelu:
+    wariant wymagający źródeł oddawałby rozwiązanie po samym zajrzeniu do kodu, albo model
+    cytowałby linie, których nie widział."""
+    read = {"path": GENERATOR_PATH, "from_line": 5, "to_line": 12}
+    llm  = FakeLLMClient(turns=[
+        tool_call_turn("find_code_text", {"exact": "Brak sekwencji numeracji"}, call_id="call_1"),
+        tool_call_turn("read_code_file", read, call_id="call_2"),
+        tool_call_turn(
+            "quote_code",
+            {"path": GENERATOR_PATH, "from_line": 8, "to_line": 10, "role": "cause"},
+            call_id="call_3",
+        ),
+        tool_call_turn(graph.RESPOND_TOOL_NAME, {}, call_id="call_4"),
+    ])
+
+    final    = await run_graph(await loop_graph(graph, llm), graph.example_state())
+    read_out = json.loads(llm.turn_calls[2].messages[-1].content)
+
+    assert [line["line"] for line in read_out["lines"]] == list(range(5, 13))
+    assert "if (!$sekwencja) {" in read_out["lines"][3]["text"]
+    assert [ref.key for ref in final.sources] == [f"code:{GENERATOR_PATH}:8-10"]
+    assert [entry.message for entry in final.log if entry.node == "run_tools"] == [
+        "wywołania: find_code_text; źródła: 0",
+        "wywołania: read_code_file; źródła: 0",
+        "wywołania: quote_code; źródła: 1",
+    ]
+
+
 async def test_after_an_error_the_model_gets_another_turn() -> None:
     """Sprawdza, czy po odczycie wątku o nieznanym numerze (90019) model dostaje w następnej turze
     błąd z tym numerem, a przebieg idzie dalej: model czyta właściwy wątek (90011), który jako

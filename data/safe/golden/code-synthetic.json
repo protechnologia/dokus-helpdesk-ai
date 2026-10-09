@@ -10,12 +10,12 @@
     "rules": [
       "Aplikacja jest ZMYŚLONA; każda pułapka odpowiada czemuś widzianemu w prawdziwym kodzie.",
       "Sekcja na narzędzie: zapytanie w kształcie narzędzia i oczekiwany wynik. Kształty pochodzą z planu (p. 62–67) i z prototypów sondy z 2026-10-07; przy budowie każdego narzędzia jego sekcję dopasowuje się do modelu zapytania.",
-      "Miejsce w kodzie to ścieżka i stały fragment linii, bez numeru linii. Pola z końcówką _at (offset_at, from_at, to_at) niosą fragment, z którego test wylicza numer linii.",
+      "Miejsce w kodzie to ścieżka i stały fragment linii, bez numeru linii. Pola z końcówką _at (from_at, to_at) niosą fragment, z którego test wylicza numer linii.",
       "find_code_text: expected to komplet trafień (ścieżka i fragment linii), w dowolnej kolejności; pusta lista znaczy brak trafień, a matched_by przy trafieniu mówi, czym ma być znalezione. expected_total i expected_files opisują zapytanie, które przekracza limit pozycji. expected z error: true znaczy błąd wracający do modelu.",
-      "read_code_file i read_code_symbol: contains i lacks to fragmenty, które wynik ma zawierać albo których ma nie zawierać; error: true znaczy błąd wracający do modelu.",
+      "read_code_file i read_code_symbol: contains i lacks to fragmenty, które wynik ma zawierać albo których ma nie zawierać; error: true znaczy błąd wracający do modelu. W read_code_file cut_by_limit i end_of_file to flagi oddanego zakresu: czy odczyt urwał limit linii i czy kończy się na ostatniej linii pliku.",
       "list_code_files: includes i lacks to nazwy pozycji katalogu.",
       "quote_code: source mówi, czy cytowanie trafia na listę źródeł (tylko rola cause); returns_text: false znaczy, że narzędzie nie oddaje treści linii.",
-      "absent_paths: pliki ze źródła, których paczka nie może zawierać; odczyt oddaje błąd.",
+      "absent_paths: pliki ze źródła, których paczka nie może zawierać; odczyt (read_code_file) oddaje błąd.",
       "Zestaw stoi na paczce zbudowanej ze źródła skryptem; test bez zbudowanej paczki nie ma na czym stanąć."
     ]
   },
@@ -283,7 +283,8 @@
         "contains": [
           "odpowiedz.status === 401"
         ],
-        "truncated": false
+        "cut_by_limit": false,
+        "end_of_file": true
       }
     },
     {
@@ -296,15 +297,15 @@
         "contains": [
           "parametry.tytul || 'Błąd'"
         ],
-        "truncated": false
+        "cut_by_limit": false,
+        "end_of_file": true
       }
     },
     {
       "id": "r03",
-      "phenomenon": "długi kontroler od początku: odczyt ucięty przed końcem",
+      "phenomenon": "długi kontroler bez zakresu: odczyt urwany limitem linii",
       "query": {
-        "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php",
-        "limit": 150
+        "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php"
       },
       "expected": {
         "contains": [
@@ -313,7 +314,8 @@
         "lacks": [
           "Sprawa jest już zamknięta"
         ],
-        "truncated": true
+        "cut_by_limit": true,
+        "end_of_file": false
       }
     },
     {
@@ -321,14 +323,18 @@
       "phenomenon": "zakres linii w długim kontrolerze",
       "query": {
         "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php",
-        "offset_at": "public function executeZamknij(",
-        "limit": 12
+        "from_at": "public function executeZamknij(",
+        "to_at": "Sprawa jest już zamknięta"
       },
       "expected": {
         "contains": [
           "Sprawa jest już zamknięta"
         ],
-        "truncated": false
+        "lacks": [
+          "public function executeLista("
+        ],
+        "cut_by_limit": false,
+        "end_of_file": false
       }
     },
     {
@@ -346,6 +352,83 @@
       "phenomenon": "katalog zamiast pliku",
       "query": {
         "path": "src/web/js/_global"
+      },
+      "expected": {
+        "error": true
+      }
+    },
+    {
+      "id": "r07",
+      "phenomenon": "koniec zakresu za końcem pliku: odczyt do ostatniej linii",
+      "query": {
+        "path": "src/web/js/_global/bledy.js",
+        "from_at": "odpowiedz.status === 401",
+        "to_line": 500
+      },
+      "expected": {
+        "contains": [
+          "odpowiedz.status === 401"
+        ],
+        "cut_by_limit": false,
+        "end_of_file": true
+      }
+    },
+    {
+      "id": "r08",
+      "phenomenon": "zakres dłuższy niż limit linii, podany wprost",
+      "query": {
+        "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php",
+        "from_at": "public function executeZapisz(",
+        "to_at": "public function executeZamknij("
+      },
+      "expected": {
+        "contains": [
+          "public function executeZapisz("
+        ],
+        "lacks": [
+          "public function executeLista(",
+          "public function executeZamknij("
+        ],
+        "cut_by_limit": true,
+        "end_of_file": false
+      }
+    },
+    {
+      "id": "r09",
+      "phenomenon": "od miejsca w długim kontrolerze do końca pliku",
+      "query": {
+        "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php",
+        "from_at": "public function executeSlownikSzablony("
+      },
+      "expected": {
+        "contains": [
+          "Sprawa jest już zamknięta"
+        ],
+        "lacks": [
+          "public function executeLista("
+        ],
+        "cut_by_limit": false,
+        "end_of_file": true
+      }
+    },
+    {
+      "id": "r10",
+      "phenomenon": "początek odczytu za końcem pliku",
+      "query": {
+        "path": "src/web/js/_global/bledy.js",
+        "from_line": 5000
+      },
+      "expected": {
+        "error": true
+      }
+    },
+    {
+      "id": "r11",
+      "phenomenon": "zakres, który kończy się przed swoim początkiem",
+      "query": {
+        "path": "src/web/js/_global/bledy.js",
+        "from_line": 8,
+        "to_line": 3
       },
       "expected": {
         "error": true

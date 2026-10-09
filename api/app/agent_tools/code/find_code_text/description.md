@@ -13,9 +13,8 @@
      i `MAX_TEXT_CHARS` z `models.py`, a „trzy znaki" przy `words` to
      `MIN_LONGEST_WORD_CHARS`; pilnuje ich test opisu.
 
-     Zasady nie wymieniają jeszcze narzędzi odczytu kodu po nazwie:
-     dojdą razem z nimi (p. 63, 66). Do tego czasu model nie ma czym
-     przeczytać otoczenia znalezionej linii.
+     Zasady wymieniają po nazwie odczyt pliku (`read_code_file`);
+     odczyt symbolu dojdzie razem z nim (p. 66).
 
      Zmiana dotyczy wszystkich grafów naraz, więc po strojeniu jednego
      trzeba przemierzyć pozostałe (p. 23, 25–26).
@@ -66,7 +65,8 @@ JSON z liniami kodu:
   że trzeba zawęzić: dłuższą frazą albo katalogiem w `path`.
 - `text` to jedna linia, ucięta po 200 znakach (kończy się wtedy
   znakiem „…"). Pokazuje, gdzie tekst stoi, a nie w jakim warunku
-  kod do niego dochodzi.
+  kod do niego dochodzi. Otoczenie linii przeczytaj narzędziem
+  `read_code_file`: podaj mu `path` i numery linii wokół `line`.
 - Jako przyczynę (narzędzie `quote_code`) wskazuj fragment dopiero
   wtedy, gdy przeczytałeś jego otoczenie, a nie samą trafioną linię.
 - Pusta lista znaczy, że takiego tekstu nie ma w kodzie aplikacji:

@@ -37,7 +37,7 @@ pytestmark = pytest.mark.llm_live
 # Jakości odpowiedzi nie sprawdzają: to pomiary grafów (CLAUDE.md -> „Plan", p. 21–28).
 #
 # KOSZTUJE: jeden przebieg pliku to jedna sprawa na graf, czyli osiem spraw — pięć po jednej turze
-# i trzy w pętli po kilka tur z dziesięcioma narzędziami — oraz dwie sprawy `suggest_solution`:
+# i trzy w pętli po kilka tur z jedenastoma narzędziami — oraz dwie sprawy `suggest_solution`:
 # na narzędziach, które nic nie znajdują, i ze zgłoszeniem, którego komunikat stoi tylko w kodzie
 # aplikacji (razem rząd kilkunastu centów na mocnym modelu). Sprawa
 # każdego grafu liczy się raz, dopiero gdy potrzebuje jej test, i jest wspólna dla jego testów —
@@ -184,7 +184,8 @@ def live_run(
             except Exception as error:  # noqa: BLE001 — zapamiętany i zgłoszony każdemu testowi
                 done[name] = error
             else:
-                live_usage.record(f"graf {name}", done[name].usage, done[name].log)
+                final = done[name]
+                live_usage.record(f"graf {name}", final.usage, final.log, final.messages)
 
         # --- sprawa skończyła się błędem: każdy test tego grafu dostaje ten sam błąd ---
         if isinstance(done[name], Exception):
@@ -217,7 +218,9 @@ def solution_without_material(
     tools = fake_agent_tools_without_material()
     final = asyncio.run(_run_the_graph(suggest_solution, llm, tools))
 
-    live_usage.record("graf suggest_solution bez materiału", final.usage, final.log)
+    live_usage.record(
+        "graf suggest_solution bez materiału", final.usage, final.log, final.messages,
+    )
 
     return final
 
@@ -245,7 +248,9 @@ def solution_with_message_in_code(
     tools = fake_agent_tools_with_code_only()
     final = asyncio.run(_run_the_graph(suggest_solution, llm, tools, TICKET_WITH_MESSAGE))
 
-    live_usage.record("graf suggest_solution: komunikat tylko w kodzie", final.usage, final.log)
+    live_usage.record(
+        "graf suggest_solution: komunikat tylko w kodzie", final.usage, final.log, final.messages,
+    )
 
     return final
 

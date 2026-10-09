@@ -10,15 +10,16 @@ sekcji dokumentacji. Treść dają dopiero odczyty i tylko one cytują, więc na
 to, co model przeczytał. Kod aplikacji idzie inaczej: model przechodzi przez wiele więcej
 plików, niż potrzebuje do odpowiedzi, więc źródłem jest dopiero fragment, który wskazał jako
 przyczynę osobnym narzędziem (`quote_code`). Dlatego szukanie w kodzie (`find_code_text`) może
-pokazać treść trafionej linii: źródła nie tworzy ani ono, ani odczyt. Wynik każdego narzędzia
-trafia do modelu jako JSON (`result_as_json()`).
+pokazać treść trafionej linii, a odczyt pliku (`read_code_file`) jest narzędziem pomocniczym:
+źródła nie tworzy ani jedno, ani drugie. Wynik każdego narzędzia trafia do modelu jako JSON
+(`result_as_json()`).
 
 Do czego:
 Dwa rodzaje narzędzi, rozdzielone kontraktem (patrz `base.py`):
     * `KnowledgeSource` — odczyt albo cytowanie kodu: z jego wyniku powstają źródła
       odpowiedzi, a które, mówi samo narzędzie (`cite()`);
-    * `AuxiliaryTool`   — wyszukiwanie i spis: zwraca wyłącznie tekst, więc jego wynik nigdy
-      nie zostanie źródłem.
+    * `AuxiliaryTool`   — wyszukiwanie, spis i odczyt kodu: zwraca wyłącznie tekst, więc jego
+      wynik nigdy nie zostanie źródłem.
 
 Celowo NIE ma tu anonimizatora ani modelu. Anonimizacja to stały węzeł, przez który przechodzi
 każdy graf, a nie coś, co agent może wywołać albo pominąć; model jest wołającym te narzędzia, nie
@@ -55,11 +56,13 @@ narzędzie i co ono oddaje. Po co wyniki w danej funkcji, mówi prompt grafu.
 | `find_docs_text`      | pomocnicze    | `exact`, `words`      | opisy sekcji, czym znaleziono    |
 | `read_docs`           | źródło wiedzy | `section_ids`         | treść sekcji; cytuje             |
 | `find_code_text`      | pomocnicze    | fraza, słowa, ścieżka | linie kodu z treścią             |
+| `read_code_file`      | pomocnicze    | ścieżka, zakres linii | linie pliku z numerami           |
 | `quote_code`          | źródło wiedzy | ścieżka, linie, rola  | potwierdzenie; cytuje przyczynę  |
 
 Każde ma narzędzie właściwe i atrapę. Wyszukiwanie po znaczeniu i karty stoją na Qdrancie,
 pozostałe narzędzia zgłoszeń i dokumentacji na Postgresie, a narzędzia kodu na paczce kodu na
-dysku: `find_code_text` szuka w niej programem ripgrep (`engine_process/`). Tabela zgłoszeń
+dysku: `find_code_text` szuka w niej programem ripgrep (`engine_process/`), a `read_code_file`
+i `quote_code` czytają jej pliki wprost. Tabela zgłoszeń
 w Postgresie dostanie prawdziwe wątki po anonimizacji (p. 19) i masowym imporcie (p. 31), więc
 `find_tickets_text` i `read_tickets_thread` są sprawdzone na zmyślonych.
 Narzędzia dokumentacji są opcjonalne: bez dokumentacji nie trafiają do rejestru.

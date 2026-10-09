@@ -110,9 +110,10 @@ narzędzie, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzj
 są właściwe i każdy graf przeszedł na prawdziwym modelu (OpenAI), na zmyślonych zgłoszeniach
 i atrapach narzędzi. Trasy biorą graf z węzłów właściwych, gdy model generujący nie jest atrapą,
 ale bez prawdziwego anonimizatora taka konfiguracja odmawia, więc na danych klientów nic jeszcze
-nie rusza. Wszystkie dziesięć narzędzi ma wersję właściwą: osiem na zgłoszeniach i instrukcjach
-oraz dwa pierwsze narzędzia kodu, szukanie i cytowanie fragmentu. Dwa, które czytają wątki
-zgłoszeń, czekają na dane, bo tabela wątków napełni się dopiero po anonimizacji.
+nie rusza. Wszystkie jedenaście narzędzi ma wersję właściwą: osiem na zgłoszeniach
+i instrukcjach oraz trzy pierwsze narzędzia kodu: szukanie, odczyt pliku i cytowanie fragmentu.
+Dwa, które czytają wątki zgłoszeń, czekają na dane, bo tabela wątków napełni się dopiero po
+anonimizacji.
 
 ### Zasady produktu
 
@@ -915,10 +916,11 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — indeksacja i narzędzia powstają
 
 Trzeci materiał obok zgłoszeń i instrukcji: kod źródłowy Dokusa, czytany narzędziami agenta
 (p. 60–67). Ma pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają, przede wszystkim gdy
-zgłoszenie niesie komunikat albo kod błędu. Z narzędzi są szukanie (`find_code_text`, p. 62)
-i cytowanie fragmentu (`quote_code`, p. 67); odczyt jeszcze nie powstał (p. 63–66). Są też paczka
+zgłoszenie niesie komunikat albo kod błędu. Z narzędzi są szukanie (`find_code_text`, p. 62),
+odczyt pliku (`read_code_file`, p. 63) i cytowanie fragmentu (`quote_code`, p. 67); spis
+katalogu, opis projektu i odczyt symbolu jeszcze nie powstały (p. 64–66). Są też paczka
 kodu (p. 60) i zestaw przypadków (p. 61). Niżej decyzje i liczby z 2026-10-06, z prób
-z 2026-10-07 i z budowy szukania z 2026-10-09.
+z 2026-10-07 i z budowy szukania i odczytu z 2026-10-09.
 Liczby bez dopisku „w paczce" pochodzą z rozpoznania na kopii roboczej gałęzi jednego klienta,
 a paczka powstała z innej gałęzi.
 
@@ -1010,12 +1012,28 @@ a paczka powstała z innej gałęzi.
   `find_code_text` ani `quote_code`. Nie pomogło też zgłoszenie z komunikatem, który stoi tylko
   w kodzie: model poszukał go w zgłoszeniach i instrukcjach i oddał same uwagi. Po dopisaniu
   wstępnej reguły do promptów `suggest_solution` i `suggest_questions` w tej samej sprawie
-  zawołał `find_code_text`, a w sprawach bez komunikatu nadal nie. Reguła każe szukać, ale nie
-  cytować znalezionej linii jako przyczyny, bo model nie ma czym przeczytać jej otoczenia; pełna
-  reguła i prompt `search` czekają na odczyt pliku (p. 63). Model szukał stałego fragmentu
-  komunikatu, bez roku, a w uwagach dla wdrożeniowca podał plik, numer linii i treść linii
-  z dopiskiem, że sama linia nie mówi, kiedy błąd występuje. To pojedyncze przebiegi na atrapach
-  narzędzi, nie pomiar.
+  zawołał `find_code_text`, a w sprawach bez komunikatu nadal nie. Model szukał stałego
+  fragmentu komunikatu, bez roku, a w uwagach dla wdrożeniowca podał plik, numer linii i treść
+  linii z dopiskiem, że sama linia nie mówi, kiedy błąd występuje. To pojedyncze przebiegi na
+  atrapach narzędzi, nie pomiar. Od p. 63 reguła jest pełna i stoi w promptach trzech grafów:
+  znajdź (`find_code_text`), przeczytaj otoczenie (`read_code_file`), zacytuj fragment, który
+  pokazuje warunek (`quote_code`). Warunek sięgnięcia po kod został wąski: komunikat, wpis
+  z logu albo kod błędu, których zgłoszenia i instrukcje nie tłumaczą. W `suggest_solution`
+  fakty wolno brać także z przeczytanego kodu; kształt odpowiedzi opartej wyłącznie na kodzie
+  stroi p. 26.
+- **Na żywym `gpt-6.1-sol` model idzie drogą szukanie → odczyt → cytowanie (2026-10-09,
+  pojedyncze przebiegi, nie pomiar; raport
+  `data/unsafe/docs/przebieg-read-code-file-gpt-6.1-sol-2026-10-09.md`).** Siedem spraw
+  z komunikatem: jedna w testach `llm_live` na atrapach i sześć w sondzie na aplikacji
+  syntetycznej, z prawdziwymi narzędziami kodu. W każdej model zaczynał od zgłoszeń
+  i instrukcji, a w kodzie szukał od drugiej tury. W sześciu sprawach, w których szukanie
+  trafiło, było 11 odczytów bez błędu, każdy pliku z wyniku szukania, i 10 cytowań, wszystkie
+  linii wcześniej odczytanych; w sprawie bez trafień model nie czytał i nie cytował.
+  W kontrolerze na 441 linii prosił o zakres wokół trafienia (od około 50 linii przed nim),
+  nie o cały plik. W 6 z 9 odczytów sondy koniec zakresu wypadał za końcem pliku, bo model
+  nie zna długości pliku. Limitu 300 linii nie osiągnął ani razu (najdłuższy odczyt miał 150
+  linii), więc `cut_by_limit` i doczytywanie od `to_line` + 1 sprawdzają tylko testy bez
+  modelu. Sprawa w sondzie to 4–8 tur i 0,01–0,04 USD.
 - **Jeden komunikat ma w kodzie kilka brzmień** — „Nie udało się skomunikować z serwerem" trzy,
   w tym jedno z innym szykiem słów — a komunikat składany z części nie istnieje w kodzie
   w całości. Stąd szukanie po słowach obok frazy i szukanie stałego fragmentu, bez numerów
@@ -1023,7 +1041,9 @@ a paczka powstała z innej gałęzi.
 - **Sama nazwa nie wskazuje symbolu:** 3022 akcje mają 1081 różnych nazw, a najczęstsza powtarza
   się 172 razy. Symbol wskazuje ścieżka pliku z nazwą.
 - **89% plików PHP ma do 200 linii, ale główne kontrolery po 3–4 tys.** Odczyt pliku ma limit
-  linii, a odczyt symbolu daje najwięcej właśnie w nich.
+  300 linii na wywołanie: w paczce mieści się w nim w całości 92% plików (przy 150 liniach
+  84%, przy 400 — 95%). Odczyt symbolu daje najwięcej w długich kontrolerach. W paczce jest
+  45 plików pustych, a linii dłuższych niż 500 znaków 72 na 1,18 mln.
 - **Opis projektu szkicuje model z kodu, a poprawia programista aplikacji.** Leży w paczce
   i mówi, gdzie zacząć szukać: wejścia do aplikacji, droga od adresu do akcji i od zdarzenia JS
   do handlera.
@@ -1038,12 +1058,13 @@ a paczka powstała z innej gałęzi.
   Opisy zachowania zatwierdza osoba znająca Dokusa; do tego czasu przypadek ma
   `behaviour_confirmed: false`.
 - **Zestaw do aplikacji syntetycznej ma inny kształt, bo służy testom bez modelu (2026-10-07).**
-  `data/safe/golden/code-synthetic.json` trzyma sekcję na narzędzie: 39 zapytań w kształcie
+  `data/safe/golden/code-synthetic.json` trzyma sekcję na narzędzie: 44 zapytania w kształcie
   narzędzia z oczekiwanym wynikiem, oraz listę plików, których paczka nie może zawierać.
   Zgłoszeń w nim nie ma: testowi bez modelu nic nie dają, bo zamiana zgłoszenia na wywołania
   narzędzi to praca modelu. Kształty zapytań pochodzą z planu i prototypów, więc sekcję
-  narzędzia dopasowuje się przy jego budowie; sekcja `find_code_text` jest dopasowana
-  (2026-10-09, 18 zapytań, `words` jako tekst).
+  narzędzia dopasowuje się przy jego budowie; dopasowane są sekcje `find_code_text`
+  (2026-10-09, 18 zapytań, `words` jako tekst) i `read_code_file` (2026-10-09, 11 zapytań,
+  `from_at` i `to_at` zamiast `offset_at` i `limit`).
 - **Przypadek trafia do zestawu po próbie na świeżym agencie, który zna tylko zgłoszenie
   i folder paczki.** W próbach z 2026-10-07 miejsce wybrane przez autora było błędne albo
   niepełne w 3 przypadkach z 8, a w 2 kolejnych błędny był opis albo rodzaj przypadku. Cena:
@@ -1709,6 +1730,21 @@ czasu jest pusta.
   paczki albo donikąd, zapytanie bez frazy i słów oraz same słowa krótsze niż trzy znaki. Cena:
   model może wskazać przyczynę po jednej linii, której otoczenia nie czytał; mówi o tym opis
   dla modelu, a liczy pomiar (p. 59).
+- **Odczyt pliku kodu, `read_code_file` (2026-10-09), przyjmuje `path` i opcjonalne `from_line`
+  i `to_line`, a oddaje linie z numerami oraz zakres żądany obok oddanego.** Numery linii
+  nazywają się jak w `quote_code`, więc model cytuje przeczytany fragment bez przeliczania;
+  bez numerów prosi o cały plik. Jedno wywołanie oddaje najwyżej 300 linii (stała w modelu
+  zapytania), a limit to 10 odczytów na sprawę; w sondzie było ich 4–10 przy 150 liniach.
+  Wynik ma `path`, `file_info.total_lines`, `requested`, `returned` i `lines[]` z polami
+  `line` i `text`, tymi samymi co w szukaniu. To jedyne narzędzie, które może oddać mniej, niż
+  żądano, więc powód nazywają dwie flagi w `returned`: `cut_by_limit` (limit urwał żądany
+  zakres, dalej czyta się od `to_line` + 1) i `end_of_file` (oddano ostatnią linię pliku).
+  Liczy je razem z zakresem jedna funkcja, wspólna z atrapą. Treść linii wraca znak w znak,
+  z wcięciem i bez ucinania. Koniec zakresu za końcem pliku nie jest błędem, bo model nie zna
+  długości pliku przed odczytem; jako błąd wracają: ścieżka spoza paczki, katalog albo brak
+  pliku, początek za końcem pliku, plik pusty i odwrócony zakres. Narzędzie jest pomocnicze,
+  bez `cite()`: źródła nie tworzy. Cena: linia kodu jako obiekt zajmuje 2,34 razy tyle znaków
+  co goły tekst, więc typowy odczyt 150 linii to około 12,5 tys. znaków.
 - **Wynik każdego narzędzia trafia do modelu jako JSON (`result_as_json()` w `base.py`)** — model
   wyniku zapisany wprost, z polami pod nazwami ze schematu. Identyfikatory wracają w kształcie,
   w jakim model poda je następnemu narzędziu, a treść pisana przez klienta siedzi w polu
@@ -1762,9 +1798,10 @@ czasu jest pusta.
   materiał, który odpowiedź może cytować, i sam mówi który (`cite()`). `AuxiliaryTool` to
   wyszukiwanie i spis: zwraca **wyłącznie tekst** i nie ma `cite()`, więc jego wynik **nie ma jak**
   trafić na listę źródeł. Dzięki temu `requires_hits` wymusza przeczytanie materiału przed
-  propozycją, a nie samo jego znalezienie. Cytowanie kodu (`quote_code`) też jest
-  `KnowledgeSource`, choć niczego nie odczytuje: jego `cite()` oddaje źródło tylko dla fragmentu
-  wskazanego jako przyczyna.
+  propozycją, a nie samo jego znalezienie. W kodzie jest odwrotnie niż w zgłoszeniach
+  i dokumentacji: odczyt pliku (`read_code_file`) jest `AuxiliaryTool`, a cytowanie
+  (`quote_code`) `KnowledgeSource`, choć niczego nie odczytuje: jego `cite()` oddaje źródło
+  tylko dla fragmentu wskazanego jako przyczyna.
 - **`item_id` w `SourceRef` identyfikuje odczytany element; klucz to `source:item_id`**, bo id są
   unikalne tylko w obrębie materiału, a deduplikacja po samym id scaliłaby zgłoszenie z sekcją
   dokumentacji. **`source` nazywa materiał („tickets", „docs"), nie narzędzie (2026-10-03):** to
@@ -1813,8 +1850,9 @@ czasu jest pusta.
   dopisywania go do żadnej listy.
 - **Narzędzia właściwe buduje `agent_tools/factory.py`, z konfiguracji (2026-10-05):** po jednym
   kliencie embeddera, Qdranta i Postgresa, wspólnym dla ośmiu narzędzi, oraz paczka kodu
-  i klient ripgrepa dla dwóch narzędzi kodu, w kolejności `TOOL_NAMES` grafów. Powstaje
-  wszystkie dziesięć; czy instancja bez dokumentacji ma pomijać jej narzędzia, rozstrzyga p. 15.
+  i klient ripgrepa dla trzech narzędzi kodu, w kolejności `TOOL_NAMES` grafów. Powstaje
+  wszystkie jedenaście; czy instancja bez dokumentacji ma pomijać jej narzędzia, rozstrzyga
+  p. 15.
 - **Kod aplikacji liczy się jako źródło jak zgłoszenie i instrukcja, także w wariancie
   wymagającym źródeł (decyzja 2026-10-06, narzędzia w p. 62–67).** Odpowiedź opartą wyłącznie na
   kodzie wołający rozpoznaje po rodzaju źródła (`code`). Źródłem jest fragment, który model
@@ -1833,12 +1871,11 @@ czasu jest pusta.
   tam opisze (2026-10-08), a w odpowiedzi `/search` w `queries`.
 - **`quote_code` oddaje samo potwierdzenie i nie sprawdza, czy model cytowane linie czytał
   (2026-10-07).** Wynik to ścieżka, zakres i rola, bez treści linii: z treścią w zwrocie model
-  w sondzie używał cytowania zamiast odczytu. Narzędzie nie widzi rozmowy, a narzędzi odczytu
-  kodu jeszcze nie ma, więc regułę „cytuj tylko to, co przeczytałeś" niesie opis dla modelu,
-  a liczy pomiar (p. 59). Jako błąd do modelu wracają: ścieżka spoza paczki, katalog albo brak
-  pliku, fragment za końcem pliku, a z modelu zapytania brak roli, odwrócony zakres i fragment
-  ponad limit. Cena: do czasu p. 63–66 model widzi z kodu tylko linie trafione szukaniem, więc
-  cytuje po jednej linii albo na ślepo.
+  w sondzie używał cytowania zamiast odczytu. Narzędzie nie widzi rozmowy, więc regułę „cytuj
+  tylko to, co przeczytałeś narzędziem `read_code_file`" niesie opis dla modelu, a liczy
+  pomiar (p. 59). Jako błąd do modelu wracają: ścieżka spoza paczki, katalog albo brak pliku,
+  fragment za końcem pliku, a z modelu zapytania brak roli, odwrócony zakres i fragment ponad
+  limit.
 - **Każde narzędzie jest tylko do odczytu** — wstrzyknięcie przez treść zgłoszenia może co
   najwyżej skierować agenta do nietrafionego materiału, nie zmienić indeksu.
 
@@ -1874,17 +1911,19 @@ czasu jest pusta.
   model wywołanie poprawił, a limit wątków ma być liczbą wątków przeczytanych. Ten
   sam limit stoi w opisie narzędzia dla modelu: miejsce `{{max_calls}}` w `description.md`
   wypełnia `tool_definitions()`, więc narzędzie bez limitu to błąd składania. Ile jedno
-  wywołanie może pobrać (20 kart, 5 sekcji, 20 linii z szukania w kodzie, 40 linii cytowanego
-  kodu), zostaje stałą w modelu zapytania; wątek jest zawsze jeden. Wartości od 2026-10-05:
-  wyszukiwania i karty po 5, sekcje i wątki po 3, spis treści 1; od 2026-10-07 cytowanie kodu 5;
-  od 2026-10-09 szukanie w kodzie 10, bo od komunikatu do miejsca, które go wywołuje, idzie się
-  kilkoma szukaniami z rzędu (w sondzie limit 10 wyczerpał się w 5 sprawach z 9).
+  wywołanie może pobrać (20 kart, 5 sekcji, 20 linii z szukania w kodzie, 300 linii odczytanego
+  pliku kodu, 40 linii cytowanego kodu), zostaje stałą w modelu zapytania; wątek jest zawsze
+  jeden. Wartości od 2026-10-05: wyszukiwania i karty po 5, sekcje i wątki po 3, spis treści 1;
+  od 2026-10-07 cytowanie kodu 5; od 2026-10-09 szukanie w kodzie 10, bo od komunikatu do
+  miejsca, które go wywołuje, idzie się kilkoma szukaniami z rzędu (w sondzie limit 10
+  wyczerpał się w 5 sprawach z 9), i odczyt pliku kodu też 10, bo po każdym takim szukaniu
+  model czyta otoczenie trafionej linii.
 - **Limit tur modelu: `AGENT_MAX_ITERATIONS` = 20 (2026-10-05).** Liczy odpowiedzi modelu
   w grafie z narzędziami, nie wywołania. Gdy w ostatniej dozwolonej turze model nadal woła
   narzędzia wiedzy, `route_after_agent()` prowadzi do `respond` i narzędzia nie są wykonywane.
   Domyka to, czego limity narzędzi nie domykają: wywołanie ponad limit narzędzia dostaje odmowę,
   ale turę zużywa. 20 to zapas, nie cel: sprawa w sondach to 4–7 tur, a limity narzędzi pozwalają
-  na 47 wywołań, czyli do 48 tur przy jednym wywołaniu na turę (do przeliczenia w p. 23).
+  na 57 wywołań, czyli do 58 tur przy jednym wywołaniu na turę (do przeliczenia w p. 23).
   Sprawa ucięta limitem dostaje od `respond` jedną turę ponad limit, na samą odpowiedź: jest już
   opłacona, a narzędzia w tej turze nadal nie ruszają.
 - **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `engine_llm/models/messages.py`), żadnych typów
@@ -2591,17 +2630,17 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1442 (0)           | 23 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 426 (79)           | 73 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 105 (9)            | 9 s  |
-| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 37 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1504 (0)           | 23 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 464 (79)           | 87 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 105 (9)            | 12 s |
+| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 50 s |
 
 Liczby i czasy z 2026-10-09: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku. Bez testów na stacku
-integracyjne trwają 16 s, a ewaluacyjne poniżej sekundy — całe 37 s to 207 wyszukań golden setów
+integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy — całe 50 s to 207 wyszukań golden setów
 przez prawdziwy embedder (178 w zgłoszeniach, 29 w dokumentacji). Komplet jednym poleceniem
-(`pytest -m "not llm_live"`): 1977 testów, 160 s; domyślny `pytest`, bez stacku: 1851 testów,
-35 s. Trzydzieści sześć testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
+(`pytest -m "not llm_live"`): 2077 testów, 148 s; domyślny `pytest`, bez stacku: 1951 testów,
+33 s. Trzydzieści sześć testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
 folderu, ale poza oboma przebiegami.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
@@ -2655,6 +2694,11 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   a model ma w obu przypadkach dostać błąd w miejscu wyniku. Testy `find_code_text` są od
   2026-10-09: zapytania z zestawu idą przez prawdziwy `run_tools` i prawdziwego ripgrepa, a test
   w pliku `quote_code` sprawdza, że linię znalezioną szukaniem da się zacytować bez przeróbki.
+  Testy `read_code_file` są od 2026-10-09: zapytania z zestawu idą przez prawdziwy `run_tools`,
+  każda oddana linia jest porównana z plikiem w paczce, a test łańcucha sprawdza, że linię
+  znalezioną szukaniem da się odczytać, a oddany zakres zacytować. Wybieranie zakresu i obie
+  flagi mają test jednostkowy na siatce układów granic: długość pliku, początek, długość
+  zakresu.
   Cena: to jedyne testy bez markera, które potrzebują czegoś spoza commita — zbudowanej paczki
   syntetycznej i programu ripgrep na hoście. Bez paczki domyślny `pytest` kończy się błędem
   z poleceniem budowy, a bez ripgrepa błędem z poleceniem instalacji.
@@ -2707,11 +2751,13 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   Odmawia błędem, gdy wybór testów nie wymienia `llm_live` (płatne wywołanie nie może być
   skutkiem ubocznym `-m ""`) i gdy dostawcą jest `fake`. Odpowiedzi modelu plik liczy raz
   i dzieli między testy. Trzy pliki: `complete()` (dwa wywołania), tura z narzędziami (dwie
-  tury na zmyślonych narzędziach) i każdy graf na węzłach właściwych (dziewięć spraw, 20–25 tur
-  i 0,07–0,14 USD na `gpt-6.1-sol`, dwa przebiegi z 2026-10-09; różnicę robi głównie zapis do
-  cache promptu, 32,7 tys. tokenów w pierwszym i 6,3 tys. w drugim). Po zmianie promptu pierwsza
-  tura grafu zapisuje początek żądania do cache od nowa: około 0,02 USD zamiast 0,002. Sprawa grafu liczy się dopiero, gdy potrzebuje jej test,
-  więc `-k <graf>` opłaca jeden graf. Testy grafów sprawdzają okablowanie: czy model odpowiada
+  tury na zmyślonych narzędziach) i każdy graf na węzłach właściwych (dziesięć spraw, 30 tur
+  i 0,16 USD na `gpt-6.1-sol` w przebiegu z 2026-10-09 po zmianie promptów trzech grafów;
+  dwa wcześniejsze przebiegi tego dnia, na dziewięciu sprawach, kosztowały 0,14 i 0,07 USD,
+  a różnicę robi głównie zapis do cache promptu). Po zmianie promptu pierwsza tura grafu
+  zapisuje początek żądania do cache od nowa: około 0,02 USD zamiast 0,002. Sprawa grafu liczy
+  się dopiero, gdy potrzebuje jej test, więc `-k <graf>` opłaca jeden graf. Testy grafów
+  sprawdzają okablowanie: czy model odpowiada
   narzędziem grafu i czy odpowiedź przechodzi przez `respond`. Jakość odpowiedzi to p. 59
   i p. 21–28. Dziewiąta sprawa (2026-10-08) to `suggest_solution` na narzędziach, które nic nie
   znajdują: węzeł `respond` czyta odpowiedź także bez źródeł, więc model, który wtedy odpowie
@@ -2721,9 +2767,13 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   może być kod i że propozycja nie powstaje bez źródła, a to, czy model sięga po szukanie
   w kodzie, czyta się z raportu zużycia.
 - **Przebieg testów `llm_live` kończy się raportem zużycia (2026-10-09).** Każda sprawa zgłasza
-  swoje `usage`, a grafy także `log`, przez fixture `live_usage`; pytest wypisuje na końcu linię
-  na sprawę, pod nią wpisy przebiegu, i sumę kosztu. Z wpisów widać, które narzędzia model wołał
-  w której turze. Sprawa zakończona błędem nie oddaje stanu, więc w raporcie jej nie ma.
+  swoje `usage`, a grafy także `log` i `messages`, przez fixture `live_usage`; pytest wypisuje
+  na końcu linię na sprawę, pod nią wpisy przebiegu, i sumę kosztu. Pod wpisem każdej tury
+  modelu stoją jej wywołania narzędzi z argumentami i opis wyniku: nazwy pól z liczbami
+  i flagami, lista jako liczba pozycji, długi tekst jako długość, błąd w całości. Argumenty
+  i wyniki raport bierze z rozmowy w stanie grafu, nie z `log`: wpis przebiegu wraca
+  w odpowiedzi każdej trasy i niesie same nazwy i liczby, a argumenty wyszukiwań to treść
+  zgłoszenia. Sprawa zakończona błędem nie oddaje stanu, więc w raporcie jej nie ma.
 - **Poza testami `llm_live` oba modele są atrapą, cokolwiek stoi w `.env` (2026-10-05)** —
   ustawia to fixture `fake_models_outside_live_tests` z `tests/conftest.py`. Fabryka grafów przy
   prawdziwym dostawcy składa graf na prawdziwym modelu, więc bez tego zwykły test trasy zależałby
@@ -2856,7 +2906,9 @@ narzędzie o tej samej nazwie.
 **Raport zużycia żywego modelu leży w `tests/helpers_live_usage.py`** (`LiveUsageReport`),
 a test dostaje go przez fixture `live_usage` z `tests/conftest.py`. Fixture i funkcja wypisująca
 podsumowanie zostają w `conftest.py`, bo pytest szuka ich tylko tam; obiekt raportu zbudowany
-w teście nie trafiłby do podsumowania.
+w teście nie trafiłby do podsumowania. Ten sam plik zamienia rozmowę ze stanu grafu na linie
+z wywołaniami narzędzi (`run_as_lines()`); sonda na żywym modelu bierze je stąd, zamiast pisać
+własne wypisywanie.
 
 **Paczkę syntetycznej aplikacji i zapytania do niej bierz z `tests/helpers_code_package.py`** —
 `synthetic_code_package()` oddaje czytnik zbudowanej paczki, `synthetic_code_cases()` sekcję
@@ -3022,9 +3074,19 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Cytowanie kodu bez ról** — model cytował też miejsca wykluczone, jako dowód, więc sprawa bez
   odpowiedzi miała dwa źródła; z rolą `excluded` nie ma żadnego.
 - **Blokada cytowania linii, których model nie odczytał** — narzędzie nie widzi rozmowy,
-  a sprawdzanie w węźle wiązałoby go z nazwami narzędzi odczytu, których jeszcze nie ma; bez
-  treści w zwrocie model w dwóch przebiegach nie cytował na ślepo. Wraca, gdy pomiar pokaże
-  takie cytowania (p. 59).
+  a sprawdzanie w węźle wiązałoby go z nazwami narzędzi odczytu; bez treści w zwrocie model
+  w dwóch przebiegach nie cytował na ślepo. Wraca, gdy pomiar pokaże takie cytowania (p. 59).
+- **`offset` i `limit` w `read_code_file`** — tak pytał prototyp z sondy; `from_line`
+  i `to_line` nazywają się jak w `quote_code`, więc model cytuje przeczytany zakres bez
+  przeliczania.
+- **Linie odczytu jako lista napisów „numer: treść" albo jeden napis** — 1,33 i 1,16 razy tyle
+  znaków co goły tekst, wobec 2,34 przy liście obiektów; obiekty mają te same pola co wynik
+  szukania (`line`, `text`). Wraca, gdy pomiar pokaże, że koszt odczytów boli (p. 59).
+- **Flaga `truncated` albo sama para „żądane, oddane" w wyniku odczytu** — żadna nie mówi, czy
+  skończył się plik, czy zadziałał limit; mówią to `cut_by_limit` i `end_of_file`.
+- **Ucinanie długich linii i budżet znaków w odczycie pliku** — linii dłuższych niż 500 znaków
+  jest w paczce 72 na 1,18 mln, a okno 300 linii przekracza 20 tys. znaków w 25 plikach
+  z 11 424.
 - **Wynik `find_code_text` bez treści linii** — tak stało w planie z 2026-10-06, gdy odczyt pliku
   miał tworzyć źródło; odkąd tworzy je tylko cytowanie przyczyny, treść w szukaniu źródeł nie
   omija, a bez niej każde trafienie trzeba odczytać.
@@ -3252,13 +3314,16 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   zapisuje w metryczce gałąź z pliku kopii roboczej; którą gałąź indeksuje instancja, przechodzi
   do p. 65; reguły — „Kod aplikacji", „Warstwy kodu", „Warstwa narzędzi agenta", „Warstwa
   węzłów", „Logi i obserwowalność", „Testy".
-- [ ] **63. `read_code_file`** — plik albo zakres linii, z limitem linii na wywołanie
-  i informacją o ucięciu; źródeł nie tworzy, robi to `quote_code` (p. 67); opisy `quote_code`
-  i `find_code_text` dostają wtedy nazwy narzędzi odczytu, a prompty trzech grafów pełną regułę
-  „znajdź, przeczytaj, zacytuj" (dziś wstępna w dwóch, bez cytowania); ścieżka spoza paczki to
-  błąd wracający do modelu. *Dlaczego:*
-  po trafieniu trzeba zobaczyć, w jakiej klasie i metodzie leży linia, a główne kontrolery mają
-  po 3–4 tys. linii.
+- [x] **63. `read_code_file`** (2026-10-09) — `ReadCodeFileTool` na paczce kodu: plik albo
+  zakres linii z numerami, do 300 linii na wywołanie, zakres żądany obok oddanego i flagi
+  `cut_by_limit` i `end_of_file`; narzędzie pomocnicze, bez źródeł, limit 10 odczytów na sprawę;
+  opisy `quote_code` i `find_code_text` z nazwą odczytu, pełna reguła „znajdź, przeczytaj,
+  zacytuj" w promptach `search`, `suggest_questions` i `suggest_solution`; sekcja
+  `read_code_file` zestawu syntetycznego dopasowana; na żywym `gpt-6.1-sol` droga szukanie →
+  odczyt → cytowanie przeszła w testach grafów i w sondzie na aplikacji syntetycznej, bez
+  osiągnięcia limitu linii; raport zużycia w testach wypisuje wywołania narzędzi
+  z argumentami; reguły — „Kod aplikacji", „Warstwa narzędzi agenta", „Warstwa węzłów",
+  „Testy", „Świadomie pominięte".
 - [ ] **64. `list_code_files`** — drzewo katalogu z opcjonalną głębokością, z limitem pozycji.
   *Dlaczego:* szukanie bez komunikatu i bez kodu błędu, po wskazówkach z opisu projektu.
 - [ ] **65. `describe_code`** — opis projektu w całości, raz na sprawę; szkic pisze model
@@ -3351,9 +3416,9 @@ każdy mierzy się osobno.
   zwrotu), ewaluacja per reguła, złośliwy zestaw reguł w teście-strażniku. *Dlaczego:* fałszywy
   alarm uczy obchodzić bramkę odruchowo, a „bramka ma 90%" nie mówi, która reguła się sypie.
 - [ ] **23. `search`** — prompt pętli (jak pytać każde narzędzie, kiedy materiał wystarcza
-  i kiedy sięgać po kod aplikacji — dziś prompt o nim nie mówi i model po niego nie sięga;
-  reguła ma zachęcać do kodu częściej niż wstępna z 2026-10-09: także wtedy, gdy sprawa wygląda
-  na związaną z działaniem kodu albo z logiką biznesową, nie tylko gdy niesie komunikat);
+  i kiedy sięgać po kod aplikacji — reguła z p. 63 ma wąski warunek: komunikat, wpis z logu
+  albo kod błędu; ma zachęcać do kodu częściej: także wtedy, gdy sprawa wygląda na związaną
+  z działaniem kodu albo z logiką biznesową);
   pomiar pętli wobec wszystkich narzędzi naraz (tryb bez pętli zostaje jako odniesienie i tryb
   awaryjny), w zestawie klastry wieloprzyczynowe; osobna oś — trafność zapytań pisanych przez
   agenta wobec zapytań z parsera korpusu (golden set, `recall@1` i MRR; punkt odniesienia to pola

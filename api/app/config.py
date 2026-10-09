@@ -182,6 +182,10 @@ class Settings(BaseSettings):
     # miejsca, które go wywołuje, idzie się po nazwach, kilkoma szukaniami z rzędu. W sondzie
     # z 2026-10-07 limit 10 wyczerpał się w 5 sprawach z 9.
     agent_max_calls_find_code_text:      int = Field(default=10, ge=1)
+    # Odczyt pliku kodu też ma 10, choć jedno wywołanie oddaje do 300 linii: po szukaniu model
+    # czyta otoczenie każdej trafionej linii. W sondzie z 2026-10-07 było to 4–10 odczytów na
+    # sprawę, przy 150 liniach na odczyt.
+    agent_max_calls_read_code_file:      int = Field(default=10, ge=1)
     # Cytowanie kodu: jedno wywołanie to jeden fragment, więc limit jest liczbą cytowań w sprawie.
     agent_max_calls_quote_code:          int = Field(default=5, ge=1)
 
@@ -191,7 +195,7 @@ class Settings(BaseSettings):
     # Domyka to, czego limity narzędzi nie domykają: wywołanie ponad limit narzędzia dostaje
     # odmowę, ale turę zużywa, więc model wołający w kółko zużywałby tokeny bez końca.
     # 20 to zapas, nie cel: sprawa w sondach z 2026-10-04 to 4–7 tur, a limity narzędzi pozwalają
-    # na 47 wywołań, które model zwykle grupuje po kilka na turę. Ucięcie sprawy kosztuje
+    # na 57 wywołań, które model zwykle grupuje po kilka na turę. Ucięcie sprawy kosztuje
     # więcej niż kilka tur zapasu.
     agent_max_iterations: int = Field(default=20, ge=1)
 

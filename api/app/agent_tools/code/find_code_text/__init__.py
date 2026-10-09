@@ -18,8 +18,8 @@ Przykład zapytania i wyniku — w opisie `tool.py`; przykład tekstu, który cz
 `base.py`.
 
 Wynik niesie treść trafionej linii, inaczej niż wyszukiwania zgłoszeń i dokumentacji: bez niej
-model nie odróżni definicji od setek użyć tej samej nazwy. Narzędzi, którymi model czyta
-otoczenie linii, jeszcze nie ma (CLAUDE.md -> p. 63–66).
+model nie odróżni definicji od setek użyć tej samej nazwy. Otoczenie trafionej linii model
+czyta narzędziem `read_code_file`.
 """
 
 from app.agent_tools.code.find_code_text.base import FindCodeTextToolBase, shorten_line

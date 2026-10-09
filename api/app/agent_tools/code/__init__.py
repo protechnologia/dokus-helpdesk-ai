@@ -9,12 +9,13 @@ model wskazuje fragment powodujący opisane zachowanie.
 |-------------------|------------------------------------------------------------------------|
 | `fake_code.py`    | zmyślone pliki, na których stoją atrapy narzędzi kodu                  |
 | `find_code_text/` | szukanie linii z podanym tekstem: ścieżka, numer i treść linii         |
+| `read_code_file/` | odczyt pliku albo zakresu linii, z numerami; źródeł nie tworzy         |
 | `quote_code/`     | cytowanie fragmentu pliku: przyczyna trafia na listę źródeł odpowiedzi |
 
 Narzędzia właściwe stoją na paczce kodu na dysku (`CodePackage` z
 `core_service/loader_code_package.py`), bez bazy; szuka w niej program ripgrep, uruchamiany
-przez `engine_process/`. Odczyt pliku i symbolu, spis katalogu i opis projektu dojdą jako kolejne
-katalogi (CLAUDE.md -> p. 63–66).
+przez `engine_process/`. Odczyt symbolu, spis katalogu i opis projektu dojdą jako kolejne
+katalogi (CLAUDE.md -> p. 64–66).
 
 Narzędzie importuje się z jego pakietu
 (`from app.agent_tools.code.quote_code import QuoteCodeTool`), nie stąd.

@@ -2,7 +2,7 @@
 Description:
 Buduje narzędzia agenta na prawdziwych zależnościach, z konfiguracji: jeden klient embeddera,
 jeden Qdranta i jeden Postgresa, a na nich osiem narzędzi, oraz paczka kodu aplikacji na dysku
-z dwoma: jedno w niej szuka programem ripgrep, drugie ją cytuje.
+z trzema: jedno w niej szuka programem ripgrep, drugie czyta jej pliki, trzecie ją cytuje.
 
 | narzędzie             | na czym stoi                                         |
 |-----------------------|------------------------------------------------------|
@@ -15,6 +15,7 @@ z dwoma: jedno w niej szuka programem ripgrep, drugie ją cytuje.
 | `find_docs_text`      | tabela dokumentacji w Postgresie                     |
 | `read_docs`           | tabela dokumentacji w Postgresie                     |
 | `find_code_text`      | paczka kodu aplikacji i program ripgrep              |
+| `read_code_file`      | paczka kodu aplikacji na dysku (`CODE_PACKAGE_DIR`)  |
 | `quote_code`          | paczka kodu aplikacji na dysku (`CODE_PACKAGE_DIR`)  |
 
 Do czego:
@@ -27,7 +28,7 @@ O czym pamiętać przy zmianach:
 - Narzędzia buduje się raz na proces, nie na żądanie. Postgres ładuje słownik w każdej sesji
   (około 0,6 s), więc klient musi trzymać pulę połączeń między żądaniami.
 - Budowa nie łączy się z niczym i nie dotyka dysku — połączenia powstają przy pierwszym użyciu
-  narzędzia, a brak paczki kodu albo ripgrepa wychodzi przy pierwszym szukaniu lub cytowaniu.
+  narzędzia, a brak paczki kodu albo ripgrepa wychodzi przy pierwszym użyciu narzędzia kodu.
 - Kolejność listy jest kolejnością `TOOL_NAMES` grafów. Model dostaje definicje narzędzi w tej
   kolejności w każdej turze, a stały początek żądania to warunek cache promptu.
 - Kto zbudował narzędzia, ten je zamyka: `aclose()` każdego z nich. Klienci są wspólni, więc
@@ -39,6 +40,7 @@ O czym pamiętać przy zmianach:
 from app.agent_tools.base import AgentTool
 from app.agent_tools.code.find_code_text import FindCodeTextTool
 from app.agent_tools.code.quote_code import QuoteCodeTool
+from app.agent_tools.code.read_code_file import ReadCodeFileTool
 from app.agent_tools.docs.find_docs_text import FindDocsTextTool
 from app.agent_tools.docs.find_docs_vector import FindDocsVectorTool
 from app.agent_tools.docs.list_docs import ListDocsTool
@@ -70,7 +72,7 @@ def build_agent_tools(
     Example result:
         [FindTicketsVectorTool(…), FindTicketsTextTool(…), ReadTicketsCardTool(…),
          ReadTicketsThreadTool(…), ListDocsTool(…), FindDocsVectorTool(…), FindDocsTextTool(…),
-         ReadDocsTool(…), FindCodeTextTool(…), QuoteCodeTool(…)]
+         ReadDocsTool(…), FindCodeTextTool(…), ReadCodeFileTool(…), QuoteCodeTool(…)]
 
     Raises:
         EmbeddingConfigError: pusty adres embeddera
@@ -133,6 +135,7 @@ def build_agent_tools(
         FindDocsTextTool(docs=docs_sections, limit=settings.rag_top_k),
         ReadDocsTool(docs=docs_sections),
         FindCodeTextTool(package=code, ripgrep=ripgrep),
+        ReadCodeFileTool(package=code),
         QuoteCodeTool(package=code),
     ]
 
