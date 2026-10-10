@@ -2399,9 +2399,12 @@ dobre rozwiązanie: pierwsze mają trafiać w niewiadome, drugie w sprawdzony kr
 Zestaw to **syntetyczne zapytania**, nie pary historycznych zgłoszeń: produkt bierze nowe
 zgłoszenie i szuka podobnych, więc para `ticket ↔ ticket` mierzyłaby coś, czego produkt nie robi.
 Uboczny zysk: znika problem singletonów (47% rekordów nie ma bliskiego sąsiada), bo **zapytanie
-dostaje każdy rekord**. Pliki: `data/unsafe/golden/golden200.json` (162 zapytania + 38 odrzuceń
-z powodem), korpus `data/unsafe/parsed/bielik-11b-golden200/` (200 artefaktów) i dystraktory
-`data/unsafe/golden/distractors.json` — materiał wielokrotnego użytku przy każdej zmianie modelu.
+dostaje każdy rekord**. Pliki: `data/unsafe/golden/tickets-dokus.json` (162 zapytania
+i 38 odrzuceń z powodem; do 2026-10-10 `golden200.json`), korpus
+`data/unsafe/parsed/bielik-11b-golden200/` (200 artefaktów) i dystraktory
+`data/unsafe/golden/tickets-dokus-distractors.json` (wcześniej `distractors.json`) — materiał
+wielokrotnego użytku przy każdej zmianie modelu. „Golden200" zostaje nazwą próbki 200 zgłoszeń
+i katalogu z jej kartami.
 
 - **Każde zapytanie ma dwa kształty: `query_raw` i `query_problem` + `query_symptoms`** (dopisane
   2026-10-03, także w dystraktorach). Drugi to kształt narzędzia `find_tickets_vector`, napisany
@@ -2495,7 +2498,7 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
   per kandydat na próg), `... detail --threshold 0.48` (co ten próg robi z każdym dystraktorem
   i które trafienia poprawne kosztuje) oraz `... plot` (wykres obu rozkładów z linią progu do
   `data/unsafe/docs/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz
-  `data/unsafe/golden/distractors.json`; sam golden set mierzy tylko połowę rozkładu
+  `data/unsafe/golden/tickets-dokus-distractors.json`; sam golden set mierzy tylko połowę rozkładu
 
 **Komendy na grafach** (bramki, propozycje, „Popraw", wyszukiwanie, karta zgłoszenia) dojdą
 w p. 46.
@@ -3408,6 +3411,19 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   w obu sprawach, które tego wymagały, i w żadnej, która nie wymagała; szukanie bez
   komunikatu, po opisie projektu, przechodzi do p. 65; reguły — „Kod aplikacji", „Warstwa
   narzędzi agenta", „Warstwa węzłów", „Testy", „Świadomie pominięte".
+- [ ] **70. `search` jako rozpoznanie dla operatora** (dopisany 2026-10-10, numer spoza
+  kolejności) — prompt wymienia trzy materiały na równi (zgłoszenia, instrukcje, kod aplikacji)
+  i mówi, po co jest wynik: operator ma na jego podstawie zdecydować, czy dopytać, odpowiedzieć,
+  czy przekazać sprawę; warunek sięgnięcia po kod szerszy niż komunikat, wpis z logu i kod
+  błędu — także sprawa, która wygląda na związaną z działaniem aplikacji; odpowiedź `/search`
+  dostaje krótkie uwagi dla operatora: co agent znalazł w każdym materiale, czy przeczytane
+  sprawy zgadzają się co do przyczyny, czego szukał i nie znalazł, co wykluczył w kodzie;
+  guzika uwagi nie wskazują; sprawdzenie sondą na zmyślonych sprawach, a pomiar na prawdziwych
+  zostaje w p. 23. *Dlaczego:* dziś rola w prompcie mówi tylko o zgłoszeniach i instrukcjach,
+  a wynik to sama lista źródeł: pięć spraw o jednym objawie i pięciu przyczynach wygląda tak
+  samo jak pięć zgodnych, a to rozstrzyga, czy pytać, czy odpowiadać. Cena do policzenia:
+  droga przez kod dokłada 2–3 tury (dziś wyszukiwanie to około 5 tur i 0,02 USD), a uwagi są
+  pierwszym tekstem modelu w odpowiedzi tej trasy.
 - [ ] **65. `describe_code`** — opis projektu w całości, raz na sprawę; szkic pisze model
   z kodu, poprawia programista Dokusa, plik leży w paczce; opis nazywa wprost połączenia idące
   przez napis, których mapa symboli nie zna (które zdarzenie obsługuje która funkcja); do
@@ -3516,6 +3532,18 @@ każdy mierzy się osobno.
   („KOMENTARZ", rola, data). *Dlaczego:*
   najgroźniejszy błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach
   (e-Doręczenia: 6 zgłoszeń, 6 przyczyn), a zapytanie agenta nie powstaje już promptem korpusu.
+- [ ] **71. Ustalenia z `search` jako wejście `/suggest`** (dopisany 2026-10-10, numer spoza
+  kolejności) — wariant z pętlą (`questions`, `solution`) przyjmuje opcjonalnie wynik
+  wyszukiwania: identyfikatory źródeł, które operator zostawił, i uwagi z p. 70; graf odczytuje
+  te źródła narzędziami, więc lista źródeł nadal powstaje z odczytu (zasada 9), i może szukać
+  dalej; bez wyniku wyszukiwania wariant działa jak dziś; do rozstrzygnięcia: czy operator
+  odznacza źródła przed generacją (etykieta do feedbacku, p. 42), co dostaje `handoff`, który
+  nie ma pętli (p. 27), i czy uwagi z wyszukiwania wchodzą do promptu jako dane; pomiar: koszt
+  i jakość wariantu z ustaleniami wobec wariantu, który szuka sam. *Dlaczego:* dziś każdy guzik
+  szuka od nowa, więc ta sama praca jest opłacana dwa razy, a propozycja może stanąć na innych
+  sprawach niż te, które operator widział w wyszukiwaniu; punkt wraca do decyzji z 2026-10-02
+  („każda funkcja ma własną pętlę"). Stoi po p. 23, bo potrzebuje zmierzonego wyszukiwania,
+  a przed p. 25–26, żeby warianty były mierzone już w docelowym kształcie.
 - [ ] **24. `parse_ticket`** — karta zgłoszenia promptem parsującym na modelu docelowym, porównana z
   próbkami z `porownanie-modeli-parsowania.md` (zbierane jeszcze JSON-em w tekście — od 2026-10-02
   karta wychodzi narzędziem `respond_parse_ticket`). *Dlaczego:* ten sam prompt buduje korpus przy

@@ -17,8 +17,9 @@ a testy jednostkowe i integracyjne na trzech zmyślonych zgłoszeniach tego nie 
 
 Co się dzieje po drodze:
 
-1. Czyta zapytania z `data/unsafe/golden/golden200.json` (162, każde ze wskazanym rekordem-celem)
-   i z `data/unsafe/golden/distractors.json` (16, bez odpowiednika w indeksie).
+1. Czyta zapytania z `data/unsafe/golden/tickets-dokus.json` (162, każde ze wskazanym
+   rekordem-celem) i z `data/unsafe/golden/tickets-dokus-distractors.json` (16, bez odpowiednika
+   w indeksie).
 2. Każde wysyła do `FindTicketsVectorTool` polami `query_problem` i `query_symptoms`, na
    skonfigurowanej kolekcji, z `RAG_TOP_K` i `RAG_SCORE_MIN` z konfiguracji.
 3. Liczy, ile razy rekord-cel wrócił jako pierwszy, ile razy wrócił w ogóle i ile dystraktorów
@@ -62,8 +63,8 @@ pytestmark = [
 ]
 
 # Zapytania z rekordem-celem i zapytania bez odpowiednika w indeksie.
-GOLDEN_FILE      = Path("data/unsafe/golden/golden200.json")
-DISTRACTORS_FILE = Path("data/unsafe/golden/distractors.json")
+GOLDEN_FILE      = Path("data/unsafe/golden/tickets-dokus.json")
+DISTRACTORS_FILE = Path("data/unsafe/golden/tickets-dokus-distractors.json")
 
 # Zmierzone 152 ze 162; próg niżej, żeby wyłapać zepsutą ścieżkę, a nie zwykły dryf.
 MIN_TARGET_FIRST = 145

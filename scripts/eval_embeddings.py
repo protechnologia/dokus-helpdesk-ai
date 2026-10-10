@@ -21,7 +21,7 @@ Co liczy:
 
 Przykład wyjścia (PolDense-150M, przebieg z 2026-10-05):
 
-    Golden set: golden200.json
+    Golden set: tickets-dokus.json
       zapytań: 162, korpus: 200 rekordów (z dystraktorami)
       długość zapytania: mediana 138 zn.
 
@@ -98,7 +98,7 @@ sys.path.insert(0, str(REPO_ROOT / "api"))
 
 from app.core_model.tickets.parsed_ticket import ParsedTicket  # noqa: E402  (po sys.path)
 
-DEFAULT_GOLDEN = REPO_ROOT / "data" / "unsafe" / "golden" / "golden200.json"
+DEFAULT_GOLDEN = REPO_ROOT / "data" / "unsafe" / "golden" / "tickets-dokus.json"
 
 # Tryby prefiksów PER MODEL. Klucz to nazwa modelu na HF, wartość to mapowanie
 # rola -> prefiks. `document` jest tym, co w naszym kontrakcie nazywa się `passage`.
@@ -350,7 +350,7 @@ def recall(
     which of them wins is genuinely open (CLAUDE.md -> „Embeddingi").
 
     Example args:
-        golden=Path("data/unsafe/golden/golden200.json")
+        golden=Path("data/unsafe/golden/tickets-dokus.json")
         models=["OPI-PIB/PolDense-150M"]
         k=5
         batch=32
