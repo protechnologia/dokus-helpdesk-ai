@@ -254,7 +254,8 @@ class AuxiliaryTool(ABC):
     """
     Description:
     Narzędzie, które agent woła po coś innego niż materiał do cytowania: wyszukiwarki zgłoszeń,
-    dokumentacji i kodu, spis treści dokumentacji, odczyt pliku kodu, a później notatki agenta.
+    dokumentacji i kodu, spis treści dokumentacji, spis katalogu i odczyt pliku kodu, a później
+    notatki agenta.
 
     Do czego:
     Drugi rodzaj narzędzia agenta, oddzielony od `KnowledgeSource` z samej konstrukcji: zwraca

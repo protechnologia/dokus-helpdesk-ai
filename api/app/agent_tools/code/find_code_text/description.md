@@ -13,8 +13,9 @@
      i `MAX_TEXT_CHARS` z `models.py`, a „trzy znaki" przy `words` to
      `MIN_LONGEST_WORD_CHARS`; pilnuje ich test opisu.
 
-     Zasady wymieniają po nazwie odczyt pliku (`read_code_file`);
-     odczyt symbolu dojdzie razem z nim (p. 66).
+     Zasady wymieniają po nazwie odczyt pliku (`read_code_file`)
+     i spis katalogu (`list_code_files`); odczyt symbolu dojdzie
+     razem z nim (p. 66).
 
      Zmiana dotyczy wszystkich grafów naraz, więc po strojeniu jednego
      trzeba przemierzyć pozostałe (p. 23, 25–26).
@@ -63,6 +64,7 @@ JSON z liniami kodu:
 - Wynik ma najwyżej 20 linii; pasujące ponad limit są tylko
   policzone w `omitted_over_limit`. Wartość większa od zera znaczy,
   że trzeba zawęzić: dłuższą frazą albo katalogiem w `path`.
+  Katalogi kodu pokazuje narzędzie `list_code_files`.
 - `text` to jedna linia, ucięta po 200 znakach (kończy się wtedy
   znakiem „…"). Pokazuje, gdzie tekst stoi, a nie w jakim warunku
   kod do niego dochodzi. Otoczenie linii przeczytaj narzędziem

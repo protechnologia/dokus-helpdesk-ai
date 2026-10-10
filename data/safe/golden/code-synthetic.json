@@ -8,12 +8,12 @@
       "source": "data/safe/code/source"
     },
     "rules": [
-      "Aplikacja jest ZMYŚLONA; każda pułapka odpowiada czemuś widzianemu w prawdziwym kodzie.",
+      "Aplikacja jest ZMYŚLONA; każda pułapka odpowiada czemuś widzianemu w prawdziwym kodzie. Wyjątek: katalog szablonów z nadmiarowym plikiem (src/lib/Urzad/Szablony) nie ma odpowiednika w prawdziwym kodzie — powstał, żeby spis katalogu miał sprawę, której nie rozstrzyga szukanie: komunikat nie podaje nazwy pliku, a nazwa nie stoi w żadnej linii kodu.",
       "Sekcja na narzędzie: zapytanie w kształcie narzędzia i oczekiwany wynik. Kształty pochodzą z planu (p. 62–67) i z prototypów sondy z 2026-10-07; przy budowie każdego narzędzia jego sekcję dopasowuje się do modelu zapytania.",
       "Miejsce w kodzie to ścieżka i stały fragment linii, bez numeru linii. Pola z końcówką _at (from_at, to_at) niosą fragment, z którego test wylicza numer linii.",
       "find_code_text: expected to komplet trafień (ścieżka i fragment linii), w dowolnej kolejności; pusta lista znaczy brak trafień, a matched_by przy trafieniu mówi, czym ma być znalezione. expected_total i expected_files opisują zapytanie, które przekracza limit pozycji. expected z error: true znaczy błąd wracający do modelu.",
       "read_code_file i read_code_symbol: contains i lacks to fragmenty, które wynik ma zawierać albo których ma nie zawierać; error: true znaczy błąd wracający do modelu. W read_code_file cut_by_limit i end_of_file to flagi oddanego zakresu: czy odczyt urwał limit linii i czy kończy się na ostatniej linii pliku.",
-      "list_code_files: includes i lacks to nazwy pozycji katalogu.",
+      "list_code_files: includes i lacks to pełne ścieżki pozycji, które spis ma zawierać albo których ma nie zawierać; path to ścieżka katalogu w wyniku, depth to oddana głębokość, a has_more_depth mówi, czy katalog sięga głębiej, niż pokazuje spis; error: true znaczy błąd wracający do modelu.",
       "quote_code: source mówi, czy cytowanie trafia na listę źródeł (tylko rola cause); returns_text: false znaczy, że narzędzie nie oddaje treści linii.",
       "absent_paths: pliki ze źródła, których paczka nie może zawierać; odczyt (read_code_file) oddaje błąd.",
       "Zestaw stoi na paczce zbudowanej ze źródła skryptem; test bez zbudowanej paczki nie ma na czym stanąć."
@@ -270,6 +270,27 @@
       "expected": {
         "error": true
       }
+    },
+    {
+      "id": "f19",
+      "phenomenon": "komunikat o nadmiarowym pliku: stoi w kodzie raz i nie podaje nazwy pliku",
+      "query": {
+        "exact": "znajduje się nadmiarowy plik"
+      },
+      "expected": [
+        {
+          "path": "src/lib/Urzad/Szablony/RejestrSzablonow.php",
+          "fragment": "W katalogu szablonów pism znajduje się nadmiarowy plik"
+        }
+      ]
+    },
+    {
+      "id": "f20",
+      "phenomenon": "nazwa pliku, która nie stoi w żadnej linii kodu: szukanie jej nie znajdzie, pokazuje ją tylko spis katalogu",
+      "query": {
+        "exact": "wezwanie_stare"
+      },
+      "expected": []
     }
   ],
   "read_code_file": [
@@ -511,67 +532,83 @@
       "id": "l01",
       "phenomenon": "katalog z biblioteką zewnętrzną i plikiem zminifikowanym obok",
       "query": {
-        "path": "src/web/js"
+        "path": "src/web/js",
+        "depth": 1
       },
       "expected": {
+        "path": "src/web/js",
         "includes": [
-          "_global",
-          "archiwum",
-          "pisma",
-          "sprawy"
+          "src/web/js/_global",
+          "src/web/js/archiwum",
+          "src/web/js/pisma",
+          "src/web/js/sprawy"
         ],
         "lacks": [
-          "_vendor",
-          "kalendarz.min.js"
-        ]
+          "src/web/js/_vendor",
+          "src/web/js/kalendarz.min.js",
+          "src/web/js/_global/bledy.js"
+        ],
+        "depth": 1,
+        "has_more_depth": true
       }
     },
     {
       "id": "l02",
       "phenomenon": "katalog z biblioteką zewnętrzną",
       "query": {
-        "path": "src/lib"
+        "path": "src/lib",
+        "depth": 1
       },
       "expected": {
+        "path": "src/lib",
         "includes": [
-          "Urzad",
-          "task"
+          "src/lib/Urzad",
+          "src/lib/task"
         ],
         "lacks": [
-          "vendor"
-        ]
+          "src/lib/vendor"
+        ],
+        "depth": 1,
+        "has_more_depth": true
       }
     },
     {
       "id": "l03",
       "phenomenon": "katalog z cache obok",
       "query": {
-        "path": "src/apps/frontend"
+        "path": "src/apps/frontend",
+        "depth": 1
       },
       "expected": {
+        "path": "src/apps/frontend",
         "includes": [
-          "config",
-          "modules",
-          "templates"
+          "src/apps/frontend/config",
+          "src/apps/frontend/modules",
+          "src/apps/frontend/templates"
         ],
         "lacks": [
-          "cache"
-        ]
+          "src/apps/frontend/cache"
+        ],
+        "depth": 1,
+        "has_more_depth": true
       }
     },
     {
       "id": "l04",
-      "phenomenon": "katalog konfiguracji: wchodzi routing, nie wchodzi plik z hasłem",
+      "phenomenon": "katalog konfiguracji: wchodzi routing, nie wchodzi plik z hasłem; katalog płytszy niż domyślna głębokość",
       "query": {
         "path": "src/apps/frontend/config"
       },
       "expected": {
+        "path": "src/apps/frontend/config",
         "includes": [
-          "routing.yml"
+          "src/apps/frontend/config/routing.yml"
         ],
         "lacks": [
-          "app.yml"
-        ]
+          "src/apps/frontend/config/app.yml"
+        ],
+        "depth": 1,
+        "has_more_depth": false
       }
     },
     {
@@ -582,6 +619,151 @@
       },
       "expected": {
         "error": true
+      }
+    },
+    {
+      "id": "l06",
+      "phenomenon": "bez argumentów: dwa poziomy od katalogu głównego kodu",
+      "query": {},
+      "expected": {
+        "path": ".",
+        "includes": [
+          "src",
+          "src/apps",
+          "src/config",
+          "src/lib",
+          "src/web"
+        ],
+        "lacks": [
+          "src/web/js",
+          "src/web/index.php"
+        ],
+        "depth": 2,
+        "has_more_depth": true
+      }
+    },
+    {
+      "id": "l07",
+      "phenomenon": "dwa poziomy: podkatalogi razem ze swoimi plikami",
+      "query": {
+        "path": "src/lib/Urzad/Wysylka",
+        "depth": 2
+      },
+      "expected": {
+        "path": "src/lib/Urzad/Wysylka",
+        "includes": [
+          "src/lib/Urzad/Wysylka/Edoreczenia",
+          "src/lib/Urzad/Wysylka/Edoreczenia/PobieranieSkrzynki.php",
+          "src/lib/Urzad/Wysylka/Epuap",
+          "src/lib/Urzad/Wysylka/Epuap/WysylkaEpuap.php",
+          "src/lib/Urzad/Wysylka/LimitZalacznika.php"
+        ],
+        "lacks": [],
+        "depth": 2,
+        "has_more_depth": false
+      }
+    },
+    {
+      "id": "l08",
+      "phenomenon": "głębokość większa, niż ma katalog: spis do końca, nie błąd",
+      "query": {
+        "path": "src/lib/Urzad/Wysylka",
+        "depth": 9
+      },
+      "expected": {
+        "path": "src/lib/Urzad/Wysylka",
+        "includes": [
+          "src/lib/Urzad/Wysylka/Epuap/WysylkaEpuap.php"
+        ],
+        "lacks": [],
+        "depth": 2,
+        "has_more_depth": false
+      }
+    },
+    {
+      "id": "l09",
+      "phenomenon": "katalog zapisany przez ..: ścieżka wraca w jednej postaci",
+      "query": {
+        "path": "src/lib/Urzad/../task",
+        "depth": 1
+      },
+      "expected": {
+        "path": "src/lib/task",
+        "includes": [
+          "src/lib/task/pobierzEdoreczeniaTask.class.php"
+        ],
+        "lacks": [],
+        "depth": 1,
+        "has_more_depth": false
+      }
+    },
+    {
+      "id": "l10",
+      "phenomenon": "plik zamiast katalogu",
+      "query": {
+        "path": "src/web/index.php"
+      },
+      "expected": {
+        "error": true
+      }
+    },
+    {
+      "id": "l11",
+      "phenomenon": "ścieżka wychodząca poza paczkę",
+      "query": {
+        "path": "../../../.."
+      },
+      "expected": {
+        "error": true
+      }
+    },
+    {
+      "id": "l12",
+      "phenomenon": "głębokość zero",
+      "query": {
+        "path": "src",
+        "depth": 0
+      },
+      "expected": {
+        "error": true
+      }
+    },
+    {
+      "id": "l13",
+      "phenomenon": "katalog szablonów z plikiem spoza listy typów: nazwę pliku pokazuje tylko spis",
+      "query": {
+        "path": "src/lib/Urzad/Szablony/pisma",
+        "depth": 1
+      },
+      "expected": {
+        "path": "src/lib/Urzad/Szablony/pisma",
+        "includes": [
+          "src/lib/Urzad/Szablony/pisma/decyzja.twig",
+          "src/lib/Urzad/Szablony/pisma/wezwanie.twig",
+          "src/lib/Urzad/Szablony/pisma/wezwanie_stare.twig",
+          "src/lib/Urzad/Szablony/pisma/zawiadomienie.twig"
+        ],
+        "lacks": [],
+        "depth": 1,
+        "has_more_depth": false
+      }
+    },
+    {
+      "id": "l14",
+      "phenomenon": "klasa i katalog, który ona sprawdza, w jednym spisie o domyślnej głębokości",
+      "query": {
+        "path": "src/lib/Urzad/Szablony"
+      },
+      "expected": {
+        "path": "src/lib/Urzad/Szablony",
+        "includes": [
+          "src/lib/Urzad/Szablony/RejestrSzablonow.php",
+          "src/lib/Urzad/Szablony/pisma",
+          "src/lib/Urzad/Szablony/pisma/wezwanie_stare.twig"
+        ],
+        "lacks": [],
+        "depth": 2,
+        "has_more_depth": false
       }
     }
   ],

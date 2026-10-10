@@ -2,7 +2,8 @@
 Description:
 Buduje narzędzia agenta na prawdziwych zależnościach, z konfiguracji: jeden klient embeddera,
 jeden Qdranta i jeden Postgresa, a na nich osiem narzędzi, oraz paczka kodu aplikacji na dysku
-z trzema: jedno w niej szuka programem ripgrep, drugie czyta jej pliki, trzecie ją cytuje.
+z czterema: jedno w niej szuka programem ripgrep, drugie spisuje jej katalogi, trzecie czyta jej
+pliki, czwarte ją cytuje.
 
 | narzędzie             | na czym stoi                                         |
 |-----------------------|------------------------------------------------------|
@@ -15,6 +16,7 @@ z trzema: jedno w niej szuka programem ripgrep, drugie czyta jej pliki, trzecie 
 | `find_docs_text`      | tabela dokumentacji w Postgresie                     |
 | `read_docs`           | tabela dokumentacji w Postgresie                     |
 | `find_code_text`      | paczka kodu aplikacji i program ripgrep              |
+| `list_code_files`     | paczka kodu aplikacji na dysku (`CODE_PACKAGE_DIR`)  |
 | `read_code_file`      | paczka kodu aplikacji na dysku (`CODE_PACKAGE_DIR`)  |
 | `quote_code`          | paczka kodu aplikacji na dysku (`CODE_PACKAGE_DIR`)  |
 
@@ -39,6 +41,7 @@ O czym pamiętać przy zmianach:
 
 from app.agent_tools.base import AgentTool
 from app.agent_tools.code.find_code_text import FindCodeTextTool
+from app.agent_tools.code.list_code_files import ListCodeFilesTool
 from app.agent_tools.code.quote_code import QuoteCodeTool
 from app.agent_tools.code.read_code_file import ReadCodeFileTool
 from app.agent_tools.docs.find_docs_text import FindDocsTextTool
@@ -72,7 +75,8 @@ def build_agent_tools(
     Example result:
         [FindTicketsVectorTool(…), FindTicketsTextTool(…), ReadTicketsCardTool(…),
          ReadTicketsThreadTool(…), ListDocsTool(…), FindDocsVectorTool(…), FindDocsTextTool(…),
-         ReadDocsTool(…), FindCodeTextTool(…), ReadCodeFileTool(…), QuoteCodeTool(…)]
+         ReadDocsTool(…), FindCodeTextTool(…), ListCodeFilesTool(…), ReadCodeFileTool(…),
+         QuoteCodeTool(…)]
 
     Raises:
         EmbeddingConfigError: pusty adres embeddera
@@ -135,6 +139,7 @@ def build_agent_tools(
         FindDocsTextTool(docs=docs_sections, limit=settings.rag_top_k),
         ReadDocsTool(docs=docs_sections),
         FindCodeTextTool(package=code, ripgrep=ripgrep),
+        ListCodeFilesTool(package=code),
         ReadCodeFileTool(package=code),
         QuoteCodeTool(package=code),
     ]

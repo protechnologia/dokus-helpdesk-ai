@@ -24,6 +24,7 @@ import httpx
 
 from app.agent_tools import AgentTool
 from app.agent_tools.code.find_code_text.fake import FakeFindCodeTextTool
+from app.agent_tools.code.list_code_files.fake import FakeListCodeFilesTool
 from app.agent_tools.code.quote_code.fake import FakeQuoteCodeTool
 from app.agent_tools.code.read_code_file.fake import FakeReadCodeFileTool
 from app.agent_tools.docs.find_docs_text.fake import FakeFindDocsTextTool
@@ -66,6 +67,7 @@ def fake_agent_tools() -> list[AgentTool]:
         FakeFindDocsTextTool(),
         FakeReadDocsTool(),
         FakeFindCodeTextTool(),
+        FakeListCodeFilesTool(),
         FakeReadCodeFileTool(),
         FakeQuoteCodeTool(),
     ]
@@ -78,13 +80,13 @@ def fake_agent_tools_without_material() -> list[AgentTool]:
     Description:
     Atrapy wszystkich narzędzi agenta, w których nic nie ma do znalezienia: wyszukiwania zgłoszeń
     i dokumentacji oddają puste listy, spis dokumentacji jest pusty, szukanie w kodzie nic nie
-    znajduje, a odczyt i cytowanie kodu nie znają żadnego pliku. Odczyty zgłoszeń
+    znajduje, a spis katalogu, odczyt i cytowanie kodu nie znają żadnego pliku. Odczyty zgłoszeń
     i dokumentacji zostają takie same, ale model nie ma skąd wziąć identyfikatora, więc sprawa
     kończy się bez źródeł. Kolejność jak w `fake_agent_tools()`.
 
     Cytowanie kodu jest puste, bo przykład ścieżki w opisie `quote_code` to plik z wbudowanego
-    zestawu atrapy: model mógłby go zacytować na ślepo i dostać źródło. Szukanie i odczyt kodu
-    są puste z tego samego powodu: wbudowany wynik szukania wskazuje linie tych samych plików,
+    zestawu atrapy: model mógłby go zacytować na ślepo i dostać źródło. Szukanie, spis i odczyt
+    kodu są puste z tego samego powodu: wbudowany wynik szukania i spis wskazują te same pliki,
     a ten sam przykład ścieżki stoi w opisie `read_code_file`.
 
     Example args:
@@ -103,6 +105,7 @@ def fake_agent_tools_without_material() -> list[AgentTool]:
         FakeFindDocsTextTool(matched=[]),
         FakeReadDocsTool(),
         FakeFindCodeTextTool(lines=[]),
+        FakeListCodeFilesTool(files=[]),
         FakeReadCodeFileTool(files={}),
         FakeQuoteCodeTool(files={}),
     ]
@@ -114,17 +117,17 @@ def fake_agent_tools_with_code_only() -> list[AgentTool]:
     """
     Description:
     Atrapy wszystkich narzędzi agenta, w których materiał jest tylko w kodzie aplikacji:
-    wyszukiwania zgłoszeń i dokumentacji oddają puste listy, a szukanie w kodzie, odczyt pliku
-    i cytowanie stoją na wbudowanych zmyślonych plikach. Do sprawy, w której zgłoszenie niesie
-    komunikat, a nie tłumaczy go żadne zgłoszenie ani instrukcja. Kolejność jak
-    w `fake_agent_tools()`.
+    wyszukiwania zgłoszeń i dokumentacji oddają puste listy, a szukanie w kodzie, spis
+    katalogu, odczyt pliku i cytowanie stoją na wbudowanych zmyślonych plikach. Do sprawy,
+    w której zgłoszenie niesie komunikat, a nie tłumaczy go żadne zgłoszenie ani instrukcja.
+    Kolejność jak w `fake_agent_tools()`.
 
     Example args:
         (brak)
 
     Example result:
         [FakeFindTicketsVectorTool(tickets=[]), …, FakeFindCodeTextTool(),
-         FakeReadCodeFileTool(), FakeQuoteCodeTool()]
+         FakeListCodeFilesTool(), FakeReadCodeFileTool(), FakeQuoteCodeTool()]
     """
     tools: list[AgentTool] = [
         FakeFindTicketsVectorTool(tickets=[]),
@@ -136,6 +139,7 @@ def fake_agent_tools_with_code_only() -> list[AgentTool]:
         FakeFindDocsTextTool(matched=[]),
         FakeReadDocsTool(),
         FakeFindCodeTextTool(),
+        FakeListCodeFilesTool(),
         FakeReadCodeFileTool(),
         FakeQuoteCodeTool(),
     ]

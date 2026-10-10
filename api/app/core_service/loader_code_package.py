@@ -1,8 +1,9 @@
 """
 Description:
-Czyta pliki z paczki kodu aplikacji i pilnuje, żeby ścieżka podana przez model nie wyszła poza
-paczkę. Paczka to katalog zbudowany przez `scripts/build_code_package.py`: kod leży w `repo/`,
-obok stoi `manifest.json`. Nie woła żadnej usługi — kod zostaje w folderze, bez bazy.
+Czyta pliki z paczki kodu aplikacji, wylicza pliki jej katalogów i pilnuje, żeby ścieżka podana
+przez model nie wyszła poza paczkę. Paczka to katalog zbudowany przez
+`scripts/build_code_package.py`: kod leży w `repo/`, obok stoi `manifest.json`. Nie woła żadnej
+usługi — kod zostaje w folderze, bez bazy.
 
 Przed — ścieżka od modelu:
 
@@ -13,9 +14,11 @@ Po — ścieżka w paczce i linie pliku:
     package.locate(…)      →  "src/lib/Urzad/Numeracja/GeneratorNumeru.php"
     package.read_lines(…)  →  ["<?php", "", "namespace Urzad\\Numeracja;", …]
 
-Szukanie w kodzie przyjmuje też katalog, więc `locate()` ma flagę `allow_dir`:
+Szukanie w kodzie i spis katalogu przyjmują też katalog, więc `locate()` ma flagę `allow_dir`,
+a `list_files()` oddaje ścieżki wszystkich plików pod katalogiem:
 
     package.locate("src/web/../web/js", allow_dir=True)  →  "src/web/js"
+    package.list_files("src/web/js")  →  ["src/web/js/_global/bledy.js", "src/web/js/pisma/…", …]
 
 Co jest sprawdzane:
 
@@ -25,6 +28,7 @@ Co jest sprawdzane:
 | ścieżka wychodzi poza `repo/` (`..`, dowiązanie)       | `CodePathError`          |
 | pod ścieżką jest katalog, a flagi `allow_dir` nie ma   | `CodePathError`          |
 | pod ścieżką nic nie ma albo nie da się jej odczytać    | `CodePathError`          |
+| `list_files()` dostało ścieżkę pliku, nie katalogu     | `CodePathError`          |
 
 O czym pamiętać przy zmianach:
 
@@ -40,8 +44,11 @@ O czym pamiętać przy zmianach:
   i zamienia CRLF.
 - Samo szukanie tu nie mieszka: robi je program ripgrep, uruchamiany przez `engine_process/`.
   Stąd dostaje katalog z kodem (`repo_dir()`) i ścieżkę już sprawdzoną (`locate()`).
+- `list_files()` oddaje same pliki, a w dowiązania nie wchodzi i ich nie pokazuje. Katalogu
+  bez plików w wyniku nie ma: paczka powstaje z plików, więc pustych katalogów nie zawiera.
 """
 
+import os
 from pathlib import Path
 
 # Podkatalog paczki z kodem; obok niego stoi metryczka `manifest.json`.
@@ -62,9 +69,9 @@ class CodePackageConfigError(Exception):
 class CodePathError(Exception):
     """
     Description:
-    Ścieżka nie wskazuje pliku w paczce kodu: wychodzi poza paczkę, prowadzi do katalogu albo
-    donikąd. Komunikat powtarza ścieżkę w brzmieniu od wołającego i nadaje się do pokazania
-    modelowi.
+    Ścieżka nie wskazuje w paczce kodu tego, o co proszono: wychodzi poza paczkę, prowadzi
+    donikąd, do katalogu zamiast pliku albo do pliku zamiast katalogu. Komunikat powtarza
+    ścieżkę w brzmieniu od wołającego i nadaje się do pokazania modelowi.
     """
 
 
@@ -97,7 +104,8 @@ def split_lines(
 class CodePackage:
     """
     Description:
-    Paczka kodu aplikacji na dysku: znajduje w niej plik po ścieżce i oddaje jego linie.
+    Paczka kodu aplikacji na dysku: znajduje w niej plik po ścieżce, oddaje jego linie
+    i wylicza pliki katalogu.
 
     Do czego:
     Na niej stoją narzędzia agenta czytające kod (`agent_tools/code/`), tak jak narzędzia
@@ -108,7 +116,8 @@ class CodePackage:
         1. Konstruktor zapamiętuje katalog paczki; dysku nie dotyka.
         2. `locate()` sprawdza ścieżkę i oddaje ją w postaci względnej wobec `repo/`.
         3. `read_lines()` oddaje linie znalezionego pliku, bez znaków końca linii.
-        4. `repo_dir()` oddaje katalog z kodem temu, kto w nim szuka.
+        4. `list_files()` oddaje ścieżki plików leżących pod katalogiem, na każdej głębokości.
+        5. `repo_dir()` oddaje katalog z kodem temu, kto w nim szuka.
     """
 
     def __init__(
@@ -208,6 +217,57 @@ class CodePackage:
         text    = (self.repo_dir() / located).read_text(encoding="utf-8")
 
         return split_lines(text)
+
+    def list_files(
+        self,
+        path: str,  # np. "src/lib/Urzad/Wysylka"; "." to cały kod
+    ) -> list[str]:
+        """
+        Description:
+        Oddaje ścieżki wszystkich plików leżących pod katalogiem, na każdej głębokości: względne
+        wobec `repo/`, po kolei alfabetycznie. Z tych ścieżek widać też podkatalogi, więc spis
+        katalogu nie potrzebuje niczego więcej.
+
+        Pokazuje tylko zwykłe pliki. W dowiązania nie wchodzi i ich nie pokazuje: dowiązanie
+        mogłoby prowadzić poza paczkę, a plik spod takiej ścieżki i tak nie dałby się odczytać.
+
+        Example args:
+            path="src/lib/Urzad/Wysylka"
+
+        Example result:
+            ["src/lib/Urzad/Wysylka/Edoreczenia/PobieranieSkrzynki.php",
+             "src/lib/Urzad/Wysylka/Epuap/WysylkaEpuap.php",
+             "src/lib/Urzad/Wysylka/LimitZalacznika.php"]
+
+        Raises:
+            CodePathError: ścieżka wychodzi poza paczkę, wskazuje plik albo nic nie wskazuje
+            CodePackageConfigError: paczki nie ma pod skonfigurowaną ścieżką
+        """
+        repo      = self.repo_dir()
+        located   = self.locate(path, allow_dir=True)
+        directory = repo / located
+
+        # --- plik: spis ma sens tylko dla katalogu ---
+        if not directory.is_dir():
+            raise CodePathError(f"to plik, nie katalog: {path}")
+
+        # --- przejście po katalogach: bez rekurencji, katalogi do odwiedzenia czekają na liście ---
+        # Na napisach, nie na `Path`: przy kilkunastu tysiącach plików składanie obiektów
+        # ścieżek trwało ponad sekundę, a wycinanie początku napisu setne części.
+        skip    = len(str(repo)) + 1
+        files:   list[str] = []
+        pending: list[str] = [str(directory)]
+
+        while pending:
+            with os.scandir(pending.pop()) as entries:
+                for entry in entries:
+                    # Dowiązanie nie jest tu ani katalogiem, ani plikiem, więc wypada.
+                    if entry.is_dir(follow_symlinks=False):
+                        pending.append(entry.path)
+                    elif entry.is_file(follow_symlinks=False):
+                        files.append(entry.path[skip:].replace(os.sep, "/"))
+
+        return sorted(files)
 
     def repo_dir(self) -> Path:
         """

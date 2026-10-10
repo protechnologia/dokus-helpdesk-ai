@@ -18,8 +18,8 @@ Przykład zapytania i wyniku — w opisie `tool.py`; przykład tekstu, który cz
 flag `cut_by_limit` i `end_of_file` — w opisie `base.py`.
 
 Jedno wywołanie oddaje najwyżej `MAX_LINES_PER_READ` linii. Wynik niesie obok siebie zakres, o
-który agent prosił, i zakres, który dostał, bo to jedyne narzędzie, które może oddać mniej, niż
-żądano: gdy odczyt urwie limit albo skończy się plik.
+który agent prosił, i zakres, który dostał, bo narzędzie może oddać mniej, niż żądano: gdy
+odczyt urwie limit albo skończy się plik.
 """
 
 from app.agent_tools.code.read_code_file.base import (

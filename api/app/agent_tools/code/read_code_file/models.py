@@ -68,8 +68,8 @@ class RequestedLines(BaseModel):
     """
     Description:
     Zakres linii, o który agent prosił `read_code_file` — powtórzony w wyniku, żeby stał obok
-    zakresu oddanego (`ReturnedLines`). To jedyne narzędzie, które może oddać inny zakres niż
-    żądany, więc różnicę ma być widać w samym wyniku, bez sięgania do wywołania.
+    zakresu oddanego (`ReturnedLines`). Narzędzie może oddać inny zakres niż żądany, więc
+    różnicę ma być widać w samym wyniku, bez sięgania do wywołania.
     """
 
     model_config = ConfigDict(extra="forbid")

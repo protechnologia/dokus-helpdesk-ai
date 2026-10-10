@@ -246,6 +246,34 @@ async def test_of_code_found_read_and_quoted_only_the_quote_is_a_source(graph: M
     ]
 
 
+@pytest.mark.parametrize("graph", LOOP_GRAPHS, ids=name_of)
+async def test_a_code_listing_reaches_the_model_and_is_not_a_source(graph: ModuleType) -> None:
+    """Sprawdza w każdym grafie z narzędziami wiedzy, czy spis katalogu kodu wraca do modelu
+    w następnej turze z pełnymi ścieżkami pozycji, czy ścieżkę pliku ze spisu przyjmuje odczyt
+    pliku i czy ani spis, ani odczyt nie dokładają niczego do listy źródeł.
+
+    Wyłapuje graf, w którym spis katalogu nie jest dozwolony albo jego wynik nie wraca do
+    modelu, oraz spis, który zaczął tworzyć źródła: katalog zawsze da się obejrzeć, więc wariant
+    wymagający źródeł oddawałby rozwiązanie po samym rozejrzeniu się po kodzie."""
+    llm = FakeLLMClient(turns=[
+        tool_call_turn("list_code_files", {"path": "src/lib", "depth": 9}, call_id="call_1"),
+        tool_call_turn("read_code_file", {"path": GENERATOR_PATH}, call_id="call_2"),
+        tool_call_turn(graph.RESPOND_TOOL_NAME, {}, call_id="call_3"),
+    ])
+
+    final   = await run_graph(await loop_graph(graph, llm), graph.example_state())
+    listing = json.loads(llm.turn_calls[1].messages[-1].content)
+    read    = json.loads(llm.turn_calls[2].messages[-1].content)
+
+    assert {"path": GENERATOR_PATH, "kind": "file"} in listing["entries"]
+    assert read["path"]  == GENERATOR_PATH
+    assert final.sources == []
+    assert [entry.message for entry in final.log if entry.node == "run_tools"] == [
+        "wywołania: list_code_files; źródła: 0",
+        "wywołania: read_code_file; źródła: 0",
+    ]
+
+
 async def test_after_an_error_the_model_gets_another_turn() -> None:
     """Sprawdza, czy po odczycie wątku o nieznanym numerze (90019) model dostaje w następnej turze
     błąd z tym numerem, a przebieg idzie dalej: model czyta właściwy wątek (90011), który jako

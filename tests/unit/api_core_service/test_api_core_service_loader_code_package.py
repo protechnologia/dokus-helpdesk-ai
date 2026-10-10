@@ -221,3 +221,117 @@ def test_building_the_package_does_not_touch_the_disk(tmp_path: Path) -> None:
     Wyłapuje sprawdzanie dysku w konstruktorze: narzędzia buduje się raz na proces, razem z tymi
     na bazach, i instancja bez paczki kodu nie mogłaby wtedy obsłużyć żadnej sprawy."""
     CodePackage(tmp_path / "nie-ma")
+
+
+def _package_with_a_tree(
+    tmp_path: Path,  # katalog tymczasowy testu
+) -> CodePackage:
+    """
+    Description:
+    Buduje paczkę z plikami na trzech głębokościach, żeby było widać, że wyliczanie plików
+    schodzi w podkatalogi: plik w katalogu głównym kodu, dwa w `src/lib` i jeden poziom niżej.
+
+    Example args:
+        tmp_path=Path("/tmp/pytest-of-root/pytest-0/test_x0")
+
+    Example result:
+        CodePackage z plikami index.php, src/lib/b.php, src/lib/a.php i src/lib/Sesja/Kontrola.php
+    """
+    repo = tmp_path / "paczka" / "repo"
+
+    for path in ("index.php", "src/lib/b.php", "src/lib/a.php", "src/lib/Sesja/Kontrola.php"):
+        (repo / path).parent.mkdir(parents=True, exist_ok=True)
+        (repo / path).write_text("<?php\n", encoding="utf-8")
+
+    (tmp_path / "haslo.yml").write_text(SECRET, encoding="utf-8")
+
+    return CodePackage(tmp_path / "paczka")
+
+
+def test_the_files_of_a_directory_are_listed_at_every_depth(tmp_path: Path) -> None:
+    """Sprawdza, czy wyliczenie plików katalogu oddaje wszystkie pliki leżące pod nim, także
+    w podkatalogach, jako ścieżki względne wobec kodu i po kolei alfabetycznie, a plik spoza
+    tego katalogu pomija.
+
+    Wyłapuje wyliczanie, które zatrzymuje się na pierwszym poziomie albo oddaje same nazwy:
+    spis katalogu nie pokazałby wtedy zawartości podkatalogów, a ścieżki z niego nie dałoby
+    się podać odczytowi pliku."""
+    package = _package_with_a_tree(tmp_path)
+
+    assert package.list_files("src/lib") == [
+        "src/lib/Sesja/Kontrola.php",
+        "src/lib/a.php",
+        "src/lib/b.php",
+    ]
+
+
+def test_the_code_directory_itself_lists_the_whole_code(tmp_path: Path) -> None:
+    """Sprawdza, czy wyliczenie plików dla ścieżki `.`, czyli samego katalogu z kodem, oddaje
+    wszystkie pliki paczki, a katalog zapisany przez `..` daje to samo co zapisany wprost.
+
+    Wyłapuje wyliczanie, które dla katalogu głównego oddaje ścieżki zaczynające się od `./`
+    albo od położenia paczki na dysku: takiej ścieżki nie przyjmie żadne narzędzie kodu."""
+    package = _package_with_a_tree(tmp_path)
+
+    assert package.list_files(".") == [
+        "index.php",
+        "src/lib/Sesja/Kontrola.php",
+        "src/lib/a.php",
+        "src/lib/b.php",
+    ]
+    assert package.list_files("src/lib/Sesja/..") == package.list_files("src/lib")
+
+
+@pytest.mark.parametrize(
+    ("path", "message"),
+    [
+        ("src/lib/a.php", "to plik, nie katalog: src/lib/a.php"),
+        ("src/brak",      "nie ma takiego pliku ani katalogu"),
+        ("../..",         "wychodzi poza kod aplikacji"),
+    ],
+    ids=["plik", "brak katalogu", "poza paczką"],
+)
+def test_listing_something_that_is_not_a_directory_of_the_package_is_refused(
+    tmp_path: Path,
+    path:     str,
+    message:  str,
+) -> None:
+    """Sprawdza, czy wyliczenie plików dla ścieżki pliku, dla katalogu, którego nie ma, i dla
+    katalogu poza kodem kończy się wyjątkiem `CodePathError` z komunikatem nazywającym powód.
+
+    Wyłapuje wyliczanie, które dla pliku oddaje pustą listę albo błąd systemu plików, oraz
+    takie, które wychodzi poza paczkę: model zobaczyłby wtedy nazwy plików kontenera."""
+    with pytest.raises(CodePathError, match=message):
+        _package_with_a_tree(tmp_path).list_files(path)
+
+
+def test_links_are_neither_listed_nor_followed(tmp_path: Path) -> None:
+    """Sprawdza, czy wyliczenie plików pomija dowiązania: dowiązanie do pliku spoza paczki nie
+    trafia na listę, a dowiązanie do katalogu spoza paczki nie jest przeszukiwane.
+
+    Wyłapuje wyliczanie, które wchodzi w dowiązania: przez dowiązany katalog spis pokazałby
+    nazwy plików spoza paczki, a dowiązanego pliku i tak nie dałoby się odczytać."""
+    package = _package_with_a_tree(tmp_path)
+    repo    = tmp_path / "paczka" / "repo"
+    outside = tmp_path / "poza"
+
+    outside.mkdir()
+    (outside / "tajne.php").write_text(SECRET, encoding="utf-8")
+    (repo / "src" / "lib" / "dowiazany-plik.php").symlink_to(tmp_path / "haslo.yml")
+    (repo / "src" / "lib" / "dowiazany-katalog").symlink_to(outside, target_is_directory=True)
+
+    assert package.list_files("src/lib") == [
+        "src/lib/Sesja/Kontrola.php",
+        "src/lib/a.php",
+        "src/lib/b.php",
+    ]
+
+
+def test_listing_files_of_a_missing_package_is_a_deployment_error(tmp_path: Path) -> None:
+    """Sprawdza, czy wyliczenie plików w paczce, której nie ma na dysku, kończy się wyjątkiem
+    `CodePackageConfigError`, a nie `CodePathError`.
+
+    Wyłapuje brak paczki zgłaszany jak brak katalogu: model dostawałby „nie ma takiego
+    katalogu" na każdy spis, a błąd wdrożenia zostałby niezauważony."""
+    with pytest.raises(CodePackageConfigError):
+        CodePackage(tmp_path / "nie-ma").list_files(".")

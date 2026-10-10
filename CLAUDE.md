@@ -110,8 +110,9 @@ narzędzie, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzj
 są właściwe i każdy graf przeszedł na prawdziwym modelu (OpenAI), na zmyślonych zgłoszeniach
 i atrapach narzędzi. Trasy biorą graf z węzłów właściwych, gdy model generujący nie jest atrapą,
 ale bez prawdziwego anonimizatora taka konfiguracja odmawia, więc na danych klientów nic jeszcze
-nie rusza. Wszystkie jedenaście narzędzi ma wersję właściwą: osiem na zgłoszeniach
-i instrukcjach oraz trzy pierwsze narzędzia kodu: szukanie, odczyt pliku i cytowanie fragmentu.
+nie rusza. Wszystkie dwanaście narzędzi ma wersję właściwą: osiem na zgłoszeniach
+i instrukcjach oraz cztery pierwsze narzędzia kodu: szukanie, spis katalogu, odczyt pliku
+i cytowanie fragmentu.
 Dwa, które czytają wątki zgłoszeń, czekają na dane, bo tabela wątków napełni się dopiero po
 anonimizacji.
 
@@ -917,10 +918,11 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — indeksacja i narzędzia powstają
 Trzeci materiał obok zgłoszeń i instrukcji: kod źródłowy Dokusa, czytany narzędziami agenta
 (p. 60–67). Ma pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają, przede wszystkim gdy
 zgłoszenie niesie komunikat albo kod błędu. Z narzędzi są szukanie (`find_code_text`, p. 62),
-odczyt pliku (`read_code_file`, p. 63) i cytowanie fragmentu (`quote_code`, p. 67); spis
-katalogu, opis projektu i odczyt symbolu jeszcze nie powstały (p. 64–66). Są też paczka
-kodu (p. 60) i zestaw przypadków (p. 61). Niżej decyzje i liczby z 2026-10-06, z prób
-z 2026-10-07 i z budowy szukania i odczytu z 2026-10-09.
+spis katalogu (`list_code_files`, p. 64), odczyt pliku (`read_code_file`, p. 63) i cytowanie
+fragmentu (`quote_code`, p. 67); opis projektu i odczyt symbolu jeszcze nie powstały
+(p. 65–66). Są też paczka kodu (p. 60) i zestaw przypadków (p. 61). Niżej decyzje i liczby
+z 2026-10-06, z prób z 2026-10-07, z budowy szukania i odczytu z 2026-10-09 i spisu
+z 2026-10-10.
 Liczby bez dopisku „w paczce" pochodzą z rozpoznania na kopii roboczej gałęzi jednego klienta,
 a paczka powstała z innej gałęzi.
 
@@ -930,13 +932,16 @@ a paczka powstała z innej gałęzi.
   wczytano (p. 65).
 - **Są dwie paczki: prawdziwy kod Dokusa i zmyślona aplikacja (2026-10-06, wcześniej tylko
   prawdziwy kod).** Paczka z Dokusa leży w `data/unsafe/code/` i na niej mierzy się skuteczność
-  (p. 61). Aplikacja syntetyczna leży w `data/safe/code/source/`: 29 plików w kształcie
+  (p. 61). Aplikacja syntetyczna leży w `data/safe/code/source/`: 34 pliki w kształcie
   Symfony 1, w tym samym zmyślonym świecie co syntetyczna dokumentacja i zgłoszenia atrap.
   Pilnuje okablowania narzędzi bez danych klienta i ma wstawione celowo pułapki prawdziwego
   kodu: komunikat zapisany sekwencjami, trzy brzmienia jednego komunikatu, komunikat składany
   z części, tę samą nazwę akcji w trzech modułach, długi kontroler i pliki, które mają nie
-  wejść. Paczkę z niej buduje się tym samym skryptem przed testami; `repo/` i `manifest.json`
-  są poza commitem.
+  wejść. Jedna sprawa nie ma odpowiednika w prawdziwym kodzie (2026-10-10): klasa, która
+  zgłasza błąd, gdy w katalogu szablonów leży nadmiarowy plik. Komunikat nie podaje jego
+  nazwy i nazwa nie stoi w żadnej linii kodu, więc pokazuje ją tylko spis katalogu. Paczkę
+  z aplikacji buduje się tym samym skryptem przed testami; `repo/` i `manifest.json` są poza
+  commitem.
 - **PHP 7.4 na dwóch warstwach: Symfony 1 z Doctrine 1 (główna) i Symfony 2 (pomocnicza),
   z własnym frontendem JS.** Kod własny to ok. 7 tys. plików PHP (685 tys. linii; górna granica,
   bo w katalogach własnych leży kilka wklejonych bibliotek) i 576 plików JS (233 tys. linii).
@@ -1020,7 +1025,9 @@ a paczka powstała z innej gałęzi.
   pokazuje warunek (`quote_code`). Warunek sięgnięcia po kod został wąski: komunikat, wpis
   z logu albo kod błędu, których zgłoszenia i instrukcje nie tłumaczą. W `suggest_solution`
   fakty wolno brać także z przeczytanego kodu; kształt odpowiedzi opartej wyłącznie na kodzie
-  stroi p. 26.
+  stroi p. 26. Od p. 64 akapit o kodzie kończy zdanie o spisie katalogu (`list_code_files`):
+  model może obejrzeć katalog, gdy szukanie daje za dużo trafień albo chce zobaczyć, co leży
+  obok znalezionego pliku. To przyzwolenie, nie nakaz, i nie jest osobnym wejściem w kod.
 - **Na żywym `gpt-6.1-sol` model idzie drogą szukanie → odczyt → cytowanie (2026-10-09,
   pojedyncze przebiegi, nie pomiar; raport
   `data/unsafe/docs/przebieg-read-code-file-gpt-6.1-sol-2026-10-09.md`).** Siedem spraw
@@ -1034,6 +1041,21 @@ a paczka powstała z innej gałęzi.
   nie zna długości pliku. Limitu 300 linii nie osiągnął ani razu (najdłuższy odczyt miał 150
   linii), więc `cut_by_limit` i doczytywanie od `to_line` + 1 sprawdzają tylko testy bez
   modelu. Sprawa w sondzie to 4–8 tur i 0,01–0,04 USD.
+- **Katalogi paczki są małe, a kilka jest bardzo dużych (2026-10-10).** Paczka ma 2375
+  katalogów: połowa ma do 2 pozycji, 90% do 9, 99% do 53, a największy 1264; katalog główny
+  ma jedną. Stąd spis pokazuje kilka poziomów naraz (domyślnie 2) i najwyżej 200 pozycji. Sam
+  katalog nie mieści się w 200 w siedmiu przypadkach, wszystkie z setkami plików; przy 100
+  odpadałyby jeszcze cztery, w tym trzy listy podkatalogów (114–155), czyli spisy modułów.
+  Dwa poziomy nie mieszczą się w 18 katalogach. Spis od katalogu głównego trwa 0,08 s.
+- **Na żywym `gpt-6.1-sol` model sięga po spis katalogu, gdy sprawa tego wymaga, i nie sięga,
+  gdy nie wymaga (2026-10-10, trzy pojedyncze przebiegi, nie pomiar; raport
+  `data/unsafe/docs/przebieg-list-code-files-gpt-6.1-sol-2026-10-10.md`).** W dwóch sprawach
+  z nadmiarowym plikiem w katalogu szablonów (`suggest_solution` i `search`) model znalazł
+  komunikat, przeczytał klasę, spisał jej katalog z głębokością 2 podaną wprost i przeczytał
+  plik, którego nazwę znał tylko ze spisu. W sprawie kontrolnej spisu nie wywołał. Nazwany
+  plik opisał jako stan sprawdzonego kodu i dopisał, że jego obecność u klienta wymaga
+  sprawdzenia. Sprawa to 5–7 tur i 0,02–0,05 USD. W sondach z 2026-10-07 na kodzie Dokusa
+  prototyp spisu, pokazujący jeden poziom, model wołał w 7 z 15 przebiegów.
 - **Jeden komunikat ma w kodzie kilka brzmień** — „Nie udało się skomunikować z serwerem" trzy,
   w tym jedno z innym szykiem słów — a komunikat składany z części nie istnieje w kodzie
   w całości. Stąd szukanie po słowach obok frazy i szukanie stałego fragmentu, bez numerów
@@ -1058,13 +1080,14 @@ a paczka powstała z innej gałęzi.
   Opisy zachowania zatwierdza osoba znająca Dokusa; do tego czasu przypadek ma
   `behaviour_confirmed: false`.
 - **Zestaw do aplikacji syntetycznej ma inny kształt, bo służy testom bez modelu (2026-10-07).**
-  `data/safe/golden/code-synthetic.json` trzyma sekcję na narzędzie: 44 zapytania w kształcie
+  `data/safe/golden/code-synthetic.json` trzyma sekcję na narzędzie: 55 zapytań w kształcie
   narzędzia z oczekiwanym wynikiem, oraz listę plików, których paczka nie może zawierać.
   Zgłoszeń w nim nie ma: testowi bez modelu nic nie dają, bo zamiana zgłoszenia na wywołania
   narzędzi to praca modelu. Kształty zapytań pochodzą z planu i prototypów, więc sekcję
   narzędzia dopasowuje się przy jego budowie; dopasowane są sekcje `find_code_text`
-  (2026-10-09, 18 zapytań, `words` jako tekst) i `read_code_file` (2026-10-09, 11 zapytań,
-  `from_at` i `to_at` zamiast `offset_at` i `limit`).
+  (2026-10-09, dziś 20 zapytań, `words` jako tekst), `read_code_file` (2026-10-09, 11 zapytań,
+  `from_at` i `to_at` zamiast `offset_at` i `limit`) i `list_code_files` (2026-10-10,
+  14 zapytań, pełne ścieżki pozycji zamiast nazw).
 - **Przypadek trafia do zestawu po próbie na świeżym agencie, który zna tylko zgłoszenie
   i folder paczki.** W próbach z 2026-10-07 miejsce wybrane przez autora było błędne albo
   niepełne w 3 przypadkach z 8, a w 2 kolejnych błędny był opis albo rodzaj przypadku. Cena:
@@ -1736,8 +1759,8 @@ czasu jest pusta.
   bez numerów prosi o cały plik. Jedno wywołanie oddaje najwyżej 300 linii (stała w modelu
   zapytania), a limit to 10 odczytów na sprawę; w sondzie było ich 4–10 przy 150 liniach.
   Wynik ma `path`, `file_info.total_lines`, `requested`, `returned` i `lines[]` z polami
-  `line` i `text`, tymi samymi co w szukaniu. To jedyne narzędzie, które może oddać mniej, niż
-  żądano, więc powód nazywają dwie flagi w `returned`: `cut_by_limit` (limit urwał żądany
+  `line` i `text`, tymi samymi co w szukaniu. Odczyt może oddać mniej, niż żądano, więc
+  powód nazywają dwie flagi w `returned`: `cut_by_limit` (limit urwał żądany
   zakres, dalej czyta się od `to_line` + 1) i `end_of_file` (oddano ostatnią linię pliku).
   Liczy je razem z zakresem jedna funkcja, wspólna z atrapą. Treść linii wraca znak w znak,
   z wcięciem i bez ucinania. Koniec zakresu za końcem pliku nie jest błędem, bo model nie zna
@@ -1745,6 +1768,27 @@ czasu jest pusta.
   pliku, początek za końcem pliku, plik pusty i odwrócony zakres. Narzędzie jest pomocnicze,
   bez `cite()`: źródła nie tworzy. Cena: linia kodu jako obiekt zajmuje 2,34 razy tyle znaków
   co goły tekst, więc typowy odczyt 150 linii to około 12,5 tys. znaków.
+- **Spis katalogu kodu, `list_code_files` (2026-10-10), przyjmuje opcjonalne `path` i `depth`,
+  a oddaje płaską listę pozycji z pełną ścieżką i rodzajem (`dir` albo `file`).** Bez `path`
+  spisuje katalog główny kodu, bez `depth` dwa poziomy. Ścieżki pozycji przyjmują bez
+  przeróbki odczyt pliku, szukanie (jako `path`) i kolejny spis. Pozycje stoją w kolejności
+  drzewa: katalog, pod nim jego zawartość, podkatalogi przed plikami. Wynik ma najwyżej 200
+  pozycji (stała w modelu zapytania), a limit to 5 spisów na sprawę. Gdy żądana głębokość się
+  nie mieści, narzędzie oddaje tyle pełnych poziomów, ile się mieści, zamiast ucinać poziom
+  w środku: po uciętym poziomie nie byłoby widać, które podkatalogi są rozwinięte. Wynik ma
+  `path`, `dir_info.total_depth` (ile poziomów ma wszystko pod katalogiem), `requested.depth`
+  i `returned` z czterema polami: `depth`, `depth_cut_by_limit` (limit zmniejszył głębokość,
+  pokazane poziomy są pełne), `has_more_depth` (głębiej leżą pozycje spoza wyniku)
+  i `omitted_over_limit` (większe od zera tylko wtedy, gdy sam katalog ma ponad 200 pozycji:
+  wynik pokazuje wtedy podkatalogi i początek plików). Liczy je jedna funkcja, wspólna
+  z atrapą, ze ścieżek plików, które oddaje czytnik paczki; w dowiązania spis nie wchodzi.
+  Jako błąd do modelu wracają: ścieżka spoza paczki, plik zamiast katalogu, brak katalogu
+  i głębokość mniejsza niż 1. Narzędzie jest pomocnicze, bez `cite()`. Cena: pełna ścieżka
+  powtarza się przy każdej pozycji, więc lista obiektów zajmuje 1,4 razy tyle znaków co lista
+  napisów i 1,65 razy tyle co pozycje pogrupowane po katalogu; największy możliwy wynik to
+  29 tys. znaków, a trzy poziomy od katalogu głównego paczki Dokusa to 4,3 tys. Druga cena:
+  `has_more_depth` mówi „jest coś głębiej", a `end_of_file` w odczycie „dalej nic nie ma",
+  więc dwa narzędzia kodu mają flagi o przeciwnym kierunku.
 - **Wynik każdego narzędzia trafia do modelu jako JSON (`result_as_json()` w `base.py`)** — model
   wyniku zapisany wprost, z polami pod nazwami ze schematu. Identyfikatory wracają w kształcie,
   w jakim model poda je następnemu narzędziu, a treść pisana przez klienta siedzi w polu
@@ -1850,8 +1894,8 @@ czasu jest pusta.
   dopisywania go do żadnej listy.
 - **Narzędzia właściwe buduje `agent_tools/factory.py`, z konfiguracji (2026-10-05):** po jednym
   kliencie embeddera, Qdranta i Postgresa, wspólnym dla ośmiu narzędzi, oraz paczka kodu
-  i klient ripgrepa dla trzech narzędzi kodu, w kolejności `TOOL_NAMES` grafów. Powstaje
-  wszystkie jedenaście; czy instancja bez dokumentacji ma pomijać jej narzędzia, rozstrzyga
+  i klient ripgrepa dla czterech narzędzi kodu, w kolejności `TOOL_NAMES` grafów. Powstaje
+  wszystkie dwanaście; czy instancja bez dokumentacji ma pomijać jej narzędzia, rozstrzyga
   p. 15.
 - **Kod aplikacji liczy się jako źródło jak zgłoszenie i instrukcja, także w wariancie
   wymagającym źródeł (decyzja 2026-10-06, narzędzia w p. 62–67).** Odpowiedź opartą wyłącznie na
@@ -1911,19 +1955,21 @@ czasu jest pusta.
   model wywołanie poprawił, a limit wątków ma być liczbą wątków przeczytanych. Ten
   sam limit stoi w opisie narzędzia dla modelu: miejsce `{{max_calls}}` w `description.md`
   wypełnia `tool_definitions()`, więc narzędzie bez limitu to błąd składania. Ile jedno
-  wywołanie może pobrać (20 kart, 5 sekcji, 20 linii z szukania w kodzie, 300 linii odczytanego
-  pliku kodu, 40 linii cytowanego kodu), zostaje stałą w modelu zapytania; wątek jest zawsze
+  wywołanie może pobrać (20 kart, 5 sekcji, 20 linii z szukania w kodzie, 200 pozycji spisu
+  katalogu kodu, 300 linii odczytanego pliku kodu, 40 linii cytowanego kodu), zostaje stałą
+  w modelu zapytania; wątek jest zawsze
   jeden. Wartości od 2026-10-05: wyszukiwania i karty po 5, sekcje i wątki po 3, spis treści 1;
   od 2026-10-07 cytowanie kodu 5; od 2026-10-09 szukanie w kodzie 10, bo od komunikatu do
   miejsca, które go wywołuje, idzie się kilkoma szukaniami z rzędu (w sondzie limit 10
   wyczerpał się w 5 sprawach z 9), i odczyt pliku kodu też 10, bo po każdym takim szukaniu
-  model czyta otoczenie trafionej linii.
+  model czyta otoczenie trafionej linii; od 2026-10-10 spis katalogu kodu 5 (prototyp
+  pokazujący jeden poziom zużywał cały limit 3 w 4 z 7 przebiegów, w których model go wołał).
 - **Limit tur modelu: `AGENT_MAX_ITERATIONS` = 20 (2026-10-05).** Liczy odpowiedzi modelu
   w grafie z narzędziami, nie wywołania. Gdy w ostatniej dozwolonej turze model nadal woła
   narzędzia wiedzy, `route_after_agent()` prowadzi do `respond` i narzędzia nie są wykonywane.
   Domyka to, czego limity narzędzi nie domykają: wywołanie ponad limit narzędzia dostaje odmowę,
   ale turę zużywa. 20 to zapas, nie cel: sprawa w sondach to 4–7 tur, a limity narzędzi pozwalają
-  na 57 wywołań, czyli do 58 tur przy jednym wywołaniu na turę (do przeliczenia w p. 23).
+  na 62 wywołania, czyli do 63 tur przy jednym wywołaniu na turę (do przeliczenia w p. 23).
   Sprawa ucięta limitem dostaje od `respond` jedną turę ponad limit, na samą odpowiedź: jest już
   opłacona, a narzędzia w tej turze nadal nie ruszają.
 - **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `engine_llm/models/messages.py`), żadnych typów
@@ -2630,17 +2676,17 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1504 (0)           | 23 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 464 (79)           | 87 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 105 (9)            | 12 s |
-| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 50 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1575 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 508 (79)           | 96 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 105 (9)            | 10 s |
+| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 38 s |
 
-Liczby i czasy z 2026-10-09: każdy folder osobno, w komplecie
+Liczby i czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku. Bez testów na stacku
-integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy — całe 50 s to 207 wyszukań golden setów
+integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy — całe 38 s to 207 wyszukań golden setów
 przez prawdziwy embedder (178 w zgłoszeniach, 29 w dokumentacji). Komplet jednym poleceniem
-(`pytest -m "not llm_live"`): 2077 testów, 148 s; domyślny `pytest`, bez stacku: 1951 testów,
-33 s. Trzydzieści sześć testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
+(`pytest -m "not llm_live"`): 2192 testy, 132 s; domyślny `pytest`, bez stacku: 2066 testów,
+30 s. Trzydzieści sześć testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
 folderu, ale poza oboma przebiegami.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
@@ -2699,6 +2745,13 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   znalezioną szukaniem da się odczytać, a oddany zakres zacytować. Wybieranie zakresu i obie
   flagi mają test jednostkowy na siatce układów granic: długość pliku, początek, długość
   zakresu.
+  Testy `list_code_files` są od 2026-10-10: zapytania z zestawu idą przez prawdziwy
+  `run_tools`, każda pozycja spisu jest porównana z dyskiem paczki, spis całego kodu wymienia
+  dokładnie pliki paczki i żadnego z listy `absent_paths`, a test łańcucha sprawdza, że pliki
+  ze spisu da się odczytać, a katalog podać szukaniu. Paczka syntetyczna nie ma 200 pozycji,
+  więc zmniejszenie głębokości i katalog ponad limit sprawdza test jednostkowy na siatce
+  kształtów katalogu oraz narzędzie na katalogu tymczasowym. Trzynaście celowo wstawionych
+  usterek w wybieraniu pozycji i w wyliczaniu plików testy wyłapały.
   Cena: to jedyne testy bez markera, które potrzebują czegoś spoza commita — zbudowanej paczki
   syntetycznej i programu ripgrep na hoście. Bez paczki domyślny `pytest` kończy się błędem
   z poleceniem budowy, a bez ripgrepa błędem z poleceniem instalacji.
@@ -2754,7 +2807,8 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   tury na zmyślonych narzędziach) i każdy graf na węzłach właściwych (dziesięć spraw, 30 tur
   i 0,16 USD na `gpt-6.1-sol` w przebiegu z 2026-10-09 po zmianie promptów trzech grafów;
   dwa wcześniejsze przebiegi tego dnia, na dziewięciu sprawach, kosztowały 0,14 i 0,07 USD,
-  a różnicę robi głównie zapis do cache promptu). Po zmianie promptu pierwsza tura grafu
+  a różnicę robi głównie zapis do cache promptu; przebieg z 2026-10-10, po dopisaniu zdania
+  o spisie katalogu, to 27 tur i 0,12 USD). Po zmianie promptu pierwsza tura grafu
   zapisuje początek żądania do cache od nowa: około 0,02 USD zamiast 0,002. Sprawa grafu liczy
   się dopiero, gdy potrzebuje jej test, więc `-k <graf>` opłaca jeden graf. Testy grafów
   sprawdzają okablowanie: czy model odpowiada
@@ -3087,6 +3141,25 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Ucinanie długich linii i budżet znaków w odczycie pliku** — linii dłuższych niż 500 znaków
   jest w paczce 72 na 1,18 mln, a okno 300 linii przekracza 20 tys. znaków w 25 plikach
   z 11 424.
+- **Pozycje spisu katalogu pogrupowane po katalogu albo jako lista napisów z ukośnikiem po
+  nazwie katalogu** — 0,6 i 0,7 znaków listy obiektów; obiekty mają pełną ścieżkę gotową do
+  podania dalej i ten sam kształt co linie z szukania. Wraca, gdy pomiar pokaże, że koszt
+  spisów boli (p. 59).
+- **Ucinanie spisu katalogu w środku poziomu** — po uciętym poziomie nie widać, które
+  podkatalogi są rozwinięte, a które puste; narzędzie zmniejsza głębokość do pełnych poziomów.
+- **Górna granica głębokości spisu** — limit pozycji i tak zmniejsza głębokość, a granica
+  zmieniałaby wynik tylko w wąskim, głębokim katalogu, który mieści się w limicie.
+- **Jedna flaga ucięcia albo sam licznik pominiętych w wyniku spisu** — przy „prosił o 2
+  poziomy, dostał 1, pominięto 500" nie byłoby wiadomo, czy pierwszy poziom jest pełny; o
+  zmniejszonej głębokości mówi `depth_cut_by_limit`, a licznik liczy tylko pozycje pokazanego
+  poziomu.
+- **Liczba linii przy pliku w spisie katalogu** — wymaga czytania każdego pliku, a długość
+  podaje pierwszy odczyt.
+- **Stronicowanie katalogu, który nie mieści się w spisie** — takich katalogów jest w paczce
+  siedem, wszystkie z setkami plików; w nich szuka się po treści, z katalogiem w `path`.
+- **Test na żywym modelu wymagający wywołania spisu katalogu** — narzędzie jest pomocnicze
+  i model ma go używać tylko wtedy, gdy sprawa tego wymaga; zdanie w promptach jest
+  przyzwoleniem. Czy używa go z sensem, pokazała sonda, a policzy pomiar (p. 59).
 - **Wynik `find_code_text` bez treści linii** — tak stało w planie z 2026-10-06, gdy odczyt pliku
   miał tworzyć źródło; odkąd tworzy je tylko cytowanie przyczyny, treść w szukaniu źródeł nie
   omija, a bez niej każde trafienie trzeba odczytać.
@@ -3324,13 +3397,23 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   osiągnięcia limitu linii; raport zużycia w testach wypisuje wywołania narzędzi
   z argumentami; reguły — „Kod aplikacji", „Warstwa narzędzi agenta", „Warstwa węzłów",
   „Testy", „Świadomie pominięte".
-- [ ] **64. `list_code_files`** — drzewo katalogu z opcjonalną głębokością, z limitem pozycji.
-  *Dlaczego:* szukanie bez komunikatu i bez kodu błędu, po wskazówkach z opisu projektu.
+- [x] **64. `list_code_files`** (2026-10-10) — `ListCodeFilesTool` na paczce kodu: spis
+  katalogu do wskazanej głębokości (domyślnie 2), płaska lista pozycji z pełną ścieżką
+  i rodzajem, do 200 pozycji; głębokość żądana obok oddanej, `dir_info.total_depth` i trzy
+  sygnały (`depth_cut_by_limit`, `has_more_depth`, `omitted_over_limit`); narzędzie pomocnicze,
+  bez źródeł, limit 5 spisów na sprawę; czytnik paczki wylicza pliki katalogu; jedno zdanie
+  o spisie w promptach `search`, `suggest_questions` i `suggest_solution`; sekcja
+  `list_code_files` zestawu syntetycznego dopasowana, a aplikacja syntetyczna ma sprawę
+  z nadmiarowym plikiem w katalogu szablonów; na żywym `gpt-6.1-sol` model sięgnął po spis
+  w obu sprawach, które tego wymagały, i w żadnej, która nie wymagała; szukanie bez
+  komunikatu, po opisie projektu, przechodzi do p. 65; reguły — „Kod aplikacji", „Warstwa
+  narzędzi agenta", „Warstwa węzłów", „Testy", „Świadomie pominięte".
 - [ ] **65. `describe_code`** — opis projektu w całości, raz na sprawę; szkic pisze model
   z kodu, poprawia programista Dokusa, plik leży w paczce; opis nazywa wprost połączenia idące
   przez napis, których mapa symboli nie zna (które zdarzenie obsługuje która funkcja); do
   rozstrzygnięcia, którą gałąź indeksuje instancja, i pokazanie jej modelowi i człowiekowi
-  (metryczka paczki niesie gałąź od p. 62).
+  (metryczka paczki niesie gałąź od p. 62); z opisem dochodzi reguła promptu dla sprawy bez
+  komunikatu i bez kodu błędu: zacząć od opisu i iść po katalogach spisem (`list_code_files`).
   *Dlaczego:* mówi, gdzie zacząć: wejścia do aplikacji, droga od adresu do akcji i od zdarzenia
   JS do handlera; w sondzie z 2026-10-06 na komunikacie „Nie udało się skomunikować z serwerem"
   przejście od zdarzenia błędu do funkcji, która je obsługuje, zajęło 6 z 10 wywołań.
@@ -3356,7 +3439,9 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   trafiają do odpowiedzi; para dla narzędzi kodu: komunikat jest tylko w kodzie, a w parze
   kontrolnej nie ma go nigdzie — czy model powstrzymuje się wtedy od rozwiązania z luźno
   powiązanego pliku i ile cytowań wskazuje linie, których nie odczytał; linia widziana tylko
-  w wyniku szukania liczy się jako nieodczytana). *Dlaczego:* da się je
+  w wyniku szukania liczy się jako nieodczytana; do tego sprawa z nadmiarowym plikiem
+  w katalogu szablonów aplikacji syntetycznej — czy model sięga po spis katalogu i czy
+  odróżnia stan kodu od instalacji klienta). *Dlaczego:* da się je
   uruchomić przed anonimizatorem, więc prompty dostają sygnał z modelu docelowego wcześniej niż
   z p. 21–28; tamtych pomiarów nie zastępują,
   bo scenariusze pisze autor promptów; stoi po p. 11, bo ocenia odpowiedź przepuszczoną przez
@@ -3483,7 +3568,11 @@ każdy mierzy się osobno.
       placeholderów, czytnik SQL, wznawianie, raport, porządek w `data/unsafe/parsed/` (golden200
       zostaje); zanonimizowany wątek idzie do tabeli wyszukiwania — do ustalenia, czy każdego
       zgłoszenia, czy tylko tych z kartą przyjętą przez filtr jakości (wątek musi mieć każdy
-      numer, który oddaje wyszukiwanie po kartach). *Dlaczego:* to jedyny
+      numer, który oddaje wyszukiwanie po kartach); po napełnieniu tabeli powstaje zestaw
+      zapytań tekstowych do zgłoszeń (komunikaty i kody błędów z wątków, w polach `exact`
+      i `words`) i test ewaluacyjny `find_tickets_text` z progiem — dziś narzędzie ma tylko
+      test integracyjny na pięciu zmyślonych wątkach, a golden set zgłoszeń ma zapytania
+      wyłącznie w kształcie wyszukiwania po znaczeniu. *Dlaczego:* to jedyny
       drogi przebieg (zasada 7), więc anonimizator i prompt muszą być gotowe przed nim.
 - [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
   „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy. *Dlaczego:* 77 ze 123 zgłoszeń

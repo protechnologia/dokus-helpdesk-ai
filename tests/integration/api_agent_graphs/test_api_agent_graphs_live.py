@@ -37,7 +37,7 @@ pytestmark = pytest.mark.llm_live
 # Jakości odpowiedzi nie sprawdzają: to pomiary grafów (CLAUDE.md -> „Plan", p. 21–28).
 #
 # KOSZTUJE: jeden przebieg pliku to jedna sprawa na graf, czyli osiem spraw — pięć po jednej turze
-# i trzy w pętli po kilka tur z jedenastoma narzędziami — oraz dwie sprawy `suggest_solution`:
+# i trzy w pętli po kilka tur z dwunastoma narzędziami — oraz dwie sprawy `suggest_solution`:
 # na narzędziach, które nic nie znajdują, i ze zgłoszeniem, którego komunikat stoi tylko w kodzie
 # aplikacji (razem rząd kilkunastu centów na mocnym modelu). Sprawa
 # każdego grafu liczy się raz, dopiero gdy potrzebuje jej test, i jest wspólna dla jego testów —
