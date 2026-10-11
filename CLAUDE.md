@@ -1457,6 +1457,10 @@ Wspólne:
   jest `null`, a lista źródeł pusta. To ta sama odpowiedź co „nowy typ problemu", nie błąd; log
   przebiegu kończy się wpisem o braku źródeł. Uwagi dla wdrożeniowca zostają (2026-10-08): mówią,
   czego agent szukał i co wykluczył.
+- **Wariant `questions` oddaje `text: null`, gdy pytań już nie trzeba (2026-10-11).** To ten
+  sam kształt co wyżej: 200, brak treści dla klienta i uwagi, które zaczynają się od „Pytań już
+  nie trzeba:" i mówią, które fakty ze zgłoszenia rozstrzygają sprawę. Źródła zostają, bo agent
+  je odczytał. Helpdesk rozpoznaje brak pytań po `text` równym `null`, nie po treści.
 - **Model, który mimo poprawki nie oddał poprawnej odpowiedzi, to 503 (2026-10-05)** — jak każda
   awaria modelu, więc przy bramkach decyduje helpdesk. Cena: zużycie takiej sprawy jest tylko
   w logu usługi, nie w odpowiedzi.
@@ -2027,6 +2031,12 @@ czasu jest pusta.
   bo węzeł nie zna pól wyniku; funkcja bez `requires_sources` to błąd składania. Cena: sprawa bez
   źródeł może zużyć turę poprawki, a uwagi w niej nie stoją na odczytanym materiale — ogranicza je
   tylko prompt.
+- **Graf może podać węzłowi funkcję `to_output`: na co zamienić odpowiedź modelu, gdy wynik
+  grafu ma inny kształt (2026-10-11).** Węzeł waliduje argumenty do modelu odpowiedzi,
+  a w `output` zapisuje to, co oddała funkcja; przy sprawie bez źródeł `without_sources` dostaje
+  już zamieniony wynik. Podaje ją tylko `suggest_questions`: model odpowiada w kształcie
+  `QuestionsAnswer`, w którym `text` może być `null`, a wynikiem jest `Proposal` albo
+  `ProposalNotes`. Dzięki temu `Proposal` dalej wymaga treści w pozostałych wariantach.
 - **Węzeł odpowiedzi buduje `respond_node()` z pakietu grafu**: graf zna swoje narzędzie
   odpowiedzi, model wyniku, wymóg źródeł i pola, które wypełnia sam. W `parse_ticket` pola od
   grafu (`filled_by_graph()`) wygrywają z tym, co podał model.
@@ -2119,8 +2129,8 @@ nowe zgłoszenie (surowy tekst)
   spoza `TOOL_NAMES` to błąd składania.
 - **Model wyniku wspólny dla kilku grafów — w `core_model/graphs/` (`Verdict`, `Proposal`,
   `ProposalNotes`);
-  używany przez jeden graf — w `agent_graphs/<graf>/models.py`** (`SearchNotes`, `PolishedText`),
-  jak modele narzędzi.
+  używany przez jeden graf — w `agent_graphs/<graf>/models.py`** (`SearchNotes`, `PolishedText`,
+  `QuestionsAnswer`), jak modele narzędzi.
 - **`search` kończy się `respond_search` z uwagami dla wdrożeniowca (2026-10-11, wcześniej bez
   argumentów).** Wynikiem są źródła z `cite()`, zapytania agenta z `messages` i uwagi
   (`SearchNotes.internal_notes`) w lekkim Markdownie: cztery sekcje z nagłówkiem `##` —
@@ -2140,8 +2150,8 @@ nowe zgłoszenie (surowy tekst)
 - **Rozpoznanie stoi na stanie sprawy po ostatniej wiadomości wątku (2026-10-11).** Prompt
   `search` mówi o pytaniach konsultanta i odpowiedziach klienta, a uwagi mają nazwać przyczyny,
   które te odpowiedzi wykluczają. Z grafów z narzędziami wiedzy mówi o nim poza tym tylko
-  `suggest_questions` (dwie reguły), a zgłoszenia przykładowe tych grafów i ich testów to sam
-  opis zgłaszającego.
+  `suggest_questions`, a zgłoszenia przykładowe tych grafów i ich testów to sam opis
+  zgłaszającego.
 - **Na żywym `gpt-6.1-sol` rozpoznanie wyszło w siedmiu zmyślonych sprawach (2026-10-11,
   pojedyncze przebiegi, nie pomiar; raport
   `data/unsafe/docs/przebieg-search-rozpoznanie-gpt-6.1-sol-2026-10-11.md`).** Narzędzia kodu
@@ -2195,6 +2205,18 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 - **`questions` działa dwutorowo:** bez trafień pyta na podstawie samego zgłoszenia,
   z trafieniami dokłada `questions_summary` z podobnych spraw. Ryzykiem nie jest puste pole, tylko
   sentinel w przebraniu („Brak pytań ze strony prowadzącego sprawę.") — 28 na 200 rekordów.
+- **`questions` może oddać brak pytań (2026-10-11).** Gdy fakty ze zgłoszenia — z opisu albo
+  z odpowiedzi klienta w wątku — zostawiają jedną przyczynę albo nic, o co klient mógłby
+  odpowiedzieć bez diagnozy, model oddaje `text: null` i uwagi zamiast pytań na siłę. Wyjściem
+  jest wartość pola, nie zdanie: zdanie-formułkę o braku pytań słabszy model doklejał po
+  pytaniach w 7 przebiegach na 8. Hamulec w prompcie: zgodny objaw to nie jedna przyczyna, więc
+  gdy przeczytane sprawy podają różne przyczyny, a zgłoszenie ich nie rozróżnia, pytania są.
+  Na żywym `gpt-6.1-sol` (cztery pojedyncze przebiegi, 0,13 USD, raport
+  `data/unsafe/docs/przebieg-suggest-questions-pytan-nie-trzeba-gpt-6.1-sol-2026-10-11.md`)
+  model oddał brak pytań w obu sprawach, w których fakty rozstrzygały (raz z wątku, raz
+  z samego opisu), a pytania w obu, w których nie rozstrzygały: jedno nowe po odpowiedziach,
+  które tylko zawężały, i pięć przy samym objawie. Guzik nadal nie pamięta pytań
+  wygenerowanych, ale niewysłanych.
 - **Prompt `questions` nie może przepisać cudzych pytań.** Materiał historyczny to wzorzec:
   odrzuć pytania niepasujące do sprawy, przeformułuj pod to zgłoszenie, pomiń te, na które
   odpowiedź już jest w treści.
@@ -2724,16 +2746,16 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1588 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 509 (79)           | 96 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 109 (9)            | 10 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1604 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 511 (79)           | 96 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 110 (9)            | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 38 s |
 
 Liczby z 2026-10-11, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku. Bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy — całe 38 s to 207 wyszukań golden setów
 przez prawdziwy embedder (178 w zgłoszeniach, 29 w dokumentacji). Komplet jednym poleceniem
-(`pytest -m "not llm_live"`): 2210 testów, 132 s; domyślny `pytest`, bez stacku: 2084 testy,
+(`pytest -m "not llm_live"`): 2229 testów, 132 s; domyślny `pytest`, bez stacku: 2103 testy,
 30 s. Trzydzieści sześć testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
 folderu, ale poza oboma przebiegami.
 
@@ -3249,6 +3271,11 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   zapisuje tylko węzeł `respond`.
 - **Sprawa bez źródeł bez uwag dla wdrożeniowca** — tak było do 2026-10-08: węzeł nie czytał
   odpowiedzi, więc ginęło, czego agent szukał i co wykluczył.
+- **Zdanie „mam komplet informacji" w `text` zamiast `text: null` w wariancie `questions`** —
+  `text` to pole dla klienta, brzmienie zdania pływa, a helpdesk musiałby rozpoznawać brak pytań
+  po treści.
+- **Wyjście „pytań już nie trzeba" tylko po odpowiedziach klienta w wątku** — pierwsza wersja
+  reguły; przy opisie, który sam rozstrzyga sprawę, kazałaby pytać na siłę.
 
 ### Plan
 
@@ -3476,16 +3503,13 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   `gpt-6.1-sol`, bez pary na starym prompcie; pomiar na prawdziwych sprawach i na kodzie Dokusa
   zostaje w p. 23; reguły — „Warstwa grafów", „Warstwa API", „Kod aplikacji", „Testy",
   „Świadomie pominięte".
-- [ ] **72. `suggest_questions`: „pytań już nie trzeba"** (dopisany 2026-10-11, numer spoza
-  kolejności) — gdy odpowiedzi klienta w wątku rozstrzygają sprawę, wariant oddaje `text: null`
-  i jedno zdanie w uwagach, które odpowiedzi ją rozstrzygają, zamiast słabszych pytań; graf
-  dostaje własne wyjście, bo `Proposal.text` wymaga dziś niepustej treści w trzech wariantach;
-  reguła w prompcie i sonda na dwóch zmyślonych sprawach (odpowiedzi rozstrzygają; odpowiedzi
-  zawężają, ale pytania jeszcze są). *Dlaczego:* dziś prompt każe dać 3–6 pytań i nigdy nie
-  odmawiać, a guzik nie pamięta poprzedniego kliknięcia, więc po odpowiedziach klienta
-  wdrożeniowiec dostaje pytania zamiast informacji, że pora na rozwiązanie. Kształt już jest:
-  tak wraca `solution` bez źródeł. Odrzucone: zdanie „mam komplet informacji" w `text`, bo to
-  pole dla klienta, a brzmienie zdania pływa.
+- [x] **72. `suggest_questions`: „pytań już nie trzeba"** (2026-10-11) — gdy fakty ze
+  zgłoszenia, z opisu albo z wątku, rozstrzygają sprawę, wariant oddaje `text: null` i uwagi
+  zamiast pytań na siłę; model odpowiada w kształcie `QuestionsAnswer`, a węzeł `respond`
+  zamienia go na wynik funkcją grafu `to_output`; reguła z hamulcem w prompcie; sonda na czterech
+  zmyślonych sprawach na żywym `gpt-6.1-sol`; jak często i czy słusznie model sięga po to
+  wyjście na prawdziwych sprawach, zostaje w p. 25; reguły — „Warianty generacji", „Warstwa
+  API", „Warstwa węzłów", „Świadomie pominięte".
 - [ ] **65. `describe_code`** — opis projektu w całości, raz na sprawę; szkic pisze model
   z kodu, poprawia programista Dokusa, plik leży w paczce; opis nazywa wprost połączenia idące
   przez napis, których mapa symboli nie zna (które zdarzenie obsługuje która funkcja); do
@@ -3524,8 +3548,8 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   z p. 21–28; tamtych pomiarów nie zastępują,
   bo scenariusze pisze autor promptów; stoi po p. 11, bo ocenia odpowiedź przepuszczoną przez
   właściwy `respond`. Do każdego grafu z pętlą dochodzi scenariusz, w którym bieżące zgłoszenie
-  ma wątek z pytaniami konsultanta i odpowiedziami klienta (dopisane 2026-10-11): dziś sprawdza
-  to jedna sprawa sondy `search`.
+  ma wątek z pytaniami konsultanta i odpowiedziami klienta (dopisane 2026-10-11): dziś sprawdzają
+  to tylko pojedyncze sprawy sond `search` i `suggest_questions`.
 - [ ] **46. CLI dla grafów** (dopisany 2026-10-02, numer spoza kolejności) — `helpdesk gate
   close|reply`, `helpdesk suggest <wariant>`, „Popraw" i karta zgłoszenia na tej samej fabryce
   grafów co trasy; także wyszukiwanie i parsowanie zgłoszeń do korpusu (dawne `rag search`
@@ -3617,7 +3641,9 @@ każdy mierzy się osobno.
 - [ ] **25. `suggest_questions`** — prompt z 6.3 przemierzony na modelu docelowym z placeholderami,
   z regułą zgodności przyczyny z objawem i z szerszą regułą sięgania po kod, tą samą co w p. 23; do sprawdzenia, czy długi tekst w JSON-ie (wątek, sekcja
   instrukcji) czyta się modelowi gorzej niż goły;
-  ewaluacja wariantu; sentinele `questions_summary` rozpoznaje `no_questions()` dopisane
+  ewaluacja wariantu, w tym jak często model oddaje „pytań już nie trzeba" (p. 72) i czy
+  słusznie — fałszywe wyjście przy zgodnym objawie i różnych przyczynach jest tu najgroźniejsze;
+  sentinele `questions_summary` rozpoznaje `no_questions()` dopisane
   do `normalizer_ticket_sentinel.py`. *Dlaczego:* prompt z 6.3 powstał pod słabszy model, a znana
   dziura (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
 - [ ] **26. `suggest_solution`** — prompt z 6.4 przemierzony na modelu docelowym, z regułą

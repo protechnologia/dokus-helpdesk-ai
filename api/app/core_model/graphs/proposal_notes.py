@@ -5,7 +5,8 @@ class ProposalNotes(BaseModel):
     """
     Description:
     Propozycja bez treści dla klienta — same uwagi dla wdrożeniowca. Wynik wariantu wymagającego
-    źródeł (`suggest_solution`), gdy agent nie odczytał żadnego źródła.
+    źródeł (`suggest_solution`), gdy agent nie odczytał żadnego źródła, oraz wariantu z pytaniami
+    (`suggest_questions`), gdy pytań już nie trzeba.
 
     Do czego:
     Bez źródeł treść dla klienta byłaby napisana „z głowy", więc węzeł `respond` ją odrzuca

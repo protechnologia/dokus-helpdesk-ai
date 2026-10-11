@@ -351,6 +351,63 @@ async def test_with_sources_the_graph_function_is_not_used() -> None:
     assert update["output"] == Proposal(**PROPOSAL)
 
 
+async def test_the_graph_function_turns_the_answer_into_the_output() -> None:
+    """Sprawdza, czy węzeł, który dostał od grafu funkcję zamiany odpowiedzi na wynik, zapisuje
+    w wyniku to, co ta funkcja oddała (tu same uwagi zamiast całej propozycji), a dziennik nazywa
+    typ wyniku po zamianie.
+
+    Wyłapuje węzeł, który zapisuje odpowiedź modelu w jej własnym kształcie: graf, w którym model
+    odpowiada inaczej, niż wygląda wynik, oddawałby wołającemu kształt, którego ten nie zna."""
+    node   = RespondNode(SOLUTION_TOOL, Proposal, to_output=notes_only)
+    update = await node.run(state_after(answer(PROPOSAL, name=SOLUTION_TOOL)))
+
+    assert update["output"]         == ProposalNotes(internal_notes="Szukałem po komunikacie.")
+    assert update["log"][0].message == "output: ProposalNotes"
+
+
+async def test_an_invalid_answer_never_reaches_the_graph_function() -> None:
+    """Sprawdza, czy odpowiedź, której nie da się przyjąć (tu bez pola z uwagami), wraca do modelu
+    do poprawki, zanim węzeł zawoła funkcję zamiany odpowiedzi na wynik.
+
+    Wyłapuje funkcję grafu wołaną na niesprawdzonej odpowiedzi: dostałaby dane w złym kształcie,
+    a przebieg skończyłby się błędem zamiast poprawką."""
+    def must_not_run(output: BaseModel) -> BaseModel:
+        raise AssertionError("funkcja grafu zawołana na odrzuconej odpowiedzi")
+
+    node   = RespondNode(SOLUTION_TOOL, Proposal, to_output=must_not_run)
+    turn   = answer({"text": "Prosimy o restart usługi."}, name=SOLUTION_TOOL)
+    update = await node.run(state_after(turn))
+
+    assert "output" not in update
+    assert update["respond_retries"] == 1
+
+
+async def test_without_sources_the_turned_output_goes_to_the_other_graph_function() -> None:
+    """Sprawdza kolejność dwóch funkcji grafu w sprawie bez źródeł: najpierw odpowiedź modelu
+    jest zamieniana na wynik, a dopiero ten wynik trafia do funkcji na sprawę bez źródeł.
+
+    Wyłapuje odwróconą kolejność: funkcja na sprawę bez źródeł dostałaby odpowiedź modelu
+    w kształcie, którego nie zna."""
+    seen: list[BaseModel] = []
+
+    def remember(output: BaseModel) -> BaseModel:
+        seen.append(output)
+
+        return output
+
+    node = RespondNode(
+        respond_tool_name = SOLUTION_TOOL,
+        output_model      = Proposal,
+        requires_sources  = True,
+        without_sources   = remember,
+        to_output         = notes_only,
+    )
+
+    await node.run(SourcesState(input_text="x", messages=[answer(PROPOSAL, name=SOLUTION_TOOL)]))
+
+    assert seen == [ProposalNotes(internal_notes="Szukałem po komunikacie.")]
+
+
 def test_a_function_for_missing_sources_without_requiring_them_is_refused() -> None:
     """Sprawdza, czy węzła odpowiedzi nie da się zbudować z funkcją na sprawę bez źródeł, gdy graf
     źródeł nie wymaga.

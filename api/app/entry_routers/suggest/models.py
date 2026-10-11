@@ -28,6 +28,9 @@ class SuggestResponse(BaseModel):
     odczytał: treści dla klienta wtedy nie ma, cokolwiek model napisał (zasada 9), a uwagi
     zostają — mówią, czego agent szukał i co wykluczył. To poprawna odpowiedź („nowy typ
     problemu"), nie błąd — stąd 200 z pustą listą źródeł.
+
+    `text` jest puste także w wariancie z pytaniami, gdy pytań już nie trzeba: fakty ze zgłoszenia
+    rozstrzygają sprawę, a uwagi mówią które. Źródła wtedy zostają.
     """
 
     variant:        str              = Field(examples=["questions"])

@@ -1,8 +1,10 @@
 """
 Description:
 Graf `suggest_questions` — wariant generacji „Jakie pytania zadać": lista pytań dla wdrożeniowca,
-oparta na podobnych sprawach, które agent sam znajduje. Wynik to `Proposal`; źródła z `cite()`
-leżą w `sources`.
+oparta na podobnych sprawach, które agent sam znajduje. Wynik to `Proposal`, a gdy fakty ze
+zgłoszenia rozstrzygają sprawę i pytań już nie trzeba — same uwagi (`ProposalNotes`, wołający
+dostaje `text: null`). Model odpowiada w kształcie `QuestionsAnswer`, który na wynik zamienia
+`to_output()`. Źródła z `cite()` leżą w `sources`.
 
 Przebieg: anonymize → pętla agent ⇄ run_tools → respond. Narzędzia: wyszukiwania i spis oddają
 identyfikatory, odczyty treść (opisy dla modelu w katalogach narzędzi); koniec wywołaniem
@@ -23,13 +25,16 @@ from app.agent_graphs.suggest_questions.graph import (
     model_tools,
     respond_node,
     system_prompt,
+    to_output,
     user_prompt,
 )
+from app.agent_graphs.suggest_questions.models import QuestionsAnswer
 from app.agent_graphs.suggest_questions.respond_tool import RESPOND_TOOL_NAME, respond_tool
 from app.agent_graphs.suggest_questions.state import SuggestQuestionsState
 
 __all__ = [
     "LABEL",
+    "QuestionsAnswer",
     "REQUIRES_HITS",
     "RESPOND_TOOL_NAME",
     "STATE",
@@ -42,5 +47,6 @@ __all__ = [
     "respond_node",
     "respond_tool",
     "system_prompt",
+    "to_output",
     "user_prompt",
 ]

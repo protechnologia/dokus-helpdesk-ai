@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.core_model.graphs.proposal import Proposal
+from app.agent_graphs.suggest_questions.models import QuestionsAnswer
 from app.core_util.json_schema import json_schema_without_docs
 from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition
@@ -13,9 +13,9 @@ DESCRIPTION_FILE  = Path(__file__).parent / "respond_tool.md"
 def respond_tool() -> ToolDefinition:
     """
     Description:
-    Definicja narzędzia, którym model oddaje listę pytań — kontrakt wyjścia grafu. Nic go nie
-    wykonuje: węzeł `respond` waliduje argumenty do `Proposal`. Źródeł w schemacie nie ma —
-    powstają z `cite()`.
+    Definicja narzędzia, którym model oddaje listę pytań albo jej brak — kontrakt wyjścia
+    grafu. Nic go nie wykonuje: węzeł `respond` waliduje argumenty do `QuestionsAnswer`.
+    Źródeł w schemacie nie ma — powstają z `cite()`.
 
     Example args:
         (brak)
@@ -27,7 +27,7 @@ def respond_tool() -> ToolDefinition:
     tool = ToolDefinition(
         name        = RESPOND_TOOL_NAME,
         description = read_document(DESCRIPTION_FILE).rstrip(),
-        parameters  = json_schema_without_docs(Proposal),
+        parameters  = json_schema_without_docs(QuestionsAnswer),
     )
 
     return tool

@@ -111,3 +111,36 @@ def test_a_variant_that_requires_sources_gives_only_notes_without_them(variant: 
     assert body["sources"]        == []
     assert body["log"][-1]["node"] == "respond"
     assert "brak źródeł" in body["log"][-1]["message"]
+
+
+def test_questions_that_are_no_longer_needed_come_back_as_notes_only() -> None:
+    """Sprawdza, czy wariant z pytaniami, w którym model odpowiada, że pytań już nie trzeba
+    (`text` równe `null` i uwagi), wraca ze statusem 200, bez treści dla klienta (`text` równe
+    `null`) i z uwagami dla wdrożeniowca z odpowiedzi modelu.
+
+    Wyłapuje trasę, która przy braku pytań oddaje błąd albo pusty napis w miejscu treści: helpdesk
+    rozpoznaje po `text` równym `null`, że nie ma czego wysłać klientowi, tak samo jak przy
+    rozwiązaniu bez źródeł."""
+    graph    = VARIANTS["questions"]
+    notes    = "Pytań już nie trzeba: klient potwierdził plik blokady (zgł. 90002)."
+    answer   = tool_call_turn(graph.RESPOND_TOOL_NAME, {"text": None, "internal_notes": notes})
+    compiled = build_real_graph(
+        graph          = graph,
+        llm            = FakeLLMClient(turns=[answer]),
+        anonymizer     = FakeAnonymizer(),
+        tools          = fake_agent_tools(),
+        limits         = LIMITS,
+        max_iterations = FAKE_MAX_ITERATIONS,
+    )
+
+    app = create_app()
+    app.dependency_overrides[get_graph_builder] = lambda: (lambda module: compiled)
+
+    response = TestClient(app).post("/suggest", json={**TICKET, "variant": "questions"})
+    body     = response.json()
+
+    assert response.status_code == 200
+    assert body["variant"]        == "questions"
+    assert body["text"]           is None
+    assert body["internal_notes"] == notes
+

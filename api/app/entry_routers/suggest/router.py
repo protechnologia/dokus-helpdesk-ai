@@ -60,7 +60,8 @@ async def suggest_answer(
                                variant="questions")
 
     Wariant, który wymaga źródeł, bez odczytanych źródeł wraca bez treści dla klienta: `text` jest
-    puste, lista źródeł pusta, a uwagi dla wdrożeniowca zostają.
+    puste, lista źródeł pusta, a uwagi dla wdrożeniowca zostają. Tak samo, z `text` pustym
+    i uwagami, wraca wariant z pytaniami, gdy pytań już nie trzeba; źródła wtedy zostają.
 
     Example result:
         SuggestResponse(variant="questions", text="1. Od kiedy…",
@@ -84,7 +85,8 @@ async def suggest_answer(
     sources = getattr(final, "sources", [])
 
     # Bez odczytanych źródeł wariant, który ich wymaga, oddaje same uwagi (`ProposalNotes`), a gdy
-    # jego graf nie zostawia nawet ich — nic. Treść dla klienta jest tylko w pełnej propozycji.
+    # jego graf nie zostawia nawet ich — nic. Same uwagi oddaje też wariant z pytaniami, gdy pytań
+    # już nie trzeba. Treść dla klienta jest tylko w pełnej propozycji.
     output         = final.output
     text           = output.text if isinstance(output, Proposal) else None
     internal_notes = output.internal_notes if output is not None else ""

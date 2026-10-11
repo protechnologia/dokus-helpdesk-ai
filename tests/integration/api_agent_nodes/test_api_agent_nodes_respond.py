@@ -8,7 +8,14 @@ import pytest
 from langgraph.graph.state import CompiledStateGraph
 
 import app.agent_graphs
-from app.agent_graphs import gate_close, parse_ticket, run_graph, search, suggest_solution
+from app.agent_graphs import (
+    gate_close,
+    parse_ticket,
+    run_graph,
+    search,
+    suggest_questions,
+    suggest_solution,
+)
 from app.agent_graphs.factory import build_real_graph
 from app.agent_graphs.fake import FAKE_MAX_ITERATIONS, FAKE_READ_ARGUMENTS, FAKE_SEARCH_ARGUMENTS
 from app.agent_graphs.search.fake import DEFAULT_NOTES
@@ -465,6 +472,52 @@ async def test_a_solution_with_only_excluded_code_keeps_only_the_notes() -> None
     assert final.sources         == []
     assert final.respond_retries == 0
     assert "brak źródeł" in final.log[-1].message
+
+
+async def test_questions_that_are_no_longer_needed_end_with_notes_only() -> None:
+    """Sprawdza, czy w wariancie z pytaniami odpowiedź modelu bez pytań (`text` równe `null`)
+    kończy sprawę samymi uwagami dla wdrożeniowca, bez poprawki, choć agent przeczytał zgłoszenia
+    i źródła są. Dziennik nazywa typ wyniku.
+
+    Wyłapuje graf, który odrzuca odpowiedź bez pytań albo zapisuje ją jako propozycję: po
+    odpowiedziach klienta, które rozstrzygają sprawę, wdrożeniowiec dostawałby pytania na siłę
+    albo błąd zamiast informacji, że pytań już nie trzeba."""
+    notes = "Pytań już nie trzeba: klient potwierdził plik blokady (zgł. 90002)."
+    name  = suggest_questions.RESPOND_TOOL_NAME
+    llm   = FakeLLMClient(turns=[
+        *reading_turns(suggest_questions),
+        tool_call_turn(name, {"text": None, "internal_notes": notes}),
+    ])
+
+    final = await run_graph(real_graph(suggest_questions, llm), suggest_questions.example_state())
+
+    assert final.output          == ProposalNotes(internal_notes=notes)
+    assert final.respond_retries == 0
+    assert final.sources
+    assert final.log[-1].message == "output: ProposalNotes"
+
+
+async def test_no_questions_without_a_reason_go_back_once() -> None:
+    """Sprawdza, czy odpowiedź bez pytań i bez uwag wraca do modelu do poprawki, a wynikiem
+    sprawy zostaje dopiero odpowiedź z uwagami, podana w następnej turze.
+
+    Wyłapuje pustą odpowiedź przyjętą jako wynik: wdrożeniowiec nie dostałby ani pytań, ani
+    wyjaśnienia, dlaczego ich nie ma."""
+    notes = "Pytań już nie trzeba: klient potwierdził plik blokady (zgł. 90002)."
+    name  = suggest_questions.RESPOND_TOOL_NAME
+    llm   = FakeLLMClient(turns=[
+        tool_call_turn(name, {"text": None, "internal_notes": ""}, call_id="call_1"),
+        tool_call_turn(name, {"text": None, "internal_notes": notes}, call_id="call_2"),
+    ])
+
+    graph    = real_graph(suggest_questions, llm)
+    final    = await run_graph(graph, suggest_questions.example_state())
+    feedback = final.messages[-2]
+
+    assert final.output          == ProposalNotes(internal_notes=notes)
+    assert final.respond_retries == 1
+    assert (feedback.role, feedback.call_id) == ("tool", "call_1")
+    assert is_error_json(feedback.content)
 
 
 async def test_the_card_gets_its_identity_from_the_graph() -> None:

@@ -10,12 +10,14 @@ from app.agent_graphs.base import (
     route_after_respond,
     tool_definitions,
 )
+from app.agent_graphs.suggest_questions.models import QuestionsAnswer
 from app.agent_graphs.suggest_questions.respond_tool import RESPOND_TOOL_NAME, respond_tool
 from app.agent_graphs.suggest_questions.state import SuggestQuestionsState
 from app.agent_nodes import Node
 from app.agent_nodes.respond import RespondNode
 from app.agent_tools import AgentTool
 from app.core_model.graphs.proposal import Proposal
+from app.core_model.graphs.proposal_notes import ProposalNotes
 from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition
 
@@ -116,23 +118,50 @@ def model_tools(
     return definitions
 
 
+def to_output(
+    answer: QuestionsAnswer,  # np. QuestionsAnswer(text=None, internal_notes="Pytań już…")
+) -> Proposal | ProposalNotes:
+    """
+    Description:
+    Zamienia odpowiedź modelu na wynik grafu: lista pytań z uwagami to propozycja, a brak pytań
+    to same uwagi dla wdrożeniowca — ten sam kształt, w jakim wariant z rozwiązaniem wraca bez
+    źródeł, więc wołający dostaje `text: null` i uwagi. Węzeł `respond` woła tę funkcję po
+    przyjęciu odpowiedzi.
+
+    Example args:
+        answer=QuestionsAnswer(text=None, internal_notes="Pytań już nie trzeba: klient…")
+
+    Example result:
+        ProposalNotes(internal_notes="Pytań już nie trzeba: klient…")
+    """
+    # --- pytań już nie trzeba: zostają same uwagi ---
+    if answer.text is None:
+        return ProposalNotes(internal_notes=answer.internal_notes)
+
+    return Proposal(text=answer.text, internal_notes=answer.internal_notes)
+
+
 def respond_node() -> RespondNode:
     """
     Description:
-    Węzeł odpowiedzi tego grafu: waliduje argumenty `respond_suggest_questions` do `Proposal`.
-    Wariant nie wymaga źródeł (`REQUIRES_HITS`), więc pytania powstają także wtedy, gdy agent
-    niczego nie odczytał.
+    Węzeł odpowiedzi tego grafu: waliduje argumenty `respond_suggest_questions` do
+    `QuestionsAnswer` i zamienia je na wynik (`to_output()`): propozycję z pytaniami albo — gdy
+    fakty ze zgłoszenia rozstrzygają sprawę i pytań już nie trzeba — same uwagi. Wariant nie
+    wymaga źródeł (`REQUIRES_HITS`), więc pytania powstają także wtedy, gdy agent niczego nie
+    odczytał.
 
     Example args:
         (brak)
 
     Example result:
-        RespondNode czytający wywołanie `respond_suggest_questions` jako `Proposal`
+        RespondNode czytający wywołanie `respond_suggest_questions` jako `QuestionsAnswer`
+        i zapisujący `Proposal` albo `ProposalNotes`
     """
     node = RespondNode(
         respond_tool_name = RESPOND_TOOL_NAME,
-        output_model      = Proposal,
+        output_model      = QuestionsAnswer,
         requires_sources  = REQUIRES_HITS,
+        to_output         = to_output,
     )
 
     return node
