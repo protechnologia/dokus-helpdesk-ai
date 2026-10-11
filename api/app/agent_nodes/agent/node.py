@@ -86,7 +86,7 @@ class AgentNode(AgentNodeBase):
         Przyjmuje klienta modelu oraz prompt i narzędzia grafu, w którym węzeł pracuje.
 
         Example args:
-            llm=FakeLLMClient(turns=[tool_call_turn("respond_search", {})])
+            llm=FakeLLMClient(turns=[tool_call_turn("respond_search", {"internal_notes": "…"})])
             system_prompt="Jesteś asystentem wdrożeniowca helpdesku…"
             user_prompt=search.user_prompt
             tools=[ToolDefinition(name="find_tickets_vector", …),

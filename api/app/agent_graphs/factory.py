@@ -73,7 +73,7 @@ def build_real_graph(
 
     Example args:
         graph=app.agent_graphs.search
-        llm=FakeLLMClient(turns=[tool_call_turn("respond_search", {})])
+        llm=FakeLLMClient(turns=[tool_call_turn("respond_search", {"internal_notes": "…"})])
         anonymizer=FakeAnonymizer()
         tools=[FakeFindTicketsVectorTool(), FakeReadTicketsCardTool(), …]
         limits={"find_tickets_vector": 5, "read_tickets_card": 5, …}

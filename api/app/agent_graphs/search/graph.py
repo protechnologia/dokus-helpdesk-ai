@@ -10,7 +10,7 @@ from app.agent_graphs.base import (
     route_after_respond,
     tool_definitions,
 )
-from app.agent_graphs.search.models import SearchDone
+from app.agent_graphs.search.models import SearchNotes
 from app.agent_graphs.search.respond_tool import RESPOND_TOOL_NAME, respond_tool
 from app.agent_graphs.search.state import SearchState
 from app.agent_nodes import Node
@@ -54,7 +54,7 @@ def system_prompt() -> str:
         (brak)
 
     Example result:
-        "Jesteś asystentem wdrożeniowca helpdesku. Do nowego zgłoszenia wyszukujesz w bazie…"
+        "Jesteś asystentem wdrożeniowca helpdesku. Do zgłoszenia robisz rozpoznanie…"
     """
     return read_document(SYSTEM_FILE).rstrip()
 
@@ -112,19 +112,19 @@ def model_tools(
 def respond_node() -> RespondNode:
     """
     Description:
-    Węzeł odpowiedzi tego grafu: sprawdza, czy model zakończył wyszukiwanie wywołaniem
-    `respond_search` bez argumentów (`SearchDone`). Wynikiem są źródła i zapytania z przebiegu,
-    więc brak źródeł nie jest tu błędem — to poprawny wynik.
+    Węzeł odpowiedzi tego grafu: waliduje argumenty `respond_search` do `SearchNotes`, czyli
+    uwag dla wdrożeniowca. Źródła i zapytania biorą się z przebiegu, więc brak źródeł nie jest
+    tu błędem — to poprawny wynik, a uwagi mówią wtedy, czego agent szukał.
 
     Example args:
         (brak)
 
     Example result:
-        RespondNode czytający wywołanie `respond_search` jako `SearchDone`
+        RespondNode czytający wywołanie `respond_search` jako `SearchNotes`
     """
     node = RespondNode(
         respond_tool_name = RESPOND_TOOL_NAME,
-        output_model      = SearchDone,
+        output_model      = SearchNotes,
     )
 
     return node
@@ -134,7 +134,7 @@ def build_graph(
     anonymize:      Node,  # np. AnonymizeNode(FakeAnonymizer())
     agent:          Node,  # np. FakeAgentNode([tool_call_turn("find_tickets_vector", …), …])
     run_tools:      Node,  # np. FakeRunToolsNode(sources=[…])
-    respond:        Node,  # np. FakeRespondNode(SearchDone())
+    respond:        Node,  # np. FakeRespondNode(SearchNotes(internal_notes="…"))
     max_iterations: int,   # np. 20 — limit tur modelu z `AGENT_MAX_ITERATIONS`
 ) -> CompiledStateGraph:
     """
@@ -151,7 +151,7 @@ def build_graph(
         anonymize=AnonymizeNode(FakeAnonymizer())
         agent=FakeAgentNode([…])
         run_tools=FakeRunToolsNode(sources=[…])
-        respond=FakeRespondNode(SearchDone())
+        respond=FakeRespondNode(SearchNotes(internal_notes="…"))
         max_iterations=20
 
     Example result:

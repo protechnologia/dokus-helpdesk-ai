@@ -11,6 +11,7 @@ import app.agent_graphs
 from app.agent_graphs import gate_close, parse_ticket, run_graph, search, suggest_solution
 from app.agent_graphs.factory import build_real_graph
 from app.agent_graphs.fake import FAKE_MAX_ITERATIONS, FAKE_READ_ARGUMENTS, FAKE_SEARCH_ARGUMENTS
+from app.agent_graphs.search.fake import DEFAULT_NOTES
 from app.agent_nodes.agent import tool_call_turn
 from app.agent_nodes.respond import RespondError
 from app.agent_tools import AgentTool
@@ -77,7 +78,7 @@ def real_graph(
 
     Example args:
         graph=<module app.agent_graphs.search>
-        llm=FakeLLMClient(turns=[tool_call_turn("respond_search", {})])
+        llm=FakeLLMClient(turns=[tool_call_turn("respond_search", {"internal_notes": "…"})])
         tools=None
         max_iterations=10
 
@@ -304,7 +305,7 @@ async def test_a_run_cut_by_the_turn_limit_gets_one_turn_to_answer() -> None:
     llm   = FakeLLMClient(turns=[
         tool_call_turn("read_tickets_card", FAKE_READ_ARGUMENTS, call_id="call_1"),
         tool_call_turn("find_tickets_vector", FAKE_SEARCH_ARGUMENTS, call_id="call_2"),
-        tool_call_turn(search.RESPOND_TOOL_NAME, {}, call_id="call_3"),
+        tool_call_turn(search.RESPOND_TOOL_NAME, DEFAULT_NOTES.model_dump(), call_id="call_3"),
     ])
 
     graph   = real_graph(search, llm, tools, max_iterations=2)
@@ -315,7 +316,7 @@ async def test_a_run_cut_by_the_turn_limit_gets_one_turn_to_answer() -> None:
         if message.role == "tool"
     }
 
-    assert final.output == search.SearchDone()
+    assert final.output == DEFAULT_NOTES
     assert [entry.node for entry in final.log] == [
         "anonymize", "agent", "run_tools", "agent", "respond", "agent", "respond",
     ]
@@ -350,23 +351,47 @@ async def test_an_answer_together_with_a_search_runs_nothing() -> None:
 
     Wyłapuje wyszukanie wykonane po cichu razem z odpowiedzią: model skończyłby sprawę, nie
     widząc wyniku, o który sam poprosił, a wywołanie zużyłoby limit narzędzia."""
-    tools = fake_agent_tools()
-    both  = ChatMessage(
+    tools  = fake_agent_tools()
+    answer = DEFAULT_NOTES.model_dump()
+    both   = ChatMessage(
         role       = "assistant",
         tool_calls = [
             *tool_call_turn("find_tickets_vector", FAKE_SEARCH_ARGUMENTS, "call_1").tool_calls,
-            *tool_call_turn(search.RESPOND_TOOL_NAME, {}, "call_2").tool_calls,
+            *tool_call_turn(search.RESPOND_TOOL_NAME, answer, "call_2").tool_calls,
         ],
     )
-    llm = FakeLLMClient(turns=[both, tool_call_turn(search.RESPOND_TOOL_NAME, {}, "call_3")])
+    llm = FakeLLMClient(turns=[both, tool_call_turn(search.RESPOND_TOOL_NAME, answer, "call_3")])
 
     final   = await run_graph(real_graph(search, llm, tools), search.example_state())
     results = [message for message in final.messages if message.role == "tool"]
 
-    assert final.output     == search.SearchDone()
+    assert final.output     == DEFAULT_NOTES
     assert tools[0].queries == []
     assert [message.call_id for message in results] == ["call_1", "call_2"]
     assert all(is_error_json(message.content) for message in results)
+
+
+async def test_a_search_answer_without_notes_goes_back_once() -> None:
+    """Sprawdza, czy wyszukiwanie zakończone wywołaniem `respond_search` bez uwag wraca do modelu
+    do poprawki: wywołanie dostaje błąd w miejscu wyniku, a wynikiem sprawy zostają dopiero uwagi
+    podane w następnej turze. Tak samo wraca odpowiedź z pustym napisem w miejscu uwag.
+
+    Wyłapuje graf, który przyjmuje wyszukiwanie bez uwag, jak przed ich wprowadzeniem:
+    wdrożeniowiec dostałby samą listę źródeł, bez informacji, czy sprawy zgadzają się co do
+    przyczyny i czego agent szukał bez skutku."""
+    for without_notes in ({}, {"internal_notes": ""}):
+        llm = FakeLLMClient(turns=[
+            tool_call_turn(search.RESPOND_TOOL_NAME, without_notes, call_id="call_1"),
+            tool_call_turn(search.RESPOND_TOOL_NAME, DEFAULT_NOTES.model_dump(), call_id="call_2"),
+        ])
+
+        final    = await run_graph(real_graph(search, llm), search.example_state())
+        feedback = final.messages[-2]
+
+        assert final.output          == DEFAULT_NOTES
+        assert final.respond_retries == 1
+        assert (feedback.role, feedback.call_id) == ("tool", "call_1")
+        assert is_error_json(feedback.content)
 
 
 @pytest.mark.parametrize(

@@ -1,7 +1,14 @@
-<!-- Opis narzędzia odpowiedzi grafu `search` — czyta go MODEL. Bez argumentów z założenia:
-     wynikiem są źródła i zapytania z przebiegu, nie treść od modelu (models.py -> SearchDone).
-     Szkielet z p. 5; treść stroi się z promptem w p. 23.
+<!-- Opis narzędzia odpowiedzi grafu `search` — czyta go MODEL razem ze schematem argumentów
+     (schemat z `SearchNotes`, bez docstringów i przykładów — patrz respond_tool.py). Kształt
+     uwag opisuje prompt systemowy (wzór czterech sekcji), tu tylko pole. Listy źródeł model nie
+     podaje: powstaje z odczytów i z cytowań przyczyny (zasada 9). Treść stroi się z promptem
+     w p. 23.
 
      Komentarze redakcyjne jak ten są wycinane przed wysłaniem. -->
-Kończy wyszukiwanie. Wywołaj je, gdy kolejne wyszukanie nic nowego nie dodaje — jako jedyne
-wywołanie w turze. Nie przyjmuje argumentów: znalezione materiały człowiek zobaczy sam.
+Kończy rozpoznanie i oddaje uwagi dla wdrożeniowca. Wywołaj je, gdy kolejne wyszukanie nic nowego
+nie dodaje — jako jedyne wywołanie w turze. Listy źródeł nie podajesz: wdrożeniowiec dostanie to,
+co odczytałeś, i fragmenty kodu zacytowane jako przyczyna.
+
+- `internal_notes` — uwagi dla wdrożeniowca w lekkim Markdownie, w czterech sekcjach ze wzoru
+  z instrukcji (Zgłoszenia historyczne, Instrukcje i dokumentacja, Kod aplikacji, Nie znaleziono),
+  po polsku; nigdy puste.

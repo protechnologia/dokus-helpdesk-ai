@@ -93,14 +93,16 @@ async def search_tickets(
 ) -> SearchResponse:
     """
     Description:
-    Podobne zgłoszenia i fragmenty instrukcji do zgłoszenia — graf `search`. Cienki adapter:
-    żądanie na stan, graf, stan na odpowiedź. Brak źródeł to 200 z pustą listą, nie 404.
+    Rozpoznanie do zgłoszenia w zgłoszeniach, instrukcjach i kodzie aplikacji — graf `search`.
+    Cienki adapter: żądanie na stan, graf, stan na odpowiedź. Brak źródeł to 200 z pustą listą,
+    nie 404; uwagi dla wdrożeniowca wracają także wtedy.
 
     Example args:
         request=TicketRequest(ticket_id="41002", body="Nie mogę wysłać pisma przez ePUAP.")
 
     Example result:
         SearchResponse(sources=[SourceItem(…), …],
+                       internal_notes="## Zgłoszenia historyczne\n- 41002 (2026-03-14): …",
                        queries=[AgentQuery(tool="find_tickets_vector", …,
                                            dropped_below_threshold=0), …])
     """
@@ -108,19 +110,22 @@ async def search_tickets(
     final = await run_graph(build(search), state)
 
     response = SearchResponse(
-        sources = to_source_items(final.sources),
-        queries = _agent_queries(final.messages),
-        usage   = to_usage_item(final.usage),
-        log     = to_log_items(final.log),
+        sources        = to_source_items(final.sources),
+        internal_notes = final.output.internal_notes,
+        queries        = _agent_queries(final.messages),
+        usage          = to_usage_item(final.usage),
+        log            = to_log_items(final.log),
     )
 
-    # Same identyfikatory i liczby — źródła niosą dane klientów (CLAUDE.md -> „Logi").
+    # Same identyfikatory i liczby — źródła i uwagi niosą dane klientów (CLAUDE.md -> „Logi"),
+    # więc z uwag idzie do logu tylko długość.
     logger.info(
-        "search ticket_id=%s sources=%d queries=%d dropped_below_threshold=%d",
+        "search ticket_id=%s sources=%d queries=%d dropped_below_threshold=%d notes_chars=%d",
         request.ticket_id,
         len(response.sources),
         len(response.queries),
         sum(query.dropped_below_threshold or 0 for query in response.queries),
+        len(response.internal_notes),
     )
 
     return response

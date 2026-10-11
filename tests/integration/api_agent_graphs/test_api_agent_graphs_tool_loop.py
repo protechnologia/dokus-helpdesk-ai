@@ -11,6 +11,7 @@ from app.agent_graphs.fake import (
     FAKE_READ_ARGUMENTS,
     FAKE_SEARCH_ARGUMENTS,
 )
+from app.agent_graphs.search.fake import DEFAULT_NOTES
 from app.agent_nodes.agent import FakeAgentNode, tool_call_turn
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
@@ -126,7 +127,7 @@ async def test_a_call_over_the_limit_gets_an_error_and_the_loop_goes_on() -> Non
             result_text = '{"tickets": []}',
             limits      = {"find_tickets_vector": 2},
         ),
-        respond        = FakeRespondNode(search.SearchDone()),
+        respond        = FakeRespondNode(DEFAULT_NOTES),
         max_iterations = FAKE_MAX_ITERATIONS,
     )
 
@@ -196,7 +197,7 @@ async def test_the_cost_of_every_model_turn_adds_up_in_the_state() -> None:
         anonymize      = AnonymizeNode(FakeAnonymizer()),
         agent          = agent,
         run_tools      = FakeRunToolsNode(result_text="{}"),
-        respond        = FakeRespondNode(search.SearchDone()),
+        respond        = FakeRespondNode(DEFAULT_NOTES),
         max_iterations = FAKE_MAX_ITERATIONS,
     )
 

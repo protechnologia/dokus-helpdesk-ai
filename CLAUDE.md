@@ -1028,6 +1028,9 @@ a paczka powstała z innej gałęzi.
   stroi p. 26. Od p. 64 akapit o kodzie kończy zdanie o spisie katalogu (`list_code_files`):
   model może obejrzeć katalog, gdy szukanie daje za dużo trafień albo chce zobaczyć, co leży
   obok znalezionego pliku. To przyzwolenie, nie nakaz, i nie jest osobnym wejściem w kod.
+  Od p. 70 (2026-10-11) wąski warunek stoi już tylko w `suggest_questions`
+  i `suggest_solution`: `search` sprawdza kod w każdej sprawie o działaniu aplikacji, a gdy
+  zgłoszenie nie niesie komunikatu, szuka nazw z ekranu.
 - **Na żywym `gpt-6.1-sol` model idzie drogą szukanie → odczyt → cytowanie (2026-10-09,
   pojedyncze przebiegi, nie pomiar; raport
   `data/unsafe/docs/przebieg-read-code-file-gpt-6.1-sol-2026-10-09.md`).** Siedem spraw
@@ -1418,6 +1421,12 @@ Wspólne:
   `dropped_below_threshold` (2026-10-05): ile trafień TEGO zapytania odciął próg, odczytane
   z wyniku narzędzia w rozmowie. Przy zapytaniu, nie jako suma na odpowiedź: agent szuka kilka
   razy i te same słabe trafienia liczyłyby się wielokrotnie.
+- **`/search` oddaje uwagi dla wdrożeniowca w `internal_notes` (2026-10-11)**, pod tą samą
+  nazwą co `/suggest`, bo czyta je ta sama osoba. To jedyny tekst modelu w odpowiedzi tej
+  trasy, w lekkim Markdownie (nagłówki `##` i listy `-`), czytelnym także bez renderowania;
+  nigdy nie jest pusty, także przy pustej liście źródeł. Sama lista źródeł nie mówi, czy
+  przeczytane sprawy zgadzają się co do przyczyny, a od tego zależy, czy dopytać, czy
+  odpowiadać. Do logu usługi idzie tylko długość uwag, a w `log` przebiegu ich nie ma.
 - **Każda odpowiedź trasy opartej na grafie niesie `usage`** — liczbę wywołań modelu, tokeny
   w czterech klasach i `cost_usd` całej sprawy, żeby wołający widział koszt bez logów.
 - **Każda taka odpowiedź niesie też `log` (2026-10-04)** — wpisy przebiegu grafu ze stanu
@@ -2110,10 +2119,46 @@ nowe zgłoszenie (surowy tekst)
   spoza `TOOL_NAMES` to błąd składania.
 - **Model wyniku wspólny dla kilku grafów — w `core_model/graphs/` (`Verdict`, `Proposal`,
   `ProposalNotes`);
-  używany przez jeden graf — w `agent_graphs/<graf>/models.py`** (`SearchDone`, `PolishedText`),
+  używany przez jeden graf — w `agent_graphs/<graf>/models.py`** (`SearchNotes`, `PolishedText`),
   jak modele narzędzi.
-- **`search` kończy się pustym `respond_search`** — wynikiem są źródła z `cite()` i zapytania
-  agenta z `messages`, nic z deklaracji modelu.
+- **`search` kończy się `respond_search` z uwagami dla wdrożeniowca (2026-10-11, wcześniej bez
+  argumentów).** Wynikiem są źródła z `cite()`, zapytania agenta z `messages` i uwagi
+  (`SearchNotes.internal_notes`) w lekkim Markdownie: cztery sekcje z nagłówkiem `##` —
+  Zgłoszenia historyczne, Instrukcje i dokumentacja, Kod aplikacji, Nie znaleziono — a w nich
+  punkt na sprawę, sekcję instrukcji albo fragment kodu; sekcja bez materiału to jedno zdanie.
+  Jedna sprawa w jednym punkcie pokazuje zgodność albo rozbieżność przyczyn bez czytania
+  akapitu. Uwagi pisze model, lista źródeł nadal powstaje z odczytów (zasada 9).
+  Są wymagane i niepuste, inaczej niż w propozycjach: przy zerze trafień mówią, czego agent
+  szukał, więc `respond_search` bez uwag wraca do poprawki. Wzór trzyma prompt, kod kształtu
+  nie sprawdza, a zgodność nagłówków z opisem narzędzia odpowiedzi pilnuje test. Uwagi nie
+  podpowiadają, czy dopytać, odpowiedzieć, czy przekazać sprawę.
+- **`search` sprawdza kod aplikacji w każdej sprawie o działaniu aplikacji, razem ze
+  zgłoszeniami i instrukcjami (decyzja 2026-10-11).** Pomija go tylko sprawa organizacyjna
+  (konto, szkolenie, termin). Bez komunikatu wejściem są nazwy z ekranu. W `suggest_questions`
+  i `suggest_solution` kod zostaje wyjściem awaryjnym do p. 25–26. Cena: w większości spraw
+  dochodzą wywołania narzędzi kodu.
+- **Rozpoznanie stoi na stanie sprawy po ostatniej wiadomości wątku (2026-10-11).** Prompt
+  `search` mówi o pytaniach konsultanta i odpowiedziach klienta, a uwagi mają nazwać przyczyny,
+  które te odpowiedzi wykluczają. Z grafów z narzędziami wiedzy mówi o nim poza tym tylko
+  `suggest_questions` (dwie reguły), a zgłoszenia przykładowe tych grafów i ich testów to sam
+  opis zgłaszającego.
+- **Na żywym `gpt-6.1-sol` rozpoznanie wyszło w siedmiu zmyślonych sprawach (2026-10-11,
+  pojedyncze przebiegi, nie pomiar; raport
+  `data/unsafe/docs/przebieg-search-rozpoznanie-gpt-6.1-sol-2026-10-11.md`).** Narzędzia kodu
+  prawdziwe, na aplikacji syntetycznej; razem 33 tury i 0,19 USD, bez poprawki odpowiedzi.
+  W sześciu sprawach o działaniu aplikacji model wszedł w kod w pierwszej turze, w sprawie
+  organizacyjnej ani razu. Sprawa to 3–6 tur i 0,01–0,05 USD, bo model woła kilka narzędzi
+  w jednej turze; ta sama sprawa co w sondzie z 2026-10-10 zajęła 6 tur zamiast 7. Uwagi miały
+  wtedy kształt czterech linii z etykietą i 600–1500 znaków, więcej niż zakładał plan; po
+  zmianie na sekcje Markdown trzy z tych spraw puszczono jeszcze raz (0,09 USD): model
+  trzymał cztery nagłówki i punkt na sprawę w każdej, bez innych znaczników, a uwagi urosły
+  do 620–1770 znaków, mimo limitu zdań w regułach. Przy trzech różnych
+  przyczynach wymieniały je osobno, przy trzech zgodnych mówiły o zgodności z dopiskiem, że
+  u klienta przyczyna nie jest potwierdzona, a przy wątku z odpowiedziami klienta nazwały
+  przyczynę wykluczoną i te, które zostają. Wszystkie 11 cytowań dotyczyło linii wcześniej
+  odczytanych i żadne uwagi nie podpowiadały, co zrobić ze sprawą. Tych samych spraw na starym
+  prompcie nie puszczano. Bez komunikatu model trafiał w kod jednym albo dwoma szukaniami, ale
+  aplikacja syntetyczna ma 34 pliki, więc o kodzie Dokusa to nic nie mówi.
 - **Prompt parsujący leży w `agent_graphs/parse_ticket/`, jak każdy prompt grafu (2026-10-02)** — i
   nadal jest KONTRAKTEM ARTEFAKTU (zasada 7): `prompt_system.md` (rola, jak czytać wątek),
   `respond_tool.md` (znaczenie pól, przykłady) i `prompt_user.md` (słownik i wątek) pod
@@ -2679,16 +2724,16 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1575 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 508 (79)           | 96 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 105 (9)            | 10 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1588 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 509 (79)           | 96 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 109 (9)            | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 38 s |
 
-Liczby i czasy z 2026-10-10: każdy folder osobno, w komplecie
+Liczby z 2026-10-11, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku. Bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy — całe 38 s to 207 wyszukań golden setów
 przez prawdziwy embedder (178 w zgłoszeniach, 29 w dokumentacji). Komplet jednym poleceniem
-(`pytest -m "not llm_live"`): 2192 testy, 132 s; domyślny `pytest`, bez stacku: 2066 testów,
+(`pytest -m "not llm_live"`): 2210 testów, 132 s; domyślny `pytest`, bez stacku: 2084 testy,
 30 s. Trzydzieści sześć testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
 folderu, ale poza oboma przebiegami.
 
@@ -3158,6 +3203,18 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   poziomu.
 - **Liczba linii przy pliku w spisie katalogu** — wymaga czytania każdego pliku, a długość
   podaje pierwszy odczyt.
+- **Pole-dana o zgodności przyczyn w odpowiedzi `/search`** (`zgodne` / `rozbieżne` / `nie da
+  się ocenić`) — stoi blisko wskazywania guzika, a przy pustych `cause` zamienia brak wiedzy
+  w pewność; zgodność opisują uwagi. Wraca, gdy helpdesk zechce pokazać ją jako znacznik.
+- **Uwagi `/search` jako osobne pole na każdy materiał** — inny kształt niż w `/suggest`
+  i więcej do przeniesienia w p. 71; jest jeden tekst ze wzorem czterech sekcji.
+- **Uwagi `/search` jako cztery linie z etykietą i dwukropkiem** — tak wyszły z p. 70; przy
+  600–1500 znakach gęste linie źle się czytały, a przyczyny spraw stały w jednym zdaniu.
+- **Nagłówek `#` w uwagach `/search`** — w panelu, który renderuje Markdown, wyszedłby jak
+  tytuł strony; sekcje mają `##`.
+- **Kod aplikacji w `search` tylko wtedy, gdy zgłoszenia i instrukcje nie rozstrzygają
+  przyczyny** — tańsze, ale kod nie jest wtedy trzecim materiałem na równi, tylko wyjściem
+  awaryjnym.
 - **Stronicowanie katalogu, który nie mieści się w spisie** — takich katalogów jest w paczce
   siedem, wszystkie z setkami plików; w nich szuka się po treści, z katalogiem w `path`.
 - **Test na żywym modelu wymagający wywołania spisu katalogu** — narzędzie jest pomocnicze
@@ -3411,19 +3468,24 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   w obu sprawach, które tego wymagały, i w żadnej, która nie wymagała; szukanie bez
   komunikatu, po opisie projektu, przechodzi do p. 65; reguły — „Kod aplikacji", „Warstwa
   narzędzi agenta", „Warstwa węzłów", „Testy", „Świadomie pominięte".
-- [ ] **70. `search` jako rozpoznanie dla operatora** (dopisany 2026-10-10, numer spoza
-  kolejności) — prompt wymienia trzy materiały na równi (zgłoszenia, instrukcje, kod aplikacji)
-  i mówi, po co jest wynik: operator ma na jego podstawie zdecydować, czy dopytać, odpowiedzieć,
-  czy przekazać sprawę; warunek sięgnięcia po kod szerszy niż komunikat, wpis z logu i kod
-  błędu — także sprawa, która wygląda na związaną z działaniem aplikacji; odpowiedź `/search`
-  dostaje krótkie uwagi dla operatora: co agent znalazł w każdym materiale, czy przeczytane
-  sprawy zgadzają się co do przyczyny, czego szukał i nie znalazł, co wykluczył w kodzie;
-  guzika uwagi nie wskazują; sprawdzenie sondą na zmyślonych sprawach, a pomiar na prawdziwych
-  zostaje w p. 23. *Dlaczego:* dziś rola w prompcie mówi tylko o zgłoszeniach i instrukcjach,
-  a wynik to sama lista źródeł: pięć spraw o jednym objawie i pięciu przyczynach wygląda tak
-  samo jak pięć zgodnych, a to rozstrzyga, czy pytać, czy odpowiadać. Cena do policzenia:
-  droga przez kod dokłada 2–3 tury (dziś wyszukiwanie to około 5 tur i 0,02 USD), a uwagi są
-  pierwszym tekstem modelu w odpowiedzi tej trasy.
+- [x] **70. `search` jako rozpoznanie dla wdrożeniowca** (2026-10-11) — prompt wymienia
+  zgłoszenia, instrukcje i kod aplikacji na równi i mówi, po co jest wynik; kod w każdej sprawie
+  o działaniu aplikacji, bez komunikatu wejściem są nazwy z ekranu; zdanie o wątku bieżącej
+  sprawy; `respond_search` oddaje uwagi (`SearchNotes`, cztery sekcje Markdown, niepuste), a trasa
+  `/search` niesie je w `internal_notes`; sonda na siedmiu zmyślonych sprawach na żywym
+  `gpt-6.1-sol`, bez pary na starym prompcie; pomiar na prawdziwych sprawach i na kodzie Dokusa
+  zostaje w p. 23; reguły — „Warstwa grafów", „Warstwa API", „Kod aplikacji", „Testy",
+  „Świadomie pominięte".
+- [ ] **72. `suggest_questions`: „pytań już nie trzeba"** (dopisany 2026-10-11, numer spoza
+  kolejności) — gdy odpowiedzi klienta w wątku rozstrzygają sprawę, wariant oddaje `text: null`
+  i jedno zdanie w uwagach, które odpowiedzi ją rozstrzygają, zamiast słabszych pytań; graf
+  dostaje własne wyjście, bo `Proposal.text` wymaga dziś niepustej treści w trzech wariantach;
+  reguła w prompcie i sonda na dwóch zmyślonych sprawach (odpowiedzi rozstrzygają; odpowiedzi
+  zawężają, ale pytania jeszcze są). *Dlaczego:* dziś prompt każe dać 3–6 pytań i nigdy nie
+  odmawiać, a guzik nie pamięta poprzedniego kliknięcia, więc po odpowiedziach klienta
+  wdrożeniowiec dostaje pytania zamiast informacji, że pora na rozwiązanie. Kształt już jest:
+  tak wraca `solution` bez źródeł. Odrzucone: zdanie „mam komplet informacji" w `text`, bo to
+  pole dla klienta, a brzmienie zdania pływa.
 - [ ] **65. `describe_code`** — opis projektu w całości, raz na sprawę; szkic pisze model
   z kodu, poprawia programista Dokusa, plik leży w paczce; opis nazywa wprost połączenia idące
   przez napis, których mapa symboli nie zna (które zdarzenie obsługuje która funkcja); do
@@ -3461,7 +3523,9 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   uruchomić przed anonimizatorem, więc prompty dostają sygnał z modelu docelowego wcześniej niż
   z p. 21–28; tamtych pomiarów nie zastępują,
   bo scenariusze pisze autor promptów; stoi po p. 11, bo ocenia odpowiedź przepuszczoną przez
-  właściwy `respond`.
+  właściwy `respond`. Do każdego grafu z pętlą dochodzi scenariusz, w którym bieżące zgłoszenie
+  ma wątek z pytaniami konsultanta i odpowiedziami klienta (dopisane 2026-10-11): dziś sprawdza
+  to jedna sprawa sondy `search`.
 - [ ] **46. CLI dla grafów** (dopisany 2026-10-02, numer spoza kolejności) — `helpdesk gate
   close|reply`, `helpdesk suggest <wariant>`, „Popraw" i karta zgłoszenia na tej samej fabryce
   grafów co trasy; także wyszukiwanie i parsowanie zgłoszeń do korpusu (dawne `rag search`
@@ -3517,9 +3581,10 @@ każdy mierzy się osobno.
   zwrotu), ewaluacja per reguła, złośliwy zestaw reguł w teście-strażniku. *Dlaczego:* fałszywy
   alarm uczy obchodzić bramkę odruchowo, a „bramka ma 90%" nie mówi, która reguła się sypie.
 - [ ] **23. `search`** — prompt pętli (jak pytać każde narzędzie, kiedy materiał wystarcza
-  i kiedy sięgać po kod aplikacji — reguła z p. 63 ma wąski warunek: komunikat, wpis z logu
-  albo kod błędu; ma zachęcać do kodu częściej: także wtedy, gdy sprawa wygląda na związaną
-  z działaniem kodu albo z logiką biznesową);
+  i ile kosztuje kod aplikacji sprawdzany w każdej sprawie o działaniu aplikacji — reguła
+  z p. 70; na kodzie Dokusa do policzenia, jak często szukanie nazw z ekranu trafia we właściwe
+  miejsce i ile szukań zużywa, oraz czy uwagi dla wdrożeniowca mówią prawdę o przeczytanych
+  sprawach i ile mają mieć znaków);
   pomiar pętli wobec wszystkich narzędzi naraz (tryb bez pętli zostaje jako odniesienie i tryb
   awaryjny), w zestawie klastry wieloprzyczynowe; osobna oś — trafność zapytań pisanych przez
   agenta wobec zapytań z parsera korpusu (golden set, `recall@1` i MRR; punkt odniesienia to pola
@@ -3564,7 +3629,8 @@ każdy mierzy się osobno.
   bierze fakty z obu na równi; w sondzie krok z instrukcji stanął pierwszy, choć żadne
   zgłoszenie go nie potwierdzało); reguła dla odpowiedzi opartej wyłącznie na kodzie: przy jakim
   warunku pada komunikat i co sprawdzić, wprost, że nie potwierdza tego żadna sprawa, a nazwy
-  klas i ścieżki w uwagach dla wdrożeniowca (p. 68); ewaluacja
+  klas i ścieżki w uwagach dla wdrożeniowca (p. 68); reguła o wątku bieżącej sprawy: nie
+  proponować kroku, który wątek pokazuje jako już wykonany (dziś prompt o wątku milczy); ewaluacja
   wariantu. *Dlaczego:* ostrzeżenie nie padło w żadnym z czterech pomiarów, a bez reguły zgodności
   model kazał wygasić duplikat kontrahenta przy zgłoszeniu o przenoszeniu zasobów.
 - [ ] **27. `suggest_handoff`** — prompt niosący, co sprawdzono i czego brakuje; do

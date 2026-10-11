@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.agent_graphs import search
@@ -20,7 +21,7 @@ from app.engine_llm import LLMUsage
 from app.main import create_app
 from tests.helpers_agent_tools import find_tickets_vector_with_dead_embedder
 
-# Kontrakt HTTP `POST /search` w procesie: kształt odpowiedzi (źródła + zapytania agenta),
+# Kontrakt HTTP `POST /search` w procesie: kształt odpowiedzi (źródła, uwagi, zapytania agenta),
 # walidacja żądania i to, co trasa wkłada do grafu. Że trasa jest zamontowana w obrazie, sprawdza
 # `stack_api`.
 
@@ -28,6 +29,11 @@ TICKET = {"ticket_id": "41002", "body": "Od wczoraj nie przychodzą przesyłki z
 
 # Limity wywołań narzędzi, jakie daje konfiguracja domyślna.
 LIMITS = Settings(_env_file=None).tool_call_limits()
+
+# Uwagi dla wdrożeniowca inne niż domyślne atrapy grafu, ze słowem, którego nie ma nigdzie indziej.
+NOTES = search.SearchNotes(
+    internal_notes = "Zgłoszenia: 90001, 90002, 90003 — przyczyny rozbieżne (znacznik-uwag).",
+)
 
 
 def client_searching_with(
@@ -49,15 +55,36 @@ def client_searching_with(
         anonymize      = AnonymizeNode(FakeAnonymizer()),
         agent          = FakeAgentNode([
             tool_call_turn("find_tickets_vector", FAKE_SEARCH_ARGUMENTS, call_id="call_1"),
-            tool_call_turn(search.RESPOND_TOOL_NAME, {}, call_id="call_2"),
+            tool_call_turn(search.RESPOND_TOOL_NAME, NOTES.model_dump(), call_id="call_2"),
         ]),
         run_tools      = RunToolsNode([tool], LIMITS),
-        respond        = FakeRespondNode(search.SearchDone()),
+        respond        = FakeRespondNode(NOTES),
         max_iterations = FAKE_MAX_ITERATIONS,
     )
 
     app = create_app()
     app.dependency_overrides[get_graph_builder] = lambda: (lambda module: graph)
+
+    return TestClient(app)
+
+
+def client_answering_with(
+    notes: search.SearchNotes,  # np. SearchNotes(internal_notes="Zgłoszenia: 90001…")
+) -> TestClient:
+    """
+    Description:
+    Aplikacja, w której atrapa grafu `search` kończy sprawę podanymi uwagami zamiast domyślnych.
+
+    Example args:
+        notes=SearchNotes(internal_notes="Zgłoszenia: 90001, 90002, 90003 — przyczyny rozbieżne…")
+
+    Example result:
+        TestClient, którego `/search` oddaje podane uwagi
+    """
+    app = create_app()
+    app.dependency_overrides[get_graph_builder] = lambda: (
+        lambda module: search.build_fake_graph(notes)
+    )
 
     return TestClient(app)
 
@@ -87,6 +114,63 @@ def test_sources_and_agent_queries_go_out() -> None:
             "dropped_below_threshold": None,
         },
     ]
+
+
+def test_the_notes_of_the_run_go_out() -> None:
+    """Sprawdza, czy `POST /search` oddaje w polu `internal_notes` uwagi dla wdrożeniowca, którymi
+    graf zakończył sprawę, znak w znak, obok źródeł z tego samego przebiegu.
+
+    Wyłapuje trasę, która gubi uwagi albo oddaje w ich miejscu wartość domyślną: wdrożeniowiec
+    dostałby samą listę źródeł, na której trzy sprawy o trzech różnych przyczynach wyglądają tak
+    samo jak trzy zgodne."""
+    response = client_answering_with(NOTES).post("/search", json=TICKET)
+
+    assert response.status_code              == 200
+    assert response.json()["internal_notes"] == NOTES.internal_notes
+    assert [item["item_id"] for item in response.json()["sources"]] == ["90001", "90002", "90003"]
+
+
+def test_the_notes_go_out_also_without_sources() -> None:
+    """Sprawdza, czy `/search` oddaje uwagi także wtedy, gdy agent niczego nie odczytał: lista
+    źródeł jest pusta, a `internal_notes` niesie to, czym graf zakończył sprawę.
+
+    Wyłapuje trasę, która przy pustej liście źródeł wycina uwagi, jak wariant wymagający źródeł
+    wycina treść dla klienta: przy zerze trafień uwagi są jedyną informacją o tym, czego agent
+    szukał."""
+    tool     = FakeFindTicketsVectorTool(tickets=[], dropped_below_threshold=0)
+    response = client_searching_with(tool).post("/search", json=TICKET)
+
+    assert response.json()["sources"]        == []
+    assert response.json()["internal_notes"] == NOTES.internal_notes
+
+
+def test_the_notes_are_not_in_the_log_of_the_run() -> None:
+    """Sprawdza, czy uwagi dla wdrożeniowca wracają tylko w swoim polu: żaden wpis logu przebiegu
+    w odpowiedzi `/search` nie zawiera ich treści.
+
+    Wyłapuje uwagi przepisane do logu przebiegu: log ma nieść same nazwy, liczby
+    i identyfikatory, a uwagi pisze model z treści zgłoszeń, więc niosą dane klientów."""
+    log = client_answering_with(NOTES).post("/search", json=TICKET).json()["log"]
+
+    assert log
+    assert all("znacznik-uwag" not in entry["message"] for entry in log)
+
+
+def test_the_service_log_carries_the_length_of_the_notes_not_their_text(
+    capsys: pytest.CaptureFixture[str],  # wstrzykiwane przez pytest; zbiera wyjście procesu
+) -> None:
+    """Sprawdza, czy wpis logu usługi o zakończonym wyszukiwaniu podaje długość uwag
+    (`notes_chars`), a nie ich treść.
+
+    Wyłapuje uwagi wypisane do logu usługi: uwagi pisze model z treści zgłoszeń, a do logu wolno
+    zapisywać wyłącznie identyfikatory i liczby."""
+    client_answering_with(NOTES).post("/search", json=TICKET)
+
+    # Log usługi idzie na standardowe wyjście błędów; aplikacja ustawia go przy starcie.
+    service_log = capsys.readouterr().err
+
+    assert f"notes_chars={len(NOTES.internal_notes)}" in service_log
+    assert "znacznik-uwag" not in service_log
 
 
 def test_hits_cut_by_the_threshold_are_counted_in_the_response() -> None:
@@ -183,13 +267,13 @@ def test_the_cost_of_the_run_goes_out_rounded() -> None:
 
     Wyłapuje koszt oddany wprost z sumowania ułamków, z ogonem w rodzaju 0,006000000000000001,
     oraz zużycie, które nie sumuje się z kolejnych tur."""
-    agent, run_tools = fake_search_nodes(search.RESPOND_TOOL_NAME, search.SearchDone())
+    agent, run_tools = fake_search_nodes(search.RESPOND_TOOL_NAME, NOTES)
     agent._usage     = LLMUsage(calls=1, prompt_tokens=100, completion_tokens=10, cost_usd=0.002)
     graph            = search.build_graph(
         AnonymizeNode(FakeAnonymizer()),
         agent,
         run_tools,
-        FakeRespondNode(search.SearchDone()),
+        FakeRespondNode(NOTES),
         FAKE_MAX_ITERATIONS,
     )
 
@@ -222,12 +306,12 @@ def test_the_graph_reads_the_whole_thread() -> None:
     Wyłapuje trasę, która przekazuje sam opis albo gubi numer zgłoszenia: agent szukałby wtedy
     na podstawie innego tekstu niż ten, z jakiego powstały karty w indeksie."""
     anonymizer       = FakeAnonymizer()
-    agent, run_tools = fake_search_nodes(search.RESPOND_TOOL_NAME, search.SearchDone())
+    agent, run_tools = fake_search_nodes(search.RESPOND_TOOL_NAME, NOTES)
     graph            = search.build_graph(
         AnonymizeNode(anonymizer),
         agent,
         run_tools,
-        FakeRespondNode(search.SearchDone()),
+        FakeRespondNode(NOTES),
         FAKE_MAX_ITERATIONS,
     )
 

@@ -26,7 +26,7 @@ do poprawki, raz (respond → agent):
 |---------------------|--------------------------------|----------------|
 | `gate_close`        | —                              | `Verdict`      |
 | `gate_reply`        | —                              | `Verdict`      |
-| `search`            | zgłoszenia, dokumentacja i kod | `SearchDone`   |
+| `search`            | zgłoszenia, dokumentacja i kod | `SearchNotes`  |
 | `parse_ticket`      | —                              | `ParsedTicket` |
 | `suggest_questions` | zgłoszenia, dokumentacja i kod | `Proposal`     |
 | `suggest_solution`  | zgłoszenia, dokumentacja i kod | `Proposal`     |
@@ -34,8 +34,8 @@ do poprawki, raz (respond → agent):
 | `polish`            | —                              | `PolishedText` |
 
 „Zgłoszenia, dokumentacja i kod" to wszystkie narzędzia z `agent_tools/`: dwa wyszukiwania i dwa
-odczyty zgłoszeń, spis treści, dwa wyszukiwania i odczyt dokumentacji oraz cytowanie fragmentu
-kodu aplikacji. Z narzędzi kodu jest na razie samo cytowanie; szukanie i odczyt dojdą osobno.
+odczyty zgłoszeń, spis treści, dwa wyszukiwania i odczyt dokumentacji oraz cztery narzędzia kodu
+aplikacji: szukanie, spis katalogu, odczyt pliku i cytowanie fragmentu.
 """
 
 import langsmith

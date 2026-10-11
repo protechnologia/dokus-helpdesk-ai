@@ -63,7 +63,7 @@ async def loop_graph(
 
     Example args:
         graph=<module app.agent_graphs.search>
-        llm=FakeLLMClient(turns=[tool_call_turn("respond_search", {})])
+        llm=FakeLLMClient(turns=[tool_call_turn("respond_search", {"internal_notes": "…"})])
         tools=None
         limits=LIMITS
 

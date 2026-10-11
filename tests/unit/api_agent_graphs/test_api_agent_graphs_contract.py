@@ -12,6 +12,7 @@ import app.agent_graphs
 from app.agent_graphs import merge_sources, parse_ticket
 from app.agent_graphs.fake import FAKE_MAX_ITERATIONS
 from app.agent_graphs.polish import PolishedText
+from app.agent_graphs.search import SearchNotes
 from app.agent_nodes import Node
 from app.agent_nodes.agent import FakeAgentNode
 from app.agent_nodes.anonymize import AnonymizeNode
@@ -70,11 +71,15 @@ BLOCK = Verdict(
     hint    = "Dopisz, dlaczego usługa stanęła.",
 )
 
+# Nazwa narzędzia podana w prompcie: w grawisach i zaczyna się od czynności narzędzia.
+TOOL_NAME_IN_PROMPT = r"`((?:find|read|list|quote|describe|respond)_[a-z_]+)`"
+
 GIVEN_OUTPUTS: dict[str, BaseModel] = {
     "gate_close":        BLOCK,
     "gate_reply":        BLOCK,
     "parse_ticket":      parse_ticket.default_ticket().model_copy(update={"cause": "brak"}),
     "polish":            PolishedText(text="Dzień dobry, przesyłki już docierają."),
+    "search":            SearchNotes(internal_notes="Zgłoszenia: żadnej nie znaleziono."),
     "suggest_handoff":   Proposal(text="Przekazujemy sprawę do dalszych prac.", internal_notes=""),
     "suggest_questions": Proposal(
         text           = "1. Od kiedy nie przychodzą przesyłki?",
@@ -333,8 +338,7 @@ async def test_the_fake_agent_answers_through_the_respond_tool(graph: ModuleType
 async def test_the_fake_graph_returns_the_given_output(graph: ModuleType) -> None:
     """Sprawdza, czy atrapa każdego grafu, którego wynik ma treść, oddaje dokładnie ten wynik,
     który jej podano, inny niż domyślny, i czy model oddał go wywołaniem narzędzia odpowiedzi,
-    z tym samym wynikiem w argumentach. Wyszukiwanie tu nie wchodzi: jego wynik to pusty sygnał
-    końca.
+    z tym samym wynikiem w argumentach.
 
     Wyłapuje atrapę, która gubi albo podmienia podany wynik: test trasy, który podaje jej własny
     werdykt albo propozycję, sprawdzałby wtedy odpowiedź domyślną zamiast swojej."""
@@ -483,6 +487,21 @@ def test_both_prompt_turns_name_the_respond_tool(graph: ModuleType) -> None:
     odpowiedzieć narzędziem, którego model nie dostał, a w diffie promptu nie byłoby tego widać."""
     assert graph.RESPOND_TOOL_NAME in graph.system_prompt()
     assert graph.RESPOND_TOOL_NAME in graph.user_prompt(anonymized_state(graph))
+
+
+@pytest.mark.parametrize("graph", RESPOND_GRAPHS, ids=name_of)
+def test_the_system_prompt_names_only_tools_the_model_gets(graph: ModuleType) -> None:
+    """Sprawdza, czy każda nazwa narzędzia, którą prompt systemowy grafu podaje modelowi, jest
+    nazwą narzędzia z listy tego grafu albo jego narzędzia odpowiedzi.
+
+    Wyłapuje zmianę nazwy narzędzia w kodzie albo zdjęcie go z listy grafu bez poprawienia
+    promptu: prompt kazałby wtedy wywołać narzędzie, którego model nie dostał, a w diffie
+    promptu nie byłoby tego widać."""
+    # Nazwy narzędzi zaczynają się od czynności; tak odróżniamy je od nazw pól w grawisach.
+    named   = set(re.findall(TOOL_NAME_IN_PROMPT, graph.system_prompt()))
+    allowed = {*graph.TOOL_NAMES, graph.RESPOND_TOOL_NAME}
+
+    assert named <= allowed
 
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)

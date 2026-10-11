@@ -12,6 +12,7 @@ from app.agent_graphs.factory import (
     close_process_agent_tools,
     process_agent_tools,
 )
+from app.agent_graphs.search.fake import DEFAULT_NOTES
 from app.agent_nodes.agent import tool_call_turn
 from app.config import Settings
 from app.engine_anonymization import AnonymizationConfigError, FakeAnonymizer
@@ -99,7 +100,7 @@ def use_fake_dependencies(
 
     Example args:
         monkeypatch=<fixture pytest>
-        llm=FakeLLMClient(turns=[tool_call_turn("respond_search", {})])
+        llm=FakeLLMClient(turns=[tool_call_turn("respond_search", {"internal_notes": "…"})])
 
     Example result:
         None — fabryka buduje graf na atrapach zależności
@@ -163,7 +164,8 @@ async def test_a_real_model_gets_a_graph_of_real_nodes(monkeypatch: pytest.Monke
 
     Wyłapuje fabrykę, która przy prawdziwym modelu dalej oddaje atrapę grafu albo gubi limity:
     model liczyłby tury, a wołający dostawałby stałą odpowiedź atrapy."""
-    llm = FakeLLMClient(turns=[PLAIN_TEXT, tool_call_turn(search.RESPOND_TOOL_NAME, {})])
+    answer = tool_call_turn(search.RESPOND_TOOL_NAME, DEFAULT_NOTES.model_dump())
+    llm    = FakeLLMClient(turns=[PLAIN_TEXT, answer])
 
     use_a_real_provider(monkeypatch)
     use_fake_dependencies(monkeypatch, llm)
@@ -173,7 +175,7 @@ async def test_a_real_model_gets_a_graph_of_real_nodes(monkeypatch: pytest.Monke
     first     = llm.turn_calls[0]
     read_docs = next(tool for tool in first.tools if tool.name == "read_docs")
 
-    assert final.output          == search.SearchDone()
+    assert final.output          == DEFAULT_NOTES
     assert final.respond_retries == 1
     assert first.system          == search.system_prompt()
     assert [tool.name for tool in first.tools] == [*search.TOOL_NAMES, search.RESPOND_TOOL_NAME]

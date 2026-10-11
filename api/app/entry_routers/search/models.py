@@ -30,11 +30,21 @@ class AgentQuery(BaseModel):
 class SearchResponse(BaseModel):
     """
     Description:
-    Odpowiedź `POST /search`: znalezione źródła i zapytania agenta. Brak źródeł to 200 z pustą
-    listą — „nowy typ problemu" jest poprawną odpowiedzią dla 47% korpusu.
+    Odpowiedź `POST /search`: rozpoznanie do zgłoszenia — źródła, uwagi dla wdrożeniowca
+    i zapytania agenta. Brak źródeł to 200 z pustą listą — „nowy typ problemu" jest poprawną
+    odpowiedzią dla 47% korpusu.
+
+    `internal_notes` to uwagi, które czyta wdrożeniowiec: czy przeczytane sprawy zgadzają się co
+    do przyczyny, co mówią instrukcje i kod aplikacji, czego agent szukał bez skutku i co w kodzie
+    wykluczył. To lekki Markdown: cztery sekcje z nagłówkiem `##` (Zgłoszenia historyczne,
+    Instrukcje i dokumentacja, Kod aplikacji, Nie znaleziono), a w nich lista albo zwykły tekst.
+    Pisze je model, a lista źródeł obok powstaje z odczytów, nie z uwag. Nigdy nie są puste:
+    przy pustej liście źródeł mówią, czego agent szukał. Pole nazywa się jak uwagi w `/suggest`,
+    bo czyta je ta sama osoba.
     """
 
-    sources: list[SourceItem] = Field(default_factory=list)
-    queries: list[AgentQuery] = Field(default_factory=list)
-    usage:   UsageItem
-    log:     list[LogItem]    = Field(default_factory=list)
+    sources:        list[SourceItem] = Field(default_factory=list)
+    internal_notes: str              = Field(examples=["## Zgłoszenia historyczne\n- 41002: …"])
+    queries:        list[AgentQuery] = Field(default_factory=list)
+    usage:          UsageItem
+    log:            list[LogItem]    = Field(default_factory=list)
