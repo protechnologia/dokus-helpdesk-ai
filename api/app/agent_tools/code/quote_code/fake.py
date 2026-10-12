@@ -27,19 +27,24 @@ class FakeQuoteCodeTool(QuoteCodeToolBase):
 
     def __init__(
         self,
-        files: Mapping[str, str] | None = None,  # np. {"src/lib/Blad.php": "<?php\\n…"}
+        files:  Mapping[str, str] | None = None,  # np. {"src/lib/Blad.php": "<?php\\n…"}
+        branch: str | None               = None,  # np. "/main/stage-gminy"; brak: paczka bez gałęzi
     ):
         """
         Description:
-        Ustala pliki, które atrapa zna, i zakłada dziennik zapytań.
+        Ustala pliki, które atrapa zna, i gałąź zmyślonej paczki, i zakłada dziennik zapytań.
+        Bez gałęzi tytuł źródła nie ma dopisku, jak na paczce z aplikacji syntetycznej.
 
         Example args:
             files=None
+            branch=None
 
         Example result:
-            FakeQuoteCodeTool znająca dwa wbudowane pliki
+            FakeQuoteCodeTool znająca dwa wbudowane pliki, bez gałęzi
         """
         files = dict(files) if files is not None else default_files()
+
+        self._branch = branch
 
         # Linie liczone tą samą funkcją co w czytniku paczki, więc numery znaczą to samo.
         self._line_counts = {path: len(split_lines(code)) for path, code in files.items()}
@@ -72,4 +77,11 @@ class FakeQuoteCodeTool(QuoteCodeToolBase):
         if query.path not in self._line_counts:
             raise UnknownCodeFileError(f"nie ma takiego pliku w kodzie aplikacji: {query.path}")
 
-        return check_lines_and_build_result(query, query.path, self._line_counts[query.path])
+        quote = check_lines_and_build_result(
+            query      = query,
+            path       = query.path,
+            line_count = self._line_counts[query.path],
+            branch     = self._branch,
+        )
+
+        return quote

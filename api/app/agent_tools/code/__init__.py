@@ -7,7 +7,8 @@ model wskazuje fragment powodujący opisane zachowanie.
 
 | co                 | co zawiera                                                             |
 |--------------------|------------------------------------------------------------------------|
-| `fake_code.py`     | zmyślone pliki, na których stoją atrapy narzędzi kodu                  |
+| `fake_code.py`     | zmyślone pliki i opis projektu, na których stoją atrapy narzędzi kodu  |
+| `describe_code/`   | opis projektu w całości, z gałęzią paczki; źródeł nie tworzy           |
 | `find_code_text/`  | szukanie linii z podanym tekstem: ścieżka, numer i treść linii         |
 | `list_code_files/` | spis katalogu do wskazanej głębokości; źródeł nie tworzy               |
 | `read_code_file/`  | odczyt pliku albo zakresu linii, z numerami; źródeł nie tworzy         |
@@ -15,8 +16,8 @@ model wskazuje fragment powodujący opisane zachowanie.
 
 Narzędzia właściwe stoją na paczce kodu na dysku (`CodePackage` z
 `core_service/loader_code_package.py`), bez bazy; szuka w niej program ripgrep, uruchamiany
-przez `engine_process/`. Opis projektu i odczyt symbolu dojdą jako kolejne katalogi
-(CLAUDE.md -> p. 65–66).
+przez `engine_process/`. Opis projektu to plik `project.md` w paczce, obok kodu: pisze go
+człowiek. Odczyt symbolu dojdzie jako kolejny katalog (CLAUDE.md -> p. 66).
 
 Narzędzie importuje się z jego pakietu
 (`from app.agent_tools.code.quote_code import QuoteCodeTool`), nie stąd.

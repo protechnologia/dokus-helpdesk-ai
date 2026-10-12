@@ -50,6 +50,7 @@ from tests.helpers_code_package import (
     line_of,
     synthetic_absent_paths,
     synthetic_code_cases,
+    synthetic_code_description,
     synthetic_code_package,
 )
 
@@ -264,7 +265,7 @@ async def test_a_line_found_by_the_search_can_be_read_and_then_quoted() -> None:
     package = synthetic_code_package()
     find    = FindCodeTextTool(package=package, ripgrep=RipgrepClient(timeout=10.0))
     read    = ReadCodeFileTool(package=package)
-    quote   = QuoteCodeTool(package=package)
+    quote   = QuoteCodeTool(package=package, description=synthetic_code_description())
 
     found = await find.find(FindCodeTextQuery(exact="przekracza limit"))
 

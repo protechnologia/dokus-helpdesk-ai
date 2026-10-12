@@ -1,6 +1,11 @@
 from typing import get_args
 
-from app.agent_tools.code.quote_code import MAX_LINES_PER_QUOTE, FakeQuoteCodeTool, QuoteRole
+from app.agent_tools.code.quote_code import (
+    MAX_LINES_PER_QUOTE,
+    FakeQuoteCodeTool,
+    QuoteCodeResult,
+    QuoteRole,
+)
 
 # Opis `quote_code` dla modelu podaje dwie rzeczy, które kod trzyma gdzie indziej: limit długości
 # fragmentu i nazwy ról. Układ opisu sprawdza test kontraktu narzędzi; tu pilnujemy tylko tego,
@@ -26,3 +31,15 @@ def test_the_description_explains_every_role() -> None:
     ale nie wiedziałby, co znaczy ani czy robi z cytowania źródło."""
     for role in get_args(QuoteRole):
         assert f"`{role}`" in DESCRIPTION
+
+
+def test_the_description_explains_every_field_of_the_result() -> None:
+    """Sprawdza, czy tabelka wyniku w opisie narzędzia wymienia każde pole potwierdzenia, które
+    model dostaje, razem z gałęzią paczki (`branch`).
+
+    Wyłapuje pole dopisane w modelu wyniku bez słowa w opisie: model widziałby je w odpowiedzi,
+    ale nie wiedziałby, co znaczy."""
+    returns = DESCRIPTION.split("# Co zwraca")[1].split("# Zasady")[0]
+
+    for field in QuoteCodeResult.model_fields:
+        assert f"| {field} " in returns, field

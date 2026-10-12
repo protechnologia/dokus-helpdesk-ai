@@ -2,8 +2,8 @@
 Description:
 Buduje narzędzia agenta na prawdziwych zależnościach, z konfiguracji: jeden klient embeddera,
 jeden Qdranta i jeden Postgresa, a na nich osiem narzędzi, oraz paczka kodu aplikacji na dysku
-z czterema: jedno w niej szuka programem ripgrep, drugie spisuje jej katalogi, trzecie czyta jej
-pliki, czwarte ją cytuje.
+z pięcioma: pierwsze oddaje opis projektu, drugie szuka w niej programem ripgrep, trzecie
+spisuje jej katalogi, czwarte czyta jej pliki, piąte ją cytuje.
 
 | narzędzie             | na czym stoi                                         |
 |-----------------------|------------------------------------------------------|
@@ -15,10 +15,11 @@ pliki, czwarte ją cytuje.
 | `find_docs_vector`    | embedder i kolekcja `QDRANT_DOCS_COLLECTION`         |
 | `find_docs_text`      | tabela dokumentacji w Postgresie                     |
 | `read_docs`           | tabela dokumentacji w Postgresie                     |
+| `describe_code`       | opis projektu i metryczka w paczce kodu aplikacji    |
 | `find_code_text`      | paczka kodu aplikacji i program ripgrep              |
 | `list_code_files`     | paczka kodu aplikacji na dysku (`CODE_PACKAGE_DIR`)  |
 | `read_code_file`      | paczka kodu aplikacji na dysku (`CODE_PACKAGE_DIR`)  |
-| `quote_code`          | paczka kodu aplikacji na dysku (`CODE_PACKAGE_DIR`)  |
+| `quote_code`          | paczka kodu aplikacji i jej metryczka (gałąź)        |
 
 Do czego:
 Fabryka grafów (`agent_graphs/factory.py`) bierze stąd narzędzia, gdy model generujący nie jest
@@ -40,6 +41,7 @@ O czym pamiętać przy zmianach:
 """
 
 from app.agent_tools.base import AgentTool
+from app.agent_tools.code.describe_code import DescribeCodeTool
 from app.agent_tools.code.find_code_text import FindCodeTextTool
 from app.agent_tools.code.list_code_files import ListCodeFilesTool
 from app.agent_tools.code.quote_code import QuoteCodeTool
@@ -53,6 +55,7 @@ from app.agent_tools.tickets.find_tickets_vector import FindTicketsVectorTool
 from app.agent_tools.tickets.read_tickets_card import ReadTicketsCardTool
 from app.agent_tools.tickets.read_tickets_thread import ReadTicketsThreadTool
 from app.config import Settings
+from app.core_service.loader_code_description import CodeDescription
 from app.core_service.loader_code_package import CodePackage
 from app.core_service.loader_dict_resolution import get_resolution_classes
 from app.db_postgres import DocsTable, PostgresClient, TicketsTable
@@ -75,8 +78,8 @@ def build_agent_tools(
     Example result:
         [FindTicketsVectorTool(…), FindTicketsTextTool(…), ReadTicketsCardTool(…),
          ReadTicketsThreadTool(…), ListDocsTool(…), FindDocsVectorTool(…), FindDocsTextTool(…),
-         ReadDocsTool(…), FindCodeTextTool(…), ListCodeFilesTool(…), ReadCodeFileTool(…),
-         QuoteCodeTool(…)]
+         ReadDocsTool(…), DescribeCodeTool(…), FindCodeTextTool(…), ListCodeFilesTool(…),
+         ReadCodeFileTool(…), QuoteCodeTool(…)]
 
     Raises:
         EmbeddingConfigError: pusty adres embeddera
@@ -116,8 +119,10 @@ def build_agent_tools(
     docs_sections   = DocsTable(postgres)
 
     # --- kod aplikacji: folder paczki, bez bazy; szuka w nim program uruchamiany procesem ---
-    code    = CodePackage(settings.code_package_dir)
-    ripgrep = RipgrepClient(timeout=settings.code_search_timeout_seconds)
+    # Obok kodu stoją w paczce opis projektu i metryczka; czyta je osobny czytnik.
+    code        = CodePackage(settings.code_package_dir)
+    description = CodeDescription(settings.code_package_dir)
+    ripgrep     = RipgrepClient(timeout=settings.code_search_timeout_seconds)
 
     tools: list[AgentTool] = [
         FindTicketsVectorTool(
@@ -138,10 +143,11 @@ def build_agent_tools(
         ),
         FindDocsTextTool(docs=docs_sections, limit=settings.rag_top_k),
         ReadDocsTool(docs=docs_sections),
+        DescribeCodeTool(description=description),
         FindCodeTextTool(package=code, ripgrep=ripgrep),
         ListCodeFilesTool(package=code),
         ReadCodeFileTool(package=code),
-        QuoteCodeTool(package=code),
+        QuoteCodeTool(package=code, description=description),
     ]
 
     return tools

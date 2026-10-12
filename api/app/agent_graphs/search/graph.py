@@ -38,6 +38,7 @@ TOOL_NAMES: tuple[str, ...] = (
     "find_docs_vector",     # sekcje dokumentacji po znaczeniu
     "find_docs_text",       # sekcje dokumentacji po dosłownym brzmieniu
     "read_docs",            # treść sekcji po identyfikatorach — cytuje
+    "describe_code",        # opis projektu: z jakich części składa się aplikacja i gdzie leżą
     "find_code_text",       # linie kodu aplikacji po dosłownym brzmieniu
     "list_code_files",      # spis katalogu kodu aplikacji, do wskazanej głębokości
     "read_code_file",       # plik albo zakres linii kodu aplikacji, z numerami linii

@@ -113,3 +113,21 @@ def test_the_built_in_files_are_the_ones_the_table_names() -> None:
     Wyłapuje zmianę ścieżek w zestawie: testy grafów odwołują się do nich wprost, więc zaczęłyby
     cytować pliki, których atrapa nie zna."""
     assert set(default_files()) == {GENERATOR_PATH, ERRORS_PATH}
+
+
+async def test_the_fake_puts_its_branch_in_the_title_and_has_none_by_default() -> None:
+    """Sprawdza, czy atrapa zbudowana z gałęzią dopisuje ją do tytułu źródła i do potwierdzenia,
+    a atrapa zbudowana bez gałęzi daje tytuł bez dopisku.
+
+    Wyłapuje atrapę, która gałęzi nie przenosi: test grafu nie mógłby wtedy sprawdzić, czy
+    gałąź paczki dociera do listy źródeł, którą dostaje człowiek."""
+    with_branch = FakeQuoteCodeTool(branch="/main/stage-gminy")
+    plain       = FakeQuoteCodeTool()
+
+    quote   = await with_branch.search(CAUSE)
+    [ref]   = with_branch.cite(quote)
+    [other] = plain.cite(await plain.search(CAUSE))
+
+    assert quote.branch == "/main/stage-gminy"
+    assert ref.title    == f"{GENERATOR_PATH}, linie 8–10 (gałąź /main/stage-gminy)"
+    assert other.title  == f"{GENERATOR_PATH}, linie 8–10"

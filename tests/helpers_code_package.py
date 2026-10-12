@@ -7,6 +7,7 @@ commitem — test jej nie buduje (CLAUDE.md -> „Świadomie pominięte").
 | helper                     | co oddaje                                                   |
 |----------------------------|-------------------------------------------------------------|
 | `synthetic_code_package()` | czytnik zbudowanej paczki syntetycznej                      |
+| `synthetic_code_description()` | czytnik jej opisu projektu i metryczki                  |
 | `synthetic_code_cases()`   | sekcję jednego narzędzia z `code-synthetic.json`            |
 | `synthetic_absent_paths()` | pliki ze źródła, których paczka nie może zawierać           |
 | `line_of()`                | numer linii, w której stoi fragment zapisany w zestawie     |
@@ -34,6 +35,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from app.core_service.loader_code_description import CodeDescription
 from app.core_service.loader_code_package import CodePackage
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -70,6 +72,29 @@ def synthetic_code_package() -> CodePackage:
     assert built, f"brak zbudowanej paczki syntetycznej — zbuduj ją: {BUILD_COMMAND}"
 
     return CodePackage(SYNTHETIC_PACKAGE_DIR)
+
+
+def synthetic_code_description() -> CodeDescription:
+    """
+    Description:
+    Czytnik opisu projektu i metryczki paczki syntetycznej. Opis (`project.md`) leży w repo
+    obok źródła aplikacji, metryczkę zapisuje skrypt przy budowie — więc tak jak czytnik kodu
+    odmawia, gdy paczki nie zbudowano.
+
+    Example args:
+        (brak)
+
+    Example result:
+        CodeDescription czytająca data/safe/code/project.md i manifest.json
+
+    Raises:
+        AssertionError: paczki syntetycznej nie zbudowano
+    """
+    built = (SYNTHETIC_PACKAGE_DIR / "manifest.json").is_file()
+
+    assert built, f"brak zbudowanej paczki syntetycznej — zbuduj ją: {BUILD_COMMAND}"
+
+    return CodeDescription(SYNTHETIC_PACKAGE_DIR)
 
 
 def synthetic_code_cases(

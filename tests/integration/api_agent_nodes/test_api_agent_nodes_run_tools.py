@@ -13,7 +13,13 @@ from app.agent_nodes.respond import FakeRespondNode
 from app.agent_nodes.run_tools import RunToolsNode
 from app.agent_tools import AgentTool
 from app.agent_tools.base import is_error_json
-from app.agent_tools.code.fake_code import ERRORS_PATH, GENERATOR_PATH
+from app.agent_tools.code.fake_code import (
+    BACKEND_DIR,
+    ERRORS_PATH,
+    GENERATOR_PATH,
+    PROJECT_DESCRIPTION,
+)
+from app.agent_tools.code.quote_code import FakeQuoteCodeTool
 from app.config import Settings
 from app.engine_anonymization import FakeAnonymizer
 from app.engine_embedding import EmbeddingError
@@ -271,6 +277,94 @@ async def test_a_code_listing_reaches_the_model_and_is_not_a_source(graph: Modul
     assert [entry.message for entry in final.log if entry.node == "run_tools"] == [
         "wywołania: list_code_files; źródła: 0",
         "wywołania: read_code_file; źródła: 0",
+    ]
+
+
+@pytest.mark.parametrize("graph", LOOP_GRAPHS, ids=name_of)
+async def test_a_project_description_leads_to_a_listing_and_is_not_a_source(
+    graph: ModuleType,
+) -> None:
+    """Sprawdza w każdym grafie z narzędziami wiedzy, czy opis projektu wraca do modelu
+    w następnej turze w całości, razem z metryczką paczki, czy katalog wzięty z opisu przyjmuje
+    spis katalogu i czy ani opis, ani spis, ani odczyt nie dokładają niczego do listy źródeł.
+
+    Wyłapuje graf, w którym opis projektu nie jest dozwolony albo jego wynik nie wraca do
+    modelu, oraz opis, który zaczął tworzyć źródła: opis zawsze da się przeczytać, więc wariant
+    wymagający źródeł oddawałby rozwiązanie po samym rozejrzeniu się po kodzie."""
+    llm = FakeLLMClient(turns=[
+        tool_call_turn("describe_code", {}, call_id="call_1"),
+        tool_call_turn("list_code_files", {"path": BACKEND_DIR, "depth": 9}, call_id="call_2"),
+        tool_call_turn("read_code_file", {"path": GENERATOR_PATH}, call_id="call_3"),
+        tool_call_turn(graph.RESPOND_TOOL_NAME, {}, call_id="call_4"),
+    ])
+
+    final     = await run_graph(await loop_graph(graph, llm), graph.example_state())
+    described = json.loads(llm.turn_calls[1].messages[-1].content)
+    listing   = json.loads(llm.turn_calls[2].messages[-1].content)
+
+    assert described["description"]            == PROJECT_DESCRIPTION
+    assert described["package_info"]["branch"] is None
+    assert f"`{BACKEND_DIR}/`" in described["description"]
+    assert {"path": GENERATOR_PATH, "kind": "file"} in listing["entries"]
+    assert final.sources == []
+    assert [entry.message for entry in final.log if entry.node == "run_tools"] == [
+        "wywołania: describe_code; źródła: 0",
+        "wywołania: list_code_files; źródła: 0",
+        "wywołania: read_code_file; źródła: 0",
+    ]
+
+
+async def test_the_project_description_is_served_once_per_case() -> None:
+    """Sprawdza, czy przy limitach z konfiguracji domyślnej drugie wywołanie opisu projektu
+    w tej samej sprawie dostaje odmowę zamiast wyniku, a narzędzie było wołane raz.
+
+    Wyłapuje podniesiony albo zgubiony limit opisu projektu: opis jest jeden dla całego kodu
+    i wraca w całości, więc każde kolejne wywołanie dokładałoby do rozmowy te same kilka
+    tysięcy znaków."""
+    tools    = fake_agent_tools()
+    describe = next(tool for tool in tools if tool.name == "describe_code")
+    llm      = FakeLLMClient(turns=[
+        tool_call_turn("describe_code", {}, call_id="call_1"),
+        tool_call_turn("describe_code", {}, call_id="call_2"),
+        tool_call_turn(search.RESPOND_TOOL_NAME, {}, call_id="call_3"),
+    ])
+
+    final   = await run_graph(await loop_graph(search, llm, tools), search.example_state())
+    answers = tool_results(final.messages)
+
+    assert LIMITS["describe_code"] == 1
+    assert not is_error_json(answers[0])
+    assert is_error_json(answers[1])
+    assert describe.calls == 1
+
+
+@pytest.mark.parametrize("graph", LOOP_GRAPHS, ids=name_of)
+async def test_the_branch_of_the_code_reaches_the_list_of_sources(graph: ModuleType) -> None:
+    """Sprawdza w każdym grafie z narzędziami wiedzy, czy przy paczce kodu zbudowanej z gałęzi
+    `/main/stage-gminy` źródło z fragmentu zacytowanego jako przyczyna ma tę gałąź w tytule,
+    a klucz źródła zostaje bez niej.
+
+    Wyłapuje graf, w którym gałąź paczki ginie po drodze od narzędzia do listy źródeł:
+    człowiek dostałby fragment kodu bez informacji, z której wersji pochodzi, a klienci mają
+    własne gałęzie."""
+    tools = [
+        FakeQuoteCodeTool(branch="/main/stage-gminy") if tool.name == "quote_code" else tool
+        for tool in fake_agent_tools()
+    ]
+    llm = FakeLLMClient(turns=[
+        tool_call_turn(
+            "quote_code",
+            {"path": GENERATOR_PATH, "from_line": 8, "to_line": 10, "role": "cause"},
+            call_id="call_1",
+        ),
+        tool_call_turn(graph.RESPOND_TOOL_NAME, {}, call_id="call_2"),
+    ])
+
+    final = await run_graph(await loop_graph(graph, llm, tools), graph.example_state())
+
+    assert [ref.key for ref in final.sources]   == [f"code:{GENERATOR_PATH}:8-10"]
+    assert [ref.title for ref in final.sources] == [
+        f"{GENERATOR_PATH}, linie 8–10 (gałąź /main/stage-gminy)",
     ]
 
 

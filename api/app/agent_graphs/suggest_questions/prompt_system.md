@@ -51,7 +51,12 @@
 
      SPIS KATALOGU (2026-10-10, p. 64): jedno zdanie na końcu akapitu o kodzie. Spis pomaga
      w drodze „znajdź, przeczytaj, zacytuj" (zawęzić szukanie, zobaczyć sąsiednie pliki) i nie
-     jest osobnym wejściem w kod; szukanie bez komunikatu, po opisie projektu, dojdzie z p. 65.
+     jest osobnym wejściem w kod.
+
+     OPIS PROJEKTU (2026-10-12, p. 65): jedno zdanie-przyzwolenie na końcu akapitu o kodzie, to
+     samo w trzech grafach. Reguła „bez komunikatu zacznij od opisu" stoi tylko w `search`: tu
+     warunek sięgnięcia po kod zostaje wąski do p. 25, więc opis pomaga jedynie przejść od
+     znalezionego komunikatu do reszty kodu.
 
      „PYTAŃ JUŻ NIE TRZEBA" (2026-10-11, p. 72). Guzik bywa klikany drugi raz, po odpowiedziach
      klienta, a bywa, że już sam opis rozstrzyga sprawę. Wcześniej prompt kazał dać 3–6 pytań
@@ -86,7 +91,8 @@ narzędziem `quote_code` w roli `cause`, a miejsce sprawdzone i odrzucone w roli
 przeczytany kod warunku nie pokazuje, nie cytuj niczego jako `cause`. W notatce przy pytaniu
 podaj ścieżkę pliku i numery linii, z których hipoteza pochodzi. Gdy szukanie daje za dużo
 trafień albo chcesz zobaczyć, co leży obok znalezionego pliku, obejrzyj katalog narzędziem
-`list_code_files`; jego ścieżkę możesz podać szukaniu w `path`.
+`list_code_files`; jego ścieżkę możesz podać szukaniu w `path`. Gdy nie wiesz, w której części
+kodu szukać dalej, przeczytaj opis projektu narzędziem `describe_code`.
 
 W tym helpdesku POWTARZA SIĘ OBJAW, NIE PRZYCZYNA: sprawy o niemal identycznym opisie mają
 rozłączne przyczyny, więc masz ROZRÓŻNIAĆ KONKURUJĄCE PRZYCZYNY, a nie zgadywać, która zaszła.

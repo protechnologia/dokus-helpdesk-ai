@@ -10,6 +10,12 @@ Do czego:
 
     Pierwszy argument to folder wejściowy, drugi wyjściowy (katalog paczki); oba są wymagane.
 
+    W katalogu paczki, obok `repo/` i metryczki, leży opis projektu `project.md`. Pisze go
+    człowiek, a skrypt go nie zmienia, tylko sprawdza wobec paczki — na końcu budowy i osobną
+    komendą, bo opis poprawia się bez przebudowy:
+
+    python scripts/build_code_package.py check-description data/unsafe/code
+
 Reguły (`rules.json` w katalogu paczki albo plik podany w `--rules`). Opisują układ kodu
 klienta, więc leżą w `data/unsafe/`, poza repo. Ścieżki liczą się od folderu wejściowego:
 
@@ -35,6 +41,18 @@ Co skrypt zmienia w treści (przykład linii z pliku JS, przed i po):
     Rozkodowuje tylko polskie litery i tylko w plikach `.js`; w każdym pliku zamienia końce linii
     CRLF na LF. Ścieżki i numery linii zostają takie jak w folderze wejściowym.
 
+Co skrypt sprawdza w opisie projektu (`check_description`). Ścieżką jest napis w odwróconych
+apostrofach, który zaczyna się od katalogu głównego paczki (zwykle `src`):
+
+    | gdzie stoi ścieżka                   | czego skrypt oczekuje         | przykład            |
+    |--------------------------------------|-------------------------------|---------------------|
+    | w sekcji „Czego w paczce nie ma"     | ścieżki w paczce NIE ma       | `src/data/update/`  |
+    | w każdym innym miejscu opisu         | ścieżka w paczce JEST         | `src/web/js/`       |
+
+    `<nazwa>` w ścieżce zastępuje jedną nazwę katalogu albo pliku, tak jak `*`
+    (`src/apps/<aplikacja>/modules/`); ukośnik na końcu znaczy, że ma to być katalog. Sekcję
+    rozpoznaje nagłówek Markdown o tym tytule, na dowolnym poziomie.
+
 Flow:
     1. Czyta reguły (`load_rules`).
     2. Przechodzi po folderach z listy i po plikach wskazanych wprost (`find_files`).
@@ -42,6 +60,8 @@ Flow:
        tymczasowego (`_add_file`).
     4. Na końcu podmienia `repo/` i zapisuje metryczkę (`build_package`), a w niej gałąź, na
        której stoi folder wejściowy (`read_branch`).
+    5. Sprawdza opis projektu wobec nowej paczki i wypisuje, co się nie zgadza
+       (`check_description`); budowy to nie zatrzymuje.
 
 O czym pamiętać przy zmianach:
     - Skrypt kopiuje to, co leży na dysku. Plik prywatny albo lokalnie zmieniony wchodzi do
@@ -57,6 +77,11 @@ O czym pamiętać przy zmianach:
     - Gałąź w metryczce pochodzi z pliku `.plastic/plastic.selector` folderu wejściowego, czyli
       z kopii roboczej PlasticSCM; skrypt nie rozmawia z repozytorium. Folder bez tego pliku
       (aplikacja syntetyczna) daje metryczkę bez gałęzi. Numeru changesetu metryczka nie ma.
+    - Opis projektu leży OBOK `repo/`, nie w nim: `repo/` znika przy każdej budowie, a plik
+      w `repo/` wychodziłby w szukaniu i w spisie katalogu jak kod. Bez opisu narzędzie
+      `describe_code` kończy sprawę błędem konfiguracji, więc budowa o jego braku ostrzega.
+    - Sprawdzenie opisu działa w obie strony, bo opis mówi też, czego w paczce nie ma. Po
+      zmianie reguł ścieżka z tamtej sekcji może trafić do paczki i opis wprowadzałby w błąd.
 """
 
 import dataclasses
@@ -67,13 +92,29 @@ import os
 import pathlib
 import re
 import shutil
+import sys
 
 import typer
 
-CODE_DIR      = "repo"
-BUILDING_DIR  = "repo.building"
-RULES_NAME    = "rules.json"
-MANIFEST_NAME = "manifest.json"
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+# `app` mieszka w api/ i nie jest na ścieżce przy uruchomieniu `python scripts/...`.
+sys.path.insert(0, str(REPO_ROOT / "api"))
+
+from app.core_util.markdown import read_document  # noqa: E402  (po sys.path)
+
+CODE_DIR         = "repo"
+BUILDING_DIR     = "repo.building"
+RULES_NAME       = "rules.json"
+MANIFEST_NAME    = "manifest.json"
+DESCRIPTION_NAME = "project.md"
+
+# Tytuł sekcji opisu projektu, w której stoją ścieżki, których w paczce ma NIE być.
+ABSENT_SECTION = "czego w paczce nie ma"
+# Napis w odwróconych apostrofach, w jednej linii.
+BACKTICKED     = re.compile(r"`([^`\n]+)`")
+# `<moduł>` w ścieżce: jedna dowolna nazwa, jak gwiazdka.
+PLACEHOLDER    = re.compile(r"<[^<>/]+>")
 
 # Plik kopii roboczej PlasticSCM, w którym stoi gałąź: linia `smartbranch "/main/…"` albo
 # `branch "/main/…"`.
@@ -135,6 +176,30 @@ class Manifest:
     package:  PackageSize
     changes:  Changes
     skipped:  Skipped
+
+
+@dataclasses.dataclass
+class DescriptionCheck:
+    """Co wyszło ze sprawdzenia opisu projektu wobec paczki."""
+
+    found:      bool                                                     # czy plik opisu jest
+    chars:      int       = 0                                            # długość bez komentarzy
+    missing:    list[str] = dataclasses.field(default_factory=list)      # mają być, a nie ma
+    unexpected: list[str] = dataclasses.field(default_factory=list)      # ma nie być, a są
+
+    @property
+    def ok(self) -> bool:
+        """
+        Description:
+        Mówi, czy opis jest i czy każda jego ścieżka zgadza się z paczką.
+
+        Example args:
+            (brak)
+
+        Example result:
+            True
+        """
+        return self.found and not self.missing and not self.unexpected
 
 
 def branch_of_selector(
@@ -479,6 +544,144 @@ def find_files(
     return sorted(taken), sorted(not_taken)
 
 
+def paths_of_description(
+    text:  str,       # np. "Backend w `src/lib/`.\n## Czego w paczce nie ma\n`src/data/update/`"
+    roots: set[str],  # np. {"src"} — katalogi główne paczki
+) -> tuple[list[str], list[str]]:
+    """
+    Description:
+    Wyjmuje z opisu projektu ścieżki: napisy w odwróconych apostrofach, które zaczynają się od
+    katalogu głównego paczki. Oddaje dwie listy, bez powtórzeń, w kolejności z opisu: ścieżki,
+    które mają być w paczce, i ścieżki z sekcji „Czego w paczce nie ma".
+
+    Napis bez takiego początku ścieżką nie jest: nazwa funkcji, zdarzenia (`modul/akcja`) czy
+    komendy zostaje pominięta.
+
+    Example args:
+        text="Backend w `src/lib/`.\n## Czego w paczce nie ma\n`src/data/update/`"
+        roots={"src"}
+
+    Example result:
+        (["src/lib/"], ["src/data/update/"])
+    """
+    expected: list[str] = []
+    absent:   list[str] = []
+    in_absent           = False
+
+    for line in text.split("\n"):
+        # Nagłówek otwiera sekcję: tę jedną rozpoznajemy po tytule, każdy inny ją zamyka.
+        if line.lstrip().startswith("#"):
+            in_absent = line.strip("# \t").lower().startswith(ABSENT_SECTION)
+            continue
+        target = absent if in_absent else expected
+        for token in BACKTICKED.findall(line):
+            path = token.strip()
+            if path.split("/")[0] in roots and path not in target:
+                target.append(path)
+
+    return expected, absent
+
+
+def is_in_package(
+    code_dir: pathlib.Path,  # np. Path("data/unsafe/code/repo")
+    path:     str,           # np. "src/apps/<aplikacja>/modules/"
+) -> bool:
+    """
+    Description:
+    Mówi, czy ścieżka z opisu projektu wskazuje coś w paczce. `<nazwa>` i `*` zastępują jedną
+    nazwę, a ukośnik na końcu znaczy, że ma to być katalog.
+
+    Example args:
+        code_dir=Path("data/unsafe/code/repo")
+        path="src/apps/<aplikacja>/modules/"
+
+    Example result:
+        True
+    """
+    wants_dir = path.endswith("/")
+    pattern   = PLACEHOLDER.sub("*", path).rstrip("/")
+    # Ścieżka z `..` mogłaby wskazać coś poza paczką i wyglądać na istniejącą.
+    if ".." in pattern.split("/"):
+        return False
+    found = code_dir.glob(pattern) if "*" in pattern else [code_dir / pattern]
+
+    return any(entry.is_dir() if wants_dir else entry.exists() for entry in found)
+
+
+def check_description(
+    output_dir: pathlib.Path,  # np. Path("data/unsafe/code")
+) -> DescriptionCheck:
+    """
+    Description:
+    Sprawdza opis projektu (`project.md` w katalogu paczki) wobec kodu w `repo/`: każda ścieżka
+    z opisu ma w paczce być, a każda z sekcji „Czego w paczce nie ma" ma w niej nie być. Niczego
+    nie zmienia.
+
+    Example args:
+        output_dir=Path("data/unsafe/code")
+
+    Example result:
+        DescriptionCheck(found=True, chars=2140, missing=["src/lib/stare/"], unexpected=[])
+
+    Raises:
+        ValueError: gdy w katalogu nie ma zbudowanej paczki
+    """
+    code_dir    = output_dir / CODE_DIR
+    description = output_dir / DESCRIPTION_NAME
+    if not code_dir.is_dir():
+        raise ValueError(f"W {output_dir} nie ma zbudowanej paczki (brak {CODE_DIR}/).")
+    if not description.is_file():
+        return DescriptionCheck(found=False)
+
+    # Ten sam odczyt co w usłudze: komentarze redakcyjne nie docierają do modelu, więc ścieżka
+    # z komentarza nie jest sprawdzana.
+    text             = read_document(description)
+    roots            = {entry.name for entry in code_dir.iterdir()}
+    expected, absent = paths_of_description(text, roots)
+    check            = DescriptionCheck(
+        found      = True,
+        chars      = len(text.rstrip()),
+        missing    = [path for path in expected if not is_in_package(code_dir, path)],
+        unexpected = [path for path in absent if is_in_package(code_dir, path)],
+    )
+
+    return check
+
+
+def report_description(
+    check:      DescriptionCheck,
+    output_dir: pathlib.Path,      # np. Path("data/unsafe/code")
+) -> None:
+    """
+    Description:
+    Wypisuje wynik sprawdzenia opisu projektu: brak pliku, długość opisu i ścieżki, które nie
+    zgadzają się z paczką.
+
+    Example args:
+        check=DescriptionCheck(found=True, chars=2140, missing=["src/lib/stare/"])
+        output_dir=Path("data/unsafe/code")
+
+    Example result:
+        None (linie na stdout)
+    """
+    description = output_dir / DESCRIPTION_NAME
+    # --- brak opisu: narzędzie describe_code zatrzyma sprawę błędem konfiguracji ---
+    if not check.found:
+        typer.echo(f"Opis projektu: BRAK pliku {description} — narzędzie describe_code nie "
+                   f"zadziała, dopóki go nie napiszesz.")
+        return
+
+    typer.echo(f"Opis projektu: {check.chars} znaków w {description}")
+    # --- ścieżka z opisu prowadzi donikąd: model dostałby błąd przy spisie albo szukaniu ---
+    for path in check.missing:
+        typer.echo(f"  nie ma w paczce, a opis ją wymienia: {path}")
+    # --- opis mówi, że czegoś nie ma, a to jest: model nie szukałby tam, gdzie mógłby ---
+    for path in check.unexpected:
+        typer.echo(f"  jest w paczce, a opis mówi, że jej nie ma: {path}")
+    if check.ok:
+        typer.echo("  ścieżki z opisu zgadzają się z paczką")
+
+
 def build_package(
     input_dir:  pathlib.Path,  # np. Path("/mnt/c/Apache24/htdocs/php74/dokus")
     output_dir: pathlib.Path,  # np. Path("data/unsafe/code")
@@ -611,6 +814,8 @@ HELP_COMMAND = "Buduje paczkę kodu z folderu z kodem aplikacji według reguł z
 HELP_INPUT   = "Folder z kodem aplikacji; od niego liczą się ścieżki w regułach."
 HELP_OUTPUT  = "Katalog paczki: powstaje w nim repo/ z kodem i manifest.json."
 HELP_RULES   = "Plik reguł wyboru plików; domyślnie rules.json w katalogu paczki."
+HELP_CHECK   = "Sprawdza, czy ścieżki z opisu projektu (project.md) zgadzają się z paczką."
+HELP_PACKAGE = "Katalog zbudowanej paczki: repo/ z kodem, a obok project.md."
 
 
 @cli.command(help=HELP_COMMAND)
@@ -659,6 +864,37 @@ def build(
                f"w {changes.escapes_files} plikach")
     typer.echo(f"  pominięte, bo nie UTF-8: {len(manifest.skipped.not_utf8)}")
     typer.echo(f"  w folderach z listy, ale poza regułami: {len(manifest.skipped.not_in_rules)}")
+    # Opis pisano dla poprzedniej paczki; po przebudowie jego ścieżki mogą prowadzić donikąd.
+    report_description(check_description(output_dir), output_dir)
+
+
+@cli.command("check-description", help=HELP_CHECK)
+def check_description_command(
+    output_dir: pathlib.Path = typer.Argument(..., help=HELP_PACKAGE),
+) -> None:
+    """
+    Description:
+    Sprawdza opis projektu wobec zbudowanej paczki i wypisuje wynik. Kończy się kodem 1, gdy
+    opisu nie ma albo któraś jego ścieżka nie zgadza się z paczką.
+
+    Example args:
+        output_dir=Path("data/unsafe/code")
+
+    Example result:
+        None (wynik na stdout)
+
+    Raises:
+        typer.Exit: gdy nie ma paczki, nie ma opisu albo opis nie zgadza się z paczką
+    """
+    try:
+        check = check_description(output_dir)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+    report_description(check, output_dir)
+    if not check.ok:
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

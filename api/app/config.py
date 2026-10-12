@@ -121,9 +121,9 @@ class Settings(BaseSettings):
 
     # --- kod aplikacji: paczka dla narzędzi agenta ---
     # Katalog paczki zbudowanej przez `scripts/build_code_package.py` (kod w `repo/`, obok
-    # `manifest.json`), po stronie kontenera. Montuje go compose, tylko do odczytu; zmiana tej
-    # wartości montowania nie przestawia. Nie jest sprawdzany przy starcie: brak paczki wychodzi
-    # przy pierwszym użyciu narzędzia kodu.
+    # `manifest.json` i pisany ręcznie opis projektu `project.md`), po stronie kontenera.
+    # Montuje go compose, tylko do odczytu; zmiana tej wartości montowania nie przestawia. Nie
+    # jest sprawdzany przy starcie: brak paczki wychodzi przy pierwszym użyciu narzędzia kodu.
     code_package_dir: Path = Path("/code/data/unsafe/code")
     # Najdłużej tyle trwa jedno szukanie w paczce programem ripgrep. Najwolniejsze zmierzone na
     # paczce z 11 tys. plików zajęło 0,4 s; dłużej trwa tylko na dysku, na którym paczka leżeć
@@ -178,6 +178,9 @@ class Settings(BaseSettings):
     agent_max_calls_find_docs_vector:    int = Field(default=5, ge=1)
     agent_max_calls_find_docs_text:      int = Field(default=5, ge=1)
     agent_max_calls_read_docs:           int = Field(default=3, ge=1)
+    # Opis projektu jest jeden dla całego kodu i wraca w całości, więc wystarcza jedno
+    # wywołanie na sprawę, jak przy spisie treści dokumentacji.
+    agent_max_calls_describe_code:       int = Field(default=1, ge=1)
     # Szukanie w kodzie ma 10, dwa razy więcej niż pozostałe wyszukiwania: od komunikatu do
     # miejsca, które go wywołuje, idzie się po nazwach, kilkoma szukaniami z rzędu. W sondzie
     # z 2026-10-07 limit 10 wyczerpał się w 5 sprawach z 9.
@@ -199,7 +202,7 @@ class Settings(BaseSettings):
     # Domyka to, czego limity narzędzi nie domykają: wywołanie ponad limit narzędzia dostaje
     # odmowę, ale turę zużywa, więc model wołający w kółko zużywałby tokeny bez końca.
     # 20 to zapas, nie cel: sprawa w sondach z 2026-10-04 to 4–7 tur, a limity narzędzi pozwalają
-    # na 62 wywołania, które model zwykle grupuje po kilka na turę. Ucięcie sprawy kosztuje
+    # na 63 wywołania, które model zwykle grupuje po kilka na turę. Ucięcie sprawy kosztuje
     # więcej niż kilka tur zapasu.
     agent_max_iterations: int = Field(default=20, ge=1)
 

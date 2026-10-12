@@ -37,7 +37,12 @@ from app.agent_tools.code.find_code_text import FindCodeTextQuery, FindCodeTextT
 from app.agent_tools.code.quote_code import QuoteCodeQuery, QuoteCodeTool
 from app.config import Settings
 from app.engine_process.ripgrep import RipgrepClient
-from tests.helpers_code_package import line_of, synthetic_code_cases, synthetic_code_package
+from tests.helpers_code_package import (
+    line_of,
+    synthetic_code_cases,
+    synthetic_code_description,
+    synthetic_code_package,
+)
 
 CASES    = synthetic_code_cases("quote_code")
 ACCEPTED = [case for case in CASES if not case["expected"].get("error")]
@@ -91,7 +96,11 @@ async def _call(
          "log": [LogEntry(node="run_tools", message="wywołania: quote_code; źródła: 1")],
          "sources": [SourceRef(source="code", item_id="src/…:17-18", …)]}
     """
-    node  = RunToolsNode([QuoteCodeTool(package=synthetic_code_package())], LIMITS)
+    tool  = QuoteCodeTool(
+        package     = synthetic_code_package(),
+        description = synthetic_code_description(),
+    )
+    node  = RunToolsNode([tool], LIMITS)
     state = suggest_solution.example_state().model_copy(
         update={"messages": [tool_call_turn("quote_code", arguments)]},
     )
@@ -169,7 +178,7 @@ async def test_a_line_found_by_the_search_can_be_quoted_as_it_came() -> None:
     błąd albo źródło wskazujące inną linię."""
     package = synthetic_code_package()
     find    = FindCodeTextTool(package=package, ripgrep=RipgrepClient(timeout=10.0))
-    quote   = QuoteCodeTool(package=package)
+    quote   = QuoteCodeTool(package=package, description=synthetic_code_description())
 
     found = await find.find(FindCodeTextQuery(exact="przekracza limit"))
 

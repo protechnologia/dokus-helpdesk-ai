@@ -73,11 +73,16 @@ class QuoteCodeResult(BaseModel):
 
     Treści linii tu nie ma, celowo: narzędzie, które ją oddaje, służy modelowi za odczyt i kusi
     do cytowania linii, których nie przeczytał. Treść daje wyłącznie odczyt.
+
+    Gałąź paczki (`branch`) mówi, z której wersji kodu pochodzi fragment: trafia do tytułu
+    źródła, który czyta człowiek, i do potwierdzenia, które czyta model.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    path:      str       = Field(min_length=1, examples=["src/lib/Urzad/Numeracja/Generator.php"])
-    from_line: int       = Field(ge=1, examples=[14])
-    to_line:   int       = Field(ge=1, examples=[19])
-    role:      QuoteRole = Field(examples=["cause"])
+    path:      str        = Field(min_length=1, examples=["src/lib/Urzad/Numeracja/Generator.php"])
+    from_line: int        = Field(ge=1, examples=[14])
+    to_line:   int        = Field(ge=1, examples=[19])
+    role:      QuoteRole  = Field(examples=["cause"])
+    # Gałąź, z której zbudowano paczkę kodu; brak, gdy metryczka paczki jej nie zna.
+    branch:    str | None = Field(default=None, min_length=1, examples=["/main/stage-gminy"])

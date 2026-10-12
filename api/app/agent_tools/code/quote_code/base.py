@@ -11,6 +11,7 @@ Przed — wynik cytowania:
         from_line = 8,
         to_line   = 10,
         role      = "cause",
+        branch    = "/main/stage-gminy",
     )
 
 Po — tekst dla modelu, bez treści linii:
@@ -19,13 +20,15 @@ Po — tekst dla modelu, bez treści linii:
       "path": "src/lib/Urzad/Numeracja/GeneratorNumeru.php",
       "from_line": 8,
       "to_line": 10,
-      "role": "cause"
+      "role": "cause",
+      "branch": "/main/stage-gminy"
     }
 
 Po — źródło odpowiedzi:
 
     SourceRef(source="code", item_id="src/lib/Urzad/Numeracja/GeneratorNumeru.php:8-10",
-              title="src/lib/Urzad/Numeracja/GeneratorNumeru.php, linie 8–10")
+              title="src/lib/Urzad/Numeracja/GeneratorNumeru.php, linie 8–10 "
+                    "(gałąź /main/stage-gminy)")
 
 Co decyduje rola:
 
@@ -44,8 +47,12 @@ O czym pamiętać przy zmianach:
   model zacytuje go potem jako wykluczony.
 - Tytuł to pełna ścieżka, nie sama nazwa pliku: w aplikacji na Symfony dziesiątki kontrolerów
   nazywają się `actions.class.php`.
-- Źródło nie ma daty. Wersję kodu wyznacza gałąź, z której zbudowano paczkę; zapisuje ją
-  metryczka paczki (`manifest.json`), a narzędzia jej nie czytają (CLAUDE.md -> p. 65).
+- Źródło nie ma daty. Wersję kodu wyznacza gałąź, z której zbudowano paczkę, więc gałąź stoi
+  w tytule źródła, tak jak tytuł sekcji instrukcji niesie wydanie dokumentu. Paczka bez gałęzi
+  (aplikacja syntetyczna) daje tytuł bez dopisku.
+- Gałąź widzi też model, w potwierdzeniu cytowania: w sprawie z komunikatem idzie drogą
+  szukanie, odczyt, cytowanie i po opis projektu (`describe_code`) zwykle nie sięga, więc
+  inaczej nie zobaczyłby jej wcale.
 """
 
 from app.agent_tools.base import KnowledgeSource, read_description
@@ -58,12 +65,13 @@ def check_lines_and_build_result(
     query:      QuoteCodeQuery,  # np. QuoteCodeQuery(path="…", from_line=8, to_line=10, …)
     path:       str,             # np. "src/lib/Urzad/Numeracja/GeneratorNumeru.php" — z paczki
     line_count: int,             # np. 27 — tyle linii ma plik
+    branch:     str | None,      # np. "/main/stage-gminy" — gałąź paczki; None, gdy nieznana
 ) -> QuoteCodeResult:
     """
     Description:
     Sprawdza, czy cytowane linie mieszczą się w pliku, i składa wynik narzędzia: potwierdzenie
-    cytowania. Wspólne dla atrapy i narzędzia właściwego: oba najpierw ustalają ścieżkę w paczce
-    i długość pliku.
+    cytowania. Wspólne dla atrapy i narzędzia właściwego: oba najpierw ustalają ścieżkę w paczce,
+    długość pliku i gałąź paczki.
 
     Sprawdza tylko koniec fragmentu wobec długości pliku. Ścieżkę sprawdził wcześniej czytnik
     paczki, a kolejność linii i długość fragmentu model zapytania.
@@ -73,10 +81,11 @@ def check_lines_and_build_result(
                              from_line=8, to_line=10, role="cause")
         path="src/lib/Urzad/Numeracja/GeneratorNumeru.php"
         line_count=27
+        branch="/main/stage-gminy"
 
     Example result:
         QuoteCodeResult(path="src/lib/Urzad/Numeracja/GeneratorNumeru.php", from_line=8,
-                        to_line=10, role="cause")
+                        to_line=10, role="cause", branch="/main/stage-gminy")
 
     Raises:
         LinesOutOfFileError: fragment kończy się za ostatnią linią pliku
@@ -89,6 +98,7 @@ def check_lines_and_build_result(
         from_line = query.from_line,
         to_line   = query.to_line,
         role      = query.role,
+        branch    = branch,
     )
 
     return quote
@@ -131,15 +141,17 @@ class QuoteCodeToolBase(KnowledgeSource):
 
         Woła ją węzeł `run_tools` po każdym wykonanym cytowaniu; samo narzędzie jej nie woła.
         Identyfikatorem wpisu jest ścieżka z zakresem linii, a tytułem ta sama ścieżka z zakresem
-        zapisanym słowami.
+        zapisanym słowami i z gałęzią paczki, gdy paczka ją zna.
 
         Example args:
             result=QuoteCodeResult(path="src/lib/Urzad/Numeracja/GeneratorNumeru.php",
-                                   from_line=8, to_line=10, role="cause")
+                                   from_line=8, to_line=10, role="cause",
+                                   branch="/main/stage-gminy")
 
         Example result:
             [SourceRef(source="code", item_id="src/lib/Urzad/Numeracja/GeneratorNumeru.php:8-10",
-                       title="src/lib/Urzad/Numeracja/GeneratorNumeru.php, linie 8–10")]
+                       title="src/lib/Urzad/Numeracja/GeneratorNumeru.php, linie 8–10 "
+                             "(gałąź /main/stage-gminy)")]
         """
         # --- wykluczenie: zostaje w rozmowie, źródłem odpowiedzi nie jest ---
         if result.role != "cause":
@@ -151,10 +163,14 @@ class QuoteCodeToolBase(KnowledgeSource):
             else f"linie {result.from_line}–{result.to_line}"
         )
 
+        # Gałąź mówi człowiekowi, z której wersji kodu pochodzi fragment; paczka bez gałęzi
+        # daje tytuł bez dopisku.
+        branch = f" (gałąź {result.branch})" if result.branch else ""
+
         ref = SourceRef(
             source  = self.source,
             item_id = f"{result.path}:{result.from_line}-{result.to_line}",
-            title   = f"{result.path}, {lines}",
+            title   = f"{result.path}, {lines}{branch}",
         )
 
         return [ref]

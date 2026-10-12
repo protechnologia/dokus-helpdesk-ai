@@ -7,6 +7,7 @@ w folderze swojego tematu. Importuje się z modułów; ten plik niczego nie eksp
 |------------|--------------------------------------------------------------------|
 | `tickets/` | zgłoszenie źródłowe, karta, raporty walidacji, filtru i indeksacji |
 | `docs/`    | sekcja dokumentacji, manifest, wczytana paczka, raport indeksacji  |
+| `code/`    | z której gałęzi i z kiedy jest kod aplikacji w paczce              |
 | `dicts/`   | słowniki i zestawy reguł klienta                                   |
 | `graphs/`  | wyniki wspólne dla kilku grafów: werdykt, propozycja               |
 """

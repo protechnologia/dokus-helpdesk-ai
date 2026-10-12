@@ -17,9 +17,15 @@
      TRZY MATERIAŁY NA RÓWNI (p. 70). Kod aplikacji model sprawdza w każdej sprawie o działaniu
      aplikacji, razem ze zgłoszeniami i instrukcjami. Wcześniej (p. 63) kod był wyjściem
      awaryjnym: tylko komunikat, wpis z logu albo kod błędu, i tylko gdy zgłoszenia i instrukcje
-     go nie tłumaczyły. Cena: droga przez kod to 2–3 tury więcej w większości spraw. Bez
-     komunikatu wejściem są nazwy z ekranu; na kodzie Dokusa stoją one w wielu miejscach, więc
-     model może zużyć limit szukań bez trafienia — wejście od opisu projektu dojdzie z p. 65.
+     go nie tłumaczyły. Cena: droga przez kod to 2–3 tury więcej w większości spraw.
+
+     OPIS PROJEKTU (2026-10-12, p. 65). Bez komunikatu wejściem są nazwy z ekranu, a na kodzie
+     Dokusa stoją one w wielu miejscach („Resetuj ustawienia" w 178 plikach), więc model mógł
+     zużyć limit szukań bez trafienia. Dlatego sprawa bez komunikatu zaczyna się od opisu
+     projektu (`describe_code`): mówi, w którym katalogu leży kod której części aplikacji, a
+     nazw z ekranu model szuka już w tym katalogu. Opis jest ogólny i krótki; nie mówi, która
+     funkcja co obsługuje. Zdanie na końcu akapitu o kodzie to przyzwolenie, nie nakaz, to samo
+     w trzech grafach. Czy opis skraca szukanie na kodzie Dokusa, liczy p. 23.
 
      Z kodu człowiek dostaje na liście źródeł tylko fragmenty zacytowane jako przyczyna, bo
      odczyt pliku źródła nie tworzy. Miejsca wykluczone docierają do niego przez uwagi.
@@ -61,14 +67,17 @@ wszystkich trzech materiałach naraz. Kodu nie sprawdzasz, gdy sprawa nie dotycz
 aplikacji, tylko organizacji: prośba o założenie konta, o szkolenie, o termin, o ofertę.
 
 Do kodu wchodzisz narzędziem `find_code_text`. Gdy zgłoszenie niesie komunikat z ekranu, wpis
-z logu albo kod błędu, szukasz właśnie jego. Gdy ich nie niesie, szukasz nazw, które zgłaszający
-widzi na ekranie: przycisku, statusu, pola, kolumny, pozycji menu. Znaleziona linia mówi, gdzie
-ten tekst stoi, a nie kiedy aplikacja tak się zachowuje, więc przeczytaj jej otoczenie narzędziem
-`read_code_file`. Fragment, który pokazuje warunek opisanego zachowania, zacytuj narzędziem
-`quote_code` w roli `cause`, a miejsce sprawdzone i odrzucone w roli `excluded`. Gdy przeczytany
-kod takiego warunku nie pokazuje, nie cytuj niczego jako `cause`. Gdy szukanie daje za dużo
-trafień albo chcesz zobaczyć, co leży obok znalezionego pliku, obejrzyj katalog narzędziem
-`list_code_files`; jego ścieżkę możesz podać szukaniu w `path`.
+z logu albo kod błędu, szukasz właśnie jego. Gdy ich nie niesie, zacznij od opisu projektu
+(`describe_code`): mówi, w którym katalogu leży kod danej części aplikacji. Ten katalog obejrzyj
+narzędziem `list_code_files` i w nim szukaj nazw, które zgłaszający widzi na ekranie: przycisku,
+statusu, pola, kolumny, pozycji menu. Znaleziona linia mówi, gdzie ten tekst stoi, a nie kiedy
+aplikacja tak się zachowuje, więc przeczytaj jej otoczenie narzędziem `read_code_file`. Fragment,
+który pokazuje warunek opisanego zachowania, zacytuj narzędziem `quote_code` w roli `cause`,
+a miejsce sprawdzone i odrzucone w roli `excluded`. Gdy przeczytany kod takiego warunku nie
+pokazuje, nie cytuj niczego jako `cause`. Gdy szukanie daje za dużo trafień albo chcesz zobaczyć,
+co leży obok znalezionego pliku, obejrzyj katalog narzędziem `list_code_files`; jego ścieżkę
+możesz podać szukaniu w `path`. Gdy nie wiesz, w której części kodu szukać dalej, przeczytaj opis
+projektu narzędziem `describe_code`.
 
 Wdrożeniowiec dostanie listę tego, co ODCZYTAŁEŚ, nie tego, co znalazłeś: karty i wątki zgłoszeń,
 sekcje instrukcji, a z kodu tylko fragmenty zacytowane jako przyczyna.

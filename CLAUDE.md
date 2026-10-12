@@ -110,9 +110,9 @@ narzędzie, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzj
 są właściwe i każdy graf przeszedł na prawdziwym modelu (OpenAI), na zmyślonych zgłoszeniach
 i atrapach narzędzi. Trasy biorą graf z węzłów właściwych, gdy model generujący nie jest atrapą,
 ale bez prawdziwego anonimizatora taka konfiguracja odmawia, więc na danych klientów nic jeszcze
-nie rusza. Wszystkie dwanaście narzędzi ma wersję właściwą: osiem na zgłoszeniach
-i instrukcjach oraz cztery pierwsze narzędzia kodu: szukanie, spis katalogu, odczyt pliku
-i cytowanie fragmentu.
+nie rusza. Wszystkie trzynaście narzędzi ma wersję właściwą: osiem na zgłoszeniach
+i instrukcjach oraz pięć pierwszych narzędzi kodu: opis projektu, szukanie, spis katalogu,
+odczyt pliku i cytowanie fragmentu.
 Dwa, które czytają wątki zgłoszeń, czekają na dane, bo tabela wątków napełni się dopiero po
 anonimizacji.
 
@@ -279,7 +279,7 @@ dokus-helpdesk-ai/
 │       ├── parsed/               # sparsowane JSON-y (trwały artefakt, zasada 7)
 │       ├── golden/               # zestawy do ewaluacji: zgłoszenia, dystraktory
 │       ├── instruction/          # właściwa dokumentacja (p. 55)
-│       ├── code/                 # paczka kodu aplikacji: rules.json, manifest.json, repo/ (p. 60)
+│       ├── code/                 # paczka kodu aplikacji: rules.json, manifest.json, project.md, repo/ (p. 60)
 │       └── docs/                 # raporty z pomiarów i dokumenty projektu
 ├── api/                          # folder = usługa z compose, nazwany tak samo
 │   ├── Dockerfile
@@ -292,7 +292,7 @@ dokus-helpdesk-ai/
 │       ├── entry_routers/        # trasy: katalog na zasób (router.py + models.py z modelami API);
 │       │                         #   wspólne modele API i mapowanie na górze pakietu
 │       │                         # --- nasza strona: podział po RODZAJU obiektu ---
-│       ├── core_model/           # tickets/, docs/, dicts/, graphs/ — folder na temat, plik nazwany jak model
+│       ├── core_model/           # tickets/, docs/, code/, dicts/, graphs/ — folder na temat, plik nazwany jak model
 │       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, indexer_*, factory_*
 │       ├── core_text/            # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
 │       ├── core_util/            # html, validation_text, time, text
@@ -917,19 +917,23 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — indeksacja i narzędzia powstają
 
 Trzeci materiał obok zgłoszeń i instrukcji: kod źródłowy Dokusa, czytany narzędziami agenta
 (p. 60–67). Ma pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają, przede wszystkim gdy
-zgłoszenie niesie komunikat albo kod błędu. Z narzędzi są szukanie (`find_code_text`, p. 62),
-spis katalogu (`list_code_files`, p. 64), odczyt pliku (`read_code_file`, p. 63) i cytowanie
-fragmentu (`quote_code`, p. 67); opis projektu i odczyt symbolu jeszcze nie powstały
-(p. 65–66). Są też paczka kodu (p. 60) i zestaw przypadków (p. 61). Niżej decyzje i liczby
-z 2026-10-06, z prób z 2026-10-07, z budowy szukania i odczytu z 2026-10-09 i spisu
-z 2026-10-10.
+zgłoszenie niesie komunikat albo kod błędu. Z narzędzi są opis projektu (`describe_code`,
+p. 65), szukanie (`find_code_text`, p. 62), spis katalogu (`list_code_files`, p. 64), odczyt
+pliku (`read_code_file`, p. 63) i cytowanie fragmentu (`quote_code`, p. 67); odczyt symbolu
+jeszcze nie powstał (p. 66). Są też paczka kodu (p. 60) i zestaw przypadków (p. 61). Niżej
+decyzje i liczby z 2026-10-06, z prób z 2026-10-07, z budowy szukania i odczytu z 2026-10-09,
+spisu z 2026-10-10 i opisu projektu z 2026-10-12.
 Liczby bez dopisku „w paczce" pochodzą z rozpoznania na kopii roboczej gałęzi jednego klienta,
 a paczka powstała z innej gałęzi.
 
 - **Kod może wyjść do modelu zewnętrznego (decyzja 2026-10-06).** Nie przechodzi przez
-  anonimizację: wynik narzędzia idzie do modelu wprost. Otwarte zostaje, którą gałąź indeksuje
-  instancja: klienci mają własne gałęzie obok głównej, a odpowiedź z kodu opisuje tylko tę, którą
-  wczytano (p. 65).
+  anonimizację: wynik narzędzia idzie do modelu wprost.
+- **Instancja ma jedną paczkę z jednej gałęzi, wybranej przy budowie paczki (decyzja
+  2026-10-12).** Klienci mają własne gałęzie obok głównej, a odpowiedź z kodu opisuje tylko tę,
+  z której zbudowano paczkę. Dlatego gałąź widzi model (w wyniku `describe_code`
+  i w potwierdzeniu cytowania) i człowiek (w tytule źródła z kodu). Którą gałąź zbudować na
+  produkcję, rozstrzyga wdrożenie; paczka do pomiarów stoi na gałęzi zadaniowej pod
+  `stage-gminy`.
 - **Są dwie paczki: prawdziwy kod Dokusa i zmyślona aplikacja (2026-10-06, wcześniej tylko
   prawdziwy kod).** Paczka z Dokusa leży w `data/unsafe/code/` i na niej mierzy się skuteczność
   (p. 61). Aplikacja syntetyczna leży w `data/safe/code/source/`: 34 pliki w kształcie
@@ -970,8 +974,9 @@ a paczka powstała z innej gałęzi.
   z listy, których reguły nie biorą). Po tej ostatniej liście widać, czego model nie dostaje.
   Obok stoją folder wejściowy, data budowy i gałąź (od 2026-10-09): skrypt czyta ją z pliku
   kopii roboczej PlasticSCM (`.plastic/plastic.selector`), bez rozmowy z serwerem, a folder bez
-  tego pliku daje metryczkę bez gałęzi. Gałąź służy człowiekowi: żaden kod jej nie czyta
-  (p. 65). Do metryczki paczki z 2026-10-07 dopisano ją ręcznie, w tym samym kształcie.
+  tego pliku daje metryczkę bez gałęzi. Gałąź i dzień budowy czyta z metryczki `CodeDescription`
+  (od 2026-10-12), dla narzędzi `describe_code` i `quote_code`; paczka bez metryczki to błąd
+  konfiguracji. Do metryczki paczki z 2026-10-07 gałąź dopisano ręcznie, w tym samym kształcie.
 - **Przegląd paczki wykrywaczem sekretów (gitleaks, 2026-10-06): 8 tokenów JWT w komentarzu
   jednego zadania technicznego; zostają w paczce świadomie.** Wśród 107 przypisań hasła, tokenu
   albo klucza nie ma prawdziwej wartości: to nazwy ustawień, kolumn i klas. Wykrywacz nie
@@ -1030,7 +1035,27 @@ a paczka powstała z innej gałęzi.
   obok znalezionego pliku. To przyzwolenie, nie nakaz, i nie jest osobnym wejściem w kod.
   Od p. 70 (2026-10-11) wąski warunek stoi już tylko w `suggest_questions`
   i `suggest_solution`: `search` sprawdza kod w każdej sprawie o działaniu aplikacji, a gdy
-  zgłoszenie nie niesie komunikatu, szuka nazw z ekranu.
+  zgłoszenie nie niesie komunikatu, szuka nazw z ekranu. Od p. 65 (2026-10-12) taka sprawa
+  zaczyna się w `search` od opisu projektu (`describe_code`): model bierze z niego katalog,
+  ogląda go spisem i dopiero w nim szuka nazw z ekranu. Wszystkie trzy grafy mają też
+  zdanie-przyzwolenie: gdy model nie wie, w której części kodu szukać dalej, może przeczytać
+  opis.
+- **Na żywym `gpt-6.1-sol` model sięga po opis projektu, gdy zgłoszenie nie niesie komunikatu,
+  i pomija go, gdy niesie (2026-10-12, osiem pojedynczych przebiegów `search`, 0,83 USD, nie
+  pomiar; raport `data/unsafe/docs/przebieg-describe-code-gpt-6.1-sol-2026-10-12.md`).** Dwie
+  sprawy na aplikacji syntetycznej i trzy z zestawu Dokusa (K6, K7, K1), te trzy z opisem
+  i bez; narzędzia zgłoszeń i dokumentacji bez materiału. W trzech sprawach bez komunikatu
+  model wywołał `describe_code` w pierwszej turze, a potem zawężał szukanie do katalogu
+  z opisu; w dwóch z komunikatem nie wywołał go wcale. W K7 („Resetuj ustawienia", napis
+  w 178 plikach) z opisem zacytował oba wymagane miejsca w 11 turach, a bez opisu poszedł
+  martwą ścieżką, wyczerpał limit 20 tur i nie zacytował żadnego. W K6 opis wyniku nie
+  zmienił: w obu ramionach model przeczytał właściwy plik i nie wskazał przyczyny, bo
+  wyzwalacza bazy w paczce nie ma. W K1 (komunikat) oba ramiona poszły tą samą drogą.
+  Zdanie-przyzwolenie nie zadziałało ani razu. Opis podnosi koszt sprawy, w której niczego
+  nie skraca (K6: 0,116 wobec 0,090 USD), i obniża tam, gdzie skraca (K7: 0,145 wobec
+  0,204 USD); sprawa na kodzie Dokusa to 8–20 tur i 0,09–0,20 USD. Wszystkie cztery błędy
+  narzędzi to zgadywane nazwy katalogów modułów (dwa razy `obidokumentywychodzace` zamiast
+  `obidokout`): opis nie wymienia nazw głównych modułów.
 - **Na żywym `gpt-6.1-sol` model idzie drogą szukanie → odczyt → cytowanie (2026-10-09,
   pojedyncze przebiegi, nie pomiar; raport
   `data/unsafe/docs/przebieg-read-code-file-gpt-6.1-sol-2026-10-09.md`).** Siedem spraw
@@ -1069,9 +1094,28 @@ a paczka powstała z innej gałęzi.
   300 linii na wywołanie: w paczce mieści się w nim w całości 92% plików (przy 150 liniach
   84%, przy 400 — 95%). Odczyt symbolu daje najwięcej w długich kontrolerach. W paczce jest
   45 plików pustych, a linii dłuższych niż 500 znaków 72 na 1,18 mln.
-- **Opis projektu szkicuje model z kodu, a poprawia programista aplikacji.** Leży w paczce
-  i mówi, gdzie zacząć szukać: wejścia do aplikacji, droga od adresu do akcji i od zdarzenia JS
-  do handlera.
+- **Opis projektu to plik `project.md` w katalogu paczki, obok metryczki (2026-10-12).** Nie
+  w `repo/`: skrypt kasuje `repo/` przy każdej budowie, a plik wychodziłby tam w szukaniu
+  i w spisie jak kod. Nie `description.md`, bo tak nazywa się opis każdego narzędzia dla
+  modelu. Szkicuje go model z kodu, poprawia programista aplikacji, a komentarze redakcyjne
+  są wycinane jak w promptach. Czyta go `CodeDescription`
+  (`core_service/loader_code_description.py`), osobno od czytnika kodu, przy każdym wywołaniu,
+  bo opis poprawia się bez restartu usługi. Brak opisu albo pusty opis to błąd konfiguracji,
+  nie błąd dla modelu: model szukałby dalej bez opisu i braku nikt by nie zauważył.
+- **Opis jest ogólny i na początek zwięzły (decyzja 2026-10-12): gdzie co leży i czego się
+  spodziewać.** Opis Dokusa ma spis treści, stos, drzewo katalogów na dwa poziomy, trzy części
+  systemu (Obieg, Archiwum, Admin), dwie warstwy Symfony, backend, interfejs z ogólną obsługą
+  błędów, główne integracje po jednym zdaniu, bazę danych i to, czego w paczce nie ma: 8,5 tys.
+  znaków. To szkic napisany z paczki i z `CLAUDE.md` folderu roboczego `dokus`; czeka na
+  poprawki programisty. Rozbudowujemy go dopiero, gdy przebiegi pokażą, czego modelowi
+  brakuje. Opis aplikacji syntetycznej (`data/safe/code/project.md`) ma dwa zdania i pilnuje
+  okablowania.
+- **Ścieżki z opisu sprawdza skrypt paczki, w obie strony (2026-10-12).** Ścieżką jest napis
+  w odwróconych apostrofach zaczynający się od katalogu głównego paczki; `<nazwa>` i `*`
+  zastępują jedną nazwę, a ukośnik na końcu znaczy katalog. Ścieżka z sekcji „Czego w paczce
+  nie ma" ma w paczce nie istnieć, każda inna ma istnieć. Sprawdzenie rusza na końcu budowy,
+  bez zatrzymywania jej, i osobną komendą `check-description`, bo opis poprawia się bez
+  przebudowy. W opisie Dokusa sprawdza 53 ścieżki, z tego 5 na nieobecność.
 - **`filters.yml` jest w paczce od 2026-10-07 (`src/apps/*/config/filters.yml`, 8 plików, same
   nazwy klas).** Bez niego nie dało się wskazać, który z czterech filtrów sesji jest wpięty;
   z nim świeży agent wskazał jeden i rozpoznał bliźniaczą klasę jako martwą.
@@ -1083,14 +1127,15 @@ a paczka powstała z innej gałęzi.
   Opisy zachowania zatwierdza osoba znająca Dokusa; do tego czasu przypadek ma
   `behaviour_confirmed: false`.
 - **Zestaw do aplikacji syntetycznej ma inny kształt, bo służy testom bez modelu (2026-10-07).**
-  `data/safe/golden/code-synthetic.json` trzyma sekcję na narzędzie: 55 zapytań w kształcie
+  `data/safe/golden/code-synthetic.json` trzyma sekcję na narzędzie: 57 zapytań w kształcie
   narzędzia z oczekiwanym wynikiem, oraz listę plików, których paczka nie może zawierać.
   Zgłoszeń w nim nie ma: testowi bez modelu nic nie dają, bo zamiana zgłoszenia na wywołania
   narzędzi to praca modelu. Kształty zapytań pochodzą z planu i prototypów, więc sekcję
   narzędzia dopasowuje się przy jego budowie; dopasowane są sekcje `find_code_text`
   (2026-10-09, dziś 20 zapytań, `words` jako tekst), `read_code_file` (2026-10-09, 11 zapytań,
   `from_at` i `to_at` zamiast `offset_at` i `limit`) i `list_code_files` (2026-10-10,
-  14 zapytań, pełne ścieżki pozycji zamiast nazw).
+  14 zapytań, pełne ścieżki pozycji zamiast nazw). Sekcja `describe_code` doszła 2026-10-12:
+  2 zapytania, a oczekiwany wynik wymienia katalogi, które opis projektu ma nazwać.
 - **Przypadek trafia do zestawu po próbie na świeżym agencie, który zna tylko zgłoszenie
   i folder paczki.** W próbach z 2026-10-07 miejsce wybrane przez autora było błędne albo
   niepełne w 3 przypadkach z 8, a w 2 kolejnych błędny był opis albo rodzaj przypadku. Cena:
@@ -1437,7 +1482,8 @@ Wspólne:
   Odczyt po numerze nie zna podobieństwa; widzi je tylko model, w wyniku wyszukiwania. `/search`
   oddaje więc karty przeczytane przez agenta, a nie wszystko, co wyszukiwanie znalazło. Źródło
   z kodu (`source` „code") to fragment zacytowany jako przyczyna: `item_id` niesie ścieżkę pliku
-  z zakresem linii, a daty nie ma (2026-10-07).
+  z zakresem linii, a daty nie ma (2026-10-07). Z której gałęzi kodu pochodzi, mówi tytuł
+  źródła (2026-10-12); osobnego pola z gałęzią odpowiedź nie ma.
 - **Wspólne żądanie `TicketRequest` dla `/search`, `/gate/close`, `/parse-ticket` i `/suggest`**;
   trasa robi z niego `RawTicket.as_thread()`, czyli ten sam tekst wątku, który widzi parser
   korpusu. `/gate/reply` i `/polish` biorą samą wiadomość albo notatki.
@@ -1802,6 +1848,15 @@ czasu jest pusta.
   29 tys. znaków, a trzy poziomy od katalogu głównego paczki Dokusa to 4,3 tys. Druga cena:
   `has_more_depth` mówi „jest coś głębiej", a `end_of_file` w odczycie „dalej nic nie ma",
   więc dwa narzędzia kodu mają flagi o przeciwnym kierunku.
+- **Opis projektu, `describe_code` (2026-10-12), nie ma argumentów i oddaje opis w całości.**
+  Wynik ma `package_info` (`branch` i `built_on` z metryczki; `branch` to `null`, gdy paczka
+  nie zna gałęzi) i `description`, czyli tekst z `project.md` znak w znak. Limit to jedno
+  wywołanie na sprawę. Narzędzie jest pomocnicze, bez `cite()`. Stoi na `CodeDescription`,
+  nie na czytniku kodu, i nie ma własnych błędów: brak opisu albo metryczki zatrzymuje
+  przebieg błędem konfiguracji. Zasady w opisie dla modelu nazywają całą dalszą drogę
+  w jednym punkcie: z opisu bierze się katalog, w nim się szuka albo ogląda pliki, a o
+  zachowaniu aplikacji mówi dopiero przeczytany kod. Cena: opis Dokusa to 8,5 tys. znaków
+  w rozmowie przy każdej sprawie, w której model po niego sięgnie.
 - **Wynik każdego narzędzia trafia do modelu jako JSON (`result_as_json()` w `base.py`)** — model
   wyniku zapisany wprost, z polami pod nazwami ze schematu. Identyfikatory wracają w kształcie,
   w jakim model poda je następnemu narzędziu, a treść pisana przez klienta siedzi w polu
@@ -1906,10 +1961,10 @@ czasu jest pusta.
   na pakiet i brak `cite()` w narzędziach pomocniczych. Nowe narzędzie jest objęte testem bez
   dopisywania go do żadnej listy.
 - **Narzędzia właściwe buduje `agent_tools/factory.py`, z konfiguracji (2026-10-05):** po jednym
-  kliencie embeddera, Qdranta i Postgresa, wspólnym dla ośmiu narzędzi, oraz paczka kodu
-  i klient ripgrepa dla czterech narzędzi kodu, w kolejności `TOOL_NAMES` grafów. Powstaje
-  wszystkie dwanaście; czy instancja bez dokumentacji ma pomijać jej narzędzia, rozstrzyga
-  p. 15.
+  kliencie embeddera, Qdranta i Postgresa, wspólnym dla ośmiu narzędzi, oraz paczka kodu, jej
+  opis z metryczką i klient ripgrepa dla pięciu narzędzi kodu, w kolejności `TOOL_NAMES`
+  grafów. Powstaje wszystkie trzynaście; czy instancja bez dokumentacji ma pomijać jej
+  narzędzia, rozstrzyga p. 15.
 - **Kod aplikacji liczy się jako źródło jak zgłoszenie i instrukcja, także w wariancie
   wymagającym źródeł (decyzja 2026-10-06, narzędzia w p. 62–67).** Odpowiedź opartą wyłącznie na
   kodzie wołający rozpoznaje po rodzaju źródła (`code`). Źródłem jest fragment, który model
@@ -1921,7 +1976,12 @@ czasu jest pusta.
   Przyjmuje ścieżkę pliku, pierwszą i ostatnią linię oraz wymaganą rolę: `cause` (fragment
   powoduje opisane zachowanie) albo `excluded` (sprawdzony i wykluczony). Źródłem jest tylko
   `cause`: `source` to „code", `item_id` to ścieżka z zakresem linii (`ścieżka:17-19`), tytuł to
-  ta sama ścieżka z zakresem słowami, daty nie ma. Fragment ma najwyżej 40 linii (stała w modelu
+  ta sama ścieżka z zakresem słowami, daty nie ma. Od 2026-10-12 tytuł kończy się gałęzią
+  paczki („… linie 8–10 (gałąź /main/stage-gminy)"), tak jak tytuł sekcji instrukcji niesie
+  wydanie dokumentu; paczka bez gałęzi daje tytuł bez dopisku, a `item_id` gałęzi nie niesie.
+  Tę samą gałąź model dostaje w potwierdzeniu, w polu `branch`: w sprawie z komunikatem po
+  opis projektu zwykle nie sięga, więc inaczej nie zobaczyłby jej wcale. Fragment ma najwyżej
+  40 linii (stała w modelu
   zapytania), a limit to 5 cytowań na sprawę, przyczyn i wykluczeń razem; obie liczby pochodzą
   z sondy i wracają do pomiaru w p. 59. Wykluczenie nie cofa źródła zacytowanego wcześniej jako
   przyczyna i źródłem nie jest: do człowieka trafia przez uwagi dla wdrożeniowca, jeśli model je
@@ -1976,13 +2036,14 @@ czasu jest pusta.
   miejsca, które go wywołuje, idzie się kilkoma szukaniami z rzędu (w sondzie limit 10
   wyczerpał się w 5 sprawach z 9), i odczyt pliku kodu też 10, bo po każdym takim szukaniu
   model czyta otoczenie trafionej linii; od 2026-10-10 spis katalogu kodu 5 (prototyp
-  pokazujący jeden poziom zużywał cały limit 3 w 4 z 7 przebiegów, w których model go wołał).
+  pokazujący jeden poziom zużywał cały limit 3 w 4 z 7 przebiegów, w których model go wołał);
+  od 2026-10-12 opis projektu 1, bo jest jeden dla całego kodu i wraca w całości.
 - **Limit tur modelu: `AGENT_MAX_ITERATIONS` = 20 (2026-10-05).** Liczy odpowiedzi modelu
   w grafie z narzędziami, nie wywołania. Gdy w ostatniej dozwolonej turze model nadal woła
   narzędzia wiedzy, `route_after_agent()` prowadzi do `respond` i narzędzia nie są wykonywane.
   Domyka to, czego limity narzędzi nie domykają: wywołanie ponad limit narzędzia dostaje odmowę,
   ale turę zużywa. 20 to zapas, nie cel: sprawa w sondach to 4–7 tur, a limity narzędzi pozwalają
-  na 62 wywołania, czyli do 63 tur przy jednym wywołaniu na turę (do przeliczenia w p. 23).
+  na 63 wywołania, czyli do 64 tur przy jednym wywołaniu na turę (do przeliczenia w p. 23).
   Sprawa ucięta limitem dostaje od `respond` jedną turę ponad limit, na samą odpowiedź: jest już
   opłacona, a narzędzia w tej turze nadal nie ruszają.
 - **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `engine_llm/models/messages.py`), żadnych typów
@@ -2356,7 +2417,9 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
     się przez składnię Pythona, a jako dokument diff w review pokazuje zmianę treści wprost.
     Komentarze redakcyjne (`<!-- … -->`) muszą być **wycinane przed wysłaniem**: notatka dla nas nie
     ma prawa dotrzeć do modelu. Wycina je jedno miejsce — `core_util/markdown.py` — wspólne dla
-    wszystkich rodzin promptów.
+    wszystkich rodzin promptów. Plik jest czytany przy każdym wywołaniu (od 2026-10-12,
+    wcześniej raz na proces): odczyt największego promptu trwa 0,15 ms, a poprawiony prompt
+    działa w dev bez restartu kontenera.
   - **Wyjątek: treści konfigurowane przez klienta** — reguły bramek i zasady „Popraw".
     Wyjątek dotyczy **treści**, nie szkieletu: rama promptu zostaje w repo pod
     testem-strażnikiem, a z magazynu reguł wchodzą dane wstawiane w wyznaczone miejsce.
@@ -2549,6 +2612,9 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
   i `manifest.json`)
 - Paczka z aplikacji syntetycznej, budowana przed testami narzędzi kodu:
   `python scripts/build_code_package.py build data/safe/code/source data/safe/code`
+- Sprawdzenie opisu projektu wobec paczki, po każdej poprawce opisu:
+  `python scripts/build_code_package.py check-description data/unsafe/code` (kod 1, gdy opisu
+  nie ma albo któraś ścieżka nie zgadza się z paczką; budowa paczki robi to samo na końcu)
 
 **Pipeline danych (CLI `helpdesk`)**
 - Walidacja artefaktów: `helpdesk tickets validate data/unsafe/parsed/`
@@ -2746,18 +2812,18 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1604 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 511 (79)           | 96 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1676 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 542 (79)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 110 (9)            | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 38 s |
 
-Liczby z 2026-10-11, czasy z 2026-10-10: każdy folder osobno, w komplecie
+Liczby z 2026-10-12, czasy folderów z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku. Bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy — całe 38 s to 207 wyszukań golden setów
 przez prawdziwy embedder (178 w zgłoszeniach, 29 w dokumentacji). Komplet jednym poleceniem
-(`pytest -m "not llm_live"`): 2229 testów, 132 s; domyślny `pytest`, bez stacku: 2103 testy,
-30 s. Trzydzieści sześć testów integracyjnych na żywym modelu (`llm_live`) jest w liczbie testów
-folderu, ale poza oboma przebiegami.
+(`pytest -m "not llm_live"`): 2332 testy, 130 s; domyślny `pytest`, bez stacku: 2206 testów,
+37 s (oba czasy z 2026-10-12). Trzydzieści sześć testów integracyjnych na żywym modelu
+(`llm_live`) jest w liczbie testów folderu, ale poza oboma przebiegami.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
 (Qdrant), system plików, rusztowanie frameworka (aplikacja FastAPI wokół handlerów), silnik
@@ -2822,6 +2888,13 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   więc zmniejszenie głębokości i katalog ponad limit sprawdza test jednostkowy na siatce
   kształtów katalogu oraz narzędzie na katalogu tymczasowym. Trzynaście celowo wstawionych
   usterek w wybieraniu pozycji i w wyliczaniu plików testy wyłapały.
+  Testy `describe_code` są od 2026-10-12: zapytania z zestawu idą przez prawdziwy `run_tools`,
+  opis jest porównany z plikiem `project.md` paczki syntetycznej, metryczka z `manifest.json`,
+  a test łańcucha sprawdza, że każdy katalog z opisu przyjmują spis i szukanie. Brak opisu,
+  pusty opis i brak metryczki sprawdza narzędzie na katalogu tymczasowym. W grafach z pętlą
+  osobne testy pilnują, że opis nie tworzy źródeł, że drugie wywołanie w sprawie dostaje
+  odmowę i że gałąź paczki dociera do tytułu źródła. Czternaście celowo wstawionych usterek
+  testy wyłapały, jedną dopiero po poprawce testu.
   Cena: to jedyne testy bez markera, które potrzebują czegoś spoza commita — zbudowanej paczki
   syntetycznej i programu ripgrep na hoście. Bez paczki domyślny `pytest` kończy się błędem
   z poleceniem budowy, a bez ripgrepa błędem z poleceniem instalacji.
@@ -2834,7 +2907,11 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   sprawdzają dobór jednej ścieżki według reguł i poprawki treści. Integracyjne budują paczkę
   z aplikacji syntetycznej do katalogu tymczasowego i pilnują, że źródło to dokładnie paczka plus
   lista `absent_paths` z zestawu syntetycznego: nowy plik źródła trzeba zaliczyć do jednej
-  z grup. Zbudowanej paczki obok źródła nie potrzebują.
+  z grup. Zbudowanej paczki obok źródła nie potrzebują. Sprawdzanie opisu projektu
+  (2026-10-12) ma test jednostkowy wyjmowania ścieżek z tekstu i integracyjne na małych
+  drzewach plików: ścieżka donikąd, ścieżka z sekcji „Czego w paczce nie ma", która w paczce
+  jest, dopasowanie `<nazwa>` i ukośnika, brak opisu, kody wyjścia komendy; osobny test
+  pilnuje, że opis aplikacji syntetycznej z repo zgadza się z paczką z jej źródła.
 - **Bez obronnego boilerplate'u bez uzasadnienia.** Zadeklarowanych zależności (runtime i dev)
   **nie** guardujemy `pytest.importorskip` — brak zadeklarowanej zależności ma być głośnym
   `ImportError`, nie cichym skipem. `importorskip` zostaje tylko dla zależności faktycznie
@@ -2878,7 +2955,8 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   i 0,16 USD na `gpt-6.1-sol` w przebiegu z 2026-10-09 po zmianie promptów trzech grafów;
   dwa wcześniejsze przebiegi tego dnia, na dziewięciu sprawach, kosztowały 0,14 i 0,07 USD,
   a różnicę robi głównie zapis do cache promptu; przebieg z 2026-10-10, po dopisaniu zdania
-  o spisie katalogu, to 27 tur i 0,12 USD). Po zmianie promptu pierwsza tura grafu
+  o spisie katalogu, to 27 tur i 0,12 USD; przebieg z 2026-10-12, po dopisaniu opisu
+  projektu, to 28 tur i 0,19 USD). Po zmianie promptu pierwsza tura grafu
   zapisuje początek żądania do cache od nowa: około 0,02 USD zamiast 0,002. Sprawa grafu liczy
   się dopiero, gdy potrzebuje jej test, więc `-k <graf>` opłaca jeden graf. Testy grafów
   sprawdzają okablowanie: czy model odpowiada
@@ -3035,9 +3113,10 @@ z wywołaniami narzędzi (`run_as_lines()`); sonda na żywym modelu bierze je st
 własne wypisywanie.
 
 **Paczkę syntetycznej aplikacji i zapytania do niej bierz z `tests/helpers_code_package.py`** —
-`synthetic_code_package()` oddaje czytnik zbudowanej paczki, `synthetic_code_cases()` sekcję
-narzędzia z zestawu, a `line_of()` zamienia fragment linii z zestawu na numer linii. Bez
-zbudowanej paczki helper kończy test błędem, nie pominięciem.
+`synthetic_code_package()` oddaje czytnik zbudowanej paczki, `synthetic_code_description()`
+czytnik jej opisu projektu i metryczki, `synthetic_code_cases()` sekcję narzędzia z zestawu,
+a `line_of()` zamienia fragment linii z zestawu na numer linii. Bez zbudowanej paczki helper
+kończy test błędem, nie pominięciem.
 
 ## Zakres i plan
 
@@ -3276,6 +3355,29 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   po treści.
 - **Wyjście „pytań już nie trzeba" tylko po odpowiedziach klienta w wątku** — pierwsza wersja
   reguły; przy opisie, który sam rozstrzyga sprawę, kazałaby pytać na siłę.
+- **Opis projektu w prompcie systemowym zamiast narzędzia** — przy narzędziu sprawa
+  organizacyjna za opis nie płaci, a opis to dane paczki, nie nasz prompt.
+- **Mapa „które zdarzenie obsługuje która funkcja" w opisie projektu** — opis ma być ogólny
+  i zwięzły; zostaje jedna ogólna reguła kliknięcia i wspólna obsługa błędów. Wraca, gdy
+  przebiegi pokażą, że model gubi się na takim przejściu.
+- **Opis projektu i metryczka w czytniku kodu (`CodePackage`)** — czytnik kodu pilnuje ścieżek
+  od modelu, a te dwa pliki ich nie przyjmują; czyta je osobny `CodeDescription`. Cena:
+  `quote_code` ma dwie zależności.
+- **Brak opisu projektu jako błąd wracający do modelu albo narzędzie, które wtedy nie
+  powstaje** — brak opisu objawiałby się tylko gorszym szukaniem; jest błędem konfiguracji.
+- **Gałąź paczki ukryta przed modelem w potwierdzeniu cytowania** — w sprawie z komunikatem
+  model po opis projektu nie sięga, więc gałęzi nie zobaczyłby wcale.
+- **Osobne pole z gałęzią w odpowiedzi `/search` i `/suggest`** — gałąź stoi w tytule źródła,
+  czyli tam, gdzie kod jest cytowany, bez zmiany kontraktu tras.
+- **Kilka gałęzi kodu w jednej instancji** — osobna paczka na gałąź i wskazanie gałęzi
+  w każdym narzędziu kodu; instancja ma jedną paczkę.
+- **Reguła „bez komunikatu zacznij od opisu projektu" w `suggest_questions`
+  i `suggest_solution`** — warunek sięgania po kod zostaje tam wąski do p. 25–26; mają samo
+  zdanie-przyzwolenie.
+- **Test na żywym modelu wymagający wywołania opisu projektu** — narzędzie jest pomocnicze;
+  czy model sięga po nie z sensem, pokaże sonda.
+- **Pamiętanie plików w `read_document()` (`lru_cache`)** — zysk to 0,15 ms na odczyt, a opis
+  projektu i prompt w dev docierały w starej wersji aż do restartu.
 
 ### Plan
 
@@ -3510,15 +3612,15 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   zmyślonych sprawach na żywym `gpt-6.1-sol`; jak często i czy słusznie model sięga po to
   wyjście na prawdziwych sprawach, zostaje w p. 25; reguły — „Warianty generacji", „Warstwa
   API", „Warstwa węzłów", „Świadomie pominięte".
-- [ ] **65. `describe_code`** — opis projektu w całości, raz na sprawę; szkic pisze model
-  z kodu, poprawia programista Dokusa, plik leży w paczce; opis nazywa wprost połączenia idące
-  przez napis, których mapa symboli nie zna (które zdarzenie obsługuje która funkcja); do
-  rozstrzygnięcia, którą gałąź indeksuje instancja, i pokazanie jej modelowi i człowiekowi
-  (metryczka paczki niesie gałąź od p. 62); z opisem dochodzi reguła promptu dla sprawy bez
-  komunikatu i bez kodu błędu: zacząć od opisu i iść po katalogach spisem (`list_code_files`).
-  *Dlaczego:* mówi, gdzie zacząć: wejścia do aplikacji, droga od adresu do akcji i od zdarzenia
-  JS do handlera; w sondzie z 2026-10-06 na komunikacie „Nie udało się skomunikować z serwerem"
-  przejście od zdarzenia błędu do funkcji, która je obsługuje, zajęło 6 z 10 wywołań.
+- [x] **65. `describe_code`** (2026-10-12) — `DescribeCodeTool` na czytniku `CodeDescription`:
+  opis projektu w całości, z gałęzią i dniem budowy paczki, raz na sprawę; plik `project.md`
+  obok metryczki i sprawdzanie jego ścieżek w skrypcie paczki; gałąź w tytule źródła z kodu
+  i w potwierdzeniu cytowania; reguła „bez komunikatu zacznij od opisu" w `search`
+  i zdanie-przyzwolenie w trzech grafach; opis aplikacji syntetycznej i szkic opisu Dokusa,
+  który czeka na poprawki programisty; instancja ma jedną paczkę z jednej gałęzi;
+  `read_document()` bez pamiętania plików; sonda na ośmiu przebiegach na żywym `gpt-6.1-sol`;
+  czy opis skraca szukanie na kodzie Dokusa, liczy p. 23; reguły — „Kod aplikacji", „Warstwa
+  narzędzi agenta", „Warstwa węzłów", „Warstwa API", „Testy", „Świadomie pominięte".
 - [ ] **66. Mapa symboli i `read_code_symbol`** — mapa budowana komendą do pliku obok paczki,
   narzędziem wybranym po próbie na kodzie Dokusa (linia końca metody PHP, handlery JS
   definiowane przypisaniem); symbol wskazuje ścieżka z nazwą, przy kilku kandydatach narzędzie
@@ -3607,8 +3709,8 @@ każdy mierzy się osobno.
 - [ ] **23. `search`** — prompt pętli (jak pytać każde narzędzie, kiedy materiał wystarcza
   i ile kosztuje kod aplikacji sprawdzany w każdej sprawie o działaniu aplikacji — reguła
   z p. 70; na kodzie Dokusa do policzenia, jak często szukanie nazw z ekranu trafia we właściwe
-  miejsce i ile szukań zużywa, oraz czy uwagi dla wdrożeniowca mówią prawdę o przeczytanych
-  sprawach i ile mają mieć znaków);
+  miejsce i ile szukań zużywa, czy opis projektu (p. 65) to szukanie skraca, oraz czy uwagi
+  dla wdrożeniowca mówią prawdę o przeczytanych sprawach i ile mają mieć znaków);
   pomiar pętli wobec wszystkich narzędzi naraz (tryb bez pętli zostaje jako odniesienie i tryb
   awaryjny), w zestawie klastry wieloprzyczynowe; osobna oś — trafność zapytań pisanych przez
   agenta wobec zapytań z parsera korpusu (golden set, `recall@1` i MRR; punkt odniesienia to pola

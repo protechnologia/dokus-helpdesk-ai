@@ -46,6 +46,8 @@ O czym pamiętać przy zmianach:
   Stąd dostaje katalog z kodem (`repo_dir()`) i ścieżkę już sprawdzoną (`locate()`).
 - `list_files()` oddaje same pliki, a w dowiązania nie wchodzi i ich nie pokazuje. Katalogu
   bez plików w wyniku nie ma: paczka powstaje z plików, więc pustych katalogów nie zawiera.
+- Ten plik czyta wyłącznie kod z `repo/`. Opis projektu i metryczkę, które stoją obok kodu,
+  czyta `loader_code_description.py`.
 """
 
 import os
@@ -58,8 +60,8 @@ REPO_DIR = "repo"
 class CodePackageConfigError(Exception):
     """
     Description:
-    Paczki kodu nie ma tam, gdzie wskazuje konfiguracja (`CODE_PACKAGE_DIR`): katalog nie
-    istnieje albo nie ma w nim `repo/`.
+    Paczki kodu nie ma tam, gdzie wskazuje konfiguracja (`CODE_PACKAGE_DIR`), albo jest
+    niekompletna: katalog nie istnieje, nie ma w nim `repo/`, opisu projektu albo metryczki.
 
     Błąd wdrożenia, a nie wywołania: poprawiona ścieżka niczego by nie zmieniła, więc do modelu
     nie wraca i zatrzymuje przebieg.

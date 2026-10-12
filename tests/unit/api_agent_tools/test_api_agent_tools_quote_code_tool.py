@@ -10,11 +10,15 @@ from app.agent_tools.code.quote_code import (
     QuoteCodeTool,
     UnknownCodeFileError,
 )
+from app.core_service.loader_code_description import CodeDescription
 from app.core_service.loader_code_package import CodePackage, CodePackageConfigError
 
-# Narzędzie stoi na prawdziwym czytniku paczki, a paczka to kilka linii w katalogu tymczasowym —
-# sprawdzamy więc, co narzędzie robi z plikiem i z odmową czytnika. Samej granicy paczki pilnują
-# testy czytnika; pełną paczkę syntetyczną czyta test integracyjny.
+# Narzędzie stoi na prawdziwych czytnikach paczki, a paczka to kilka linii i metryczka w katalogu
+# tymczasowym — sprawdzamy więc, co narzędzie robi z plikiem, z gałęzią z metryczki i z odmową
+# czytnika. Samej granicy paczki pilnują testy czytnika; pełną paczkę syntetyczną czyta test
+# integracyjny.
+
+BRANCH = "/main/stage-gminy"
 
 GENERATOR = "src/lib/Numeracja/GeneratorNumeru.php"
 CODE      = [
@@ -29,24 +33,34 @@ CODE      = [
 
 
 def _tool(
-    tmp_path: Path,  # katalog tymczasowy testu
+    tmp_path: Path,               # katalog tymczasowy testu
+    branch:   str | None = None,  # np. "/main/stage-gminy"; brak: metryczka bez gałęzi
+    manifest: bool = True,        # False: paczka bez metryczki
 ) -> QuoteCodeTool:
     """
     Description:
-    Buduje narzędzie na paczce z jednym plikiem PHP na siedem linii.
+    Buduje narzędzie na paczce z jednym plikiem PHP na siedem linii i z metryczką, w której
+    stoi podana gałąź.
 
     Example args:
         tmp_path=Path("/tmp/pytest-of-root/pytest-0/test_x0")
+        branch=None
+        manifest=True
 
     Example result:
-        QuoteCodeTool cytujące z <tmp_path>/paczka/repo
+        QuoteCodeTool cytujące z <tmp_path>/paczka/repo, paczka bez gałęzi
     """
-    file = tmp_path / "paczka" / "repo" / GENERATOR
+    root = tmp_path / "paczka"
+    file = root / "repo" / GENERATOR
 
     file.parent.mkdir(parents=True)
     file.write_text("\n".join(CODE) + "\n", encoding="utf-8")
 
-    return QuoteCodeTool(package=CodePackage(tmp_path / "paczka"))
+    if manifest:
+        metadata = {"branch": branch, "built_on": "2026-10-07"}
+        (root / "manifest.json").write_text(json.dumps(metadata), encoding="utf-8")
+
+    return QuoteCodeTool(package=CodePackage(root), description=CodeDescription(root))
 
 
 async def test_a_quote_comes_back_as_a_confirmation(tmp_path: Path) -> None:
@@ -68,8 +82,8 @@ async def test_a_quote_comes_back_as_a_confirmation(tmp_path: Path) -> None:
 
 
 async def test_the_model_does_not_get_the_quoted_lines(tmp_path: Path) -> None:
-    """Sprawdza, czy tekst, który model dostaje po cytowaniu, to JSON z czterema polami (ścieżka,
-    pierwsza i ostatnia linia, rola) i czy nie ma w nim treści cytowanych linii.
+    """Sprawdza, czy tekst, który model dostaje po cytowaniu, to JSON z pięcioma polami (ścieżka,
+    pierwsza i ostatnia linia, rola, gałąź paczki) i czy nie ma w nim treści cytowanych linii.
 
     Wyłapuje cytowanie, które oddaje kod: model używałby go wtedy zamiast odczytu i cytował
     linie, których nie przeczytał."""
@@ -78,8 +92,46 @@ async def test_the_model_does_not_get_the_quoted_lines(tmp_path: Path) -> None:
 
     text = tool.render_for_model(quote)
 
-    assert set(json.loads(text)) == {"path", "from_line", "to_line", "role"}
+    assert set(json.loads(text)) == {"path", "from_line", "to_line", "role", "branch"}
     assert "sekwencj" not in text
+
+
+async def test_the_branch_of_the_package_is_in_the_title_and_in_the_confirmation(
+    tmp_path: Path,
+) -> None:
+    """Sprawdza, czy przy paczce zbudowanej z gałęzi `/main/stage-gminy` tytuł źródła kończy się
+    dopiskiem „(gałąź /main/stage-gminy)", a potwierdzenie, które czyta model, niesie tę samą
+    gałąź w polu `branch`. Identyfikator źródła zostaje bez gałęzi.
+
+    Wyłapuje źródło z kodu, po którym nie widać, z której wersji kodu pochodzi: klienci mają
+    własne gałęzie, więc człowiek wziąłby fragment za stan swojej instalacji. Wyłapuje też
+    gałąź doklejoną do identyfikatora: ten sam fragment po przebudowie paczki z innej gałęzi
+    byłby dla wołającego innym źródłem."""
+    tool  = _tool(tmp_path, branch=BRANCH)
+    quote = await tool.search(QuoteCodeQuery(path=GENERATOR, from_line=4, to_line=6, role="cause"))
+
+    [ref] = tool.cite(quote)
+    text  = json.loads(tool.render_for_model(quote))
+
+    assert ref.title      == f"{GENERATOR}, linie 4–6 (gałąź {BRANCH})"
+    assert ref.item_id    == f"{GENERATOR}:4-6"
+    assert text["branch"] == BRANCH
+
+
+async def test_a_package_without_a_branch_gives_a_title_without_the_note(tmp_path: Path) -> None:
+    """Sprawdza, czy przy paczce, której metryczka nie zna gałęzi, tytuł źródła nie ma dopisku
+    o gałęzi, a model dostaje w potwierdzeniu `branch` równe `null`.
+
+    Wyłapuje tytuł z dopiskiem „(gałąź None)" i potwierdzenie bez pola: paczka z folderu, który
+    nie jest kopią roboczą, ma mówić wprost, że gałęzi nie zna."""
+    tool  = _tool(tmp_path, branch=None)
+    quote = await tool.search(QuoteCodeQuery(path=GENERATOR, from_line=4, to_line=6, role="cause"))
+
+    [ref] = tool.cite(quote)
+    text  = json.loads(tool.render_for_model(quote))
+
+    assert ref.title      == f"{GENERATOR}, linie 4–6"
+    assert text["branch"] is None
 
 
 async def test_a_cause_becomes_a_source_with_the_path_and_the_lines(tmp_path: Path) -> None:
@@ -180,9 +232,25 @@ async def test_a_missing_package_stops_the_call_instead_of_answering_the_model(
 
     Wyłapuje brak paczki oddawany modelowi jako „nie ma takiego pliku": instancja bez paczki kodu
     odpowiadałaby tak na każde cytowanie, a błąd wdrożenia zostałby niezauważony."""
-    tool = QuoteCodeTool(package=CodePackage(tmp_path / "nie-ma"))
+    root = tmp_path / "nie-ma"
+    tool = QuoteCodeTool(package=CodePackage(root), description=CodeDescription(root))
 
     with pytest.raises(CodePackageConfigError) as caught:
         await tool.search(QuoteCodeQuery(path=GENERATOR, from_line=1, to_line=2, role="cause"))
+
+    assert not isinstance(caught.value, ToolCallError)
+
+
+async def test_a_package_without_a_manifest_stops_the_call(tmp_path: Path) -> None:
+    """Sprawdza, czy cytowanie istniejącego fragmentu na paczce bez metryczki kończy się
+    wyjątkiem `CodePackageConfigError`, który nie jest odmianą `ToolCallError`.
+
+    Wyłapuje narzędzie, które przy braku metryczki po cichu pomija gałąź: źródło z kodu nie
+    mówiłoby wtedy, z której wersji kodu pochodzi, a o niekompletnej paczce nikt by się nie
+    dowiedział."""
+    tool = _tool(tmp_path, manifest=False)
+
+    with pytest.raises(CodePackageConfigError) as caught:
+        await tool.search(QuoteCodeQuery(path=GENERATOR, from_line=4, to_line=6, role="cause"))
 
     assert not isinstance(caught.value, ToolCallError)

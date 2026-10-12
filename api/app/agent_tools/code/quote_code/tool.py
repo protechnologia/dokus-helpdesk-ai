@@ -14,14 +14,16 @@ Przed — zapytanie agenta:
 Po — wynik `search()`:
 
     QuoteCodeResult(path="src/lib/Urzad/Numeracja/GeneratorNumeru.php",
-                    from_line=17, to_line=19, role="cause")
+                    from_line=17, to_line=19, role="cause", branch="/main/stage-gminy")
 
 Co się dzieje po drodze:
 
 1. Czytnik paczki sprawdza ścieżkę i oddaje ją w jednej postaci, względnej wobec kodu.
 2. Ścieżka spoza paczki, katalog albo brak pliku kończy się `UnknownCodeFileError`.
 3. Fragment, który kończy się za ostatnią linią pliku, kończy się `LinesOutOfFileError`.
-4. Wynikiem jest samo potwierdzenie: ścieżka, zakres i rola.
+4. Z metryczki paczki (`CodeDescription`) dochodzi gałąź, z której zbudowano paczkę.
+5. Wynikiem jest potwierdzenie: ścieżka, zakres, rola i gałąź. Gałąź trafia też do tytułu
+   źródła.
 
 O czym pamiętać przy zmianach:
 
@@ -32,6 +34,9 @@ O czym pamiętać przy zmianach:
 - Długość fragmentu i kolejność linii sprawdza model zapytania, zanim narzędzie ruszy.
 - Brak paczki pod skonfigurowaną ścieżką to `CodePackageConfigError`: nie wraca do modelu,
   zatrzymuje przebieg. Inaczej model dostawałby „nie ma takiego pliku" na każde cytowanie.
+  Tak samo kończy się brak metryczki: paczka bez niej nie powstała skryptem paczki.
+- Gałąź czyta się z metryczki przy każdym cytowaniu, bez pamiętania: paczkę podmienia
+  przebudowa, bez restartu usługi.
 """
 
 import logging
@@ -39,6 +44,7 @@ import logging
 from app.agent_tools.code.quote_code.base import QuoteCodeToolBase, check_lines_and_build_result
 from app.agent_tools.code.quote_code.errors import UnknownCodeFileError
 from app.agent_tools.code.quote_code.models import QuoteCodeQuery, QuoteCodeResult
+from app.core_service.loader_code_description import CodeDescription
 from app.core_service.loader_code_package import CodePackage, CodePathError
 
 logger = logging.getLogger(__name__)
@@ -56,27 +62,31 @@ class QuoteCodeTool(QuoteCodeToolBase):
     a nie każdy plik, przez który model przeszedł. Tylko do odczytu.
 
     Flow:
-        1. `search()` ustala ścieżkę w paczce i liczy linie pliku.
+        1. `search()` ustala ścieżkę w paczce, liczy linie pliku i bierze gałąź z metryczki.
         2. `check_lines_and_build_result()` sprawdza, że fragment mieści się w pliku, i składa
            potwierdzenie.
-        3. `render_for_model()` i `cite()` z klas bazowych robią z wyniku tekst i źródło.
+        3. `render_for_model()` i `cite()` z klasy bazowej robią z wyniku tekst i źródło.
     """
 
     def __init__(
         self,
-        package: CodePackage,  # np. CodePackage(Path("/code/data/unsafe/code"))
+        package:     CodePackage,      # np. CodePackage(Path("/code/data/unsafe/code"))
+        description: CodeDescription,  # np. CodeDescription(Path("/code/data/unsafe/code"))
     ):
         """
         Description:
-        Spina narzędzie z paczką kodu. Paczka jest wstrzykiwana, nie budowana tutaj.
+        Spina narzędzie z paczką kodu i z jej metryczką. Oba czytniki są wstrzykiwane, nie
+        budowane tutaj: pierwszy sprawdza plik i linie, z drugiego pochodzi gałąź paczki.
 
         Example args:
             package=CodePackage(Path("/code/data/unsafe/code"))
+            description=CodeDescription(Path("/code/data/unsafe/code"))
 
         Example result:
             QuoteCodeTool gotowe do cytowania plików z paczki
         """
-        self._package = package
+        self._package     = package
+        self._description = description
 
     async def search(
         self,
@@ -92,12 +102,12 @@ class QuoteCodeTool(QuoteCodeToolBase):
 
         Example result:
             QuoteCodeResult(path="src/lib/Urzad/Numeracja/GeneratorNumeru.php", from_line=17,
-                            to_line=19, role="cause")
+                            to_line=19, role="cause", branch="/main/stage-gminy")
 
         Raises:
             UnknownCodeFileError: ścieżka nie wskazuje pliku w paczce
             LinesOutOfFileError: fragment kończy się za ostatnią linią pliku
-            CodePackageConfigError: paczki nie ma pod skonfigurowaną ścieżką
+            CodePackageConfigError: paczki albo jej metryczki nie ma pod skonfigurowaną ścieżką
         """
         # --- plik: ścieżka w jednej postaci i liczba linii ---
         try:
@@ -107,7 +117,9 @@ class QuoteCodeTool(QuoteCodeToolBase):
             # `from None`: wyjątek czytnika niczego tu nie dodaje, a komunikat idzie do modelu.
             raise UnknownCodeFileError(str(exc)) from None
 
-        quote = check_lines_and_build_result(query, path, line_count)
+        # --- gałąź paczki: do tytułu źródła ---
+        branch = self._description.read_package_info().branch
+        quote  = check_lines_and_build_result(query, path, line_count, branch)
 
         # Rola i liczby: ścieżkę podaje model, a wskazuje ona miejsce w kodzie klienta.
         logger.info(

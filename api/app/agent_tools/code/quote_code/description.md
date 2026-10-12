@@ -41,12 +41,13 @@ jest.
 
 JSON z potwierdzeniem cytowania, bez treści linii:
 
-| pole      | co zawiera                       |
-|-----------|----------------------------------|
-| path      | ścieżka pliku w kodzie aplikacji |
-| from_line | pierwsza linia fragmentu         |
-| to_line   | ostatnia linia fragmentu         |
-| role      | rola, w której fragment zapisano |
+| pole      | co zawiera                             |
+|-----------|----------------------------------------|
+| path      | ścieżka pliku w kodzie aplikacji       |
+| from_line | pierwsza linia fragmentu               |
+| to_line   | ostatnia linia fragmentu               |
+| role      | rola, w której fragment zapisano       |
+| branch    | gałąź kodu; `null`, gdy nieznana       |
 
 # Zasady
 
@@ -60,5 +61,7 @@ JSON z potwierdzeniem cytowania, bez treści linii:
   nie zastąpi.
 - Jedno wywołanie to jeden fragment. Cytuj samo miejsce, które
   rozstrzyga: warunek, ustawienie, treść komunikatu.
+- Kod, który cytujesz, pochodzi z jednej gałęzi (`branch`).
+  Instalacja klienta może stać na innej.
 - Limit wywołań w jednej sprawie: {{max_calls}}. Po jego wyczerpaniu
   narzędzie zwraca błąd zamiast wyniku.

@@ -11,6 +11,7 @@
       "Aplikacja jest ZMYŚLONA; każda pułapka odpowiada czemuś widzianemu w prawdziwym kodzie. Wyjątek: katalog szablonów z nadmiarowym plikiem (src/lib/Urzad/Szablony) nie ma odpowiednika w prawdziwym kodzie — powstał, żeby spis katalogu miał sprawę, której nie rozstrzyga szukanie: komunikat nie podaje nazwy pliku, a nazwa nie stoi w żadnej linii kodu.",
       "Sekcja na narzędzie: zapytanie w kształcie narzędzia i oczekiwany wynik. Kształty pochodzą z planu (p. 62–67) i z prototypów sondy z 2026-10-07; przy budowie każdego narzędzia jego sekcję dopasowuje się do modelu zapytania.",
       "Miejsce w kodzie to ścieżka i stały fragment linii, bez numeru linii. Pola z końcówką _at (from_at, to_at) niosą fragment, z którego test wylicza numer linii.",
+      "describe_code: contains i lacks to fragmenty, które opis projektu ma zawierać albo których ma nie zawierać (komentarz redakcyjny z pliku project.md); names_dirs to katalogi, które opis wymienia — każdy ma przyjąć spis katalogu i szukanie; branch to gałąź z metryczki paczki (paczka syntetyczna jej nie ma). error: true znaczy błąd wracający do modelu.",
       "find_code_text: expected to komplet trafień (ścieżka i fragment linii), w dowolnej kolejności; pusta lista znaczy brak trafień, a matched_by przy trafieniu mówi, czym ma być znalezione. expected_total i expected_files opisują zapytanie, które przekracza limit pozycji. expected z error: true znaczy błąd wracający do modelu.",
       "read_code_file i read_code_symbol: contains i lacks to fragmenty, które wynik ma zawierać albo których ma nie zawierać; error: true znaczy błąd wracający do modelu. W read_code_file cut_by_limit i end_of_file to flagi oddanego zakresu: czy odczyt urwał limit linii i czy kończy się na ostatniej linii pliku.",
       "list_code_files: includes i lacks to pełne ścieżki pozycji, które spis ma zawierać albo których ma nie zawierać; path to ścieżka katalogu w wyniku, depth to oddana głębokość, a has_more_depth mówi, czy katalog sięga głębiej, niż pokazuje spis; error: true znaczy błąd wracający do modelu.",
@@ -19,6 +20,41 @@
       "Zestaw stoi na paczce zbudowanej ze źródła skryptem; test bez zbudowanej paczki nie ma na czym stanąć."
     ]
   },
+  "describe_code": [
+    {
+      "id": "d01",
+      "phenomenon": "opis projektu wraca w całości, bez komentarza redakcyjnego, z metryczką paczki bez gałęzi",
+      "query": {},
+      "expected": {
+        "branch": null,
+        "contains": [
+          "Zmyślona aplikacja urzędu na Symfony 1",
+          "plików konfiguracji z hasłami w paczce nie ma"
+        ],
+        "lacks": [
+          "<!--",
+          "check-description"
+        ],
+        "names_dirs": [
+          "src/apps/frontend/modules",
+          "src/lib/Urzad",
+          "src/web/js",
+          "src/web/js/_global",
+          "src/config/doctrine"
+        ]
+      }
+    },
+    {
+      "id": "d02",
+      "phenomenon": "argument wymyślony przez model (opis jednego katalogu) to błąd, nie opis całości",
+      "query": {
+        "path": "src/lib"
+      },
+      "expected": {
+        "error": true
+      }
+    }
+  ],
   "find_code_text": [
     {
       "id": "f01",

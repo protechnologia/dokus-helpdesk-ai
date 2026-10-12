@@ -9,16 +9,38 @@ narzędzia kodu czytają tę samą paczkę.
 | `src/lib/Urzad/Numeracja/GeneratorNumeru.php` | 14    | przyczyna: warunek i treść komunikatu    |
 | `src/web/js/_global/bledy.js`                 | 8     | miejsce do wykluczenia: ogólny komunikat |
 
+Obok plików stoi to, co paczka trzyma poza kodem: zmyślony opis projektu (`PROJECT_DESCRIPTION`)
+i metryczka (`default_package_info()`), na których stoi atrapa `describe_code`.
+
 O czym pamiętać przy zmianach:
 
 - Kod jest wymyślony, nigdy kopiowany z kodu klienta. Leży w tym samym zmyślonym świecie co
   zgłoszenia atrap: zgłoszenie 90012 to brak sekwencji numeracji.
 - Ścieżki i numery linii są stałe: testy odwołują się do nich wprost.
 - Linie dzieli `\\n`, jak w paczce; atrapy liczą je tą samą funkcją co czytnik paczki.
+- Opis projektu wymienia katalogi obu plików, więc katalog wzięty z opisu atrapa spisu pokaże.
+  Katalog dopisany do opisu musi mieć tu plik.
 """
+
+from datetime import date
+
+from app.core_model.code.code_package_info import CodePackageInfo
 
 GENERATOR_PATH = "src/lib/Urzad/Numeracja/GeneratorNumeru.php"
 ERRORS_PATH    = "src/web/js/_global/bledy.js"
+
+# Katalogi, które wymienia zmyślony opis projektu: w każdym leży jeden z plików wyżej.
+BACKEND_DIR   = "src/lib/Urzad"
+INTERFACE_DIR = "src/web/js"
+
+PROJECT_DESCRIPTION = (
+    f"Zmyślona aplikacja urzędu na Symfony 1: backend w PHP (kod domenowy w `{BACKEND_DIR}/`), "
+    f"interfejs w JS (`{INTERFACE_DIR}/`, katalog na moduł, część wspólna "
+    f"w `{INTERFACE_DIR}/_global/`)."
+)
+
+# Dzień budowy zmyślonej paczki; gałęzi nie ma, jak w paczce z aplikacji syntetycznej.
+PACKAGE_BUILT_ON = date(2026, 10, 1)
 
 GENERATOR_CODE = "\n".join([
     "<?php",
@@ -66,3 +88,17 @@ def default_files() -> dict[str, str]:
     }
 
     return files
+
+
+def default_package_info() -> CodePackageInfo:
+    """
+    Description:
+    Metryczka zmyślonej paczki: bez gałęzi, ze stałym dniem budowy.
+
+    Example args:
+        (brak)
+
+    Example result:
+        CodePackageInfo(branch=None, built_on=date(2026, 10, 1))
+    """
+    return CodePackageInfo(branch=None, built_on=PACKAGE_BUILT_ON)
