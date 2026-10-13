@@ -12,7 +12,7 @@
      `models.py`; pilnuje jej test opisu.
 
      Zasady wymieniają po nazwie odczyt pliku (`read_code_file`);
-     odczyt symbolu dojdzie razem z nim (p. 66).
+     odczyt symbolu dojdzie razem z nim (p. 73).
 
      Zmiana dotyczy wszystkich grafów naraz, więc po strojeniu jednego
      trzeba przemierzyć pozostałe (p. 23, 25–26).

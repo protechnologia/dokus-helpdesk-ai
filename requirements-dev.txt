@@ -14,3 +14,9 @@ pyyaml==6.0.2
 # scripts only, never by a service or a test — a report figure has to be reproducible, so the
 # dependency is declared rather than installed ad hoc.
 matplotlib==3.11.1
+# Parser for the symbol map of the application code package (scripts/build_code_symbols.py ->
+# symbols.json next to the package manifest). Script-only: the api image reads the finished map
+# and never parses code, so these stay out of api/requirements.txt.
+tree-sitter==0.26.0
+tree-sitter-php==0.25.1
+tree-sitter-javascript==0.25.0

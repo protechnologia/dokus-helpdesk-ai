@@ -14,6 +14,7 @@ data/*
 # więc w repo jest tylko źródło i reguły.
 data/safe/code/repo/
 data/safe/code/manifest.json
+data/safe/code/symbols.json
 
 # --- Python ---
 .venv/

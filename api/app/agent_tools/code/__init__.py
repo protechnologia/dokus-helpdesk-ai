@@ -17,7 +17,7 @@ model wskazuje fragment powodujący opisane zachowanie.
 Narzędzia właściwe stoją na paczce kodu na dysku (`CodePackage` z
 `core_service/loader_code_package.py`), bez bazy; szuka w niej program ripgrep, uruchamiany
 przez `engine_process/`. Opis projektu to plik `project.md` w paczce, obok kodu: pisze go
-człowiek. Odczyt symbolu dojdzie jako kolejny katalog (CLAUDE.md -> p. 66).
+człowiek. Odczyt symbolu dojdzie jako kolejny katalog (CLAUDE.md -> p. 73).
 
 Narzędzie importuje się z jego pakietu
 (`from app.agent_tools.code.quote_code import QuoteCodeTool`), nie stąd.

@@ -100,7 +100,7 @@ z deklaracji modelu, a wariant wymagający źródeł bez źródeł nie oddaje pr
 jest człowiek: dostaje propozycję albo werdykt ze źródłami i sam decyduje.
 
 **Rozwój to dokładanie narzędzi.** Narzędzie jest katalogiem z kontraktem, więc kolejne źródło
-wiedzy nie zmienia grafów ani węzłów. Następne jest czytanie kodu aplikacji (p. 60–67): sześć
+wiedzy nie zmienia grafów ani węzłów. Następne jest czytanie kodu aplikacji (p. 60–67 i 73): sześć
 narzędzi tylko do odczytu, które mają pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają,
 przede wszystkim gdy zgłoszenie niesie komunikat albo kod błędu. Kandydat bez decyzji (p. 58):
 dostęp do instancji testowej, na której agent sprawdzi opisany objaw. Byłoby to pierwsze
@@ -279,7 +279,7 @@ dokus-helpdesk-ai/
 │       ├── parsed/               # sparsowane JSON-y (trwały artefakt, zasada 7)
 │       ├── golden/               # zestawy do ewaluacji: zgłoszenia, dystraktory
 │       ├── instruction/          # właściwa dokumentacja (p. 55)
-│       ├── code/                 # paczka kodu aplikacji: rules.json, manifest.json, project.md, repo/ (p. 60)
+│       ├── code/                 # paczka kodu aplikacji: rules.json, manifest.json, symbols.json, project.md, repo/ (p. 60)
 │       └── docs/                 # raporty z pomiarów i dokumenty projektu
 ├── api/                          # folder = usługa z compose, nazwany tak samo
 │   ├── Dockerfile
@@ -360,9 +360,9 @@ dokus-helpdesk-ai/
   korzysta. Na górze pakietu jest to, co wspólne (`run_program()`, błędy, `ProgramOutput`),
   a każdy program ma podfolder z klientem i jego modelami; pierwszy to `ripgrep/`. Nazwa mówi
   o mechanizmie, nie o roli, inaczej niż pozostałe silniki, bo pakiet ma przyjąć każdy program
-  uruchamiany procesem (następny to budowa mapy symboli, p. 66). Program rusza bez powłoki,
-  z argumentami jako osobnymi napisami i z limitem czasu. Błędy: `ProcessError`
-  i `ProcessConfigError`. Cena: nazwa od mechanizmu nie mówi, do czego pakiet służy.
+  uruchamiany procesem. Program rusza bez powłoki, z argumentami jako osobnymi napisami
+  i z limitem czasu. Błędy: `ProcessError` i `ProcessConfigError`. Cena: nazwa od mechanizmu
+  nie mówi, do czego pakiet służy.
 - **Transport vs domena.** Transport = rozmowa z usługą zewnętrzną (LLM, embedder, Qdrant); domena =
   logika, nieświadoma tego, co pod spodem. Domena dostaje klienta transportowego przez
   konstruktor, nigdy nie sięga po SDK.
@@ -920,9 +920,10 @@ Trzeci materiał obok zgłoszeń i instrukcji: kod źródłowy Dokusa, czytany n
 zgłoszenie niesie komunikat albo kod błędu. Z narzędzi są opis projektu (`describe_code`,
 p. 65), szukanie (`find_code_text`, p. 62), spis katalogu (`list_code_files`, p. 64), odczyt
 pliku (`read_code_file`, p. 63) i cytowanie fragmentu (`quote_code`, p. 67); odczyt symbolu
-jeszcze nie powstał (p. 66). Są też paczka kodu (p. 60) i zestaw przypadków (p. 61). Niżej
-decyzje i liczby z 2026-10-06, z prób z 2026-10-07, z budowy szukania i odczytu z 2026-10-09,
-spisu z 2026-10-10 i opisu projektu z 2026-10-12.
+jeszcze nie powstał (p. 73). Są też paczka kodu (p. 60), jej mapa symboli (p. 66) i zestaw
+przypadków (p. 61). Niżej decyzje i liczby z 2026-10-06, z prób z 2026-10-07, z budowy szukania
+i odczytu z 2026-10-09, spisu z 2026-10-10, opisu projektu z 2026-10-12 i mapy symboli
+z 2026-10-13.
 Liczby bez dopisku „w paczce" pochodzą z rozpoznania na kopii roboczej gałęzi jednego klienta,
 a paczka powstała z innej gałęzi.
 
@@ -1089,7 +1090,43 @@ a paczka powstała z innej gałęzi.
   w całości. Stąd szukanie po słowach obok frazy i szukanie stałego fragmentu, bez numerów
   i nazw.
 - **Sama nazwa nie wskazuje symbolu:** 3022 akcje mają 1081 różnych nazw, a najczęstsza powtarza
-  się 172 razy. Symbol wskazuje ścieżka pliku z nazwą.
+  się 172 razy. Symbol wskazuje ścieżka pliku z nazwą. W paczce (2026-10-13) sama nazwa
+  wskazuje jedną definicję dla 27% funkcji i metod, a nazwa z plikiem dla 99,2%; powtórzoną
+  nazwę ma 50 plików, z tego 48 JS. Z 3078 akcji `execute*` w modułach 1363 leży poza
+  `actions.class.php`, w klasie bazowej obok.
+- **Mapa symboli to plik `symbols.json` w katalogu paczki, obok metryczki (2026-10-13).** Dla
+  każdego pliku PHP i JS trzyma definicje funkcji, metod i klas: nazwę, miejsce (`scope`: klasa
+  metody, ścieżka nazw w JS), rodzaj oraz pierwszą i ostatnią linię. Same definicje, bez użyć:
+  kto woła funkcję, mówi szukanie. Buduje ją `scripts/build_code_symbols.py`, na końcu budowy
+  paczki i osobną komendą. W paczce Dokusa to 55 086 symboli w 8987 plikach (46 694 funkcje
+  i metody, 8392 klasy), 7 MB i 9 s budowy; funkcja ma medianę 7 linii, 90% do 30, a ponad
+  300 linii ma 8. Każdy plik kodu zajmuje w mapie jedną linię, więc szukanie nazwy w pliku
+  mapy pokazuje od razu plik kodu. Kod zapisany jako tekst symboli nie ma: metody w szablonach
+  generatora i funkcje JS wypisywane z pliku PHP to 116 definicji w 54 plikach. Cena: mapa
+  opisuje kod z dnia budowy, a ręcznej zmiany `repo/` nikt nie wykryje.
+- **Mapę buduje tree-sitter, biblioteka tylko w `requirements-dev.txt` (decyzja 2026-10-13).**
+  ctags z apt (5.9, ten sam na hoście i w Debianie obrazu) nie podaje linii końca dla PHP ani
+  JS. tree-sitter bierze ją z drzewa składni: ostatnia linia każdej z 38 tys. metod PHP to
+  nawias zamykający albo średnik. Obraz `api` kodu nie rozbiera, tylko czyta gotową mapę.
+  Pułapka wersji 0.26.0: odczyt wiersza węzła atrybutem (`start_point.row`) psuje pamięć
+  procesu — numery linii wychodziły ujemne, a proces kończył się błędem pamięci — więc
+  skrypt bierze wiersz indeksem (`start_point[0]`).
+- **Definicja w ciele funkcji nie jest osobnym symbolem (2026-10-13).** W JS to głównie funkcje
+  podawane jako argument: w rozpoznaniu było ich 3462 na 11 841 definicji (`success` 772 razy,
+  `open` 479), a czyta się je razem z funkcją, w której leżą. Funkcja bez nazwy, która
+  opakowuje plik, symbolem nie jest, więc definicje w jej ciele trafiają do mapy. W JS nazwą
+  jest ostatni człon ścieżki, a reszta to miejsce: przypisanie
+  `OBI.sprawy.obsluzBlad = function` i pole `obsluzBlad` obiektu przypisanego do `OBI.sprawy`
+  dają ten sam wpis. Miejsce ma 6974 z 8379 funkcji JS; nie ma go funkcja w obiekcie podanym
+  wprost jako argument wywołania.
+- **Plik z błędem składni nie ma w mapie żadnego symbolu i stoi na liście `syntax_errors`
+  (2026-10-13).** Parser po błędzie czyta dalej, ale granic funkcji z takiego pliku nie da się
+  ręczyć. W paczce Dokusa to 5 plików PHP z 10 250: cztery szkielety generatora i jeden
+  poprawny plik, w którym parser nie przyjmuje stałej klasy o nazwie `NAMESPACE`.
+- **Mapę czyta `CodeSymbols` z `core_service/loader_code_symbols.py`, w całości i przy każdym
+  wywołaniu (2026-10-13).** Odczyt mapy Dokusa ze sprawdzeniem kształtu trwa 0,18 s. Brak mapy
+  to błąd konfiguracji, jak brak metryczki. Nikt w aplikacji mapy jeszcze nie czyta: narzędzie
+  i pole w szukaniu dochodzą w p. 73, razem z wyszukiwaniem po mapie.
 - **89% plików PHP ma do 200 linii, ale główne kontrolery po 3–4 tys.** Odczyt pliku ma limit
   300 linii na wywołanie: w paczce mieści się w nim w całości 92% plików (przy 150 liniach
   84%, przy 400 — 95%). Odczyt symbolu daje najwięcej w długich kontrolerach. W paczce jest
@@ -2608,13 +2645,16 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
   --module-id 116` (wymaga kontenera z zaimportowanym zrzutem; kontrola liczb wobec bazy na końcu
   przebiegu)
 - Paczka kodu aplikacji: `python scripts/build_code_package.py build <folder z kodem>
-  data/unsafe/code` (reguły z `rules.json` w katalogu paczki albo z `--rules`; zastępuje `repo/`
-  i `manifest.json`)
+  data/unsafe/code` (reguły z `rules.json` w katalogu paczki albo z `--rules`; zastępuje `repo/`,
+  `manifest.json` i `symbols.json`)
 - Paczka z aplikacji syntetycznej, budowana przed testami narzędzi kodu:
   `python scripts/build_code_package.py build data/safe/code/source data/safe/code`
 - Sprawdzenie opisu projektu wobec paczki, po każdej poprawce opisu:
   `python scripts/build_code_package.py check-description data/unsafe/code` (kod 1, gdy opisu
   nie ma albo któraś ścieżka nie zgadza się z paczką; budowa paczki robi to samo na końcu)
+- Mapa symboli do paczki, która już stoi, bez kopiowania kodu od nowa:
+  `python scripts/build_code_symbols.py build data/unsafe/code` (zastępuje `symbols.json`;
+  budowa paczki robi to samo na końcu)
 
 **Pipeline danych (CLI `helpdesk`)**
 - Walidacja artefaktów: `helpdesk tickets validate data/unsafe/parsed/`
@@ -2640,7 +2680,8 @@ w p. 46.
 - Lint: `ruff check .`
 - Wszystko, co nie potrzebuje stacku ani płatnego modelu (każdy rodzaj testu): `pytest`
   (wymaga zbudowanej paczki z aplikacji syntetycznej — polecenie w „Przygotowanie danych" —
-  i programu ripgrep na hoście: `apt install ripgrep`)
+  programu ripgrep na hoście: `apt install ripgrep`, i zależności z `requirements-dev.txt`,
+  od 2026-10-13 także tree-sittera)
 - Wszystko naraz: `pytest -m "not llm_live"` — **jedno polecenie na cały przebieg**; wymaga
   stacku. **Nie `pytest -m ""`** — ono wybiera też testy na żywym modelu, a te bez jawnego
   `llm_live` kończą się błędem
@@ -2812,17 +2853,17 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1676 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 542 (79)           | 96 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1738 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 559 (79)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 110 (9)            | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 38 s |
 
-Liczby z 2026-10-12, czasy folderów z 2026-10-10: każdy folder osobno, w komplecie
+Liczby z 2026-10-13, czasy folderów z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku. Bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy — całe 38 s to 207 wyszukań golden setów
 przez prawdziwy embedder (178 w zgłoszeniach, 29 w dokumentacji). Komplet jednym poleceniem
-(`pytest -m "not llm_live"`): 2332 testy, 130 s; domyślny `pytest`, bez stacku: 2206 testów,
-37 s (oba czasy z 2026-10-12). Trzydzieści sześć testów integracyjnych na żywym modelu
+(`pytest -m "not llm_live"`): 2411 testów, 140 s; domyślny `pytest`, bez stacku: 2285 testów,
+42 s (oba czasy z 2026-10-13). Trzydzieści sześć testów integracyjnych na żywym modelu
 (`llm_live`) jest w liczbie testów folderu, ale poza oboma przebiegami.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
@@ -2912,6 +2953,17 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   drzewach plików: ścieżka donikąd, ścieżka z sekcji „Czego w paczce nie ma", która w paczce
   jest, dopasowanie `<nazwa>` i ukośnika, brak opisu, kody wyjścia komendy; osobny test
   pilnuje, że opis aplikacji syntetycznej z repo zgadza się z paczką z jej źródła.
+- **Mapa symboli ma testy jednostkowe i integracyjne (2026-10-13).** Jednostkowe rozbierają
+  krótkie zmyślone źródła PHP i JS i porównują nazwę, miejsce, rodzaj i obie linie każdego
+  symbolu: nawiasy w napisach i w heredoc, metody bez ciała, funkcje w ciele funkcji, obiekty
+  zagnieżdżone, plik z błędem składni. Osobny test na pliku z 300 metodami pilnuje numerów
+  linii przed błędem pamięci biblioteki parsera. Integracyjne budują paczkę i mapę
+  z aplikacji syntetycznej do katalogu tymczasowego: pierwsza linia każdego symbolu zawiera
+  jego nazwę, liczba funkcji w mapie zgadza się z liczbą słów `function` w pliku, a mapę
+  zapisaną przez skrypt czyta czytnik z `api`. Na małych drzewach plików: plik z błędem
+  składni, przerwana budowa, która nie zostawia starej mapy, kody wyjścia komendy. Z 42
+  celowo wstawionych usterek testy wyłapały 41, dwie dopiero po dopisaniu testów; jedna nie
+  zmienia zachowania. Cena: domyślny `pytest` wymaga tree-sittera w `.venv`.
 - **Bez obronnego boilerplate'u bez uzasadnienia.** Zadeklarowanych zależności (runtime i dev)
   **nie** guardujemy `pytest.importorskip` — brak zadeklarowanej zależności ma być głośnym
   `ImportError`, nie cichym skipem. `importorskip` zostaje tylko dla zależności faktycznie
@@ -3378,6 +3430,29 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   czy model sięga po nie z sensem, pokaże sonda.
 - **Pamiętanie plików w `read_document()` (`lru_cache`)** — zysk to 0,15 ms na odczyt, a opis
   projektu i prompt w dev docierały w starej wersji aż do restartu.
+- **ctags do mapy symboli** — wersja z apt (5.9) nie podaje linii końca dla PHP ani JS,
+  a nowszej nie ma w Debianie obrazu; mapę buduje tree-sitter.
+- **Rozbiór pliku na żądanie w `api` zamiast pliku mapy** — parser trafiłby do obrazu,
+  a narzędzie znałoby tylko plik, o który zapytano; mapa zna wszystkie definicje nazwy w całym
+  kodzie. Cena: mapa może być starsza niż ręcznie zmienione `repo/`.
+- **Użycia (wywołania) w mapie symboli** — parser widzi składnię, nie typy, więc
+  z `$obiekt->zapisz()` nie wynika, której klasy to metoda, a 73% funkcji dzieli nazwę z inną;
+  użycia znajduje szukanie.
+- **Symbole z pliku z błędem składni** — parser czyta dalej, ale granice funkcji bywają
+  przesunięte; plik trafia na listę i czyta się go zakresem linii. Cena: jeden poprawny plik
+  Dokusa nie ma symboli przez lukę parsera.
+- **Funkcje zwrotne JS jako osobne symbole** — `success` i `click` powtarzają się w jednym
+  pliku dziesiątki razy, a czyta się je razem z funkcją, w której leżą.
+- **Komentarz nad funkcją jako część symbolu** — symbol zaczyna się w linii definicji, żeby
+  pierwsza linia niosła nazwę; komentarz model doczyta odczytem pliku.
+- **Dziedziczenie i przestrzenie nazw PHP w mapie symboli** — metodę z klasy bazowej ma
+  znaleźć odczyt po nazwie zawężony do katalogu modułu (p. 73); wraca, gdy to nie wystarczy.
+- **Mapa symboli jako tablice bez nazw pól** — 4,2 MB i 0,07 s odczytu zamiast 7 MB i 0,18 s,
+  ale wpis `["nastepny", "Numer", "method", 4, 6]` czyta się tylko z opisem obok.
+- **Walidator kolejności linii w modelu symbolu** — wydłużał odczyt mapy Dokusa z 0,18 s do
+  0,34 s; tego, że koniec nie stoi przed początkiem, pilnują testy skryptu.
+- **Pamiętanie mapy symboli w procesie** — odczyt trwa 0,18 s, a mapy nikt jeszcze nie czyta;
+  wraca z narzędziami (p. 73), gdy będzie wiadomo, ile odczytów przypada na sprawę.
 
 ### Plan
 
@@ -3506,7 +3581,7 @@ Właściwe węzły na atrapach zależności. Grafy już działają na atrapach w
 wchodzą po jednym, a przebieg grafu się przy tym nie zmienia. Prawdziwy model (p. 18 i 17) stoi
 tu od 2026-10-05, zaraz po `run_tools`, a przed `respond`: pierwszy przebieg pętli na prawdziwym
 modelu ma być jak najwcześniej, bo jego wynik przestawi limity, opisy narzędzi i prompty taniej
-niż zgadywanie. Narzędzia kodu aplikacji (p. 60–67) stoją tu od 2026-10-06, przed scenariuszami
+niż zgadywanie. Narzędzia kodu aplikacji (p. 60–67 i 73) stoją tu od 2026-10-06, przed scenariuszami
 z p. 59, żeby te objęły też sprawę, w której komunikat jest tylko w kodzie; każde wchodzi
 z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_solution`.
 
@@ -3621,12 +3696,28 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   `read_document()` bez pamiętania plików; sonda na ośmiu przebiegach na żywym `gpt-6.1-sol`;
   czy opis skraca szukanie na kodzie Dokusa, liczy p. 23; reguły — „Kod aplikacji", „Warstwa
   narzędzi agenta", „Warstwa węzłów", „Warstwa API", „Testy", „Świadomie pominięte".
-- [ ] **66. Mapa symboli i `read_code_symbol`** — mapa budowana komendą do pliku obok paczki,
-  narzędziem wybranym po próbie na kodzie Dokusa (linia końca metody PHP, handlery JS
-  definiowane przypisaniem); symbol wskazuje ścieżka z nazwą, przy kilku kandydatach narzędzie
-  oddaje ich listę bez treści; `find_code_text` dostaje pole z nazwą symbolu, w którym leży
-  linia. *Dlaczego:* 3022 akcje mają 1081 nazw, a w długim kontrolerze odczyt symbolu zastępuje
-  odczyt pliku.
+- [x] **66. Mapa symboli** (2026-10-13) — skrypt `scripts/build_code_symbols.py` buduje
+  tree-sitterem plik `symbols.json` obok metryczki: definicje funkcji, metod i klas z plików
+  PHP i JS, z pierwszą i ostatnią linią, same definicje, bez użyć; budowa paczki woła go na
+  końcu, a osobna komenda dobudowuje mapę do paczki, która już stoi; czytnik `CodeSymbols`
+  i modele `CodeSymbol` i `CodeSymbolMap`; mapy obu paczek zbudowane; ctags odrzucony, bo nie
+  podaje linii końca; narzędzie, pole w szukaniu i wyszukiwanie po mapie przeszły do p. 73;
+  reguły — „Kod aplikacji", „Warstwy kodu", „Testy", „Świadomie pominięte".
+- [ ] **73. `read_code_symbol` i pole `symbol` w szukaniu** (wydzielony z p. 66 2026-10-13,
+  numer spoza kolejności) — narzędzie pomocnicze na mapie symboli: `name` wymagane, `path`
+  opcjonalne, plik albo katalog, jak w `find_code_text`; jedna pasująca definicja wraca
+  z treścią (do 300 linii, dalej `read_code_file`), kilka jako lista kandydatów bez treści
+  (ścieżka, miejsce, linie; do 20), a brak definicji jako błąd z liczbą definicji poza
+  ścieżką; po liście kandydatów model zawęża `path` do pliku kandydata, a kandydata z tego
+  samego pliku czyta `read_code_file` po jego liniach; nazwa pasuje sama albo razem
+  z miejscem (`Klasa::metoda`, `APP.pisma.wyslij`); `find_code_text` dostaje pole z nazwą
+  symbolu, w którym leży linia; wyszukiwanie po mapie (definicje nazwy pod ścieżką, symbol
+  obejmujący linię) dochodzi razem z nimi, a z nim pomiar, ile odczytów mapy (0,18 s każdy)
+  przypada na sprawę; limit 10 odczytów symbolu na sprawę; sonda na żywym modelu na
+  sprawach z długim kontrolerem, z narzędziem i bez. *Dlaczego:* w paczce Dokusa nazwa
+  z plikiem wskazuje jedną definicję dla 99,2% funkcji, a sama nazwa dla 27%; 1363 z 3078
+  akcji leży poza `actions.class.php`, w klasie bazowej obok, a w sondzie z 2026-10-07
+  6 z 10 wywołań prototypu, który wymagał pliku, skończyło się błędem.
 - [ ] **59. Scenariusze ewaluacyjne grafów na zmyślonych danych** (dopisany 2026-10-05, numer
   spoza kolejności) — testy w `tests/evaluation/` za markerem `llm_live`: grafy na węzłach
   właściwych i modelu generującym, scenariusze jako dane w `data/safe/golden/`, materiał podawany

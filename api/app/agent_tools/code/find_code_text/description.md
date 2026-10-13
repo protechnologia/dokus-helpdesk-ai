@@ -15,7 +15,7 @@
 
      Zasady wymieniają po nazwie odczyt pliku (`read_code_file`)
      i spis katalogu (`list_code_files`); odczyt symbolu dojdzie
-     razem z nim (p. 66).
+     razem z nim (p. 73).
 
      Zmiana dotyczy wszystkich grafów naraz, więc po strojeniu jednego
      trzeba przemierzyć pozostałe (p. 23, 25–26).

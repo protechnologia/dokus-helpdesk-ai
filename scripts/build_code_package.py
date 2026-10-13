@@ -16,6 +16,9 @@ Do czego:
 
     python scripts/build_code_package.py check-description data/unsafe/code
 
+    Na końcu budowy powstaje też mapa symboli `symbols.json`: gdzie zaczyna się i kończy każda
+    funkcja, metoda i klasa. Buduje ją `build_code_symbols.py`, który ma też własną komendę.
+
 Reguły (`rules.json` w katalogu paczki albo plik podany w `--rules`). Opisują układ kodu
 klienta, więc leżą w `data/unsafe/`, poza repo. Ścieżki liczą się od folderu wejściowego:
 
@@ -60,7 +63,8 @@ Flow:
        tymczasowego (`_add_file`).
     4. Na końcu podmienia `repo/` i zapisuje metryczkę (`build_package`), a w niej gałąź, na
        której stoi folder wejściowy (`read_branch`).
-    5. Sprawdza opis projektu wobec nowej paczki i wypisuje, co się nie zgadza
+    5. Buduje mapę symboli nowej paczki (`build_symbols` z `build_code_symbols.py`).
+    6. Sprawdza opis projektu wobec nowej paczki i wypisuje, co się nie zgadza
        (`check_description`); budowy to nie zatrzymuje.
 
 O czym pamiętać przy zmianach:
@@ -95,6 +99,7 @@ import shutil
 import sys
 
 import typer
+from build_code_symbols import build_symbols, report_symbols
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -812,7 +817,7 @@ def main() -> None:
 # dla programisty (CLAUDE.md -> „Warstwa CLI").
 HELP_COMMAND = "Buduje paczkę kodu z folderu z kodem aplikacji według reguł z pliku rules.json."
 HELP_INPUT   = "Folder z kodem aplikacji; od niego liczą się ścieżki w regułach."
-HELP_OUTPUT  = "Katalog paczki: powstaje w nim repo/ z kodem i manifest.json."
+HELP_OUTPUT  = "Katalog paczki: powstaje w nim repo/ z kodem, manifest.json i symbols.json."
 HELP_RULES   = "Plik reguł wyboru plików; domyślnie rules.json w katalogu paczki."
 HELP_CHECK   = "Sprawdza, czy ścieżki z opisu projektu (project.md) zgadzają się z paczką."
 HELP_PACKAGE = "Katalog zbudowanej paczki: repo/ z kodem, a obok project.md."
@@ -827,6 +832,7 @@ def build(
     """
     Description:
     Buduje paczkę kodu i wypisuje podsumowanie: ile plików weszło i co skrypt w nich zmienił.
+    Potem buduje mapę symboli nowej paczki i sprawdza wobec niej opis projektu.
 
     Example args:
         input_dir=Path("/mnt/c/Apache24/htdocs/php74/dokus")
@@ -864,6 +870,8 @@ def build(
                f"w {changes.escapes_files} plikach")
     typer.echo(f"  pominięte, bo nie UTF-8: {len(manifest.skipped.not_utf8)}")
     typer.echo(f"  w folderach z listy, ale poza regułami: {len(manifest.skipped.not_in_rules)}")
+    # Mapa opisuje dokładnie ten kod, z którego powstała, więc buduje się ją przy każdej paczce.
+    report_symbols(build_symbols(output_dir), output_dir)
     # Opis pisano dla poprzedniej paczki; po przebudowie jego ścieżki mogą prowadzić donikąd.
     report_description(check_description(output_dir), output_dir)
 
