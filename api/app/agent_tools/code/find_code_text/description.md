@@ -13,9 +13,9 @@
      i `MAX_TEXT_CHARS` z `models.py`, a „trzy znaki" przy `words` to
      `MIN_LONGEST_WORD_CHARS`; pilnuje ich test opisu.
 
-     Zasady wymieniają po nazwie odczyt pliku (`read_code_file`)
-     i spis katalogu (`list_code_files`); odczyt symbolu dojdzie
-     razem z nim (p. 73).
+     Zasady wymieniają po nazwie odczyt pliku (`read_code_file`),
+     odczyt symbolu (`read_code_symbol`) i spis katalogu
+     (`list_code_files`).
 
      Zmiana dotyczy wszystkich grafów naraz, więc po strojeniu jednego
      trzeba przemierzyć pozostałe (p. 23, 25–26).
@@ -49,6 +49,7 @@ JSON z liniami kodu:
 | lines              | trafienia frazą pierwsze, po ścieżce i linii |
 | lines[].path       | ścieżka pliku w kodzie aplikacji             |
 | lines[].line       | numer linii w pliku, liczony od 1            |
+| lines[].symbol     | funkcja albo klasa, w której leży linia      |
 | lines[].matched_by | czym znaleziona: `exact` albo `words`        |
 | lines[].text       | treść tej jednej linii, bez wcięcia          |
 | omitted_over_limit | ile pasujących linii ponad limit wyniku      |
@@ -69,6 +70,10 @@ JSON z liniami kodu:
   znakiem „…"). Pokazuje, gdzie tekst stoi, a nie w jakim warunku
   kod do niego dochodzi. Otoczenie linii przeczytaj narzędziem
   `read_code_file`: podaj mu `path` i numery linii wokół `line`.
+- `symbol` to nazwa funkcji, metody albo klasy, w której leży
+  linia; `null`, gdy linia leży poza nimi. Całą tę funkcję
+  przeczytasz narzędziem `read_code_symbol`: podaj mu `symbol`
+  jako `name`, a `path` linii jako `path`.
 - Jako przyczynę (narzędzie `quote_code`) wskazuj fragment dopiero
   wtedy, gdy przeczytałeś jego otoczenie, a nie samą trafioną linię.
 - Pusta lista znaczy, że takiego tekstu nie ma w kodzie aplikacji:

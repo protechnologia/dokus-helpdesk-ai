@@ -75,8 +75,10 @@ class FindCodeTextQuery(BaseModel):
 class MatchedLine(BaseModel):
     """
     Description:
-    Jedna linia kodu zwrócona przez `find_code_text`: plik, numer linii, czym ją znaleziono i jej
-    treść. Ścieżka i numer wracają w kształcie, w jakim model poda je narzędziu cytującemu.
+    Jedna linia kodu zwrócona przez `find_code_text`: plik, numer linii, funkcja, w której
+    leży, czym ją znaleziono i jej treść. Ścieżka i numer wracają w kształcie, w jakim model
+    poda je narzędziu cytującemu, a nazwa funkcji w kształcie, w jakim przyjmuje ją
+    `read_code_symbol`.
 
     Treść jest tu celowo, inaczej niż w wyszukiwaniach zgłoszeń i dokumentacji: bez niej model
     nie odróżni definicji od setek użyć tej samej nazwy, a źródłem odpowiedzi i tak jest dopiero
@@ -85,11 +87,15 @@ class MatchedLine(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    path:       str       = Field(min_length=1, examples=["src/lib/Urzad/Numeracja/Generator.php"])
-    line:       int       = Field(ge=1, examples=[18])
-    matched_by: MatchKind = Field(examples=["exact"])
+    path:       str        = Field(min_length=1, examples=["src/lib/Urzad/Numeracja/Generator.php"])
+    line:       int        = Field(ge=1, examples=[18])
+    # Nazwa funkcji, metody albo klasy, w której leży linia — najgłębszej z mapy symboli.
+    # `None`: linia leży poza definicjami albo plik nie ma symboli. Pole jest wymagane, żeby
+    # brak był zapisany wprost.
+    symbol:     str | None = Field(min_length=1, examples=["nastepnyNumer"])
+    matched_by: MatchKind  = Field(examples=["exact"])
     # Bez wcięcia; linia dłuższa niż `MAX_TEXT_CHARS` jest ucięta i kończy się znakiem „…".
-    text:       str       = Field(examples=["throw new BrakSekwencjiException('Brak sekwencji…"])
+    text:       str        = Field(examples=["throw new BrakSekwencjiException('Brak sekwencji…"])
 
 
 class FindCodeTextResult(BaseModel):

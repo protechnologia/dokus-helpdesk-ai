@@ -12,8 +12,9 @@
       "Sekcja na narzędzie: zapytanie w kształcie narzędzia i oczekiwany wynik. Kształty pochodzą z planu (p. 62–67) i z prototypów sondy z 2026-10-07; przy budowie każdego narzędzia jego sekcję dopasowuje się do modelu zapytania.",
       "Miejsce w kodzie to ścieżka i stały fragment linii, bez numeru linii. Pola z końcówką _at (from_at, to_at) niosą fragment, z którego test wylicza numer linii.",
       "describe_code: contains i lacks to fragmenty, które opis projektu ma zawierać albo których ma nie zawierać (komentarz redakcyjny z pliku project.md); names_dirs to katalogi, które opis wymienia — każdy ma przyjąć spis katalogu i szukanie; branch to gałąź z metryczki paczki (paczka syntetyczna jej nie ma). error: true znaczy błąd wracający do modelu.",
-      "find_code_text: expected to komplet trafień (ścieżka i fragment linii), w dowolnej kolejności; pusta lista znaczy brak trafień, a matched_by przy trafieniu mówi, czym ma być znalezione. expected_total i expected_files opisują zapytanie, które przekracza limit pozycji. expected z error: true znaczy błąd wracający do modelu.",
-      "read_code_file i read_code_symbol: contains i lacks to fragmenty, które wynik ma zawierać albo których ma nie zawierać; error: true znaczy błąd wracający do modelu. W read_code_file cut_by_limit i end_of_file to flagi oddanego zakresu: czy odczyt urwał limit linii i czy kończy się na ostatniej linii pliku.",
+      "find_code_text: expected to komplet trafień (ścieżka i fragment linii), w dowolnej kolejności; pusta lista znaczy brak trafień, a matched_by przy trafieniu mówi, czym ma być znalezione. symbol przy trafieniu to nazwa funkcji albo klasy, w której leży linia (null: poza definicjami); gdzie go nie ma, test nazwy nie sprawdza. expected_total i expected_files opisują zapytanie, które przekracza limit pozycji. expected z error: true znaczy błąd wracający do modelu.",
+      "read_code_file: contains i lacks to fragmenty, które wynik ma zawierać albo których ma nie zawierać; error: true znaczy błąd wracający do modelu; cut_by_limit i end_of_file to flagi oddanego zakresu: czy odczyt urwał limit linii i czy kończy się na ostatniej linii pliku.",
+      "read_code_symbol: zapytanie to name i opcjonalne path (plik albo katalog). Gdy pasuje jedna definicja, expected ma symbol (path, scope, kind), contains i lacks jak w read_code_file oraz cut_by_limit; gdy pasuje kilka, expected ma candidates: listę par ścieżka i scope, w kolejności wyniku, a wynik nie niesie treści. error: true znaczy błąd wracający do modelu, a says to fragment, który komunikat błędu ma zawierać.",
       "list_code_files: includes i lacks to pełne ścieżki pozycji, które spis ma zawierać albo których ma nie zawierać; path to ścieżka katalogu w wyniku, depth to oddana głębokość, a has_more_depth mówi, czy katalog sięga głębiej, niż pokazuje spis; error: true znaczy błąd wracający do modelu.",
       "quote_code: source mówi, czy cytowanie trafia na listę źródeł (tylko rola cause); returns_text: false znaczy, że narzędzie nie oddaje treści linii.",
       "absent_paths: pliki ze źródła, których paczka nie może zawierać; odczyt (read_code_file) oddaje błąd.",
@@ -65,11 +66,13 @@
       "expected": [
         {
           "path": "src/web/js/_global/bledy.js",
-          "fragment": "tresc: 'Nie udało się skomunikować z serwerem' }"
+          "fragment": "tresc: 'Nie udało się skomunikować z serwerem' }",
+          "symbol": null
         },
         {
           "path": "src/web/js/archiwum/archiwum.js",
-          "fragment": "Nie udało się skomunikować z serwerem."
+          "fragment": "Nie udało się skomunikować z serwerem.",
+          "symbol": "pobierzTeczkeHandler"
         }
       ]
     },
@@ -90,7 +93,8 @@
         },
         {
           "path": "src/lib/Urzad/Http/KlientUslugi.php",
-          "fragment": "Z serwerem usługi nie udało się skomunikować: "
+          "fragment": "Z serwerem usługi nie udało się skomunikować: ",
+          "symbol": "wyslij"
         }
       ]
     },
@@ -103,11 +107,13 @@
       "expected": [
         {
           "path": "src/lib/Urzad/Wysylka/LimitZalacznika.php",
-          "fragment": "' MB i przekracza limit '"
+          "fragment": "' MB i przekracza limit '",
+          "symbol": "sprawdz"
         },
         {
           "path": "src/lib/Urzad/Wysylka/Edoreczenia/PobieranieSkrzynki.php",
-          "fragment": "przekracza limit pobierania"
+          "fragment": "przekracza limit pobierania",
+          "symbol": "pobierz"
         }
       ]
     },
@@ -145,15 +151,18 @@
       "expected": [
         {
           "path": "src/apps/frontend/modules/kontrahenci/actions/actions.class.php",
-          "fragment": "public function executeZapisz("
+          "fragment": "public function executeZapisz(",
+          "symbol": "executeZapisz"
         },
         {
           "path": "src/apps/frontend/modules/pisma/actions/actions.class.php",
-          "fragment": "public function executeZapisz("
+          "fragment": "public function executeZapisz(",
+          "symbol": "executeZapisz"
         },
         {
           "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php",
-          "fragment": "public function executeZapisz("
+          "fragment": "public function executeZapisz(",
+          "symbol": "executeZapisz"
         }
       ]
     },
@@ -495,71 +504,377 @@
   "read_code_symbol": [
     {
       "id": "s01",
-      "phenomenon": "ta sama nazwa akcji w trzech modułach: wskazuje ją ścieżka",
+      "phenomenon": "ta sama nazwa akcji w trzech modułach: wskazuje ją plik",
       "query": {
-        "path": "src/apps/frontend/modules/kontrahenci/actions/actions.class.php",
-        "name": "executeZapisz"
+        "name": "executeZapisz",
+        "path": "src/apps/frontend/modules/kontrahenci/actions/actions.class.php"
       },
       "expected": {
+        "symbol": {
+          "path": "src/apps/frontend/modules/kontrahenci/actions/actions.class.php",
+          "scope": "kontrahenciActions",
+          "kind": "method"
+        },
         "contains": [
           "Nazwa kontrahenta może mieć najwyżej "
-        ]
+        ],
+        "cut_by_limit": false
       }
     },
     {
       "id": "s02",
       "phenomenon": "akcja na końcu długiego kontrolera",
       "query": {
-        "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php",
-        "name": "executeZamknij"
+        "name": "executeZamknij",
+        "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php"
       },
       "expected": {
+        "symbol": {
+          "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php",
+          "scope": "sprawyActions",
+          "kind": "method"
+        },
         "contains": [
           "Sprawa jest już zamknięta"
         ],
         "lacks": [
           "public function executeLista("
-        ]
+        ],
+        "cut_by_limit": false
       }
     },
     {
       "id": "s03",
-      "phenomenon": "metoda klasy w bibliotece aplikacji",
+      "phenomenon": "metoda klasy w bibliotece aplikacji, zawężenie do katalogu",
       "query": {
-        "path": "src/lib/Urzad/Numeracja/GeneratorNumeru.php",
-        "name": "nastepnyNumer"
+        "name": "nastepnyNumer",
+        "path": "src/lib/Urzad/Numeracja"
       },
       "expected": {
+        "symbol": {
+          "path": "src/lib/Urzad/Numeracja/GeneratorNumeru.php",
+          "scope": "GeneratorNumeru",
+          "kind": "method"
+        },
         "contains": [
           "Brak sekwencji numeracji dla roku "
-        ]
+        ],
+        "cut_by_limit": false
       }
     },
     {
       "id": "s04",
       "phenomenon": "funkcja JS zapisana jako pole obiektu",
       "query": {
-        "path": "src/web/js/pisma/pisma.js",
-        "name": "wyslijHandler"
+        "name": "wyslijHandler",
+        "path": "src/web/js/pisma/pisma.js"
       },
       "expected": {
+        "symbol": {
+          "path": "src/web/js/pisma/pisma.js",
+          "scope": "APP.pisma",
+          "kind": "function"
+        },
         "contains": [
           "$.post('/pisma/wyslij'"
         ],
         "lacks": [
           "$.post('/pisma/zapisz'"
-        ]
+        ],
+        "cut_by_limit": false
       }
     },
     {
       "id": "s05",
-      "phenomenon": "symbol, którego w pliku nie ma",
+      "phenomenon": "nazwa jedyna w całym kodzie, bez ścieżki",
       "query": {
-        "path": "src/web/js/pisma/pisma.js",
-        "name": "anulujHandler"
+        "name": "nastepnyNumer"
       },
       "expected": {
-        "error": true
+        "symbol": {
+          "path": "src/lib/Urzad/Numeracja/GeneratorNumeru.php",
+          "scope": "GeneratorNumeru",
+          "kind": "method"
+        },
+        "contains": [
+          "Brak sekwencji numeracji dla roku "
+        ],
+        "cut_by_limit": false
+      }
+    },
+    {
+      "id": "s06",
+      "phenomenon": "metoda podana razem z klasą: jedna z trzech akcji o tej nazwie",
+      "query": {
+        "name": "sprawyActions::executeZapisz"
+      },
+      "expected": {
+        "symbol": {
+          "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php",
+          "scope": "sprawyActions",
+          "kind": "method"
+        },
+        "contains": [
+          "public function executeZapisz("
+        ],
+        "cut_by_limit": false
+      }
+    },
+    {
+      "id": "s07",
+      "phenomenon": "funkcja JS podana razem z obiektem, w którym leży",
+      "query": {
+        "name": "APP.pisma.wyslijHandler"
+      },
+      "expected": {
+        "symbol": {
+          "path": "src/web/js/pisma/pisma.js",
+          "scope": "APP.pisma",
+          "kind": "function"
+        },
+        "contains": [
+          "$.post('/pisma/wyslij'"
+        ],
+        "lacks": [
+          "$.post('/pisma/zapisz'"
+        ],
+        "cut_by_limit": false
+      }
+    },
+    {
+      "id": "s08",
+      "phenomenon": "klasa po nazwie",
+      "query": {
+        "name": "GeneratorNumeru"
+      },
+      "expected": {
+        "symbol": {
+          "path": "src/lib/Urzad/Numeracja/GeneratorNumeru.php",
+          "scope": null,
+          "kind": "class"
+        },
+        "contains": [
+          "class GeneratorNumeru",
+          "public function nastepnyNumer("
+        ],
+        "cut_by_limit": false
+      }
+    },
+    {
+      "id": "s09",
+      "phenomenon": "klasa dłuższa niż limit linii: długi kontroler",
+      "query": {
+        "name": "sprawyActions"
+      },
+      "expected": {
+        "symbol": {
+          "path": "src/apps/frontend/modules/sprawy/actions/actions.class.php",
+          "scope": null,
+          "kind": "class"
+        },
+        "contains": [
+          "class sprawyActions"
+        ],
+        "lacks": [
+          "Sprawa jest już zamknięta"
+        ],
+        "cut_by_limit": true
+      }
+    },
+    {
+      "id": "s10",
+      "phenomenon": "ta sama nazwa akcji w trzech modułach, bez ścieżki: kandydaci",
+      "query": {
+        "name": "executeZapisz"
+      },
+      "expected": {
+        "candidates": [
+          [
+            "src/apps/frontend/modules/kontrahenci/actions/actions.class.php",
+            "kontrahenciActions"
+          ],
+          [
+            "src/apps/frontend/modules/pisma/actions/actions.class.php",
+            "pismaActions"
+          ],
+          [
+            "src/apps/frontend/modules/sprawy/actions/actions.class.php",
+            "sprawyActions"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "s11",
+      "phenomenon": "ta sama nazwa akcji, zawężenie do katalogu wszystkich modułów",
+      "query": {
+        "name": "executeZapisz",
+        "path": "src/apps/frontend/modules"
+      },
+      "expected": {
+        "candidates": [
+          [
+            "src/apps/frontend/modules/kontrahenci/actions/actions.class.php",
+            "kontrahenciActions"
+          ],
+          [
+            "src/apps/frontend/modules/pisma/actions/actions.class.php",
+            "pismaActions"
+          ],
+          [
+            "src/apps/frontend/modules/sprawy/actions/actions.class.php",
+            "sprawyActions"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "s12",
+      "phenomenon": "nazwa, której nie ma w kodzie wcale",
+      "query": {
+        "name": "anulujHandler",
+        "path": "src/web/js/pisma/pisma.js"
+      },
+      "expected": {
+        "error": true,
+        "says": "find_code_text"
+      }
+    },
+    {
+      "id": "s13",
+      "phenomenon": "metoda jest w kodzie, ale poza wskazanym katalogiem",
+      "query": {
+        "name": "executeZamknij",
+        "path": "src/apps/frontend/modules/pisma"
+      },
+      "expected": {
+        "error": true,
+        "says": "poza tą ścieżką: 1"
+      }
+    },
+    {
+      "id": "s14",
+      "phenomenon": "klasa nie ma takiej metody, ma ją inna klasa",
+      "query": {
+        "name": "pismaActions::executeZamknij"
+      },
+      "expected": {
+        "error": true,
+        "says": "samej nazwie executeZamknij"
+      }
+    },
+    {
+      "id": "s15",
+      "phenomenon": "funkcja bez nazwy, podana jako argument: nie ma definicji",
+      "query": {
+        "name": "ajaxError",
+        "path": "src/web/js/_global/bledy.js"
+      },
+      "expected": {
+        "error": true,
+        "says": "find_code_text"
+      }
+    },
+    {
+      "id": "s16",
+      "phenomenon": "ścieżka zawężenia wychodzi poza kod",
+      "query": {
+        "name": "executeZapisz",
+        "path": "../.."
+      },
+      "expected": {
+        "error": true,
+        "says": "poza kod aplikacji"
+      }
+    },
+    {
+      "id": "s17",
+      "phenomenon": "ścieżka zawężenia, której nie ma",
+      "query": {
+        "name": "executeZapisz",
+        "path": "src/apps/frontend/modules/brak"
+      },
+      "expected": {
+        "error": true,
+        "says": "nie ma takiego pliku ani katalogu"
+      }
+    },
+    {
+      "id": "s18",
+      "phenomenon": "definicja w pliku, którego paczka nie zawiera (biblioteka zewnętrzna)",
+      "query": {
+        "name": "PdfMaker"
+      },
+      "expected": {
+        "error": true,
+        "says": "find_code_text"
+      }
+    },
+    {
+      "id": "s19",
+      "phenomenon": "akcja odziedziczona z klasy bazowej: w pliku klasy modułu jej nie ma",
+      "query": {
+        "name": "executeResetujUklad",
+        "path": "src/apps/frontend/modules/archiwum/actions/actions.class.php"
+      },
+      "expected": {
+        "error": true,
+        "says": "poza tą ścieżką: 1"
+      }
+    },
+    {
+      "id": "s20",
+      "phenomenon": "akcja odziedziczona z klasy bazowej: katalog modułu oddaje metodę klasy bazowej",
+      "query": {
+        "name": "executeResetujUklad",
+        "path": "src/apps/frontend/modules/archiwum"
+      },
+      "expected": {
+        "symbol": {
+          "path": "src/apps/frontend/modules/archiwum/actions/BaseArchiwumActions.class.php",
+          "scope": "BaseArchiwumActions",
+          "kind": "method"
+        },
+        "contains": [
+          "Lista nie ma zapisanego układu kolumn"
+        ],
+        "cut_by_limit": false
+      }
+    },
+    {
+      "id": "s21",
+      "phenomenon": "klasa podana z przestrzenią nazw: liczy się sama nazwa klasy",
+      "query": {
+        "name": "Urzad\\Numeracja\\GeneratorNumeru"
+      },
+      "expected": {
+        "symbol": {
+          "path": "src/lib/Urzad/Numeracja/GeneratorNumeru.php",
+          "scope": null,
+          "kind": "class"
+        },
+        "contains": [
+          "class GeneratorNumeru"
+        ],
+        "cut_by_limit": false
+      }
+    },
+    {
+      "id": "s22",
+      "phenomenon": "metoda podana z klasą i z przestrzenią nazw",
+      "query": {
+        "name": "Urzad\\Numeracja\\GeneratorNumeru::nastepnyNumer"
+      },
+      "expected": {
+        "symbol": {
+          "path": "src/lib/Urzad/Numeracja/GeneratorNumeru.php",
+          "scope": "GeneratorNumeru",
+          "kind": "method"
+        },
+        "contains": [
+          "Brak sekwencji numeracji dla roku "
+        ],
+        "cut_by_limit": false
       }
     }
   ],

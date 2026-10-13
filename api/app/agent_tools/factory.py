@@ -2,8 +2,8 @@
 Description:
 Buduje narzędzia agenta na prawdziwych zależnościach, z konfiguracji: jeden klient embeddera,
 jeden Qdranta i jeden Postgresa, a na nich osiem narzędzi, oraz paczka kodu aplikacji na dysku
-z pięcioma: pierwsze oddaje opis projektu, drugie szuka w niej programem ripgrep, trzecie
-spisuje jej katalogi, czwarte czyta jej pliki, piąte ją cytuje.
+z sześcioma: pierwsze oddaje opis projektu, drugie szuka w niej programem ripgrep, trzecie
+spisuje jej katalogi, czwarte czyta jej pliki, piąte jej funkcje po nazwie, szóste ją cytuje.
 
 | narzędzie             | na czym stoi                                         |
 |-----------------------|------------------------------------------------------|
@@ -16,9 +16,10 @@ spisuje jej katalogi, czwarte czyta jej pliki, piąte ją cytuje.
 | `find_docs_text`      | tabela dokumentacji w Postgresie                     |
 | `read_docs`           | tabela dokumentacji w Postgresie                     |
 | `describe_code`       | opis projektu i metryczka w paczce kodu aplikacji    |
-| `find_code_text`      | paczka kodu aplikacji i program ripgrep              |
+| `find_code_text`      | paczka kodu, program ripgrep i mapa symboli paczki   |
 | `list_code_files`     | paczka kodu aplikacji na dysku (`CODE_PACKAGE_DIR`)  |
 | `read_code_file`      | paczka kodu aplikacji na dysku (`CODE_PACKAGE_DIR`)  |
+| `read_code_symbol`    | paczka kodu aplikacji i jej mapa symboli             |
 | `quote_code`          | paczka kodu aplikacji i jej metryczka (gałąź)        |
 
 Do czego:
@@ -31,7 +32,8 @@ O czym pamiętać przy zmianach:
 - Narzędzia buduje się raz na proces, nie na żądanie. Postgres ładuje słownik w każdej sesji
   (około 0,6 s), więc klient musi trzymać pulę połączeń między żądaniami.
 - Budowa nie łączy się z niczym i nie dotyka dysku — połączenia powstają przy pierwszym użyciu
-  narzędzia, a brak paczki kodu albo ripgrepa wychodzi przy pierwszym użyciu narzędzia kodu.
+  narzędzia, a brak paczki kodu, jej mapy symboli albo ripgrepa wychodzi przy pierwszym
+  użyciu narzędzia kodu.
 - Kolejność listy jest kolejnością `TOOL_NAMES` grafów. Model dostaje definicje narzędzi w tej
   kolejności w każdej turze, a stały początek żądania to warunek cache promptu.
 - Kto zbudował narzędzia, ten je zamyka: `aclose()` każdego z nich. Klienci są wspólni, więc
@@ -46,6 +48,7 @@ from app.agent_tools.code.find_code_text import FindCodeTextTool
 from app.agent_tools.code.list_code_files import ListCodeFilesTool
 from app.agent_tools.code.quote_code import QuoteCodeTool
 from app.agent_tools.code.read_code_file import ReadCodeFileTool
+from app.agent_tools.code.read_code_symbol import ReadCodeSymbolTool
 from app.agent_tools.docs.find_docs_text import FindDocsTextTool
 from app.agent_tools.docs.find_docs_vector import FindDocsVectorTool
 from app.agent_tools.docs.list_docs import ListDocsTool
@@ -57,6 +60,7 @@ from app.agent_tools.tickets.read_tickets_thread import ReadTicketsThreadTool
 from app.config import Settings
 from app.core_service.loader_code_description import CodeDescription
 from app.core_service.loader_code_package import CodePackage
+from app.core_service.loader_code_symbols import CodeSymbols
 from app.core_service.loader_dict_resolution import get_resolution_classes
 from app.db_postgres import DocsTable, PostgresClient, TicketsTable
 from app.db_qdrant import DocsCollection, QdrantClient, TicketsCollection
@@ -79,7 +83,7 @@ def build_agent_tools(
         [FindTicketsVectorTool(…), FindTicketsTextTool(…), ReadTicketsCardTool(…),
          ReadTicketsThreadTool(…), ListDocsTool(…), FindDocsVectorTool(…), FindDocsTextTool(…),
          ReadDocsTool(…), DescribeCodeTool(…), FindCodeTextTool(…), ListCodeFilesTool(…),
-         ReadCodeFileTool(…), QuoteCodeTool(…)]
+         ReadCodeFileTool(…), ReadCodeSymbolTool(…), QuoteCodeTool(…)]
 
     Raises:
         EmbeddingConfigError: pusty adres embeddera
@@ -119,9 +123,10 @@ def build_agent_tools(
     docs_sections   = DocsTable(postgres)
 
     # --- kod aplikacji: folder paczki, bez bazy; szuka w nim program uruchamiany procesem ---
-    # Obok kodu stoją w paczce opis projektu i metryczka; czyta je osobny czytnik.
+    # Obok kodu stoją w paczce opis projektu i metryczka oraz mapa symboli; każde ma czytnik.
     code        = CodePackage(settings.code_package_dir)
     description = CodeDescription(settings.code_package_dir)
+    symbols     = CodeSymbols(settings.code_package_dir)
     ripgrep     = RipgrepClient(timeout=settings.code_search_timeout_seconds)
 
     tools: list[AgentTool] = [
@@ -144,9 +149,10 @@ def build_agent_tools(
         FindDocsTextTool(docs=docs_sections, limit=settings.rag_top_k),
         ReadDocsTool(docs=docs_sections),
         DescribeCodeTool(description=description),
-        FindCodeTextTool(package=code, ripgrep=ripgrep),
+        FindCodeTextTool(package=code, ripgrep=ripgrep, symbols=symbols),
         ListCodeFilesTool(package=code),
         ReadCodeFileTool(package=code),
+        ReadCodeSymbolTool(package=code, symbols=symbols),
         QuoteCodeTool(package=code, description=description),
     ]
 

@@ -52,6 +52,7 @@ from tests.helpers_code_package import (
     synthetic_code_cases,
     synthetic_code_description,
     synthetic_code_package,
+    synthetic_code_symbols,
 )
 
 CASES   = synthetic_code_cases("read_code_file")
@@ -263,7 +264,11 @@ async def test_a_line_found_by_the_search_can_be_read_and_then_quoted() -> None:
     numerowane inaczej. Model czytałby wtedy inne miejsce, niż wskazało mu szukanie, albo
     cytował linie, których odczyt nie pokazał."""
     package = synthetic_code_package()
-    find    = FindCodeTextTool(package=package, ripgrep=RipgrepClient(timeout=10.0))
+    find    = FindCodeTextTool(
+        package = package,
+        ripgrep = RipgrepClient(timeout=10.0),
+        symbols = synthetic_code_symbols(),
+    )
     read    = ReadCodeFileTool(package=package)
     quote   = QuoteCodeTool(package=package, description=synthetic_code_description())
 

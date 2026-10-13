@@ -1,8 +1,8 @@
 """
 Description:
 Prawdziwe narzędzie `find_code_text`: znajduje w paczce kodu aplikacji linie, w których stoi
-podany tekst, i oddaje je ze ścieżką, numerem i treścią. Nie woła embeddera, bazy ani LLM-a —
-tylko program ripgrep na folderze paczki.
+podany tekst, i oddaje je ze ścieżką, numerem, treścią i nazwą funkcji, w której leżą. Nie woła
+embeddera, bazy ani LLM-a — tylko program ripgrep na folderze paczki i mapę symboli paczki.
 
     `exact` → cała fraza w linii ───────────┐
                                             ├→ jedna lista, każda linia raz → limit → linie
@@ -16,11 +16,14 @@ Po — wynik `find()` (frazę mają dwie linie, oba słowa — te same i jeszcze
 
     FindCodeTextResult(
         lines = [
-            MatchedLine(path="src/web/js/_global/bledy.js", line=12, matched_by="exact",
+            MatchedLine(path="src/web/js/_global/bledy.js", line=12, symbol=None,
+                        matched_by="exact",
                         text="APP.zdarzenia.wywolaj('okna/pokazBlad', { tresc: 'Nie udało…"),
-            MatchedLine(path="src/web/js/archiwum/archiwum.js", line=9, matched_by="exact",
+            MatchedLine(path="src/web/js/archiwum/archiwum.js", line=9,
+                        symbol="pobierzTeczkeHandler", matched_by="exact",
                         text="APP.zdarzenia.wywolaj('okna/pokazBlad', { tresc: 'Nie udało…"),
-            MatchedLine(path="src/lib/Urzad/Http/KlientUslugi.php", line=23, matched_by="words",
+            MatchedLine(path="src/lib/Urzad/Http/KlientUslugi.php", line=23, symbol="wyslij",
+                        matched_by="words",
                         text="throw new \\RuntimeException('Z serwerem usługi nie udało się…"),
         ],
         omitted_over_limit = 0,
@@ -36,6 +39,7 @@ Co się dzieje po drodze:
    ścieżce i numerze linii. Linia znaleziona obiema drogami stoi raz, jako znaleziona frazą.
 4. Lista jest cięta do `MAX_LINES_PER_SEARCH`; reszta jest policzona w `omitted_over_limit`.
 5. Treść każdej pokazanej linii traci wcięcie i jest ucinana po `MAX_TEXT_CHARS` znakach.
+6. Każda pokazana linia dostaje nazwę funkcji, w której leży, z mapy symboli paczki.
 
 O czym pamiętać przy zmianach:
 
@@ -48,12 +52,18 @@ O czym pamiętać przy zmianach:
   model widzi pierwsze pliki, a nie najważniejsze. Stąd `omitted_over_limit` i zawężanie.
 - Brak paczki albo ripgrepa to błąd konfiguracji: nie wraca do modelu, zatrzymuje przebieg.
   Inaczej model dostawałby „nic nie znaleziono" na każde pytanie i uznawał, że kod nic nie mówi.
+- Mapę symboli czyta się tylko wtedy, gdy szukanie coś znalazło, raz na wywołanie. Jej brak to
+  też błąd konfiguracji: wynik bez nazw funkcji wyglądałby jak linie, które leżą poza funkcjami.
 """
 
 import logging
 from itertools import islice
 
-from app.agent_tools.code.find_code_text.base import FindCodeTextToolBase, shorten_line
+from app.agent_tools.code.find_code_text.base import (
+    FindCodeTextToolBase,
+    shorten_line,
+    symbol_name_at,
+)
 from app.agent_tools.code.find_code_text.errors import UnknownCodePathError
 from app.agent_tools.code.find_code_text.models import (
     MAX_LINES_PER_SEARCH,
@@ -63,6 +73,7 @@ from app.agent_tools.code.find_code_text.models import (
 )
 from app.agent_tools.models import MatchKind
 from app.core_service.loader_code_package import CodePackage, CodePathError
+from app.core_service.loader_code_symbols import CodeSymbols
 from app.engine_process.ripgrep import WHOLE_DIRECTORY, FoundLine, RipgrepClient
 
 logger = logging.getLogger(__name__)
@@ -72,7 +83,7 @@ class FindCodeTextTool(FindCodeTextToolBase):
     """
     Description:
     `find_code_text` na prawdziwej paczce kodu: ripgrep znajduje linie z frazą i ze słowami,
-    a narzędzie łączy wyniki, tnie je limitem i oddaje linie z treścią.
+    a narzędzie łączy wyniki, tnie je limitem i oddaje linie z treścią i z nazwą funkcji.
 
     Do czego:
     Szukanie w kodzie aplikacji w grafach `search`, `suggest_questions` i `suggest_solution` —
@@ -83,28 +94,33 @@ class FindCodeTextTool(FindCodeTextToolBase):
         1. `find()` ustala, gdzie szukać: cały kod albo ścieżka sprawdzona przez czytnik paczki.
         2. Pyta ripgrepa o frazę z `exact` i o słowa z `words`.
         3. Łączy trafienia w jedną listę z etykietami, tnie ją limitem i liczy resztę.
-        4. `run()` z klasy bazowej robi z wyniku JSON dla modelu.
+        4. Każdej pokazanej linii dopisuje nazwę funkcji, w której leży, z mapy symboli.
+        5. `run()` z klasy bazowej robi z wyniku JSON dla modelu.
     """
 
     def __init__(
         self,
         package: CodePackage,    # np. CodePackage(Path("/code/data/unsafe/code"))
         ripgrep: RipgrepClient,  # np. RipgrepClient(timeout=10.0)
+        symbols: CodeSymbols,    # np. CodeSymbols(Path("/code/data/unsafe/code"))
     ):
         """
         Description:
-        Spina narzędzie z paczką kodu i z klientem ripgrepa. Oba są wstrzykiwane, nie budowane
-        tutaj: paczka pilnuje ścieżek, klient szuka.
+        Spina narzędzie z paczką kodu, z klientem ripgrepa i z mapą symboli paczki. Wszystkie
+        trzy są wstrzykiwane, nie budowane tutaj: paczka pilnuje ścieżek, klient szuka, a mapa
+        mówi, w której funkcji leży znaleziona linia.
 
         Example args:
             package=CodePackage(Path("/code/data/unsafe/code"))
             ripgrep=RipgrepClient(timeout=10.0)
+            symbols=CodeSymbols(Path("/code/data/unsafe/code"))
 
         Example result:
             FindCodeTextTool gotowe do szukania w paczce kodu
         """
         self._package = package
         self._ripgrep = ripgrep
+        self._symbols = symbols
 
     async def find(
         self,
@@ -120,13 +136,14 @@ class FindCodeTextTool(FindCodeTextToolBase):
 
         Example result:
             FindCodeTextResult(lines=[MatchedLine(path="src/apps/frontend/modules/kontrahenci/…",
-                                                  line=13, matched_by="exact",
+                                                  line=13, symbol="executeZapisz",
+                                                  matched_by="exact",
                                                   text="public function executeZapisz(…")],
                                omitted_over_limit=0)
 
         Raises:
             UnknownCodePathError: `path` nie wskazuje pliku ani katalogu w paczce
-            CodePackageConfigError: paczki nie ma pod skonfigurowaną ścieżką
+            CodePackageConfigError: nie ma paczki albo, gdy są trafienia, jej mapy symboli
             ProcessConfigError: nie ma programu ripgrep
             ProcessError: szukanie nie skończyło w czasie albo zakończyło się błędem
         """
@@ -174,11 +191,15 @@ class FindCodeTextTool(FindCodeTextToolBase):
             omitted,
         )
 
+        # --- w której funkcji leży każda pokazana linia: mapa czytana raz, gdy jest po co ---
+        symbol_map = self._symbols.read() if kept else None
+
         result = FindCodeTextResult(
             lines = [
                 MatchedLine(
                     path       = line.path,
                     line       = line.line,
+                    symbol     = symbol_name_at(symbol_map, line.path, line.line),
                     matched_by = kind,
                     text       = shorten_line(line.text),
                 )

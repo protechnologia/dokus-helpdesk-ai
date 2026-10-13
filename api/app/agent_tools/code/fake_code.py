@@ -10,7 +10,9 @@ narzędzia kodu czytają tę samą paczkę.
 | `src/web/js/_global/bledy.js`                 | 8     | miejsce do wykluczenia: ogólny komunikat |
 
 Obok plików stoi to, co paczka trzyma poza kodem: zmyślony opis projektu (`PROJECT_DESCRIPTION`)
-i metryczka (`default_package_info()`), na których stoi atrapa `describe_code`.
+i metryczka (`default_package_info()`), na których stoi atrapa `describe_code`, oraz mapa
+symboli (`default_symbol_map()`), z której atrapy `read_code_symbol` i `find_code_text` biorą
+granice funkcji.
 
 O czym pamiętać przy zmianach:
 
@@ -20,11 +22,15 @@ O czym pamiętać przy zmianach:
 - Linie dzieli `\\n`, jak w paczce; atrapy liczą je tą samą funkcją co czytnik paczki.
 - Opis projektu wymienia katalogi obu plików, więc katalog wzięty z opisu atrapa spisu pokaże.
   Katalog dopisany do opisu musi mieć tu plik.
+- Mapa symboli jest spisana ręcznie, bo `api` kodu nie rozbiera. Test porównuje ją z mapą,
+  którą dla tych samych plików buduje skrypt paczki, więc po zmianie pliku trzeba ją poprawić.
 """
 
 from datetime import date
 
 from app.core_model.code.code_package_info import CodePackageInfo
+from app.core_model.code.code_symbol import CodeSymbol
+from app.core_model.code.code_symbol_map import CodeSymbolMap
 
 GENERATOR_PATH = "src/lib/Urzad/Numeracja/GeneratorNumeru.php"
 ERRORS_PATH    = "src/web/js/_global/bledy.js"
@@ -102,3 +108,44 @@ def default_package_info() -> CodePackageInfo:
         CodePackageInfo(branch=None, built_on=date(2026, 10, 1))
     """
     return CodePackageInfo(branch=None, built_on=PACKAGE_BUILT_ON)
+
+
+def default_symbol_map() -> CodeSymbolMap:
+    """
+    Description:
+    Mapa symboli zmyślonych plików: klasa generatora i jej jedyna metoda. Plik obsługi błędów
+    ma samą funkcję bez nazwy, podaną jako argument, więc symboli nie ma i w mapie go nie ma.
+
+    Example args:
+        (brak)
+
+    Example result:
+        CodeSymbolMap(built_on=date(2026, 10, 1), syntax_errors=[],
+                      files={"src/lib/Urzad/Numeracja/GeneratorNumeru.php": [
+                          CodeSymbol(name="GeneratorNumeru", kind="class", from_line=3, …),
+                          CodeSymbol(name="nastepnyNumer", kind="method", from_line=5, …)]})
+    """
+    symbol_map = CodeSymbolMap(
+        built_on      = PACKAGE_BUILT_ON,
+        syntax_errors = [],
+        files         = {
+            GENERATOR_PATH: [
+                CodeSymbol(
+                    name      = "GeneratorNumeru",
+                    scope     = None,
+                    kind      = "class",
+                    from_line = 3,
+                    to_line   = 14,
+                ),
+                CodeSymbol(
+                    name      = "nastepnyNumer",
+                    scope     = "GeneratorNumeru",
+                    kind      = "method",
+                    from_line = 5,
+                    to_line   = 13,
+                ),
+            ],
+        },
+    )
+
+    return symbol_map

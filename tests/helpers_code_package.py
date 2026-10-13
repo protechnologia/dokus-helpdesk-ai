@@ -8,6 +8,7 @@ commitem — test jej nie buduje (CLAUDE.md -> „Świadomie pominięte").
 |----------------------------|-------------------------------------------------------------|
 | `synthetic_code_package()` | czytnik zbudowanej paczki syntetycznej                      |
 | `synthetic_code_description()` | czytnik jej opisu projektu i metryczki                  |
+| `synthetic_code_symbols()` | czytnik jej mapy symboli                                    |
 | `synthetic_code_cases()`   | sekcję jednego narzędzia z `code-synthetic.json`            |
 | `synthetic_absent_paths()` | pliki ze źródła, których paczka nie może zawierać           |
 | `line_of()`                | numer linii, w której stoi fragment zapisany w zestawie     |
@@ -37,6 +38,7 @@ from typing import Any
 
 from app.core_service.loader_code_description import CodeDescription
 from app.core_service.loader_code_package import CodePackage
+from app.core_service.loader_code_symbols import CodeSymbols
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -95,6 +97,29 @@ def synthetic_code_description() -> CodeDescription:
     assert built, f"brak zbudowanej paczki syntetycznej — zbuduj ją: {BUILD_COMMAND}"
 
     return CodeDescription(SYNTHETIC_PACKAGE_DIR)
+
+
+def synthetic_code_symbols() -> CodeSymbols:
+    """
+    Description:
+    Czytnik mapy symboli paczki syntetycznej. Mapę zapisuje skrypt na końcu budowy paczki, więc
+    tak jak czytnik kodu odmawia, gdy paczki nie zbudowano — albo zbudowano ją, zanim skrypt
+    zaczął budować mapę.
+
+    Example args:
+        (brak)
+
+    Example result:
+        CodeSymbols czytająca data/safe/code/symbols.json
+
+    Raises:
+        AssertionError: paczka syntetyczna nie ma mapy symboli
+    """
+    built = (SYNTHETIC_PACKAGE_DIR / "symbols.json").is_file()
+
+    assert built, f"paczka syntetyczna nie ma mapy symboli — zbuduj ją: {BUILD_COMMAND}"
+
+    return CodeSymbols(SYNTHETIC_PACKAGE_DIR)
 
 
 def synthetic_code_cases(

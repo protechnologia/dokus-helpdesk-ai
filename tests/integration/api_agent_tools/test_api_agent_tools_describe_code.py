@@ -44,6 +44,7 @@ from tests.helpers_code_package import (
     synthetic_code_cases,
     synthetic_code_description,
     synthetic_code_package,
+    synthetic_code_symbols,
 )
 
 CASES     = synthetic_code_cases("describe_code")
@@ -168,7 +169,11 @@ async def test_the_directories_of_the_description_are_taken_by_the_listing_and_t
     w pozostałych narzędziach: model wziąłby z opisu katalog i dostał błąd od spisu."""
     package  = synthetic_code_package()
     listing  = ListCodeFilesTool(package=package)
-    find     = FindCodeTextTool(package=package, ripgrep=RipgrepClient(timeout=10.0))
+    find     = FindCodeTextTool(
+        package = package,
+        ripgrep = RipgrepClient(timeout=10.0),
+        symbols = synthetic_code_symbols(),
+    )
     with_hit = 0
 
     for path in case["expected"]["names_dirs"]:

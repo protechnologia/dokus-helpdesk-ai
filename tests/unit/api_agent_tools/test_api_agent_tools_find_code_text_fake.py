@@ -70,7 +70,9 @@ async def test_own_lines_and_the_omitted_counter_replace_the_built_in_result() -
 
     Wyłapuje atrapę, która pustą listę bierze za „nie podano": nie dałoby się wtedy odtworzyć
     sprawy, w której tekstu nie ma w kodzie, a to jej najważniejszy scenariusz."""
-    own = MatchedLine(path="src/a.php", line=3, matched_by="exact", text="trafienie();")
+    own = MatchedLine(
+        path="src/a.php", line=3, symbol=None, matched_by="exact", text="trafienie();",
+    )
 
     general = await FakeFindCodeTextTool(lines=[own], omitted_over_limit=493).find(PHRASE)
     nothing = await FakeFindCodeTextTool(lines=[]).find(PHRASE)
@@ -81,12 +83,24 @@ async def test_own_lines_and_the_omitted_counter_replace_the_built_in_result() -
 
 async def test_the_model_reads_the_result_as_json_with_the_line_text() -> None:
     """Sprawdza, czy tekst, który model dostaje od atrapy, to JSON z listą linii i licznikiem
-    pominiętych, a każda linia ma ścieżkę, numer, etykietę i treść.
+    pominiętych, a każda linia ma ścieżkę, numer, nazwę funkcji, etykietę i treść.
 
     Wyłapuje atrapę z własnym kształtem tekstu dla modelu: test grafu na atrapie sprawdzałby
     wtedy inny tekst niż ten, który model czyta na produkcji."""
     body = json.loads(await FakeFindCodeTextTool().run(PHRASE))
 
     assert set(body)             == {"lines", "omitted_over_limit"}
-    assert set(body["lines"][0]) == {"path", "line", "matched_by", "text"}
+    assert set(body["lines"][0]) == {"path", "line", "symbol", "matched_by", "text"}
     assert "Brak sekwencji numeracji" in body["lines"][0]["text"]
+
+
+async def test_the_built_in_lines_name_the_function_they_lie_in() -> None:
+    """Sprawdza, czy wbudowane trafienia atrapy niosą nazwę funkcji z mapy symboli zmyślonych
+    plików: linia z komunikatem o braku sekwencji leży w metodzie `nastepnyNumer`, a linia
+    z ogólnym komunikatem w funkcji bez nazwy, więc nazwy nie ma.
+
+    Wyłapuje atrapę szukania i atrapę odczytu symbolu rozjechane ze sobą: nazwy z wyniku
+    szukania nie dałoby się w testach grafów podać odczytowi symbolu."""
+    result = await FakeFindCodeTextTool().find(PHRASE)
+
+    assert [line.symbol for line in result.lines] == ["nastepnyNumer", None]

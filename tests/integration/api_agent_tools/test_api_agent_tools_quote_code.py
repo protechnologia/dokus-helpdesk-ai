@@ -42,6 +42,7 @@ from tests.helpers_code_package import (
     synthetic_code_cases,
     synthetic_code_description,
     synthetic_code_package,
+    synthetic_code_symbols,
 )
 
 CASES    = synthetic_code_cases("quote_code")
@@ -177,7 +178,11 @@ async def test_a_line_found_by_the_search_can_be_quoted_as_it_came() -> None:
     numerowane inaczej. Model cytowałby wtedy miejsce, które szukanie mu wskazało, i dostawał
     błąd albo źródło wskazujące inną linię."""
     package = synthetic_code_package()
-    find    = FindCodeTextTool(package=package, ripgrep=RipgrepClient(timeout=10.0))
+    find    = FindCodeTextTool(
+        package = package,
+        ripgrep = RipgrepClient(timeout=10.0),
+        symbols = synthetic_code_symbols(),
+    )
     quote   = QuoteCodeTool(package=package, description=synthetic_code_description())
 
     found = await find.find(FindCodeTextQuery(exact="przekracza limit"))

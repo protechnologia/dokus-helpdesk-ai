@@ -46,6 +46,7 @@ from tests.helpers_code_package import (
     synthetic_absent_paths,
     synthetic_code_cases,
     synthetic_code_package,
+    synthetic_code_symbols,
 )
 
 CASES   = synthetic_code_cases("list_code_files")
@@ -234,7 +235,11 @@ async def test_the_listed_paths_are_taken_by_the_reading_and_by_the_search() -> 
         ListCodeFilesQuery(path="src/lib/Urzad/Wysylka", depth=2),
     )
     read = ReadCodeFileTool(package=package)
-    find = FindCodeTextTool(package=package, ripgrep=RipgrepClient(timeout=10.0))
+    find = FindCodeTextTool(
+        package = package,
+        ripgrep = RipgrepClient(timeout=10.0),
+        symbols = synthetic_code_symbols(),
+    )
 
     files = [entry.path for entry in listing.entries if entry.kind == "file"]
     dirs  = [entry.path for entry in listing.entries if entry.kind == "dir"]

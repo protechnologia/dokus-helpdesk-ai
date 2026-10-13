@@ -100,7 +100,7 @@ z deklaracji modelu, a wariant wymagający źródeł bez źródeł nie oddaje pr
 jest człowiek: dostaje propozycję albo werdykt ze źródłami i sam decyduje.
 
 **Rozwój to dokładanie narzędzi.** Narzędzie jest katalogiem z kontraktem, więc kolejne źródło
-wiedzy nie zmienia grafów ani węzłów. Następne jest czytanie kodu aplikacji (p. 60–67 i 73): sześć
+wiedzy nie zmienia grafów ani węzłów. Tak doszło czytanie kodu aplikacji (p. 60–67 i 73): sześć
 narzędzi tylko do odczytu, które mają pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają,
 przede wszystkim gdy zgłoszenie niesie komunikat albo kod błędu. Kandydat bez decyzji (p. 58):
 dostęp do instancji testowej, na której agent sprawdzi opisany objaw. Byłoby to pierwsze
@@ -110,9 +110,9 @@ narzędzie, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzj
 są właściwe i każdy graf przeszedł na prawdziwym modelu (OpenAI), na zmyślonych zgłoszeniach
 i atrapach narzędzi. Trasy biorą graf z węzłów właściwych, gdy model generujący nie jest atrapą,
 ale bez prawdziwego anonimizatora taka konfiguracja odmawia, więc na danych klientów nic jeszcze
-nie rusza. Wszystkie trzynaście narzędzi ma wersję właściwą: osiem na zgłoszeniach
-i instrukcjach oraz pięć pierwszych narzędzi kodu: opis projektu, szukanie, spis katalogu,
-odczyt pliku i cytowanie fragmentu.
+nie rusza. Wszystkie czternaście narzędzi ma wersję właściwą: osiem na zgłoszeniach
+i instrukcjach oraz sześć narzędzi kodu: opis projektu, szukanie, spis katalogu, odczyt pliku,
+odczyt symbolu i cytowanie fragmentu.
 Dwa, które czytają wątki zgłoszeń, czekają na dane, bo tabela wątków napełni się dopiero po
 anonimizacji.
 
@@ -295,7 +295,7 @@ dokus-helpdesk-ai/
 │       ├── core_model/           # tickets/, docs/, code/, dicts/, graphs/ — folder na temat, plik nazwany jak model
 │       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, indexer_*, factory_*
 │       ├── core_text/            # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
-│       ├── core_util/            # html, validation_text, time, text
+│       ├── core_util/            # html, validation_text, time, text, path
 │       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
 │       ├── engine_llm/           # LLMClient + fabryka; client/, pricing/, models/
 │       ├── engine_embedding/     # EmbeddingClient (HTTP do `embedder`) + prefiksy
@@ -402,7 +402,8 @@ dokus-helpdesk-ai/
   praktyczny — czytnik SQL z masowego importu (p. 31) potrzebuje tego samego strippera.
   `contains_all()` trafiło tam z jednym wołającym (2026-10-09), żeby następny go użył, zamiast
   pisać od nowa; argument, od którego zależy wynik (wielkość liter), podaje się tam zawsze
-  wprost, bez wartości domyślnej.
+  wprost, bez wartości domyślnej. Tak samo `is_path_under()` (2026-10-13): mówi, czy ścieżka
+  jest podaną ścieżką albo leży pod nią, a „brak zawężenia znaczy cały kod" zostaje u wołającego.
 - **Funkcja czy klasa — rozstrzyga stan, nie symetria.** Implementacja z cyklem życia (wagi
   modelu, sesja HTTP) to obiekt budowany raz; obliczenie bezstanowe zostaje funkcją modułową
   wołaną przez tę implementację (`deterministic_vector` wewnątrz `FakeEncoder`).
@@ -919,8 +920,8 @@ Trzeci materiał obok zgłoszeń i instrukcji: kod źródłowy Dokusa, czytany n
 (p. 60–67). Ma pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają, przede wszystkim gdy
 zgłoszenie niesie komunikat albo kod błędu. Z narzędzi są opis projektu (`describe_code`,
 p. 65), szukanie (`find_code_text`, p. 62), spis katalogu (`list_code_files`, p. 64), odczyt
-pliku (`read_code_file`, p. 63) i cytowanie fragmentu (`quote_code`, p. 67); odczyt symbolu
-jeszcze nie powstał (p. 73). Są też paczka kodu (p. 60), jej mapa symboli (p. 66) i zestaw
+pliku (`read_code_file`, p. 63), odczyt symbolu (`read_code_symbol`, p. 73) i cytowanie
+fragmentu (`quote_code`, p. 67). Są też paczka kodu (p. 60), jej mapa symboli (p. 66) i zestaw
 przypadków (p. 61). Niżej decyzje i liczby z 2026-10-06, z prób z 2026-10-07, z budowy szukania
 i odczytu z 2026-10-09, spisu z 2026-10-10, opisu projektu z 2026-10-12 i mapy symboli
 z 2026-10-13.
@@ -937,11 +938,12 @@ a paczka powstała z innej gałęzi.
   `stage-gminy`.
 - **Są dwie paczki: prawdziwy kod Dokusa i zmyślona aplikacja (2026-10-06, wcześniej tylko
   prawdziwy kod).** Paczka z Dokusa leży w `data/unsafe/code/` i na niej mierzy się skuteczność
-  (p. 61). Aplikacja syntetyczna leży w `data/safe/code/source/`: 34 pliki w kształcie
+  (p. 61). Aplikacja syntetyczna leży w `data/safe/code/source/`: 36 plików w kształcie
   Symfony 1, w tym samym zmyślonym świecie co syntetyczna dokumentacja i zgłoszenia atrap.
   Pilnuje okablowania narzędzi bez danych klienta i ma wstawione celowo pułapki prawdziwego
   kodu: komunikat zapisany sekwencjami, trzy brzmienia jednego komunikatu, komunikat składany
-  z części, tę samą nazwę akcji w trzech modułach, długi kontroler i pliki, które mają nie
+  z części, tę samą nazwę akcji w trzech modułach, długi kontroler, akcję odziedziczoną
+  z klasy bazowej, która leży w pliku obok pliku modułu (2026-10-13), i pliki, które mają nie
   wejść. Jedna sprawa nie ma odpowiednika w prawdziwym kodzie (2026-10-10): klasa, która
   zgłasza błąd, gdy w katalogu szablonów leży nadmiarowy plik. Komunikat nie podaje jego
   nazwy i nazwa nie stoi w żadnej linii kodu, więc pokazuje ją tylko spis katalogu. Paczkę
@@ -1040,7 +1042,9 @@ a paczka powstała z innej gałęzi.
   zaczyna się w `search` od opisu projektu (`describe_code`): model bierze z niego katalog,
   ogląda go spisem i dopiero w nim szuka nazw z ekranu. Wszystkie trzy grafy mają też
   zdanie-przyzwolenie: gdy model nie wie, w której części kodu szukać dalej, może przeczytać
-  opis.
+  opis. Od p. 73 (2026-10-13) po zdaniu o odczycie otoczenia stoi w trzech grafach drugie
+  przyzwolenie: gdy model zna nazwę funkcji — z pola `symbol` przy znalezionej linii albo
+  z wywołania w przeczytanym kodzie — może przeczytać ją w całości (`read_code_symbol`).
 - **Na żywym `gpt-6.1-sol` model sięga po opis projektu, gdy zgłoszenie nie niesie komunikatu,
   i pomija go, gdy niesie (2026-10-12, osiem pojedynczych przebiegów `search`, 0,83 USD, nie
   pomiar; raport `data/unsafe/docs/przebieg-describe-code-gpt-6.1-sol-2026-10-12.md`).** Dwie
@@ -1057,6 +1061,23 @@ a paczka powstała z innej gałęzi.
   0,204 USD); sprawa na kodzie Dokusa to 8–20 tur i 0,09–0,20 USD. Wszystkie cztery błędy
   narzędzi to zgadywane nazwy katalogów modułów (dwa razy `obidokumentywychodzace` zamiast
   `obidokout`): opis nie wymienia nazw głównych modułów.
+- **Na żywym `gpt-6.1-sol` model sam sięga po odczyt symbolu, ale w czterech sprawach nie dał
+  on ani lepszego wyniku, ani mniej tur (2026-10-13, osiem pojedynczych przebiegów `search`,
+  0,75 USD, nie pomiar; raport
+  `data/unsafe/docs/przebieg-read-code-symbol-gpt-6.1-sol-2026-10-13.md`).** Sprawy K1, K2, K7
+  i K9 z zestawu Dokusa, każda na kodzie z narzędziem i polem `symbol` oraz bez nich;
+  narzędzia zgłoszeń i dokumentacji bez materiału. Z narzędziem model wywołał je w każdej
+  sprawie, razem 14 razy (1–6 na sprawę): 13 wywołań oddało definicję od razu, a jedno błąd,
+  bo nazwa klasy miała przestrzeń nazw, której mapa nie trzyma; po sondzie narzędzie
+  przestrzeń nazw pomija. W 12 wywołaniach podał
+  `path`, z tego 4 razy katalog, i listy kandydatów nie dostał ani razu. Odczytów pliku było
+  9 zamiast 18, a wyników narzędzi w rozmowie o 14% mniej znaków. Wymagane miejsca zostały
+  zacytowane we wszystkich czterech sprawach w obu wariantach, więc poprawy skuteczności
+  sonda nie mogła pokazać. Tur było razem 34 wobec 29 (w K7 16 wobec 11, w pozostałych po
+  tyle samo), a koszt 0,368 wobec 0,381 USD. W K2 model wziął nazwę z pola `symbol` i od razu
+  przeczytał funkcję: wyniki narzędzi to 5,6 tys. znaków wobec 14 tys. Dwa odczyty urwał
+  limit 300 linii (klasa i funkcja na 465 linii), każdy to około 25 tys. znaków. Mapa była
+  czytana 2–14 razy na sprawę, czyli 0,4–2,5 s przy sprawie trwającej 35–166 s.
 - **Na żywym `gpt-6.1-sol` model idzie drogą szukanie → odczyt → cytowanie (2026-10-09,
   pojedyncze przebiegi, nie pomiar; raport
   `data/unsafe/docs/przebieg-read-code-file-gpt-6.1-sol-2026-10-09.md`).** Siedem spraw
@@ -1125,8 +1146,10 @@ a paczka powstała z innej gałęzi.
   poprawny plik, w którym parser nie przyjmuje stałej klasy o nazwie `NAMESPACE`.
 - **Mapę czyta `CodeSymbols` z `core_service/loader_code_symbols.py`, w całości i przy każdym
   wywołaniu (2026-10-13).** Odczyt mapy Dokusa ze sprawdzeniem kształtu trwa 0,18 s. Brak mapy
-  to błąd konfiguracji, jak brak metryczki. Nikt w aplikacji mapy jeszcze nie czyta: narzędzie
-  i pole w szukaniu dochodzą w p. 73, razem z wyszukiwaniem po mapie.
+  to błąd konfiguracji, jak brak metryczki. Czytają ją dwa narzędzia: `read_code_symbol`
+  bierze z niej granice definicji, a `find_code_text` nazwę funkcji, w której leży znaleziona
+  linia. Na paczce Dokusa szukanie trwa przez to 0,23 s zamiast 0,05–0,1 s, a odczyt symbolu
+  0,19–0,34 s; szukanie bez trafień mapy nie czyta.
 - **89% plików PHP ma do 200 linii, ale główne kontrolery po 3–4 tys.** Odczyt pliku ma limit
   300 linii na wywołanie: w paczce mieści się w nim w całości 92% plików (przy 150 liniach
   84%, przy 400 — 95%). Odczyt symbolu daje najwięcej w długich kontrolerach. W paczce jest
@@ -1164,7 +1187,7 @@ a paczka powstała z innej gałęzi.
   Opisy zachowania zatwierdza osoba znająca Dokusa; do tego czasu przypadek ma
   `behaviour_confirmed: false`.
 - **Zestaw do aplikacji syntetycznej ma inny kształt, bo służy testom bez modelu (2026-10-07).**
-  `data/safe/golden/code-synthetic.json` trzyma sekcję na narzędzie: 57 zapytań w kształcie
+  `data/safe/golden/code-synthetic.json` trzyma sekcję na narzędzie: 74 zapytania w kształcie
   narzędzia z oczekiwanym wynikiem, oraz listę plików, których paczka nie może zawierać.
   Zgłoszeń w nim nie ma: testowi bez modelu nic nie dają, bo zamiana zgłoszenia na wywołania
   narzędzi to praca modelu. Kształty zapytań pochodzą z planu i prototypów, więc sekcję
@@ -1172,7 +1195,10 @@ a paczka powstała z innej gałęzi.
   (2026-10-09, dziś 20 zapytań, `words` jako tekst), `read_code_file` (2026-10-09, 11 zapytań,
   `from_at` i `to_at` zamiast `offset_at` i `limit`) i `list_code_files` (2026-10-10,
   14 zapytań, pełne ścieżki pozycji zamiast nazw). Sekcja `describe_code` doszła 2026-10-12:
-  2 zapytania, a oczekiwany wynik wymienia katalogi, które opis projektu ma nazwać.
+  2 zapytania, a oczekiwany wynik wymienia katalogi, które opis projektu ma nazwać. Sekcja
+  `read_code_symbol` jest dopasowana od 2026-10-13 (22 zapytania: `name` i opcjonalne `path`,
+  w oczekiwaniu jedna definicja albo lista kandydatów), a sześć trafień `find_code_text`
+  podaje nazwę funkcji, w której leży linia.
 - **Przypadek trafia do zestawu po próbie na świeżym agencie, który zna tylko zgłoszenie
   i folder paczki.** W próbach z 2026-10-07 miejsce wybrane przez autora było błędne albo
   niepełne w 3 przypadkach z 8, a w 2 kolejnych błędny był opis albo rodzaj przypadku. Cena:
@@ -1894,6 +1920,31 @@ czasu jest pusta.
   w jednym punkcie: z opisu bierze się katalog, w nim się szuka albo ogląda pliki, a o
   zachowaniu aplikacji mówi dopiero przeczytany kod. Cena: opis Dokusa to 8,5 tys. znaków
   w rozmowie przy każdej sprawie, w której model po niego sięgnie.
+- **Odczyt symbolu, `read_code_symbol` (2026-10-13), przyjmuje `name` i opcjonalne `path`, a oddaje
+  jedną definicję z liniami albo listę kandydatów bez treści.** Granice bierze z mapy symboli
+  paczki. `path` znaczy to samo co w `find_code_text`: plik albo katalog, a bez niego narzędzie
+  szuka w całym kodzie. Nazwa pasuje sama albo razem z miejscem (`GeneratorNumeru::nastepnyNumer`,
+  `APP.pisma.wyslijHandler`, także z `->`), z zachowaniem wielkości liter. Przestrzeń nazw PHP
+  przed nazwą klasy jest pomijana, bo mapa jej nie trzyma: `Urzad\Numeracja\GeneratorNumeru`
+  wskazuje klasę `GeneratorNumeru`. Jedna pasująca definicja wraca w `symbol` (plik, nazwa,
+  miejsce, rodzaj, linie) z liniami w kształcie odczytu pliku (`line`, `text`), najwyżej 300, z
+  `returned.cut_by_limit`; resztę czyta się `read_code_file`. Kilka wraca w `candidates`, najwyżej
+  20, z `omitted_over_limit`, a `symbol` i `returned` to wtedy `null`: model zawęża `path` do pliku
+  kandydata, a kandydatów z jednego pliku czyta odczytem pliku po ich liniach. Brak definicji to
+  błąd wracający do modelu, w czterech brzmieniach: definicje są poza ścieżką (z liczbą), klasa nie
+  ma takiej metody, ale sama nazwa jest (z liczbą), nazwy nie ma w kodzie wcale, plik odrzucił
+  parser. Nazwa z klasą, która takiej metody nie ma, nie jest po cichu zamieniana na samą nazwę.
+  Definicja, której linie wychodzą poza plik, to błąd konfiguracji: mapa powstała z innego kodu.
+  Narzędzie jest pomocnicze, bez `cite()`; limit to 10 odczytów na sprawę. Na paczce Dokusa metodę
+  odziedziczoną z klasy bazowej oddaje jedno wywołanie z katalogiem modułu, a `__construct` bez
+  ścieżki daje 20 kandydatów i 1603 pominiętych. Cena: sama nazwa wskazuje jedną definicję tylko
+  dla 27% funkcji, więc wywołanie bez ścieżki bywa zużyte na listę kandydatów.
+- **`find_code_text` podaje przy każdej linii nazwę funkcji, w której linia leży (`symbol`,
+  2026-10-13).** To nazwa najgłębszej definicji z mapy symboli, która obejmuje linię: metoda,
+  a nie jej klasa; `null`, gdy linia leży poza definicjami albo plik nie ma symboli. Nazwę
+  razem ze ścieżką linii przyjmuje `read_code_symbol`. Jest to sama nazwa, bez klasy: klasę
+  wskazuje plik. Cena: około 25 znaków na linię wyniku i odczyt mapy (0,18 s) przy każdym
+  szukaniu, które coś znalazło.
 - **Wynik każdego narzędzia trafia do modelu jako JSON (`result_as_json()` w `base.py`)** — model
   wyniku zapisany wprost, z polami pod nazwami ze schematu. Identyfikatory wracają w kształcie,
   w jakim model poda je następnemu narzędziu, a treść pisana przez klienta siedzi w polu
@@ -1999,9 +2050,9 @@ czasu jest pusta.
   dopisywania go do żadnej listy.
 - **Narzędzia właściwe buduje `agent_tools/factory.py`, z konfiguracji (2026-10-05):** po jednym
   kliencie embeddera, Qdranta i Postgresa, wspólnym dla ośmiu narzędzi, oraz paczka kodu, jej
-  opis z metryczką i klient ripgrepa dla pięciu narzędzi kodu, w kolejności `TOOL_NAMES`
-  grafów. Powstaje wszystkie trzynaście; czy instancja bez dokumentacji ma pomijać jej
-  narzędzia, rozstrzyga p. 15.
+  opis z metryczką, jej mapa symboli i klient ripgrepa dla sześciu narzędzi kodu, w kolejności
+  `TOOL_NAMES` grafów. Powstaje wszystkie czternaście; czy instancja bez dokumentacji ma
+  pomijać jej narzędzia, rozstrzyga p. 15.
 - **Kod aplikacji liczy się jako źródło jak zgłoszenie i instrukcja, także w wariancie
   wymagającym źródeł (decyzja 2026-10-06, narzędzia w p. 62–67).** Odpowiedź opartą wyłącznie na
   kodzie wołający rozpoznaje po rodzaju źródła (`code`). Źródłem jest fragment, który model
@@ -2066,21 +2117,22 @@ czasu jest pusta.
   sam limit stoi w opisie narzędzia dla modelu: miejsce `{{max_calls}}` w `description.md`
   wypełnia `tool_definitions()`, więc narzędzie bez limitu to błąd składania. Ile jedno
   wywołanie może pobrać (20 kart, 5 sekcji, 20 linii z szukania w kodzie, 200 pozycji spisu
-  katalogu kodu, 300 linii odczytanego pliku kodu, 40 linii cytowanego kodu), zostaje stałą
-  w modelu zapytania; wątek jest zawsze
+  katalogu kodu, 300 linii odczytanego pliku kodu, 300 linii odczytanej definicji albo 20
+  kandydatów, 40 linii cytowanego kodu), zostaje stałą w modelu zapytania; wątek jest zawsze
   jeden. Wartości od 2026-10-05: wyszukiwania i karty po 5, sekcje i wątki po 3, spis treści 1;
   od 2026-10-07 cytowanie kodu 5; od 2026-10-09 szukanie w kodzie 10, bo od komunikatu do
   miejsca, które go wywołuje, idzie się kilkoma szukaniami z rzędu (w sondzie limit 10
   wyczerpał się w 5 sprawach z 9), i odczyt pliku kodu też 10, bo po każdym takim szukaniu
   model czyta otoczenie trafionej linii; od 2026-10-10 spis katalogu kodu 5 (prototyp
   pokazujący jeden poziom zużywał cały limit 3 w 4 z 7 przebiegów, w których model go wołał);
-  od 2026-10-12 opis projektu 1, bo jest jeden dla całego kodu i wraca w całości.
+  od 2026-10-12 opis projektu 1, bo jest jeden dla całego kodu i wraca w całości; od
+  2026-10-13 odczyt symbolu 10, jak odczyt pliku, który zastępuje.
 - **Limit tur modelu: `AGENT_MAX_ITERATIONS` = 20 (2026-10-05).** Liczy odpowiedzi modelu
   w grafie z narzędziami, nie wywołania. Gdy w ostatniej dozwolonej turze model nadal woła
   narzędzia wiedzy, `route_after_agent()` prowadzi do `respond` i narzędzia nie są wykonywane.
   Domyka to, czego limity narzędzi nie domykają: wywołanie ponad limit narzędzia dostaje odmowę,
   ale turę zużywa. 20 to zapas, nie cel: sprawa w sondach to 4–7 tur, a limity narzędzi pozwalają
-  na 63 wywołania, czyli do 64 tur przy jednym wywołaniu na turę (do przeliczenia w p. 23).
+  na 73 wywołania, czyli do 74 tur przy jednym wywołaniu na turę (do przeliczenia w p. 23).
   Sprawa ucięta limitem dostaje od `respond` jedną turę ponad limit, na samą odpowiedź: jest już
   opłacona, a narzędzia w tej turze nadal nie ruszają.
 - **Własne typy wiadomości (`ChatMessage`, `ToolCall` w `engine_llm/models/messages.py`), żadnych typów
@@ -2853,8 +2905,8 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1738 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 559 (79)           | 96 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1866 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 620 (79)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 110 (9)            | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 40 (38)            | 38 s |
 
@@ -2862,8 +2914,8 @@ Liczby z 2026-10-13, czasy folderów z 2026-10-10: każdy folder osobno, w kompl
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku. Bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy — całe 38 s to 207 wyszukań golden setów
 przez prawdziwy embedder (178 w zgłoszeniach, 29 w dokumentacji). Komplet jednym poleceniem
-(`pytest -m "not llm_live"`): 2411 testów, 140 s; domyślny `pytest`, bez stacku: 2285 testów,
-42 s (oba czasy z 2026-10-13). Trzydzieści sześć testów integracyjnych na żywym modelu
+(`pytest -m "not llm_live"`): 2600 testów, 153 s; domyślny `pytest`, bez stacku: 2474 testy,
+36 s (oba czasy z 2026-10-13). Trzydzieści sześć testów integracyjnych na żywym modelu
 (`llm_live`) jest w liczbie testów folderu, ale poza oboma przebiegami.
 
 Zależnością w teście integracyjnym jest wszystko, z czym jednostka naprawdę współpracuje: baza
@@ -2936,6 +2988,15 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   osobne testy pilnują, że opis nie tworzy źródeł, że drugie wywołanie w sprawie dostaje
   odmowę i że gałąź paczki dociera do tytułu źródła. Czternaście celowo wstawionych usterek
   testy wyłapały, jedną dopiero po poprawce testu.
+  Testy `read_code_symbol` są od 2026-10-13: zapytania z zestawu idą przez prawdziwy
+  `run_tools`, każda oddana linia jest porównana z plikiem w paczce, a kandydata da się
+  odczytać po zawężeniu ścieżki do jego pliku. Osobny test przechodzi po całej mapie symboli
+  paczki: każda funkcja i metoda, która leży w klasie albo w obiekcie, czyta się tak samo po
+  nazwie z miejscem i po nazwie z plikiem. Test łańcucha sprawdza, że nazwę funkcji i ścieżkę
+  z wyniku szukania przyjmuje odczyt symbolu, a oddany zakres cytowanie. Mapa symboli atrap
+  jest spisana ręcznie i porównywana z mapą, którą dla tych samych zmyślonych plików buduje
+  skrypt. Z 47 celowo wstawionych usterek testy wyłapały wszystkie, jedną dopiero po
+  dopisaniu testu.
   Cena: to jedyne testy bez markera, które potrzebują czegoś spoza commita — zbudowanej paczki
   syntetycznej i programu ripgrep na hoście. Bez paczki domyślny `pytest` kończy się błędem
   z poleceniem budowy, a bez ripgrepa błędem z poleceniem instalacji.
@@ -3008,7 +3069,8 @@ w pozostałych rodzajach mniejszość. Tabelka markerów stoi na górze `tests/c
   dwa wcześniejsze przebiegi tego dnia, na dziewięciu sprawach, kosztowały 0,14 i 0,07 USD,
   a różnicę robi głównie zapis do cache promptu; przebieg z 2026-10-10, po dopisaniu zdania
   o spisie katalogu, to 27 tur i 0,12 USD; przebieg z 2026-10-12, po dopisaniu opisu
-  projektu, to 28 tur i 0,19 USD). Po zmianie promptu pierwsza tura grafu
+  projektu, to 28 tur i 0,19 USD; przebieg z 2026-10-13, po dopisaniu zdania o odczycie
+  symbolu, to 29 tur i 0,21 USD). Po zmianie promptu pierwsza tura grafu
   zapisuje początek żądania do cache od nowa: około 0,02 USD zamiast 0,002. Sprawa grafu liczy
   się dopiero, gdy potrzebuje jej test, więc `-k <graf>` opłaca jeden graf. Testy grafów
   sprawdzają okablowanie: czy model odpowiada
@@ -3451,8 +3513,21 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   ale wpis `["nastepny", "Numer", "method", 4, 6]` czyta się tylko z opisem obok.
 - **Walidator kolejności linii w modelu symbolu** — wydłużał odczyt mapy Dokusa z 0,18 s do
   0,34 s; tego, że koniec nie stoi przed początkiem, pilnują testy skryptu.
-- **Pamiętanie mapy symboli w procesie** — odczyt trwa 0,18 s, a mapy nikt jeszcze nie czyta;
-  wraca z narzędziami (p. 73), gdy będzie wiadomo, ile odczytów przypada na sprawę.
+- **Pamiętanie mapy symboli w procesie** — odczyt trwa 0,18 s, a w sondzie mapa była czytana
+  2–14 razy na sprawę, czyli najwyżej 2,5 s przy sprawie trwającej 35–166 s; wraca, gdy
+  pomiar pokaże, że to boli (p. 23).
+- **Argument `line` w `read_code_symbol`** — kilka definicji o jednej nazwie w jednym pliku ma
+  w paczce 50 plików; kandydat niesie linie i czyta się go odczytem pliku.
+- **Ciche dopasowanie po samej nazwie, gdy nazwa z klasą nie pasuje** — model dostałby metodę
+  innej klasy niż ta, o którą prosił; błąd podaje liczbę definicji o samej nazwie.
+- **Treść pierwszej definicji, gdy do nazwy pasuje kilka** — narzędzie zgadywałoby, o który
+  moduł chodzi; wybiera model, z listy kandydatów.
+- **Nazwa razem z klasą w polu `symbol` wyniku szukania** — klasę wskazuje plik, a nazwa
+  z plikiem jest jednoznaczna dla 99,2% funkcji; sama nazwa to mniej znaków w każdej linii.
+- **Część ścieżki obiektu jako miejsce w JS** (`pisma.wyslij` dla `APP.pisma.wyslij`) —
+  miejsce pasuje w całości albo wcale; błąd podaje liczbę definicji o samej nazwie.
+- **Test na żywym modelu wymagający wywołania odczytu symbolu** — narzędzie jest pomocnicze,
+  a zdanie w promptach jest przyzwoleniem; czy model sięga po nie z sensem, pokazuje sonda.
 
 ### Plan
 
@@ -3703,21 +3778,18 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   i modele `CodeSymbol` i `CodeSymbolMap`; mapy obu paczek zbudowane; ctags odrzucony, bo nie
   podaje linii końca; narzędzie, pole w szukaniu i wyszukiwanie po mapie przeszły do p. 73;
   reguły — „Kod aplikacji", „Warstwy kodu", „Testy", „Świadomie pominięte".
-- [ ] **73. `read_code_symbol` i pole `symbol` w szukaniu** (wydzielony z p. 66 2026-10-13,
-  numer spoza kolejności) — narzędzie pomocnicze na mapie symboli: `name` wymagane, `path`
-  opcjonalne, plik albo katalog, jak w `find_code_text`; jedna pasująca definicja wraca
-  z treścią (do 300 linii, dalej `read_code_file`), kilka jako lista kandydatów bez treści
-  (ścieżka, miejsce, linie; do 20), a brak definicji jako błąd z liczbą definicji poza
-  ścieżką; po liście kandydatów model zawęża `path` do pliku kandydata, a kandydata z tego
-  samego pliku czyta `read_code_file` po jego liniach; nazwa pasuje sama albo razem
-  z miejscem (`Klasa::metoda`, `APP.pisma.wyslij`); `find_code_text` dostaje pole z nazwą
-  symbolu, w którym leży linia; wyszukiwanie po mapie (definicje nazwy pod ścieżką, symbol
-  obejmujący linię) dochodzi razem z nimi, a z nim pomiar, ile odczytów mapy (0,18 s każdy)
-  przypada na sprawę; limit 10 odczytów symbolu na sprawę; sonda na żywym modelu na
-  sprawach z długim kontrolerem, z narzędziem i bez. *Dlaczego:* w paczce Dokusa nazwa
-  z plikiem wskazuje jedną definicję dla 99,2% funkcji, a sama nazwa dla 27%; 1363 z 3078
-  akcji leży poza `actions.class.php`, w klasie bazowej obok, a w sondzie z 2026-10-07
-  6 z 10 wywołań prototypu, który wymagał pliku, skończyło się błędem.
+- [x] **73. `read_code_symbol` i pole `symbol` w szukaniu** (2026-10-13, wydzielony z p. 66)
+  — `ReadCodeSymbolTool` na paczce kodu i jej mapie symboli: `name` wymagane, `path`
+  opcjonalne (plik albo katalog), jedna definicja z treścią do 300 linii, kilka jako lista
+  kandydatów bez treści, brak definicji jako błąd z podpowiedzią; nazwa sama, z klasą albo
+  obiektem, z przestrzenią nazw; pole `symbol` w wyniku `find_code_text`; narzędzie
+  pomocnicze, bez źródeł, limit 10 odczytów na sprawę; wpięte w `search`, `suggest_questions`
+  i `suggest_solution`, jedno zdanie-przyzwolenie w trzech promptach; `is_path_under()`
+  w `core_util/`; sekcja `read_code_symbol` zestawu syntetycznego i akcja w klasie bazowej
+  w aplikacji syntetycznej; na żywym `gpt-6.1-sol` model sięgał po narzędzie w każdej
+  z czterech spraw Dokusa, ale wynik i liczba tur wyszły jak bez niego; czy narzędzie pomaga
+  tam, gdzie model dziś nie dochodzi do miejsca, liczy p. 23; reguły — „Kod aplikacji",
+  „Warstwa narzędzi agenta", „Warstwa węzłów", „Testy", „Świadomie pominięte".
 - [ ] **59. Scenariusze ewaluacyjne grafów na zmyślonych danych** (dopisany 2026-10-05, numer
   spoza kolejności) — testy w `tests/evaluation/` za markerem `llm_live`: grafy na węzłach
   właściwych i modelu generującym, scenariusze jako dane w `data/safe/golden/`, materiał podawany
@@ -3800,8 +3872,9 @@ każdy mierzy się osobno.
 - [ ] **23. `search`** — prompt pętli (jak pytać każde narzędzie, kiedy materiał wystarcza
   i ile kosztuje kod aplikacji sprawdzany w każdej sprawie o działaniu aplikacji — reguła
   z p. 70; na kodzie Dokusa do policzenia, jak często szukanie nazw z ekranu trafia we właściwe
-  miejsce i ile szukań zużywa, czy opis projektu (p. 65) to szukanie skraca, oraz czy uwagi
-  dla wdrożeniowca mówią prawdę o przeczytanych sprawach i ile mają mieć znaków);
+  miejsce i ile szukań zużywa, czy opis projektu (p. 65) to szukanie skraca, czy odczyt
+  symbolu (p. 73) pomaga w sprawach, w których model dziś nie dochodzi do miejsca, oraz czy
+  uwagi dla wdrożeniowca mówią prawdę o przeczytanych sprawach i ile mają mieć znaków);
   pomiar pętli wobec wszystkich narzędzi naraz (tryb bez pętli zostaje jako odniesienie i tryb
   awaryjny), w zestawie klastry wieloprzyczynowe; osobna oś — trafność zapytań pisanych przez
   agenta wobec zapytań z parsera korpusu (golden set, `recall@1` i MRR; punkt odniesienia to pola

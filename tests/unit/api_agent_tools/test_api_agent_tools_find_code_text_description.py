@@ -3,6 +3,8 @@ from app.agent_tools.code.find_code_text import (
     MAX_TEXT_CHARS,
     MIN_LONGEST_WORD_CHARS,
     FakeFindCodeTextTool,
+    FindCodeTextResult,
+    MatchedLine,
 )
 from app.agent_tools.code.find_code_text.base import CUT_MARK
 
@@ -39,3 +41,32 @@ def test_the_description_names_the_shortest_word_the_code_accepts() -> None:
     dopiero z błędu, po zużyciu tury."""
     assert MIN_LONGEST_WORD_CHARS == 3
     assert "jedno słowo ma mieć trzy znaki" in DESCRIPTION
+
+
+def test_the_description_explains_every_field_of_the_result() -> None:
+    """Sprawdza, czy tabelka wyniku w opisie narzędzia wymienia każde pole trafionej linii,
+    w tym nazwę funkcji (`lines[].symbol`), i oba pola górnego poziomu.
+
+    Wyłapuje pole dopisane w modelu wyniku bez słowa w opisie: model widziałby przy linii nazwę
+    funkcji, ale nie wiedziałby, że może ją podać narzędziu `read_code_symbol`."""
+    returns = DESCRIPTION.split("# Co zwraca")[1].split("# Zasady")[0]
+
+    assert set(FindCodeTextResult.model_fields) == {"lines", "omitted_over_limit"}
+
+    fields = ["lines", "omitted_over_limit"]
+    fields += [f"lines[].{name}" for name in MatchedLine.model_fields]
+
+    for field in fields:
+        assert f"| {field} " in returns, field
+
+
+def test_the_description_says_what_to_do_with_the_symbol() -> None:
+    """Sprawdza, czy zasady w opisie mówią, czym jest `symbol` i któremu narzędziu się go podaje:
+    `read_code_symbol`, jako `name`, razem ze ścieżką linii.
+
+    Wyłapuje pole bez instrukcji: nazwa funkcji przy każdej linii kosztuje znaki w każdym
+    wyniku, więc ma prowadzić model do odczytu całej funkcji."""
+    rules = DESCRIPTION.split("# Zasady")[1]
+
+    assert "`read_code_symbol`" in rules
+    assert "jako `name`" in rules

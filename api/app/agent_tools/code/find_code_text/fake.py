@@ -1,7 +1,16 @@
 from collections.abc import Sequence
 
-from app.agent_tools.code.fake_code import ERRORS_PATH, GENERATOR_PATH, default_files
-from app.agent_tools.code.find_code_text.base import FindCodeTextToolBase, shorten_line
+from app.agent_tools.code.fake_code import (
+    ERRORS_PATH,
+    GENERATOR_PATH,
+    default_files,
+    default_symbol_map,
+)
+from app.agent_tools.code.find_code_text.base import (
+    FindCodeTextToolBase,
+    shorten_line,
+    symbol_name_at,
+)
 from app.agent_tools.code.find_code_text.models import (
     FindCodeTextQuery,
     FindCodeTextResult,
@@ -19,8 +28,9 @@ def matched_line_of_fake_file(
     """
     Description:
     Składa trafienie z linii zmyślonego pliku atrap (`agent_tools/code/fake_code.py`): treść
-    bierze z pliku i przycina tak samo jak narzędzie właściwe, więc ścieżka, numer i treść
-    zgadzają się z tym, co o tym pliku wiedzą atrapy pozostałych narzędzi kodu.
+    bierze z pliku i przycina tak samo jak narzędzie właściwe, a nazwę funkcji z mapy symboli
+    tych plików, więc ścieżka, numer, treść i nazwa zgadzają się z tym, co o tym pliku wiedzą
+    atrapy pozostałych narzędzi kodu.
 
     Example args:
         path="src/lib/Urzad/Numeracja/GeneratorNumeru.php"
@@ -29,13 +39,14 @@ def matched_line_of_fake_file(
 
     Example result:
         MatchedLine(path="src/lib/Urzad/Numeracja/GeneratorNumeru.php", line=9,
-                    matched_by="exact",
+                    symbol="nastepnyNumer", matched_by="exact",
                     text="throw new BrakSekwencjiException('Brak sekwencji numeracji dla roku '…")
     """
     lines   = split_lines(default_files()[path])
     matched = MatchedLine(
         path       = path,
         line       = line,
+        symbol     = symbol_name_at(default_symbol_map(), path, line),
         matched_by = matched_by,
         text       = shorten_line(lines[line - 1]),
     )

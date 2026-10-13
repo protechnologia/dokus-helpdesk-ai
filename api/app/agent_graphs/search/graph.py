@@ -42,6 +42,7 @@ TOOL_NAMES: tuple[str, ...] = (
     "find_code_text",       # linie kodu aplikacji po dosłownym brzmieniu
     "list_code_files",      # spis katalogu kodu aplikacji, do wskazanej głębokości
     "read_code_file",       # plik albo zakres linii kodu aplikacji, z numerami linii
+    "read_code_symbol",     # jedna funkcja, metoda albo klasa z kodu aplikacji, po nazwie
     "quote_code",           # fragment kodu aplikacji — cytuje tylko wskazaną przyczynę
 )
 

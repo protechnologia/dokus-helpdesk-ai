@@ -11,8 +11,8 @@
      Liczba 40 w tabelce argumentów to `MAX_LINES_PER_QUOTE` z
      `models.py`; pilnuje jej test opisu.
 
-     Zasady wymieniają po nazwie odczyt pliku (`read_code_file`);
-     odczyt symbolu dojdzie razem z nim (p. 73).
+     Zasady wymieniają po nazwie oba odczyty: pliku
+     (`read_code_file`) i symbolu (`read_code_symbol`).
 
      Zmiana dotyczy wszystkich grafów naraz, więc po strojeniu jednego
      trzeba przemierzyć pozostałe (p. 23, 25–26).
@@ -57,8 +57,8 @@ JSON z potwierdzeniem cytowania, bez treści linii:
   fragment powoduje opisane zachowanie. Gdy kod przyczyny nie
   pokazuje, nie cytuj niczego jako `cause`.
 - Cytuj wyłącznie linie, które wcześniej przeczytałeś narzędziem
-  `read_code_file`. To narzędzie nie pokazuje kodu, więc odczytu
-  nie zastąpi.
+  `read_code_file` albo `read_code_symbol`. To narzędzie nie
+  pokazuje kodu, więc odczytu nie zastąpi.
 - Jedno wywołanie to jeden fragment. Cytuj samo miejsce, które
   rozstrzyga: warunek, ustawienie, treść komunikatu.
 - Kod, który cytujesz, pochodzi z jednej gałęzi (`branch`).

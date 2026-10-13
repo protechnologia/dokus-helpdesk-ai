@@ -85,7 +85,9 @@ odczytanego zgłoszenia.
 Gdy zgłoszenie niesie komunikat z ekranu, wpis z logu albo kod błędu, a zgłoszenia i instrukcje
 go nie tłumaczą, sprawdź go w kodzie aplikacji. Najpierw znajdź go narzędziem `find_code_text`.
 Znaleziona linia mówi, gdzie ten tekst stoi, a nie kiedy aplikacja go pokazuje, więc przeczytaj
-jej otoczenie narzędziem `read_code_file`. Warunek, który tam przeczytasz, jest hipotezą do
+jej otoczenie narzędziem `read_code_file`. Gdy znasz nazwę funkcji — z pola `symbol` przy
+znalezionej linii albo z wywołania w przeczytanym kodzie — możesz przeczytać ją w całości
+narzędziem `read_code_symbol`. Warunek, który tam przeczytasz, jest hipotezą do
 pytania: zapytaj o fakt, który ją rozstrzyga. Fragment, który ten warunek pokazuje, zacytuj
 narzędziem `quote_code` w roli `cause`, a miejsce sprawdzone i odrzucone w roli `excluded`. Gdy
 przeczytany kod warunku nie pokazuje, nie cytuj niczego jako `cause`. W notatce przy pytaniu

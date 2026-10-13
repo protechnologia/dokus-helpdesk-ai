@@ -55,6 +55,9 @@ JSON z liniami pliku i z tym, który zakres dostałeś:
 - Po trafieniu z `find_code_text` czytaj otoczenie linii:
   kilkadziesiąt linii przed nią i po niej. Mały plik możesz
   przeczytać w całości.
+- Gdy znasz nazwę funkcji, w której leży linia (pole `symbol`
+  w wyniku szukania), całą funkcję odda narzędzie
+  `read_code_symbol`, bez zgadywania zakresu.
 - Jedno wywołanie oddaje najwyżej 300 linii. Gdy
   `returned.cut_by_limit` jest `true`, limit urwał odczyt: dalsze
   linie przeczytaj od `returned.to_line` + 1.

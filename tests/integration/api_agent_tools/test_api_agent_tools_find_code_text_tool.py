@@ -10,11 +10,17 @@ linii, kształt ścieżki po zawężeniu i odróżnienie błędu modelu od błę
 | zawężenie zapisane przez `..`              | ścieżki w wyniku w jednej postaci          |
 | ścieżka zawężenia spoza paczki             | `UnknownCodePathError`, wraca do modelu    |
 | paczki albo ripgrepa nie ma                | błąd konfiguracji, do modelu nie wraca     |
+| linia w klasie, poza klasą, plik bez mapy  | nazwa klasy, brak nazwy, brak nazwy        |
+| są trafienia, a mapy symboli nie ma        | błąd konfiguracji, do modelu nie wraca     |
+
+Mapę symboli małej paczki buduje ten sam skrypt, który buduje ją dla prawdziwej
+(`scripts/build_code_symbols.py`).
 """
 
 from pathlib import Path
 
 import pytest
+from build_code_symbols import SYMBOLS_NAME, build_symbols
 
 from app.agent_tools import ToolCallError
 from app.agent_tools.code.find_code_text import (
@@ -25,12 +31,15 @@ from app.agent_tools.code.find_code_text import (
 )
 from app.agent_tools.code.find_code_text.base import CUT_MARK
 from app.core_service.loader_code_package import CodePackage, CodePackageConfigError
+from app.core_service.loader_code_symbols import CodeSymbols
 from app.engine_process import ProcessConfigError
 from app.engine_process.ripgrep import RipgrepClient
 from app.engine_process.ripgrep import client as ripgrep_client
 
 GENERATOR = "src/lib/Numeracja/GeneratorNumeru.php"
-LONG_LINE = "        $komunikat = 'Brak sekwencji numeracji" + " i jeszcze" * 30 + "';"
+# Stała klasy, nie instrukcja: plik ma być poprawnym PHP, bo plik z błędem składni nie ma
+# w mapie symboli żadnej definicji.
+LONG_LINE = "        const KOMUNIKAT = 'Brak sekwencji numeracji" + " i jeszcze" * 30 + "';"
 CODE      = [
     "<?php",
     "class GeneratorNumeru",
@@ -46,7 +55,7 @@ def _tool(
     """
     Description:
     Buduje narzędzie na paczce z jednym plikiem PHP, w którym czwarta linia jest dłuższa niż
-    limit treści w wyniku.
+    limit treści w wyniku, i z mapą symboli tej paczki.
 
     Example args:
         tmp_path=Path("/tmp/pytest-of-root/pytest-0/test_x0")
@@ -58,10 +67,12 @@ def _tool(
 
     file.parent.mkdir(parents=True)
     file.write_text("\n".join(CODE) + "\n", encoding="utf-8")
+    build_symbols(tmp_path / "paczka")
 
     return FindCodeTextTool(
         package = CodePackage(tmp_path / "paczka"),
         ripgrep = RipgrepClient(timeout=10.0),
+        symbols = CodeSymbols(tmp_path / "paczka"),
     )
 
 
@@ -128,6 +139,7 @@ async def test_a_missing_package_stops_the_call_instead_of_answering_the_model(
     tool = FindCodeTextTool(
         package = CodePackage(tmp_path / "nie-ma"),
         ripgrep = RipgrepClient(timeout=10.0),
+        symbols = CodeSymbols(tmp_path / "nie-ma"),
     )
 
     with pytest.raises(CodePackageConfigError) as caught:
@@ -151,4 +163,40 @@ async def test_a_missing_ripgrep_stops_the_call_instead_of_answering_the_model(
     with pytest.raises(ProcessConfigError) as caught:
         await _tool(tmp_path).find(FindCodeTextQuery(exact="Brak sekwencji"))
 
+    assert not isinstance(caught.value, ToolCallError)
+
+
+async def test_a_line_is_named_after_its_class_and_a_line_outside_has_no_name(
+    tmp_path: Path,
+) -> None:
+    """Sprawdza, czy linia leżąca w klasie niesie w polu `symbol` nazwę tej klasy z mapy
+    symboli paczki, a linia przed klasą nie niesie żadnej.
+
+    Wyłapuje narzędzie, które mapy nie czyta albo każdej linii pliku daje tę samą nazwę: model
+    nie odróżniłby linii w funkcji od linii poza nią."""
+    tool = _tool(tmp_path)
+
+    inside  = await tool.find(FindCodeTextQuery(exact="Brak sekwencji numeracji"))
+    outside = await tool.find(FindCodeTextQuery(exact="<?php"))
+
+    assert [(line.line, line.symbol) for line in inside.lines]  == [(4, "GeneratorNumeru")]
+    assert [(line.line, line.symbol) for line in outside.lines] == [(1, None)]
+
+
+async def test_a_missing_symbol_map_stops_a_search_that_found_something(tmp_path: Path) -> None:
+    """Sprawdza, czy na paczce bez mapy symboli szukanie, które coś znalazło, kończy się
+    wyjątkiem `CodePackageConfigError`, który nie jest odmianą `ToolCallError`, a szukanie bez
+    trafień oddaje pusty wynik jak zwykle.
+
+    Wyłapuje brak mapy przykryty wynikiem bez nazw funkcji: wyglądałby jak linie leżące poza
+    funkcjami, a paczki zbudowanej przed wprowadzeniem mapy nikt by nie przebudował."""
+    tool = _tool(tmp_path)
+    (tmp_path / "paczka" / SYMBOLS_NAME).unlink()
+
+    nothing = await tool.find(FindCodeTextQuery(exact="takiego tekstu nie ma"))
+
+    with pytest.raises(CodePackageConfigError) as caught:
+        await tool.find(FindCodeTextQuery(exact="Brak sekwencji numeracji"))
+
+    assert nothing.lines == []
     assert not isinstance(caught.value, ToolCallError)

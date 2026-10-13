@@ -11,8 +11,9 @@ to, co model przeczytał. Kod aplikacji idzie inaczej: model przechodzi przez wi
 plików, niż potrzebuje do odpowiedzi, więc źródłem jest dopiero fragment, który wskazał jako
 przyczynę osobnym narzędziem (`quote_code`). Dlatego szukanie w kodzie (`find_code_text`) może
 pokazać treść trafionej linii, a odczyt pliku (`read_code_file`) jest narzędziem pomocniczym,
-jak spis katalogu (`list_code_files`) i opis projektu (`describe_code`): źródła nie tworzy żadne
-z nich. Wynik każdego narzędzia trafia do modelu jako JSON (`result_as_json()`).
+jak odczyt symbolu (`read_code_symbol`), spis katalogu (`list_code_files`) i opis projektu
+(`describe_code`): źródła nie tworzy żadne z nich. Wynik każdego narzędzia trafia do modelu jako
+JSON (`result_as_json()`).
 
 Do czego:
 Dwa rodzaje narzędzi, rozdzielone kontraktem (patrz `base.py`):
@@ -59,13 +60,15 @@ narzędzie i co ono oddaje. Po co wyniki w danej funkcji, mówi prompt grafu.
 | `find_code_text`      | pomocnicze    | fraza, słowa, ścieżka | linie kodu z treścią             |
 | `list_code_files`     | pomocnicze    | katalog, głębokość    | spis katalogów i plików          |
 | `read_code_file`      | pomocnicze    | ścieżka, zakres linii | linie pliku z numerami           |
+| `read_code_symbol`    | pomocnicze    | nazwa, ścieżka        | linie funkcji albo kandydaci     |
 | `quote_code`          | źródło wiedzy | ścieżka, linie, rola  | potwierdzenie; cytuje przyczynę  |
 
 Każde ma narzędzie właściwe i atrapę. Wyszukiwanie po znaczeniu i karty stoją na Qdrancie,
 pozostałe narzędzia zgłoszeń i dokumentacji na Postgresie, a narzędzia kodu na paczce kodu na
 dysku: `find_code_text` szuka w niej programem ripgrep (`engine_process/`), `list_code_files`,
-`read_code_file` i `quote_code` czytają jej katalogi i pliki wprost, a `describe_code` oddaje
-opis projektu, który stoi w paczce obok kodu. Tabela zgłoszeń
+`read_code_file` i `quote_code` czytają jej katalogi i pliki wprost, `read_code_symbol` bierze
+granice funkcji z mapy symboli paczki, a `describe_code` oddaje opis projektu, który stoi
+w paczce obok kodu. Tabela zgłoszeń
 w Postgresie dostanie prawdziwe wątki po anonimizacji (p. 19) i masowym imporcie (p. 31), więc
 `find_tickets_text` i `read_tickets_thread` są sprawdzone na zmyślonych.
 Narzędzia dokumentacji są opcjonalne: bez dokumentacji nie trafiają do rejestru.

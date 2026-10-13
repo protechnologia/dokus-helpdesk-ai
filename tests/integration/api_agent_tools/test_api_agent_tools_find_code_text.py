@@ -37,10 +37,16 @@ from app.agent_tools.base import is_error_json
 from app.agent_tools.code.find_code_text import MAX_LINES_PER_SEARCH, FindCodeTextTool
 from app.config import Settings
 from app.engine_process.ripgrep import RipgrepClient
-from tests.helpers_code_package import line_of, synthetic_code_cases, synthetic_code_package
+from tests.helpers_code_package import (
+    line_of,
+    synthetic_code_cases,
+    synthetic_code_package,
+    synthetic_code_symbols,
+)
 
 CASES      = synthetic_code_cases("find_code_text")
 FOUND      = [case for case in CASES if isinstance(case.get("expected"), list)]
+NAMED      = [case for case in FOUND if any("symbol" in place for place in case["expected"])]
 LABELLED   = [case for case in FOUND if any("matched_by" in place for place in case["expected"])]
 OVER_LIMIT = [case for case in CASES if "expected_total" in case]
 REFUSED    = [case for case in CASES if isinstance(case.get("expected"), dict)]
@@ -69,6 +75,7 @@ async def _call(
     tool = FindCodeTextTool(
         package = synthetic_code_package(),
         ripgrep = RipgrepClient(timeout=SETTINGS.code_search_timeout_seconds),
+        symbols = synthetic_code_symbols(),
     )
     node  = RunToolsNode([tool], LIMITS)
     state = suggest_solution.example_state().model_copy(
@@ -107,7 +114,7 @@ def test_the_set_has_cases_of_every_kind() -> None:
 
     Wyłapuje zestaw po zmianie kształtu, w którym jedna z grup jest pusta: testy niżej nie
     uruchomiłyby się wtedy dla żadnego przypadku i wyglądały na zielone."""
-    assert FOUND and LABELLED and OVER_LIMIT and REFUSED
+    assert FOUND and NAMED and LABELLED and OVER_LIMIT and REFUSED
 
 
 @pytest.mark.parametrize("case", FOUND, ids=lambda case: case["id"])
@@ -133,6 +140,49 @@ async def test_a_search_finds_exactly_the_lines_of_the_set(case: dict[str, Any])
 
     for place, fragment in expected.items():
         assert fragment.strip() in found[place]
+
+
+@pytest.mark.parametrize("case", NAMED, ids=lambda case: case["id"])
+async def test_a_found_line_names_the_function_it_lies_in(case: dict[str, Any]) -> None:
+    """Sprawdza, czy trafienia, przy których zestaw podaje funkcję, niosą w polu `symbol` właśnie
+    jej nazwę, a trafienie w funkcji bez nazwy, podanej jako argument, nie niesie żadnej.
+
+    Wyłapuje nazwę klasy zamiast metody, nazwę sąsiedniej funkcji albo nazwę nadaną linii, która
+    leży poza definicjami: model prosiłby `read_code_symbol` o nie tę funkcję, w której stoi
+    komunikat."""
+    package  = synthetic_code_package()
+    expected = {
+        (place["path"], line_of(package, place["path"], place["fragment"])): place["symbol"]
+        for place in case["expected"]
+        if "symbol" in place
+    }
+
+    result = await _result(case["query"])
+    found  = {(line["path"], line["line"]): line["symbol"] for line in result["lines"]}
+
+    assert {place: found[place] for place in expected} == expected
+
+
+async def test_every_name_of_a_found_line_is_a_definition_around_that_line() -> None:
+    """Sprawdza na szukaniu, które trafia w wiele plików: każda nazwa funkcji przy znalezionej
+    linii jest w mapie symboli definicją tego pliku, która tę linię obejmuje.
+
+    Wyłapuje nazwę wziętą z innego pliku albo z definicji, która linii nie obejmuje: test
+    porównuje wynik z mapą symboli paczki, a nie z listą spisaną w zestawie."""
+    symbol_map = synthetic_code_symbols().read()
+    result     = await _result({"exact": "function"})
+    named      = [line for line in result["lines"] if line["symbol"]]
+
+    assert named
+
+    for line in named:
+        around = [
+            symbol.name
+            for symbol in symbol_map.files[line["path"]]
+            if symbol.from_line <= line["line"] <= symbol.to_line
+        ]
+
+        assert line["symbol"] in around
 
 
 @pytest.mark.parametrize("case", LABELLED, ids=lambda case: case["id"])

@@ -28,6 +28,7 @@ from app.agent_tools.code.find_code_text.fake import FakeFindCodeTextTool
 from app.agent_tools.code.list_code_files.fake import FakeListCodeFilesTool
 from app.agent_tools.code.quote_code.fake import FakeQuoteCodeTool
 from app.agent_tools.code.read_code_file.fake import FakeReadCodeFileTool
+from app.agent_tools.code.read_code_symbol.fake import FakeReadCodeSymbolTool
 from app.agent_tools.docs.find_docs_text.fake import FakeFindDocsTextTool
 from app.agent_tools.docs.find_docs_vector.fake import FakeFindDocsVectorTool
 from app.agent_tools.docs.list_docs.fake import FakeListDocsTool
@@ -75,6 +76,7 @@ def fake_agent_tools() -> list[AgentTool]:
         FakeFindCodeTextTool(),
         FakeListCodeFilesTool(),
         FakeReadCodeFileTool(),
+        FakeReadCodeSymbolTool(),
         FakeQuoteCodeTool(),
     ]
 
@@ -86,8 +88,8 @@ def fake_agent_tools_without_material() -> list[AgentTool]:
     Description:
     Atrapy wszystkich narzędzi agenta, w których nic nie ma do znalezienia: wyszukiwania zgłoszeń
     i dokumentacji oddają puste listy, spis dokumentacji jest pusty, opis projektu nie wymienia
-    żadnego katalogu, szukanie w kodzie nic nie znajduje, a spis katalogu, odczyt i cytowanie
-    kodu nie znają żadnego pliku. Odczyty zgłoszeń
+    żadnego katalogu, szukanie w kodzie nic nie znajduje, a spis katalogu, odczyt pliku, odczyt
+    symbolu i cytowanie kodu nie znają żadnego pliku. Odczyty zgłoszeń
     i dokumentacji zostają takie same, ale model nie ma skąd wziąć identyfikatora, więc sprawa
     kończy się bez źródeł. Kolejność jak w `fake_agent_tools()`.
 
@@ -115,6 +117,7 @@ def fake_agent_tools_without_material() -> list[AgentTool]:
         FakeFindCodeTextTool(lines=[]),
         FakeListCodeFilesTool(files=[]),
         FakeReadCodeFileTool(files={}),
+        FakeReadCodeSymbolTool(files={}),
         FakeQuoteCodeTool(files={}),
     ]
 
@@ -126,7 +129,8 @@ def fake_agent_tools_with_code_only() -> list[AgentTool]:
     Description:
     Atrapy wszystkich narzędzi agenta, w których materiał jest tylko w kodzie aplikacji:
     wyszukiwania zgłoszeń i dokumentacji oddają puste listy, a opis projektu, szukanie
-    w kodzie, spis katalogu, odczyt pliku i cytowanie stoją na wbudowanych zmyślonych plikach.
+    w kodzie, spis katalogu, odczyt pliku, odczyt symbolu i cytowanie stoją na wbudowanych
+    zmyślonych plikach.
     Do sprawy, w której zgłoszenie niesie komunikat, a nie tłumaczy go żadne zgłoszenie ani
     instrukcja. Kolejność jak w `fake_agent_tools()`.
 
@@ -136,7 +140,7 @@ def fake_agent_tools_with_code_only() -> list[AgentTool]:
     Example result:
         [FakeFindTicketsVectorTool(tickets=[]), …, FakeDescribeCodeTool(),
          FakeFindCodeTextTool(), FakeListCodeFilesTool(), FakeReadCodeFileTool(),
-         FakeQuoteCodeTool()]
+         FakeReadCodeSymbolTool(), FakeQuoteCodeTool()]
     """
     tools: list[AgentTool] = [
         FakeFindTicketsVectorTool(tickets=[]),
@@ -151,6 +155,7 @@ def fake_agent_tools_with_code_only() -> list[AgentTool]:
         FakeFindCodeTextTool(),
         FakeListCodeFilesTool(),
         FakeReadCodeFileTool(),
+        FakeReadCodeSymbolTool(),
         FakeQuoteCodeTool(),
     ]
 

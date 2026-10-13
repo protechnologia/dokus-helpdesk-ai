@@ -71,7 +71,9 @@ z logu albo kod błędu, szukasz właśnie jego. Gdy ich nie niesie, zacznij od 
 (`describe_code`): mówi, w którym katalogu leży kod danej części aplikacji. Ten katalog obejrzyj
 narzędziem `list_code_files` i w nim szukaj nazw, które zgłaszający widzi na ekranie: przycisku,
 statusu, pola, kolumny, pozycji menu. Znaleziona linia mówi, gdzie ten tekst stoi, a nie kiedy
-aplikacja tak się zachowuje, więc przeczytaj jej otoczenie narzędziem `read_code_file`. Fragment,
+aplikacja tak się zachowuje, więc przeczytaj jej otoczenie narzędziem `read_code_file`. Gdy
+znasz nazwę funkcji — z pola `symbol` przy znalezionej linii albo z wywołania w przeczytanym
+kodzie — możesz przeczytać ją w całości narzędziem `read_code_symbol`. Fragment,
 który pokazuje warunek opisanego zachowania, zacytuj narzędziem `quote_code` w roli `cause`,
 a miejsce sprawdzone i odrzucone w roli `excluded`. Gdy przeczytany kod takiego warunku nie
 pokazuje, nie cytuj niczego jako `cause`. Gdy szukanie daje za dużo trafień albo chcesz zobaczyć,

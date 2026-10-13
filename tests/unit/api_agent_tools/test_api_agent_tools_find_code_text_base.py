@@ -1,7 +1,61 @@
-from app.agent_tools.code.find_code_text import MAX_TEXT_CHARS, shorten_line
+import pytest
+
+from app.agent_tools.code.find_code_text import MAX_TEXT_CHARS, shorten_line, symbol_name_at
 from app.agent_tools.code.find_code_text.base import CUT_MARK
+from app.core_model.code.code_symbol import CodeSymbol
+from app.core_model.code.code_symbol_map import CodeSymbolMap
 
 # Treść linii kodu w wyniku `find_code_text`: bez wcięcia i najwyżej `MAX_TEXT_CHARS` znaków.
+# Obok treści stoi nazwa funkcji, w której linia leży, brana z mapy symboli.
+
+GENERATOR  = "src/lib/Numeracja/Generator.php"
+SYMBOL_MAP = CodeSymbolMap(
+    built_on      = "2026-10-13",
+    syntax_errors = [],
+    files         = {
+        GENERATOR: [
+            CodeSymbol(name="Generator", scope=None, kind="class", from_line=3, to_line=20),
+            CodeSymbol(name="nastepny", scope="Generator", kind="method", from_line=5, to_line=9),
+            CodeSymbol(name="formatuj", scope="Generator", kind="method", from_line=11, to_line=19),
+        ],
+    },
+)
+
+
+@pytest.mark.parametrize(
+    ("line", "name"),
+    [
+        (1,  None),
+        (3,  "Generator"),
+        (4,  "Generator"),
+        (5,  "nastepny"),
+        (9,  "nastepny"),
+        (10, "Generator"),
+        (11, "formatuj"),
+        (19, "formatuj"),
+        (20, "Generator"),
+        (21, None),
+    ],
+)
+def test_a_line_is_named_after_the_innermost_definition_around_it(
+    line: int,
+    name: str | None,
+) -> None:
+    """Sprawdza, w której definicji leży linia pliku: w metodzie od jej pierwszej do ostatniej
+    linii włącznie, w klasie między metodami, a poza klasą w żadnej.
+
+    Wyłapuje nazwę klasy zamiast metody albo granicę przesuniętą o linię: model prosiłby
+    narzędzie `read_code_symbol` o całą klasę albo o sąsiednią metodę zamiast o tę, w której
+    stoi znaleziony tekst."""
+    assert symbol_name_at(SYMBOL_MAP, GENERATOR, line) == name
+
+
+def test_a_file_the_map_does_not_know_has_no_names() -> None:
+    """Sprawdza, czy linia pliku, którego nie ma w mapie symboli, nie dostaje nazwy.
+
+    Wyłapuje błąd zamiast braku nazwy: szablony, pliki YAML i pliki odrzucone przez parser są
+    w paczce, ale nie w mapie, a szukanie ma w nich działać jak dotąd."""
+    assert symbol_name_at(SYMBOL_MAP, "src/config/routing.yml", 5) is None
 
 
 def test_the_indentation_is_dropped() -> None:
