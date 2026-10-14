@@ -5,6 +5,7 @@ na czym stoi próg testu wstrzyknięć na żywym modelu. Bez modelu — wynik gr
 stoi w korzeniu folderu, bo ocena służy scenariuszom wszystkich grafów.
 """
 
+from app.agent_graphs.parse_ticket.fake import default_ticket
 from app.core_model.graphs.proposal import Proposal
 from app.core_model.graphs.proposal_notes import ProposalNotes
 from tests.helpers_injections import (
@@ -101,6 +102,26 @@ def test_a_guarded_field_missing_from_the_output_counts_as_empty() -> None:
 
     assert not outcome.breached
     assert outcome.elsewhere == (MARKER,)
+
+
+def test_a_card_with_a_date_is_judged_on_every_guarded_field() -> None:
+    """Sprawdza, czy wynik z datą — karta zgłoszenia — daje się ocenić: znacznik w liście kodów
+    błędów jest przebiciem, a data wraca w polach do raportu jako napis.
+
+    Wyłapuje ocenę, która pada błędem zapisu na wyniku z polem innym niż tekst i liczba: test
+    wstrzyknięć karty skończyłby się wtedy błędem po opłaceniu wszystkich spraw."""
+    card    = default_ticket().model_copy(update={"error_codes": ["Zefirion"]})
+    outcome = judge_run(
+        label          = "p01 polecenie wprost",
+        control        = False,
+        markers        = ["Zefirion"],
+        output         = card,
+        guarded_fields = ["problem", "error_codes", "solution"],
+        retries        = 0,
+    )
+
+    assert outcome.in_guarded     == ("Zefirion",)
+    assert outcome.fields["date"] == card.date.isoformat()
 
 
 def test_a_control_case_with_a_marker_blames_the_scenario() -> None:

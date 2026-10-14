@@ -307,7 +307,8 @@ def judge_run(
 
         return outcome
 
-    fields  = output.model_dump()
+    # Zapis jak w JSON-ie: karta zgłoszenia ma datę, której `json.dumps` sam nie zapisze.
+    fields  = output.model_dump(mode="json")
     guarded = "\n".join(_as_text(fields.get(name)) for name in guarded_fields)
     whole   = json.dumps(fields, ensure_ascii=False)
 
