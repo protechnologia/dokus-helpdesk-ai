@@ -8,7 +8,8 @@
       "rules_version: wersja zestawu domyślnego reguł bramki (api/app/core_text/dict_rules_<graf>.json), pod którą napisano sprawy. Test bierze reguły z tego zestawu, tak jak trasa, i odmawia przy innej wersji: po zmianie reguł sprawy trzeba przejrzeć.",
       "cases: rule to numer reguły w zestawie, od 1. kind: breaks — wejście łamie tę regułę i tylko ją (werdykt block); correct — bliźniak łamiącego, różny tylko fragmentem, który łamał (pass); trap — wejście poprawne, które wygląda na łamiące, bo niesie słowo albo zwrot kojarzony z regułą (pass). Każda reguła ma wszystkie trzy rodzaje.",
       "Zły werdykt na correct albo trap to fałszywy alarm, na breaks przepuszczenie; liczą się osobno, bo fałszywy alarm uczy wdrożeniowców klikać furtkę odruchowo. Odpowiedź, której węzeł respond nie przyjął, liczy się osobno: helpdesk dostaje wtedy 503 i decyduje sam.",
-      "W gate_reply wejściem jest wiadomość do klienta. Każda, poza łamiącą regułę o formie zwrotu, zwraca się do klienta formą „Państwo”, i każda kończy się podpisem zespołu: łamiąca ma łamać jedną regułę."
+      "W gate_reply wejściem jest wiadomość do klienta. Każda, poza łamiącą regułę o formie zwrotu, zwraca się do klienta formą „Państwo”, i każda kończy się podpisem zespołu: łamiąca ma łamać jedną regułę.",
+      "W gate_close wejściem jest zgłoszenie z wątkiem w kształcie RawTicket.as_thread(), zamykane komentarzem typu rozwiazanie. Pułapka stawia problem albo to, co zrobiono, w wątku, a nie tam, gdzie się tego szuka: opis jest ogólnikowy, a problem podaje klient w odpowiedzi na pytanie konsultanta, albo komentarz zamykający to formułka, a krok, który rozwiązał sprawę, opisał klient."
     ]
   },
   "gate_reply": {
@@ -67,6 +68,47 @@
         "rule": 3,
         "kind": "trap",
         "input": "Dzień dobry,\n\npo kliknięciu przycisku „Podpisz” pojawi się okno z poleceniem „Wybierz certyfikat i kliknij Dalej”. Prosimy Państwa o wybranie w nim certyfikatu kwalifikowanego, a nie certyfikatu służącego do logowania.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      }
+    ]
+  },
+  "gate_close": {
+    "rules_version": 1,
+    "cases": [
+      {
+        "id": "z01",
+        "rule": 1,
+        "kind": "breaks",
+        "input": "ZGŁOSZENIE 90401 z 2026-10-06\nTemat: Pilne\n\nOPIS ZGŁASZAJĄCEGO:\nNie działa. Proszę o pilny kontakt.\n\nKOMENTARZ 1 — konsultant, 2026-10-06 10:10:00 (typ: rozwiazanie):\nZaktualizowaliśmy komponent serwera do wersji 4.12 i zrestartowaliśmy usługi aplikacji. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z02",
+        "rule": 1,
+        "kind": "correct",
+        "input": "ZGŁOSZENIE 90402 z 2026-10-06\nTemat: Pilne\n\nOPIS ZGŁASZAJĄCEGO:\nOd rana nie przychodzą przesyłki z e-Doręczeń: skrzynka odbiorcza jest pusta, choć nadawcy potwierdzają wysyłkę. Proszę o pilny kontakt.\n\nKOMENTARZ 1 — konsultant, 2026-10-06 10:10:00 (typ: rozwiazanie):\nZaktualizowaliśmy komponent serwera do wersji 4.12 i zrestartowaliśmy usługi aplikacji. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z03",
+        "rule": 1,
+        "kind": "trap",
+        "input": "ZGŁOSZENIE 90403 z 2026-10-06\nTemat: Pilne\n\nOPIS ZGŁASZAJĄCEGO:\nNie działa. Proszę o pilny kontakt.\n\nKOMENTARZ 1 — konsultant, 2026-10-06 09:20:00 (typ: zwyczajny):\nCo dokładnie nie działa i od kiedy?\n\nKOMENTARZ 2 — klient, 2026-10-06 09:35:00 (typ: zwyczajny):\nOd rana nie przychodzą przesyłki z e-Doręczeń: skrzynka odbiorcza jest pusta, choć nadawcy potwierdzają wysyłkę.\n\nKOMENTARZ 3 — konsultant, 2026-10-06 10:10:00 (typ: rozwiazanie):\nZaktualizowaliśmy komponent serwera do wersji 4.12 i zrestartowaliśmy usługi aplikacji. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z04",
+        "rule": 2,
+        "kind": "breaks",
+        "input": "ZGŁOSZENIE 90404 z 2026-10-07\nTemat: Brak przycisku „Wyślij do ePUAP”\n\nOPIS ZGŁASZAJĄCEGO:\nPo aktualizacji z 1 października w karcie pisma wychodzącego nie ma przycisku „Wyślij do ePUAP”. Pozostałe przyciski są widoczne.\n\nKOMENTARZ 1 — konsultant, 2026-10-07 13:15:00 (typ: rozwiazanie):\nJuż powinno działać. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z05",
+        "rule": 2,
+        "kind": "correct",
+        "input": "ZGŁOSZENIE 90405 z 2026-10-07\nTemat: Brak przycisku „Wyślij do ePUAP”\n\nOPIS ZGŁASZAJĄCEGO:\nPo aktualizacji z 1 października w karcie pisma wychodzącego nie ma przycisku „Wyślij do ePUAP”. Pozostałe przyciski są widoczne.\n\nKOMENTARZ 1 — konsultant, 2026-10-07 13:15:00 (typ: rozwiazanie):\nPo aktualizacji przycisk wymaga nowego uprawnienia „Wysyłka do ePUAP”. Nadaliśmy je roli Kancelaria w menu Administracja → Role i po ponownym zalogowaniu przycisk jest widoczny. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z06",
+        "rule": 2,
+        "kind": "trap",
+        "input": "ZGŁOSZENIE 90406 z 2026-10-07\nTemat: Brak przycisku „Wyślij do ePUAP”\n\nOPIS ZGŁASZAJĄCEGO:\nPo aktualizacji z 1 października w karcie pisma wychodzącego nie ma przycisku „Wyślij do ePUAP”. Pozostałe przyciski są widoczne.\n\nKOMENTARZ 1 — konsultant, 2026-10-07 11:40:00 (typ: zwyczajny):\nCzy przycisk pojawia się po wyczyszczeniu pamięci podręcznej przeglądarki skrótem CTRL+F5?\n\nKOMENTARZ 2 — klient, 2026-10-07 12:55:00 (typ: zwyczajny):\nTak, po wyczyszczeniu pamięci podręcznej skrótem CTRL+F5 przycisk wrócił na wszystkich stanowiskach.\n\nKOMENTARZ 3 — konsultant, 2026-10-07 13:15:00 (typ: rozwiazanie):\nDziękujemy za informację. Zamykam zgłoszenie."
       }
     ]
   }

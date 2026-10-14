@@ -18,6 +18,7 @@ Pomiary:
 | bramka       | fałszywe alarmy | przepuszczenia | pomiar                                         |
 |--------------|-----------------|----------------|------------------------------------------------|
 | `gate_reply` | 0 z 6           | 0 z 3          | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach |
+| `gate_close` | 0 z 4           | 0 z 2          | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach |
 
 Pierwszy pomiar `gate_reply` dał w obu przebiegach fałszywy alarm na pułapce g06: bramka uznała
 cytat komunikatu z ekranu („Ups! Coś poszło nie tak.”) za potoczne słownictwo wiadomości. Po
@@ -36,7 +37,7 @@ O czym pamiętać przy zmianach:
   w raporcie, który pytest wypisuje po przebiegu; czyta się je przy pierwszym pomiarze i przy
   każdej zmianie wyniku.
 - KOSZTUJE: sprawa to jedna tura modelu. `gate_reply` ma dziewięć spraw: na `gpt-6.1-sol`
-  0,02 USD i kilka sekund.
+  0,02 USD i kilka sekund; `gate_close` sześć: 0,01 USD.
 """
 
 import asyncio

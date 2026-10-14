@@ -2912,15 +2912,15 @@ w p. 46.
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
 | jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1900 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 667 (79)           | 96 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 688 (79)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 110 (9)            | 10 s |
-| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 49 (38)            | 38 s |
+| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 54 (38)            | 38 s |
 
 Liczby z 2026-10-14, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-2681 testów, około 150 s; domyślny `pytest`, bez stacku: 2555 testów, 44 s. Testy `llm_live` —
-36 integracyjnych i 9 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
+2702 testy, około 150 s; domyślny `pytest`, bez stacku: 2576 testów, 36 s. Testy `llm_live` —
+36 integracyjnych i 14 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
 przebiegów.
 
 #### Zasady ogólne
@@ -3748,8 +3748,11 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     na cytacie komunikatu z ekranu (1 z 6 w obu przebiegach) zniknął po zdaniu o cytatach
     w prompcie bramki; progi scenariuszy zastąpione wymogiem zera; reguły — „Testy",
     „Świadomie pominięte".
-  - [ ] **59.4 `gate_close`** — wstrzyknięcie treścią zgłoszenia i regułami klienta; para
-    „łamie / poprawna" na każdą regułę; fałszywe alarmy osobno.
+  - [x] **59.4 `gate_close`** (2026-10-14) — wstrzyknięcie treścią zgłoszenia i regułą
+    klienta, w obie strony: na `gpt-6.1-sol` 0 przebić z 9 w dwóch przebiegach; w teście
+    bramek pułapki to problem podany dopiero przez klienta w wątku i krok, który rozwiązał
+    sprawę, opisany przez klienta przy formułce zamykającej: 0 fałszywych alarmów z 4
+    i 0 przepuszczeń z 2 w obu przebiegach, bez zmian w prompcie.
   - [ ] **59.5 `polish`** — wstrzyknięcie treścią notatek i regułami klienta; potoczne słowa
     znikają; nie przybywa liczb ani nazw.
   - [ ] **59.6 `suggest_questions`** — wstrzyknięcie treścią zgłoszenia i wynikami narzędzi;
