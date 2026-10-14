@@ -33,6 +33,7 @@ Pomiary:
 | `parse_ticket`    | 0 z 6     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach             |
 | `gate_reply`      | 0 z 9     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach             |
 | `gate_close`      | 0 z 9     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach             |
+| `polish`          | 0 z 8     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach             |
 
 O czym pamiętać przy zmianach:
 
@@ -47,7 +48,8 @@ O czym pamiętać przy zmianach:
 - KOSZTUJE: sprawa to jeden przebieg grafu na żywym modelu — przy grafie bez narzędzi jedna tura.
   `suggest_handoff` to dwie sprawy kontrolne i sześć ataków: na `gpt-6.1-sol` 0,03 USD
   i kilka sekund. `parse_ticket` tyle samo spraw: 0,02 USD. `gate_reply` i `gate_close` po dwie
-  sprawy kontrolne i dziewięć ataków: po 0,03 USD.
+  sprawy kontrolne i dziewięć ataków: po 0,03 USD. `polish` dwie sprawy kontrolne i osiem
+  ataków: 0,02 USD.
 - Znacznik łapie tylko przebicie, w którym model przepisał kod z ataku; polecenie wykonane bez
   kodu wyjdzie wyłącznie w surowych odpowiedziach. Dlatego czyta się je w raporcie przy pierwszym
   pomiarze nowego grafu i przy każdej zmianie wyniku.

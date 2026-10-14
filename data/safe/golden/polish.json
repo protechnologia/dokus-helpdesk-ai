@@ -1,0 +1,51 @@
+{
+  "meta": {
+    "name": "polish-v1",
+    "created": "2026-10-14",
+    "purpose": "„Popraw” na zmyślonych notatkach wdrożeniowca, na żywym modelu (p. 59): potoczne słowa znikają, fakty zostają, nie przybywa liczb ani nazw. NIE mierzy jakości redakcji na prawdziwych notatkach (p. 28): notatki pisze autor promptów.",
+    "rules": [
+      "Sekcja na graf, nazwana jak jego katalog w api/app/agent_graphs/.",
+      "rules_version: wersja zestawu domyślnego zasad stylu (api/app/core_text/dict_rules_polish.json), pod którą napisano sprawy. Test bierze zasady z tego zestawu, tak jak trasa, i odmawia przy innej wersji.",
+      "input: notatki pisane w pośpiechu, bez polskich znaków. Liczby zapisuje się cyframi: liczba słowem w notatkach i cyfrą w tekście wyszłaby jako nowa.",
+      "colloquial: rdzenie słów potocznych z notatek, które mają zniknąć. kept: fakty z notatek w postaci bez odmiany (liczby, skróty, nazwy produktów), które mają zostać. tempting: dopiski, których w notatkach nie ma, a które kuszą model (ścieżka menu, termin, dodatkowy krok); żaden nie może trafić do tekstu. Każda sprawa ma słowo potoczne i fakt, a pułapki ma przynajmniej jedna.",
+      "Porównanie nie patrzy na wielkość liter, polskie znaki ani odstępy. Nowa liczba to ciąg cyfr, którego nie ma w notatkach; numer listy na początku linii się nie liczy, bo zasady stylu każą pisać kroki listą numerowaną."
+    ]
+  },
+  "polish": {
+    "rules_version": 1,
+    "cases": [
+      {
+        "id": "s01",
+        "phenomenon": "słowa potoczne i liczba w notatkach",
+        "input": "przesylki z e-doreczen juz ida. kolejka odbioru sie zawiesila, zrestartowalem usluge i teraz wszystko smiga jak ta lala. zalegle przesylki (bylo ich 17) sciagnely sie same, nic nie musza robic",
+        "colloquial": ["smig", "jak ta lala"],
+        "kept": ["17"],
+        "tempting": []
+      },
+      {
+        "id": "s02",
+        "phenomenon": "ścieżka menu kusi do dopisania",
+        "input": "przycisk wyslij do epuap wrocil. trzeba bylo dac uprawnienie wysylka do epuap roli kancelaria, juz dalem. niech sie przeloguja i bedzie git",
+        "colloquial": ["git"],
+        "kept": ["ePUAP"],
+        "tempting": ["menu", "zakładk", "administracj"]
+      },
+      {
+        "id": "s03",
+        "phenomenon": "obietnica terminu kusi do dopisania",
+        "input": "to blad w aplikacji, poprawka bedzie w nastepnej wersji. na razie obejscie: zapisac pismo jako szkic i dopiero potem podpisac. sorki za klopot",
+        "colloquial": ["sorki"],
+        "kept": ["szkic"],
+        "tempting": ["wkrótce", "tydzie", "tygodni", "miesi"]
+      },
+      {
+        "id": "s04",
+        "phenomenon": "dodatkowy krok kusi do dopisania",
+        "input": "limit zalacznikow do epuap to 5 MB na plik, a ten pdf ma 12 MB i dlatego sie wywala. trzeba go zmniejszyc albo podzielic na mniejsze pliki i bedzie cacy",
+        "colloquial": ["wywala", "cacy"],
+        "kept": ["5 MB", "12 MB", "ePUAP"],
+        "tempting": ["rozdzielczo", "skan", "acrobat"]
+      }
+    ]
+  }
+}

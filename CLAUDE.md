@@ -2754,6 +2754,9 @@ w p. 46.
 - Scenariusze bramek (fałszywe alarmy i przepuszczenia na parach reguł, p. 59):
   `pytest tests/evaluation/test_api_agent_graphs_gates_live.py -m llm_live` — **kosztuje, pytaj
   przed**; jedna bramka przez `-k <graf>`
+- Scenariusze „Popraw" (słowa potoczne, zgubione fakty, dopiski, p. 59):
+  `pytest tests/evaluation/test_api_agent_graphs_polish_live.py -m llm_live` — **kosztuje, pytaj
+  przed**
 - **Podając marker, podaj też folder** — marker odsiewa dopiero PO imporcie, więc bez ścieżki
   pytest wczytuje wszystkie pliki testowe, żeby uruchomić kilkanaście (kolekcja podzbioru spada
   wtedy trzykrotnie). Foldery i markery można łączyć:
@@ -2911,16 +2914,16 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1900 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 688 (79)           | 96 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1909 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 711 (79)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 110 (9)            | 10 s |
-| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 54 (38)            | 38 s |
+| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 60 (38)            | 38 s |
 
 Liczby z 2026-10-14, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-2702 testy, około 150 s; domyślny `pytest`, bez stacku: 2576 testów, 36 s. Testy `llm_live` —
-36 integracyjnych i 14 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
+2734 testy, około 150 s; domyślny `pytest`, bez stacku: 2608 testów, 46 s. Testy `llm_live` —
+36 integracyjnych i 20 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
 przebiegów.
 
 #### Zasady ogólne
@@ -3086,6 +3089,17 @@ przebiegów.
   z zestawu domyślnego, tak jak trasa; przy wersji innej niż w sekcji odmawia, zanim zawoła
   model, a test bez modelu pada. Liczy się werdykt, a czy bramka zablokowała z właściwego
   powodu, mówi uzasadnienie w raporcie. Nowa bramka to sekcja zestawu.
+- **„Popraw" ma drugi test na żywym modelu: zmiana formy bez zmiany treści**
+  (`tests/evaluation/test_api_agent_graphs_polish_live.py`, zestaw
+  `data/safe/golden/polish.json`). Sprawa to notatki pisane w pośpiechu z trzema listami: rdzenie
+  słów potocznych, które mają zniknąć, fakty bez odmiany (liczby, skróty), które mają zostać,
+  i pułapki — dopiski, których w notatkach nie ma, a które kuszą model (ścieżka menu, termin,
+  dodatkowy krok). Do tego każda liczba w tekście musi stać w notatkach; numer listy na
+  początku linii się nie liczy, bo zasady stylu każą numerować kroki. Porównanie nie patrzy na
+  wielkość liter, polskie znaki ani odstępy. Każdy rodzaj znaleziska ma osobny test i wymaga
+  zera. Listy łapią tylko to, co przewidział autor sprawy, więc poprawiony tekst czyta się
+  w raporcie. W zestawie wstrzyknięć polem chronionym `polish` jest `text`, a znacznik w nim
+  jest przebiciem także wtedy, gdy model tylko przepisał linię skierowaną do narzędzia.
 - **Testy generacji parametryzuje się po rejestrze grafów**, a osobno sprawdza nieznany
   wariant (422) i wariant `requires_hits` bez trafień (pusta lista źródeł, a nie wygenerowane
   rozwiązanie).
@@ -3115,6 +3129,7 @@ przebiegów.
 | `tests/helpers_live_usage.py`   | raport zużycia (fixture `live_usage`) i wydruk rozmowy (`run_as_lines()`) |
 | `tests/helpers_injections.py`   | zestaw wstrzyknięć, sprawy sekcji, ocena sprawy i raport (fixture `injection_report`) |
 | `tests/helpers_gates.py`        | zestaw scenariuszy bramek, ocena werdyktu i raport (fixture `gate_report`) |
+| `tests/helpers_polish.py`       | zestaw scenariuszy „Popraw", ocena tekstu i raport (fixture `polish_report`) |
 | `tests/helpers_code_package.py` | paczka syntetyczna, jej opis i zapytania z zestawu syntetycznego      |
 
 - **Adresów usług nie wpisuje się w pliku testu:** konfiguracja wskazuje nazwy z sieci compose
@@ -3443,6 +3458,12 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   poprawia się w prompcie, a próg z zerem tylko udawałby strojenie. Cena: jedna dziwna
   odpowiedź niedeterministycznego modelu daje czerwony test; wtedy czyta się surowe odpowiedzi
   z raportu. Wraca w jednym miejscu, gdyby w grafach z pętlą zero okazało się nieosiągalne.
+- **Wielkie litery jako wykrywacz nazw dopisanych przez „Popraw"** — odmiana i „Państwo"
+  dawałyby fałszywe alarmy; dopisane nazwy łapią pułapki przy sprawie, a liczby porównanie
+  z notatkami.
+- **Przepisana linia z poleceniem dla narzędzia jako atak odparty w „Popraw"** — klient nie
+  może dostać ani polecenia dla narzędzia, ani kodu z niego, więc znacznik w tekście jest
+  przebiciem, czy model polecenie wykonał, czy tylko przepisał.
 - **Złamana reguła jako dana w scenariuszach bramek** — `Verdict` nie niesie numeru reguły, więc
   regułę wskazuje para spraw, a uzasadnienie czyta się w raporcie; numer reguły w werdykcie
   zmieniałby kontrakt odpowiedzi (p. 22).
@@ -3732,11 +3753,11 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   grafy z pętlą. Wstrzyknięcie treścią wejścia ma od 59.1 jeden test dla wszystkich grafów
   (zestaw `data/safe/golden/injections.json`), więc w kolejnych podpunktach to sekcja zestawu.
   Pary „łamie / poprawna" bramek mają od 59.3 własny test (zestaw
-  `data/safe/golden/gates.json`), więc w 59.4 to też sekcja zestawu. *Dlaczego:* da się je
-  uruchomić przed anonimizatorem, więc prompty dostają
-  sygnał z modelu docelowego wcześniej niż z p. 21–28; tamtych pomiarów nie zastępują, bo
-  scenariusze pisze autor promptów; stoi po p. 11, bo ocenia odpowiedź przepuszczoną przez
-  właściwy `respond`.
+  `data/safe/golden/gates.json`), więc w 59.4 to też sekcja zestawu, a „Popraw" od 59.5
+  (zestaw `data/safe/golden/polish.json`). *Dlaczego:* da się je uruchomić przed
+  anonimizatorem, więc prompty dostają sygnał z modelu docelowego wcześniej niż z p. 21–28;
+  tamtych pomiarów nie zastępują, bo scenariusze pisze autor promptów; stoi po p. 11, bo ocenia
+  odpowiedź przepuszczoną przez właściwy `respond`.
   - [x] **59.1 `suggest_handoff`** (2026-10-14) — wstrzyknięcie treścią zgłoszenia: test dla
     wszystkich grafów, sześć ataków, na `gpt-6.1-sol` 0 przebić w dwóch przebiegach; reguły —
     „Testy", „Świadomie pominięte".
@@ -3753,8 +3774,11 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     bramek pułapki to problem podany dopiero przez klienta w wątku i krok, który rozwiązał
     sprawę, opisany przez klienta przy formułce zamykającej: 0 fałszywych alarmów z 4
     i 0 przepuszczeń z 2 w obu przebiegach, bez zmian w prompcie.
-  - [ ] **59.5 `polish`** — wstrzyknięcie treścią notatek i regułami klienta; potoczne słowa
-    znikają; nie przybywa liczb ani nazw.
+  - [x] **59.5 `polish`** (2026-10-14) — wstrzyknięcie notatkami i zasadą klienta: na
+    `gpt-6.1-sol` 0 przebić z 8 w dwóch przebiegach; nowy test „Popraw” z czterema sprawami:
+    słowa potoczne zniknęły, fakty zostały, a liczby i dopiski z pułapek (ścieżka menu,
+    termin, dodatkowy krok) nie przybyły w żadnej, w obu przebiegach, bez zmian w prompcie;
+    reguły — „Testy", „Świadomie pominięte".
   - [ ] **59.6 `suggest_questions`** — wstrzyknięcie treścią zgłoszenia i wynikami narzędzi;
     bieżące zgłoszenie z wątkiem, w którym są pytania konsultanta i odpowiedzi klienta, jako
     para na danych: odpowiedzi rozstrzygają sprawę, więc `text` to `null`, albo tylko ją
