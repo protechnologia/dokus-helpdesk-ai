@@ -1,7 +1,7 @@
 import asyncio
 import importlib
 import pkgutil
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from types import ModuleType
 from typing import get_args
 
@@ -9,20 +9,17 @@ import pytest
 from pydantic import BaseModel
 
 import app.agent_graphs
-from app.agent_graphs import run_graph, suggest_solution
-from app.agent_graphs.factory import build_real_graph
-from app.agent_tools import AgentTool
-from app.config import LLMSettings, Settings
+from app.agent_graphs import suggest_solution
+from app.config import Settings
 from app.core_model.graphs.proposal import Proposal
 from app.core_model.graphs.proposal_notes import ProposalNotes
-from app.engine_anonymization import FakeAnonymizer
-from app.engine_llm import get_llm_client
 from tests.conftest import live_generation_llm
 from tests.helpers_agent_tools import (
     fake_agent_tools,
     fake_agent_tools_with_code_only,
     fake_agent_tools_without_material,
 )
+from tests.helpers_live_graphs import run_live_graph
 from tests.helpers_live_usage import LiveUsageReport
 
 pytestmark = pytest.mark.llm_live
@@ -101,53 +98,6 @@ def output_type(
     return found[0]
 
 
-async def _run_the_graph(
-    graph:  ModuleType,           # np. <module app.agent_graphs.search>
-    llm:    LLMSettings,          # np. Settings().llm_generation()
-    tools:  Sequence[AgentTool],  # np. fake_agent_tools()
-    ticket: str | None = None,    # np. TICKET_WITH_MESSAGE; None to przykładowe zgłoszenie grafu
-) -> BaseModel:
-    """
-    Description:
-    Składa graf tą samą funkcją, której używa fabryka grafów (`build_real_graph()`) — z limitami
-    wywołań i limitem tur z konfiguracji — i przepuszcza przez niego zgłoszenie na prawdziwym
-    modelu: przykładowe zgłoszenie tego grafu albo podane w `ticket`. To jedyne miejsce w pliku,
-    które woła model.
-
-    Example args:
-        graph=<module app.agent_graphs.search>
-        llm=LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", model="gpt-5.4-mini", …)
-        tools=fake_agent_tools()
-        ticket=None
-
-    Example result:
-        SearchState(sources=[SourceRef(item_id="90001", …), …], iterations=4,
-                    usage=LLMUsage(calls=4, cost_usd=0.021, …), …)
-
-    Raises:
-        LLMError: dostawca odmówił, nie odpowiedział w czasie albo oddał turę nie do użycia;
-            także `RespondError`, gdy model mimo poprawki nie oddał poprawnej odpowiedzi
-    """
-    settings = Settings()
-
-    compiled = build_real_graph(
-        graph          = graph,
-        llm            = get_llm_client(llm),
-        anonymizer     = FakeAnonymizer(),
-        tools          = tools,
-        limits         = settings.tool_call_limits(),
-        max_iterations = settings.agent_max_iterations,
-    )
-
-    state = graph.example_state()
-
-    # --- własne zgłoszenie zamiast przykładowego: reszta stanu zostaje jak w przykładzie ---
-    if ticket is not None:
-        state = state.model_copy(update={"input_text": ticket})
-
-    return await run_graph(compiled, state)
-
-
 @pytest.fixture(scope="module")
 def live_run(
     request:    pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór testów z `-m`
@@ -156,12 +106,13 @@ def live_run(
     """
     Description:
     Oddaje funkcję, która dla grafu zwraca stan końcowy jego sprawy na prawdziwym modelu
-    (`_run_the_graph()`). Sprawa liczy się przy pierwszym teście, który o nią poprosi, i jest
-    zapamiętana na cały plik — razem z błędem, jeśli się nim skończyła, żeby nieudana sprawa nie
-    była opłacana od nowa w każdym teście tego grafu. Konfigurację bierze przez
-    `live_generation_llm()`, które odmawia, gdy testy wybrano bez jawnego `llm_live` albo gdy
-    modelem jest atrapa. Zużycie i przebieg każdej udanej sprawy zgłasza do raportu przebiegu;
-    sprawa zakończona błędem nie oddaje stanu, więc jej zużycia w raporcie nie ma.
+    (`run_live_graph()` z `tests/helpers_live_graphs.py`). Sprawa liczy się przy pierwszym
+    teście, który o nią poprosi, i jest zapamiętana na cały plik — razem z błędem, jeśli się nim
+    skończyła, żeby nieudana sprawa nie była opłacana od nowa w każdym teście tego grafu.
+    Konfigurację bierze przez `live_generation_llm()`, które odmawia, gdy testy wybrano bez
+    jawnego `llm_live` albo gdy modelem jest atrapa. Zużycie i przebieg każdej udanej sprawy
+    zgłasza do raportu przebiegu; sprawa zakończona błędem nie oddaje stanu, więc jej zużycia
+    w raporcie nie ma.
 
     Example args:
         (wstrzykiwane przez pytest)
@@ -180,7 +131,7 @@ def live_run(
         # --- pierwsza prośba o ten graf: jedna sprawa na prawdziwym modelu ---
         if name not in done:
             try:
-                done[name] = asyncio.run(_run_the_graph(graph, llm, fake_agent_tools()))
+                done[name] = asyncio.run(run_live_graph(graph, llm, fake_agent_tools()))
             except Exception as error:  # noqa: BLE001 — zapamiętany i zgłoszony każdemu testowi
                 done[name] = error
             else:
@@ -216,7 +167,7 @@ def solution_without_material(
     """
     llm   = live_generation_llm(request.config)
     tools = fake_agent_tools_without_material()
-    final = asyncio.run(_run_the_graph(suggest_solution, llm, tools))
+    final = asyncio.run(run_live_graph(suggest_solution, llm, tools))
 
     live_usage.record(
         "graf suggest_solution bez materiału", final.usage, final.log, final.messages,
@@ -246,7 +197,7 @@ def solution_with_message_in_code(
     """
     llm   = live_generation_llm(request.config)
     tools = fake_agent_tools_with_code_only()
-    final = asyncio.run(_run_the_graph(suggest_solution, llm, tools, TICKET_WITH_MESSAGE))
+    final = asyncio.run(run_live_graph(suggest_solution, llm, tools, TICKET_WITH_MESSAGE))
 
     live_usage.record(
         "graf suggest_solution: komunikat tylko w kodzie", final.usage, final.log, final.messages,

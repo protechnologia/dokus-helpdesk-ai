@@ -42,7 +42,8 @@ O czym pamiętać przy zmianach:
 - Testy `llm_live` zgłaszają zużycie każdej sprawy przez fixture `live_usage`, a na końcu
   przebiegu pytest wypisuje je z sumą kosztu (`pytest_terminal_summary()`). Sam raport leży
   w `tests/helpers_live_usage.py`; tu zostają fixture i funkcja wypisująca, bo pytest szuka ich
-  tylko w `conftest.py`.
+  tylko w `conftest.py`. Tak samo raport scenariuszy wstrzyknięć: fixture `injection_report`,
+  a klasa w `tests/helpers_injections.py`; po przebiegu stoi przed zużyciem modelu.
 """
 
 import os
@@ -53,6 +54,7 @@ from _pytest.terminal import TerminalReporter  # pytest 8.3 nie wystawia tego ty
 
 from app.config import LLMSettings, Settings
 from app.db_postgres import PostgresClient
+from tests.helpers_injections import InjectionReport
 from tests.helpers_live_usage import LiveUsageReport
 
 EMBEDDER_URL_ENV     = "EMBEDDER_TEST_URL"
@@ -172,33 +174,65 @@ def live_usage(
     return pytestconfig.stash[LIVE_USAGE_KEY]
 
 
-def pytest_terminal_summary(
-    terminalreporter: TerminalReporter,  # wstrzykiwane przez pytest; pisze na ekran
-    config:           pytest.Config,     # wstrzykiwane przez pytest; trzyma raport
-) -> None:
+# Miejsce raportu wstrzyknięć w konfiguracji przebiegu, na tej samej zasadzie co raport zużycia.
+INJECTION_REPORT_KEY = pytest.StashKey[InjectionReport]()
+
+
+@pytest.fixture(scope="session")
+def injection_report(
+    pytestconfig: pytest.Config,  # wstrzykiwane przez pytest; trzyma raport na cały przebieg
+) -> InjectionReport:
     """
     Description:
-    Po przebiegu wypisuje zużycie żywego modelu: sprawy zgłoszone przez testy `llm_live`
-    i sumę kosztu. Pytest woła tę funkcję sam, po nazwie. Gdy żaden test niczego nie zgłosił —
-    czyli w każdym przebiegu bez żywego modelu — nie wypisuje nic.
+    Raport scenariuszy wstrzyknięć, jeden na cały przebieg pytesta. Test wstrzyknięć zgłasza
+    w nim ocenę każdej sprawy, a po przebiegu pytest wypisuje ją razem z polami wyniku.
 
     Example args:
         (wstrzykiwane przez pytest)
 
     Example result:
-        None — na końcu wyjścia pytesta stoi sekcja „zużycie żywego modelu"
+        InjectionReport wspólny dla wszystkich testów przebiegu
     """
-    report = config.stash.get(LIVE_USAGE_KEY, None)
-    lines  = report.lines() if report is not None else []
+    if INJECTION_REPORT_KEY not in pytestconfig.stash:
+        pytestconfig.stash[INJECTION_REPORT_KEY] = InjectionReport()
 
-    # --- przebieg bez żywego modelu ---
-    if not lines:
-        return
+    return pytestconfig.stash[INJECTION_REPORT_KEY]
 
-    terminalreporter.write_sep("=", "zużycie żywego modelu")
 
-    for line in lines:
-        terminalreporter.write_line(line)
+def pytest_terminal_summary(
+    terminalreporter: TerminalReporter,  # wstrzykiwane przez pytest; pisze na ekran
+    config:           pytest.Config,     # wstrzykiwane przez pytest; trzyma raporty
+) -> None:
+    """
+    Description:
+    Po przebiegu wypisuje raporty testów na żywym modelu: najpierw oceny spraw ze scenariuszy
+    wstrzyknięć z polami wyniku, potem zużycie żywego modelu z sumą kosztu. Pytest woła tę
+    funkcję sam, po nazwie. Raport, do którego żaden test niczego nie zgłosił — czyli każdy
+    w przebiegu bez żywego modelu — nie wypisuje nic.
+
+    Example args:
+        (wstrzykiwane przez pytest)
+
+    Example result:
+        None — na końcu wyjścia pytesta stoją sekcje „wstrzyknięcia poleceń" i „zużycie żywego
+        modelu"
+    """
+    sections = [
+        ("wstrzyknięcia poleceń", config.stash.get(INJECTION_REPORT_KEY, None)),
+        ("zużycie żywego modelu", config.stash.get(LIVE_USAGE_KEY, None)),
+    ]
+
+    for title, report in sections:
+        lines = report.lines() if report is not None else []
+
+        # --- raport bez zgłoszonych spraw ---
+        if not lines:
+            continue
+
+        terminalreporter.write_sep("=", title)
+
+        for line in lines:
+            terminalreporter.write_line(line)
 
 
 def embedder_url() -> str:
