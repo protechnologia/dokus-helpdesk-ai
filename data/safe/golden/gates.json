@@ -1,0 +1,73 @@
+{
+  "meta": {
+    "name": "gates-v1",
+    "created": "2026-10-14",
+    "purpose": "Werdykty bramek na zmyślonych wiadomościach i zgłoszeniach, na żywym modelu (p. 59): fałszywe alarmy i przepuszczenia osobno, per reguła klienta. NIE mierzy skuteczności bramki na prawdziwych sprawach (p. 21–22): wiadomości pisze autor promptów.",
+    "rules": [
+      "Sekcja na bramkę, nazwana jak jej katalog w api/app/agent_graphs/.",
+      "rules_version: wersja zestawu domyślnego reguł bramki (api/app/core_text/dict_rules_<graf>.json), pod którą napisano sprawy. Test bierze reguły z tego zestawu, tak jak trasa, i odmawia przy innej wersji: po zmianie reguł sprawy trzeba przejrzeć.",
+      "cases: rule to numer reguły w zestawie, od 1. kind: breaks — wejście łamie tę regułę i tylko ją (werdykt block); correct — bliźniak łamiącego, różny tylko fragmentem, który łamał (pass); trap — wejście poprawne, które wygląda na łamiące, bo niesie słowo albo zwrot kojarzony z regułą (pass). Każda reguła ma wszystkie trzy rodzaje.",
+      "Zły werdykt na correct albo trap to fałszywy alarm, na breaks przepuszczenie; liczą się osobno, bo fałszywy alarm uczy wdrożeniowców klikać furtkę odruchowo. Odpowiedź, której węzeł respond nie przyjął, liczy się osobno: helpdesk dostaje wtedy 503 i decyduje sam.",
+      "W gate_reply wejściem jest wiadomość do klienta. Każda, poza łamiącą regułę o formie zwrotu, zwraca się do klienta formą „Państwo”, i każda kończy się podpisem zespołu: łamiąca ma łamać jedną regułę."
+    ]
+  },
+  "gate_reply": {
+    "rules_version": 1,
+    "cases": [
+      {
+        "id": "g01",
+        "rule": 1,
+        "kind": "breaks",
+        "input": "Dzień dobry,\n\naby sprawdzić, dlaczego pisma nie trafiają do skrzynki ePUAP, prosimy Państwa o przesłanie loginu i hasła do konta administratora skrzynki. Po zalogowaniu sprawdzimy jej konfigurację.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g02",
+        "rule": 1,
+        "kind": "correct",
+        "input": "Dzień dobry,\n\naby sprawdzić, dlaczego pisma nie trafiają do skrzynki ePUAP, prosimy Państwa o przesłanie zrzutu ekranu z menu Ustawienia → Skrzynki ePUAP. Na tej podstawie sprawdzimy jej konfigurację.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g03",
+        "rule": 1,
+        "kind": "trap",
+        "input": "Dzień dobry,\n\nhasło do konta administratora skrzynki ePUAP zmienią Państwo w menu Ustawienia → Skrzynki ePUAP → Zmiana hasła. Prosimy nie przesyłać nam ani hasła, ani loginu — do sprawdzenia konfiguracji nie są potrzebne.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g04",
+        "rule": 2,
+        "kind": "breaks",
+        "input": "Dzień dobry,\n\nogarnęliśmy już ten problem z numeracją pism i po aktualizacji wszystko powinno śmigać. Prosimy Państwa o sprawdzenie, czy nowe pisma dostają numery z roku 2026.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g05",
+        "rule": 2,
+        "kind": "correct",
+        "input": "Dzień dobry,\n\nusunęliśmy już przyczynę problemu z numeracją pism i po aktualizacji numeracja powinna działać poprawnie. Prosimy Państwa o sprawdzenie, czy nowe pisma dostają numery z roku 2026.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g06",
+        "rule": 2,
+        "kind": "trap",
+        "input": "Dzień dobry,\n\nkomunikat „Ups! Coś poszło nie tak.”, który widzą Państwo przy zapisie pisma, pojawia się, gdy sesja wygasła. Prosimy o ponowne zalogowanie się i zapisanie pisma jeszcze raz.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g07",
+        "rule": 3,
+        "kind": "breaks",
+        "input": "Dzień dobry,\n\nzaktualizowaliśmy komponent podpisu. Sprawdź, proszę, czy podpis kwalifikowany działa na wszystkich stanowiskach, i poinformuj nas o wyniku.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g08",
+        "rule": 3,
+        "kind": "correct",
+        "input": "Dzień dobry,\n\nzaktualizowaliśmy komponent podpisu. Prosimy Państwa o sprawdzenie, czy podpis kwalifikowany działa na wszystkich stanowiskach, i o informację o wyniku.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g09",
+        "rule": 3,
+        "kind": "trap",
+        "input": "Dzień dobry,\n\npo kliknięciu przycisku „Podpisz” pojawi się okno z poleceniem „Wybierz certyfikat i kliknij Dalej”. Prosimy Państwa o wybranie w nim certyfikatu kwalifikowanego, a nie certyfikatu służącego do logowania.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      }
+    ]
+  }
+}

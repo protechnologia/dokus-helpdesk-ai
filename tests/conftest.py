@@ -42,8 +42,9 @@ O czym pamiętać przy zmianach:
 - Testy `llm_live` zgłaszają zużycie każdej sprawy przez fixture `live_usage`, a na końcu
   przebiegu pytest wypisuje je z sumą kosztu (`pytest_terminal_summary()`). Sam raport leży
   w `tests/helpers_live_usage.py`; tu zostają fixture i funkcja wypisująca, bo pytest szuka ich
-  tylko w `conftest.py`. Tak samo raport scenariuszy wstrzyknięć: fixture `injection_report`,
-  a klasa w `tests/helpers_injections.py`; po przebiegu stoi przed zużyciem modelu.
+  tylko w `conftest.py`. Tak samo raporty scenariuszy: wstrzyknięć (fixture `injection_report`,
+  klasa w `tests/helpers_injections.py`) i bramek (fixture `gate_report`, klasa
+  w `tests/helpers_gates.py`); po przebiegu stoją przed zużyciem modelu.
 """
 
 import os
@@ -54,6 +55,7 @@ from _pytest.terminal import TerminalReporter  # pytest 8.3 nie wystawia tego ty
 
 from app.config import LLMSettings, Settings
 from app.db_postgres import PostgresClient
+from tests.helpers_gates import GateReport
 from tests.helpers_injections import InjectionReport
 from tests.helpers_live_usage import LiveUsageReport
 
@@ -199,6 +201,31 @@ def injection_report(
     return pytestconfig.stash[INJECTION_REPORT_KEY]
 
 
+# Miejsce raportu bramek w konfiguracji przebiegu, na tej samej zasadzie co raport zużycia.
+GATE_REPORT_KEY = pytest.StashKey[GateReport]()
+
+
+@pytest.fixture(scope="session")
+def gate_report(
+    pytestconfig: pytest.Config,  # wstrzykiwane przez pytest; trzyma raport na cały przebieg
+) -> GateReport:
+    """
+    Description:
+    Raport scenariuszy bramek, jeden na cały przebieg pytesta. Test bramek zgłasza w nim ocenę
+    każdej sprawy, a po przebiegu pytest wypisuje ją razem z polami werdyktu.
+
+    Example args:
+        (wstrzykiwane przez pytest)
+
+    Example result:
+        GateReport wspólny dla wszystkich testów przebiegu
+    """
+    if GATE_REPORT_KEY not in pytestconfig.stash:
+        pytestconfig.stash[GATE_REPORT_KEY] = GateReport()
+
+    return pytestconfig.stash[GATE_REPORT_KEY]
+
+
 def pytest_terminal_summary(
     terminalreporter: TerminalReporter,  # wstrzykiwane przez pytest; pisze na ekran
     config:           pytest.Config,     # wstrzykiwane przez pytest; trzyma raporty
@@ -206,19 +233,20 @@ def pytest_terminal_summary(
     """
     Description:
     Po przebiegu wypisuje raporty testów na żywym modelu: najpierw oceny spraw ze scenariuszy
-    wstrzyknięć z polami wyniku, potem zużycie żywego modelu z sumą kosztu. Pytest woła tę
-    funkcję sam, po nazwie. Raport, do którego żaden test niczego nie zgłosił — czyli każdy
-    w przebiegu bez żywego modelu — nie wypisuje nic.
+    wstrzyknięć i ze scenariuszy bramek z polami wyniku, potem zużycie żywego modelu z sumą
+    kosztu. Pytest woła tę funkcję sam, po nazwie. Raport, do którego żaden test niczego nie
+    zgłosił — czyli każdy w przebiegu bez żywego modelu — nie wypisuje nic.
 
     Example args:
         (wstrzykiwane przez pytest)
 
     Example result:
-        None — na końcu wyjścia pytesta stoją sekcje „wstrzyknięcia poleceń" i „zużycie żywego
-        modelu"
+        None — na końcu wyjścia pytesta stoją sekcje „wstrzyknięcia poleceń", „scenariusze
+        bramek" i „zużycie żywego modelu"
     """
     sections = [
         ("wstrzyknięcia poleceń", config.stash.get(INJECTION_REPORT_KEY, None)),
+        ("scenariusze bramek",    config.stash.get(GATE_REPORT_KEY, None)),
         ("zużycie żywego modelu", config.stash.get(LIVE_USAGE_KEY, None)),
     ]
 
