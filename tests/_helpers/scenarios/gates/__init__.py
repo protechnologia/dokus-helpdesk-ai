@@ -3,7 +3,9 @@ Description:
 Zestaw scenariuszy bramek, ocena werdyktu i raport.
 
 Logika leży w `helper.py`, modele danych w `models/` (plik na model), stałe
-w `constants.py`, a raport w `report.py`; testy importują wszystko z pakietu.
+w `constants.py`, raport w `report.py`, a przebieg spraw na żywym modelu w `measure.py`;
+testy importują wszystko z pakietu. Próbki do testów samego helpera leżą w `samples.py`
+i pakiet ich nie wystawia.
 """
 
 from tests._helpers.scenarios.gates.constants import (
@@ -16,6 +18,10 @@ from tests._helpers.scenarios.gates.helper import (
     gate_sections,
     judge_gate_case,
 )
+from tests._helpers.scenarios.gates.measure import (
+    GateOutcomesOf,
+    measure_gate_cases,
+)
 from tests._helpers.scenarios.gates.models.gate_case import GateCase
 from tests._helpers.scenarios.gates.models.gate_outcome import GateOutcome
 from tests._helpers.scenarios.gates.models.gate_section import GateSection
@@ -26,10 +32,12 @@ __all__ = [
     "gate_sections",
     "GateCase",
     "GateOutcome",
+    "GateOutcomesOf",
     "GateReport",
     "GATES_FILE",
     "GateSection",
     "judge_gate_case",
     "KIND_LABELS",
+    "measure_gate_cases",
     "META_KEY",
 ]

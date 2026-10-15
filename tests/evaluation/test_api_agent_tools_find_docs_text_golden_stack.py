@@ -28,71 +28,21 @@ O czym pamiętać przy zmianach:
   założoną przed zmianą kolumny `search_text` trzeba zbudować ponownie.
 - Przed pomiarem fixture `synthetic_docs_table` z `conftest.py` sprawdza, że tabela indeksu ma
   dokładnie sekcje paczki z treścią jak w plikach; nieaktualny indeks kończy pomiar błędem.
+- Odpytanie indeksu leży w `tests/_helpers/synthetic_docs/`.
 """
 
 import asyncio
-import json
-from pathlib import Path
 
 import pytest
 
-from app.agent_tools.docs.find_docs_text import (
-    FindDocsTextQuery,
-    FindDocsTextResult,
-    FindDocsTextTool,
-)
-from app.config import Settings
-from app.core_service.factory_docs_indexer import docs_index_names
-from app.db_postgres import DbPostgresError, DocsTable
-from tests.conftest import build_host_settings, build_postgres_client
+from app.agent_tools.docs.find_docs_text import FindDocsTextResult
+from tests._helpers.synthetic_docs import BUILD_HINT, docs_text_entries, search_docs_text
+from tests.conftest import build_host_settings
 
 pytestmark = [pytest.mark.stack, pytest.mark.stack_postgres]
 
-GOLDEN_FILE = Path("data/safe/golden/docs-synthetic.json")
-
 # Zapytania zestawu, czytane przy imporcie: z nich powstają parametry testów.
-ENTRIES = json.loads(GOLDEN_FILE.read_text(encoding="utf-8"))["find_docs_text"]
-
-BUILD_HINT = (
-    "zbuduj indeks syntetyczny: "
-    "docker compose exec api helpdesk docs index data/safe/instruction --synthetic --yes"
-)
-
-
-async def _search_all(
-    settings: Settings,  # np. Settings(rag_top_k=5, …)
-) -> dict[str, FindDocsTextResult]:
-    """
-    Description:
-    Przepuszcza wszystkie zapytania zestawu przez `FindDocsTextTool` na indeksie syntetycznym,
-    z limitem z konfiguracji, i oddaje wyniki po identyfikatorze zapytania. Tabela, której nie
-    ma, wywala test z podpowiedzią, jak ją zbudować.
-
-    Example args:
-        settings=Settings(rag_top_k=5, …)
-
-    Example result:
-        {"t01": FindDocsTextResult(sections=[MatchedSection(…)], omitted_over_limit=0), …}
-    """
-    table_name, _ = docs_index_names(settings, synthetic=True)
-
-    tool = FindDocsTextTool(
-        docs  = DocsTable(build_postgres_client(), name=table_name),
-        limit = settings.rag_top_k,
-    )
-
-    try:
-        results = {
-            entry["id"]: await tool.find(FindDocsTextQuery(**entry["query"]))
-            for entry in ENTRIES
-        }
-    except DbPostgresError as exc:
-        # Brak tabeli wygląda jak błąd zapytania; podpowiedź mówi, co zrobić.
-        pytest.fail(f"indeks syntetyczny nie odpowiada ({exc}) — {BUILD_HINT}")
-    finally:
-        await tool.aclose()
-
-    return results
+ENTRIES = docs_text_entries()
 
 
 @pytest.fixture(scope="module")
@@ -110,7 +60,7 @@ def results(
     Example result:
         {"t01": FindDocsTextResult(…), "t02": FindDocsTextResult(…), …}
     """
-    return asyncio.run(_search_all(build_host_settings()))
+    return asyncio.run(search_docs_text(build_host_settings()))
 
 
 @pytest.mark.parametrize(

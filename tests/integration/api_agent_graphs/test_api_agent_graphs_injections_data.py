@@ -8,6 +8,7 @@ z takim zestawem byłby zielony, nic nie mierząc, więc te warunki pilnuje się
 |-------------------------------------------|------------------------------------------------|
 | sekcja nazywa się jak graf                | sekcja, której nikt nie uruchomi               |
 | pola chronione są polami wyniku grafu     | znacznik szukany w polu, którego nie ma        |
+| albo listą źródeł grafu, który ją ma      |                                                |
 | oczekiwane pola dotyczą wejść sekcji      | wynik porównany z polem, którego nie ma,       |
 | i pól wyniku grafu                        | albo oczekiwanie przy wejściu, którego nie ma  |
 | sekcja ma czym wykryć przebicie           | atak, który może tylko wyjść na odparty        |
@@ -28,109 +29,41 @@ z takim zestawem byłby zielony, nic nie mierząc, więc te warunki pilnuje się
 | atrap                                     |                                                |
 """
 
-import importlib
-import pkgutil
-from typing import get_args
-
 import pytest
-from pydantic import BaseModel
 
-import app.agent_graphs
 from app.agent_tools.tickets.fake_tickets import default_cards, default_threads
 from app.core_service.loader_dict_rules import get_rule_set
+from tests._helpers.graphs import (
+    graph_module,
+    graph_names,
+    has_rules,
+    has_sources,
+    output_fields,
+)
 from tests._helpers.scenarios.injections import (
     INTO_CARD,
     INTO_INPUT,
     INTO_RULES,
     INTO_THREAD,
+    READER_OF,
+    SOURCES_FIELD,
     InjectionAttack,
     found_markers,
     injection_sections,
 )
 
-# Narzędzie, które musi mieć graf, żeby atak daną drogą do niego dotarł.
-READER_OF = {INTO_CARD: "read_tickets_card", INTO_THREAD: "read_tickets_thread"}
-
+# Sekcje zestawu, czytane przy imporcie: z nich powstają parametry testów.
 SECTIONS = injection_sections()
 
-GRAPH_NAMES = {
-    module.name
-    for module in pkgutil.iter_modules(app.agent_graphs.__path__)
-    if module.ispkg
-}
+# Grafy z regułami klienta i grafy czytające karty zgłoszeń, liczone przy imporcie: z nich
+# powstają parametry testów dróg ataku.
+RULES_GRAPHS   = sorted(graph for graph in SECTIONS if has_rules(graph_module(graph)))
+TICKETS_GRAPHS = sorted(
+    graph for graph in SECTIONS if READER_OF[INTO_CARD] in graph_module(graph).TOOL_NAMES
+)
 
 # Pary (graf, atak) zestawu, czytane przy imporcie: z nich powstają parametry testów.
 ATTACKS = [(graph, attack) for graph, section in SECTIONS.items() for attack in section.attacks]
-
-
-def _output_types(
-    graph: str,  # np. "suggest_handoff"
-) -> list[type[BaseModel]]:
-    """
-    Description:
-    Typy wyniku grafu, odczytane z pola `output` jego stanu; bez `None`.
-
-    Example args:
-        graph="suggest_handoff"
-
-    Example result:
-        [Proposal]
-    """
-    module     = importlib.import_module(f"app.agent_graphs.{graph}")
-    annotation = module.STATE.model_fields["output"].annotation
-    types      = [arg for arg in get_args(annotation) if arg is not type(None)]
-
-    return types
-
-
-def _output_fields(
-    graph: str,  # np. "suggest_handoff"
-) -> set[str]:
-    """
-    Description:
-    Nazwy pól wszystkich typów wyniku grafu.
-
-    Example args:
-        graph="suggest_handoff"
-
-    Example result:
-        {"text", "internal_notes"}
-    """
-    return {name for output_type in _output_types(graph) for name in output_type.model_fields}
-
-
-def _tool_names(
-    graph: str,  # np. "suggest_questions"
-) -> tuple[str, ...]:
-    """
-    Description:
-    Narzędzia wiedzy, które graf daje modelowi (`TOOL_NAMES`).
-
-    Example args:
-        graph="suggest_questions"
-
-    Example result:
-        ("find_tickets_vector", "find_tickets_text", "read_tickets_card", …)
-    """
-    return importlib.import_module(f"app.agent_graphs.{graph}").TOOL_NAMES
-
-
-def _has_rules(
-    graph: str,  # np. "gate_reply"
-) -> bool:
-    """
-    Description:
-    Czy stan grafu ma reguły klienta.
-
-    Example args:
-        graph="gate_reply"
-
-    Example result:
-        True
-    """
-    module = importlib.import_module(f"app.agent_graphs.{graph}")
-
-    return "rules" in module.STATE.model_fields
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
@@ -139,16 +72,21 @@ def test_every_section_names_a_graph(graph: str) -> None:
 
     Wyłapuje sekcję z literówką w nazwie: test na żywym modelu nie znalazłby takiego grafu, a jej
     ataki nie zostałyby nigdy sprawdzone."""
-    assert graph in GRAPH_NAMES
+    assert graph in graph_names()
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
 def test_guarded_fields_are_fields_of_the_graph_output(graph: str) -> None:
-    """Sprawdza, czy każde pole chronione sekcji jest polem któregoś typu wyniku grafu.
+    """Sprawdza, czy każde pole chronione sekcji jest polem któregoś typu wyniku grafu albo listą
+    źródeł (`sources`) — tę tylko w grafie, którego stan ją ma.
 
     Wyłapuje pole chronione z błędem w nazwie: ocena szukałaby znacznika w polu, którego wynik
-    nie ma, liczyłaby je jak puste, a każdy atak wyszedłby na odparty."""
-    assert set(SECTIONS[graph].guarded_fields) <= _output_fields(graph)
+    nie ma, liczyłaby je jak puste, a każdy atak wyszedłby na odparty; to samo przy liście
+    źródeł w grafie, który niczego nie odczytuje."""
+    module  = graph_module(graph)
+    allowed = output_fields(module) | ({SOURCES_FIELD} if has_sources(module) else set())
+
+    assert set(SECTIONS[graph].guarded_fields) <= allowed
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
@@ -163,7 +101,7 @@ def test_expected_fields_belong_to_inputs_and_to_the_graph_output(graph: str) ->
     expected = {name for fields in section.expected.values() for name in fields}
 
     assert set(section.expected) <= set(section.inputs)
-    assert expected <= _output_fields(graph)
+    assert expected <= output_fields(graph_module(graph))
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
@@ -188,7 +126,7 @@ def test_rules_version_is_the_version_of_the_default_rule_set(graph: str) -> Non
     których już nie ma: test na żywym modelu odmówiłby dopiero po wyborze płatnych testów."""
     version = SECTIONS[graph].rules_version
 
-    assert (version is not None) == _has_rules(graph)
+    assert (version is not None) == has_rules(graph_module(graph))
     assert version is None or version == get_rule_set(graph).version
 
 
@@ -201,10 +139,10 @@ def test_every_attack_route_fits_the_graph(graph: str) -> None:
     w regułach grafu bez reguł, który przerwałby płatny przebieg błędem, i atak w materiale,
     którego model danego grafu nie ma jak przeczytać."""
     routes = {attack.into for attack in SECTIONS[graph].attacks}
-    tools  = _tool_names(graph)
+    tools  = graph_module(graph).TOOL_NAMES
 
     assert routes <= {INTO_INPUT, INTO_RULES, INTO_CARD, INTO_THREAD}
-    assert INTO_RULES not in routes or _has_rules(graph)
+    assert INTO_RULES not in routes or has_rules(graph_module(graph))
     assert all(READER_OF[route] in tools for route in routes & READER_OF.keys())
 
 
@@ -234,7 +172,7 @@ def test_a_material_attack_points_at_text_in_the_fake_material(
     assert isinstance(getattr(cards[attack.ticket], attack.field or "", None), str)
 
 
-@pytest.mark.parametrize("graph", sorted(graph for graph in SECTIONS if _has_rules(graph)))
+@pytest.mark.parametrize("graph", RULES_GRAPHS)
 def test_a_graph_with_rules_is_attacked_by_both_routes(graph: str) -> None:
     """Sprawdza, czy sekcja grafu z regułami klienta ma ataki obiema drogami: na wejściu
     i w regułach.
@@ -248,7 +186,7 @@ def test_a_graph_with_rules_is_attacked_by_both_routes(graph: str) -> None:
 
 @pytest.mark.parametrize(
     "graph",
-    sorted(graph for graph in SECTIONS if READER_OF[INTO_CARD] in _tool_names(graph)),
+    TICKETS_GRAPHS,
 )
 def test_a_graph_reading_tickets_is_attacked_on_the_input_and_in_the_material(graph: str) -> None:
     """Sprawdza, czy sekcja grafu, który czyta karty i wątki zgłoszeń, ma ataki na wejściu,
@@ -291,7 +229,7 @@ def test_every_marker_stands_in_its_attack_and_in_no_input(
     Wyłapuje atak, który nie może się przebić, bo jego znacznika model nie ma skąd wziąć, i sprawę
     kontrolną, która pada zawsze, bo znacznik stoi już w samym wejściu, w regułach albo
     w karcie czy wątku, które model czyta także bez ataku."""
-    rules    = get_rule_set(graph).rules if _has_rules(graph) else []
+    rules    = get_rule_set(graph).rules if has_rules(graph_module(graph)) else []
     material = [card.model_dump_json() for card in default_cards()]
     material += [row.thread for row in default_threads()]
     texts    = [*SECTIONS[graph].inputs.values(), *rules, *material]

@@ -27,3 +27,8 @@ SYNTHETIC_CASES_FILE = REPO_ROOT / "data" / "safe" / "golden" / "code-synthetic.
 # Polecenie, które podaje błąd testu, gdy paczka nie jest zbudowana albo jest nieaktualna, żeby
 # dało się ją zbudować bez szukania w dokumentacji.
 BUILD_COMMAND = "python scripts/build_code_package.py build data/safe/code/source data/safe/code"
+
+# Limit czasu jednego szukania ripgrepem w narzędziach kodu na paczce syntetycznej, w sekundach.
+# Ta sama wartość co domyślne `CODE_SEARCH_TIMEOUT_SECONDS` produktu: paczka ma kilkadziesiąt
+# plików, więc szukanie trwa ułamek sekundy, a limit łapie tylko zawieszony proces.
+SEARCH_TIMEOUT_SECONDS = 10

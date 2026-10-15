@@ -2,14 +2,13 @@
 Description:
 Testy raportu zużycia żywego modelu (`LiveUsageReport` z `tests/_helpers/live/`), czyli
 podsumowania, które pytest wypisuje po przebiegu testów `llm_live`. Bez modelu — zużycie jest tu
-zmyślone. Plik stoi w korzeniu folderu, bo raport służy testom wszystkich usług.
+zmyślone, a próbki leżą w `samples.py` helpera. Plik stoi w korzeniu folderu, bo raport służy
+testom wszystkich usług.
 """
 
 import json
 
 from app.agent_nodes.models import LogEntry
-from app.agent_tools.base import error_as_json
-from app.engine_llm import ChatMessage, LLMUsage, ToolCall
 from tests._helpers.live import (
     CUT_MARK,
     MAX_ARGUMENTS_CHARS,
@@ -18,16 +17,7 @@ from tests._helpers.live import (
     result_as_summary,
     run_as_lines,
 )
-
-SEARCH = LLMUsage(
-    calls              = 5,
-    prompt_tokens      = 412,
-    cache_write_tokens = 8120,
-    cache_read_tokens  = 25010,
-    completion_tokens  = 640,
-    cost_usd           = 0.0270,
-)
-GATE = LLMUsage(calls=1, prompt_tokens=900, completion_tokens=60, cost_usd=0.0031)
+from tests._helpers.live.samples import GATE_USAGE, RUN_LOG, RUN_MESSAGES, SEARCH_USAGE
 
 
 def test_an_empty_report_prints_nothing() -> None:
@@ -45,8 +35,8 @@ def test_the_last_line_sums_every_case() -> None:
     Wyłapuje sumę, która gubi sprawę albo klasę tokenów: po to jest ten raport, żeby po przebiegu
     na płatnym modelu od razu było widać, ile kosztował."""
     report = LiveUsageReport()
-    report.record("graf search", SEARCH)
-    report.record("graf gate_close", GATE)
+    report.record("graf search", SEARCH_USAGE)
+    report.record("graf gate_close", GATE_USAGE)
 
     assert report.lines()[-1] == (
         "RAZEM: wywołań 6, świeże wejście 1312, zapis do cache 8120, odczyt z cache 25010, "
@@ -65,8 +55,8 @@ def test_the_log_of_a_case_stands_under_its_line() -> None:
         LogEntry(node="run_tools", message="wywołania: find_code_text; źródła: 0"),
     ]
     report = LiveUsageReport()
-    report.record("graf search", SEARCH, log)
-    report.record("complete: zwykłe pytanie", GATE)
+    report.record("graf search", SEARCH_USAGE, log)
+    report.record("complete: zwykłe pytanie", GATE_USAGE)
 
     lines = report.lines()
 
@@ -77,41 +67,6 @@ def test_the_log_of_a_case_stands_under_its_line() -> None:
     ]
     assert lines[3].startswith("complete: zwykłe pytanie: wywołań 1, ")
     assert len(lines) == 5
-
-
-# Przebieg i rozmowa jednej zmyślonej sprawy: model szuka w kodzie, czyta plik (ścieżką, której
-# nie ma, więc dostaje błąd) i odpowiada. Trzy tury modelu, trzy wpisy węzła `agent`.
-RUN_LOG = [
-    LogEntry(node="anonymize", message="zanonimizowano"),
-    LogEntry(node="agent",     message="tura 1: narzędzia: find_code_text; 0,0041 USD"),
-    LogEntry(node="run_tools", message="wywołania: find_code_text; źródła: 0"),
-    LogEntry(node="agent",     message="tura 2: narzędzia: read_code_file; 0,0038 USD"),
-    LogEntry(node="run_tools", message="wywołania: read_code_file; źródła: 0; błędy: 1"),
-    LogEntry(node="agent",     message="tura 3: narzędzia: respond_search; 0,0020 USD"),
-    LogEntry(node="respond",   message="odpowiedź przyjęta"),
-]
-RUN_MESSAGES = [
-    ChatMessage(role="user", content="=== ZGŁOSZENIE ===\nBrak sekwencji numeracji dla roku 2026"),
-    ChatMessage(role="assistant", tool_calls=[
-        ToolCall(call_id="call_1", name="find_code_text", arguments={"exact": "Brak sekwencji"}),
-    ]),
-    ChatMessage(
-        role    = "tool",
-        call_id = "call_1",
-        content = json.dumps({"lines": [{"path": "src/a.php"}], "omitted_over_limit": 0}),
-    ),
-    ChatMessage(role="assistant", tool_calls=[
-        ToolCall(call_id="call_2", name="read_code_file", arguments={"path": "src/brak.php"}),
-    ]),
-    ChatMessage(
-        role    = "tool",
-        call_id = "call_2",
-        content = error_as_json("nie ma takiego pliku w kodzie aplikacji: src/brak.php"),
-    ),
-    ChatMessage(role="assistant", tool_calls=[
-        ToolCall(call_id="call_3", name="respond_search", arguments={}),
-    ]),
-]
 
 
 def test_the_calls_of_a_turn_stand_under_that_turn_with_arguments_and_result() -> None:
@@ -146,10 +101,10 @@ def test_a_case_recorded_without_the_conversation_prints_the_log_alone() -> None
     Wyłapuje raport, który bez rozmowy kończy się błędem albo gubi wpisy przebiegu: testy
     zgłaszające samo zużycie i przebieg mają działać jak dotąd."""
     without = LiveUsageReport()
-    without.record("graf search", SEARCH, RUN_LOG)
+    without.record("graf search", SEARCH_USAGE, RUN_LOG)
 
     with_talk = LiveUsageReport()
-    with_talk.record("graf search", SEARCH, RUN_LOG, RUN_MESSAGES)
+    with_talk.record("graf search", SEARCH_USAGE, RUN_LOG, RUN_MESSAGES)
 
     assert without.lines()[1:-1] == [f"    {entry.node}: {entry.message}" for entry in RUN_LOG]
     assert len(with_talk.lines()) == len(without.lines()) + 5

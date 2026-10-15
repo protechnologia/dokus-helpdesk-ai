@@ -3,7 +3,9 @@ Description:
 Zestaw scenariuszy „Popraw”, ocena poprawionego tekstu i raport.
 
 Logika leży w `helper.py`, modele danych w `models/` (plik na model), stałe
-w `constants.py`, a raport w `report.py`; testy importują wszystko z pakietu.
+w `constants.py`, raport w `report.py`, a przebieg spraw na żywym modelu w `measure.py`;
+testy importują wszystko z pakietu. Próbki do testów samego helpera leżą w `samples.py`
+i pakiet ich nie wystawia.
 """
 
 from tests._helpers.scenarios.polish.constants import (
@@ -18,6 +20,10 @@ from tests._helpers.scenarios.polish.helper import (
     plain,
     polish_sections,
 )
+from tests._helpers.scenarios.polish.measure import (
+    PolishOutcomesOf,
+    measure_polish_cases,
+)
 from tests._helpers.scenarios.polish.models.polish_case import PolishCase
 from tests._helpers.scenarios.polish.models.polish_outcome import PolishOutcome
 from tests._helpers.scenarios.polish.models.polish_section import PolishSection
@@ -27,6 +33,7 @@ __all__ = [
     "EXTRA_LETTERS",
     "judge_polish_case",
     "LIST_NUMBER",
+    "measure_polish_cases",
     "META_KEY",
     "numbers",
     "plain",
@@ -34,6 +41,7 @@ __all__ = [
     "polish_sections",
     "PolishCase",
     "PolishOutcome",
+    "PolishOutcomesOf",
     "PolishReport",
     "PolishSection",
 ]

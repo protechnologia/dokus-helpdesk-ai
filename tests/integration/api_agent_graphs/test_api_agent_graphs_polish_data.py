@@ -18,23 +18,15 @@ więc te warunki pilnuje się w domyślnym `pytest`.
 | pułapka nie stoi w notatkach                  | dopisek, który jest wiernym przepisaniem    |
 """
 
-import importlib
-import pkgutil
-from typing import get_args
 
 import pytest
 
-import app.agent_graphs
 from app.core_service.loader_dict_rules import get_rule_set
+from tests._helpers.graphs import graph_module, graph_names, has_rules, output_types
 from tests._helpers.scenarios.polish import PolishCase, plain, polish_sections
 
 SECTIONS = polish_sections()
 
-GRAPH_NAMES = {
-    module.name
-    for module in pkgutil.iter_modules(app.agent_graphs.__path__)
-    if module.ispkg
-}
 
 # Pary (graf, sprawa) zestawu, czytane przy imporcie: z nich powstają parametry testów.
 CASES = [(graph, case) for graph, section in SECTIONS.items() for case in section.cases]
@@ -47,13 +39,12 @@ def test_every_section_names_a_graph_with_rules(graph: str) -> None:
 
     Wyłapuje sekcję z literówką w nazwie, której sprawy nie zostałyby nigdy sprawdzone, i sekcję
     grafu, którego wynik nie ma tekstu do oceny."""
-    assert graph in GRAPH_NAMES
+    assert graph in graph_names()
 
-    module     = importlib.import_module(f"app.agent_graphs.{graph}")
-    annotation = module.STATE.model_fields["output"].annotation
-    outputs    = [arg for arg in get_args(annotation) if arg is not type(None)]
+    module  = graph_module(graph)
+    outputs = output_types(module)
 
-    assert "rules" in module.STATE.model_fields
+    assert has_rules(module)
     assert outputs
     assert all("text" in output.model_fields for output in outputs)
 

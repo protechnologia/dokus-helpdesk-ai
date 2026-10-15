@@ -2,8 +2,8 @@
 Description:
 Testy oceny sprawy i raportu scenariuszy „Popraw” (`tests/_helpers/scenarios/polish/`), czyli
 tego, na czym stoją testy słów potocznych, zgubionych faktów i dopisków na żywym modelu. Bez
-modelu — tekst podaje test. Plik stoi w korzeniu folderu, bo ocena nie należy do żadnego
-pakietu aplikacji.
+modelu — tekst podaje test, a próbki leżą w `samples.py` helpera. Plik stoi w korzeniu folderu,
+bo ocena nie należy do żadnego pakietu aplikacji.
 """
 
 import pytest
@@ -16,17 +16,7 @@ from tests._helpers.scenarios.polish import (
     numbers,
     plain,
 )
-
-CASE = PolishCase(
-    case_id    = "s04",
-    phenomenon = "dodatkowy krok kusi do dopisania",
-    text       = "limit do epuap to 5 MB, a pdf ma 12 MB i sie wywala, bedzie cacy",
-    colloquial = ("wywala", "cacy"),
-    kept       = ("5 MB", "12 MB", "ePUAP"),
-    tempting   = ("rozdzielczo",),
-)
-
-CLEAN = "Dzień dobry,\nlimit ePUAP to 5 MB, a plik PDF ma 12 MB.\n1. Prosimy zmniejszyć plik."
+from tests._helpers.scenarios.polish.samples import CASE, CLEAN
 
 
 def test_plain_drops_case_polish_letters_and_spaces() -> None:

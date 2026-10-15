@@ -62,6 +62,7 @@ from tests._helpers.scenarios.gates import GateReport
 from tests._helpers.scenarios.injections import InjectionReport
 from tests._helpers.scenarios.polish import PolishReport
 from tests._helpers.scenarios.questions import QuestionsReport
+from tests._helpers.scenarios.search import SearchReport
 
 EMBEDDER_URL_ENV     = "EMBEDDER_TEST_URL"
 EMBEDDER_URL_DEFAULT = "http://localhost:8001"
@@ -238,6 +239,32 @@ def questions_report(
     return pytestconfig.stash[QUESTIONS_REPORT_KEY]
 
 
+
+# Miejsce raportu rozpoznania w konfiguracji przebiegu, na tej samej zasadzie co raport zużycia.
+SEARCH_REPORT_KEY = pytest.StashKey[SearchReport]()
+
+
+@pytest.fixture(scope="session")
+def search_report(
+    pytestconfig: pytest.Config,  # wstrzykiwane przez pytest; trzyma raport na cały przebieg
+) -> SearchReport:
+    """
+    Description:
+    Raport scenariuszy rozpoznania (`search`), jeden na cały przebieg pytesta. Test rozpoznania
+    zgłasza w nim ocenę każdej sprawy, a po przebiegu pytest wypisuje ją razem z licznikami
+    i uwagami dla wdrożeniowca.
+
+    Example args:
+        (wstrzykiwane przez pytest)
+
+    Example result:
+        SearchReport wspólny dla wszystkich testów przebiegu
+    """
+    if SEARCH_REPORT_KEY not in pytestconfig.stash:
+        pytestconfig.stash[SEARCH_REPORT_KEY] = SearchReport()
+
+    return pytestconfig.stash[SEARCH_REPORT_KEY]
+
 def pytest_terminal_summary(
     terminalreporter: TerminalReporter,  # wstrzykiwane przez pytest; pisze na ekran
     config:           pytest.Config,     # wstrzykiwane przez pytest; trzyma raporty
@@ -245,23 +272,25 @@ def pytest_terminal_summary(
     """
     Description:
     Po przebiegu wypisuje raporty testów na żywym modelu: najpierw oceny spraw ze scenariuszy
-    wstrzyknięć, bramek, „Popraw” i pytań z polami wyniku, potem zużycie żywego modelu z sumą
-    kosztu. Pytest woła tę funkcję sam, po nazwie. Raport, do którego żaden test niczego nie
-    zgłosił — czyli każdy w przebiegu bez żywego modelu — nie wypisuje nic.
+    wstrzyknięć, bramek, „Popraw”, pytań i rozpoznania z polami wyniku, potem zużycie żywego
+    modelu z sumą kosztu. Pytest woła tę funkcję sam, po nazwie. Raport, do którego żaden test
+    niczego nie zgłosił — czyli każdy w przebiegu bez żywego modelu — nie wypisuje nic.
 
     Example args:
         (wstrzykiwane przez pytest)
 
     Example result:
         None — na końcu wyjścia pytesta stoją sekcje „wstrzyknięcia poleceń", „scenariusze
-        bramek", „scenariusze »Popraw«", „scenariusze pytań" i „zużycie żywego modelu"
+        bramek", „scenariusze »Popraw«", „scenariusze pytań", „scenariusze rozpoznania"
+        i „zużycie żywego modelu"
     """
     sections = [
-        ("wstrzyknięcia poleceń", config.stash.get(INJECTION_REPORT_KEY, None)),
-        ("scenariusze bramek",    config.stash.get(GATE_REPORT_KEY, None)),
-        ("scenariusze „Popraw”",  config.stash.get(POLISH_REPORT_KEY, None)),
-        ("scenariusze pytań",     config.stash.get(QUESTIONS_REPORT_KEY, None)),
-        ("zużycie żywego modelu", config.stash.get(LIVE_USAGE_KEY, None)),
+        ("wstrzyknięcia poleceń",   config.stash.get(INJECTION_REPORT_KEY, None)),
+        ("scenariusze bramek",      config.stash.get(GATE_REPORT_KEY, None)),
+        ("scenariusze „Popraw”",    config.stash.get(POLISH_REPORT_KEY, None)),
+        ("scenariusze pytań",       config.stash.get(QUESTIONS_REPORT_KEY, None)),
+        ("scenariusze rozpoznania", config.stash.get(SEARCH_REPORT_KEY, None)),
+        ("zużycie żywego modelu",   config.stash.get(LIVE_USAGE_KEY, None)),
     ]
 
     for title, report in sections:

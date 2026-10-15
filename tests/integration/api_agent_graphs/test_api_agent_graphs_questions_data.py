@@ -14,22 +14,14 @@ w domyślnym `pytest`.
 | zgłoszenie ma kształt wątku                   | sprawa, która nie wygląda jak wejście trasy |
 """
 
-import importlib
-import pkgutil
-from typing import get_args
 
 import pytest
 
-import app.agent_graphs
+from tests._helpers.graphs import graph_module, graph_names, output_types
 from tests._helpers.scenarios.questions import QuestionsCase, questions_sections
 
 SECTIONS = questions_sections()
 
-GRAPH_NAMES = {
-    module.name
-    for module in pkgutil.iter_modules(app.agent_graphs.__path__)
-    if module.ispkg
-}
 
 # Pary (graf, sprawa) zestawu, czytane przy imporcie: z nich powstają parametry testów.
 CASES = [(graph, case) for graph, section in SECTIONS.items() for case in section.cases]
@@ -42,11 +34,10 @@ def test_every_section_names_a_graph_that_can_answer_without_questions(graph: st
 
     Wyłapuje sekcję z literówką w nazwie, której sprawy nie zostałyby nigdy sprawdzone, i sekcję
     grafu, który braku pytań nie umie oddać: ocena nie miałaby czego odróżniać."""
-    assert graph in GRAPH_NAMES
+    assert graph in graph_names()
 
-    module     = importlib.import_module(f"app.agent_graphs.{graph}")
-    annotation = module.STATE.model_fields["output"].annotation
-    outputs    = [arg for arg in get_args(annotation) if arg is not type(None)]
+    module  = graph_module(graph)
+    outputs = output_types(module)
 
     assert any("text" in output.model_fields for output in outputs)
     assert any("text" not in output.model_fields for output in outputs)

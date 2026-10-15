@@ -322,7 +322,7 @@ dokus-helpdesk-ai/
 │   └── initdb/                   # konfiguracja wyszukiwania `pl_search` (tylko pusty wolumen)
 ├── tests/
 │   ├── conftest.py               # adresy usług, markery, fixture'y raportów
-│   ├── _helpers/                 # folder na helper: helper.py, models/ (plik na model), constants.py, report.py, __init__.py; scenariusze p. 59 w scenarios/
+│   ├── _helpers/                 # folder na helper: helper.py, models/ (plik na model), constants.py, report.py, measure.py, samples.py, __init__.py; scenariusze p. 59 w scenarios/
 │   ├── unit/                     # podfoldery <usługa>_<pakiet>: api_agent_tools/, api_core_service/, embedder/…
 │   ├── integration/              # jednostka + prawdziwa zależność: pliki, FastAPI, LangGraph, Qdrant
 │   ├── functional/               # cała aplikacja przez HTTP albo komendę
@@ -2265,8 +2265,9 @@ nowe zgłoszenie (surowy tekst)
   `build_fake_graph()`, `example_state()` (oraz `respond_tool()`, a w `suggest_*` `LABEL`
   i `REQUIRES_HITS`). `test_api_agent_graphs_contract.py` sam znajduje grafy w `app/agent_graphs/`
   i sprawdza je wszystkie, więc nowy graf jest objęty bez dopisywania i nie ma osobnych plików
-  testów na graf. Świadomie dopisuje się go w dwóch tabelkach tego testu: które grafy mają
-  narzędzia wiedzy i jaki wynik podać jego atrapie.
+  testów na graf. Świadomie dopisuje się go w dwóch miejscach: w tabelce tego testu, które
+  grafy mają narzędzia wiedzy, i w `GIVEN_OUTPUTS` próbek helpera grafów
+  (`tests/_helpers/graphs/samples.py`), jaki wynik podać jego atrapie.
 - **Dwa kształty przebiegu.** Bez narzędzi wiedzy: anonymize → agent → respond. Z nimi: pętla
   agent ⇄ run_tools, a o kierunku po turze modelu decyduje wspólne `route_after_agent()` z
   `agent_graphs/base.py` — po tym, CO model wywołał, i po limicie tur: narzędzia wiedzy →
@@ -2762,6 +2763,9 @@ w p. 46.
 - Scenariusze „pytań już nie trzeba" (`suggest_questions`, p. 59):
   `pytest tests/evaluation/test_api_agent_graphs_questions_live.py -m llm_live` — **kosztuje,
   pytaj przed**; sprawa to pętla agenta, kilka tur modelu
+- Scenariusze rozpoznania (`search`: cytowanie kodu jako przyczyny, p. 59):
+  `pytest tests/evaluation/test_api_agent_graphs_search_live.py -m llm_live` — **kosztuje,
+  pytaj przed**; wymaga zbudowanej paczki syntetycznej i ripgrepa na hoście
 - **Podając marker, podaj też folder** — marker odsiewa dopiero PO imporcie, więc bez ścieżki
   pytest wczytuje wszystkie pliki testowe, żeby uruchomić kilkanaście (kolekcja podzbioru spada
   wtedy trzykrotnie). Foldery i markery można łączyć:
@@ -2919,16 +2923,16 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1923 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 736 (79)           | 96 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1942 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 777 (79)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 110 (9)            | 10 s |
-| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 71 (38)            | 38 s |
+| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 78 (38)            | 38 s |
 
 Liczby z 2026-10-15, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-2773 testy, około 150 s; domyślny `pytest`, bez stacku: 2647 testów, 41 s. Testy `llm_live` —
-36 integracyjnych i 31 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
+2833 testy, około 150 s; domyślny `pytest`, bez stacku: 2707 testów, 41 s. Testy `llm_live` —
+36 integracyjnych i 38 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
 przebiegów.
 
 #### Zasady ogólne
@@ -3019,7 +3023,8 @@ przebiegów.
   „znalezione → odczytane" leży w pliku odczytu.
 - **Ewaluacyjne stoją dziś na paczce syntetycznej i golden200**, więc liczby pilnują głównie
   tego, że ścieżka się nie zepsuła. Zgodność indeksu syntetycznego z plikami paczki sprawdzają
-  fixture'y z `tests/evaluation/conftest.py`.
+  fixture'y z `tests/evaluation/conftest.py`; porównanie i pomiary leżą w helperach
+  `synthetic_docs` i `golden_tickets`.
 - **Narzędzia kodu: integracyjne bez modelu na aplikacji syntetycznej, ewaluacyjne na kodzie
   Dokusa.** Zapytania z zestawu syntetycznego idą przez prawdziwy węzeł `run_tools`, bo odmowa
   bywa dziełem modelu zapytania albo narzędzia, a model ma w obu przypadkach dostać błąd
@@ -3089,7 +3094,10 @@ przebiegów.
   wejściu, regule ani materiale atrap, pola chronione i oczekiwane z modelu wyniku, droga ataku
   pasująca do narzędzi grafu, sprawa i pole tekstowe z materiału atrap, obie drogi ataku w grafie
   z regułami i trzy — wejście, karta, wątek — w grafie czytającym zgłoszenia) pilnuje test bez
-  modelu. Nowy graf to sekcja zestawu.
+  modelu. Nowy graf to sekcja zestawu. W `search` treści dla klienta nie ma, więc polem
+  chronionym jest lista źródeł: znacznikiem jest klucz źródła w kodzie (`code:` i ścieżka
+  pliku), który atak każe zacytować jako przyczynę, a ta sama ścieżka w uwagach jest tylko
+  licznikiem.
 - **Bramki mają drugi test na żywym modelu: werdykt na parach reguł**
   (`tests/evaluation/test_api_agent_graphs_gates_live.py`, zestaw
   `data/safe/golden/gates.json` z sekcją na bramkę). Na każdą regułę zestawu domyślnego są
@@ -3119,6 +3127,20 @@ przebiegów.
   jedną przyczynę wprost, a nie tylko zawęża. O pytaniach mówi pole `text` wyniku; pytania
   zbędne i brak pytań przy konkurujących przyczynach mają osobne testy i wymagają zera. Czy uwagi
   nazywają wykluczone przyczyny i czy pytania nie powtarzają już zadanych, czyta się w raporcie.
+- **`search` ma drugi test na żywym modelu: cytowanie kodu jako przyczyny**
+  (`tests/evaluation/test_api_agent_graphs_search_live.py`, zestaw
+  `data/safe/golden/search.json`). Narzędzia kodu są prawdziwe, na paczce aplikacji
+  syntetycznej, a zgłoszenia i instrukcje to atrapy. Cztery sprawy w dwóch parach: komunikat
+  stoi tylko w kodzie i ten sam układ z komunikatem, którego nie ma nigdzie, choć jego słowa
+  stoją w pliku, który kusi; wątek, w którym klient wyklucza jedną przyczynę, i to samo
+  zgłoszenie bez wątku. Pola sprawy z `must_` to warunki testu, z `should_` — liczniki
+  w raporcie, a `phenomenon` mówi krótko, czego oczekujemy po modelu. Trzy warunki, każdy
+  wymaga zera: wymagany plik wśród cytowań przyczyny, brak cytowania przyczyny przy komunikacie,
+  którego nie ma nigdzie, i cytowanie tylko linii odczytanych wcześniej — z wyniku
+  `read_code_file` albo `read_code_symbol` we wcześniejszej turze; linia widziana tylko
+  w wyniku szukania odczytana nie jest. Raport liczy spisy katalogu, nazwę pliku widocznego
+  tylko w spisie w uwagach i cytowanie fragmentu, który wątek wyklucza. Cytowania i odczyty
+  ocena bierze z wyników narzędzi w rozmowie, nie z deklaracji modelu.
 - **Testy generacji parametryzuje się po rejestrze grafów**, a osobno sprawdza nieznany
   wariant (422) i wariant `requires_hits` bez trafień (pusta lista źródeł, a nie wygenerowane
   rozwiązanie).
@@ -3144,12 +3166,16 @@ przebiegów.
 | `tests/_helpers/transport/`            | test klienta HTTP: `with_transport()`, `always()`, `routed()`, `capturing()`, `raising()` |
 | `tests/_helpers/postgres/`             | narzędzie na prawdziwej tabeli z podmienionym klientem (`ScriptedPostgres`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
-| `tests/_helpers/live/`                 | żywy model: konfiguracja (`live_generation_llm()`), graf na nim (`run_live_graph()`, z regułami klienta), sprawy grafu naraz (`run_live_cases()` na `LiveCase`: wejście, reguły, narzędzia), reguły z zestawu domyślnego (`default_rules()`), pomiar raz na graf (`remember_per_graph()`), raport zużycia (fixture `live_usage`) i wydruk rozmowy (`run_as_lines()`) |
+| `tests/_helpers/live/`                 | żywy model: konfiguracja (`live_generation_llm()`), graf na nim (`run_live_graph()`, z regułami klienta), sprawy grafu naraz (`run_live_cases()` na `LiveCase`: wejście, reguły, narzędzia), reguły z zestawu domyślnego (`default_rules()`), pomiar raz na graf (`remember_per_graph()`), sprawy testu okablowania grafów (`measure_example_case()` i dwie sprawy `suggest_solution`), raport zużycia (fixture `live_usage`) i wydruk rozmowy (`run_as_lines()`) |
+| `tests/_helpers/graphs/`               | grafy aplikacji: lista pakietów (`graph_modules()`, `graph_name()` jako `ids`), typy i pola wyniku, reguły i źródła w stanie, składanie na atrapach (`fake_nodes()`, `built_from()`, `expected_edges()`) |
 | `tests/_helpers/scenarios/injections/` | zestaw wstrzyknięć, sprawy sekcji z atakiem także w materiale atrap, kontrola dotarcia (`reached_model()`), ocena sprawy i raport (fixture `injection_report`) |
 | `tests/_helpers/scenarios/gates/`      | zestaw scenariuszy bramek, ocena werdyktu i raport (fixture `gate_report`) |
 | `tests/_helpers/scenarios/polish/`     | zestaw scenariuszy „Popraw", ocena tekstu i raport (fixture `polish_report`) |
 | `tests/_helpers/scenarios/questions/`  | zestaw scenariuszy „pytań już nie trzeba", ocena i raport (fixture `questions_report`) |
-| `tests/_helpers/synthetic_code/`       | aplikacja syntetyczna: zbudowana paczka, jej źródło i reguły, opis projektu, mapa symboli i zapytania z zestawu syntetycznego |
+| `tests/_helpers/scenarios/search/`     | zestaw scenariuszy rozpoznania, narzędzia sprawy (`case_tools()`), cytowania kodu z rozmowy, ocena i raport (fixture `search_report`) |
+| `tests/_helpers/synthetic_code/`       | aplikacja syntetyczna: zbudowana paczka, jej źródło i reguły, opis projektu, mapa symboli, zapytania z zestawu syntetycznego i prawdziwe narzędzia kodu na niej (`synthetic_code_tools()`) |
+| `tests/_helpers/synthetic_docs/`       | dokumentacja syntetyczna: indeks wobec paczki (`table_differences()`, `collection_differences()`) i pomiary obu wyszukiwań w dokumentacji |
+| `tests/_helpers/golden_tickets/`       | golden set zgłoszeń: zapytania, dystraktory, korpus odniesienia, pomiar `find_tickets_vector` i filtra jakości |
 
 - **Każdy helper ma folder w `tests/_helpers/`, także bez modeli — dla spójności (2026-10-15,
   wcześniej pliki `tests/helpers_*.py`).** W folderze `helper.py` z logiką, `models/`
@@ -3166,15 +3192,27 @@ przebiegów.
   czego jest potrzebna, a słownik stoi po jednym kluczu w linii. Wyjątek: test podmienia
   funkcję w module, z którego woła ją kod (`tests._helpers.live.helper`), bo podmiana
   w pakiecie nie dosięgnęłaby wywołania.
+- **Plik testu ma same testy (2026-10-15).** Poza testami stoją w nim tylko `pytestmark`,
+  fixture'y tego pliku i parametry liczone przy imporcie (`SECTIONS`, listy `pytest.param`).
+  Logika, stałe i dane idą do helpera, którego dotyczą: ocena do `helper.py`, przebieg spraw na
+  żywym modelu do `measure.py`, a zmyślone dane, na których stoją asercje (wejścia, wyniki,
+  skróty wołające ocenę), do `samples.py`. Powód: logika między testami utrudniała czytanie,
+  a plik testu ma się czytać jak lista tego, co sprawdzone. `measure.py` leży osobno od oceny,
+  bo bierze i ocenę, i raport, a raport bierze funkcje z `helper.py`: w jednym pliku powstałby
+  cykl importów. `samples.py` pakiet helpera nie wystawia, żeby test na żywym modelu nie wziął
+  przez pomyłkę danych testu jednostkowego; test importuje próbki z ich modułu
+  (`from tests._helpers.scenarios.gates.samples import BLOCK`).
 - **Scenariusze z p. 59 stoją razem w `tests/_helpers/scenarios/`, folder na scenariusz
   (2026-10-15).** Wszystkie mają ten sam układ: zestaw z `data/safe/golden/`, sprawy, ocena
-  i raport, a 59.7 i 59.8 dołożą kolejne. Na górze `_helpers/` zostają atrapy i podmiany
-  zależności oraz infrastruktura żywego modelu (`live`), z której korzystają też testy spoza
-  scenariuszy. Nazwa od wzorca, nie `graphs`: grafom służy prawie każdy helper.
+  i raport; 59.7 dołożył `search`, a 59.8 dołoży kolejny. Na górze `_helpers/` zostają
+  atrapy i podmiany zależności, infrastruktura żywego modelu (`live`), grafy (`graphs`) i dane
+  pomiarów ewaluacyjnych (`synthetic_docs`, `golden_tickets`), z których korzystają też testy
+  spoza scenariuszy. Nazwa od wzorca, nie od grafów: grafom służy prawie każdy helper,
+  a `graphs` to helper odczytu i składania samych grafów.
 - **Wszystko do testów na żywym modelu stoi w `tests/_helpers/live/` (2026-10-15, wcześniej
   `live_graphs`, `live_usage` i `live_generation_llm()` w `tests/conftest.py`).** W
-  `helper.py` wejście do modelu i przebieg grafu, w `report.py` raport zużycia z funkcjami
-  wydruku. `live_generation_llm()` to zwykła funkcja, nie fixture, a biorą ją też testy
+  `helper.py` wejście do modelu i przebieg grafu, w `measure.py` sprawy testu okablowania
+  grafów, w `report.py` raport zużycia z funkcjami wydruku. `live_generation_llm()` to zwykła funkcja, nie fixture, a biorą ją też testy
   samego klienta modelu, więc nie pasowała ani do conftestu, z którego się nie importuje,
   ani do helpera z „graphs” w nazwie. W conftestcie zostały fixture'y.
 
@@ -3806,8 +3844,9 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   (zestaw `data/safe/golden/injections.json`), więc w kolejnych podpunktach to sekcja zestawu.
   Pary „łamie / poprawna" bramek mają od 59.3 własny test (zestaw
   `data/safe/golden/gates.json`), więc w 59.4 to też sekcja zestawu, „Popraw" od 59.5
-  (zestaw `data/safe/golden/polish.json`), a „pytań już nie trzeba" od 59.6 (zestaw
-  `data/safe/golden/questions.json`). *Dlaczego:* da się je uruchomić przed
+  (zestaw `data/safe/golden/polish.json`), „pytań już nie trzeba" od 59.6 (zestaw
+  `data/safe/golden/questions.json`), a cytowanie kodu w rozpoznaniu od 59.7 (zestaw
+  `data/safe/golden/search.json`). *Dlaczego:* da się je uruchomić przed
   anonimizatorem, więc prompty dostają sygnał z modelu docelowego wcześniej niż z p. 21–28;
   tamtych pomiarów nie zastępują, bo scenariusze pisze autor promptów; stoi po p. 11, bo ocenia
   odpowiedź przepuszczoną przez właściwy `respond`.

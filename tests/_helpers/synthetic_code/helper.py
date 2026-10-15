@@ -9,6 +9,8 @@ commitem — test jej nie buduje (CLAUDE.md -> „Świadomie pominięte").
 | `synthetic_code_package()` | czytnik zbudowanej paczki syntetycznej                      |
 | `synthetic_code_description()` | czytnik jej opisu projektu i metryczki                  |
 | `synthetic_code_symbols()` | czytnik jej mapy symboli                                    |
+| `synthetic_code_texts()`   | treść każdego pliku zbudowanej paczki, po ścieżce           |
+| `synthetic_code_tools()`   | sześć prawdziwych narzędzi kodu na tej paczce               |
 | `synthetic_code_cases()`   | sekcję jednego narzędzia z `code-synthetic.json`            |
 | `synthetic_absent_paths()` | pliki ze źródła, których paczka nie może zawierać           |
 | `line_of()`                | numer linii, w której stoi fragment zapisany w zestawie     |
@@ -35,11 +37,20 @@ O czym pamiętać przy zmianach:
 import json
 from typing import Any
 
+from app.agent_tools import AgentTool
+from app.agent_tools.code.describe_code import DescribeCodeTool
+from app.agent_tools.code.find_code_text import FindCodeTextTool
+from app.agent_tools.code.list_code_files import ListCodeFilesTool
+from app.agent_tools.code.quote_code import QuoteCodeTool
+from app.agent_tools.code.read_code_file import ReadCodeFileTool
+from app.agent_tools.code.read_code_symbol import ReadCodeSymbolTool
 from app.core_service.loader_code_description import CodeDescription
 from app.core_service.loader_code_package import CodePackage
 from app.core_service.loader_code_symbols import CodeSymbols
+from app.engine_process.ripgrep import RipgrepClient
 from tests._helpers.synthetic_code.constants import (
     BUILD_COMMAND,
+    SEARCH_TIMEOUT_SECONDS,
     SYNTHETIC_CASES_FILE,
     SYNTHETIC_PACKAGE_DIR,
 )
@@ -110,6 +121,71 @@ def synthetic_code_symbols() -> CodeSymbols:
     assert built, f"paczka syntetyczna nie ma mapy symboli — zbuduj ją: {BUILD_COMMAND}"
 
     return CodeSymbols(SYNTHETIC_PACKAGE_DIR)
+
+
+def synthetic_code_texts() -> dict[str, str]:
+    """
+    Description:
+    Treść każdego pliku zbudowanej paczki syntetycznej, po ścieżce względem `repo/` — tej samej,
+    którą przyjmują narzędzia kodu. Odmawia, gdy paczki nie zbudowano.
+
+    Example args:
+        (brak)
+
+    Example result:
+        {"src/lib/Urzad/Szablony/RejestrSzablonow.php": "<?php\n\nnamespace Urzad\\Szablony;…", …}
+
+    Raises:
+        AssertionError: paczki syntetycznej nie zbudowano
+    """
+    repo  = SYNTHETIC_PACKAGE_DIR / "repo"
+    built = repo.is_dir()
+
+    assert built, f"brak zbudowanej paczki syntetycznej — zbuduj ją: {BUILD_COMMAND}"
+
+    texts = {
+        path.relative_to(repo).as_posix(): path.read_text(encoding="utf-8")
+        for path in sorted(repo.rglob("*"))
+        if path.is_file()
+    }
+
+    return texts
+
+
+def synthetic_code_tools() -> list[AgentTool]:
+    """
+    Description:
+    Sześć prawdziwych narzędzi kodu na paczce syntetycznej, w kolejności `TOOL_NAMES` grafów:
+    opis projektu, szukanie ripgrepem, spis katalogu, odczyt pliku, odczyt symbolu i cytowanie.
+    Do scenariuszy na żywym modelu, w których model ma dojść w kodzie do miejsca albo nie znaleźć
+    niczego — atrapa szukania zawsze oddaje te same linie, więc sprawy „nigdzie” nie zagra.
+    Odmawia, gdy paczki nie zbudowano.
+
+    Example args:
+        (brak)
+
+    Example result:
+        [DescribeCodeTool(…), FindCodeTextTool(…), ListCodeFilesTool(…), ReadCodeFileTool(…),
+         ReadCodeSymbolTool(…), QuoteCodeTool(…)]
+
+    Raises:
+        AssertionError: paczki syntetycznej, jej metryczki albo mapy symboli nie zbudowano
+    """
+    package     = synthetic_code_package()
+    description = synthetic_code_description()
+    symbols     = synthetic_code_symbols()
+    ripgrep     = RipgrepClient(timeout=SEARCH_TIMEOUT_SECONDS)
+
+    tools: list[AgentTool] = [
+        DescribeCodeTool(description=description),
+        FindCodeTextTool(package=package, ripgrep=ripgrep, symbols=symbols),
+        ListCodeFilesTool(package=package),
+        ReadCodeFileTool(package=package),
+        ReadCodeSymbolTool(package=package, symbols=symbols),
+        QuoteCodeTool(package=package, description=description),
+    ]
+
+    return tools
 
 
 def synthetic_code_cases(

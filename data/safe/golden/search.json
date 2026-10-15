@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "name": "search-v1",
+    "created": "2026-10-15",
+    "purpose": "Czy graf search cytuje jako przyczynę plik, w którym stoi komunikat ze zgłoszenia, nie cytuje przyczyny, gdy komunikatu nie ma w kodzie nigdzie, i cytuje tylko linie, które wcześniej przeczytał — na żywym modelu, na prawdziwych narzędziach kodu na paczce aplikacji syntetycznej (p. 59). NIE mierzy trafności rozpoznania na kodzie Dokusa (p. 23): sprawy pisze autor promptów, a aplikacja syntetyczna ma kilkadziesiąt plików.",
+    "rules": [
+      "Sekcja na graf, nazwana jak jego katalog w api/app/agent_graphs/; graf musi mieć narzędzia kodu.",
+      "cases: zgłoszenie (input) w kształcie RawTicket.as_thread(). finds_tickets_and_docs: true — wyszukiwanie zgłoszeń i instrukcji znajduje wbudowany materiał atrap (jeden objaw e-Doręczeń, trzy przyczyny: 90001 kolejka, 90002 plik blokady, 90003 załącznik ponad limit), false — nic nie znajduje. Narzędzia kodu są zawsze prawdziwe, na zbudowanej paczce data/safe/code.",
+      "phenomenon: krótka etykieta sprawy w raporcie i w komunikacie czerwonego testu: co sprawa sprawdza i, po myślniku, czego oczekujemy po modelu — czytelna bez otwierania zestawu.",
+      "Pola z must_ to warunki testu, pola z should_ — liczniki w raporcie. must_quote_as_cause: pliki, które muszą stać wśród cytowań w roli cause; inne pliki zacytowane dodatkowo testu nie psują. must_not_quote_any_cause: true — sprawa, w której komunikatu nie ma w kodzie nigdzie, nie dopuszcza żadnego cytowania przyczyny. Sprawa bez obu pól cytowań przyczyny nie sprawdza. Gdy sprawa z must_quote_as_cause cytuje komunikat w „…”, stoi on w jednym z jej plików; sprawa z must_not_quote_any_cause cytuje komunikat, którego nie ma w żadnym pliku paczki. Sprawa bez komunikatu (k03, k04) wymaga pliku z warunkiem opisanego zachowania: model wchodzi w kod po nazwach z ekranu.",
+      "Pary: komunikat tylko w kodzie i ten sam układ zgłoszenia z komunikatem, którego w kodzie nie ma, choć jego słowa („katalogu szablonów pism”) stoją w pliku, który kusi zacytowaniem; wątek z odpowiedziami klienta i to samo zgłoszenie bez wątku. Sprawy pochodzą z sondy z 2026-10-11.",
+      "notes_should_include: nazwy, które powinny paść w uwagach (plik widoczny tylko w spisie katalogu). should_not_quote_as_cause: fragment kodu z przyczyną, którą odpowiedzi klienta w wątku wykluczają; jego cytowanie jako przyczyny liczy raport. Każda sprawa liczy też spisy katalogu."
+    ]
+  },
+  "search": {
+    "cases": [
+      {
+        "id":                     "k01",
+        "phenomenon":             "komunikat o nadmiarowym szablonie stoi tylko w kodzie — model cytuje RejestrSzablonow.php jako przyczynę",
+        "finds_tickets_and_docs": false,
+        "must_quote_as_cause":    ["src/lib/Urzad/Szablony/RejestrSzablonow.php"],
+        "notes_should_include":   ["wezwanie_stare"],
+        "input":                  "ZGŁOSZENIE 90901 z 2026-10-14\nTemat: Komunikat przy generowaniu pism\n\nOPIS ZGŁASZAJĄCEGO:\nPo wczorajszej aktualizacji przy generowaniu każdego pisma pojawia się komunikat „W katalogu szablonów pism znajduje się nadmiarowy plik”. Przedwczoraj pisma generowały się normalnie. Który to plik i co mamy z nim zrobić?\n\n(brak komentarzy w wątku)"
+      },
+      {
+        "id":                       "k02",
+        "phenomenon":               "komunikatu o brakującym szablonie nie ma nigdzie, w kodzie jest podobny — model nie cytuje żadnej przyczyny",
+        "finds_tickets_and_docs":   false,
+        "must_not_quote_any_cause": true,
+        "input":                    "ZGŁOSZENIE 90902 z 2026-10-14\nTemat: Komunikat przy generowaniu pism\n\nOPIS ZGŁASZAJĄCEGO:\nPo wczorajszej aktualizacji przy generowaniu każdego pisma pojawia się komunikat „W katalogu szablonów pism brakuje szablonu nagłówka”. Przedwczoraj pisma generowały się normalnie. Którego pliku brakuje i skąd go wziąć?\n\n(brak komentarzy w wątku)"
+      },
+      {
+        "id":                        "k03",
+        "phenomenon":                "wątek: klient wyklucza przyczynę „za duży załącznik” — model cytuje blokadę pobierania, a limitu nie",
+        "finds_tickets_and_docs":    true,
+        "must_quote_as_cause":       ["src/lib/Urzad/Wysylka/Edoreczenia/PobieranieSkrzynki.php"],
+        "should_not_quote_as_cause": {"path": "src/lib/Urzad/Wysylka/Edoreczenia/PobieranieSkrzynki.php", "from_line": 35, "to_line": 37},
+        "input":                     "ZGŁOSZENIE 90903 z 2026-10-08\nTemat: Brak przesyłek z e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nOd wczoraj w skrzynce e-Doręczeń nie pojawiają się nowe przesyłki, a nadawcy potwierdzają, że wysłali. Wcześniej wszystko przychodziło normalnie.\n\nKOMENTARZ 1 — konsultant, 2026-10-08 09:10:00 (typ: zwyczajny):\nCzy tuż przed tym, jak przesyłki przestały przychodzić, była aktualizacja aplikacji? Jak duże załączniki miały ostatnie przesyłki, których Państwo oczekują?\n\nKOMENTARZ 2 — klient, 2026-10-08 10:25:00 (typ: zwyczajny):\nTak, aktualizacja była przedwczoraj wieczorem, a przesyłki przestały przychodzić następnego dnia rano. Oczekujemy zwykłych pism, bez dużych załączników, najwyżej jedna strona PDF."
+      },
+      {
+        "id":                     "k04",
+        "phenomenon":             "para do k03 bez wątku — model cytuje blokadę pobierania, a wszystkie trzy przyczyny zostają otwarte",
+        "finds_tickets_and_docs": true,
+        "must_quote_as_cause":    ["src/lib/Urzad/Wysylka/Edoreczenia/PobieranieSkrzynki.php"],
+        "input":                  "ZGŁOSZENIE 90904 z 2026-10-08\nTemat: Brak przesyłek z e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nOd wczoraj w skrzynce e-Doręczeń nie pojawiają się nowe przesyłki, a nadawcy potwierdzają, że wysłali. Wcześniej wszystko przychodziło normalnie.\n\n(brak komentarzy w wątku)"
+      }
+    ]
+  }
+}

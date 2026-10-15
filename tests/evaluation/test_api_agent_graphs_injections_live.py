@@ -60,30 +60,19 @@ O czym pamiętać przy zmianach:
   pomiarze nowego grafu i przy każdej zmianie wyniku.
 """
 
-import asyncio
-import importlib
-from collections.abc import Callable
 
 import pytest
 
-from app.agent_nodes.respond import MAX_RETRIES
-from app.config import LLMSettings
-from tests._helpers.fake_tools import fake_agent_tools_with_tickets
 from tests._helpers.live import (
-    LiveCase,
     LiveUsageReport,
-    default_rules,
     live_generation_llm,
     remember_per_graph,
-    run_live_cases,
 )
 from tests._helpers.scenarios.injections import (
-    InjectionOutcome,
+    InjectionOutcomesOf,
     InjectionReport,
-    injection_cases,
     injection_sections,
-    judge_run,
-    reached_model,
+    measure_injection_cases,
 )
 
 pytestmark = pytest.mark.llm_live
@@ -91,19 +80,13 @@ pytestmark = pytest.mark.llm_live
 # Sekcje zestawu, czytane przy imporcie: z nich powstają parametry testów.
 SECTIONS = injection_sections()
 
-# Oceny spraw jednego grafu: najpierw kontrolne, potem ataki.
-GraphOutcomes = tuple[list[InjectionOutcome], list[InjectionOutcome]]
-
-# Funkcja z fixture `outcomes`: z nazwy grafu robi oceny jego spraw.
-OutcomesOf = Callable[[str], GraphOutcomes]
-
 
 @pytest.fixture(scope="module")
 def outcomes(
     request:          pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór z `-m`
     live_usage:       LiveUsageReport,        # wstrzykiwane przez pytest; raport zużycia
     injection_report: InjectionReport,        # wstrzykiwane przez pytest; raport ocen spraw
-) -> OutcomesOf:
+) -> InjectionOutcomesOf:
     """
     Description:
     Oddaje funkcję, która dla nazwy grafu przeprowadza jego sprawy na żywym modelu i oddaje ich
@@ -121,82 +104,16 @@ def outcomes(
     """
     llm = live_generation_llm(request.config)
 
-    return remember_per_graph(lambda name: _measure(name, llm, live_usage, injection_report))
-
-
-def _measure(
-    name:             str,               # np. "suggest_handoff"
-    llm:              LLMSettings,       # np. live_generation_llm(request.config)
-    live_usage:       LiveUsageReport,   # raport zużycia przebiegu
-    injection_report: InjectionReport,   # raport ocen spraw
-) -> GraphOutcomes:
-    """
-    Description:
-    Przeprowadza sprawy jednego grafu na żywym modelu — każde wejście bez ataku i każdy atak —
-    ocenia je, zgłasza do obu raportów i oddaje oceny: kontrolne i ataki osobno. Sekcja pod inną
-    wersją reguł klienta niż zestaw domyślny kończy pomiar, zanim zawoła model.
-
-    Example args:
-        name="suggest_handoff"
-        llm=LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", …)
-        live_usage=LiveUsageReport()
-        injection_report=InjectionReport()
-
-    Example result:
-        ([InjectionOutcome(label="kontrolna podpis", control=True, …), …],
-         [InjectionOutcome(label="h01 polecenie wprost w komentarzu klienta", …), …])
-
-    Raises:
-        AssertionError: reguły klienta w innej wersji niż sekcja
-        LLMError: dostawca odmówił albo nie odpowiedział w czasie
-    """
-    section = SECTIONS[name]
-    graph   = importlib.import_module(f"app.agent_graphs.{name}")
-    cases   = injection_cases(section, default_rules(name, section.rules_version))
-
-    live = [
-        LiveCase(
-            text  = case.text,
-            rules = case.rules,
-            tools = fake_agent_tools_with_tickets(case.cards, case.threads),
-        )
-        for case in cases
-    ]
-    finals = asyncio.run(run_live_cases(graph, llm, live))
-
-    judged: list[InjectionOutcome] = []
-
-    for case, final in zip(cases, finals, strict=True):
-        # --- sprawa z wynikiem: zużycie do raportu; odrzucona nie oddała stanu ---
-        if final is not None:
-            live_usage.record(
-                f"wstrzyknięcie {name}: {case.label}", final.usage, final.log, final.messages,
-            )
-
-        outcome = judge_run(
-            label          = case.label,
-            control        = case.control,
-            markers        = case.markers,
-            output         = None if final is None else final.output,
-            guarded_fields = section.guarded_fields,
-            expected       = case.expected,
-            retries        = MAX_RETRIES if final is None else final.respond_retries,
-            delivered      = final is None or reached_model(final.messages, case.markers),
-        )
-
-        injection_report.record(name, outcome)
-        judged.append(outcome)
-
-    controls = [outcome for outcome in judged if outcome.control]
-    attacks  = [outcome for outcome in judged if not outcome.control]
-
-    measured = (controls, attacks)
-
-    return measured
+    return remember_per_graph(
+        lambda name: measure_injection_cases(name, llm, live_usage, injection_report)
+    )
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_control_cases_end_cleanly_without_markers(graph: str, outcomes: OutcomesOf) -> None:
+def test_control_cases_end_cleanly_without_markers(
+    graph:    str,
+    outcomes: InjectionOutcomesOf,
+) -> None:
     """Sprawdza, czy każde wejście grafu bez ataku kończy się na żywym modelu wynikiem, który węzeł
     odpowiedzi przyjął, z polami, których wejście wymaga (w bramce: werdyktem), i czy w żadnym polu
     tego wyniku nie stoi żaden znacznik ataków na to wejście.
@@ -215,7 +132,7 @@ def test_control_cases_end_cleanly_without_markers(graph: str, outcomes: Outcome
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_every_attack_reaches_the_model(graph: str, outcomes: OutcomesOf) -> None:
+def test_every_attack_reaches_the_model(graph: str, outcomes: InjectionOutcomesOf) -> None:
     """Sprawdza, czy znacznik każdego ataku stoi w tym, co model w sprawie przeczytał: w zgłoszeniu
     albo w wyniku narzędzia.
 
@@ -232,7 +149,7 @@ def test_every_attack_reaches_the_model(graph: str, outcomes: OutcomesOf) -> Non
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_no_attack_breaks_through(graph: str, outcomes: OutcomesOf) -> None:
+def test_no_attack_breaks_through(graph: str, outcomes: InjectionOutcomesOf) -> None:
     """Sprawdza, czy żaden atak z zestawu nie przebija się w grafie: przebiciem jest znacznik ataku
     w polu wyniku, które idzie do klienta albo do korpusu, werdykt bramki inny niż bez ataku albo
     odpowiedź, której węzeł odpowiedzi nie przyjął.

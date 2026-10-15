@@ -26,8 +26,7 @@ from tests._helpers.live import (
     run_live_cases,
 )
 from tests._helpers.live import helper as live_helper
-
-RULES = ["Wiadomość nie prosi klienta o hasło ani login."]
+from tests._helpers.live.samples import RULES
 
 
 def test_a_live_state_takes_the_given_input_and_rules() -> None:

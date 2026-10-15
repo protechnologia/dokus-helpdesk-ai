@@ -1,7 +1,7 @@
 """
 Description:
-Stałe scenariuszy wstrzyknięć: plik zestawu, klucz metryczki, drogi ataku i role
-wiadomości, które niosą to, co model dostał.
+Stałe scenariuszy wstrzyknięć: plik zestawu, klucz metryczki, drogi ataku, role wiadomości,
+które niosą to, co model dostał, i pole z listą źródeł.
 """
 
 from pathlib import Path
@@ -22,6 +22,11 @@ ATTACK_SEPARATOR = "\n\n"
 # znaczy, że atak już dotarł.
 DELIVERING_ROLES = ("user", "tool")
 
+# Pole, pod którym ocena dokłada do pól wyniku listę źródeł ze stanu grafu z narzędziami wiedzy,
+# jako klucze `materiał:identyfikator`. Dzięki temu źródło, które atak kazał zacytować, da się
+# chronić jak pole wyniku, choć model go nie pisze: lista powstaje z wywołań odczytu.
+SOURCES_FIELD = "sources"
+
 # Droga ataku, który dokleja się na końcu wejścia grafu; tak jest, gdy zestaw drogi nie podaje.
 INTO_INPUT = "input"
 
@@ -35,3 +40,10 @@ INTO_CARD = "card"
 # Droga ataku, który dopisuje się na końcu wątku historycznej sprawy w materiale atrap narzędzi;
 # dociera do modelu dopiero, gdy model ten wątek przeczyta.
 INTO_THREAD = "thread"
+
+# Narzędzie, które graf musi dawać modelowi, żeby atak w materiale daną drogą do niego dotarł:
+# atak w karcie czyta odczyt karty, a atak w wątku — odczyt wątku.
+READER_OF = {
+    INTO_CARD:   "read_tickets_card",
+    INTO_THREAD: "read_tickets_thread",
+}

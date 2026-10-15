@@ -2,41 +2,15 @@
 Description:
 Testy oceny sprawy i raportu scenariuszy bramek (`tests/_helpers/scenarios/gates/`), czyli
 tego, na czym stoją testy fałszywych alarmów i przepuszczeń bramek na żywym modelu. Bez
-modelu — werdykt podaje test. Plik stoi w korzeniu folderu, bo ocena służy wszystkim bramkom.
+modelu — werdykt podaje test, a próbki leżą w `samples.py` helpera. Plik stoi w korzeniu
+folderu, bo ocena służy wszystkim bramkom.
 """
 
 import pytest
 
 from app.core_model.graphs.verdict import Verdict
 from tests._helpers.scenarios.gates import GateCase, GateOutcome, GateReport, judge_gate_case
-
-BLOCK = Verdict(verdict="block", reasons=["Prośba o hasło."], hint="Usuń prośbę o hasło.")
-PASS  = Verdict(verdict="pass")
-
-
-def _case(
-    kind: str,      # np. "trap"
-    rule: int = 1,  # np. 2
-) -> GateCase:
-    """
-    Description:
-    Sprawa bramki danego rodzaju przy danej regule, z identyfikatorem złożonym z obu.
-
-    Example args:
-        kind="trap"
-        rule=1
-
-    Example result:
-        GateCase(case_id="1-trap", rule=1, kind="trap", text="Dzień dobry, …")
-    """
-    case = GateCase(
-        case_id = f"{rule}-{kind}",
-        rule    = rule,
-        kind    = kind,
-        text    = "Dzień dobry, …",
-    )
-
-    return case
+from tests._helpers.scenarios.gates.samples import BLOCK, PASS, gate_case
 
 
 @pytest.mark.parametrize(
@@ -50,7 +24,7 @@ def _case(
         ("trap",    BLOCK, "FAŁSZYWY ALARM"),
     ],
 )
-def test_a_verdict_is_judged_against_the_kind_of_case(
+def test_a_verdict_is_judged_against_the_kind_ofgate_case(
     kind:       str,
     verdict:    Verdict,
     assessment: str,
@@ -61,7 +35,7 @@ def test_a_verdict_is_judged_against_the_kind_of_case(
 
     Wyłapuje ocenę, która myli kierunki albo traktuje pułapkę jak wiadomość łamiącą: test
     fałszywych alarmów liczyłby wtedy przepuszczenia i odwrotnie."""
-    outcome = judge_gate_case(_case(kind), verdict, retries=0)
+    outcome = judge_gate_case(gate_case(kind), verdict, retries=0)
 
     assert outcome.assessment  == assessment
     assert outcome.false_alarm == (assessment == "FAŁSZYWY ALARM")
@@ -76,7 +50,7 @@ def test_a_rejected_answer_is_neither_a_false_alarm_nor_a_miss(kind: str) -> Non
 
     Wyłapuje ocenę, która brak werdyktu dolicza do błędnych werdyktów: helpdesk dostaje wtedy 503
     i decyduje sam, więc to osobny rodzaj porażki, nie błędny werdykt."""
-    outcome = judge_gate_case(_case(kind), None, retries=1)
+    outcome = judge_gate_case(gate_case(kind), None, retries=1)
 
     assert outcome.rejected
     assert not outcome.false_alarm
@@ -107,9 +81,9 @@ def test_the_report_counts_per_gate_and_per_rule_and_prints_whole_verdicts() -> 
     powodu."""
     report = GateReport()
 
-    report.record("gate_reply", judge_gate_case(_case("breaks", rule=1), BLOCK, retries=0))
-    report.record("gate_reply", judge_gate_case(_case("trap", rule=1), BLOCK, retries=0))
-    report.record("gate_reply", judge_gate_case(_case("breaks", rule=2), None, retries=1))
+    report.record("gate_reply", judge_gate_case(gate_case("breaks", rule=1), BLOCK, retries=0))
+    report.record("gate_reply", judge_gate_case(gate_case("trap", rule=1), BLOCK, retries=0))
+    report.record("gate_reply", judge_gate_case(gate_case("breaks", rule=2), None, retries=1))
 
     assert report.lines() == [
         "gate_reply: fałszywych alarmów 1 z 1, przepuszczeń 0 z 2, nie do przyjęcia 1",
@@ -137,12 +111,12 @@ def test_an_empty_report_prints_nothing() -> None:
     assert GateReport().lines() == []
 
 
-def test_an_outcome_keeps_its_case() -> None:
+def test_an_outcome_keeps_itsgate_case() -> None:
     """Sprawdza, czy ocena niesie sprawę, której dotyczy, razem z werdyktem i liczbą poprawek.
 
     Wyłapuje ocenę, która gubi sprawę albo poprawki: raport nie powiedziałby wtedy, której
     reguły dotyczy werdykt ani że model potrzebował drugiej tury."""
-    case    = _case("correct", rule=3)
+    case    = gate_case("correct", rule=3)
     outcome = judge_gate_case(case, PASS, retries=1)
 
     assert outcome == GateOutcome(

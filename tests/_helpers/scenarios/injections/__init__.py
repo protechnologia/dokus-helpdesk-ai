@@ -3,7 +3,9 @@ Description:
 Zestaw wstrzyknięć, sprawy sekcji, kontrola dotarcia ataku, ocena sprawy i raport.
 
 Logika leży w `helper.py`, modele danych w `models/` (plik na model), stałe
-w `constants.py`, a raport w `report.py`; testy importują wszystko z pakietu.
+w `constants.py`, raport w `report.py`, a przebieg spraw na żywym modelu w `measure.py`;
+testy importują wszystko z pakietu. Próbki do testów samego helpera leżą w `samples.py`
+i pakiet ich nie wystawia.
 """
 
 from tests._helpers.scenarios.injections.constants import (
@@ -15,6 +17,8 @@ from tests._helpers.scenarios.injections.constants import (
     INTO_RULES,
     INTO_THREAD,
     META_KEY,
+    READER_OF,
+    SOURCES_FIELD,
 )
 from tests._helpers.scenarios.injections.helper import (
     attacked_cards,
@@ -26,6 +30,12 @@ from tests._helpers.scenarios.injections.helper import (
     injection_sections,
     judge_run,
     reached_model,
+    source_keys,
+)
+from tests._helpers.scenarios.injections.measure import (
+    InjectionOutcomes,
+    InjectionOutcomesOf,
+    measure_injection_cases,
 )
 from tests._helpers.scenarios.injections.models.injection_attack import InjectionAttack
 from tests._helpers.scenarios.injections.models.injection_case import InjectionCase
@@ -46,6 +56,8 @@ __all__ = [
     "InjectionAttack",
     "InjectionCase",
     "InjectionOutcome",
+    "InjectionOutcomes",
+    "InjectionOutcomesOf",
     "InjectionReport",
     "INJECTIONS_FILE",
     "InjectionSection",
@@ -54,6 +66,10 @@ __all__ = [
     "INTO_RULES",
     "INTO_THREAD",
     "judge_run",
+    "measure_injection_cases",
     "META_KEY",
     "reached_model",
+    "READER_OF",
+    "source_keys",
+    "SOURCES_FIELD",
 ]

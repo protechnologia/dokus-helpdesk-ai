@@ -9,6 +9,7 @@ Logika leży w `helper.py`, stałe w `constants.py`; testy importują wszystko z
 from tests._helpers.synthetic_code.constants import (
     BUILD_COMMAND,
     REPO_ROOT,
+    SEARCH_TIMEOUT_SECONDS,
     SYNTHETIC_CASES_FILE,
     SYNTHETIC_PACKAGE_DIR,
     SYNTHETIC_RULES_FILE,
@@ -21,18 +22,23 @@ from tests._helpers.synthetic_code.helper import (
     synthetic_code_description,
     synthetic_code_package,
     synthetic_code_symbols,
+    synthetic_code_texts,
+    synthetic_code_tools,
 )
 
 __all__ = [
     "BUILD_COMMAND",
     "line_of",
     "REPO_ROOT",
+    "SEARCH_TIMEOUT_SECONDS",
     "synthetic_absent_paths",
     "SYNTHETIC_CASES_FILE",
     "synthetic_code_cases",
     "synthetic_code_description",
     "synthetic_code_package",
     "synthetic_code_symbols",
+    "synthetic_code_texts",
+    "synthetic_code_tools",
     "SYNTHETIC_PACKAGE_DIR",
     "SYNTHETIC_RULES_FILE",
     "SYNTHETIC_SOURCE_DIR",

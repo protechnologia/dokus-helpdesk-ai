@@ -16,24 +16,15 @@ ma, więc te warunki pilnuje się w domyślnym `pytest`.
 | i pułapkę                                   |                                               |
 """
 
-import importlib
-import pkgutil
-from typing import get_args
 
 import pytest
 
-import app.agent_graphs
 from app.core_model.graphs.verdict import Verdict
 from app.core_service.loader_dict_rules import get_rule_set
+from tests._helpers.graphs import graph_module, graph_names, has_rules, output_types
 from tests._helpers.scenarios.gates import EXPECTED_VERDICTS, gate_sections
 
 SECTIONS = gate_sections()
-
-GRAPH_NAMES = {
-    module.name
-    for module in pkgutil.iter_modules(app.agent_graphs.__path__)
-    if module.ispkg
-}
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
@@ -43,13 +34,12 @@ def test_every_section_names_a_gate(graph: str) -> None:
 
     Wyłapuje sekcję z literówką w nazwie, której sprawy nie zostałyby nigdy sprawdzone, i sekcję
     grafu, który nie jest bramką: ocena czytałaby werdykt z wyniku, który go nie ma."""
-    assert graph in GRAPH_NAMES
+    assert graph in graph_names()
 
-    module     = importlib.import_module(f"app.agent_graphs.{graph}")
-    annotation = module.STATE.model_fields["output"].annotation
+    module = graph_module(graph)
 
-    assert "rules" in module.STATE.model_fields
-    assert Verdict in get_args(annotation)
+    assert has_rules(module)
+    assert Verdict in output_types(module)
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))

@@ -33,26 +33,18 @@ O czym pamiętać przy zmianach:
   0,01 USD i kilka sekund.
 """
 
-import asyncio
-import importlib
-from collections.abc import Callable
 
 import pytest
 
-from app.agent_nodes.respond import MAX_RETRIES
-from app.config import LLMSettings
 from tests._helpers.live import (
-    LiveCase,
     LiveUsageReport,
-    default_rules,
     live_generation_llm,
     remember_per_graph,
-    run_live_cases,
 )
 from tests._helpers.scenarios.polish import (
-    PolishOutcome,
+    PolishOutcomesOf,
     PolishReport,
-    judge_polish_case,
+    measure_polish_cases,
     polish_sections,
 )
 
@@ -61,16 +53,13 @@ pytestmark = pytest.mark.llm_live
 # Sekcje zestawu, czytane przy imporcie: z nich powstają parametry testów.
 SECTIONS = polish_sections()
 
-# Funkcja z fixture `outcomes`: z nazwy grafu robi oceny jego spraw.
-OutcomesOf = Callable[[str], list[PolishOutcome]]
-
 
 @pytest.fixture(scope="module")
 def outcomes(
     request:       pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór z `-m`
     live_usage:    LiveUsageReport,        # wstrzykiwane przez pytest; raport zużycia
     polish_report: PolishReport,           # wstrzykiwane przez pytest; raport ocen spraw
-) -> OutcomesOf:
+) -> PolishOutcomesOf:
     """
     Description:
     Oddaje funkcję, która dla nazwy grafu przeprowadza jego sprawy na żywym modelu i oddaje ich
@@ -85,64 +74,13 @@ def outcomes(
     """
     llm = live_generation_llm(request.config)
 
-    return remember_per_graph(lambda name: _measure(name, llm, live_usage, polish_report))
-
-
-def _measure(
-    name:          str,              # np. "polish"
-    llm:           LLMSettings,      # np. live_generation_llm(request.config)
-    live_usage:    LiveUsageReport,  # raport zużycia przebiegu
-    polish_report: PolishReport,     # raport ocen spraw
-) -> list[PolishOutcome]:
-    """
-    Description:
-    Przeprowadza wszystkie sprawy grafu na żywym modelu, z zasadami stylu z zestawu domyślnego,
-    ocenia je, zgłasza do obu raportów i oddaje oceny. Sekcja pod inną wersją zasad kończy
-    pomiar, zanim zawoła model.
-
-    Example args:
-        name="polish"
-        llm=LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", …)
-        live_usage=LiveUsageReport()
-        polish_report=PolishReport()
-
-    Example result:
-        [PolishOutcome(case=PolishCase(case_id="s01", …), colloquial=(), lost=(), …), …]
-
-    Raises:
-        AssertionError: zasady stylu w innej wersji niż sekcja
-        LLMError: dostawca odmówił albo nie odpowiedział w czasie
-    """
-    section = SECTIONS[name]
-    graph   = importlib.import_module(f"app.agent_graphs.{name}")
-    rules   = default_rules(name, section.rules_version)
-
-    cases  = [LiveCase(text=case.text, rules=rules) for case in section.cases]
-    finals = asyncio.run(run_live_cases(graph, llm, cases))
-
-    judged: list[PolishOutcome] = []
-
-    for case, final in zip(section.cases, finals, strict=True):
-        # --- sprawa z wynikiem: zużycie do raportu; odrzucona nie oddała stanu ---
-        if final is not None:
-            live_usage.record(
-                f"popraw {name}: {case.label}", final.usage, final.log, final.messages,
-            )
-
-        outcome = judge_polish_case(
-            case    = case,
-            output  = None if final is None else final.output,
-            retries = MAX_RETRIES if final is None else final.respond_retries,
-        )
-
-        polish_report.record(name, outcome)
-        judged.append(outcome)
-
-    return judged
+    return remember_per_graph(
+        lambda name: measure_polish_cases(name, llm, live_usage, polish_report)
+    )
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_every_case_gets_an_accepted_text(graph: str, outcomes: OutcomesOf) -> None:
+def test_every_case_gets_an_accepted_text(graph: str, outcomes: PolishOutcomesOf) -> None:
     """Sprawdza, czy każda sprawa „Popraw” kończy się na żywym modelu tekstem, który węzeł
     odpowiedzi przyjął.
 
@@ -156,7 +94,7 @@ def test_every_case_gets_an_accepted_text(graph: str, outcomes: OutcomesOf) -> N
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_colloquial_words_disappear(graph: str, outcomes: OutcomesOf) -> None:
+def test_colloquial_words_disappear(graph: str, outcomes: PolishOutcomesOf) -> None:
     """Sprawdza, czy w żadnym poprawionym tekście nie zostaje słowo potoczne z notatek.
 
     Wyłapuje „Popraw”, które przepisuje notatki prawie dosłownie: wiadomość z „śmiga” albo
@@ -170,7 +108,7 @@ def test_colloquial_words_disappear(graph: str, outcomes: OutcomesOf) -> None:
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_facts_from_the_notes_stay(graph: str, outcomes: OutcomesOf) -> None:
+def test_facts_from_the_notes_stay(graph: str, outcomes: PolishOutcomesOf) -> None:
     """Sprawdza, czy każdy fakt z notatek (liczba, skrót, nazwa produktu) zostaje w poprawionym
     tekście.
 
@@ -185,7 +123,7 @@ def test_facts_from_the_notes_stay(graph: str, outcomes: OutcomesOf) -> None:
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_no_numbers_or_names_are_added(graph: str, outcomes: OutcomesOf) -> None:
+def test_no_numbers_or_names_are_added(graph: str, outcomes: PolishOutcomesOf) -> None:
     """Sprawdza, czy w żadnym poprawionym tekście nie ma liczby spoza notatek ani dopisku
     z pułapek sprawy (ścieżki menu, terminu, dodatkowego kroku).
 

@@ -30,25 +30,18 @@ O czym pamiętać przy zmianach:
   `gpt-6.1-sol` to 0,09 USD i około minuty.
 """
 
-import asyncio
-import importlib
-from collections.abc import Callable
 
 import pytest
 
-from app.agent_nodes.respond import MAX_RETRIES
-from app.config import LLMSettings
 from tests._helpers.live import (
-    LiveCase,
     LiveUsageReport,
     live_generation_llm,
     remember_per_graph,
-    run_live_cases,
 )
 from tests._helpers.scenarios.questions import (
-    QuestionsOutcome,
+    QuestionsOutcomesOf,
     QuestionsReport,
-    judge_questions_case,
+    measure_questions_cases,
     questions_sections,
 )
 
@@ -57,16 +50,13 @@ pytestmark = pytest.mark.llm_live
 # Sekcje zestawu, czytane przy imporcie: z nich powstają parametry testów.
 SECTIONS = questions_sections()
 
-# Funkcja z fixture `outcomes`: z nazwy grafu robi oceny jego spraw.
-OutcomesOf = Callable[[str], list[QuestionsOutcome]]
-
 
 @pytest.fixture(scope="module")
 def outcomes(
     request:          pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór z `-m`
     live_usage:       LiveUsageReport,        # wstrzykiwane przez pytest; raport zużycia
     questions_report: QuestionsReport,        # wstrzykiwane przez pytest; raport ocen spraw
-) -> OutcomesOf:
+) -> QuestionsOutcomesOf:
     """
     Description:
     Oddaje funkcję, która dla nazwy grafu przeprowadza jego sprawy na żywym modelu i oddaje ich
@@ -81,61 +71,13 @@ def outcomes(
     """
     llm = live_generation_llm(request.config)
 
-    return remember_per_graph(lambda name: _measure(name, llm, live_usage, questions_report))
-
-
-def _measure(
-    name:             str,              # np. "suggest_questions"
-    llm:              LLMSettings,      # np. live_generation_llm(request.config)
-    live_usage:       LiveUsageReport,  # raport zużycia przebiegu
-    questions_report: QuestionsReport,  # raport ocen spraw
-) -> list[QuestionsOutcome]:
-    """
-    Description:
-    Przeprowadza wszystkie sprawy grafu na żywym modelu, na atrapach wszystkich narzędzi, ocenia
-    je, zgłasza do obu raportów i oddaje oceny.
-
-    Example args:
-        name="suggest_questions"
-        llm=LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", …)
-        live_usage=LiveUsageReport()
-        questions_report=QuestionsReport()
-
-    Example result:
-        [QuestionsOutcome(case=QuestionsCase(case_id="w01", …), asked=False, …), …]
-
-    Raises:
-        LLMError: dostawca odmówił albo nie odpowiedział w czasie
-    """
-    section = SECTIONS[name]
-    graph   = importlib.import_module(f"app.agent_graphs.{name}")
-
-    cases  = [LiveCase(text=case.text) for case in section.cases]
-    finals = asyncio.run(run_live_cases(graph, llm, cases))
-
-    judged: list[QuestionsOutcome] = []
-
-    for case, final in zip(section.cases, finals, strict=True):
-        # --- sprawa z wynikiem: zużycie do raportu; odrzucona nie oddała stanu ---
-        if final is not None:
-            live_usage.record(
-                f"pytania {name}: {case.label}", final.usage, final.log, final.messages,
-            )
-
-        outcome = judge_questions_case(
-            case    = case,
-            output  = None if final is None else final.output,
-            retries = MAX_RETRIES if final is None else final.respond_retries,
-        )
-
-        questions_report.record(name, outcome)
-        judged.append(outcome)
-
-    return judged
+    return remember_per_graph(
+        lambda name: measure_questions_cases(name, llm, live_usage, questions_report)
+    )
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_every_case_gets_an_accepted_answer(graph: str, outcomes: OutcomesOf) -> None:
+def test_every_case_gets_an_accepted_answer(graph: str, outcomes: QuestionsOutcomesOf) -> None:
     """Sprawdza, czy każda sprawa kończy się na żywym modelu wynikiem, który węzeł odpowiedzi
     przyjął: pytaniami albo samymi uwagami.
 
@@ -150,7 +92,7 @@ def test_every_case_gets_an_accepted_answer(graph: str, outcomes: OutcomesOf) ->
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_no_questions_once_the_facts_settle_it(graph: str, outcomes: OutcomesOf) -> None:
+def test_no_questions_once_the_facts_settle_it(graph: str, outcomes: QuestionsOutcomesOf) -> None:
     """Sprawdza, czy przy każdej sprawie, której fakty — z opisu albo z odpowiedzi klienta
     w wątku — zostawiają jedną przyczynę, wariant oddaje brak pytań zamiast listy.
 
@@ -165,7 +107,7 @@ def test_no_questions_once_the_facts_settle_it(graph: str, outcomes: OutcomesOf)
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_questions_while_causes_compete(graph: str, outcomes: OutcomesOf) -> None:
+def test_questions_while_causes_compete(graph: str, outcomes: QuestionsOutcomesOf) -> None:
     """Sprawdza, czy przy każdej sprawie, której fakty nie rozróżniają konkurujących przyczyn,
     wariant oddaje pytania, a nie „pytań już nie trzeba”.
 

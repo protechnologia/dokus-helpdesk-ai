@@ -40,31 +40,25 @@ O czym pamiętać przy zmianach:
   0,02 USD i kilka sekund; `gate_close` sześć: 0,01 USD.
 """
 
-import asyncio
-import importlib
-from collections.abc import Callable
 
 import pytest
 
-from app.agent_nodes.respond import MAX_RETRIES
-from app.config import LLMSettings
 from tests._helpers.live import (
-    LiveCase,
     LiveUsageReport,
-    default_rules,
     live_generation_llm,
     remember_per_graph,
-    run_live_cases,
 )
-from tests._helpers.scenarios.gates import GateOutcome, GateReport, gate_sections, judge_gate_case
+from tests._helpers.scenarios.gates import (
+    GateOutcomesOf,
+    GateReport,
+    gate_sections,
+    measure_gate_cases,
+)
 
 pytestmark = pytest.mark.llm_live
 
 # Sekcje zestawu, czytane przy imporcie: z nich powstają parametry testów.
 SECTIONS = gate_sections()
-
-# Funkcja z fixture `outcomes`: z nazwy bramki robi oceny jej spraw.
-OutcomesOf = Callable[[str], list[GateOutcome]]
 
 
 @pytest.fixture(scope="module")
@@ -72,7 +66,7 @@ def outcomes(
     request:     pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór z `-m`
     live_usage:  LiveUsageReport,        # wstrzykiwane przez pytest; raport zużycia
     gate_report: GateReport,             # wstrzykiwane przez pytest; raport ocen spraw
-) -> OutcomesOf:
+) -> GateOutcomesOf:
     """
     Description:
     Oddaje funkcję, która dla nazwy bramki przeprowadza jej sprawy na żywym modelu i oddaje ich
@@ -87,64 +81,11 @@ def outcomes(
     """
     llm = live_generation_llm(request.config)
 
-    return remember_per_graph(lambda name: _measure(name, llm, live_usage, gate_report))
-
-
-def _measure(
-    name:        str,              # np. "gate_reply"
-    llm:         LLMSettings,      # np. live_generation_llm(request.config)
-    live_usage:  LiveUsageReport,  # raport zużycia przebiegu
-    gate_report: GateReport,       # raport ocen spraw
-) -> list[GateOutcome]:
-    """
-    Description:
-    Przeprowadza wszystkie sprawy jednej bramki na żywym modelu, z regułami z zestawu domyślnego,
-    ocenia je, zgłasza do obu raportów i oddaje oceny. Sekcja pod inną wersją reguł kończy
-    pomiar, zanim zawoła model.
-
-    Example args:
-        name="gate_reply"
-        llm=LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", …)
-        live_usage=LiveUsageReport()
-        gate_report=GateReport()
-
-    Example result:
-        [GateOutcome(case=GateCase(case_id="g01", …), answer="block", …), …]
-
-    Raises:
-        AssertionError: reguły w innej wersji niż sekcja
-        LLMError: dostawca odmówił albo nie odpowiedział w czasie
-    """
-    section = SECTIONS[name]
-    graph   = importlib.import_module(f"app.agent_graphs.{name}")
-    rules   = default_rules(name, section.rules_version)
-
-    cases  = [LiveCase(text=case.text, rules=rules) for case in section.cases]
-    finals = asyncio.run(run_live_cases(graph, llm, cases))
-
-    judged: list[GateOutcome] = []
-
-    for case, final in zip(section.cases, finals, strict=True):
-        # --- sprawa z wynikiem: zużycie do raportu; odrzucona nie oddała stanu ---
-        if final is not None:
-            live_usage.record(
-                f"bramka {name}: {case.label}", final.usage, final.log, final.messages,
-            )
-
-        outcome = judge_gate_case(
-            case    = case,
-            output  = None if final is None else final.output,
-            retries = MAX_RETRIES if final is None else final.respond_retries,
-        )
-
-        gate_report.record(name, outcome)
-        judged.append(outcome)
-
-    return judged
+    return remember_per_graph(lambda name: measure_gate_cases(name, llm, live_usage, gate_report))
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_every_case_gets_an_accepted_verdict(graph: str, outcomes: OutcomesOf) -> None:
+def test_every_case_gets_an_accepted_verdict(graph: str, outcomes: GateOutcomesOf) -> None:
     """Sprawdza, czy każda sprawa bramki kończy się na żywym modelu werdyktem, który węzeł
     odpowiedzi przyjął.
 
@@ -158,7 +99,7 @@ def test_every_case_gets_an_accepted_verdict(graph: str, outcomes: OutcomesOf) -
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_no_correct_input_is_blocked(graph: str, outcomes: OutcomesOf) -> None:
+def test_no_correct_input_is_blocked(graph: str, outcomes: GateOutcomesOf) -> None:
     """Sprawdza, czy bramka nie blokuje żadnego poprawnego wejścia — ani bliźniaka łamiącego, ani
     pułapki.
 
@@ -174,7 +115,7 @@ def test_no_correct_input_is_blocked(graph: str, outcomes: OutcomesOf) -> None:
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_no_breaking_input_passes(graph: str, outcomes: OutcomesOf) -> None:
+def test_no_breaking_input_passes(graph: str, outcomes: GateOutcomesOf) -> None:
     """Sprawdza, czy bramka nie przepuszcza żadnego wejścia, które łamie regułę.
 
     Wyłapuje bramkę, która nie widzi złamania reguły: prośba o hasło, potoczne słowa albo zwrot

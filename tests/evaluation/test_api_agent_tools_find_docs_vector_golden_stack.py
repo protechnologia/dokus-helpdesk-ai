@@ -18,11 +18,12 @@ pokażą.
 
 Co się dzieje po drodze:
 
-1. Czyta 29 zapytań `find_docs_vector` z `data/safe/golden/docs-synthetic.json`: 24 ze wskazanymi
-   sekcjami (część także z dystraktorami) i 5, na które poprawną odpowiedzią jest pusty wynik.
+1. `measure_docs_vector()` z `tests/_helpers/synthetic_docs/` czyta 29 zapytań
+   `find_docs_vector` z `data/safe/golden/docs-synthetic.json`: 24 ze wskazanymi sekcjami (część
+   także z dystraktorami) i 5, na które poprawną odpowiedzią jest pusty wynik.
 2. Każde wysyła do `FindDocsVectorTool` na indeksie syntetycznym, z `RAG_TOP_K`
    i `RAG_DOCS_SCORE_MIN` z konfiguracji.
-3. Liczy trzy wielkości z tabelki.
+3. Liczy trzy wielkości z tabelki, a testy porównują je z progami.
 
 O czym pamiętać przy zmianach:
 
@@ -39,17 +40,17 @@ O czym pamiętać przy zmianach:
 """
 
 import asyncio
-import json
-from pathlib import Path
-from typing import NamedTuple
 
 import pytest
 
-from app.agent_tools.docs.find_docs_vector import FindDocsVectorQuery, FindDocsVectorTool
-from app.config import Settings
-from app.core_service.factory_docs_indexer import docs_index_names
-from app.db_qdrant import DbQdrantError, DocsCollection, QdrantClient
-from app.engine_embedding import EmbeddingClient
+from tests._helpers.synthetic_docs import (
+    BUILD_HINT,
+    MAX_UNANSWERED_WITH_HITS,
+    MIN_DISTRACTORS_BELOW,
+    MIN_EXPECTED_FIRST,
+    DocsVectorMeasurement,
+    measure_docs_vector,
+)
 from tests.conftest import build_host_settings
 
 pytestmark = [
@@ -58,131 +59,11 @@ pytestmark = [
     pytest.mark.stack_embedder,
 ]
 
-GOLDEN_FILE = Path("data/safe/golden/docs-synthetic.json")
-
-# Zmierzone 24 z 24; próg niżej, żeby wyłapać zepsutą ścieżkę, a nie zwykły dryf.
-MIN_EXPECTED_FIRST = 22
-
-# Zmierzone 9 z 9. Dystraktor to sekcja o tym samym zagadnieniu w innym kanale — postawiony
-# wyżej odwraca radę.
-MIN_DISTRACTORS_BELOW = 8
-
-# Zmierzone 1 z 5: jedno zapytanie dostaje dwie sekcje tuż nad progiem.
-MAX_UNANSWERED_WITH_HITS = 2
-
-BUILD_HINT = (
-    "zbuduj indeks syntetyczny: "
-    "docker compose exec api helpdesk docs index data/safe/instruction --synthetic --yes"
-)
-
-
-class Measurement(NamedTuple):
-    """
-    Description:
-    Wynik jednego przejścia zestawu przez narzędzie.
-    """
-
-    expected_first:       int  # zapytania z odpowiedzią, na które oczekiwana sekcja jest pierwsza
-    distractors_below:    int  # dystraktory niżej niż najlepsza oczekiwana sekcja albo nieobecne
-    distractors_total:    int  # wszystkie dystraktory zestawu
-    unanswered_with_hits: int  # zapytania bez odpowiedzi z co najmniej jedną sekcją
-
-
-def _queries() -> list[dict]:
-    """
-    Description:
-    Czyta zapytania `find_docs_vector` z zestawu paczki syntetycznej.
-
-    Example args:
-        (brak)
-
-    Example result:
-        [{"id": "v01", "query": {"text": "…"}, "expected": ["adm-…"], "distractors": ["adm-…"]}, …]
-    """
-    return json.loads(GOLDEN_FILE.read_text(encoding="utf-8"))["find_docs_vector"]
-
-
-async def _measure(
-    settings: Settings,  # np. Settings(embedding_base_url="http://localhost:8001", …)
-) -> Measurement:
-    """
-    Description:
-    Przepuszcza zestaw przez `FindDocsVectorTool` zbudowane tak jak w produkcie, tylko na
-    indeksie syntetycznym: `RAG_TOP_K` i `RAG_DOCS_SCORE_MIN` z konfiguracji. Indeks, którego nie
-    ma, wywala test z podpowiedzią, jak go zbudować.
-
-    Example args:
-        settings=Settings(embedding_base_url="http://localhost:8001", …)
-
-    Example result:
-        Measurement(expected_first=24, distractors_below=9, distractors_total=9,
-                    unanswered_with_hits=1)
-    """
-    _, collection_name = docs_index_names(settings, synthetic=True)
-
-    embedder = EmbeddingClient(
-        base_url = settings.embedding_base_url,
-        timeout  = settings.embedding_timeout_seconds,
-    )
-    qdrant = QdrantClient(
-        base_url = settings.qdrant_url,
-        timeout  = settings.qdrant_timeout_seconds,
-    )
-    tool = FindDocsVectorTool(
-        embedder  = embedder,
-        docs      = DocsCollection(qdrant, collection_name, settings.embedding_vector_size),
-        top_k     = settings.rag_top_k,
-        score_min = settings.rag_docs_score_min,
-    )
-
-    expected_first       = 0
-    distractors_below    = 0
-    distractors_total    = 0
-    unanswered_with_hits = 0
-
-    try:
-        for entry in _queries():
-            result = await tool.find(FindDocsVectorQuery(**entry["query"]))
-            found  = [item.section.section_id for item in result.sections]
-
-            # --- zapytanie bez odpowiedzi: każda zwrócona sekcja jest tu pomyłką ---
-            if not entry["expected"]:
-                unanswered_with_hits += bool(found)
-
-                continue
-
-            # --- zapytanie z odpowiedzią ---
-            expected_first += found[:1] != [] and found[0] in entry["expected"]
-
-            # Miejsce najlepszej oczekiwanej sekcji; gdy żadna nie wróciła, dystraktor nie ma
-            # od czego stać niżej.
-            places = [found.index(wanted) for wanted in entry["expected"] if wanted in found]
-
-            for distractor in entry.get("distractors", []):
-                distractors_total += 1
-                distractors_below += bool(places) and (
-                    distractor not in found or found.index(distractor) > min(places)
-                )
-    except DbQdrantError as exc:
-        # Brak kolekcji wygląda jak błąd zapytania; podpowiedź mówi, co zrobić.
-        pytest.fail(f"indeks syntetyczny nie odpowiada ({exc}) — {BUILD_HINT}")
-    finally:
-        await tool.aclose()
-
-    measurement = Measurement(
-        expected_first       = expected_first,
-        distractors_below    = distractors_below,
-        distractors_total    = distractors_total,
-        unanswered_with_hits = unanswered_with_hits,
-    )
-
-    return measurement
-
 
 @pytest.fixture(scope="module")
 def measurement(
     synthetic_docs_collection: None,  # warunek z conftest.py: kolekcja odpowiada plikom paczki
-) -> Measurement:
+) -> DocsVectorMeasurement:
     """
     Description:
     Robi pomiar raz na cały plik: 29 wyszukań przez prawdziwy embedder. Najpierw warunek
@@ -193,13 +74,13 @@ def measurement(
         synthetic_docs_collection=None
 
     Example result:
-        Measurement(expected_first=24, distractors_below=9, distractors_total=9,
-                    unanswered_with_hits=1)
+        DocsVectorMeasurement(expected_first=24, distractors_below=9, distractors_total=9,
+                              unanswered_with_hits=1)
     """
-    return asyncio.run(_measure(build_host_settings()))
+    return asyncio.run(measure_docs_vector(build_host_settings()))
 
 
-def test_the_expected_section_comes_back_first(measurement: Measurement) -> None:
+def test_the_expected_section_comes_back_first(measurement: DocsVectorMeasurement) -> None:
     """Sprawdza, czy wyszukiwanie w dokumentacji stawia właściwą sekcję na pierwszym miejscu: ma
     tak być dla co najmniej 22 z 24 zapytań, na które paczka ma odpowiedź.
 
@@ -212,7 +93,7 @@ def test_the_expected_section_comes_back_first(measurement: Measurement) -> None
     )
 
 
-def test_a_section_about_another_channel_stays_below(measurement: Measurement) -> None:
+def test_a_section_about_another_channel_stays_below(measurement: DocsVectorMeasurement) -> None:
     """Sprawdza, czy sekcja o tym samym zagadnieniu, ale w innym kanale (np. ePUAP zamiast
     e-Doręczeń), stoi niżej niż sekcja właściwa: ma tak być w co najmniej 8 z 9 takich par.
 
@@ -225,7 +106,7 @@ def test_a_section_about_another_channel_stays_below(measurement: Measurement) -
 
 
 def test_questions_the_documentation_does_not_answer_mostly_come_back_empty(
-    measurement: Measurement,
+    measurement: DocsVectorMeasurement,
 ) -> None:
     """Sprawdza, czy na pytania, których dokumentacja nie opisuje, wyszukiwanie nie oddaje nic:
     jakąkolwiek sekcję wolno dostać najwyżej 2 z 5 takich zapytań.
