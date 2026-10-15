@@ -2,14 +2,14 @@ import dataclasses
 from collections.abc import Mapping
 from typing import Any
 
-from tests._helpers.scenarios.search.models.search_case import SearchCase
+from tests._helpers.scenarios.code.models.code_case import CodeCase
 
 
 @dataclasses.dataclass(frozen=True)
-class SearchOutcome:
+class CodeOutcome:
     """Ocena jednej sprawy rozpoznania."""
 
-    case:                   SearchCase         # sprawa, której dotyczy ocena
+    case:                   CodeCase         # sprawa, której dotyczy ocena
     rejected:               bool               # `respond` nie przyjął odpowiedzi mimo poprawki
     cause_files:            tuple[str, ...]    # pliki zacytowane jako przyczyna, bez powtórzeń
     unread:                 tuple[str, ...]    # cytowania linii, których model wcześniej nie czytał

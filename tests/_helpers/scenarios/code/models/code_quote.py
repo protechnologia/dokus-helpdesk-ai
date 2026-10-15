@@ -1,6 +1,6 @@
 import dataclasses
 
-from tests._helpers.scenarios.search.models.code_fragment import CodeFragment
+from tests._helpers.scenarios.code.models.code_fragment import CodeFragment
 
 
 @dataclasses.dataclass(frozen=True)

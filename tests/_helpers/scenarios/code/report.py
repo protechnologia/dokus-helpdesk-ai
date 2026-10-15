@@ -1,13 +1,13 @@
 """
 Description:
-Raport scenariuszy rozpoznania (`search`): `SearchReport` zbiera oceny spraw z jednego przebiegu
+Raport scenariuszy cytowania kodu: `CodeReport` zbiera oceny spraw z jednego przebiegu
 pytesta i składa wydruk, który pytest pokazuje po testach — liczniki błędów, a pod nimi każdą
 sprawę z oceną, licznikami (przyczyny z kodu, spisy katalogu, nazwy w uwagach, fragment
 wykluczony przez wątek) i uwagami w całości.
 
 O czym pamiętać przy zmianach:
 
-- Raport dostaje się przez fixture `search_report` z `tests/conftest.py`, jeden na cały
+- Raport dostaje się przez fixture `code_report` z `tests/conftest.py`, jeden na cały
   przebieg; tam też stoi funkcja, która go wypisuje.
 - Pola wyniku wypisuje `field_lines()` z helpera wstrzyknięć, wspólna dla raportów
   scenariuszy, więc zmiana wydruku pól dotyczy wszystkich.
@@ -15,14 +15,14 @@ O czym pamiętać przy zmianach:
 
 from collections.abc import Sequence
 
+from tests._helpers.scenarios.code.models.code_outcome import CodeOutcome
 from tests._helpers.scenarios.injections import field_lines
-from tests._helpers.scenarios.search.models.search_outcome import SearchOutcome
 
 
-class SearchReport:
+class CodeReport:
     """
     Description:
-    Zbiera oceny spraw ze scenariuszy rozpoznania w jednym przebiegu pytesta i składa z nich
+    Zbiera oceny spraw ze scenariuszy cytowania kodu w jednym przebiegu pytesta i składa z nich
     wydruk: dla grafu linię z licznikami błędów, a pod nią każdą sprawę z oceną, licznikami
     i uwagami dla wdrożeniowca w całości.
 
@@ -33,7 +33,7 @@ class SearchReport:
     kodu od instalacji klienta, mówią liczniki i treść uwag — wydruk jest po to, żeby je przeczytać.
 
     Flow:
-        1. Test dostaje raport przez fixture `search_report` i woła `record()` raz na sprawę.
+        1. Test dostaje raport przez fixture `code_report` i woła `record()` raz na sprawę.
         2. Po przebiegu `pytest_terminal_summary()` wypisuje `lines()`.
     """
 
@@ -46,14 +46,14 @@ class SearchReport:
             (brak)
 
         Example result:
-            SearchReport bez zgłoszonych spraw
+            CodeReport bez zgłoszonych spraw
         """
-        self._records: list[tuple[str, SearchOutcome]] = []
+        self._records: list[tuple[str, CodeOutcome]] = []
 
     def record(
         self,
         graph:   str,            # np. "search"
-        outcome: SearchOutcome,  # np. judge_search_case(…)
+        outcome: CodeOutcome,  # np. judge_code_case(…)
     ) -> None:
         """
         Description:
@@ -61,7 +61,7 @@ class SearchReport:
 
         Example args:
             graph="search"
-            outcome=SearchOutcome(case=SearchCase(case_id="k01", …), cause_files=(…), …)
+            outcome=CodeOutcome(case=CodeCase(case_id="k01", …), cause_files=(…), …)
 
         Example result:
             None — sprawa jest w raporcie
@@ -110,7 +110,7 @@ class SearchReport:
 
 
 def _counts(
-    outcomes: Sequence[SearchOutcome],  # np. oceny spraw jednego grafu
+    outcomes: Sequence[CodeOutcome],  # np. oceny spraw jednego grafu
 ) -> str:
     """
     Description:
@@ -119,7 +119,7 @@ def _counts(
     nieodczytanych i odpowiedzi nie do przyjęcia.
 
     Example args:
-        outcomes=[SearchOutcome(case=SearchCase(must_quote_as_cause=("…",), …), …), …]
+        outcomes=[CodeOutcome(case=CodeCase(must_quote_as_cause=("…",), …), …), …]
 
     Example result:
         "bez pliku przyczyny w 1 z 1, przyczyna z luźnego pliku w 0 z 1, cytowania nieodczytane
@@ -141,7 +141,7 @@ def _counts(
 
 
 def _case_counters(
-    outcome: SearchOutcome,  # np. ocena sprawy z wynikiem
+    outcome: CodeOutcome,  # np. ocena sprawy z wynikiem
 ) -> str:
     """
     Description:
@@ -150,7 +150,7 @@ def _case_counters(
     je liczy.
 
     Example args:
-        outcome=SearchOutcome(case=SearchCase(notes_should_include=("wezwanie_stare",), …),
+        outcome=CodeOutcome(case=CodeCase(notes_should_include=("wezwanie_stare",), …),
                               listings=1, …)
 
     Example result:

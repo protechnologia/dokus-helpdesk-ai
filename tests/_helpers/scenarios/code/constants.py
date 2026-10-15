@@ -1,6 +1,6 @@
 """
 Description:
-Stałe scenariuszy rozpoznania (`search`): plik zestawu, klucz metryczki i nazwy narzędzi kodu,
+Stałe scenariuszy cytowania kodu: plik zestawu, klucz metryczki i nazwy narzędzi kodu,
 po których ocena czyta rozmowę.
 """
 
@@ -9,7 +9,7 @@ from pathlib import Path
 
 # Plik zestawu, który wczytuje się, gdy test nie poda innego. Ścieżka od korzenia repo, bo z niego
 # uruchamia się pytest.
-SEARCH_FILE = Path("data/safe/golden/search.json")
+CODE_FILE = Path("data/safe/golden/code.json")
 
 # Klucz metryczki zestawu: przy wczytywaniu sekcji jest pomijany, bo nie nazywa żadnego grafu.
 META_KEY = "meta"

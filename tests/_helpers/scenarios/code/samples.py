@@ -1,22 +1,22 @@
 """
 Description:
-Próbki do testów samego helpera rozpoznania (`tests/unit/test_search_report.py`): trzy sprawy,
+Próbki do testów samego helpera rozpoznania (`tests/unit/test_code_report.py`): trzy sprawy,
 uwagi i klocki rozmowy — wywołania narzędzi kodu razem z wynikami w tym samym kształcie, w jakim
 zapisuje je węzeł `run_tools`. Z klocków składa się rozmowę, na której test sprawdza, co ocena
 liczy jako odczytane i zacytowane.
 
-| co                    | do czego                                                            |
-|-----------------------|---------------------------------------------------------------------|
-| `CASE_IN_CODE`        | sprawa z wymaganym plikiem przyczyny i nazwą do wymienienia w uwagach |
-| `CASE_NOWHERE`        | sprawa, która nie dopuszcza żadnej przyczyny                        |
-| `CASE_THREAD`         | sprawa z wymaganym plikiem i fragmentem, którego nie powinien cytować |
-| `NOTES`               | uwagi, które wymieniają nadmiarowy plik                             |
-| `read_file()`         | odczyt pliku: wywołanie i wynik z liniami                           |
-| `read_symbol()`       | odczyt symbolu: wywołanie i wynik z liniami definicji               |
-| `quote()`             | cytowanie fragmentu: wywołanie i potwierdzenie                      |
-| `search_line()`       | szukanie: wywołanie i wynik z jedną linią                           |
-| `failed()`            | wywołanie, na które narzędzie oddało błąd                           |
-| `conversation()`      | rozmowa z tur: każda tura to wywołania modelu i wyniki narzędzi     |
+| co               | do czego                                                              |
+|------------------|-----------------------------------------------------------------------|
+| `CASE_IN_CODE`   | sprawa z wymaganym plikiem przyczyny i nazwą do wymienienia w uwagach |
+| `CASE_NOWHERE`   | sprawa, która nie dopuszcza żadnej przyczyny                          |
+| `CASE_THREAD`    | sprawa z wymaganym plikiem i fragmentem, którego nie powinien cytować |
+| `NOTES`          | uwagi, które wymieniają nadmiarowy plik                               |
+| `read_file()`    | odczyt pliku: wywołanie i wynik z liniami                             |
+| `read_symbol()`  | odczyt symbolu: wywołanie i wynik z liniami definicji                 |
+| `quote()`        | cytowanie fragmentu: wywołanie i potwierdzenie                        |
+| `search_line()`  | szukanie: wywołanie i wynik z jedną linią                             |
+| `failed()`       | wywołanie, na które narzędzie oddało błąd                             |
+| `conversation()` | rozmowa z tur: każda tura to wywołania modelu i wyniki narzędzi       |
 
 Przykład — odczyt w pierwszej turze, cytowanie w drugiej:
 
@@ -50,8 +50,8 @@ from app.agent_tools.code.read_code_symbol.models import (
     SymbolLine,
 )
 from app.engine_llm import ChatMessage, ToolCall
-from tests._helpers.scenarios.search.models.code_fragment import CodeFragment
-from tests._helpers.scenarios.search.models.search_case import SearchCase
+from tests._helpers.scenarios.code.models.code_case import CodeCase
+from tests._helpers.scenarios.code.models.code_fragment import CodeFragment
 
 # Plik z komunikatem o nadmiarowym szablonie: przyczyna w sprawie `CASE_IN_CODE`.
 TEMPLATES = "src/lib/Urzad/Szablony/RejestrSzablonow.php"
@@ -63,7 +63,7 @@ MAILBOX = "src/lib/Urzad/Wysylka/Edoreczenia/PobieranieSkrzynki.php"
 TICKET_HEAD = "ZGŁOSZENIE 90001 z 2026-10-14\nTemat: Pisma\n\nOPIS ZGŁASZAJĄCEGO:\n"
 
 # Sprawa, w której komunikat stoi tylko w kodzie: wymaga pliku przyczyny i nazwy pliku w uwagach.
-CASE_IN_CODE = SearchCase(
+CASE_IN_CODE = CodeCase(
     case_id                   = "k01",
     phenomenon                = "komunikat tylko w kodzie",
     text                      = f"{TICKET_HEAD}„Jest nadmiarowy plik”",
@@ -75,7 +75,7 @@ CASE_IN_CODE = SearchCase(
 )
 
 # Sprawa, w której komunikatu nie ma nigdzie: każde cytowanie przyczyny jest błędem.
-CASE_NOWHERE = SearchCase(
+CASE_NOWHERE = CodeCase(
     case_id                   = "k02",
     phenomenon                = "komunikatu nie ma nigdzie",
     text                      = f"{TICKET_HEAD}„Brak szablonu nagłówka”",
@@ -87,7 +87,7 @@ CASE_NOWHERE = SearchCase(
 )
 
 # Sprawa z wątkiem, w której klient wykluczył przyczynę z linii 35–37 pliku pobierania skrzynki.
-CASE_THREAD = SearchCase(
+CASE_THREAD = CodeCase(
     case_id                   = "k03",
     phenomenon                = "wątek wyklucza załącznik",
     text                      = f"{TICKET_HEAD}Od wczoraj nie ma nowych przesyłek z e-Doręczeń.",

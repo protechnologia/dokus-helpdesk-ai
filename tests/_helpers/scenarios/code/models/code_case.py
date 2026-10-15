@@ -1,11 +1,11 @@
 import dataclasses
 
-from tests._helpers.scenarios.search.models.code_fragment import CodeFragment
+from tests._helpers.scenarios.code.models.code_fragment import CodeFragment
 
 
 @dataclasses.dataclass(frozen=True)
-class SearchCase:
-    """Jedna sprawa rozpoznania z zestawu: zgłoszenie, materiał atrap i to, co ma z niej wyjść.
+class CodeCase:
+    """Jedna sprawa cytowania kodu z zestawu: zgłoszenie, materiał atrap i to, co ma z niej wyjść.
     Pola z `must_` są warunkami testu, pola z `should_` — licznikami w raporcie."""
 
     case_id:                   str                  # np. "k01"

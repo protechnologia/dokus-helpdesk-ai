@@ -58,11 +58,11 @@ from _pytest.terminal import TerminalReporter  # pytest 8.3 nie wystawia tego ty
 from app.config import Settings
 from app.db_postgres import PostgresClient
 from tests._helpers.live import LLM_LIVE_MARKER, LiveUsageReport
+from tests._helpers.scenarios.code import CodeReport
 from tests._helpers.scenarios.gates import GateReport
 from tests._helpers.scenarios.injections import InjectionReport
 from tests._helpers.scenarios.polish import PolishReport
 from tests._helpers.scenarios.questions import QuestionsReport
-from tests._helpers.scenarios.search import SearchReport
 
 EMBEDDER_URL_ENV     = "EMBEDDER_TEST_URL"
 EMBEDDER_URL_DEFAULT = "http://localhost:8001"
@@ -240,17 +240,17 @@ def questions_report(
 
 
 
-# Miejsce raportu rozpoznania w konfiguracji przebiegu, na tej samej zasadzie co raport zużycia.
-SEARCH_REPORT_KEY = pytest.StashKey[SearchReport]()
+# Miejsce raportu cytowania kodu w konfiguracji przebiegu, na tej samej zasadzie co raport zużycia.
+CODE_REPORT_KEY = pytest.StashKey[CodeReport]()
 
 
 @pytest.fixture(scope="session")
-def search_report(
+def code_report(
     pytestconfig: pytest.Config,  # wstrzykiwane przez pytest; trzyma raport na cały przebieg
-) -> SearchReport:
+) -> CodeReport:
     """
     Description:
-    Raport scenariuszy rozpoznania (`search`), jeden na cały przebieg pytesta. Test rozpoznania
+    Raport scenariuszy cytowania kodu, jeden na cały przebieg pytesta. Test cytowania kodu
     zgłasza w nim ocenę każdej sprawy, a po przebiegu pytest wypisuje ją razem z licznikami
     i uwagami dla wdrożeniowca.
 
@@ -258,12 +258,12 @@ def search_report(
         (wstrzykiwane przez pytest)
 
     Example result:
-        SearchReport wspólny dla wszystkich testów przebiegu
+        CodeReport wspólny dla wszystkich testów przebiegu
     """
-    if SEARCH_REPORT_KEY not in pytestconfig.stash:
-        pytestconfig.stash[SEARCH_REPORT_KEY] = SearchReport()
+    if CODE_REPORT_KEY not in pytestconfig.stash:
+        pytestconfig.stash[CODE_REPORT_KEY] = CodeReport()
 
-    return pytestconfig.stash[SEARCH_REPORT_KEY]
+    return pytestconfig.stash[CODE_REPORT_KEY]
 
 def pytest_terminal_summary(
     terminalreporter: TerminalReporter,  # wstrzykiwane przez pytest; pisze na ekran
@@ -272,7 +272,7 @@ def pytest_terminal_summary(
     """
     Description:
     Po przebiegu wypisuje raporty testów na żywym modelu: najpierw oceny spraw ze scenariuszy
-    wstrzyknięć, bramek, „Popraw”, pytań i rozpoznania z polami wyniku, potem zużycie żywego
+    wstrzyknięć, bramek, „Popraw”, pytań i cytowania kodu z polami wyniku, potem zużycie żywego
     modelu z sumą kosztu. Pytest woła tę funkcję sam, po nazwie. Raport, do którego żaden test
     niczego nie zgłosił — czyli każdy w przebiegu bez żywego modelu — nie wypisuje nic.
 
@@ -281,16 +281,16 @@ def pytest_terminal_summary(
 
     Example result:
         None — na końcu wyjścia pytesta stoją sekcje „wstrzyknięcia poleceń", „scenariusze
-        bramek", „scenariusze »Popraw«", „scenariusze pytań", „scenariusze rozpoznania"
+        bramek", „scenariusze »Popraw«", „scenariusze pytań", „scenariusze cytowania kodu"
         i „zużycie żywego modelu"
     """
     sections = [
-        ("wstrzyknięcia poleceń",   config.stash.get(INJECTION_REPORT_KEY, None)),
-        ("scenariusze bramek",      config.stash.get(GATE_REPORT_KEY, None)),
-        ("scenariusze „Popraw”",    config.stash.get(POLISH_REPORT_KEY, None)),
-        ("scenariusze pytań",       config.stash.get(QUESTIONS_REPORT_KEY, None)),
-        ("scenariusze rozpoznania", config.stash.get(SEARCH_REPORT_KEY, None)),
-        ("zużycie żywego modelu",   config.stash.get(LIVE_USAGE_KEY, None)),
+        ("wstrzyknięcia poleceń",        config.stash.get(INJECTION_REPORT_KEY, None)),
+        ("scenariusze bramek",           config.stash.get(GATE_REPORT_KEY, None)),
+        ("scenariusze „Popraw”",         config.stash.get(POLISH_REPORT_KEY, None)),
+        ("scenariusze pytań",            config.stash.get(QUESTIONS_REPORT_KEY, None)),
+        ("scenariusze cytowania kodu",   config.stash.get(CODE_REPORT_KEY, None)),
+        ("zużycie żywego modelu",        config.stash.get(LIVE_USAGE_KEY, None)),
     ]
 
     for title, report in sections:

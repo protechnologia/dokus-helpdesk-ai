@@ -1,8 +1,8 @@
 """
 Description:
-Testy wczytania zestawu, cytowań z rozmowy, oceny sprawy i raportu scenariuszy rozpoznania
-(`tests/_helpers/scenarios/search/`), czyli tego, na czym stoi test rozpoznania na żywym modelu.
-Bez modelu — rozmowę i wynik grafu podaje test. Sprawy, uwagi i klocki rozmowy leżą
+Testy wczytania zestawu, cytowań z rozmowy, oceny sprawy i raportu scenariuszy cytowania kodu
+(`tests/_helpers/scenarios/code/`), czyli tego, na czym stoi test cytowania kodu na żywym
+modelu. Bez modelu — rozmowę i wynik grafu podaje test. Sprawy, uwagi i klocki rozmowy leżą
 w `samples.py` helpera, więc tu stoją same testy.
 """
 
@@ -10,16 +10,16 @@ import json
 from pathlib import Path
 
 from app.agent_graphs.search.models import SearchNotes
-from tests._helpers.scenarios.search import (
+from tests._helpers.scenarios.code import (
     CodeFragment,
-    SearchReport,
+    CodeReport,
     code_quotes,
-    judge_search_case,
+    code_sections,
+    judge_code_case,
     listing_count,
     quoted_messages,
-    search_sections,
 )
-from tests._helpers.scenarios.search.samples import (
+from tests._helpers.scenarios.code.samples import (
     CASE_IN_CODE,
     CASE_NOWHERE,
     CASE_THREAD,
@@ -156,7 +156,7 @@ def test_the_set_reader_fills_absent_fields_with_no_requirement(tmp_path: Path) 
 
     Wyłapuje wczytanie, które pada na sprawie bez opcjonalnego pola albo zamienia brak zakazu
     na zakaz: sprawa bez wymogów kończyłaby się wtedy błędem albo fałszywym czerwonym testem."""
-    path = tmp_path / "search.json"
+    path = tmp_path / "code.json"
     body = {
         "meta":   {"name": "próba"},
         "search": {"cases": [
@@ -169,7 +169,7 @@ def test_the_set_reader_fills_absent_fields_with_no_requirement(tmp_path: Path) 
     }
     path.write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
 
-    bare, excluded = search_sections(path)["search"].cases
+    bare, excluded = code_sections(path)["search"].cases
 
     assert bare.must_quote_as_cause == ()
     assert bare.must_not_quote_any_cause is False
@@ -190,7 +190,7 @@ def test_a_case_with_its_file_quoted_and_named_is_matching() -> None:
         [quote("c3", TEMPLATES, 11, 25, "cause")],
     )
 
-    outcome = judge_search_case(CASE_IN_CODE, SearchNotes(internal_notes=NOTES), messages, 0)
+    outcome = judge_code_case(CASE_IN_CODE, SearchNotes(internal_notes=NOTES), messages, 0)
 
     assert outcome.assessment       == "zgodny"
     assert outcome.cause_files      == (TEMPLATES,)
@@ -210,8 +210,8 @@ def test_a_missing_file_and_a_cause_where_none_is_allowed_are_named() -> None:
     caused   = conversation(read, [quote("c2", TEMPLATES, 11, 25, "cause")])
     notes    = SearchNotes(internal_notes="## Kod aplikacji\n- nic")
 
-    missing = judge_search_case(CASE_IN_CODE, notes, excluded, 0)
-    stray   = judge_search_case(CASE_NOWHERE, notes, caused, 0)
+    missing = judge_code_case(CASE_IN_CODE, notes, excluded, 0)
+    stray   = judge_code_case(CASE_NOWHERE, notes, caused, 0)
 
     assert missing.missing_causes   == (TEMPLATES,)
     assert missing.missing_in_notes == ("wezwanie_stare",)
@@ -228,7 +228,7 @@ def test_an_unread_quote_is_named_in_the_assessment() -> None:
     przeczytał: cytowanie na ślepo przeszłoby, bo trafiło we właściwy plik."""
     messages = conversation([quote("c1", TEMPLATES, 11, 25, "cause")])
 
-    outcome = judge_search_case(CASE_IN_CODE, SearchNotes(internal_notes=NOTES), messages, 0)
+    outcome = judge_code_case(CASE_IN_CODE, SearchNotes(internal_notes=NOTES), messages, 0)
 
     assert outcome.unread     == (f"{TEMPLATES}:11-25",)
     assert outcome.assessment == f"CYTOWANIE LINII NIEODCZYTANYCH: {TEMPLATES}:11-25"
@@ -249,8 +249,8 @@ def test_the_fragment_not_to_quote_counts_only_when_quoted_as_cause() -> None:
     overlaps = conversation(read, [quote("c2", MAILBOX, 30, 35, "cause")])
     notes    = SearchNotes(internal_notes="## Kod aplikacji\n- blokada")
 
-    assert not judge_search_case(CASE_THREAD, notes, excluded, 0).ruled_out_cause_quoted
-    assert judge_search_case(CASE_THREAD, notes, overlaps, 0).ruled_out_cause_quoted
+    assert not judge_code_case(CASE_THREAD, notes, excluded, 0).ruled_out_cause_quoted
+    assert judge_code_case(CASE_THREAD, notes, overlaps, 0).ruled_out_cause_quoted
 
 
 def test_a_rejected_answer_has_no_findings_and_no_fields() -> None:
@@ -258,8 +258,8 @@ def test_a_rejected_answer_has_no_findings_and_no_fields() -> None:
     odpowiedzią nie do przyjęcia, bez znalezisk i bez pól.
 
     Wyłapuje ocenę, która brak wyniku liczy jako sprawę bez przyczyny i zalicza ją w parze
-    „nigdzie”, choć wdrożeniowiec dostałby błąd zamiast rozpoznania."""
-    outcome = judge_search_case(CASE_NOWHERE, None, (), 1)
+    „nigdzie”, choć wdrożeniowiec dostałby błąd zamiast wyniku."""
+    outcome = judge_code_case(CASE_NOWHERE, None, (), 1)
 
     assert outcome.rejected
     assert (outcome.cause_files, outcome.unread, outcome.stray_causes) == ((), (), ())
@@ -273,7 +273,7 @@ def test_the_report_counts_errors_and_prints_counters_and_notes() -> None:
 
     Wyłapuje raport, w którym liczniki mieszają sprawy z wymogiem i bez, i taki, który gubi licznik
     sprawy albo uwagi — a tylko z nich widać, czy model odróżnił kod od instalacji klienta."""
-    report = SearchReport()
+    report = CodeReport()
     named  = SearchNotes(internal_notes=NOTES)
     empty  = SearchNotes(internal_notes="—")
     caused = conversation(
@@ -285,10 +285,10 @@ def test_the_report_counts_errors_and_prints_counters_and_notes() -> None:
         [quote("c2", MAILBOX, 25, 29, "cause")],
     )
 
-    report.record("search", judge_search_case(CASE_IN_CODE, named, caused, 0))
-    report.record("search", judge_search_case(CASE_NOWHERE, empty, caused, 0))
-    report.record("search", judge_search_case(CASE_THREAD, empty, mailed, 0))
-    report.record("search", judge_search_case(CASE_NOWHERE, None, (), 1))
+    report.record("search", judge_code_case(CASE_IN_CODE, named, caused, 0))
+    report.record("search", judge_code_case(CASE_NOWHERE, empty, caused, 0))
+    report.record("search", judge_code_case(CASE_THREAD, empty, mailed, 0))
+    report.record("search", judge_code_case(CASE_NOWHERE, None, (), 1))
 
     assert report.lines() == [
         "search: bez pliku przyczyny w 0 z 2, przyczyna z luźnego pliku w 1 z 2, "
@@ -314,4 +314,4 @@ def test_an_empty_report_prints_nothing() -> None:
 
     Wyłapuje raport, który dopisywałby pustą sekcję do wyjścia każdego przebiegu bez żywego
     modelu."""
-    assert SearchReport().lines() == []
+    assert CodeReport().lines() == []

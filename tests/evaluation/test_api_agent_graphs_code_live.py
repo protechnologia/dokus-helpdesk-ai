@@ -1,10 +1,11 @@
 """
 Description:
-Scenariusze ewaluacyjne rozpoznania (`search`) na żywym modelu (p. 59): czy graf cytuje jako
-przyczynę plik, w którym stoi komunikat ze zgłoszenia, czy nie cytuje przyczyny, gdy komunikatu
-nie ma w kodzie nigdzie, choć podobny kusi, i czy cytuje tylko linie, które wcześniej przeczytał.
-Zestaw leży w `data/safe/golden/search.json`; narzędzia kodu są prawdziwe, na paczce aplikacji
-syntetycznej, a zgłoszenia i instrukcje to atrapy.
+Scenariusze ewaluacyjne cytowania kodu na żywym modelu (p. 59): czy graf z narzędziami kodu
+cytuje jako przyczynę plik, w którym stoi komunikat ze zgłoszenia, czy nie cytuje przyczyny, gdy
+komunikatu nie ma w kodzie nigdzie, choć podobny kusi, i czy cytuje tylko linie, które wcześniej
+przeczytał. Zestaw leży w `data/safe/golden/code.json`, z sekcją na graf (`search`,
+`suggest_questions`); narzędzia kodu są prawdziwe, na paczce aplikacji syntetycznej,
+a zgłoszenia i instrukcje to atrapy.
 
 Każdy graf z sekcją w zestawie przechodzi przez cztery testy:
 
@@ -17,9 +18,10 @@ Każdy graf z sekcją w zestawie przechodzi przez cztery testy:
 
 Pomiary:
 
-| graf     | bez pliku przyczyny | przyczyna z luźnego pliku | linie nieodczytane | pomiar |
-|----------|---------------------|---------------------------|--------------------|--------|
-| `search` | —                   | —                         | —                  | —      |
+| graf                | bez pliku przyczyny | z luźnego pliku | nieodczytane | pomiar |
+|---------------------|---------------------|-----------------|--------------|--------|
+| `search`            | —                   | —               | —            | —      |
+| `suggest_questions` | —                   | —               | —            | —      |
 
 O czym pamiętać przy zmianach:
 
@@ -28,32 +30,33 @@ O czym pamiętać przy zmianach:
 - Spis katalogu, nazwę pliku widocznego tylko w spisie i przyczynę wykluczoną przez wątek liczy
   raport, bez asercji; czy uwagi odróżniają stan kodu od instalacji klienta, czyta się w nich.
 - Wymaga zbudowanej paczki syntetycznej i ripgrepa na hoście, jak testy narzędzi kodu.
-- KOSZTUJE: sprawa to pętla agenta z narzędziami, 3–6 tur modelu; cztery sprawy na
-  `gpt-6.1-sol` to około 0,1–0,15 USD i około minuty.
+- KOSZTUJE: sprawa to pętla agenta z narzędziami, 3–6 tur modelu; sześć spraw (cztery
+  w `search`, dwie w `suggest_questions`) na `gpt-6.1-sol` to szacunkowo 0,15–0,25 USD
+  i około dwóch minut. Jeden graf przez `-k <graf>`.
 """
 
 import pytest
 
 from tests._helpers.live import LiveUsageReport, live_generation_llm, remember_per_graph
-from tests._helpers.scenarios.search import (
-    SearchOutcomesOf,
-    SearchReport,
-    measure_search_cases,
-    search_sections,
+from tests._helpers.scenarios.code import (
+    CodeOutcomesOf,
+    CodeReport,
+    code_sections,
+    measure_code_cases,
 )
 
 pytestmark = pytest.mark.llm_live
 
 # Sekcje zestawu, czytane przy imporcie: z nich powstają parametry testów.
-SECTIONS = search_sections()
+SECTIONS = code_sections()
 
 
 @pytest.fixture(scope="module")
 def outcomes(
     request:       pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie wybór z `-m`
     live_usage:    LiveUsageReport,        # wstrzykiwane przez pytest; raport zużycia
-    search_report: SearchReport,           # wstrzykiwane przez pytest; raport ocen spraw
-) -> SearchOutcomesOf:
+    code_report: CodeReport,           # wstrzykiwane przez pytest; raport ocen spraw
+) -> CodeOutcomesOf:
     """
     Description:
     Oddaje funkcję, która dla nazwy grafu przeprowadza jego sprawy na żywym modelu i oddaje ich
@@ -64,22 +67,23 @@ def outcomes(
         (wstrzykiwane przez pytest)
 
     Example result:
-        funkcja: outcomes("search") -> [SearchOutcome(case=SearchCase(case_id="k01", …), …), …]
+        funkcja: outcomes("search") -> [CodeOutcome(case=CodeCase(case_id="k01", …), …), …]
     """
     llm = live_generation_llm(request.config)
 
     return remember_per_graph(
-        lambda name: measure_search_cases(name, llm, live_usage, search_report)
+        lambda name: measure_code_cases(name, llm, live_usage, code_report)
     )
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_every_case_gets_an_accepted_answer(graph: str, outcomes: SearchOutcomesOf) -> None:
+def test_every_case_gets_an_accepted_answer(graph: str, outcomes: CodeOutcomesOf) -> None:
     """Sprawdza, czy każda sprawa kończy się na żywym modelu wynikiem, który węzeł odpowiedzi
-    przyjął: uwagami dla wdrożeniowca.
+    przyjął: uwagami dla wdrożeniowca w `search`, pytaniami albo samymi uwagami
+    w `suggest_questions`.
 
-    Wyłapuje prompt, przy którym model nie umie oddać rozpoznania w kształcie narzędzia odpowiedzi
-    nawet po poprawce: wdrożeniowiec dostaje wtedy błąd zamiast rozpoznania."""
+    Wyłapuje prompt, przy którym model nie umie oddać odpowiedzi w kształcie narzędzia odpowiedzi
+    nawet po poprawce: wdrożeniowiec dostaje wtedy błąd zamiast wyniku."""
     rejected = [outcome for outcome in outcomes(graph) if outcome.rejected]
 
     assert not rejected, (
@@ -90,12 +94,12 @@ def test_every_case_gets_an_accepted_answer(graph: str, outcomes: SearchOutcomes
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
 def test_the_file_with_the_message_is_quoted_as_cause(
     graph:    str,
-    outcomes: SearchOutcomesOf,
+    outcomes: CodeOutcomesOf,
 ) -> None:
     """Sprawdza, czy w każdej sprawie, której komunikat stoi tylko w kodzie, model zacytował jako
     przyczynę plik, w którym ten komunikat stoi.
 
-    Wyłapuje rozpoznanie, które komunikat znajduje, ale przyczyny nie wskazuje, albo wskazuje ją
+    Wyłapuje odpowiedź, która komunikat znajduje, ale przyczyny nie wskazuje, albo wskazuje ją
     w innym pliku: wdrożeniowiec nie dostaje na liście źródeł miejsca, które sprawę tłumaczy."""
     missing = [outcome for outcome in outcomes(graph) if outcome.missing_causes]
 
@@ -108,13 +112,13 @@ def test_the_file_with_the_message_is_quoted_as_cause(
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
 def test_no_cause_is_quoted_when_the_message_is_nowhere(
     graph:    str,
-    outcomes: SearchOutcomesOf,
+    outcomes: CodeOutcomesOf,
 ) -> None:
     """Sprawdza, czy w każdej sprawie, której komunikatu nie ma w kodzie nigdzie, model nie
     zacytował niczego jako przyczyny — także pliku z podobnym komunikatem.
 
     Wyłapuje przyczynę z luźno powiązanego pliku: na liście źródeł wdrożeniowiec dostałby miejsce
-    w kodzie, które jego sprawy nie tłumaczy, a wyglądałoby na rozpoznanie."""
+    w kodzie, które jego sprawy nie tłumaczy, a wyglądałoby na przyczynę."""
     stray = [outcome for outcome in outcomes(graph) if outcome.stray_causes]
 
     assert not stray, (
@@ -124,7 +128,7 @@ def test_no_cause_is_quoted_when_the_message_is_nowhere(
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_every_quote_points_at_lines_read_before(graph: str, outcomes: SearchOutcomesOf) -> None:
+def test_every_quote_points_at_lines_read_before(graph: str, outcomes: CodeOutcomesOf) -> None:
     """Sprawdza, czy w każdej sprawie każde cytowanie kodu — przyczyna albo wykluczenie — wskazuje
     linie, które model w jednej z wcześniejszych tur przeczytał odczytem pliku albo symbolu.
 

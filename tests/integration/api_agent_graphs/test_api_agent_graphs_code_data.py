@@ -1,30 +1,30 @@
 """
 Description:
-Spójność zestawu scenariuszy rozpoznania (`data/safe/golden/search.json`) bez modelu: czy sprawy
+Spójność zestawu scenariuszy cytowania kodu (`data/safe/golden/code.json`) bez modelu: czy sprawy
 dotyczą grafu z narzędziami kodu, czy para „komunikat w kodzie / komunikatu nigdzie” naprawdę
 stoi na paczce syntetycznej i czy narzędzia sprawy to atrapy zgłoszeń i instrukcji z prawdziwym
 kodem. Test na żywym modelu z takim zestawem mierzyłby co innego, niż obiecuje, więc te warunki
 pilnuje się w domyślnym `pytest`.
 
-| warunek                                       | czym grozi jego brak                         |
-|-----------------------------------------------|----------------------------------------------|
-| sekcja nazywa graf z cytowaniem kodu          | sekcja, której nikt nie uruchomi, albo graf, |
-| i listą źródeł                                | który przyczyny z kodu nie wskaże            |
-| sprawy mają różne identyfikatory, a sekcja    | zestaw mierzący jedną stronę pary            |
-| ma sprawę z wymaganą przyczyną i bez niej     |                                              |
-| zgłoszenie ma kształt wątku                   | sprawa, która nie wygląda jak wejście trasy  |
-| wymagany plik przyczyny leży w paczce, a      | wymóg pliku, którego nie ma albo w którym    |
-| cytowany komunikat stoi w nim                 | komunikatu nie ma                            |
-| komunikatu sprawy „nigdzie” nie ma w paczce   | sprawa, w której cytowanie przyczyny jest    |
-|                                               | słuszne, a test je karze                     |
-| fragment wykluczony przez wątek leży w paczce | licznik, który nic nie liczy                 |
-| nazwa do wymienienia stoi w paczce, nie stoi  | licznik zawsze pełny albo zawsze pusty       |
-| w zgłoszeniu                                  |                                              |
-| narzędzia sprawy: atrapy i prawdziwy kod      | sprawa „nigdzie” na atrapie szukania, która  |
-|                                               | zawsze coś znajduje                          |
+| warunek                                        | czym grozi jego brak                         |
+|------------------------------------------------|----------------------------------------------|
+| sekcja nazywa graf z cytowaniem kodu           | sekcja, której nikt nie uruchomi, albo graf, |
+| i listą źródeł                                 | który przyczyny z kodu nie wskaże            |
+| sprawy mają różne identyfikatory, a sekcja     | zestaw mierzący jedną stronę pary            |
+| ma sprawę z wymaganą przyczyną i bez niej      |                                              |
+| zgłoszenie ma kształt wątku                    | sprawa, która nie wygląda jak wejście trasy  |
+| wymagany plik przyczyny leży w paczce, a       | wymóg pliku, którego nie ma albo w którym    |
+| cytowany komunikat stoi w nim                  | komunikatu nie ma                            |
+| komunikatu sprawy „nigdzie” nie ma w paczce    | sprawa, w której cytowanie przyczyny jest    |
+|                                                | słuszne, a test je karze                     |
+| fragment wykluczony przez wątek leży w paczce  | licznik, który nic nie liczy                 |
+| nazwa do wymienienia stoi w paczce, nie stoi   | licznik zawsze pełny albo zawsze pusty       |
+| w zgłoszeniu                                   |                                              |
+| narzędzia sprawy: atrapy i prawdziwy kod       | sprawa „nigdzie” na atrapie szukania, która  |
+|                                                | zawsze coś znajduje                          |
 | szukanie zgłoszeń znajduje coś tylko w sprawie | przyczyna z historycznej sprawy w sprawie,   |
-| z `finds_tickets_and_docs`, a nigdy w sprawie | która ma mierzyć kod                         |
-| z komunikatem z ekranu                        |                                              |
+| z `finds_tickets_and_docs`, a nigdy w sprawie  | która ma mierzyć kod                         |
+| z komunikatem z ekranu                         |                                              |
 """
 
 import asyncio
@@ -33,17 +33,17 @@ import pytest
 
 from app.agent_tools.tickets.find_tickets_vector.models import FindTicketsVectorQuery
 from tests._helpers.graphs import graph_module, graph_names, has_sources
-from tests._helpers.scenarios.search import (
+from tests._helpers.scenarios.code import (
     QUOTE_TOOL,
-    SearchCase,
+    CodeCase,
     case_tools,
+    code_sections,
     quoted_messages,
-    search_sections,
 )
 from tests._helpers.synthetic_code import synthetic_code_texts, synthetic_code_tools
 
 # Sekcje zestawu, czytane przy imporcie: z nich powstają parametry testów.
-SECTIONS = search_sections()
+SECTIONS = code_sections()
 
 # Pary (graf, sprawa) zestawu, czytane przy imporcie: z nich powstają parametry testów, nazwane
 # identyfikatorem sprawy. Obok podzbiory spraw, których dotyczy tylko część testów.
@@ -93,11 +93,11 @@ def test_a_section_has_both_sides_of_the_pair_and_unique_ids(graph: str) -> None
 
 
 @pytest.mark.parametrize(("graph", "case"), CASES)
-def test_every_case_is_a_ticket_with_a_thread(graph: str, case: SearchCase) -> None:
+def test_every_case_is_a_ticket_with_a_thread(graph: str, case: CodeCase) -> None:
     """Sprawdza, czy każda sprawa ma kształt wątku z `RawTicket.as_thread()`: nagłówek zgłoszenia,
     temat i opis zgłaszającego.
 
-    Wyłapuje sprawę, która nie wygląda jak wejście trasy `/search`: model dostałby inny kształt
+    Wyłapuje sprawę, która nie wygląda jak wejście tras grafów: model dostałby inny kształt
     niż na produkcji, a wynik nie mówiłby nic o prawdziwej sprawie."""
     assert case.text.startswith("ZGŁOSZENIE ")
     assert "\nTemat: " in case.text
@@ -107,7 +107,7 @@ def test_every_case_is_a_ticket_with_a_thread(graph: str, case: SearchCase) -> N
 @pytest.mark.parametrize(("graph", "case"), CAUSE_CASES)
 def test_a_required_cause_file_lies_in_the_package_and_carries_the_message(
     graph: str,
-    case:  SearchCase,
+    case:  CodeCase,
 ) -> None:
     """Sprawdza, czy każdy plik, który sprawa wymaga wśród cytowań przyczyny, leży w paczce
     syntetycznej, a komunikat z ekranu — gdy zgłoszenie go cytuje — stoi dosłownie w jednym
@@ -127,7 +127,7 @@ def test_a_required_cause_file_lies_in_the_package_and_carries_the_message(
 @pytest.mark.parametrize(("graph", "case"), NOWHERE_CASES)
 def test_the_message_of_a_case_without_a_cause_stands_nowhere(
     graph: str,
-    case:  SearchCase,
+    case:  CodeCase,
 ) -> None:
     """Sprawdza, czy sprawa, która nie dopuszcza przyczyny z kodu, cytuje komunikat z ekranu i czy
     tego komunikatu nie ma w żadnym pliku paczki syntetycznej.
@@ -142,7 +142,7 @@ def test_the_message_of_a_case_without_a_cause_stands_nowhere(
 
 
 @pytest.mark.parametrize(("graph", "case"), EXCLUDED_CASES)
-def test_a_fragment_not_to_quote_lies_in_the_package(graph: str, case: SearchCase) -> None:
+def test_a_fragment_not_to_quote_lies_in_the_package(graph: str, case: CodeCase) -> None:
     """Sprawdza, czy fragment, który wątek wyklucza jako przyczynę, wskazuje plik paczki
     syntetycznej i zakres linii, który w tym pliku istnieje.
 
@@ -159,7 +159,7 @@ def test_a_fragment_not_to_quote_lies_in_the_package(graph: str, case: SearchCas
 @pytest.mark.parametrize(("graph", "case"), NOTES_CASES)
 def test_a_name_to_mention_stands_in_the_package_and_not_in_the_ticket(
     graph: str,
-    case:  SearchCase,
+    case:  CodeCase,
 ) -> None:
     """Sprawdza, czy każda nazwa, którą uwagi mają wymienić, stoi w którejś ścieżce paczki
     syntetycznej, a nie stoi w zgłoszeniu.
@@ -173,7 +173,7 @@ def test_a_name_to_mention_stands_in_the_package_and_not_in_the_ticket(
 
 
 @pytest.mark.parametrize(("graph", "case"), CASES)
-def test_case_tools_are_the_graph_tools_with_real_code(graph: str, case: SearchCase) -> None:
+def test_case_tools_are_the_graph_tools_with_real_code(graph: str, case: CodeCase) -> None:
     """Sprawdza, czy narzędzia sprawy to wszystkie narzędzia grafu w kolejności `TOOL_NAMES`,
     z prawdziwymi narzędziami kodu i atrapami zgłoszeń i instrukcji.
 
@@ -189,7 +189,7 @@ def test_case_tools_are_the_graph_tools_with_real_code(graph: str, case: SearchC
 @pytest.mark.parametrize(("graph", "case"), CASES)
 def test_ticket_search_finds_something_only_when_the_case_says_so(
     graph: str,
-    case:  SearchCase,
+    case:  CodeCase,
 ) -> None:
     """Sprawdza, czy wyszukiwanie zgłoszeń w narzędziach sprawy coś znajduje wtedy i tylko wtedy,
     gdy sprawa ma `finds_tickets_and_docs`.
@@ -206,7 +206,7 @@ def test_ticket_search_finds_something_only_when_the_case_says_so(
 @pytest.mark.parametrize(("graph", "case"), MESSAGE_CASES)
 def test_a_case_quoting_a_screen_message_finds_no_tickets_or_docs(
     graph: str,
-    case:  SearchCase,
+    case:  CodeCase,
 ) -> None:
     """Sprawdza, czy sprawa, której zgłoszenie cytuje komunikat z ekranu, ma puste wyszukiwanie
     zgłoszeń i instrukcji.

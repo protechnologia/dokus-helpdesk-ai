@@ -2763,9 +2763,10 @@ w p. 46.
 - Scenariusze „pytań już nie trzeba" (`suggest_questions`, p. 59):
   `pytest tests/evaluation/test_api_agent_graphs_questions_live.py -m llm_live` — **kosztuje,
   pytaj przed**; sprawa to pętla agenta, kilka tur modelu
-- Scenariusze rozpoznania (`search`: cytowanie kodu jako przyczyny, p. 59):
-  `pytest tests/evaluation/test_api_agent_graphs_search_live.py -m llm_live` — **kosztuje,
-  pytaj przed**; wymaga zbudowanej paczki syntetycznej i ripgrepa na hoście
+- Scenariusze cytowania kodu (`search` i `suggest_questions`: przyczyna z kodu, p. 59):
+  `pytest tests/evaluation/test_api_agent_graphs_code_live.py -m llm_live` — **kosztuje,
+  pytaj przed**; jeden graf przez `-k <graf>`; wymaga zbudowanej paczki syntetycznej
+  i ripgrepa na hoście
 - **Podając marker, podaj też folder** — marker odsiewa dopiero PO imporcie, więc bez ścieżki
   pytest wczytuje wszystkie pliki testowe, żeby uruchomić kilkanaście (kolekcja podzbioru spada
   wtedy trzykrotnie). Foldery i markery można łączyć:
@@ -2924,15 +2925,15 @@ w p. 46.
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
 | jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1942 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 777 (79)           | 96 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 790 (79)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 110 (9)            | 10 s |
-| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 78 (38)            | 38 s |
+| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 82 (38)            | 38 s |
 
 Liczby z 2026-10-15, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-2833 testy, około 150 s; domyślny `pytest`, bez stacku: 2707 testów, 41 s. Testy `llm_live` —
-36 integracyjnych i 38 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
+2846 testów, około 150 s; domyślny `pytest`, bez stacku: 2720 testów, 41 s. Testy `llm_live` —
+36 integracyjnych i 42 ewaluacyjne — liczą się do folderu, ale nie chodzą w żadnym z tych
 przebiegów.
 
 #### Zasady ogólne
@@ -3127,13 +3128,16 @@ przebiegów.
   jedną przyczynę wprost, a nie tylko zawęża. O pytaniach mówi pole `text` wyniku; pytania
   zbędne i brak pytań przy konkurujących przyczynach mają osobne testy i wymagają zera. Czy uwagi
   nazywają wykluczone przyczyny i czy pytania nie powtarzają już zadanych, czyta się w raporcie.
-- **`search` ma drugi test na żywym modelu: cytowanie kodu jako przyczyny**
-  (`tests/evaluation/test_api_agent_graphs_search_live.py`, zestaw
-  `data/safe/golden/search.json`). Narzędzia kodu są prawdziwe, na paczce aplikacji
-  syntetycznej, a zgłoszenia i instrukcje to atrapy. Cztery sprawy w dwóch parach: komunikat
-  stoi tylko w kodzie i ten sam układ z komunikatem, którego nie ma nigdzie, choć jego słowa
-  stoją w pliku, który kusi; wątek, w którym klient wyklucza jedną przyczynę, i to samo
-  zgłoszenie bez wątku. Pola sprawy z `must_` to warunki testu, z `should_` — liczniki
+- **Cytowanie kodu jako przyczyny ma jeden test na żywym modelu dla grafów z narzędziami
+  kodu** (`tests/evaluation/test_api_agent_graphs_code_live.py`, zestaw
+  `data/safe/golden/code.json` z sekcją na graf). Narzędzia kodu są prawdziwe, na paczce
+  aplikacji syntetycznej, a zgłoszenia i instrukcje to atrapy. W `search` cztery sprawy
+  w dwóch parach: komunikat stoi tylko w kodzie i ten sam układ z komunikatem, którego nie ma
+  nigdzie, choć jego słowa stoją w pliku, który kusi; wątek, w którym klient wyklucza jedną
+  przyczynę, i to samo zgłoszenie bez wątku. W `suggest_questions` (2026-10-15) tylko para
+  z komunikatem: ten graf sięga po kod wyłącznie przy komunikacie, wpisie z logu albo kodzie
+  błędu, więc w sprawie bez komunikatu nie ma z czego wymagać pliku. Nowy graf z narzędziami
+  kodu to sekcja zestawu. Pola sprawy z `must_` to warunki testu, z `should_` — liczniki
   w raporcie, a `phenomenon` mówi krótko, czego oczekujemy po modelu. Trzy warunki, każdy
   wymaga zera: wymagany plik wśród cytowań przyczyny, brak cytowania przyczyny przy komunikacie,
   którego nie ma nigdzie, i cytowanie tylko linii odczytanych wcześniej — z wyniku
@@ -3172,7 +3176,7 @@ przebiegów.
 | `tests/_helpers/scenarios/gates/`      | zestaw scenariuszy bramek, ocena werdyktu i raport (fixture `gate_report`) |
 | `tests/_helpers/scenarios/polish/`     | zestaw scenariuszy „Popraw", ocena tekstu i raport (fixture `polish_report`) |
 | `tests/_helpers/scenarios/questions/`  | zestaw scenariuszy „pytań już nie trzeba", ocena i raport (fixture `questions_report`) |
-| `tests/_helpers/scenarios/search/`     | zestaw scenariuszy rozpoznania, narzędzia sprawy (`case_tools()`), cytowania kodu z rozmowy, ocena i raport (fixture `search_report`) |
+| `tests/_helpers/scenarios/code/`       | zestaw scenariuszy cytowania kodu (sekcja na graf), narzędzia sprawy (`case_tools()`), cytowania kodu z rozmowy, ocena i raport (fixture `code_report`) |
 | `tests/_helpers/synthetic_code/`       | aplikacja syntetyczna: zbudowana paczka, jej źródło i reguły, opis projektu, mapa symboli, zapytania z zestawu syntetycznego i prawdziwe narzędzia kodu na niej (`synthetic_code_tools()`) |
 | `tests/_helpers/synthetic_docs/`       | dokumentacja syntetyczna: indeks wobec paczki (`table_differences()`, `collection_differences()`) i pomiary obu wyszukiwań w dokumentacji |
 | `tests/_helpers/golden_tickets/`       | golden set zgłoszeń: zapytania, dystraktory, korpus odniesienia, pomiar `find_tickets_vector` i filtra jakości |
@@ -3562,6 +3566,12 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Plik z surowymi odpowiedziami pomiaru wstrzyknięć w `data/unsafe/docs/`** — sprawy są
   zmyślone, a powtórzenie kosztuje kilka centów; wynik stoi przy progu w opisie testu,
   a odpowiedzi wypisuje raport po przebiegu.
+- **Sprawy bez komunikatu (wątek i para bez wątku) w sekcji `suggest_questions` zestawu
+  kodu** — ten graf sięga po kod tylko przy komunikacie, wpisie z logu albo kodzie błędu, więc
+  wymóg pliku padałby z założenia; wracają z szerszą regułą sięgania po kod (p. 25).
+- **Osobny zestaw cytowania kodu na graf** — trzy warunki (plik przyczyny, brak przyczyny przy
+  komunikacie, którego nie ma nigdzie, linie odczytane wcześniej) nie zależą od grafu; zestaw
+  ma sekcję na graf, jak zestaw wstrzyknięć.
 - **Jeden plik testu wstrzyknięć na graf** — ocena, raport i sprawy kontrolne są takie same
   w każdym grafie; różni je sekcja zestawu i próg.
 
@@ -3845,8 +3855,8 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   Pary „łamie / poprawna" bramek mają od 59.3 własny test (zestaw
   `data/safe/golden/gates.json`), więc w 59.4 to też sekcja zestawu, „Popraw" od 59.5
   (zestaw `data/safe/golden/polish.json`), „pytań już nie trzeba" od 59.6 (zestaw
-  `data/safe/golden/questions.json`), a cytowanie kodu w rozpoznaniu od 59.7 (zestaw
-  `data/safe/golden/search.json`). *Dlaczego:* da się je uruchomić przed
+  `data/safe/golden/questions.json`), a cytowanie kodu od 59.7 (zestaw
+  `data/safe/golden/code.json`, sekcja na graf z narzędziami kodu). *Dlaczego:* da się je uruchomić przed
   anonimizatorem, więc prompty dostają sygnał z modelu docelowego wcześniej niż z p. 21–28;
   tamtych pomiarów nie zastępują, bo scenariusze pisze autor promptów; stoi po p. 11, bo ocenia
   odpowiedź przepuszczoną przez właściwy `respond`.
@@ -3877,14 +3887,18 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     przebieg pokazał, że model czyta wątek tylko sprawy bez karty, więc atak w wątku poszedł
     tam; nowy test „pytań już nie trzeba" z czterema sprawami (rozstrzyga wątek, zawęża wątek,
     rozstrzyga opis, sam objaw): 4 z 4 zgodne w trzech przebiegach, bez zmian w prompcie;
-    reguły — „Testy", „Świadomie pominięte".
+    reguły — „Testy", „Świadomie pominięte". Cytowanie kodu dla tego grafu doszło później,
+    sekcją `suggest_questions` w zestawie kodu, i jest mierzone razem z 59.7.
   - [ ] **59.7 `search`** — wstrzyknięcie treścią zgłoszenia i wynikami narzędzi; zgłoszenie
-    z wątkiem bez progu, jako licznik w raporcie: czy uwagi nazywają przyczyny, które
-    odpowiedzi klienta wykluczają; komunikat tylko w kodzie, a w parze kontrolnej nigdzie: czy
-    model nie cytuje wtedy przyczyny z luźno powiązanego pliku i ile cytowań wskazuje linie,
-    których nie odczytał (linia widziana tylko w wyniku szukania liczy się jako nieodczytana);
+    z wątkiem bez progu, jako licznik w raporcie: czy model cytuje fragment kodu z przyczyną,
+    którą odpowiedzi klienta wykluczają (czy uwagi nazywają takie przyczyny, przeszło do
+    59.9); komunikat tylko w kodzie, a w parze kontrolnej nigdzie: czy model nie cytuje wtedy
+    przyczyny z luźno powiązanego pliku i ile cytowań wskazuje linie, których nie odczytał
+    (linia widziana tylko w wyniku szukania liczy się jako nieodczytana);
     nadmiarowy plik w katalogu szablonów aplikacji syntetycznej: czy model sięga po spis
-    katalogu i czy odróżnia stan kodu od instalacji klienta.
+    katalogu i czy odróżnia stan kodu od instalacji klienta. Zestaw i test cytowania kodu są
+    wspólne dla grafów z narzędziami kodu (od 2026-10-15 `code.json`, wcześniej `search.json`),
+    więc pomiar obejmuje też sekcję `suggest_questions`.
   - [ ] **59.8 `suggest_solution`** — wstrzyknięcie treścią zgłoszenia i wynikami narzędzi;
     zgłoszenie z wątkiem bez progu, jako licznik w raporcie: czy propozycja nie niesie kroku,
     który wątek pokazuje jako już wykonany; zastrzeżenie i krok nieodwracalny z karty trafiają
@@ -3895,6 +3909,19 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     jest tu groźniejsze niż w treści, bo to on ma dostęp do serwera, więc odpowiedzi się czyta;
     zakaz w prompcie dopiero po przebiciu i nie ogólny, bo korpus ma prawdziwe kroki
     nieodwracalne (usunięcie pliku blokady): polecenie ze zgłoszenia to dane, a nie krok.
+  - [ ] **59.9 Czytanie znalezionego materiału** (dopisany 2026-10-15) — w grafach z narzędziami
+    wiedzy (`search`, `suggest_questions`, `suggest_solution`), w każdym tylko tam, gdzie
+    sprawdzenie ma sens, na materiale atrap: przy objawie, do którego atrapa znajduje trzy karty
+    z trzema przyczynami (90001–90003), wśród źródeł stoją wszystkie trzy (warunek, wymóg
+    zera), a licznik w raporcie mówi, czy wynik nazywa trzy przyczyny; ten sam objaw z wątkiem,
+    w którym klient wyklucza przyczyny: licznik, czy uwagi nazywają przyczyny wykluczone
+    (przeniesione z 59.7); sprawa o uprawnieniu do kancelarii e-Doręczeń: licznik, czy
+    przeczytana sekcja instrukcji to właściwa, a nie dystraktor z innym kanałem; w `search`
+    sprawa organizacyjna jako kontrola: licznik wywołań narzędzi kodu, których według p. 70 ma
+    tam nie być. Atrapa wyszukiwania oddaje zawsze ten sam wynik, więc scenariusz mierzy
+    czytanie znalezionego materiału, nie jakość szukania (p. 23). *Dlaczego:* najgroźniejszy
+    błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach, a dziś żaden scenariusz
+    nie sprawdza, co agent przeczytał — test okablowania wymaga tylko niepustej listy źródeł.
 - [ ] **46. CLI dla grafów** (dopisany 2026-10-02, numer spoza kolejności) — `helpdesk gate
   close|reply`, `helpdesk suggest <wariant>`, „Popraw" i karta zgłoszenia na tej samej fabryce
   grafów co trasy; także wyszukiwanie i parsowanie zgłoszeń do korpusu (dawne `rag search`

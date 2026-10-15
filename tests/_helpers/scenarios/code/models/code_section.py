@@ -1,11 +1,11 @@
 import dataclasses
 
-from tests._helpers.scenarios.search.models.search_case import SearchCase
+from tests._helpers.scenarios.code.models.code_case import CodeCase
 
 
 @dataclasses.dataclass(frozen=True)
-class SearchSection:
+class CodeSection:
     """Sekcja zestawu dla jednego grafu: sprawy w kolejności zestawu."""
 
     graph: str                     # np. "search"
-    cases: tuple[SearchCase, ...]  # sprawy w kolejności zestawu
+    cases: tuple[CodeCase, ...]  # sprawy w kolejności zestawu

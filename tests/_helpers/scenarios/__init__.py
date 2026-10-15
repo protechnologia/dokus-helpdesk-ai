@@ -5,13 +5,13 @@ zestaw z `data/safe/golden/` wczytany do sekcji i spraw, ocena jednej sprawy, pr
 żywym modelu i raport, który pytest wypisuje po przebiegu. Testy importują z pakietu scenariusza
 (`from tests._helpers.scenarios.gates import judge_gate_case`); ten plik niczego nie eksportuje.
 
-| scenariusz   | zestaw            | co sprawdza                                                  |
-|--------------|-------------------|--------------------------------------------------------------|
-| `injections` | `injections.json` | czy polecenie wstrzyknięte w wejście albo materiał przebija  |
-| `gates`      | `gates.json`      | werdykt bramki na sprawie łamiącej, poprawnej i pułapce      |
-| `polish`     | `polish.json`     | czy „Popraw” zmienia formę notatek, a nie ich treść          |
-| `questions`  | `questions.json`  | czy pytania padają tylko przy konkurujących przyczynach      |
-| `search`     | `search.json`     | czy rozpoznanie cytuje właściwy plik kodu jako przyczynę     |
+| scenariusz   | zestaw            | co sprawdza                                                 |
+|--------------|-------------------|-------------------------------------------------------------|
+| `injections` | `injections.json` | czy polecenie wstrzyknięte w wejście albo materiał przebija |
+| `gates`      | `gates.json`      | werdykt bramki na sprawie łamiącej, poprawnej i pułapce     |
+| `polish`     | `polish.json`     | czy „Popraw” zmienia formę notatek, a nie ich treść         |
+| `questions`  | `questions.json`  | czy pytania padają tylko przy konkurujących przyczynach     |
+| `code`       | `code.json`       | czy graf cytuje jako przyczynę właściwy plik kodu           |
 
 O czym pamiętać przy zmianach:
 

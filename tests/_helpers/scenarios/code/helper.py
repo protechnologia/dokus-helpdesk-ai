@@ -1,21 +1,21 @@
 """
 Description:
-Zestaw scenariuszy rozpoznania (`data/safe/golden/search.json`) i ocena sprawy przeprowadzonej
-na żywym modelu: czy graf `search` cytuje jako przyczynę plik, w którym stoi komunikat ze
-zgłoszenia, czy nie cytuje przyczyny, gdy komunikatu nie ma w kodzie nigdzie, i czy cytuje
-tylko linie, które wcześniej przeczytał. Narzędzia kodu są prawdziwe, na paczce aplikacji
-syntetycznej, a zgłoszenia i instrukcje to atrapy. Korzysta z niego test ewaluacyjny
-rozpoznania (p. 59). Modele zestawu i oceny leżą w `models/`, a raport, który pytest wypisuje
-po przebiegu, w `report.py`.
+Zestaw scenariuszy cytowania kodu (`data/safe/golden/code.json`) i ocena sprawy przeprowadzonej
+na żywym modelu: czy graf z narzędziami kodu (`search`, `suggest_questions`) cytuje jako
+przyczynę plik, w którym stoi komunikat ze zgłoszenia, czy nie cytuje przyczyny, gdy komunikatu
+nie ma w kodzie nigdzie, i czy cytuje tylko linie, które wcześniej przeczytał. Narzędzia kodu
+są prawdziwe, na paczce aplikacji syntetycznej, a zgłoszenia i instrukcje to atrapy. Korzysta
+z niego test ewaluacyjny cytowania kodu (p. 59). Modele zestawu i oceny leżą w `models/`,
+a raport, który pytest wypisuje po przebiegu, w `report.py`.
 
-| co                     | do czego                                                          |
-|------------------------|-------------------------------------------------------------------|
-| `search_sections()`    | sekcje zestawu po nazwie grafu                                    |
-| `quoted_messages()`    | komunikaty z ekranu, które zgłoszenie cytuje w „…”                |
-| `case_tools()`         | narzędzia sprawy: atrapy zgłoszeń i instrukcji, prawdziwy kod     |
-| `code_quotes()`        | cytowania kodu z rozmowy, z tym, czy model je wcześniej przeczytał |
-| `listing_count()`      | ile razy model wywołał spis katalogu kodu                         |
-| `judge_search_case()`  | ocena jednej sprawy                                               |
+| co                  | do czego                                                           |
+|---------------------|--------------------------------------------------------------------|
+| `code_sections()`   | sekcje zestawu po nazwie grafu                                     |
+| `quoted_messages()` | komunikaty z ekranu, które zgłoszenie cytuje w „…”                 |
+| `case_tools()`      | narzędzia sprawy: atrapy zgłoszeń i instrukcji, prawdziwy kod      |
+| `code_quotes()`     | cytowania kodu z rozmowy, z tym, czy model je wcześniej przeczytał |
+| `listing_count()`   | ile razy model wywołał spis katalogu kodu                          |
+| `judge_code_case()` | ocena jednej sprawy                                                |
 
 Przykład — model zacytował fragment, którego wcześniej nie przeczytał:
 
@@ -55,40 +55,40 @@ from app.agent_tools import AgentTool
 from app.agent_tools.base import is_error_json
 from app.engine_llm import ChatMessage
 from tests._helpers.fake_tools import fake_agent_tools, fake_agent_tools_without_material
-from tests._helpers.scenarios.search.constants import (
+from tests._helpers.scenarios.code.constants import (
     CAUSE_ROLE,
+    CODE_FILE,
     LIST_TOOL,
     META_KEY,
     QUOTE_TOOL,
     QUOTED_MESSAGE,
     READ_TOOLS,
-    SEARCH_FILE,
 )
-from tests._helpers.scenarios.search.models.code_fragment import CodeFragment
-from tests._helpers.scenarios.search.models.code_quote import CodeQuote
-from tests._helpers.scenarios.search.models.search_case import SearchCase
-from tests._helpers.scenarios.search.models.search_outcome import SearchOutcome
-from tests._helpers.scenarios.search.models.search_section import SearchSection
+from tests._helpers.scenarios.code.models.code_case import CodeCase
+from tests._helpers.scenarios.code.models.code_fragment import CodeFragment
+from tests._helpers.scenarios.code.models.code_outcome import CodeOutcome
+from tests._helpers.scenarios.code.models.code_quote import CodeQuote
+from tests._helpers.scenarios.code.models.code_section import CodeSection
 from tests._helpers.synthetic_code import synthetic_code_tools
 
 
-def search_sections(
-    path: Path = SEARCH_FILE,  # np. Path("data/safe/golden/search.json")
-) -> dict[str, SearchSection]:
+def code_sections(
+    path: Path = CODE_FILE,  # np. Path("data/safe/golden/code.json")
+) -> dict[str, CodeSection]:
     """
     Description:
-    Czyta zestaw scenariuszy rozpoznania i oddaje jego sekcje po nazwie grafu, bez metryczki.
+    Czyta zestaw scenariuszy cytowania kodu i oddaje jego sekcje po nazwie grafu, bez metryczki.
 
     Example args:
-        path=Path("data/safe/golden/search.json")
+        path=Path("data/safe/golden/code.json")
 
     Example result:
-        {"search": SearchSection(graph="search", cases=(SearchCase(case_id="k01", …), …))}
+        {"search": CodeSection(graph="search", cases=(CodeCase(case_id="k01", …), …))}
     """
     raw = json.loads(path.read_text(encoding="utf-8"))
 
     sections = {
-        graph: SearchSection(
+        graph: CodeSection(
             graph = graph,
             cases = tuple(_case_from(entry) for entry in body["cases"]),
         )
@@ -101,10 +101,10 @@ def search_sections(
 
 def _case_from(
     entry: Mapping[str, Any],  # np. {"id": "k01", "must_quote_as_cause": ["src/…"], …}
-) -> SearchCase:
+) -> CodeCase:
     """
     Description:
-    Zamienia wpis sprawy z zestawu na `SearchCase`. Pole, którego wpis nie ma, znaczy, że sprawa
+    Zamienia wpis sprawy z zestawu na `CodeCase`. Pole, którego wpis nie ma, znaczy, że sprawa
     go nie sprawdza: pusta lista plików, `False` przy zakazie przyczyny albo brak fragmentu.
 
     Example args:
@@ -113,14 +113,14 @@ def _case_from(
                "notes_should_include": ["wezwanie_stare"], "input": "ZGŁOSZENIE…"}
 
     Example result:
-        SearchCase(case_id="k01", phenomenon="…", text="ZGŁOSZENIE…", finds_tickets_and_docs=False,
+        CodeCase(case_id="k01", phenomenon="…", text="ZGŁOSZENIE…", finds_tickets_and_docs=False,
                    must_quote_as_cause=("src/lib/Urzad/Szablony/RejestrSzablonow.php",),
                    must_not_quote_any_cause=False, notes_should_include=("wezwanie_stare",),
                    should_not_quote_as_cause=None)
     """
     excluded = entry.get("should_not_quote_as_cause")
 
-    case = SearchCase(
+    case = CodeCase(
         case_id                   = entry["id"],
         phenomenon                = entry["phenomenon"],
         text                      = entry["input"],
@@ -151,7 +151,7 @@ def quoted_messages(
 
 
 def case_tools(
-    case: SearchCase,  # np. SearchCase(case_id="k01", finds_tickets_and_docs=False, …)
+    case: CodeCase,  # np. CodeCase(case_id="k01", finds_tickets_and_docs=False, …)
 ) -> list[AgentTool]:
     """
     Description:
@@ -160,7 +160,7 @@ def case_tools(
     `TOOL_NAMES` grafów. Świeże na każde wywołanie, bo atrapy zapisują zapytania.
 
     Example args:
-        case=SearchCase(case_id="k01", finds_tickets_and_docs=False, …)
+        case=CodeCase(case_id="k01", finds_tickets_and_docs=False, …)
 
     Example result:
         [FakeFindTicketsVectorTool(tickets=[]), …, DescribeCodeTool(…), FindCodeTextTool(…), …]
@@ -299,12 +299,12 @@ def listing_count(
     return count
 
 
-def judge_search_case(
-    case:     SearchCase,              # np. SearchCase(case_id="k01", …)
+def judge_code_case(
+    case:     CodeCase,              # np. CodeCase(case_id="k01", …)
     output:   BaseModel | None,        # np. SearchNotes(…); None — `respond` nie przyjął odpowiedzi
     messages: Sequence[ChatMessage],   # np. state.messages; puste, gdy wyniku nie ma
     retries:  int,                     # np. 0 — poprawki odpowiedzi od węzła `respond`
-) -> SearchOutcome:
+) -> CodeOutcome:
     """
     Description:
     Ocenia jedną sprawę: pliki zacytowane jako przyczyna, cytowania linii nieodczytanych, spisy
@@ -312,20 +312,20 @@ def judge_search_case(
     jako przyczyna. Brak wyniku zapisuje jako odpowiedź nie do przyjęcia, bez znalezisk.
 
     Example args:
-        case=SearchCase(case_id="k01", must_quote_as_cause=("…/RejestrSzablonow.php",),
+        case=CodeCase(case_id="k01", must_quote_as_cause=("…/RejestrSzablonow.php",),
                         notes_should_include=("wezwanie_stare",), …)
         output=SearchNotes(internal_notes="## Kod aplikacji\\n- … wezwanie_stare.twig …")
         messages=state.messages
         retries=0
 
     Example result:
-        SearchOutcome(case=…, rejected=False, cause_files=("…/RejestrSzablonow.php",), unread=(),
+        CodeOutcome(case=…, rejected=False, cause_files=("…/RejestrSzablonow.php",), unread=(),
                       listings=1, missing_in_notes=(), ruled_out_cause_quoted=False, retries=0,
                       fields={…})
     """
     # --- brak wyniku: węzeł `respond` nie przyjął odpowiedzi mimo poprawki ---
     if output is None:
-        rejected = SearchOutcome(
+        rejected = CodeOutcome(
             case                   = case,
             rejected               = True,
             cause_files            = (),
@@ -345,7 +345,7 @@ def judge_search_case(
     causes = [quote.fragment for quote in quotes if quote.role == CAUSE_ROLE]
     excluded = case.should_not_quote_as_cause
 
-    outcome = SearchOutcome(
+    outcome = CodeOutcome(
         case                   = case,
         rejected               = False,
         cause_files            = tuple(dict.fromkeys(fragment.path for fragment in causes)),
