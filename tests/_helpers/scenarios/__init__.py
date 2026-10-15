@@ -13,6 +13,7 @@ zestaw z `data/safe/golden/` wczytany do sekcji i spraw, ocena jednej sprawy, pr
 | `questions`  | `questions.json`  | czy pytania padają tylko przy konkurujących przyczynach     |
 | `code`       | `code.json`       | czy graf cytuje jako przyczynę właściwy plik kodu           |
 | `solution`   | `solution.json`   | czy propozycja niesie fakty z karty i pomija krok zrobiony  |
+| `reading`    | `reading.json`    | czy graf czyta znaleziony materiał i nazywa jego przyczyny  |
 
 O czym pamiętać przy zmianach:
 

@@ -2772,6 +2772,9 @@ w p. 46.
   `pytest tests/evaluation/test_api_agent_graphs_code_live.py -m llm_live` — **kosztuje,
   pytaj przed**; jeden graf przez `-k <graf>`; wymaga zbudowanej paczki syntetycznej
   i ripgrepa na hoście
+- Scenariusze czytania znalezionego materiału (`search`, `suggest_questions`,
+  `suggest_solution`, p. 59): `pytest tests/evaluation/test_api_agent_graphs_reading_live.py
+  -m llm_live` — **kosztuje, pytaj przed**; jeden graf przez `-k <graf>`
 - **Podając marker, podaj też folder** — marker odsiewa dopiero PO imporcie, więc bez ścieżki
   pytest wczytuje wszystkie pliki testowe, żeby uruchomić kilkanaście (kolekcja podzbioru spada
   wtedy trzykrotnie). Foldery i markery można łączyć:
@@ -2929,16 +2932,16 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1957 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 820 (79)           | 96 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1972 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 849 (79)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 110 (9)            | 10 s |
-| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 91 (38)            | 38 s |
+| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 97 (38)            | 38 s |
 
 Liczby z 2026-10-15, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-2891 testów, około 150 s; domyślny `pytest`, bez stacku: 2765 testów, 41 s. Testy `llm_live` —
-36 integracyjnych i 51 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
+2935 testów, około 150 s; domyślny `pytest`, bez stacku: 2809 testów, 41 s. Testy `llm_live` —
+36 integracyjnych i 57 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
 przebiegów.
 
 #### Zasady ogólne
@@ -3034,7 +3037,8 @@ przebiegów.
 - **Nazwa zestawu w `data/safe/golden/` mówi, czego dotyczy (2026-10-15).** Dopisek `-tools` ma
   zestaw zapytań do narzędzi z oczekiwanym wynikiem, sprawdzany bez modelu (`code-tools.json`,
   `docs-tools.json`, wcześniej z dopiskiem `-synthetic`). Nazwa bez dopisku to scenariusze
-  ewaluacji modelu z p. 59 (`injections`, `gates`, `polish`, `questions`, `code`). Zestawy
+  ewaluacji modelu z p. 59 (`injections`, `gates`, `polish`, `questions`, `code`, `solution`,
+  `reading`). Zestawy
   w `data/unsafe/golden/` nie mają dopisku paczki (do 2026-10-15 `-dokus`): instancja obsługuje
   jeden produkt, więc dane klienta są zawsze z tej samej paczki (`tickets.json`,
   `tickets-distractors.json`, `code.json`). `code.json` w `unsafe` to sprawy dla agenta na
@@ -3174,6 +3178,28 @@ przebiegów.
   pilnuje, że fakt wymagany stoi w kartach sprawy, a nie w zgłoszeniu, i że zmieniona karta
   dociera do odczytu kart. Licznik kroku już wykonanego liczy słowa, więc pokazuje „jest” także
   przy zdaniu „nie proponujemy powtarzania tego kroku”; czyta się treść.
+- **Czytanie znalezionego materiału ma jeden test na żywym modelu dla grafów z narzędziami
+  wiedzy** (`tests/evaluation/test_api_agent_graphs_reading_live.py`, zestaw
+  `data/safe/golden/reading.json`, 2026-10-15). Zestaw to jedna lista spraw z polem `graphs`,
+  jak zestaw kodu, a materiał to atrapy narzędzi: wyszukiwania oddają zawsze ten sam wynik, więc
+  test mierzy, co model przeczytał ze znalezionego, a nie jak szukał (p. 23). Warunek z wymogiem
+  zera: przy jednym objawie i trzech kartach o trzech różnych przyczynach (90001–90003) wszystkie
+  trzy stoją na liście źródeł (`must_read`). Liczniki w raporcie: czy wynik nazywa trzy
+  przyczyny (`should_name`, w którymkolwiek polu tekstowym), czy uwagi nazywają przyczynę
+  wykluczoną przez klienta w wątku (`should_exclude`: fakt i słowo wykluczenia w jednej linii
+  uwag, bez zaprzeczenia tuż przed słowem — „nie wyklucza” i „niewykluczone” się nie liczą),
+  czy model przeczytał sekcję instrukcji o kancelarii e-Doręczeń, czy dystraktor
+  o ePUAP (`should_read`, `should_not_read`), oraz wywołania narzędzi kodu przy każdej sprawie;
+  w sprawie organizacyjnej `search` (`should_not_call_code`) każde jest wyróżnione w linii grafu
+  i przy sprawie. Test bez modelu pilnuje, że klucz źródła wskazuje materiał, który atrapy
+  znajdują, a graf sprawy umie przeczytać, że wymagane karty niosą różne przyczyny, że fakt do
+  nazwania stoi w materiale, a nie w zgłoszeniu, że każdy wariant faktu do wykluczenia stoi
+  w materiale w jednej sprawie albo sekcji, i że lista narzędzi kodu w liczniku to dokładnie
+  narzędzia kodu grafów. Ostatnie dwa warunki licznika wyszły z pomiaru: w dwóch pierwszych
+  przebiegach wszystkie trzy trafienia stały na linii, która mówiła, że przyczyny nie
+  wykluczono, albo na wariancie „limit”, który stoi też przy limitach zasobów w wątku 90011.
+  Licznik nadal liczy słowa: linia „wykluczono kolejkę, zostaje załącznik” i linia „nie jest
+  definitywnie wykluczone” liczą się jako wykluczenie.
 - **Testy generacji parametryzuje się po rejestrze grafów**, a osobno sprawdza nieznany
   wariant (422) i wariant `requires_hits` bez trafień (pusta lista źródeł, a nie wygenerowane
   rozwiązanie).
@@ -3207,6 +3233,7 @@ przebiegów.
 | `tests/_helpers/scenarios/questions/`  | zestaw scenariuszy „pytań już nie trzeba", ocena i raport (fixture `questions_report`) |
 | `tests/_helpers/scenarios/code/`       | zestaw scenariuszy cytowania kodu (sprawy z listą grafów), narzędzia sprawy (`case_tools()`), cytowania kodu z rozmowy, ocena i raport (fixture `code_report`) |
 | `tests/_helpers/scenarios/solution/`   | zestaw scenariuszy rozwiązania, karty sprawy ze zmianami (`case_cards()`), fakty w treści dla klienta (`mentions()`), ocena i raport (fixture `solution_report`) |
+| `tests/_helpers/scenarios/reading/`    | zestaw scenariuszy czytania (sprawy z listą grafów), materiał, który atrapy znajdują (`found_material()`), wywołania narzędzi kodu z rozmowy (`code_calls()`), przyczyny wykluczone w uwagach, ocena i raport (fixture `reading_report`) |
 | `tests/_helpers/synthetic_code/`       | aplikacja syntetyczna: zbudowana paczka, jej źródło i reguły, opis projektu, mapa symboli, zapytania z zestawu syntetycznego i prawdziwe narzędzia kodu na niej (`synthetic_code_tools()`) |
 | `tests/_helpers/synthetic_docs/`       | dokumentacja syntetyczna: indeks wobec paczki (`table_differences()`, `collection_differences()`) i pomiary obu wyszukiwań w dokumentacji |
 | `tests/_helpers/golden_tickets/`       | golden set zgłoszeń: zapytania, dystraktory, korpus odniesienia, pomiar `find_tickets_vector` i filtra jakości |
@@ -3238,7 +3265,8 @@ przebiegów.
   (`from tests._helpers.scenarios.gates.samples import BLOCK`).
 - **Scenariusze z p. 59 stoją razem w `tests/_helpers/scenarios/`, folder na scenariusz
   (2026-10-15).** Wszystkie mają ten sam układ: zestaw z `data/safe/golden/`, sprawy, ocena
-  i raport; 59.7 dołożył `code` (cytowanie kodu), a 59.8 — `solution`. Na górze `_helpers/` zostają
+  i raport; 59.7 dołożył `code` (cytowanie kodu), 59.8 — `solution`, a 59.9 — `reading`
+  (czytanie znalezionego materiału). Na górze `_helpers/` zostają
   atrapy i podmiany zależności, infrastruktura żywego modelu (`live`), grafy (`graphs`) i dane
   pomiarów ewaluacyjnych (`synthetic_docs`, `golden_tickets`), z których korzystają też testy
   spoza scenariuszy. Nazwa od wzorca, nie od grafów: grafom służy prawie każdy helper,
@@ -3613,6 +3641,18 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Zastrzeżenie o naszej czynności jako fakt wymagany w treści dla klienta** — prompt każe
   pisać sprawy dla serwisu w uwagach, więc model słusznie kładzie je tam; fakt wymagany to
   zastrzeżenie dla klienta.
+- **Sama wzmianka przyczyny w uwagach jako licznik wykluczenia** — przyczyna i tak stoi
+  w uwagach na liście przeczytanych spraw, więc licznik pokazywałby „jest” prawie zawsze;
+  liczy się linia z przyczyną i słowem wykluczenia.
+- **Sprawa z wątkiem w scenariuszu czytania na `suggest_solution`** — prompt tego grafu
+  o wątku milczy, więc licznik mierzyłby zachowanie, którego nikt modelowi nie zlecił; wraca
+  z regułą o wątku bieżącej sprawy (p. 26).
+- **Licznik wykluczenia rozpoznający każde zaprzeczenie** („nie jest definitywnie
+  wykluczone”) — wymagałby rozbioru zdania; licznik pomija zaprzeczenie tuż przed słowem, a resztę
+  rozstrzyga lektura uwag w raporcie.
+- **Kod w sprawie organizacyjnej `search` jako warunek** — kosztuje kilka centów, ale nie psuje
+  odpowiedzi, a asercje scenariuszy stoją na tym, co szkodzi wynikowi; jest licznikiem
+  wyróżnionym w raporcie (`should_not_call_code`).
 - **Jeden plik testu wstrzyknięć na graf** — ocena, raport i sprawy kontrolne są takie same
   w każdym grafie; różni je sekcja zestawu i próg.
 
@@ -3897,8 +3937,10 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   `data/safe/golden/gates.json`), więc w 59.4 to też sekcja zestawu, „Popraw" od 59.5
   (zestaw `data/safe/golden/polish.json`), „pytań już nie trzeba" od 59.6 (zestaw
   `data/safe/golden/questions.json`), propozycja rozwiązania od 59.8 (zestaw
-  `data/safe/golden/solution.json`), a cytowanie kodu od 59.7 (zestaw
-  `data/safe/golden/code.json`, sprawy z listą grafów z narzędziami kodu). *Dlaczego:* da się je
+  `data/safe/golden/solution.json`), cytowanie kodu od 59.7 (zestaw
+  `data/safe/golden/code.json`, sprawy z listą grafów z narzędziami kodu), a czytanie
+  znalezionego materiału od 59.9 (zestaw `data/safe/golden/reading.json`, sprawy z listą grafów
+  z narzędziami wiedzy). *Dlaczego:* da się je
   uruchomić przed
   anonimizatorem, więc prompty dostają sygnał z modelu docelowego wcześniej niż z p. 21–28;
   tamtych pomiarów nie zastępują, bo scenariusze pisze autor promptów; stoi po p. 11, bo ocenia
@@ -3951,19 +3993,17 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     w uwagach, więc karta dostała zastrzeżenie dla klienta; cytowanie kodu dla tego grafu
     w zestawie kodu (para z komunikatem): zgodne w trzech przebiegach; bez zmian w prompcie;
     przebiegi 0,17–0,32 USD; reguły — „Testy", „Świadomie pominięte".
-  - [ ] **59.9 Czytanie znalezionego materiału** (dopisany 2026-10-15) — w grafach z narzędziami
-    wiedzy (`search`, `suggest_questions`, `suggest_solution`), w każdym tylko tam, gdzie
-    sprawdzenie ma sens, na materiale atrap: przy objawie, do którego atrapa znajduje trzy karty
-    z trzema przyczynami (90001–90003), wśród źródeł stoją wszystkie trzy (warunek, wymóg
-    zera), a licznik w raporcie mówi, czy wynik nazywa trzy przyczyny; ten sam objaw z wątkiem,
-    w którym klient wyklucza przyczyny: licznik, czy uwagi nazywają przyczyny wykluczone
-    (przeniesione z 59.7); sprawa o uprawnieniu do kancelarii e-Doręczeń: licznik, czy
-    przeczytana sekcja instrukcji to właściwa, a nie dystraktor z innym kanałem; w `search`
-    sprawa organizacyjna jako kontrola: licznik wywołań narzędzi kodu, których według p. 70 ma
-    tam nie być. Atrapa wyszukiwania oddaje zawsze ten sam wynik, więc scenariusz mierzy
-    czytanie znalezionego materiału, nie jakość szukania (p. 23). *Dlaczego:* najgroźniejszy
-    błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach, a dziś żaden scenariusz
-    nie sprawdza, co agent przeczytał — test okablowania wymaga tylko niepustej listy źródeł.
+  - [x] **59.9 Czytanie znalezionego materiału** (2026-10-15) — nowy zestaw i test czytania na
+    atrapach narzędzi: w trzech przebiegach na `gpt-6.1-sol` model przy jednym objawie czytał
+    karty wszystkich trzech spraw o trzech przyczynach na `search`, `suggest_questions`
+    i `suggest_solution` i nazywał trzy przyczyny, czytał właściwą sekcję instrukcji, a nie
+    dystraktor o ePUAP, i mówił o ponownym zalogowaniu, a w sprawie organizacyjnej `search` nie
+    sięgnął po kod ani razu; w dwóch pierwszych przebiegach licznik przyczyny wykluczonej przez
+    klienta liczył fałszywie, a wątek nie wykluczał załącznika, bo „jednostronicowy PDF” nie
+    mówi o rozmiarze pliku, więc model pisał tylko, że 90003 słabiej pasuje; po mocniejszym
+    fakcie w wątku, wariantach stojących w jednej sprawie i pominięciu zaprzeczeń oba grafy
+    wykluczyły 90003 wprost w przebiegu kontrolnym; bez zmian w prompcie; przebiegi
+    0,22–0,34 USD; reguły — „Testy", „Świadomie pominięte".
 - [ ] **46. CLI dla grafów** (dopisany 2026-10-02, numer spoza kolejności) — `helpdesk gate
   close|reply`, `helpdesk suggest <wariant>`, „Popraw" i karta zgłoszenia na tej samej fabryce
   grafów co trasy; także wyszukiwanie i parsowanie zgłoszeń do korpusu (dawne `rag search`
@@ -4037,7 +4077,9 @@ każdy mierzy się osobno.
   pierwszego, i ile kosztuje dodatkowa tura odczytu; na prawdziwych wątkach także: ile wątków
   na sprawę (dziś 3), ile tur na sprawę (limit dziś 20, do ustawienia z rozkładu tur
   w przebiegach), limit długości wątku i czy wątek ma nieść etykiety z `as_thread()`
-  („KOMENTARZ", rola, data). *Dlaczego:*
+  („KOMENTARZ", rola, data); w sprawie organizacyjnej z 59.9 model czytał karty wszystkich pięciu
+  zgłoszeń z wyszukiwań, choć żadna sprawy nie dotyczyła, więc lista źródeł niosła materiał bez
+  związku (trzy przebiegi). *Dlaczego:*
   najgroźniejszy błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach
   (e-Doręczenia: 6 zgłoszeń, 6 przyczyn), a zapytanie agenta nie powstaje już promptem korpusu.
 - [ ] **71. Ustalenia z `search` jako wejście `/suggest`** (dopisany 2026-10-10, numer spoza

@@ -44,8 +44,8 @@ O czym pamiętać przy zmianach:
   w `tests/_helpers/live/`; tu zostają fixture i funkcja wypisująca, bo pytest szuka ich
   tylko w `conftest.py`. Tak samo raporty scenariuszy: fixture `<scenariusz>_report`
   (`injection_report`, `gate_report`, `polish_report`, `questions_report`, `code_report`,
-  `solution_report`), a klasa raportu w `tests/_helpers/scenarios/<scenariusz>/`; po przebiegu
-  stoją przed zużyciem modelu.
+  `solution_report`, `reading_report`), a klasa raportu
+  w `tests/_helpers/scenarios/<scenariusz>/`; po przebiegu stoją przed zużyciem modelu.
 """
 
 import os
@@ -62,6 +62,7 @@ from tests._helpers.scenarios.gates import GateReport
 from tests._helpers.scenarios.injections import InjectionReport
 from tests._helpers.scenarios.polish import PolishReport
 from tests._helpers.scenarios.questions import QuestionsReport
+from tests._helpers.scenarios.reading import ReadingReport
 from tests._helpers.scenarios.solution import SolutionReport
 
 EMBEDDER_URL_ENV     = "EMBEDDER_TEST_URL"
@@ -292,6 +293,33 @@ def solution_report(
     return pytestconfig.stash[SOLUTION_REPORT_KEY]
 
 
+# Miejsce raportu scenariuszy czytania w konfiguracji przebiegu, na tej samej zasadzie co raport
+# zużycia.
+READING_REPORT_KEY = pytest.StashKey[ReadingReport]()
+
+
+@pytest.fixture(scope="session")
+def reading_report(
+    pytestconfig: pytest.Config,  # wstrzykiwane przez pytest; trzyma raport na cały przebieg
+) -> ReadingReport:
+    """
+    Description:
+    Raport scenariuszy czytania znalezionego materiału, jeden na cały przebieg pytesta. Test
+    czytania zgłasza w nim ocenę każdej sprawy, a po przebiegu pytest wypisuje ją razem
+    z licznikami i polami wyniku.
+
+    Example args:
+        (wstrzykiwane przez pytest)
+
+    Example result:
+        ReadingReport wspólny dla wszystkich testów przebiegu
+    """
+    if READING_REPORT_KEY not in pytestconfig.stash:
+        pytestconfig.stash[READING_REPORT_KEY] = ReadingReport()
+
+    return pytestconfig.stash[READING_REPORT_KEY]
+
+
 def pytest_terminal_summary(
     terminalreporter: TerminalReporter,  # wstrzykiwane przez pytest; pisze na ekran
     config:           pytest.Config,     # wstrzykiwane przez pytest; trzyma raporty
@@ -299,9 +327,10 @@ def pytest_terminal_summary(
     """
     Description:
     Po przebiegu wypisuje raporty testów na żywym modelu: najpierw oceny spraw ze scenariuszy
-    wstrzyknięć, bramek, „Popraw”, pytań, cytowania kodu i rozwiązania z polami wyniku, potem
-    zużycie żywego modelu z sumą kosztu. Pytest woła tę funkcję sam, po nazwie. Raport, do którego
-    żaden test niczego nie zgłosił — czyli każdy w przebiegu bez żywego modelu — nie wypisuje nic.
+    wstrzyknięć, bramek, „Popraw”, pytań, cytowania kodu, rozwiązania i czytania z polami
+    wyniku, potem zużycie żywego modelu z sumą kosztu. Pytest woła tę funkcję sam, po nazwie.
+    Raport, do którego żaden test niczego nie zgłosił — czyli każdy w przebiegu bez żywego
+    modelu — nie wypisuje nic.
 
     Example args:
         (wstrzykiwane przez pytest)
@@ -309,7 +338,7 @@ def pytest_terminal_summary(
     Example result:
         None — na końcu wyjścia pytesta stoją sekcje „wstrzyknięcia poleceń", „scenariusze
         bramek", „scenariusze »Popraw«", „scenariusze pytań", „scenariusze cytowania kodu",
-        „scenariusze rozwiązania" i „zużycie żywego modelu"
+        „scenariusze rozwiązania", „scenariusze czytania" i „zużycie żywego modelu"
     """
     sections = [
         ("wstrzyknięcia poleceń",        config.stash.get(INJECTION_REPORT_KEY, None)),
@@ -318,6 +347,7 @@ def pytest_terminal_summary(
         ("scenariusze pytań",            config.stash.get(QUESTIONS_REPORT_KEY, None)),
         ("scenariusze cytowania kodu",   config.stash.get(CODE_REPORT_KEY, None)),
         ("scenariusze rozwiązania",      config.stash.get(SOLUTION_REPORT_KEY, None)),
+        ("scenariusze czytania",         config.stash.get(READING_REPORT_KEY, None)),
         ("zużycie żywego modelu",        config.stash.get(LIVE_USAGE_KEY, None)),
     ]
 
