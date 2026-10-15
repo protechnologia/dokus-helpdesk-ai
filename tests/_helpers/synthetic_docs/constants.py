@@ -11,7 +11,7 @@ from pathlib import Path
 PACKAGE_DIR = Path("data/safe/instruction")
 
 # Zestaw zapytań do paczki, sekcja na narzędzie, ze spisem sekcji w kolejności dokumentów.
-GOLDEN_FILE = Path("data/safe/golden/docs-synthetic.json")
+GOLDEN_FILE = Path("data/safe/golden/docs-tools.json")
 
 # Podpowiedź do błędu pomiaru, gdy indeksu syntetycznego nie ma albo nie odpowiada paczce: pomiar
 # kończy się błędem z poleceniem, które indeks buduje.

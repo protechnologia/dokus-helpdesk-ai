@@ -8,11 +8,11 @@ from pathlib import Path
 
 # Zapytania golden setu, każde ze wskazanym rekordem-celem, i etykiety przeglądu korpusu
 # (`rejected`: rekordy bez wiedzy). Dane klienta, poza repo.
-GOLDEN_FILE = Path("data/unsafe/golden/tickets-dokus.json")
+GOLDEN_FILE = Path("data/unsafe/golden/tickets.json")
 
 # Dystraktory: zapytania bez odpowiednika w indeksie, na które poprawną odpowiedzią jest pusty
 # wynik.
-DISTRACTORS_FILE = Path("data/unsafe/golden/tickets-dokus-distractors.json")
+DISTRACTORS_FILE = Path("data/unsafe/golden/tickets-distractors.json")
 
 # Korpus odniesienia: 200 sparsowanych zgłoszeń, z których zbudowano indeks i etykiety; ma przetrwać
 # masowy import (p. 31).

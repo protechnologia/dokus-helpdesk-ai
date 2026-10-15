@@ -22,7 +22,7 @@ SYNTHETIC_RULES_FILE = SYNTHETIC_PACKAGE_DIR / "rules.json"
 
 # Zestaw zapytań do aplikacji syntetycznej, sekcja na narzędzie: z niego powstają parametry
 # testów narzędzi kodu.
-SYNTHETIC_CASES_FILE = REPO_ROOT / "data" / "safe" / "golden" / "code-synthetic.json"
+SYNTHETIC_CASES_FILE = REPO_ROOT / "data" / "safe" / "golden" / "code-tools.json"
 
 # Polecenie, które podaje błąd testu, gdy paczka nie jest zbudowana albo jest nieaktualna, żeby
 # dało się ją zbudować bez szukania w dokumentacji.

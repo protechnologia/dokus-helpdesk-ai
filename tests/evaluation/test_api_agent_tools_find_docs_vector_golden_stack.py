@@ -19,7 +19,7 @@ pokażą.
 Co się dzieje po drodze:
 
 1. `measure_docs_vector()` z `tests/_helpers/synthetic_docs/` czyta 29 zapytań
-   `find_docs_vector` z `data/safe/golden/docs-synthetic.json`: 24 ze wskazanymi sekcjami (część
+   `find_docs_vector` z `data/safe/golden/docs-tools.json`: 24 ze wskazanymi sekcjami (część
    także z dystraktorami) i 5, na które poprawną odpowiedzią jest pusty wynik.
 2. Każde wysyła do `FindDocsVectorTool` na indeksie syntetycznym, z `RAG_TOP_K`
    i `RAG_DOCS_SCORE_MIN` z konfiguracji.

@@ -13,7 +13,7 @@ według reguł `data/safe/code/rules.json`. Bez stacku i bez modelu.
 O czym pamiętać przy zmianach:
 
 - Listę plików, które nie mogą wejść do paczki, trzyma zestaw (`absent_paths`
-  w `data/safe/golden/code-synthetic.json`). Nowy plik źródła, który ma nie wejść, dopisuje się
+  w `data/safe/golden/code-tools.json`). Nowy plik źródła, który ma nie wejść, dopisuje się
   tam; inaczej pada test „źródło to paczka plus lista".
 - Test nie czyta ani nie zmienia paczki zbudowanej obok źródła (`data/safe/code/repo/`), na
   której stoją testy narzędzi kodu.

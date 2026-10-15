@@ -1,7 +1,7 @@
 """
 Description:
 Test integracyjny narzędzia `describe_code` na paczce zbudowanej z aplikacji syntetycznej:
-każde zapytanie z sekcji `describe_code` zestawu `data/safe/golden/code-synthetic.json` idzie
+każde zapytanie z sekcji `describe_code` zestawu `data/safe/golden/code-tools.json` idzie
 przez prawdziwy węzeł `run_tools`, tak jak wywołanie modelu. Bez stacku i bez modelu; test
 łańcucha z szukaniem wymaga programu ripgrep na hoście (`apt install ripgrep`).
 

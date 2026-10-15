@@ -1,6 +1,6 @@
 {
   "meta": {
-    "name": "docs-synthetic-v1",
+    "name": "docs-tools-v1",
     "created": "2026-10-04",
     "purpose": "Okablowanie narzędzi dokumentacji (list_docs, find_docs_vector, find_docs_text) na syntetycznej paczce — NIE mierzy skuteczności: sekcje i zapytania pisał ten sam autor.",
     "docs_dir": "data/safe/instruction",

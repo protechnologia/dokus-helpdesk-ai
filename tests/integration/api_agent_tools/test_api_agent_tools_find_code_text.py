@@ -1,7 +1,7 @@
 """
 Description:
 Test integracyjny narzędzia `find_code_text` na paczce zbudowanej z aplikacji syntetycznej: każde
-zapytanie z sekcji `find_code_text` zestawu `data/safe/golden/code-synthetic.json` idzie przez
+zapytanie z sekcji `find_code_text` zestawu `data/safe/golden/code-tools.json` idzie przez
 prawdziwy węzeł `run_tools`, tak jak wywołanie modelu. Bez stacku i bez modelu; wymaga programu
 ripgrep na hoście (`apt install ripgrep`).
 

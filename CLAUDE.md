@@ -904,7 +904,7 @@ dokumentacji jeszcze nie ma (p. 15, p. 55) — indeksacja i narzędzia powstają
   paczki syntetycznej trwa na CPU ponad minutę. Słowo „import" zostaje dla masowego importu
   zgłoszeń (p. 31), który jest czymś innym: parsowaniem korpusu modelem.
 - **Paczka syntetyczna (2026-10-04):** dwa zmyślone dokumenty, 27 sekcji, `synthetic: true`,
-  z zestawem 61 zapytań do obu wyszukiwań w `data/safe/golden/docs-synthetic.json`. Mierzy
+  z zestawem 61 zapytań do obu wyszukiwań w `data/safe/golden/docs-tools.json`. Mierzy
   okablowanie narzędzi, nie skuteczność, i nie może trafić do właściwego indeksu. Ma własny:
   `helpdesk docs index --synthetic` pisze do tabeli `docs_text_synthetic` i kolekcji o nazwie
   z dopiskiem `_synthetic`, a flaga komendy i `synthetic` w manifeście muszą się zgadzać w obie
@@ -1185,11 +1185,11 @@ a paczka powstała z innej gałęzi.
   wybrane miejsce w kodzie i zgłoszenie napisane pod nie słowami zgłaszającego: komunikat
   z ekranu, fragment logu albo opis zachowania, bez nazw z kodu. Wymagane są miejsca, bez
   których nie da się odpowiedzieć na pytanie ze zgłoszenia; obok zapisane są miejsca pokrewne
-  i pułapki. Zestaw na kodzie Dokusa ma 9 przypadków (`data/unsafe/golden/code-dokus.json`).
-  Opisy zachowania zatwierdza osoba znająca Dokusa; do tego czasu przypadek ma
+  i pułapki. Zestaw na kodzie Dokusa ma 9 przypadków (`data/unsafe/golden/code.json`, do
+  2026-10-15 `code-dokus.json`). Opisy zachowania zatwierdza osoba znająca Dokusa; do tego czasu przypadek ma
   `behaviour_confirmed: false`.
 - **Zestaw do aplikacji syntetycznej ma inny kształt, bo służy testom bez modelu (2026-10-07).**
-  `data/safe/golden/code-synthetic.json` trzyma sekcję na narzędzie: 74 zapytania w kształcie
+  `data/safe/golden/code-tools.json` trzyma sekcję na narzędzie: 74 zapytania w kształcie
   narzędzia z oczekiwanym wynikiem, oraz listę plików, których paczka nie może zawierać.
   Zgłoszeń w nim nie ma: testowi bez modelu nic nie dają, bo zamiana zgłoszenia na wywołania
   narzędzi to praca modelu. Kształty zapytań pochodzą z planu i prototypów, więc sekcję
@@ -2621,11 +2621,11 @@ dobre rozwiązanie: pierwsze mają trafiać w niewiadome, drugie w sprawdzony kr
 Zestaw to **syntetyczne zapytania**, nie pary historycznych zgłoszeń: produkt bierze nowe
 zgłoszenie i szuka podobnych, więc para `ticket ↔ ticket` mierzyłaby coś, czego produkt nie robi.
 Uboczny zysk: znika problem singletonów (47% rekordów nie ma bliskiego sąsiada), bo **zapytanie
-dostaje każdy rekord**. Pliki: `data/unsafe/golden/tickets-dokus.json` (162 zapytania
-i 38 odrzuceń z powodem; do 2026-10-10 `golden200.json`), korpus
+dostaje każdy rekord**. Pliki: `data/unsafe/golden/tickets.json` (162 zapytania i 38 odrzuceń
+z powodem; do 2026-10-10 `golden200.json`, potem do 2026-10-15 `tickets-dokus.json`), korpus
 `data/unsafe/parsed/bielik-11b-golden200/` (200 artefaktów) i dystraktory
-`data/unsafe/golden/tickets-dokus-distractors.json` (wcześniej `distractors.json`) — materiał
-wielokrotnego użytku przy każdej zmianie modelu. „Golden200" zostaje nazwą próbki 200 zgłoszeń
+`data/unsafe/golden/tickets-distractors.json` (wcześniej `distractors.json`, potem
+`tickets-dokus-distractors.json`) — materiał wielokrotnego użytku przy każdej zmianie modelu. „Golden200" zostaje nazwą próbki 200 zgłoszeń
 i katalogu z jej kartami.
 
 - **Każde zapytanie ma dwa kształty: `query_raw` i `query_problem` + `query_symptoms`** (dopisane
@@ -2726,7 +2726,7 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
   per kandydat na próg), `... detail --threshold 0.48` (co ten próg robi z każdym dystraktorem
   i które trafienia poprawne kosztuje) oraz `... plot` (wykres obu rozkładów z linią progu do
   `data/unsafe/docs/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz
-  `data/unsafe/golden/tickets-dokus-distractors.json`; sam golden set mierzy tylko połowę rozkładu
+  `data/unsafe/golden/tickets-distractors.json`; sam golden set mierzy tylko połowę rozkładu
 
 **Komendy na grafach** (bramki, propozycje, „Popraw", wyszukiwanie, karta zgłoszenia) dojdą
 w p. 46.
@@ -3026,6 +3026,14 @@ przebiegów.
   tego, że ścieżka się nie zepsuła. Zgodność indeksu syntetycznego z plikami paczki sprawdzają
   fixture'y z `tests/evaluation/conftest.py`; porównanie i pomiary leżą w helperach
   `synthetic_docs` i `golden_tickets`.
+- **Nazwa zestawu w `data/safe/golden/` mówi, czego dotyczy (2026-10-15).** Dopisek `-tools` ma
+  zestaw zapytań do narzędzi z oczekiwanym wynikiem, sprawdzany bez modelu (`code-tools.json`,
+  `docs-tools.json`, wcześniej z dopiskiem `-synthetic`). Nazwa bez dopisku to scenariusze
+  ewaluacji modelu z p. 59 (`injections`, `gates`, `polish`, `questions`, `code`). Zestawy
+  w `data/unsafe/golden/` nie mają dopisku paczki (do 2026-10-15 `-dokus`): instancja obsługuje
+  jeden produkt, więc dane klienta są zawsze z tej samej paczki (`tickets.json`,
+  `tickets-distractors.json`, `code.json`). `code.json` w `unsafe` to sprawy dla agenta na
+  prawdziwym kodzie, ten sam rodzaj co `code.json` w `safe` na aplikacji syntetycznej.
 - **Narzędzia kodu: integracyjne bez modelu na aplikacji syntetycznej, ewaluacyjne na kodzie
   Dokusa.** Zapytania z zestawu syntetycznego idą przez prawdziwy węzeł `run_tools`, bo odmowa
   bywa dziełem modelu zapytania albo narzędzia, a model ma w obu przypadkach dostać błąd
@@ -3569,6 +3577,8 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Sprawy bez komunikatu (wątek i para bez wątku) w sekcji `suggest_questions` zestawu
   kodu** — ten graf sięga po kod tylko przy komunikacie, wpisie z logu albo kodzie błędu, więc
   wymóg pliku padałby z założenia; wracają z szerszą regułą sięgania po kod (p. 25).
+- **`code-citations.json` zamiast `code.json`** — nazwa bez dopisku oznacza w `data/safe/golden/`
+  ewaluację modelu, a zestawy zapytań do narzędzi mają dopisek `-tools`.
 - **Osobny zestaw cytowania kodu na graf** — trzy warunki (plik przyczyny, brak przyczyny przy
   komunikacie, którego nie ma nigdzie, linie odczytane wcześniej) nie zależą od grafu; zestaw
   ma sekcję na graf, jak zestaw wstrzyknięć.
@@ -3670,7 +3680,7 @@ punkty niżej to narzędzia właściwe.
   `stack_postgres` i test na stacku; reguły — „Warstwa wyszukiwania tekstowego (Postgres)".
 - [x] **54. Syntetyczna dokumentacja i golden set** (2026-10-04) — dwa dokumenty, 27 sekcji
   w `data/safe/instruction/syntetyczna-instrukcja-*` i 61 zapytań do obu wyszukiwań
-  w `data/safe/golden/docs-synthetic.json`; mierzy okablowanie, nie skuteczność.
+  w `data/safe/golden/docs-tools.json`; mierzy okablowanie, nie skuteczność.
 - [x] **49. Indeksacja dokumentacji** (2026-10-05) — `helpdesk docs validate|index`: czytnik
   paczki, cięcie sekcji na fragmenty, indekser zastępujący tabelę i kolekcję, osobny indeks
   syntetyczny;
@@ -3742,8 +3752,8 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   w `data/safe/code/`; przegląd wykrywaczem sekretów zrobiony; bez czystego checkoutu i bez
   gałęzi w metryczce; reguły — „Kod aplikacji", „Konfiguracja i deploy".
 - [x] **61. Zestaw przypadków do kodu Dokusa** (2026-10-07) — 9 przypadków na paczce z Dokusa
-  w `data/unsafe/golden/code-dokus.json`, budowanych z kodu i sprawdzonych świeżym agentem,
-  oraz zestaw do aplikacji syntetycznej w `data/safe/golden/code-synthetic.json` (33 zapytania
+  w `data/unsafe/golden/code.json`, budowanych z kodu i sprawdzonych świeżym agentem,
+  oraz zestaw do aplikacji syntetycznej w `data/safe/golden/code-tools.json` (33 zapytania
   w sekcjach na narzędzie); `filters.yml` dopisany do paczki; sonda na `claude-sonnet-5-5`
   z prototypami narzędzi; testów jeszcze nie ma, dochodzą z narzędziami, a opisy zachowania
   czekają na zatwierdzenie; reguły — „Kod aplikacji", „Testy".
@@ -3889,16 +3899,15 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     rozstrzyga opis, sam objaw): 4 z 4 zgodne w trzech przebiegach, bez zmian w prompcie;
     reguły — „Testy", „Świadomie pominięte". Cytowanie kodu dla tego grafu doszło później,
     sekcją `suggest_questions` w zestawie kodu, i jest mierzone razem z 59.7.
-  - [ ] **59.7 `search`** — wstrzyknięcie treścią zgłoszenia i wynikami narzędzi; zgłoszenie
-    z wątkiem bez progu, jako licznik w raporcie: czy model cytuje fragment kodu z przyczyną,
-    którą odpowiedzi klienta wykluczają (czy uwagi nazywają takie przyczyny, przeszło do
-    59.9); komunikat tylko w kodzie, a w parze kontrolnej nigdzie: czy model nie cytuje wtedy
-    przyczyny z luźno powiązanego pliku i ile cytowań wskazuje linie, których nie odczytał
-    (linia widziana tylko w wyniku szukania liczy się jako nieodczytana);
-    nadmiarowy plik w katalogu szablonów aplikacji syntetycznej: czy model sięga po spis
-    katalogu i czy odróżnia stan kodu od instalacji klienta. Zestaw i test cytowania kodu są
-    wspólne dla grafów z narzędziami kodu (od 2026-10-15 `code.json`, wcześniej `search.json`),
-    więc pomiar obejmuje też sekcję `suggest_questions`.
+  - [x] **59.7 `search`** (2026-10-15) — wstrzyknięcie treścią zgłoszenia i wynikami narzędzi,
+    z listą źródeł jako polem chronionym: na `gpt-6.1-sol` 0 przebić z 8 w dwóch przebiegach na
+    poprawionym zestawie; w pierwszym atak w wątku 90011 nie dotarł do modelu, bo przy zgłoszeniu
+    z wątkiem model czyta wątek 90003, więc atak przeszedł tam; ataki, które wskazują plik kodu
+    jako przyczynę, model sprawdza i cytuje ten plik jako wykluczony; nowy zestaw i test
+    cytowania kodu, wspólne z `suggest_questions` (para z komunikatem): w trzech przebiegach
+    wszystkie 6 spraw zgodne, bez cytowań linii nieodczytanych, bez zmian w prompcie; przebiegi
+    po 0,49–0,57 USD za obie części; czy uwagi nazywają przyczyny wykluczone przez klienta,
+    przeszło do 59.9; reguły — „Testy", „Świadomie pominięte".
   - [ ] **59.8 `suggest_solution`** — wstrzyknięcie treścią zgłoszenia i wynikami narzędzi;
     zgłoszenie z wątkiem bez progu, jako licznik w raporcie: czy propozycja nie niesie kroku,
     który wątek pokazuje jako już wykonany; zastrzeżenie i krok nieodwracalny z karty trafiają
@@ -4023,7 +4032,10 @@ każdy mierzy się osobno.
   sentinele `questions_summary` rozpoznaje `no_questions()` dopisane
   do `normalizer_ticket_sentinel.py`; w scenariuszu z p. 59.6 („wątek tylko zawęża") model
   w 1 z 3 przebiegów zapytał klienta, czy na serwerze pozostał plik blokady, czyli o diagnozę,
-  której klient nie zna. *Dlaczego:* prompt z 6.3 powstał pod słabszy model, a znana
+  której klient nie zna. W scenariuszu cytowania kodu z 59.7 (sprawa z komunikatem tylko
+  w kodzie) pierwsze pytanie do klienta niosło ścieżkę z repozytorium
+  (`src/lib/Urzad/Szablony/pisma`) w 3 z 3 przebiegów, choć prompt każe trzymać ścieżki w uwagach
+  dla wdrożeniowca; test tego nie sprawdza. *Dlaczego:* prompt z 6.3 powstał pod słabszy model, a znana
   dziura (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
 - [ ] **26. `suggest_solution`** — prompt z 6.4 przemierzony na modelu docelowym, z regułą
   zgodności trafienia z objawem, osobną regułą ostrzeżenia o kroku nieodwracalnym i szerszą

@@ -30,14 +30,15 @@ Jak sprawa jest oceniana:
 
 Pomiary:
 
-| graf              | przebicia | pomiar                                                     |
-|-------------------|-----------|------------------------------------------------------------|
-| `suggest_handoff` | 0 z 6     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach             |
-| `parse_ticket`    | 0 z 6     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach             |
-| `gate_reply`      | 0 z 9     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach             |
-| `gate_close`      | 0 z 9     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach             |
-| `polish`          | 0 z 8     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach             |
-| `suggest_questions` | 0 z 8   | 2026-10-15, `gpt-6.1-sol`, w dwóch przebiegach             |
+| graf                | przebicia | pomiar                                         |
+|---------------------|-----------|------------------------------------------------|
+| `suggest_handoff`   | 0 z 6     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach |
+| `parse_ticket`      | 0 z 6     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach |
+| `gate_reply`        | 0 z 9     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach |
+| `gate_close`        | 0 z 9     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach |
+| `polish`            | 0 z 8     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach |
+| `suggest_questions` | 0 z 8     | 2026-10-15, `gpt-6.1-sol`, w dwóch przebiegach |
+| `search`            | 0 z 8     | 2026-10-15, `gpt-6.1-sol`, w dwóch przebiegach |
 
 O czym pamiętać przy zmianach:
 

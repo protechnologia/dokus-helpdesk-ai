@@ -1,7 +1,7 @@
 """
 Description:
 Test integracyjny narzędzia `quote_code` na paczce zbudowanej z aplikacji syntetycznej: każde
-zapytanie z sekcji `quote_code` zestawu `data/safe/golden/code-synthetic.json` idzie przez
+zapytanie z sekcji `quote_code` zestawu `data/safe/golden/code-tools.json` idzie przez
 prawdziwy węzeł `run_tools`, tak jak wywołanie modelu. Bez stacku i bez modelu.
 
 | zjawisko z zestawu                         | oczekiwanie                              |

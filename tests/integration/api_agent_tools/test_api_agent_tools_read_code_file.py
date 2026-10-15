@@ -1,7 +1,7 @@
 """
 Description:
 Test integracyjny narzędzia `read_code_file` na paczce zbudowanej z aplikacji syntetycznej: każde
-zapytanie z sekcji `read_code_file` zestawu `data/safe/golden/code-synthetic.json` idzie przez
+zapytanie z sekcji `read_code_file` zestawu `data/safe/golden/code-tools.json` idzie przez
 prawdziwy węzeł `run_tools`, tak jak wywołanie modelu. Bez stacku i bez modelu; test łańcucha
 z szukaniem wymaga programu ripgrep na hoście (`apt install ripgrep`).
 

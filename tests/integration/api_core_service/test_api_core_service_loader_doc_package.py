@@ -10,7 +10,7 @@ from app.core_service.loader_doc_package import load_doc_package
 
 REPO_ROOT         = Path(__file__).resolve().parents[3]
 SYNTHETIC_PACKAGE = REPO_ROOT / "data" / "safe" / "instruction"
-SYNTHETIC_GOLDEN  = REPO_ROOT / "data" / "safe" / "golden" / "docs-synthetic.json"
+SYNTHETIC_GOLDEN  = REPO_ROOT / "data" / "safe" / "golden" / "docs-tools.json"
 
 
 def _write_document(
@@ -355,7 +355,7 @@ def test_a_long_section_is_a_warning_not_an_error(
 def test_the_synthetic_package_is_valid() -> None:
     """Sprawdza, czy paczka syntetyczna z `data/safe/instruction` jest poprawna: nie ma błędów,
     każdy jej dokument jest oznaczony jako zmyślony, a sekcje stoją w tej samej kolejności, którą
-    zapisano w zestawie zapytań `docs-synthetic.json`.
+    zapisano w zestawie zapytań `docs-tools.json`.
 
     Wyłapuje zmianę w paczce, po której przestaje ona pasować do zestawu zapytań albo traci
     oznaczenie danych zmyślonych: na paczce i zestawie razem stoją pomiary narzędzi dokumentacji,

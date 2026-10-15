@@ -1,6 +1,6 @@
 {
   "meta": {
-    "name": "code-synthetic-v1",
+    "name": "code-tools-v1",
     "created": "2026-10-07",
     "purpose": "Okablowanie narzędzi kodu na zmyślonej aplikacji (data/safe/code), w testach bez modelu. NIE mierzy skuteczności: aplikację i zapytania pisał ten sam autor.",
     "package": {

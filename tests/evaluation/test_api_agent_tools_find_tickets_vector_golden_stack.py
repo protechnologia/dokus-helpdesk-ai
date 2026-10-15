@@ -18,8 +18,8 @@ a testy jednostkowe i integracyjne na trzech zmyślonych zgłoszeniach tego nie 
 Co się dzieje po drodze:
 
 1. `measure_tickets_vector()` z `tests/_helpers/golden_tickets/` czyta zapytania
-   z `data/unsafe/golden/tickets-dokus.json` (162, każde ze wskazanym
-   rekordem-celem) i z `data/unsafe/golden/tickets-dokus-distractors.json` (16, bez odpowiednika
+   z `data/unsafe/golden/tickets.json` (162, każde ze wskazanym
+   rekordem-celem) i z `data/unsafe/golden/tickets-distractors.json` (16, bez odpowiednika
    w indeksie).
 2. Każde wysyła do `FindTicketsVectorTool` polami `query_problem` i `query_symptoms`, na
    skonfigurowanej kolekcji, z `RAG_TOP_K` i `RAG_SCORE_MIN` z konfiguracji.

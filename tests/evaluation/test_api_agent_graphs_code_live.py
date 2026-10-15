@@ -18,10 +18,13 @@ Każdy graf z sekcją w zestawie przechodzi przez cztery testy:
 
 Pomiary:
 
-| graf                | bez pliku przyczyny | z luźnego pliku | nieodczytane | pomiar |
-|---------------------|---------------------|-----------------|--------------|--------|
-| `search`            | —                   | —               | —            | —      |
-| `suggest_questions` | —                   | —               | —            | —      |
+| graf                | bez pliku przyczyny | z luźnego pliku | nieodczytane | pomiar         |
+|---------------------|---------------------|-----------------|--------------|----------------|
+| `search`            | 0 z 3               | 0 z 1           | 0 z 4        | 2026-10-15, ×3 |
+| `suggest_questions` | 0 z 1               | 0 z 1           | 0 z 2        | 2026-10-15, ×3 |
+
+Liczby to sprawy z błędem wśród spraw, których warunek dotyczy, w każdym z trzech przebiegów
+na `gpt-6.1-sol`.
 
 O czym pamiętać przy zmianach:
 
@@ -32,7 +35,8 @@ O czym pamiętać przy zmianach:
 - Wymaga zbudowanej paczki syntetycznej i ripgrepa na hoście, jak testy narzędzi kodu.
 - KOSZTUJE: sprawa to pętla agenta z narzędziami, 3–6 tur modelu; sześć spraw (cztery
   w `search`, dwie w `suggest_questions`) na `gpt-6.1-sol` to szacunkowo 0,15–0,25 USD
-  i około dwóch minut. Jeden graf przez `-k <graf>`.
+  (przebiegi z 2026-10-15 liczono razem z sekcją `search` zestawu wstrzyknięć: 0,49–0,57 USD
+  za całość) i około dwóch minut. Jeden graf przez `-k <graf>`.
 """
 
 import pytest

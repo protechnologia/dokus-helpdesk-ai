@@ -16,7 +16,7 @@ Co się dzieje po drodze (`measure_filter()` z `tests/_helpers/golden_tickets/`)
 
 1. Czyta 200 artefaktów z `data/unsafe/parsed/bielik-11b-golden200/`.
 2. Czyta id rekordów oznaczonych w przeglądzie jako niosące zero wiedzy (`rejected`
-   w `data/unsafe/golden/tickets-dokus.json`).
+   w `data/unsafe/golden/tickets.json`).
 3. Uruchamia `filter_tickets()` i liczy, ile odrzuceń trafia w oznaczone, a ile poza nie.
 
 O czym pamiętać przy zmianach:
