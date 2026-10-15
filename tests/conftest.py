@@ -41,12 +41,12 @@ O czym pamiętać przy zmianach:
   `API_TEST_URL`, `POSTGRES_TEST_DSN`).
 - Testy `llm_live` zgłaszają zużycie każdej sprawy przez fixture `live_usage`, a na końcu
   przebiegu pytest wypisuje je z sumą kosztu (`pytest_terminal_summary()`). Sam raport leży
-  w `tests/helpers_live_usage.py`; tu zostają fixture i funkcja wypisująca, bo pytest szuka ich
+  w `tests/_helpers/live/`; tu zostają fixture i funkcja wypisująca, bo pytest szuka ich
   tylko w `conftest.py`. Tak samo raporty scenariuszy: wstrzyknięć (fixture `injection_report`,
-  klasa w `tests/helpers_injections.py`) i bramek (fixture `gate_report`, klasa
-  w `tests/helpers_gates.py`), „Popraw” (fixture `polish_report`, klasa
-  w `tests/helpers_polish.py`) i pytań (fixture `questions_report`, klasa
-  w `tests/helpers_questions.py`); po przebiegu stoją przed zużyciem modelu.
+  klasa w `tests/_helpers/scenarios/injections/`) i bramek (fixture `gate_report`, klasa
+  w `tests/_helpers/scenarios/gates/`), „Popraw” (fixture `polish_report`, klasa
+  w `tests/_helpers/scenarios/polish/`) i pytań (fixture `questions_report`, klasa
+  w `tests/_helpers/scenarios/questions/`); po przebiegu stoją przed zużyciem modelu.
 """
 
 import os
@@ -55,13 +55,13 @@ from urllib.parse import urlsplit
 import pytest
 from _pytest.terminal import TerminalReporter  # pytest 8.3 nie wystawia tego typu pod `pytest.`
 
-from app.config import LLMSettings, Settings
+from app.config import Settings
 from app.db_postgres import PostgresClient
-from tests.helpers_gates import GateReport
-from tests.helpers_injections import InjectionReport
-from tests.helpers_live_usage import LiveUsageReport
-from tests.helpers_polish import PolishReport
-from tests.helpers_questions import QuestionsReport
+from tests._helpers.live import LLM_LIVE_MARKER, LiveUsageReport
+from tests._helpers.scenarios.gates import GateReport
+from tests._helpers.scenarios.injections import InjectionReport
+from tests._helpers.scenarios.polish import PolishReport
+from tests._helpers.scenarios.questions import QuestionsReport
 
 EMBEDDER_URL_ENV     = "EMBEDDER_TEST_URL"
 EMBEDDER_URL_DEFAULT = "http://localhost:8001"
@@ -79,49 +79,6 @@ API_URL_DEFAULT = "http://localhost:8010"
 # z DOCKER_POSTGRES_PORT. Przy własnych wartościach w `.env` test dostaje DSN przez zmienną.
 POSTGRES_DSN_ENV     = "POSTGRES_TEST_DSN"
 POSTGRES_DSN_DEFAULT = "postgresql://helpdesk:helpdesk@localhost:5433/helpdesk"
-
-# Marker testów wołających prawdziwy, płatny model.
-LLM_LIVE_MARKER = "llm_live"
-
-
-def live_generation_llm(
-    config: pytest.Config,  # np. request.config
-) -> LLMSettings:
-    """
-    Description:
-    Konfiguracja modelu generującego dla testów `llm_live` — jedyne wejście, przez które taki
-    test bierze model. Odmawia w dwóch sytuacjach, w obu błędem, nie pominięciem:
-
-    - testy wybrano bez jawnej prośby o żywy model, na przykład `pytest -m ""`, które zdejmuje
-      wszystkie wykluczenia naraz — płatne wywołanie nie może być skutkiem ubocznym;
-    - konfiguracja wskazuje atrapę modelu — zielony wynik bez ani jednego wywołania byłby
-      fałszywy.
-
-    Example args:
-        config=request.config
-
-    Example result:
-        LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", model="gpt-5.4-mini", …)
-
-    Raises:
-        AssertionError: wybór testów nie wymienia `llm_live` albo dostawcą jest `fake`
-    """
-    selected = config.getoption("markexpr")
-
-    assert LLM_LIVE_MARKER in selected, (
-        f"testy na żywym, płatnym modelu uruchamia się jawnie: -m {LLM_LIVE_MARKER} "
-        f"(wybrano -m {selected!r}); komplet testów to -m 'not {LLM_LIVE_MARKER}'"
-    )
-
-    llm = Settings().llm_generation()
-
-    assert llm.provider.strip().lower() != "fake", (
-        f"testy {LLM_LIVE_MARKER} wymagają prawdziwego modelu, a LLM_GENERATION_PROVIDER wskazuje "
-        f"atrapę — ustaw dostawcę, klucz i model w .env"
-    )
-
-    return llm
-
 
 @pytest.fixture(autouse=True)
 def fake_models_outside_live_tests(

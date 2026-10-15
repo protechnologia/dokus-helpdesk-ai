@@ -1,14 +1,21 @@
 """
 Description:
-Testy oceny sprawy i raportu scenariuszy „Popraw” (`tests/helpers_polish.py`), czyli tego, na czym
-stoją testy słów potocznych, zgubionych faktów i dopisków na żywym modelu. Bez modelu — tekst
-podaje test. Plik stoi w korzeniu folderu, bo ocena nie należy do żadnego pakietu aplikacji.
+Testy oceny sprawy i raportu scenariuszy „Popraw” (`tests/_helpers/scenarios/polish/`), czyli
+tego, na czym stoją testy słów potocznych, zgubionych faktów i dopisków na żywym modelu. Bez
+modelu — tekst podaje test. Plik stoi w korzeniu folderu, bo ocena nie należy do żadnego
+pakietu aplikacji.
 """
 
 import pytest
 
 from app.agent_graphs.polish.models import PolishedText
-from tests.helpers_polish import PolishCase, PolishReport, judge_polish_case, numbers, plain
+from tests._helpers.scenarios.polish import (
+    PolishCase,
+    PolishReport,
+    judge_polish_case,
+    numbers,
+    plain,
+)
 
 CASE = PolishCase(
     case_id    = "s04",

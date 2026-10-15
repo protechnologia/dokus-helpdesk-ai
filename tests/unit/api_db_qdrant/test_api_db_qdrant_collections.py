@@ -15,7 +15,7 @@ from app.db_qdrant import (
     TicketsCollection,
     point_id_for,
 )
-from tests.helpers_transport import capturing, raising, routed, with_transport
+from tests._helpers.transport import capturing, raising, routed, with_transport
 
 # Kolekcje testowane bez usługi, na prawdziwym kliencie z podmienionym transportem: sprawdzamy,
 # CO idzie do Qdranta i jak czytamy odpowiedź. Że Qdrant odpowiada na to tak, jak zakładamy,

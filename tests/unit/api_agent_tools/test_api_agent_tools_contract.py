@@ -12,7 +12,7 @@ from app.agent_tools.tickets.fake_tickets import default_cards, default_threads
 from app.agent_tools.tickets.read_tickets_card.models import ReadTicketsCardQuery
 from app.agent_tools.tickets.read_tickets_thread.models import ReadTicketsThreadQuery
 from app.config import Settings
-from tests.helpers_agent_tools import (
+from tests._helpers.fake_tools import (
     fake_agent_tools,
     fake_agent_tools_with_code_only,
     fake_agent_tools_with_tickets,

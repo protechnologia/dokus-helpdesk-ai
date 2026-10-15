@@ -15,7 +15,7 @@ from build_code_package import cli as package_cli
 from build_code_symbols import CODE_DIR, SYMBOLS_NAME, build_symbols, cli
 from typer.testing import CliRunner
 
-from tests.helpers_code_package import SYNTHETIC_RULES_FILE, SYNTHETIC_SOURCE_DIR
+from tests._helpers.synthetic_code import SYNTHETIC_RULES_FILE, SYNTHETIC_SOURCE_DIR
 
 GOOD_PHP = "<?php\nclass Numer\n{\n    public function nastepny()\n    {\n    }\n}\n"
 BAD_PHP  = "<?php\nclass Zepsuta\n{\n    public function zla( {\n    }\n}\n"

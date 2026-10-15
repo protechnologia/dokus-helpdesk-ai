@@ -13,14 +13,12 @@ from app.agent_graphs import suggest_solution
 from app.config import Settings
 from app.core_model.graphs.proposal import Proposal
 from app.core_model.graphs.proposal_notes import ProposalNotes
-from tests.conftest import live_generation_llm
-from tests.helpers_agent_tools import (
+from tests._helpers.fake_tools import (
     fake_agent_tools,
     fake_agent_tools_with_code_only,
     fake_agent_tools_without_material,
 )
-from tests.helpers_live_graphs import run_live_graph
-from tests.helpers_live_usage import LiveUsageReport
+from tests._helpers.live import LiveUsageReport, live_generation_llm, run_live_graph
 
 pytestmark = pytest.mark.llm_live
 
@@ -106,7 +104,7 @@ def live_run(
     """
     Description:
     Oddaje funkcję, która dla grafu zwraca stan końcowy jego sprawy na prawdziwym modelu
-    (`run_live_graph()` z `tests/helpers_live_graphs.py`). Sprawa liczy się przy pierwszym
+    (`run_live_graph()` z `tests/_helpers/live/`). Sprawa liczy się przy pierwszym
     teście, który o nią poprosi, i jest zapamiętana na cały plik — razem z błędem, jeśli się nim
     skończyła, żeby nieudana sprawa nie była opłacana od nowa w każdym teście tego grafu.
     Konfigurację bierze przez `live_generation_llm()`, które odmawia, gdy testy wybrano bez

@@ -24,7 +24,7 @@ from app.core_model.graphs.proposal import Proposal
 from app.core_model.graphs.verdict import Verdict
 from app.engine_anonymization import AnonymizedText, FakeAnonymizer
 from app.engine_llm import LLMError
-from tests.helpers_agent_tools import fake_agent_tools
+from tests._helpers.fake_tools import fake_agent_tools
 
 
 def all_graphs() -> list[ModuleType]:
@@ -52,7 +52,7 @@ GRAPHS         = all_graphs()
 RESPOND_GRAPHS = [graph for graph in GRAPHS if hasattr(graph, "RESPOND_TOOL_NAME")]
 
 # Każde narzędzie agenta, jakie dziś istnieje, w kolejności z `TOOL_NAMES` grafów — test wybiera
-# z nich dozwolone dla grafu. Jedna lista dla wszystkich testów: `tests/helpers_agent_tools.py`.
+# z nich dozwolone dla grafu. Jedna lista dla wszystkich testów: `tests/_helpers/fake_tools/`.
 AGENT_TOOLS = fake_agent_tools()
 
 # Limity wywołań narzędzi, jakie daje konfiguracja domyślna.

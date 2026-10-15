@@ -1,15 +1,16 @@
 """
 Description:
-Testy oceny sprawy i raportu scenariuszy „pytań już nie trzeba” (`tests/helpers_questions.py`),
-czyli tego, na czym stoją testy pytań na żywym modelu. Bez modelu — wynik grafu podaje test. Plik
-stoi w korzeniu folderu, bo ocena nie należy do żadnego pakietu aplikacji.
+Testy oceny sprawy i raportu scenariuszy „pytań już nie trzeba”
+(`tests/_helpers/scenarios/questions/`), czyli tego, na czym stoją testy pytań na żywym modelu.
+Bez modelu — wynik grafu podaje test. Plik stoi w korzeniu folderu, bo ocena nie należy do
+żadnego pakietu aplikacji.
 """
 
 import pytest
 
 from app.core_model.graphs.proposal import Proposal
 from app.core_model.graphs.proposal_notes import ProposalNotes
-from tests.helpers_questions import QuestionsCase, QuestionsReport, judge_questions_case
+from tests._helpers.scenarios.questions import QuestionsCase, QuestionsReport, judge_questions_case
 
 QUESTIONS = Proposal(text="1. Czy była aktualizacja?", internal_notes="1: odcina plik blokady")
 NO_QUESTIONS = ProposalNotes(internal_notes="Pytań już nie trzeba: wpis z logu wskazuje 90002.")

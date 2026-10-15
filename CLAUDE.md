@@ -321,6 +321,8 @@ dokus-helpdesk-ai/
 │   ├── dictionary/               # build.sh z poprawkami słownika, custom_words.txt z nazwami własnymi
 │   └── initdb/                   # konfiguracja wyszukiwania `pl_search` (tylko pusty wolumen)
 ├── tests/
+│   ├── conftest.py               # adresy usług, markery, fixture'y raportów
+│   ├── _helpers/                 # folder na helper: helper.py, models/ (plik na model), constants.py, report.py, __init__.py; scenariusze p. 59 w scenarios/
 │   ├── unit/                     # podfoldery <usługa>_<pakiet>: api_agent_tools/, api_core_service/, embedder/…
 │   ├── integration/              # jednostka + prawdziwa zależność: pliki, FastAPI, LangGraph, Qdrant
 │   ├── functional/               # cała aplikacja przez HTTP albo komendę
@@ -3037,13 +3039,13 @@ przebiegów.
   syntetycznej z repo ma się zgadzać z paczką z jej źródła. Plik z 300 metodami pilnuje numerów
   linii przed błędem pamięci tree-sittera 0.26.0. Cena: domyślny `pytest` wymaga tree-sittera
   w `.venv`.
-- **Testy `llm_live` biorą model przez `live_generation_llm()`** — konfigurację modelu
-  generującego, czyli tego, na którym produkt ma chodzić. Odmawia błędem, gdy wybór testów nie
-  wymienia `llm_live` (płatne wywołanie nie może być skutkiem ubocznym `-m ""`) i gdy dostawcą
-  jest `fake`. Poza tymi testami oba modele są atrapą, cokolwiek stoi w `.env`
-  (`fake_models_outside_live_tests`); test innego dostawcy ustawia go sam. Odpowiedzi modelu plik
-  liczy raz i dzieli między testy, a sprawa grafu liczy się dopiero, gdy potrzebuje jej test,
-  więc `-k <graf>` opłaca jeden graf.
+- **Testy `llm_live` biorą model przez `live_generation_llm()`** (`tests/_helpers/live/`) —
+  konfigurację modelu generującego, czyli tego, na którym produkt ma chodzić. Odmawia błędem,
+  gdy wybór testów nie wymienia `llm_live` (płatne wywołanie nie może być skutkiem ubocznym
+  `-m ""`) i gdy dostawcą jest `fake`. Poza tymi testami oba modele są atrapą, cokolwiek stoi
+  w `.env` (`fake_models_outside_live_tests`); test innego dostawcy ustawia go sam. Odpowiedzi
+  modelu plik liczy raz i dzieli między testy, a sprawa grafu liczy się dopiero, gdy potrzebuje
+  jej test, więc `-k <graf>` opłaca jeden graf.
 - **Testy grafów na żywym modelu sprawdzają okablowanie:** czy model odpowiada narzędziem grafu
   i czy odpowiedź przechodzi przez `respond`; jakość to p. 59 i p. 21–28. Obok spraw
   przykładowych są dwie sprawy `suggest_solution`: na narzędziach bez materiału (model ma
@@ -3136,27 +3138,54 @@ przebiegów.
 
 #### Helpery
 
-| helper                          | kiedy go brać                                                         |
-|---------------------------------|-----------------------------------------------------------------------|
-| `tests/conftest.py`             | adresy usług z hosta (`embedder_url()`, `qdrant_url()`, `api_url()`, `host_settings`, `build_host_settings()`) — nigdy wpisane w pliku testu |
-| `tests/helpers_transport.py`    | test klienta HTTP: `with_transport()`, `always()`, `routed()`, `capturing()`, `raising()` |
-| `tests/helpers_postgres.py`     | narzędzie na prawdziwej tabeli z podmienionym klientem (`ScriptedPostgres`) |
-| `tests/helpers_agent_tools.py`  | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
-| `tests/helpers_live_graphs.py`  | graf na żywym modelu (`run_live_graph()`, z regułami klienta), sprawy grafu naraz (`run_live_cases()` na `LiveCase`: wejście, reguły, narzędzia), reguły z zestawu domyślnego (`default_rules()`), pomiar raz na graf (`remember_per_graph()`) |
-| `tests/helpers_live_usage.py`   | raport zużycia (fixture `live_usage`) i wydruk rozmowy (`run_as_lines()`) |
-| `tests/helpers_injections.py`   | zestaw wstrzyknięć, sprawy sekcji z atakiem także w materiale atrap, kontrola dotarcia (`reached_model()`), ocena sprawy i raport (fixture `injection_report`) |
-| `tests/helpers_gates.py`        | zestaw scenariuszy bramek, ocena werdyktu i raport (fixture `gate_report`) |
-| `tests/helpers_polish.py`       | zestaw scenariuszy „Popraw", ocena tekstu i raport (fixture `polish_report`) |
-| `tests/helpers_questions.py`    | zestaw scenariuszy „pytań już nie trzeba", ocena i raport (fixture `questions_report`) |
-| `tests/helpers_code_package.py` | paczka syntetyczna, jej opis i zapytania z zestawu syntetycznego      |
+| helper                                 | kiedy go brać                                                           |
+|----------------------------------------|-------------------------------------------------------------------------|
+| `tests/conftest.py`                    | adresy usług z hosta (`embedder_url()`, `qdrant_url()`, `api_url()`, `host_settings`, `build_host_settings()`) — nigdy wpisane w pliku testu |
+| `tests/_helpers/transport/`            | test klienta HTTP: `with_transport()`, `always()`, `routed()`, `capturing()`, `raising()` |
+| `tests/_helpers/postgres/`             | narzędzie na prawdziwej tabeli z podmienionym klientem (`ScriptedPostgres`) |
+| `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
+| `tests/_helpers/live/`                 | żywy model: konfiguracja (`live_generation_llm()`), graf na nim (`run_live_graph()`, z regułami klienta), sprawy grafu naraz (`run_live_cases()` na `LiveCase`: wejście, reguły, narzędzia), reguły z zestawu domyślnego (`default_rules()`), pomiar raz na graf (`remember_per_graph()`), raport zużycia (fixture `live_usage`) i wydruk rozmowy (`run_as_lines()`) |
+| `tests/_helpers/scenarios/injections/` | zestaw wstrzyknięć, sprawy sekcji z atakiem także w materiale atrap, kontrola dotarcia (`reached_model()`), ocena sprawy i raport (fixture `injection_report`) |
+| `tests/_helpers/scenarios/gates/`      | zestaw scenariuszy bramek, ocena werdyktu i raport (fixture `gate_report`) |
+| `tests/_helpers/scenarios/polish/`     | zestaw scenariuszy „Popraw", ocena tekstu i raport (fixture `polish_report`) |
+| `tests/_helpers/scenarios/questions/`  | zestaw scenariuszy „pytań już nie trzeba", ocena i raport (fixture `questions_report`) |
+| `tests/_helpers/synthetic_code/`       | aplikacja syntetyczna: zbudowana paczka, jej źródło i reguły, opis projektu, mapa symboli i zapytania z zestawu syntetycznego |
+
+- **Każdy helper ma folder w `tests/_helpers/`, także bez modeli — dla spójności (2026-10-15,
+  wcześniej pliki `tests/helpers_*.py`).** W folderze `helper.py` z logiką, `models/`
+  z dataclassami danych, plik na model nazwany jak model (`InjectionCase` →
+  `models/injection_case.py`, jak w `core_model/`), `constants.py` ze stałymi i `report.py`
+  z raportem — każde tylko wtedy, gdy helper je ma — oraz `__init__.py`, który wystawia
+  całość: testy importują z pakietu helpera (`from tests._helpers.fake_tools import
+  fake_agent_tools`), nigdy z plików w nim wprost. `models/__init__.py` niczego nie
+  eksportuje, tylko wymienia pliki w tabelce. Raport to klasa, która zbiera wyniki w trakcie
+  przebiegu i składa z nich wydruk: nie model, bo ma zmienny stan i zachowanie, a osobny plik,
+  bo ma własny rytm zmian i własne testy. Funkcje, z których raport składa linie, stoją przy
+  nim w `report.py`; wspólna dla raportów kilku helperów (`field_lines()`) leży w `helper.py`
+  helpera, który ją wystawia, tak jak funkcje oceny. Każda stała ma nad sobą komentarz, do
+  czego jest potrzebna, a słownik stoi po jednym kluczu w linii. Wyjątek: test podmienia
+  funkcję w module, z którego woła ją kod (`tests._helpers.live.helper`), bo podmiana
+  w pakiecie nie dosięgnęłaby wywołania.
+- **Scenariusze z p. 59 stoją razem w `tests/_helpers/scenarios/`, folder na scenariusz
+  (2026-10-15).** Wszystkie mają ten sam układ: zestaw z `data/safe/golden/`, sprawy, ocena
+  i raport, a 59.7 i 59.8 dołożą kolejne. Na górze `_helpers/` zostają atrapy i podmiany
+  zależności oraz infrastruktura żywego modelu (`live`), z której korzystają też testy spoza
+  scenariuszy. Nazwa od wzorca, nie `graphs`: grafom służy prawie każdy helper.
+- **Wszystko do testów na żywym modelu stoi w `tests/_helpers/live/` (2026-10-15, wcześniej
+  `live_graphs`, `live_usage` i `live_generation_llm()` w `tests/conftest.py`).** W
+  `helper.py` wejście do modelu i przebieg grafu, w `report.py` raport zużycia z funkcjami
+  wydruku. `live_generation_llm()` to zwykła funkcja, nie fixture, a biorą ją też testy
+  samego klienta modelu, więc nie pasowała ani do conftestu, z którego się nie importuje,
+  ani do helpera z „graphs” w nazwie. W conftestcie zostały fixture'y.
 
 - **Adresów usług nie wpisuje się w pliku testu:** konfiguracja wskazuje nazwy z sieci compose
   (`http://embedder:8000`), nierozwiązywalne z hosta, a podmiana powielona w plikach rozjeżdżała
   porty po zmianie w jednym miejscu. Conftest stoi w korzeniu `tests/`, bo `functional/`
   potrzebuje tego samego co `integration/`.
-- **`helpers_agent_tools.py` to jedyna lista wszystkich atrap narzędzi** — wcześniej były cztery
+- **`tests/_helpers/fake_tools/` to jedyna lista wszystkich atrap narzędzi** — wcześniej były cztery
   kopie i jedna po dojściu narzędzia została nieaktualna bez czerwonego testu; test kontraktu
-  pilnuje, że helper ma atrapę każdego narzędzia. Podklasy narzędzia nie definiuje się w teście:
+  pilnuje, że helper ma atrapę każdego narzędzia. Nazwa `fake_tools`, nie `agent_tools`
+  (2026-10-15): import atrap nie może wyglądać jak import narzędzi z `app.agent_tools`. Podklasy narzędzia nie definiuje się w teście:
   test kontraktu znajduje wszystkie klasy narzędzi w procesie i policzy ją jako drugie narzędzie
   o tej samej nazwie.
 - **Fixture'y raportów i funkcja, która je wypisuje, stoją w `tests/conftest.py`**, bo pytest

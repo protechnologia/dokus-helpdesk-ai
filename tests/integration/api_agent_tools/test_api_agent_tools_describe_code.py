@@ -12,7 +12,7 @@ przez prawdziwy węzeł `run_tools`, tak jak wywołanie modelu. Bez stacku i bez
 | argument wymyślony przez model              | błąd wracający do modelu                      |
 | katalogi wymienione w opisie                | przyjmują je spis katalogu i szukanie         |
 
-Paczkę, jej opis i zestaw dają helpery z `tests/helpers_code_package.py`; paczkę buduje się
+Paczkę, jej opis i zestaw dają helpery z `tests/_helpers/synthetic_code/`; paczkę buduje się
 skryptem przed testami. Opis aplikacji syntetycznej (`data/safe/code/project.md`) leży w repo.
 
 O czym pamiętać przy zmianach:
@@ -39,7 +39,7 @@ from app.agent_tools.code.find_code_text import FindCodeTextQuery, FindCodeTextT
 from app.agent_tools.code.list_code_files import ListCodeFilesQuery, ListCodeFilesTool
 from app.config import Settings
 from app.engine_process.ripgrep import RipgrepClient
-from tests.helpers_code_package import (
+from tests._helpers.synthetic_code import (
     SYNTHETIC_PACKAGE_DIR,
     synthetic_code_cases,
     synthetic_code_description,

@@ -1,14 +1,14 @@
 """
 Description:
-Testy oceny sprawy i raportu scenariuszy bramek (`tests/helpers_gates.py`), czyli tego, na czym
-stoją testy fałszywych alarmów i przepuszczeń bramek na żywym modelu. Bez modelu —
-werdykt podaje test. Plik stoi w korzeniu folderu, bo ocena służy wszystkim bramkom.
+Testy oceny sprawy i raportu scenariuszy bramek (`tests/_helpers/scenarios/gates/`), czyli
+tego, na czym stoją testy fałszywych alarmów i przepuszczeń bramek na żywym modelu. Bez
+modelu — werdykt podaje test. Plik stoi w korzeniu folderu, bo ocena służy wszystkim bramkom.
 """
 
 import pytest
 
 from app.core_model.graphs.verdict import Verdict
-from tests.helpers_gates import GateCase, GateOutcome, GateReport, judge_gate_case
+from tests._helpers.scenarios.gates import GateCase, GateOutcome, GateReport, judge_gate_case
 
 BLOCK = Verdict(verdict="block", reasons=["Prośba o hasło."], hint="Usuń prośbę o hasło.")
 PASS  = Verdict(verdict="pass")

@@ -19,7 +19,7 @@ from app.config import Settings
 from app.engine_anonymization import FakeAnonymizer
 from app.engine_llm import LLMUsage
 from app.main import create_app
-from tests.helpers_agent_tools import find_tickets_vector_with_dead_embedder
+from tests._helpers.fake_tools import find_tickets_vector_with_dead_embedder
 
 # Kontrakt HTTP `POST /search` w procesie: kształt odpowiedzi (źródła, uwagi, zapytania agenta),
 # walidacja żądania i to, co trasa wkłada do grafu. Że trasa jest zamontowana w obrazie, sprawdza

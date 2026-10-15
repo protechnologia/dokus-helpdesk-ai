@@ -15,7 +15,7 @@ from app.db_qdrant import (
     TicketsCollection,
     point_id_for,
 )
-from tests.helpers_transport import capturing, with_transport
+from tests._helpers.transport import capturing, with_transport
 
 # Narzędzie stoi na prawdziwej kolekcji i kliencie Qdranta, a podmieniony jest tylko transport —
 # sprawdzamy więc to, co faktycznie idzie na drut, i jak odpowiedź staje się kartami.

@@ -24,7 +24,7 @@ from app.config import Settings
 from app.engine_anonymization import FakeAnonymizer
 from app.engine_embedding import EmbeddingError
 from app.engine_llm import ChatMessage, FakeLLMClient, ToolCall
-from tests.helpers_agent_tools import fake_agent_tools, find_tickets_vector_with_dead_embedder
+from tests._helpers.fake_tools import fake_agent_tools, find_tickets_vector_with_dead_embedder
 
 # Prawdziwy węzeł `run_tools` wpięty w grafy z pętlą i uruchomiony przez LangGraph, razem
 # z prawdziwym węzłem agenta. Model to atrapa, która oddaje zaplanowane tury, narzędzia to atrapy

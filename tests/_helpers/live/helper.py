@@ -1,24 +1,27 @@
 """
 Description:
-Uruchomienie grafu na żywym, płatnym modelu w testach `llm_live`: graf złożony z węzłów
-właściwych tą samą funkcją co w fabryce grafów, z atrapą anonimizatora i podanymi narzędziami.
-Korzystają z niego test okablowania grafów (`tests/integration/api_agent_graphs/`) i scenariusze
-ewaluacyjne (`tests/evaluation/`).
+Wejście do żywego, płatnego modelu w testach `llm_live` i uruchomienie na nim grafu: graf złożony
+z węzłów właściwych tą samą funkcją co w fabryce grafów, z atrapą anonimizatora i podanymi
+narzędziami. Konfigurację modelu biorą stąd wszystkie testy `llm_live`, także testy samego
+klienta modelu (`tests/integration/api_engine_llm/`); graf uruchamiają test okablowania grafów
+(`tests/integration/api_agent_graphs/`) i scenariusze ewaluacyjne (`tests/evaluation/`). Raport
+zużycia leży w `report.py`.
 
-| co                     | do czego                                                          |
-|------------------------|-------------------------------------------------------------------|
-| `run_live_graph()`     | jedna sprawa: stan przykładowy grafu z podanym wejściem i regułami |
-| `live_state()`         | stan wejściowy takiej sprawy, bez modelu                          |
-| `LiveCase`             | sprawa dla `run_live_cases()`: wejście, reguły klienta, narzędzia |
-| `run_live_cases()`     | wiele spraw grafu naraz; sprawa odrzucona przez `respond` to `None` |
-| `default_rules()`      | reguły klienta z zestawu domyślnego grafu, po sprawdzeniu wersji  |
-| `remember_per_graph()` | pomiar grafu liczony raz na plik testów, razem z błędem            |
+| co                      | do czego                                                           |
+|-------------------------|--------------------------------------------------------------------|
+| `live_generation_llm()` | konfiguracja modelu generującego; odmawia bez jawnego `llm_live`   |
+| `run_live_graph()`      | jedna sprawa: stan przykładowy grafu z podanym wejściem i regułami |
+| `live_state()`          | stan wejściowy takiej sprawy, bez modelu                           |
+| `run_live_cases()`      | wiele spraw grafu naraz; sprawa odrzucona przez `respond` to `None` |
+| `default_rules()`       | reguły klienta z zestawu domyślnego grafu, po sprawdzeniu wersji   |
+| `remember_per_graph()`  | pomiar grafu liczony raz na plik testów, razem z błędem            |
 
 O czym pamiętać przy zmianach:
 
-- Konfigurację modelu podaje wołający, wziętą przez `live_generation_llm()` z `tests/conftest.py`.
-  Ta funkcja odmawia, gdy testy wybrano bez jawnego `llm_live` albo gdy modelem jest atrapa, więc
-  tu jej się nie omija.
+- Konfigurację modelu podaje wołający, wziętą przez `live_generation_llm()`. Ta funkcja odmawia,
+  gdy testy wybrano bez jawnego `llm_live` albo gdy modelem jest atrapa, więc jej się nie omija.
+  To zwykła funkcja, nie fixture, więc nie leży w `tests/conftest.py`: z conftestu się nie
+  importuje.
 - Anonimizator to atrapa, bo zgłoszenia w tych testach są zmyślone; atrapa oddaje tekst bez zmian.
 - Limity wywołań narzędzi i limit tur pochodzą z konfiguracji, tak jak w fabryce grafów.
 - Graf z regułami klienta bez podanych reguł dostaje reguły ze swojego stanu przykładowego, a nie
@@ -27,11 +30,11 @@ O czym pamiętać przy zmianach:
 """
 
 import asyncio
-import dataclasses
 from collections.abc import Callable, Sequence
 from types import ModuleType
 from typing import TypeVar
 
+import pytest
 from pydantic import BaseModel
 
 from app.agent_graphs import run_graph
@@ -42,19 +45,51 @@ from app.config import LLMSettings, Settings
 from app.core_service.loader_dict_rules import get_rule_set
 from app.engine_anonymization import FakeAnonymizer
 from app.engine_llm import get_llm_client
-from tests.helpers_agent_tools import fake_agent_tools
+from tests._helpers.fake_tools import fake_agent_tools
+from tests._helpers.live.constants import LLM_LIVE_MARKER
+from tests._helpers.live.models.live_case import LiveCase
 
 # Wynik pomiaru, który `remember_per_graph()` zapamiętuje: dowolny, byle jeden na graf.
 Measured = TypeVar("Measured")
 
 
-@dataclasses.dataclass(frozen=True)
-class LiveCase:
-    """Sprawa do przepuszczenia przez graf na żywym modelu: wejście, reguły klienta i narzędzia."""
+def live_generation_llm(
+    config: pytest.Config,  # np. request.config
+) -> LLMSettings:
+    """
+    Description:
+    Konfiguracja modelu generującego dla testów `llm_live` — jedyne wejście, przez które taki
+    test bierze model. Odmawia w dwóch sytuacjach, w obu błędem, nie pominięciem:
 
-    text:  str                                # wejście grafu, np. "ZGŁOSZENIE 90101…"
-    rules: Sequence[str] | None = None        # reguły klienta; None — reguły z przykładu grafu
-    tools: Sequence[AgentTool] | None = None  # narzędzia sprawy; None — `fake_agent_tools()`
+    - testy wybrano bez jawnej prośby o żywy model, na przykład `pytest -m ""`, które zdejmuje
+      wszystkie wykluczenia naraz — płatne wywołanie nie może być skutkiem ubocznym;
+    - konfiguracja wskazuje atrapę modelu — zielony wynik bez ani jednego wywołania byłby
+      fałszywy.
+
+    Example args:
+        config=request.config
+
+    Example result:
+        LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", model="gpt-5.4-mini", …)
+
+    Raises:
+        AssertionError: wybór testów nie wymienia `llm_live` albo dostawcą jest `fake`
+    """
+    selected = config.getoption("markexpr")
+
+    assert LLM_LIVE_MARKER in selected, (
+        f"testy na żywym, płatnym modelu uruchamia się jawnie: -m {LLM_LIVE_MARKER} "
+        f"(wybrano -m {selected!r}); komplet testów to -m 'not {LLM_LIVE_MARKER}'"
+    )
+
+    llm = Settings().llm_generation()
+
+    assert llm.provider.strip().lower() != "fake", (
+        f"testy {LLM_LIVE_MARKER} wymagają prawdziwego modelu, a LLM_GENERATION_PROVIDER wskazuje "
+        f"atrapę — ustaw dostawcę, klucz i model w .env"
+    )
+
+    return llm
 
 
 async def run_live_graph(

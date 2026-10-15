@@ -5,8 +5,7 @@ from pydantic import BaseModel
 
 from app.config import LLMSettings
 from app.engine_llm import LLMCompletion, LLMUsage, get_llm_client
-from tests.conftest import live_generation_llm
-from tests.helpers_live_usage import LiveUsageReport
+from tests._helpers.live import LiveUsageReport, live_generation_llm
 
 pytestmark = pytest.mark.llm_live
 

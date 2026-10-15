@@ -33,26 +33,16 @@ O czym pamiętać przy zmianach:
 """
 
 import json
-from pathlib import Path
 from typing import Any
 
 from app.core_service.loader_code_description import CodeDescription
 from app.core_service.loader_code_package import CodePackage
 from app.core_service.loader_code_symbols import CodeSymbols
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-
-# Katalog paczki syntetycznej: kod w `repo/`, obok metryczka.
-SYNTHETIC_PACKAGE_DIR = REPO_ROOT / "data" / "safe" / "code"
-
-# Źródło aplikacji syntetycznej i reguły, według których skrypt buduje z niego paczkę.
-SYNTHETIC_SOURCE_DIR = SYNTHETIC_PACKAGE_DIR / "source"
-SYNTHETIC_RULES_FILE = SYNTHETIC_PACKAGE_DIR / "rules.json"
-
-# Zapytania do aplikacji syntetycznej, sekcja na narzędzie.
-SYNTHETIC_CASES_FILE = REPO_ROOT / "data" / "safe" / "golden" / "code-synthetic.json"
-
-BUILD_COMMAND = "python scripts/build_code_package.py build data/safe/code/source data/safe/code"
+from tests._helpers.synthetic_code.constants import (
+    BUILD_COMMAND,
+    SYNTHETIC_CASES_FILE,
+    SYNTHETIC_PACKAGE_DIR,
+)
 
 
 def synthetic_code_package() -> CodePackage:

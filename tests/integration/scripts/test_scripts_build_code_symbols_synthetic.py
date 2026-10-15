@@ -31,7 +31,7 @@ from build_code_symbols import SYMBOLS_NAME, Symbol, SymbolMap, build_symbols, l
 
 from app.core_service.loader_code_package import CodePackage
 from app.core_service.loader_code_symbols import CodeSymbols
-from tests.helpers_code_package import SYNTHETIC_RULES_FILE, SYNTHETIC_SOURCE_DIR
+from tests._helpers.synthetic_code import SYNTHETIC_RULES_FILE, SYNTHETIC_SOURCE_DIR
 
 # Słowo `function` w kodzie PHP i JS oraz deklaracja klasy w PHP.
 FUNCTION_WORD = re.compile(r"\bfunction\b")

@@ -1,6 +1,6 @@
 """
 Description:
-Testy raportu zużycia żywego modelu (`LiveUsageReport` z `tests/helpers_live_usage.py`), czyli
+Testy raportu zużycia żywego modelu (`LiveUsageReport` z `tests/_helpers/live/`), czyli
 podsumowania, które pytest wypisuje po przebiegu testów `llm_live`. Bez modelu — zużycie jest tu
 zmyślone. Plik stoi w korzeniu folderu, bo raport służy testom wszystkich usług.
 """
@@ -10,7 +10,7 @@ import json
 from app.agent_nodes.models import LogEntry
 from app.agent_tools.base import error_as_json
 from app.engine_llm import ChatMessage, LLMUsage, ToolCall
-from tests.helpers_live_usage import (
+from tests._helpers.live import (
     CUT_MARK,
     MAX_ARGUMENTS_CHARS,
     LiveUsageReport,

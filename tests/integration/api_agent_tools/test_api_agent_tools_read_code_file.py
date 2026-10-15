@@ -15,7 +15,7 @@ z szukaniem wymaga programu ripgrep na hoście (`apt install ripgrep`).
 | pliki, których paczka nie może zawierać            | błąd wracający do modelu                 |
 | linia znaleziona przez `find_code_text`            | daje się odczytać i zacytować bez zmian  |
 
-Paczkę i zestaw dają helpery z `tests/helpers_code_package.py`; paczkę buduje się skryptem przed
+Paczkę i zestaw dają helpery z `tests/_helpers/synthetic_code/`; paczkę buduje się skryptem przed
 testami.
 
 O czym pamiętać przy zmianach:
@@ -46,7 +46,7 @@ from app.agent_tools.code.read_code_file import (
 )
 from app.config import Settings
 from app.engine_process.ripgrep import RipgrepClient
-from tests.helpers_code_package import (
+from tests._helpers.synthetic_code import (
     line_of,
     synthetic_absent_paths,
     synthetic_code_cases,

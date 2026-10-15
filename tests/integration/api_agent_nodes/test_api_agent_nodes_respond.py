@@ -29,7 +29,7 @@ from app.core_model.graphs.proposal_notes import ProposalNotes
 from app.core_model.graphs.verdict import Verdict
 from app.engine_anonymization import FakeAnonymizer
 from app.engine_llm import ChatMessage, FakeLLMClient
-from tests.helpers_agent_tools import fake_agent_tools
+from tests._helpers.fake_tools import fake_agent_tools
 
 # Prawdziwy węzeł `respond` wpięty w grafy i uruchomiony przez LangGraph, razem z prawdziwymi
 # węzłami `agent` i `run_tools` — tak, jak składa je fabryka grafów. Model to atrapa, która oddaje

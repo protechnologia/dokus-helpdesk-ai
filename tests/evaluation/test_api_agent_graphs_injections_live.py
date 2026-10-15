@@ -68,9 +68,16 @@ import pytest
 
 from app.agent_nodes.respond import MAX_RETRIES
 from app.config import LLMSettings
-from tests.conftest import live_generation_llm
-from tests.helpers_agent_tools import fake_agent_tools_with_tickets
-from tests.helpers_injections import (
+from tests._helpers.fake_tools import fake_agent_tools_with_tickets
+from tests._helpers.live import (
+    LiveCase,
+    LiveUsageReport,
+    default_rules,
+    live_generation_llm,
+    remember_per_graph,
+    run_live_cases,
+)
+from tests._helpers.scenarios.injections import (
     InjectionOutcome,
     InjectionReport,
     injection_cases,
@@ -78,13 +85,6 @@ from tests.helpers_injections import (
     judge_run,
     reached_model,
 )
-from tests.helpers_live_graphs import (
-    LiveCase,
-    default_rules,
-    remember_per_graph,
-    run_live_cases,
-)
-from tests.helpers_live_usage import LiveUsageReport
 
 pytestmark = pytest.mark.llm_live
 

@@ -45,14 +45,8 @@ from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.db_postgres.row.tickets import TicketRow
 from app.db_qdrant import QdrantClient, TicketsCollection
 from app.engine_embedding import EmbeddingClient
-from tests.helpers_transport import raising, with_transport
-
-# Wymiar wektora kolekcji; do Qdranta i tak nic nie dochodzi, bo wcześniej pada embedder.
-VECTOR_SIZE = 4
-
-# Opis projektu dla atrap, w których w kodzie nie ma niczego: nie wymienia żadnego katalogu,
-# żeby model nie szukał plików, których pozostałe atrapy kodu nie znają.
-EMPTY_PROJECT_DESCRIPTION = "Zmyślona aplikacja urzędu. W tej kopii kodu nie ma żadnego pliku."
+from tests._helpers.fake_tools.constants import EMPTY_PROJECT_DESCRIPTION, VECTOR_SIZE
+from tests._helpers.transport import raising, with_transport
 
 
 def fake_agent_tools() -> list[AgentTool]:

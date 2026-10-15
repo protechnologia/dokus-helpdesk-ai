@@ -9,7 +9,7 @@ from app.config import Settings
 from app.engine_anonymization import FakeAnonymizer
 from app.engine_llm import FakeLLMClient
 from app.main import create_app
-from tests.helpers_agent_tools import fake_agent_tools
+from tests._helpers.fake_tools import fake_agent_tools
 
 # Kontrakt HTTP `/suggest` i `/variants`. Testy idą po rejestrze grafów, nie po zaszytej trójce
 # wariantów (CLAUDE.md -> „Testy") — nowy katalog `suggest_*` jest objęty bez dopisywania.

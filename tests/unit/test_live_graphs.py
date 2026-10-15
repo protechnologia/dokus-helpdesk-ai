@@ -1,6 +1,6 @@
 """
 Description:
-Testy tej części `tests/helpers_live_graphs.py`, która nie woła modelu, a decyduje, co model
+Testy tej części `tests/_helpers/live/`, która nie woła modelu, a decyduje, co model
 dostanie i ile razy test zapłaci: stan wejściowy sprawy, sprawy puszczane naraz, reguły klienta
 z zestawu domyślnego po sprawdzeniu wersji i pomiar zapamiętany raz na graf. Wywołanie grafu
 podmienia test. Plik stoi w korzeniu folderu, bo helper służy wszystkim grafom.
@@ -17,15 +17,15 @@ from app.agent_tools import AgentTool
 from app.config import LLMSettings
 from app.core_service.loader_dict_rules import get_rule_set
 from app.engine_llm import LLMError
-from tests import helpers_live_graphs
-from tests.helpers_agent_tools import fake_agent_tools, fake_agent_tools_with_tickets
-from tests.helpers_live_graphs import (
+from tests._helpers.fake_tools import fake_agent_tools, fake_agent_tools_with_tickets
+from tests._helpers.live import (
     LiveCase,
     default_rules,
     live_state,
     remember_per_graph,
     run_live_cases,
 )
+from tests._helpers.live import helper as live_helper
 
 RULES = ["Wiadomość nie prosi klienta o hasło ani login."]
 
@@ -74,7 +74,7 @@ async def test_live_cases_keep_their_order_rules_and_tools_and_a_rejected_answer
 
         return f"stan {input_text}"
 
-    monkeypatch.setattr(helpers_live_graphs, "run_live_graph", run)
+    monkeypatch.setattr(live_helper, "run_live_graph", run)
 
     cases  = [LiveCase("pierwsza", RULES, own), LiveCase("odrzucona")]
     finals = await run_live_cases(gate_reply, None, cases)
@@ -96,7 +96,7 @@ async def test_live_cases_let_other_model_errors_through(
     async def run(*_: object) -> str:
         raise LLMError("dostawca nie odpowiedział")
 
-    monkeypatch.setattr(helpers_live_graphs, "run_live_graph", run)
+    monkeypatch.setattr(live_helper, "run_live_graph", run)
 
     with pytest.raises(LLMError, match="nie odpowiedział"):
         await run_live_cases(gate_reply, None, [LiveCase("pierwsza", RULES)])

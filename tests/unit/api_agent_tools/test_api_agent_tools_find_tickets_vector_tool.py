@@ -10,7 +10,7 @@ from app.agent_tools.tickets.find_tickets_vector import (
 from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.db_qdrant import VECTOR_PROBLEM, DbQdrantConfigError, QdrantClient, TicketsCollection
 from app.engine_embedding import EmbeddingClient
-from tests.helpers_transport import capturing, with_transport
+from tests._helpers.transport import capturing, with_transport
 
 # Narzędzie stoi na prawdziwych klientach embeddera i Qdranta, a podmieniony jest tylko transport
 # — sprawdzamy więc to, co faktycznie idzie na drut (tryb, przestrzeń wektorów, limit).

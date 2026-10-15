@@ -3,7 +3,7 @@ import json
 from app.agent_tools.docs.fake_docs import default_sections, default_texts
 from app.agent_tools.docs.list_docs import FakeListDocsTool, ListDocsArgs, ListDocsTool
 from app.db_postgres import DocRow, DocsTable
-from tests.helpers_postgres import ScriptedPostgres
+from tests._helpers.postgres import ScriptedPostgres
 
 # Narzędzie stoi na prawdziwej `DocsTable`, a podmieniony jest tylko klient bazy — sprawdzamy
 # więc, o co narzędzie pyta tabelę i co robi z jej odpowiedzią. Że Postgres układa spis dokument

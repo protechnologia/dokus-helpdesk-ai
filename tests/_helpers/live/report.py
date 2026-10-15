@@ -1,13 +1,13 @@
 """
 Description:
-Raport zużycia żywego, płatnego modelu w testach `llm_live`: zbiera zużycie każdej sprawy
-i składa podsumowanie, które pytest wypisuje na końcu przebiegu — linię na sprawę, pod nią
-przebieg grafu z wywołaniami narzędzi, a na końcu sumę kosztu.
+Raport zużycia żywego, płatnego modelu w testach `llm_live`: `LiveUsageReport` zbiera zużycie
+każdej sprawy i składa podsumowanie, które pytest wypisuje na końcu przebiegu — linię na sprawę,
+pod nią przebieg grafu z wywołaniami narzędzi, a na końcu sumę kosztu. Obok stoją funkcje,
+z których raport składa linie.
 
 | co                    | do czego                                                          |
 |-----------------------|-------------------------------------------------------------------|
 | `LiveUsageReport`     | raport: `record()` dopisuje sprawę, `lines()` składa podsumowanie |
-| `LiveUsage`           | jedna zgłoszona sprawa: etykieta, zużycie, przebieg i rozmowa     |
 | `usage_as_text()`     | zużycie jedną linią dla człowieka                                 |
 | `run_as_lines()`      | wpisy przebiegu, a pod każdą turą modelu jej wywołania narzędzi   |
 | `arguments_as_text()` | argumenty wywołania jedną linią                                   |
@@ -56,7 +56,6 @@ O czym pamiętać przy zmianach:
 - Sprawa zakończona błędem nie oddaje stanu, więc jej zużycia w raporcie nie ma.
 """
 
-import dataclasses
 import functools
 import json
 from collections.abc import Iterator, Mapping, Sequence
@@ -65,25 +64,8 @@ from typing import Any
 from app.agent_nodes.models import LogEntry
 from app.agent_tools.base import is_error_json
 from app.engine_llm import ChatMessage, LLMUsage
-
-# Dłuższe argumenty wywołania są ucinane: narzędzie odpowiedzi niesie w nich całą propozycję.
-MAX_ARGUMENTS_CHARS = 300
-
-# Tekst w wyniku narzędzia dłuższy niż tyle znaków jest w opisie zastąpiony swoją długością.
-MAX_RESULT_TEXT_CHARS = 80
-
-# Tym znakiem kończą się ucięte argumenty.
-CUT_MARK = "…"
-
-
-@dataclasses.dataclass(frozen=True)
-class LiveUsage:
-    """Zużycie jednej sprawy na żywym modelu, zgłoszone przez test."""
-
-    label:    str                      # np. "graf search"
-    usage:    LLMUsage                 # wywołania, tokeny i koszt całej sprawy
-    log:      tuple[LogEntry, ...]     # wpisy przebiegu grafu; puste poza sprawami grafów
-    messages: tuple[ChatMessage, ...]  # rozmowa z modelem; pusta, gdy test jej nie zgłosił
+from tests._helpers.live.constants import CUT_MARK, MAX_ARGUMENTS_CHARS, MAX_RESULT_TEXT_CHARS
+from tests._helpers.live.models.live_usage import LiveUsage
 
 
 class LiveUsageReport:

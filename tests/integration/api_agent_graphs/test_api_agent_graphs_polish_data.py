@@ -26,7 +26,7 @@ import pytest
 
 import app.agent_graphs
 from app.core_service.loader_dict_rules import get_rule_set
-from tests.helpers_polish import PolishCase, plain, polish_sections
+from tests._helpers.scenarios.polish import PolishCase, plain, polish_sections
 
 SECTIONS = polish_sections()
 

@@ -17,7 +17,7 @@ from app.agent_nodes.agent import tool_call_turn
 from app.config import Settings
 from app.engine_anonymization import AnonymizationConfigError, FakeAnonymizer
 from app.engine_llm import ChatMessage, FakeLLMClient
-from tests.helpers_agent_tools import fake_agent_tools
+from tests._helpers.fake_tools import fake_agent_tools
 
 # Fabryka grafów: co konfiguracja robi z grafem, o który prosi trasa. Przy atrapie modelu ma
 # wyjść atrapa grafu, przy prawdziwym dostawcy graf z węzłów właściwych — a dopóki nie ma

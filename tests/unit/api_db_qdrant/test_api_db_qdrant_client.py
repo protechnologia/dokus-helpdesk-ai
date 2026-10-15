@@ -2,7 +2,7 @@ import httpx
 import pytest
 
 from app.db_qdrant import DbQdrantConfigError, DbQdrantError, QdrantClient
-from tests.helpers_transport import always, capturing, raising, routed, with_transport
+from tests._helpers.transport import always, capturing, raising, routed, with_transport
 
 # Klient testowany bez usługi: transport odpowiada, zapisuje albo pada zamiast gniazda. Sprawdzamy
 # tylko rozmowę — co idzie na drut i jak awaria staje się naszym błędem. Co znaczą żądania,

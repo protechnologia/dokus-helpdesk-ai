@@ -16,7 +16,7 @@ from app.agent_nodes.run_tools import FakeRunToolsNode
 from app.config import Settings
 from app.engine_anonymization import AnonymizedText, FakeAnonymizer
 from app.engine_llm import ChatMessage, FakeLLMClient
-from tests.helpers_agent_tools import fake_agent_tools
+from tests._helpers.fake_tools import fake_agent_tools
 
 # Prawdziwy węzeł agenta wpięty w grafy i uruchomiony przez LangGraph. Model to atrapa, która
 # oddaje zaplanowane tury; wykonanie narzędzi i odpowiedź to też atrapy. Te testy sprawdzają to,
@@ -30,7 +30,7 @@ GRAPHS = [
 ]
 
 # Każde narzędzie agenta, jakie dziś istnieje — test wybiera z nich dozwolone dla grafu. Jedna
-# lista dla wszystkich testów: `tests/helpers_agent_tools.py`.
+# lista dla wszystkich testów: `tests/_helpers/fake_tools/`.
 AGENT_TOOLS = fake_agent_tools()
 
 # Limity wywołań narzędzi, jakie daje konfiguracja domyślna.

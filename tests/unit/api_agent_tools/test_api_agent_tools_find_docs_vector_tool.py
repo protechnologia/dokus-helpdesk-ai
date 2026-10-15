@@ -8,7 +8,7 @@ from app.agent_tools.docs.find_docs_vector import FindDocsVectorQuery, FindDocsV
 from app.core_model.docs.doc_section import DocSection
 from app.db_qdrant import VECTOR_SECTION, DbQdrantConfigError, DocsCollection, QdrantClient
 from app.engine_embedding import EmbeddingClient
-from tests.helpers_transport import capturing, with_transport
+from tests._helpers.transport import capturing, with_transport
 
 # Narzędzie stoi na prawdziwych klientach embeddera i Qdranta, a podmieniony jest tylko transport
 # — sprawdzamy więc to, co faktycznie idzie na drut (tryb, przestrzeń wektorów, grupowanie, limit).

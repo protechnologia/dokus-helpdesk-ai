@@ -15,7 +15,7 @@ przez prawdziwy węzeł `run_tools`, tak jak wywołanie modelu. Bez stacku i bez
 | pliki, których paczka nie może zawierać              | nie ma ich w spisie całego kodu          |
 | pozycje spisu                                        | przyjmują je odczyt pliku i szukanie     |
 
-Paczkę i zestaw dają helpery z `tests/helpers_code_package.py`; paczkę buduje się skryptem przed
+Paczkę i zestaw dają helpery z `tests/_helpers/synthetic_code/`; paczkę buduje się skryptem przed
 testami.
 
 O czym pamiętać przy zmianach:
@@ -42,7 +42,7 @@ from app.agent_tools.code.list_code_files import ListCodeFilesQuery, ListCodeFil
 from app.agent_tools.code.read_code_file import ReadCodeFileQuery, ReadCodeFileTool
 from app.config import Settings
 from app.engine_process.ripgrep import RipgrepClient
-from tests.helpers_code_package import (
+from tests._helpers.synthetic_code import (
     synthetic_absent_paths,
     synthetic_code_cases,
     synthetic_code_package,

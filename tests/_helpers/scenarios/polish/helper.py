@@ -4,18 +4,15 @@ Zestaw scenariuszy „Popraw” (`data/safe/golden/polish.json`) i ocena sprawy 
 żywym modelu: czy poprawiony tekst zmienił formę notatek, a nie ich treść. Sprawa to notatki
 wdrożeniowca z listą słów potocznych, które mają zniknąć, faktów, które mają zostać, i pułapek —
 dopisków, które kuszą model, a których w notatkach nie ma. Korzysta z niego test ewaluacyjny
-„Popraw” (p. 59), a raport stąd pytest wypisuje po przebiegu.
+„Popraw” (p. 59). Modele zestawu i oceny leżą w `models/`, a raport, który pytest wypisuje po
+przebiegu, w `report.py`.
 
 | co                    | do czego                                                        |
 |-----------------------|-----------------------------------------------------------------|
 | `polish_sections()`   | sekcje zestawu po nazwie grafu                                  |
-| `PolishSection`       | sekcja: wersja zasad stylu i sprawy                             |
-| `PolishCase`          | jedna sprawa: notatki, słowa potoczne, fakty i pułapki          |
 | `plain()`             | tekst do porównań: małe litery, bez polskich znaków i odstępów |
 | `numbers()`           | liczby w tekście, bez numerów listy                             |
 | `judge_polish_case()` | ocena jednej sprawy                                             |
-| `PolishOutcome`       | wynik oceny: co zostało, co zginęło, co przybyło                |
-| `PolishReport`        | raport: `record()` dopisuje sprawę, `lines()` składa wydruk     |
 
 Przykład — notatki „limit to 5 MB, pdf ma 12 MB i sie wywala”:
 
@@ -43,11 +40,8 @@ O czym pamiętać przy zmianach:
 
 - Liczba zapisana słowem w notatkach („na dwa pliki”), a cyfrą w tekście, wyjdzie jako nowa:
   notatki w zestawie piszą liczby cyframi.
-- Raport dostaje się przez fixture `polish_report` z `tests/conftest.py`, jeden na cały
-  przebieg; tam też stoi funkcja, która go wypisuje.
 """
 
-import dataclasses
 import json
 import re
 import unicodedata
@@ -57,97 +51,15 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from tests.helpers_injections import field_lines
-
-POLISH_FILE = Path("data/safe/golden/polish.json")
-
-# Klucz zestawu z metryczką, a nie sekcja grafu.
-META_KEY = "meta"
-
-# Litery, których rozkład Unicode nie zdejmuje do litery bez znaku.
-EXTRA_LETTERS = str.maketrans({"ł": "l"})
-
-# Numer listy na początku linii: „1. ”, „12) ”.
-LIST_NUMBER = re.compile(r"^\s*\d+[.)]\s", re.MULTILINE)
-
-
-@dataclasses.dataclass(frozen=True)
-class PolishCase:
-    """Jedna sprawa „Popraw” z zestawu: notatki i to, co ma się z nimi stać."""
-
-    case_id:    str              # np. "s01"
-    phenomenon: str              # np. "słowa potoczne i liczba w notatkach"
-    text:       str              # notatki wdrożeniowca, np. "przesylki juz ida…"
-    colloquial: tuple[str, ...]  # rdzenie słów potocznych, które mają zniknąć, np. ("smig",)
-    kept:       tuple[str, ...]  # fakty, które mają zostać, np. ("17",)
-    tempting:   tuple[str, ...]  # pułapki: dopiski, których nie ma w notatkach, np. ("menu",)
-
-    @property
-    def label(self) -> str:
-        """
-        Description:
-        Nazwa sprawy w raporcie: identyfikator i zjawisko.
-
-        Example args:
-            (brak)
-
-        Example result:
-            "s01 słowa potoczne i liczba w notatkach"
-        """
-        return f"{self.case_id} {self.phenomenon}"
-
-
-@dataclasses.dataclass(frozen=True)
-class PolishSection:
-    """Sekcja zestawu dla grafu „Popraw”: wersja zasad stylu, pod którą napisano sprawy,
-    i sprawy."""
-
-    graph:         str                     # np. "polish"
-    rules_version: int                     # np. 1 — wersja zestawu domyślnego zasad stylu
-    cases:         tuple[PolishCase, ...]  # sprawy w kolejności zestawu
-
-
-@dataclasses.dataclass(frozen=True)
-class PolishOutcome:
-    """Ocena jednej sprawy „Popraw”."""
-
-    case:        PolishCase         # sprawa, której dotyczy ocena
-    rejected:    bool               # węzeł `respond` nie przyjął odpowiedzi mimo poprawki
-    colloquial:  tuple[str, ...]    # słowa potoczne, które zostały w tekście
-    lost:        tuple[str, ...]    # fakty z notatek, których w tekście nie ma
-    new_numbers: tuple[str, ...]    # liczby z tekstu, których nie ma w notatkach
-    added:       tuple[str, ...]    # pułapki, które trafiły do tekstu
-    retries:     int                # poprawki odpowiedzi od węzła `respond`
-    fields:      Mapping[str, Any]  # pola wyniku do raportu; puste, gdy wyniku nie ma
-
-    @property
-    def assessment(self) -> str:
-        """
-        Description:
-        Ocena jednym zdaniem dla raportu: „zgodny” albo lista tego, co poszło źle.
-
-        Example args:
-            (brak)
-
-        Example result:
-            "potoczne: smig; nowe liczby: 3"
-        """
-        # --- odpowiedź nie do przyjęcia: tekstu nie ma ---
-        if self.rejected:
-            return "ODPOWIEDŹ NIE DO PRZYJĘCIA"
-
-        problems = [
-            f"{name}: {', '.join(found)}"
-            for name, found in (
-                ("potoczne",    self.colloquial),
-                ("zgubione",    self.lost),
-                ("nowe liczby", self.new_numbers),
-                ("dopisane",    self.added),
-            )
-            if found
-        ]
-
-        return "; ".join(problems) if problems else "zgodny"
+from tests._helpers.scenarios.polish.constants import (
+    EXTRA_LETTERS,
+    LIST_NUMBER,
+    META_KEY,
+    POLISH_FILE,
+)
+from tests._helpers.scenarios.polish.models.polish_case import PolishCase
+from tests._helpers.scenarios.polish.models.polish_outcome import PolishOutcome
+from tests._helpers.scenarios.polish.models.polish_section import PolishSection
 
 
 def polish_sections(
@@ -293,92 +205,3 @@ def judge_polish_case(
     )
 
     return outcome
-
-
-class PolishReport:
-    """
-    Description:
-    Zbiera oceny spraw ze scenariuszy „Popraw” w jednym przebiegu pytesta i składa z nich
-    wydruk: dla grafu linię z licznikami, a pod nią każdą sprawę z oceną i poprawionym tekstem
-    w całości.
-
-    Do czego:
-    Test łapie słowa z list, a o tym, czy tekst nie dodał kroku albo obietnicy, której nie ma na
-    żadnej liście, mówi dopiero sam tekst. Wydruk jest po to, żeby go przeczytać.
-
-    Flow:
-        1. Test dostaje raport przez fixture `polish_report` i woła `record()` raz na sprawę.
-        2. Po przebiegu `pytest_terminal_summary()` wypisuje `lines()`.
-    """
-
-    def __init__(self) -> None:
-        """
-        Description:
-        Zakłada pusty raport.
-
-        Example args:
-            (brak)
-
-        Example result:
-            PolishReport bez zgłoszonych spraw
-        """
-        self._records: list[tuple[str, PolishOutcome]] = []
-
-    def record(
-        self,
-        graph:   str,            # np. "polish"
-        outcome: PolishOutcome,  # np. judge_polish_case(…)
-    ) -> None:
-        """
-        Description:
-        Dopisuje do raportu ocenę jednej sprawy.
-
-        Example args:
-            graph="polish"
-            outcome=PolishOutcome(case=PolishCase(case_id="s01", …), …)
-
-        Example result:
-            None — sprawa jest w raporcie
-        """
-        self._records.append((graph, outcome))
-
-    def lines(self) -> list[str]:
-        """
-        Description:
-        Składa wydruk: grafy w kolejności zgłoszenia, dla każdego linię z licznikami, a pod nią
-        sprawy z oceną, liczbą poprawek i poprawionym tekstem. Pusty raport daje pustą listę.
-
-        Example args:
-            (brak)
-
-        Example result:
-            ["polish: potoczne w 0 z 4, zgubione fakty w 0 z 4, nowe liczby w 0 z 4, "
-             "dopisane w 0 z 4, nie do przyjęcia 0",
-             "    s01 słowa potoczne i liczba w notatkach: zgodny; poprawek 0",
-             "        text: Dzień dobry,",
-             …]
-        """
-        graphs = list(dict.fromkeys(graph for graph, _ in self._records))
-        lines: list[str] = []
-
-        for graph in graphs:
-            outcomes = [outcome for name, outcome in self._records if name == graph]
-            total    = len(outcomes)
-
-            lines.append(
-                f"{graph}: "
-                f"potoczne w {sum(bool(outcome.colloquial) for outcome in outcomes)} z {total}, "
-                f"zgubione fakty w {sum(bool(outcome.lost) for outcome in outcomes)} z {total}, "
-                f"nowe liczby w {sum(bool(outcome.new_numbers) for outcome in outcomes)} "
-                f"z {total}, "
-                f"dopisane w {sum(bool(outcome.added) for outcome in outcomes)} z {total}, "
-                f"nie do przyjęcia {sum(outcome.rejected for outcome in outcomes)}"
-            )
-
-            for outcome in outcomes:
-                lines.append(
-                    f"    {outcome.case.label}: {outcome.assessment}; poprawek {outcome.retries}"
-                )
-                lines.extend(field_lines(outcome.fields))
-
-        return lines

@@ -28,7 +28,7 @@ from typing import NamedTuple
 import pytest
 from build_code_package import CODE_DIR, MANIFEST_NAME, Manifest, build_package, load_rules
 
-from tests.helpers_code_package import (
+from tests._helpers.synthetic_code import (
     SYNTHETIC_RULES_FILE,
     SYNTHETIC_SOURCE_DIR,
     synthetic_absent_paths,

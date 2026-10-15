@@ -21,7 +21,7 @@ from typing import get_args
 import pytest
 
 import app.agent_graphs
-from tests.helpers_questions import QuestionsCase, questions_sections
+from tests._helpers.scenarios.questions import QuestionsCase, questions_sections
 
 SECTIONS = questions_sections()
 

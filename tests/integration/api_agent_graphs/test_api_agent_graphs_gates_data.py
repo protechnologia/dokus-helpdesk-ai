@@ -25,7 +25,7 @@ import pytest
 import app.agent_graphs
 from app.core_model.graphs.verdict import Verdict
 from app.core_service.loader_dict_rules import get_rule_set
-from tests.helpers_gates import EXPECTED_VERDICTS, gate_sections
+from tests._helpers.scenarios.gates import EXPECTED_VERDICTS, gate_sections
 
 SECTIONS = gate_sections()
 

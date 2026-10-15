@@ -7,7 +7,7 @@ from app.agent_tools.tickets.find_tickets_text import (
     FindTicketsTextTool,
 )
 from app.db_postgres import TicketsTable
-from tests.helpers_postgres import ScriptedPostgres
+from tests._helpers.postgres import ScriptedPostgres
 
 # Narzędzie stoi na prawdziwej `TicketsTable`, a podmieniony jest tylko klient bazy — sprawdzamy
 # więc, o co narzędzie pyta tabelę i co robi z jej odpowiedziami. Że Postgres naprawdę tak

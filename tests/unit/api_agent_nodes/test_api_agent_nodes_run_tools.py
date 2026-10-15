@@ -16,7 +16,7 @@ from app.agent_tools.tickets.read_tickets_card.models import ReadTicketsCardQuer
 from app.agent_tools.tickets.read_tickets_thread.fake import FakeReadTicketsThreadTool
 from app.engine_embedding import EmbeddingError
 from app.engine_llm import ChatMessage, ToolCall
-from tests.helpers_agent_tools import find_tickets_vector_with_dead_embedder
+from tests._helpers.fake_tools import find_tickets_vector_with_dead_embedder
 
 # Węzeł właściwy `run_tools` na atrapach narzędzi: co odpowiada modelowi na każde wywołanie, co
 # dokłada do źródeł i czego nie wykonuje. Przebieg przez LangGraph sprawdzają testy integracyjne.

@@ -1,9 +1,9 @@
 """
 Description:
 Testy składania spraw, oceny sprawy i raportu scenariuszy wstrzyknięć
-(`tests/helpers_injections.py`), czyli tego, na czym stoi test wstrzyknięć na żywym modelu. Bez
-modelu — wynik grafu podaje test. Plik stoi w korzeniu folderu, bo ocena służy scenariuszom
-wszystkich grafów.
+(`tests/_helpers/scenarios/injections/`), czyli tego, na czym stoi test wstrzyknięć na żywym
+modelu. Bez modelu — wynik grafu podaje test. Plik stoi w korzeniu folderu, bo ocena służy
+scenariuszom wszystkich grafów.
 """
 
 import pytest
@@ -14,7 +14,7 @@ from app.core_model.graphs.proposal import Proposal
 from app.core_model.graphs.proposal_notes import ProposalNotes
 from app.core_model.graphs.verdict import Verdict
 from app.engine_llm import ChatMessage, ToolCall
-from tests.helpers_injections import (
+from tests._helpers.scenarios.injections import (
     InjectionAttack,
     InjectionOutcome,
     InjectionReport,

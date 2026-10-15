@@ -29,7 +29,7 @@ from build_code_package import (
 from typer.testing import CliRunner
 
 from app.core_util.markdown import read_document
-from tests.helpers_code_package import (
+from tests._helpers.synthetic_code import (
     SYNTHETIC_PACKAGE_DIR,
     SYNTHETIC_RULES_FILE,
     SYNTHETIC_SOURCE_DIR,

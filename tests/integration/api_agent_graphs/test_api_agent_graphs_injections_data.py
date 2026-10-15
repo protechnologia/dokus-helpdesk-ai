@@ -38,7 +38,7 @@ from pydantic import BaseModel
 import app.agent_graphs
 from app.agent_tools.tickets.fake_tickets import default_cards, default_threads
 from app.core_service.loader_dict_rules import get_rule_set
-from tests.helpers_injections import (
+from tests._helpers.scenarios.injections import (
     INTO_CARD,
     INTO_INPUT,
     INTO_RULES,

@@ -13,7 +13,7 @@ prawdziwy węzeł `run_tools`, tak jak wywołanie modelu. Bez stacku i bez model
 | ścieżka wychodząca poza paczkę             | błąd wracający do modelu                 |
 | linia znaleziona przez `find_code_text`    | daje się zacytować wprost                |
 
-Paczkę i zestaw dają helpery z `tests/helpers_code_package.py`; paczkę buduje się skryptem przed
+Paczkę i zestaw dają helpery z `tests/_helpers/synthetic_code/`; paczkę buduje się skryptem przed
 testami.
 
 O czym pamiętać przy zmianach:
@@ -37,7 +37,7 @@ from app.agent_tools.code.find_code_text import FindCodeTextQuery, FindCodeTextT
 from app.agent_tools.code.quote_code import QuoteCodeQuery, QuoteCodeTool
 from app.config import Settings
 from app.engine_process.ripgrep import RipgrepClient
-from tests.helpers_code_package import (
+from tests._helpers.synthetic_code import (
     line_of,
     synthetic_code_cases,
     synthetic_code_description,

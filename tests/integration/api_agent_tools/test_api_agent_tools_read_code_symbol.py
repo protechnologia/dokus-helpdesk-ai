@@ -14,7 +14,7 @@ przez prawdziwy węzeł `run_tools`, tak jak wywołanie modelu. Bez stacku i bez
 | brak definicji, zła klasa, ścieżka spoza paczki      | błąd wracający do modelu, z podpowiedzią |
 | linia znaleziona przez `find_code_text`              | jej funkcja daje się odczytać i zacytować |
 
-Paczkę, jej mapę symboli i zestaw dają helpery z `tests/helpers_code_package.py`; paczkę buduje
+Paczkę, jej mapę symboli i zestaw dają helpery z `tests/_helpers/synthetic_code/`; paczkę buduje
 się skryptem przed testami.
 
 O czym pamiętać przy zmianach:
@@ -46,7 +46,7 @@ from app.agent_tools.code.read_code_symbol import (
 )
 from app.config import Settings
 from app.engine_process.ripgrep import RipgrepClient
-from tests.helpers_code_package import (
+from tests._helpers.synthetic_code import (
     synthetic_code_cases,
     synthetic_code_description,
     synthetic_code_package,

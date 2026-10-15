@@ -13,7 +13,7 @@ ripgrep na hoście (`apt install ripgrep`).
 | więcej trafień niż limit                             | limit linii i licznik pominiętych    |
 | ścieżka spoza paczki albo donikąd, puste zapytanie   | błąd wracający do modelu             |
 
-Paczkę i zestaw dają helpery z `tests/helpers_code_package.py`; paczkę buduje się skryptem przed
+Paczkę i zestaw dają helpery z `tests/_helpers/synthetic_code/`; paczkę buduje się skryptem przed
 testami.
 
 O czym pamiętać przy zmianach:
@@ -37,7 +37,7 @@ from app.agent_tools.base import is_error_json
 from app.agent_tools.code.find_code_text import MAX_LINES_PER_SEARCH, FindCodeTextTool
 from app.config import Settings
 from app.engine_process.ripgrep import RipgrepClient
-from tests.helpers_code_package import (
+from tests._helpers.synthetic_code import (
     line_of,
     synthetic_code_cases,
     synthetic_code_package,

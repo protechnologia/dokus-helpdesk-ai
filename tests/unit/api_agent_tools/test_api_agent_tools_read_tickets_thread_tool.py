@@ -10,7 +10,7 @@ from app.agent_tools.tickets.read_tickets_thread import (
     UnknownTicketError,
 )
 from app.db_postgres import TicketsTable
-from tests.helpers_postgres import ScriptedPostgres
+from tests._helpers.postgres import ScriptedPostgres
 
 # Narzędzie stoi na prawdziwej `TicketsTable`, a podmieniony jest tylko klient bazy — sprawdzamy
 # więc, o co narzędzie pyta tabelę i co robi z jej odpowiedzią. Że Postgres oddaje wątek znak

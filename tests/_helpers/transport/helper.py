@@ -27,10 +27,7 @@ import json
 
 import httpx
 
-# Fallback for a request no route matched. A permissive default rather than a 404, so a test
-# declares only the calls it actually cares about; a test that cares about the miss asserts on
-# what was captured instead.
-DEFAULT_RESPONSE_BODY = {"result": {}, "status": "ok"}
+from tests._helpers.transport.constants import DEFAULT_RESPONSE_BODY
 
 
 def with_transport(

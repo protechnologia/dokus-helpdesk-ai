@@ -2,7 +2,7 @@ import httpx
 import pytest
 
 from app.engine_embedding import EmbeddingClient, EmbeddingConfigError, EmbeddingError
-from tests.helpers_transport import always, capturing, raising, with_transport
+from tests._helpers.transport import always, capturing, raising, with_transport
 
 BASE_URL = "http://embedder:8000"
 

@@ -3,7 +3,7 @@ import json
 from app.agent_tools.docs.fake_docs import default_sections, default_texts
 from app.agent_tools.docs.find_docs_text import FindDocsTextQuery, FindDocsTextTool
 from app.db_postgres import DocRow, DocsTable
-from tests.helpers_postgres import ScriptedPostgres
+from tests._helpers.postgres import ScriptedPostgres
 
 # Narzędzie stoi na prawdziwej `DocsTable`, a podmieniony jest tylko klient bazy — sprawdzamy
 # więc, o co narzędzie pyta tabelę i co robi z jej odpowiedziami. Że Postgres naprawdę tak
