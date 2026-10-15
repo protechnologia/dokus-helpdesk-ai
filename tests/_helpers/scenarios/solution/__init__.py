@@ -1,7 +1,7 @@
 """
 Description:
-Zestaw scenariuszy rozwiązania, karty i narzędzia sprawy, dopasowanie faktów w treści, ocena
-sprawy i raport.
+Zestaw scenariuszy rozwiązania, karty i narzędzia sprawy, dopasowanie faktów w treści, licznik
+pytań do klienta, ocena sprawy i raport.
 
 Logika leży w `helper.py`, modele danych w `models/` (plik na model), stałe
 w `constants.py`, raport w `report.py`, a przebieg spraw na żywym modelu w `measure.py`;
@@ -11,6 +11,7 @@ i pakiet ich nie wystawia.
 
 from tests._helpers.scenarios.solution.constants import (
     META_KEY,
+    NOT_A_QUESTION,
     SOLUTION_FILE,
 )
 from tests._helpers.scenarios.solution.helper import (
@@ -20,6 +21,7 @@ from tests._helpers.scenarios.solution.helper import (
     judge_solution_case,
     mentions,
     mentions_all,
+    question_marks,
     solution_sections,
     ticket_subject,
 )
@@ -42,6 +44,8 @@ __all__ = [
     "mentions",
     "mentions_all",
     "META_KEY",
+    "NOT_A_QUESTION",
+    "question_marks",
     "solution_sections",
     "SOLUTION_FILE",
     "SolutionCase",

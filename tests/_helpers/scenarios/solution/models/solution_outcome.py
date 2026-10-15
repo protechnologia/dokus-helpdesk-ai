@@ -15,6 +15,7 @@ class SolutionOutcome:
     missing:           tuple[str, ...]    # fakty z `must_mention` spoza treści (pierwszy wariant)
     expected_mention:  bool | None        # wzmianka z `should_mention` w treści; None — nie liczona
     forbidden_mention: bool | None        # wzmianka z `should_not_mention`; None — nie liczona
+    questions:         int                # znaki zapytania w treści poza cytatem i adresem
     sources:           tuple[str, ...]    # klucze źródeł, np. ("tickets:90002",)
     retries:           int                # poprawki odpowiedzi od węzła `respond`
     fields:            Mapping[str, Any]  # pola wyniku do raportu; puste, gdy wyniku nie ma

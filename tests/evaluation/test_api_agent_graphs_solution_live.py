@@ -29,6 +29,9 @@ O czym pamiętać przy zmianach:
   jest ona sama — na przykład wariant faktu nie obejmuje poprawnego brzmienia — nigdy pod wynik.
 - Krok, który klient już wykonał, i nieodwracalność dopisana bez materiału to liczniki
   w raporcie, bez asercji; czy propozycja mimo to nie każe powtarzać kroku, czyta się w treści.
+- Pytania do klienta (znaki zapytania w treści poza cytatem „…” i adresem) też są licznikiem:
+  prompt o pytaniach nie mówi nic, więc licznik pokazuje tylko, czy rozwiązanie nie zamienia się
+  w pytania.
 - KOSZTUJE: sprawa to pętla agenta z narzędziami, kilka tur modelu; cztery sprawy na
   `gpt-6.1-sol` to szacunkowo 0,1–0,15 USD i około minuty.
 """

@@ -13,6 +13,7 @@ dotyczą.
 | `WARNED`        | propozycja z krokiem i jego nieodwracalnością                       |
 | `BARE`          | propozycja z samym krokiem, bez nieodwracalności                    |
 | `NOTES_ONLY`    | wynik bez treści dla klienta: same uwagi z tymi samymi słowami      |
+| `QUESTIONED`    | propozycja z pytaniem do klienta, cytatem i adresem z „?”           |
 
 O czym pamiętać przy zmianach:
 
@@ -79,4 +80,14 @@ BARE = Proposal(
 # Wynik bez treści dla klienta: same uwagi, w których stoją słowa wszystkich faktów.
 NOTES_ONLY = ProposalNotes(
     internal_notes = "Ponowne pobranie tworzy wpisy, których nie da się usunąć; operator ręcznie.",
+)
+
+# Propozycja z jednym pytaniem do klienta; znak zapytania stoi też w cytacie komunikatu z ekranu,
+# w adresie i w uwagach, a żaden z nich pytaniem do klienta nie jest.
+QUESTIONED = Proposal(
+    text           = "Kroki do wykonania:\n"
+                     "1. Czy przesyłki przestały przychodzić po aktualizacji?\n"
+                     "2. Przy komunikacie „Czy zapisać zmiany?” prosimy wybrać Tak.\n"
+                     "3. Instrukcja: https://pomoc.example/szukaj?q=blokada",
+    internal_notes = "Czy klient aktualizował aplikację?",
 )

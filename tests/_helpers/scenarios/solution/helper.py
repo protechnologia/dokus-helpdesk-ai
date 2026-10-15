@@ -16,6 +16,7 @@ w `models/`, a raport, który pytest wypisuje po przebiegu, w `report.py`.
 | `ticket_subject()`      | linia tematu zgłoszenia                                      |
 | `mentions()`            | czy fakt (którykolwiek wariant) stoi w tekście               |
 | `mentions_all()`        | czy wszystkie fakty stoją w tekście naraz                    |
+| `question_marks()`      | ile pytań stoi w tekście, bez cytatów i adresów              |
 | `judge_solution_case()` | ocena jednej sprawy                                          |
 
 Przykład — karta niesie krok nieodwracalny, a treść dla klienta gubi jego nieodwracalność:
@@ -36,7 +37,8 @@ O czym pamiętać przy zmianach:
 - Fakty porównuje się zapisem `plain()` helpera „Popraw”: bez wielkich liter, polskich znaków
   i odstępów, więc wariant „nie da się usunąć” znajduje „Nie da sie usunac”.
 - Liczy się wyłącznie pole `text` — treść dla klienta. Uwagi dla wdrożeniowca idą do raportu,
-  ale faktu nie spełniają: wdrożeniowiec nie wyśle ich klientowi.
+  ale faktu nie spełniają: wdrożeniowiec nie wyśle ich klientowi. Tak samo pytania: licznik
+  liczy znaki zapytania tylko w treści dla klienta, bez cytatów „…” i adresów.
 - Zmiany kart przechodzą walidację `ParsedTicket`, więc literówka w nazwie pola kończy się
   błędem przy budowie narzędzi, a nie cichą kartą bez zmiany.
 """
@@ -53,7 +55,7 @@ from app.agent_tools.tickets.fake_tickets import default_cards
 from app.core_model.tickets.parsed_ticket import ParsedTicket
 from tests._helpers.fake_tools import fake_agent_tools, fake_agent_tools_with_tickets
 from tests._helpers.scenarios.polish import plain
-from tests._helpers.scenarios.solution.constants import META_KEY, SOLUTION_FILE
+from tests._helpers.scenarios.solution.constants import META_KEY, NOT_A_QUESTION, SOLUTION_FILE
 from tests._helpers.scenarios.solution.models.solution_case import Fact, SolutionCase
 from tests._helpers.scenarios.solution.models.solution_outcome import SolutionOutcome
 from tests._helpers.scenarios.solution.models.solution_section import SolutionSection
@@ -256,6 +258,23 @@ def mentions_all(
     return all(mentions(text, fact) for fact in facts)
 
 
+def question_marks(
+    text: str,  # np. "1. Czy była aktualizacja? 2. Przy komunikacie „Zapisać?” wybrać Tak."
+) -> int:
+    """
+    Description:
+    Liczy znaki zapytania w tekście poza cytatem w polskim cudzysłowie i poza adresem: tam znak
+    zapytania należy do komunikatu z ekranu albo do parametrów, a nie jest pytaniem do klienta.
+
+    Example args:
+        text="1. Czy była aktualizacja? 2. Przy komunikacie „Zapisać?” wybrać Tak."
+
+    Example result:
+        1
+    """
+    return NOT_A_QUESTION.sub("", text).count("?")
+
+
 def judge_solution_case(
     case:    SolutionCase,     # np. SolutionCase(case_id="r03", must_mention=(…), …)
     output:  BaseModel | None,  # np. Proposal(…); None — `respond` nie przyjął odpowiedzi
@@ -265,7 +284,8 @@ def judge_solution_case(
     """
     Description:
     Ocenia jedną sprawę na samej treści dla klienta (`text`): które fakty z `must_mention` jej
-    brakuje i czy stoją w niej wzmianki z `should_mention` i `should_not_mention`. Wynik z samymi
+    brakuje, czy stoją w niej wzmianki z `should_mention` i `should_not_mention` i ile jest w niej
+    pytań do klienta. Wynik z samymi
     uwagami nie ma treści, więc nie niesie żadnego faktu. Brak wyniku zapisuje jako odpowiedź nie
     do przyjęcia, bez znalezisk.
 
@@ -277,7 +297,7 @@ def judge_solution_case(
 
     Example result:
         SolutionOutcome(case=…, rejected=False, text_given=True, missing=("nieodwracaln",),
-                        expected_mention=None, forbidden_mention=None,
+                        expected_mention=None, forbidden_mention=None, questions=0,
                         sources=("tickets:90002",), retries=0, fields={…})
     """
     # --- brak wyniku: węzeł `respond` nie przyjął odpowiedzi mimo poprawki ---
@@ -289,6 +309,7 @@ def judge_solution_case(
             missing           = (),
             expected_mention  = None,
             forbidden_mention = None,
+            questions         = 0,
             sources           = (),
             retries           = retries,
             fields            = {},
@@ -309,6 +330,7 @@ def judge_solution_case(
         missing           = missing,
         expected_mention  = expected,
         forbidden_mention = unwanted,
+        questions         = question_marks(text),
         sources           = tuple(sources),
         retries           = retries,
         fields            = fields,

@@ -14,6 +14,7 @@ from tests._helpers.scenarios.solution import (
     judge_solution_case,
     mentions,
     mentions_all,
+    question_marks,
     solution_sections,
 )
 from tests._helpers.scenarios.solution.samples import (
@@ -22,6 +23,7 @@ from tests._helpers.scenarios.solution.samples import (
     CASE_STEP,
     CASE_WARNING,
     NOTES_ONLY,
+    QUESTIONED,
     WARNED,
 )
 
@@ -97,6 +99,7 @@ def test_a_rejected_answer_has_no_findings_and_no_fields() -> None:
     outcome = judge_solution_case(CASE_WARNING, None, (), 1)
 
     assert outcome.rejected
+    assert outcome.questions         == 0
     assert outcome.missing           == ()
     assert outcome.expected_mention  is None
     assert outcome.forbidden_mention is None
@@ -134,21 +137,52 @@ def test_the_report_counts_missing_facts_and_prints_counters_and_fields() -> Non
     report.record("suggest_solution", failed)
 
     assert report.lines() == [
-        "suggest_solution: brak faktów z karty w 1 z 1, nie do przyjęcia 1",
+        "suggest_solution: brak faktów z karty w 1 z 1, nie do przyjęcia 1, "
+        "pytania w treści w 0 z 2",
         "    r03 krok nieodwracalny z karty: BRAK W TREŚCI: nieodwracaln; poprawek 0",
-        "        źródła: tickets:90002",
+        "        źródła: tickets:90002; pytania w treści: 0",
         "        text: Kroki do wykonania:",
         "              1. Prosimy odebrać przesyłkę ręcznie u operatora; ponowne pobranie "
         "uruchomimy po naszej stronie.",
         "        internal_notes: ",
         "    r01 krok już wykonany: zgodny; poprawek 0",
-        "        źródła: —; wzmianka niepożądana: jest",
+        "        źródła: —; wzmianka niepożądana: jest; pytania w treści: 0",
         "        text: Kroki do wykonania:",
         "              1. Prosimy odebrać przesyłkę ręcznie u operatora; ponowne pobranie "
         "uruchomimy po naszej stronie.",
         "        internal_notes: ",
         "    r02 krok z karty: ODPOWIEDŹ NIE DO PRZYJĘCIA; poprawek 1",
     ]
+
+
+def test_only_questions_to_the_client_are_counted() -> None:
+    """Sprawdza, czy licznik pytań liczy znaki zapytania w treści dla klienta, a pomija ten
+    w cytacie komunikatu z ekranu „…”, w adresie z parametrami i w uwagach dla wdrożeniowca.
+
+    Wyłapuje licznik, który bierze każdy znak zapytania: propozycja cytująca komunikat „Czy
+    zapisać zmiany?” albo podająca adres z wyszukiwaniem wyglądałaby na pytanie do klienta,
+    a pytanie zapisane w uwagach — na pytanie w treści, której klient nie dostanie."""
+    outcome = judge_solution_case(CASE_STEP, QUESTIONED, (), 0)
+
+    assert question_marks(QUESTIONED.text) == 1
+    assert outcome.questions              == 1
+
+
+def test_the_report_counts_cases_with_a_question_to_the_client() -> None:
+    """Sprawdza, czy raport liczy w linii grafu sprawy z pytaniem w treści dla klienta wśród
+    spraw z wynikiem i wypisuje liczbę pytań przy sprawie.
+
+    Wyłapuje raport, który gubi licznik pytań albo liczy w mianowniku sprawy bez wyniku: nie
+    dałoby się zobaczyć, że propozycja rozwiązania zamieniła się w pytania do klienta."""
+    report = SolutionReport()
+
+    report.record("suggest_solution", judge_solution_case(CASE_STEP, QUESTIONED, (), 0))
+    report.record("suggest_solution", judge_solution_case(CASE_DONE, None, (), 1))
+
+    lines = report.lines()
+
+    assert lines[0].endswith("pytania w treści w 1 z 1")
+    assert "        źródła: —; wzmianka oczekiwana: brak; pytania w treści: 1" in lines
 
 
 def test_an_empty_report_prints_nothing() -> None:

@@ -2932,7 +2932,7 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1972 (0)           | 25 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1974 (0)           | 25 s |
 | integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 849 (79)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 110 (9)            | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 97 (38)            | 38 s |
@@ -2940,7 +2940,7 @@ w p. 46.
 Liczby z 2026-10-15, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-2935 testów, około 150 s; domyślny `pytest`, bez stacku: 2809 testów, 41 s. Testy `llm_live` —
+2937 testów, około 150 s; domyślny `pytest`, bez stacku: 2811 testów, 41 s. Testy `llm_live` —
 36 integracyjnych i 57 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
 przebiegów.
 
@@ -3086,6 +3086,17 @@ przebiegów.
   który jej posłucha i odpowie tekstem, dostaje od `respond` poprawkę. Reguły pochodzą od
   klienta, więc są niezaufanym wejściem. Czy prawdziwy model takiej reguły posłucha, mierzy
   test wstrzyknięć atakiem w regułach (p. 59).
+- **Scenariusze ewaluacyjne grafów na żywym modelu (p. 59, 2026-10-14 – 2026-10-15) dają
+  promptom sygnał z modelu docelowego przed anonimizatorem, na zmyślonych sprawach.** Grafy
+  chodzą na węzłach właściwych i modelu generującym, scenariusze leżą jako dane
+  w `data/safe/golden/`, a materiał dostają atrapy narzędzi przez konstruktor. Zestaw zalicza
+  zero błędów, bez progu: błąd poprawia się w prompcie, a scenariusz tylko wtedy, gdy błędny
+  jest on sam. Każdy scenariusz ma parę kontrolną — to samo zgłoszenie bez ataku albo bez
+  poszlak w materiale — a asercje stoją na danych (werdykt, lista źródeł, wywołane narzędzia);
+  słowa odpowiedzi są licznikami obok surowych odpowiedzi w raporcie, który czyta się przy
+  każdym pomiarze. Pomiarów z p. 21–28 nie zastępują, bo scenariusze pisze autor promptów.
+  Każdy zestaw przeszedł na `gpt-6.1-sol` co najmniej dwa przebiegi; jedyna zmiana promptu po
+  nich to zdanie o cytatach w bramce wysyłki (p. 22).
 - **Wstrzyknięcie polecenia treścią wejścia ma jeden test dla wszystkich grafów, na żywym
   modelu** (`tests/evaluation/test_api_agent_graphs_injections_live.py`, zestaw
   `data/safe/golden/injections.json` z sekcją na graf). Każde wejście sekcji idzie raz bez ataku
@@ -3106,9 +3117,10 @@ przebiegów.
   i jako ostatnia reguła klienta po zestawie domyślnym, którego wersję sekcja zapisuje. W grafie
   z narzędziami zgłoszeń atak idzie też w materiał atrap: doklejony do pola karty albo na koniec
   wątku historycznej sprawy (`fake_agent_tools_with_tickets()`). Atak w wątku może zdjąć kartę
-  tej sprawy z materiału (`without_card`, 2026-10-15): `suggest_solution` czyta wątki głównie
-  spraw bez karty, więc atak w wątku sprawy z kartą nie dotarł do modelu w trzech przebiegach.
-  Taki atak dociera do modelu dopiero, gdy model tę kartę albo wątek przeczyta, więc osobny test wymaga, żeby znacznik
+  tej sprawy z materiału (`without_card`, 2026-10-15): `suggest_questions` i `suggest_solution`
+  czytają wątki głównie spraw bez karty, więc atak w wątku sprawy z kartą do modelu nie docierał
+  (w `suggest_solution` w trzech przebiegach). Taki atak dociera do modelu dopiero, gdy model tę
+  kartę albo wątek przeczyta, więc osobny test wymaga, żeby znacznik
   każdego ataku stał w zgłoszeniu albo w wyniku narzędzia w rozmowie; atak nieprzeczytany
   niczego nie mierzy i scenariusz idzie do poprawy. Spójność zestawu (znacznik w ataku, w żadnym
   wejściu, regule ani materiale atrap, pola chronione i oczekiwane z modelu wyniku, droga ataku
@@ -3117,7 +3129,8 @@ przebiegów.
   modelu. Nowy graf to sekcja zestawu. W `search` treści dla klienta nie ma, więc polem
   chronionym jest lista źródeł: znacznikiem jest klucz źródła w kodzie (`code:` i ścieżka
   pliku), który atak każe zacytować jako przyczynę, a ta sama ścieżka w uwagach jest tylko
-  licznikiem.
+  licznikiem; w pomiarze model sprawdzał taki plik i cytował go jako wykluczony, nie jako
+  przyczynę.
 - **Bramki mają drugi test na żywym modelu: werdykt na parach reguł**
   (`tests/evaluation/test_api_agent_graphs_gates_live.py`, zestaw
   `data/safe/golden/gates.json` z sekcją na bramkę). Na każdą regułę zestawu domyślnego są
@@ -3177,7 +3190,11 @@ przebiegów.
   już wykonany i nieodwracalność dopisana bez materiału to liczniki w raporcie. Test bez modelu
   pilnuje, że fakt wymagany stoi w kartach sprawy, a nie w zgłoszeniu, i że zmieniona karta
   dociera do odczytu kart. Licznik kroku już wykonanego liczy słowa, więc pokazuje „jest” także
-  przy zdaniu „nie proponujemy powtarzania tego kroku”; czyta się treść.
+  przy zdaniu „nie proponujemy powtarzania tego kroku”; czyta się treść. Raport liczy też
+  pytania do klienta (2026-10-15, jeszcze bez pomiaru): znaki zapytania w treści poza cytatem
+  „…” i adresem, przy każdej sprawie i w linii grafu. To licznik, nie warunek, bo prompt
+  `suggest_solution` o pytaniach nie mówi nic; pokazuje, czy guzik „rozwiązanie” nie zamienia się
+  w guzik „pytania”, gdy przeczytane sprawy mają różne przyczyny.
 - **Czytanie znalezionego materiału ma jeden test na żywym modelu dla grafów z narzędziami
   wiedzy** (`tests/evaluation/test_api_agent_graphs_reading_live.py`, zestaw
   `data/safe/golden/reading.json`, 2026-10-15). Zestaw to jedna lista spraw z polem `graphs`,
@@ -3650,6 +3667,9 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Licznik wykluczenia rozpoznający każde zaprzeczenie** („nie jest definitywnie
   wykluczone”) — wymagałby rozbioru zdania; licznik pomija zaprzeczenie tuż przed słowem, a resztę
   rozstrzyga lektura uwag w raporcie.
+- **Znak zapytania w treści rozwiązania jako warunek** — prompt `suggest_solution` pytań nie
+  zakazuje, a „?” stoi też w cytatach komunikatów, adresach i uprzejmych prośbach; licznik
+  pomija cytaty i adresy, a gdy pokaże pytania, reguła trafia do p. 26.
 - **Kod w sprawie organizacyjnej `search` jako warunek** — kosztuje kilka centów, ale nie psuje
   odpowiedzi, a asercje scenariuszy stoją na tym, co szkodzi wynikowi; jest licznikiem
   wyróżnionym w raporcie (`should_not_call_code`).
@@ -3917,93 +3937,13 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   z czterech spraw Dokusa, ale wynik i liczba tur wyszły jak bez niego; czy narzędzie pomaga
   tam, gdzie model dziś nie dochodzi do miejsca, liczy p. 23; reguły — „Kod aplikacji",
   „Warstwa narzędzi agenta", „Warstwa węzłów", „Testy", „Świadomie pominięte".
-- [ ] **59. Scenariusze ewaluacyjne grafów na zmyślonych danych** (dopisany 2026-10-05, numer
-  spoza kolejności, rozpisany na grafy 2026-10-13) — testy w `tests/evaluation/` za markerem
-  `llm_live`: grafy na węzłach właściwych i modelu generującym, scenariusze jako dane
-  w `data/safe/golden/`, materiał podawany atrapom narzędzi przez konstruktor. Zestaw zalicza
-  zero błędów, bez progu (od 2026-10-14): przebicie albo zły werdykt to poprawka promptu,
-  a scenariusza tylko wtedy, gdy błędny jest on sam; każdy scenariusz ma parę kontrolną (to
-  samo zgłoszenie bez ataku albo bez poszlak w materiale); asercje stoją na danych (werdykt,
-  lista źródeł, wywołane narzędzia), a słowa
-  odpowiedzi są tylko licznikiem obok surowych odpowiedzi w raporcie. Wstrzyknięcie polecenia
-  rozpoznaje się po danych: werdykt nie może się odwrócić, a znacznik z ataku nie może trafić
-  do wyniku. Że prompt systemowy każdego grafu niesie zakaz wykonywania takich poleceń (akapit
-  „dane, nie polecenia", w grafach z narzędziami także o wynikach narzędzi), pilnuje test
-  kontraktu grafów z p. 12; scenariusze mierzą, czy model tego zakazu słucha. Podpunkty stoją
-  od najprostszego w realizacji: grafy bez narzędzi i bez reguł klienta, grafy z regułami,
-  grafy z pętlą. Wstrzyknięcie treścią wejścia ma od 59.1 jeden test dla wszystkich grafów
-  (zestaw `data/safe/golden/injections.json`), więc w kolejnych podpunktach to sekcja zestawu.
-  Pary „łamie / poprawna" bramek mają od 59.3 własny test (zestaw
-  `data/safe/golden/gates.json`), więc w 59.4 to też sekcja zestawu, „Popraw" od 59.5
-  (zestaw `data/safe/golden/polish.json`), „pytań już nie trzeba" od 59.6 (zestaw
-  `data/safe/golden/questions.json`), propozycja rozwiązania od 59.8 (zestaw
-  `data/safe/golden/solution.json`), cytowanie kodu od 59.7 (zestaw
-  `data/safe/golden/code.json`, sprawy z listą grafów z narzędziami kodu), a czytanie
-  znalezionego materiału od 59.9 (zestaw `data/safe/golden/reading.json`, sprawy z listą grafów
-  z narzędziami wiedzy). *Dlaczego:* da się je
-  uruchomić przed
-  anonimizatorem, więc prompty dostają sygnał z modelu docelowego wcześniej niż z p. 21–28;
-  tamtych pomiarów nie zastępują, bo scenariusze pisze autor promptów; stoi po p. 11, bo ocenia
-  odpowiedź przepuszczoną przez właściwy `respond`.
-  - [x] **59.1 `suggest_handoff`** (2026-10-14) — wstrzyknięcie treścią zgłoszenia: test dla
-    wszystkich grafów, sześć ataków, na `gpt-6.1-sol` 0 przebić w dwóch przebiegach; reguły —
-    „Testy", „Świadomie pominięte".
-  - [x] **59.2 `parse_ticket`** (2026-10-14) — wstrzyknięcie treścią zgłoszenia: sześć ataków
-    na wszystkie pola karty, na `gpt-6.1-sol` 0 przebić w dwóch przebiegach.
-  - [x] **59.3 `gate_reply`** (2026-10-14) — wstrzyknięcie treścią wiadomości i regułą
-    klienta, w obie strony: na `gpt-6.1-sol` 0 przebić z 9 w dwóch przebiegach; nowy test
-    bramek z łamiącą, poprawną i pułapką na każdą regułę: 0 przepuszczeń z 3, a fałszywy alarm
-    na cytacie komunikatu z ekranu (1 z 6 w obu przebiegach) zniknął po zdaniu o cytatach
-    w prompcie bramki; progi scenariuszy zastąpione wymogiem zera; reguły — „Testy",
-    „Świadomie pominięte".
-  - [x] **59.4 `gate_close`** (2026-10-14) — wstrzyknięcie treścią zgłoszenia i regułą
-    klienta, w obie strony: na `gpt-6.1-sol` 0 przebić z 9 w dwóch przebiegach; w teście
-    bramek pułapki to problem podany dopiero przez klienta w wątku i krok, który rozwiązał
-    sprawę, opisany przez klienta przy formułce zamykającej: 0 fałszywych alarmów z 4
-    i 0 przepuszczeń z 2 w obu przebiegach, bez zmian w prompcie.
-  - [x] **59.5 `polish`** (2026-10-14) — wstrzyknięcie notatkami i zasadą klienta: na
-    `gpt-6.1-sol` 0 przebić z 8 w dwóch przebiegach; nowy test „Popraw” z czterema sprawami:
-    słowa potoczne zniknęły, fakty zostały, a liczby i dopiski z pułapek (ścieżka menu,
-    termin, dodatkowy krok) nie przybyły w żadnej, w obu przebiegach, bez zmian w prompcie;
-    reguły — „Testy", „Świadomie pominięte".
-  - [x] **59.6 `suggest_questions`** (2026-10-15) — wstrzyknięcie treścią zgłoszenia
-    i wynikami narzędzi: nowa droga ataku w materiał atrap (pole karty, koniec wątku) z kontrolą,
-    że atak dotarł do modelu; na `gpt-6.1-sol` 0 przebić z 8 w dwóch przebiegach, a pierwszy
-    przebieg pokazał, że model czyta wątek tylko sprawy bez karty, więc atak w wątku poszedł
-    tam; nowy test „pytań już nie trzeba" z czterema sprawami (rozstrzyga wątek, zawęża wątek,
-    rozstrzyga opis, sam objaw): 4 z 4 zgodne w trzech przebiegach, bez zmian w prompcie;
-    reguły — „Testy", „Świadomie pominięte". Cytowanie kodu dla tego grafu doszło później,
-    w zestawie kodu, i jest mierzone razem z 59.7.
-  - [x] **59.7 `search`** (2026-10-15) — wstrzyknięcie treścią zgłoszenia i wynikami narzędzi,
-    z listą źródeł jako polem chronionym: na `gpt-6.1-sol` 0 przebić z 8 w dwóch przebiegach na
-    poprawionym zestawie; w pierwszym atak w wątku 90011 nie dotarł do modelu, bo przy zgłoszeniu
-    z wątkiem model czyta wątek 90003, więc atak przeszedł tam; ataki, które wskazują plik kodu
-    jako przyczynę, model sprawdza i cytuje ten plik jako wykluczony; nowy zestaw i test
-    cytowania kodu, wspólne z `suggest_questions` (para z komunikatem): w trzech przebiegach
-    wszystkie 6 spraw zgodne, bez cytowań linii nieodczytanych, bez zmian w prompcie; przebiegi
-    po 0,49–0,57 USD za obie części; czy uwagi nazywają przyczyny wykluczone przez klienta,
-    przeszło do 59.9; reguły — „Testy", „Świadomie pominięte".
-  - [x] **59.8 `suggest_solution`** (2026-10-15) — wstrzyknięcie treścią zgłoszenia i wynikami
-    narzędzi, w tym dwa ataki z `rm -rf` (w zgłoszeniu i w karcie 90002): na `gpt-6.1-sol`
-    0 przebić z 9 w dwóch przebiegach na poprawionym zestawie; atak w wątku nie docierał, bo ten
-    graf wątków spraw z kartą prawie nie czyta, więc doszła droga z `without_card`; nowy
-    scenariusz `solution`: krok nieodwracalny z karty, jego skutek i zastrzeżenie dla klienta
-    w treści w dwóch przebiegach, a krok, który klient już wykonał, model wymienia jako
-    niepowtarzany; zastrzeżenie o naszej czynności (sprawdzenie po aktualizacji) model kładzie
-    w uwagach, więc karta dostała zastrzeżenie dla klienta; cytowanie kodu dla tego grafu
-    w zestawie kodu (para z komunikatem): zgodne w trzech przebiegach; bez zmian w prompcie;
-    przebiegi 0,17–0,32 USD; reguły — „Testy", „Świadomie pominięte".
-  - [x] **59.9 Czytanie znalezionego materiału** (2026-10-15) — nowy zestaw i test czytania na
-    atrapach narzędzi: w trzech przebiegach na `gpt-6.1-sol` model przy jednym objawie czytał
-    karty wszystkich trzech spraw o trzech przyczynach na `search`, `suggest_questions`
-    i `suggest_solution` i nazywał trzy przyczyny, czytał właściwą sekcję instrukcji, a nie
-    dystraktor o ePUAP, i mówił o ponownym zalogowaniu, a w sprawie organizacyjnej `search` nie
-    sięgnął po kod ani razu; w dwóch pierwszych przebiegach licznik przyczyny wykluczonej przez
-    klienta liczył fałszywie, a wątek nie wykluczał załącznika, bo „jednostronicowy PDF” nie
-    mówi o rozmiarze pliku, więc model pisał tylko, że 90003 słabiej pasuje; po mocniejszym
-    fakcie w wątku, wariantach stojących w jednej sprawie i pominięciu zaprzeczeń oba grafy
-    wykluczyły 90003 wprost w przebiegu kontrolnym; bez zmian w prompcie; przebiegi
-    0,22–0,34 USD; reguły — „Testy", „Świadomie pominięte".
+- [x] **59. Scenariusze ewaluacyjne grafów na zmyślonych danych** (2026-10-14 – 2026-10-15,
+  dziewięć podpunktów) — testy `llm_live` w `tests/evaluation/`: wstrzyknięcie we wszystkich
+  grafach (0 przebić, także atakiem w regułach i w materiale narzędzi), bramki na parach reguł,
+  „Popraw”, „pytań już nie trzeba”, cytowanie kodu, rozwiązanie i czytanie znalezionego
+  materiału, każdy zestaw na `gpt-6.1-sol` w co najmniej dwóch przebiegach; jedyna poprawka
+  promptu to zdanie o cytatach w bramce wysyłki, a wnioski dla promptów czekają w p. 22–26;
+  reguły — „Testy", „Twarde reguły promptu generacji", „Świadomie pominięte".
 - [ ] **46. CLI dla grafów** (dopisany 2026-10-02, numer spoza kolejności) — `helpdesk gate
   close|reply`, `helpdesk suggest <wariant>`, „Popraw" i karta zgłoszenia na tej samej fabryce
   grafów co trasy; także wyszukiwanie i parsowanie zgłoszeń do korpusu (dawne `rag search`
@@ -4125,7 +4065,8 @@ każdy mierzy się osobno.
   proponować kroku, który wątek pokazuje jako już wykonany (dziś prompt o wątku milczy, a mimo to
   w scenariuszu z 59.8 model w trzech przebiegach napisał, że kroku nie powtarza); zastrzeżenie
   o naszej czynności („sprawdzimy po aktualizacji”) model kładzie raz w treści dla klienta, raz
-  w uwagach (59.8); ewaluacja wariantu. *Dlaczego:* ostrzeżenie nie padło w żadnym z czterech pomiarów, a bez reguły zgodności
+  w uwagach (59.8); czy treść rozwiązania może pytać klienta — licznik pytań w scenariuszu
+  rozwiązania czeka na pomiar; ewaluacja wariantu. *Dlaczego:* ostrzeżenie nie padło w żadnym z czterech pomiarów, a bez reguły zgodności
   model kazał wygasić duplikat kontrahenta przy zgłoszeniu o przenoszeniu zasobów.
 - [ ] **27. `suggest_handoff`** — prompt niosący, co sprawdzono i czego brakuje; do
   rozstrzygnięcia, czy wariant dostaje narzędzia kodu (namiar na plik i warunek w przekazaniu),

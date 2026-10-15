@@ -2,7 +2,8 @@
 Description:
 Raport scenariuszy rozwiązania: `SolutionReport` zbiera oceny spraw z jednego przebiegu pytesta
 i składa wydruk, który pytest pokazuje po testach — liczniki błędów, a pod nimi każdą sprawę
-z oceną, licznikami (źródła, wzmianka oczekiwana i niepożądana) i polami wyniku w całości.
+z oceną, licznikami (źródła, wzmianka oczekiwana i niepożądana, pytania w treści dla klienta)
+i polami wyniku w całości.
 
 O czym pamiętać przy zmianach:
 
@@ -113,20 +114,23 @@ def _counts(
     """
     Description:
     Liczniki do raportu: sprawy bez któregoś faktu z karty wśród spraw, które fakty wymagają,
-    i odpowiedzi nie do przyjęcia.
+    odpowiedzi nie do przyjęcia i sprawy z pytaniem w treści dla klienta wśród spraw z wynikiem.
 
     Example args:
         outcomes=[SolutionOutcome(case=SolutionCase(must_mention=(…), …), missing=(), …), …]
 
     Example result:
-        "brak faktów z karty w 0 z 1, nie do przyjęcia 0"
+        "brak faktów z karty w 0 z 1, nie do przyjęcia 0, pytania w treści w 1 z 4"
     """
     required = [outcome for outcome in outcomes if outcome.case.must_mention]
+    answered = [outcome for outcome in outcomes if not outcome.rejected]
 
     counts = (
         f"brak faktów z karty w {sum(bool(outcome.missing) for outcome in required)} "
         f"z {len(required)}, "
-        f"nie do przyjęcia {sum(outcome.rejected for outcome in outcomes)}"
+        f"nie do przyjęcia {sum(outcome.rejected for outcome in outcomes)}, "
+        f"pytania w treści w {sum(outcome.questions > 0 for outcome in answered)} "
+        f"z {len(answered)}"
     )
 
     return counts
@@ -137,14 +141,14 @@ def _case_counters(
 ) -> str:
     """
     Description:
-    Linia liczników jednej sprawy: przeczytane źródła i — gdy sprawa je liczy — czy w treści
-    stoi wzmianka oczekiwana i wzmianka niepożądana.
+    Linia liczników jednej sprawy: przeczytane źródła, a gdy sprawa je liczy — czy w treści
+    stoi wzmianka oczekiwana i wzmianka niepożądana; na końcu zawsze pytania w treści.
 
     Example args:
-        outcome=SolutionOutcome(sources=("tickets:90003",), expected_mention=True, …)
+        outcome=SolutionOutcome(sources=("tickets:90003",), expected_mention=True, questions=0, …)
 
     Example result:
-        "źródła: tickets:90003; wzmianka oczekiwana: jest"
+        "źródła: tickets:90003; wzmianka oczekiwana: jest; pytania w treści: 0"
     """
     parts = [f"źródła: {', '.join(outcome.sources) or '—'}"]
 
@@ -153,5 +157,7 @@ def _case_counters(
 
     if outcome.forbidden_mention is not None:
         parts.append(f"wzmianka niepożądana: {'jest' if outcome.forbidden_mention else 'brak'}")
+
+    parts.append(f"pytania w treści: {outcome.questions}")
 
     return "; ".join(parts)
