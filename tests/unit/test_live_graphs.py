@@ -18,7 +18,9 @@ from app.config import LLMSettings
 from app.core_service.loader_dict_rules import get_rule_set
 from app.engine_llm import LLMError
 from tests import helpers_live_graphs
+from tests.helpers_agent_tools import fake_agent_tools, fake_agent_tools_with_tickets
 from tests.helpers_live_graphs import (
+    LiveCase,
     default_rules,
     live_state,
     remember_per_graph,
@@ -42,24 +44,29 @@ def test_a_live_state_takes_the_given_input_and_rules() -> None:
     assert live_state(suggest_handoff, "ZGŁOSZENIE 1").input_text == "ZGŁOSZENIE 1"
 
 
-async def test_live_cases_keep_their_order_and_rules_and_a_rejected_answer_is_none(
+async def test_live_cases_keep_their_order_rules_and_tools_and_a_rejected_answer_is_none(
     monkeypatch: pytest.MonkeyPatch,  # wstrzykiwane przez pytest; podmienia wywołanie grafu
 ) -> None:
-    """Sprawdza, czy sprawy idą do grafu z własnymi regułami, wyniki wracają w kolejności spraw,
-    a sprawa, której odpowiedzi węzeł `respond` nie przyjął, daje `None`.
+    """Sprawdza, czy sprawy idą do grafu z własnymi regułami i narzędziami (bez podanych — z
+    atrapami wszystkich narzędzi), wyniki wracają w kolejności spraw, a sprawa, której
+    odpowiedzi węzeł `respond` nie przyjął, daje `None`.
 
-    Wyłapuje reguły gubione po drodze do grafu, wyniki przypisane nie tym sprawom i odpowiedź nie
-    do przyjęcia, która przerywa cały przebieg zamiast zostać oceniona."""
-    seen: list[tuple[str, Sequence[str] | None]] = []
+    Wyłapuje reguły albo narzędzia z materiałem ataku gubione po drodze do grafu — atak w karcie
+    nie dotarłby wtedy do modelu — wyniki przypisane nie tym sprawom i odpowiedź nie do
+    przyjęcia, która przerywa cały przebieg zamiast zostać oceniona."""
+    seen:  list[tuple[str, Sequence[str] | None]] = []
+    tools: list[Sequence[AgentTool]] = []
+    own   = fake_agent_tools_with_tickets(cards=[], threads=None)
 
     async def run(
         graph:      ModuleType,            # np. gate_reply
         llm:        LLMSettings,           # w teście None
-        tools:      Sequence[AgentTool],   # atrapy narzędzi
+        given:      Sequence[AgentTool],   # narzędzia sprawy
         input_text: str,                   # np. "pierwsza"
         rules:      Sequence[str] | None,  # np. RULES
     ) -> str:
         seen.append((input_text, rules))
+        tools.append(given)
 
         # --- sprawa, której odpowiedzi węzeł `respond` nie przyjął ---
         if input_text == "odrzucona":
@@ -69,10 +76,13 @@ async def test_live_cases_keep_their_order_and_rules_and_a_rejected_answer_is_no
 
     monkeypatch.setattr(helpers_live_graphs, "run_live_graph", run)
 
-    finals = await run_live_cases(gate_reply, None, [("pierwsza", RULES), ("odrzucona", None)])
+    cases  = [LiveCase("pierwsza", RULES, own), LiveCase("odrzucona")]
+    finals = await run_live_cases(gate_reply, None, cases)
 
     assert finals == ["stan pierwsza", None]
     assert seen   == [("pierwsza", RULES), ("odrzucona", None)]
+    assert tools[0] is own
+    assert [tool.name for tool in tools[1]] == [tool.name for tool in fake_agent_tools()]
 
 
 async def test_live_cases_let_other_model_errors_through(
@@ -89,7 +99,7 @@ async def test_live_cases_let_other_model_errors_through(
     monkeypatch.setattr(helpers_live_graphs, "run_live_graph", run)
 
     with pytest.raises(LLMError, match="nie odpowiedział"):
-        await run_live_cases(gate_reply, None, [("pierwsza", RULES)])
+        await run_live_cases(gate_reply, None, [LiveCase("pierwsza", RULES)])
 
 
 def test_default_rules_are_the_rule_set_of_the_graph_in_the_expected_version() -> None:

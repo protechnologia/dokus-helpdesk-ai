@@ -8,10 +8,14 @@ from pydantic import BaseModel
 import app.agent_tools
 from app.agent_graphs.base import MAX_CALLS_PLACEHOLDER
 from app.agent_tools import AgentTool, AuxiliaryTool, KnowledgeSource, ToolCallError
+from app.agent_tools.tickets.fake_tickets import default_cards, default_threads
+from app.agent_tools.tickets.read_tickets_card.models import ReadTicketsCardQuery
+from app.agent_tools.tickets.read_tickets_thread.models import ReadTicketsThreadQuery
 from app.config import Settings
 from tests.helpers_agent_tools import (
     fake_agent_tools,
     fake_agent_tools_with_code_only,
+    fake_agent_tools_with_tickets,
     fake_agent_tools_without_material,
 )
 
@@ -293,17 +297,37 @@ def test_every_tool_has_a_call_limit_in_the_configuration() -> None:
     assert set(limits) == {tool.name for tool in TOOLS}
 
 
+def fake_agent_tools_with_empty_tickets() -> list[AgentTool]:
+    """
+    Description:
+    Helper z podanym materiałem zgłoszeń, tu pustym — w postaci bez argumentów, jak pozostałe
+    helpery w teście kompletu atrap.
+
+    Example args:
+        (brak)
+
+    Example result:
+        [FakeFindTicketsVectorTool(), …, FakeReadTicketsCardTool(cards=[]), …]
+    """
+    return fake_agent_tools_with_tickets(cards=[], threads=[])
+
+
 @pytest.mark.parametrize(
     "helper",
-    [fake_agent_tools, fake_agent_tools_without_material, fake_agent_tools_with_code_only],
+    [
+        fake_agent_tools,
+        fake_agent_tools_without_material,
+        fake_agent_tools_with_code_only,
+        fake_agent_tools_with_empty_tickets,
+    ],
     ids=lambda helper: helper.__name__,
 )
 def test_the_test_helper_has_one_fake_of_every_tool(
     helper: Callable[[], list[AgentTool]],
 ) -> None:
-    """Sprawdza, czy każdy helper z kompletem atrap narzędzi (zwykły, bez materiału i z materiałem
-    tylko w kodzie) oddaje dokładnie jedną atrapę na każde narzędzie znalezione
-    w `app/agent_tools/`.
+    """Sprawdza, czy każdy helper z kompletem atrap narzędzi (zwykły, bez materiału, z materiałem
+    tylko w kodzie i z podanym materiałem zgłoszeń) oddaje dokładnie jedną atrapę na każde
+    narzędzie znalezione w `app/agent_tools/`.
 
     Wyłapuje nowe narzędzie, o którym helper nie wie: testy węzłów, grafów i tras biorą komplet
     atrap z tego jednego miejsca, więc bez wpisu przechodziłyby dalej, tylko bez nowego narzędzia,
@@ -311,6 +335,25 @@ def test_the_test_helper_has_one_fake_of_every_tool(
     names = [tool.name for tool in helper()]
 
     assert sorted(names) == sorted({tool.name for tool in TOOLS})
+
+
+async def test_the_helper_with_tickets_reads_cards_and_threads_from_the_given_material() -> None:
+    """Sprawdza, czy helper z podanym materiałem zgłoszeń czyta karty i wątki z tego materiału,
+    a pozostałe atrapy oddaje w tej samej kolejności co komplet zwykły.
+
+    Wyłapuje helper, który podany materiał gubi: atak doklejony do karty albo wątku nie dotarłby
+    do modelu, a scenariusz wstrzyknięcia w wyniku narzędzia niczego by nie mierzył."""
+    card  = default_cards()[0].model_copy(update={"cause": "przyczyna podmieniona"})
+    row   = default_threads()[0].model_copy(update={"thread": "wątek podmieniony"})
+    tools = fake_agent_tools_with_tickets([card], [row])
+    named = {tool.name: tool for tool in tools}
+
+    cards  = await named["read_tickets_card"].search(ReadTicketsCardQuery(ticket_ids=["90001"]))
+    thread = await named["read_tickets_thread"].search(ReadTicketsThreadQuery(ticket_id="90001"))
+
+    assert [tool.name for tool in tools] == [tool.name for tool in fake_agent_tools()]
+    assert cards.cards   == [card]
+    assert thread.thread == "wątek podmieniony"
 
 
 def test_some_tool_brings_its_own_errors() -> None:

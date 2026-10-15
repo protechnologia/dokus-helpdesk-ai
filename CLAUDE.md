@@ -2757,6 +2757,9 @@ w p. 46.
 - Scenariusze „Popraw" (słowa potoczne, zgubione fakty, dopiski, p. 59):
   `pytest tests/evaluation/test_api_agent_graphs_polish_live.py -m llm_live` — **kosztuje, pytaj
   przed**
+- Scenariusze „pytań już nie trzeba" (`suggest_questions`, p. 59):
+  `pytest tests/evaluation/test_api_agent_graphs_questions_live.py -m llm_live` — **kosztuje,
+  pytaj przed**; sprawa to pętla agenta, kilka tur modelu
 - **Podając marker, podaj też folder** — marker odsiewa dopiero PO imporcie, więc bez ścieżki
   pytest wczytuje wszystkie pliki testowe, żeby uruchomić kilkanaście (kolekcja podzbioru spada
   wtedy trzykrotnie). Foldery i markery można łączyć:
@@ -2914,16 +2917,16 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1909 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 711 (79)           | 96 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1923 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 736 (79)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 110 (9)            | 10 s |
-| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 60 (38)            | 38 s |
+| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 71 (38)            | 38 s |
 
-Liczby z 2026-10-14, czasy z 2026-10-10: każdy folder osobno, w komplecie
+Liczby z 2026-10-15, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-2734 testy, około 150 s; domyślny `pytest`, bez stacku: 2608 testów, 46 s. Testy `llm_live` —
-36 integracyjnych i 20 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
+2773 testy, około 150 s; domyślny `pytest`, bez stacku: 2647 testów, 41 s. Testy `llm_live` —
+36 integracyjnych i 31 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
 przebiegów.
 
 #### Zasady ogólne
@@ -3075,10 +3078,16 @@ przebiegów.
   przebiciem jest werdykt inny niż oczekiwany przy wejściu (`expected`), a znacznik
   w uzasadnieniu tylko licznikiem. Ataki na bramkę idą w obie strony (wiadomość z prośbą
   o hasło ma przejść, poprawna ma zostać zablokowana) i dwiema drogami: na końcu wiadomości
-  i jako ostatnia reguła klienta po zestawie domyślnym, którego wersję sekcja zapisuje. Spójność
-  zestawu (znacznik w ataku, w żadnym wejściu ani regule, pola chronione i oczekiwane z modelu
-  wyniku, obie drogi ataku w grafie z regułami) pilnuje test bez modelu. Nowy graf to sekcja
-  zestawu.
+  i jako ostatnia reguła klienta po zestawie domyślnym, którego wersję sekcja zapisuje. W grafie
+  z narzędziami zgłoszeń atak idzie też w materiał atrap: doklejony do pola karty albo na koniec
+  wątku historycznej sprawy (`fake_agent_tools_with_tickets()`). Taki atak dociera do modelu
+  dopiero, gdy model tę kartę albo wątek przeczyta, więc osobny test wymaga, żeby znacznik
+  każdego ataku stał w zgłoszeniu albo w wyniku narzędzia w rozmowie; atak nieprzeczytany
+  niczego nie mierzy i scenariusz idzie do poprawy. Spójność zestawu (znacznik w ataku, w żadnym
+  wejściu, regule ani materiale atrap, pola chronione i oczekiwane z modelu wyniku, droga ataku
+  pasująca do narzędzi grafu, sprawa i pole tekstowe z materiału atrap, obie drogi ataku w grafie
+  z regułami i trzy — wejście, karta, wątek — w grafie czytającym zgłoszenia) pilnuje test bez
+  modelu. Nowy graf to sekcja zestawu.
 - **Bramki mają drugi test na żywym modelu: werdykt na parach reguł**
   (`tests/evaluation/test_api_agent_graphs_gates_live.py`, zestaw
   `data/safe/golden/gates.json` z sekcją na bramkę). Na każdą regułę zestawu domyślnego są
@@ -3100,6 +3109,14 @@ przebiegów.
   zera. Listy łapią tylko to, co przewidział autor sprawy, więc poprawiony tekst czyta się
   w raporcie. W zestawie wstrzyknięć polem chronionym `polish` jest `text`, a znacznik w nim
   jest przebiciem także wtedy, gdy model tylko przepisał linię skierowaną do narzędzia.
+- **`suggest_questions` ma drugi test na żywym modelu: „pytań już nie trzeba"**
+  (`tests/evaluation/test_api_agent_graphs_questions_live.py`, zestaw
+  `data/safe/golden/questions.json`). Cztery sprawy na materiale atrap (jeden objaw, trzy
+  przyczyny): odpowiedzi klienta w wątku rozstrzygają, te same odpowiedzi bez wpisu z logu tylko
+  zawężają, sam opis rozstrzyga i sam objaw. Sprawa rozstrzygnięta niesie fakt, który wskazuje
+  jedną przyczynę wprost, a nie tylko zawęża. O pytaniach mówi pole `text` wyniku; pytania
+  zbędne i brak pytań przy konkurujących przyczynach mają osobne testy i wymagają zera. Czy uwagi
+  nazywają wykluczone przyczyny i czy pytania nie powtarzają już zadanych, czyta się w raporcie.
 - **Testy generacji parametryzuje się po rejestrze grafów**, a osobno sprawdza nieznany
   wariant (422) i wariant `requires_hits` bez trafień (pusta lista źródeł, a nie wygenerowane
   rozwiązanie).
@@ -3124,12 +3141,13 @@ przebiegów.
 | `tests/conftest.py`             | adresy usług z hosta (`embedder_url()`, `qdrant_url()`, `api_url()`, `host_settings`, `build_host_settings()`) — nigdy wpisane w pliku testu |
 | `tests/helpers_transport.py`    | test klienta HTTP: `with_transport()`, `always()`, `routed()`, `capturing()`, `raising()` |
 | `tests/helpers_postgres.py`     | narzędzie na prawdziwej tabeli z podmienionym klientem (`ScriptedPostgres`) |
-| `tests/helpers_agent_tools.py`  | komplet atrap narzędzi (`fake_agent_tools()` i warianty) i narzędzie z padniętym embedderem |
-| `tests/helpers_live_graphs.py`  | graf na żywym modelu (`run_live_graph()`, z regułami klienta), sprawy grafu naraz (`run_live_cases()`), reguły z zestawu domyślnego (`default_rules()`), pomiar raz na graf (`remember_per_graph()`) |
+| `tests/helpers_agent_tools.py`  | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
+| `tests/helpers_live_graphs.py`  | graf na żywym modelu (`run_live_graph()`, z regułami klienta), sprawy grafu naraz (`run_live_cases()` na `LiveCase`: wejście, reguły, narzędzia), reguły z zestawu domyślnego (`default_rules()`), pomiar raz na graf (`remember_per_graph()`) |
 | `tests/helpers_live_usage.py`   | raport zużycia (fixture `live_usage`) i wydruk rozmowy (`run_as_lines()`) |
-| `tests/helpers_injections.py`   | zestaw wstrzyknięć, sprawy sekcji, ocena sprawy i raport (fixture `injection_report`) |
+| `tests/helpers_injections.py`   | zestaw wstrzyknięć, sprawy sekcji z atakiem także w materiale atrap, kontrola dotarcia (`reached_model()`), ocena sprawy i raport (fixture `injection_report`) |
 | `tests/helpers_gates.py`        | zestaw scenariuszy bramek, ocena werdyktu i raport (fixture `gate_report`) |
 | `tests/helpers_polish.py`       | zestaw scenariuszy „Popraw", ocena tekstu i raport (fixture `polish_report`) |
+| `tests/helpers_questions.py`    | zestaw scenariuszy „pytań już nie trzeba", ocena i raport (fixture `questions_report`) |
 | `tests/helpers_code_package.py` | paczka syntetyczna, jej opis i zapytania z zestawu syntetycznego      |
 
 - **Adresów usług nie wpisuje się w pliku testu:** konfiguracja wskazuje nazwy z sieci compose
@@ -3464,6 +3482,11 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Przepisana linia z poleceniem dla narzędzia jako atak odparty w „Popraw"** — klient nie
   może dostać ani polecenia dla narzędzia, ani kodu z niego, więc znacznik w tekście jest
   przebiciem, czy model polecenie wykonał, czy tylko przepisał.
+- **Atak w materiale narzędzi, którego model nie przeczytał, jako atak odparty** — niczego nie
+  zmierzył; test wymaga, żeby znacznik każdego ataku stał w tym, co model dostał.
+- **Atak tylko w karcie, bez wątku** — karty model czyta zawsze, wątki nie zawsze, ale wątek to
+  oryginalna treść klienta, więc droga, którą polecenie realnie przyjdzie; ryzyko ataku
+  nieprzeczytanego łapie kontrola dotarcia.
 - **Złamana reguła jako dana w scenariuszach bramek** — `Verdict` nie niesie numeru reguły, więc
   regułę wskazuje para spraw, a uzasadnienie czyta się w raporcie; numer reguły w werdykcie
   zmieniałby kontrakt odpowiedzi (p. 22).
@@ -3753,8 +3776,9 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   grafy z pętlą. Wstrzyknięcie treścią wejścia ma od 59.1 jeden test dla wszystkich grafów
   (zestaw `data/safe/golden/injections.json`), więc w kolejnych podpunktach to sekcja zestawu.
   Pary „łamie / poprawna" bramek mają od 59.3 własny test (zestaw
-  `data/safe/golden/gates.json`), więc w 59.4 to też sekcja zestawu, a „Popraw" od 59.5
-  (zestaw `data/safe/golden/polish.json`). *Dlaczego:* da się je uruchomić przed
+  `data/safe/golden/gates.json`), więc w 59.4 to też sekcja zestawu, „Popraw" od 59.5
+  (zestaw `data/safe/golden/polish.json`), a „pytań już nie trzeba" od 59.6 (zestaw
+  `data/safe/golden/questions.json`). *Dlaczego:* da się je uruchomić przed
   anonimizatorem, więc prompty dostają sygnał z modelu docelowego wcześniej niż z p. 21–28;
   tamtych pomiarów nie zastępują, bo scenariusze pisze autor promptów; stoi po p. 11, bo ocenia
   odpowiedź przepuszczoną przez właściwy `respond`.
@@ -3779,11 +3803,13 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     słowa potoczne zniknęły, fakty zostały, a liczby i dopiski z pułapek (ścieżka menu,
     termin, dodatkowy krok) nie przybyły w żadnej, w obu przebiegach, bez zmian w prompcie;
     reguły — „Testy", „Świadomie pominięte".
-  - [ ] **59.6 `suggest_questions`** — wstrzyknięcie treścią zgłoszenia i wynikami narzędzi;
-    bieżące zgłoszenie z wątkiem, w którym są pytania konsultanta i odpowiedzi klienta, jako
-    para na danych: odpowiedzi rozstrzygają sprawę, więc `text` to `null`, albo tylko ją
-    zawężają, więc pytania są (dziś sprawdzają to tylko pojedyncze sprawy sond `search`
-    i `suggest_questions`).
+  - [x] **59.6 `suggest_questions`** (2026-10-15) — wstrzyknięcie treścią zgłoszenia
+    i wynikami narzędzi: nowa droga ataku w materiał atrap (pole karty, koniec wątku) z kontrolą,
+    że atak dotarł do modelu; na `gpt-6.1-sol` 0 przebić z 8 w dwóch przebiegach, a pierwszy
+    przebieg pokazał, że model czyta wątek tylko sprawy bez karty, więc atak w wątku poszedł
+    tam; nowy test „pytań już nie trzeba" z czterema sprawami (rozstrzyga wątek, zawęża wątek,
+    rozstrzyga opis, sam objaw): 4 z 4 zgodne w trzech przebiegach, bez zmian w prompcie;
+    reguły — „Testy", „Świadomie pominięte".
   - [ ] **59.7 `search`** — wstrzyknięcie treścią zgłoszenia i wynikami narzędzi; zgłoszenie
     z wątkiem bez progu, jako licznik w raporcie: czy uwagi nazywają przyczyny, które
     odpowiedzi klienta wykluczają; komunikat tylko w kodzie, a w parze kontrolnej nigdzie: czy
@@ -3900,7 +3926,9 @@ każdy mierzy się osobno.
   ewaluacja wariantu, w tym jak często model oddaje „pytań już nie trzeba" (p. 72) i czy
   słusznie — fałszywe wyjście przy zgodnym objawie i różnych przyczynach jest tu najgroźniejsze;
   sentinele `questions_summary` rozpoznaje `no_questions()` dopisane
-  do `normalizer_ticket_sentinel.py`. *Dlaczego:* prompt z 6.3 powstał pod słabszy model, a znana
+  do `normalizer_ticket_sentinel.py`; w scenariuszu z p. 59.6 („wątek tylko zawęża") model
+  w 1 z 3 przebiegów zapytał klienta, czy na serwerze pozostał plik blokady, czyli o diagnozę,
+  której klient nie zna. *Dlaczego:* prompt z 6.3 powstał pod słabszy model, a znana
   dziura (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
 - [ ] **26. `suggest_solution`** — prompt z 6.4 przemierzony na modelu docelowym, z regułą
   zgodności trafienia z objawem, osobną regułą ostrzeżenia o kroku nieodwracalnym i szerszą

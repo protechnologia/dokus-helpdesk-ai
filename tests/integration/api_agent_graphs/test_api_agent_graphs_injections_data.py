@@ -13,11 +13,19 @@ z takim zestawem byłby zielony, nic nie mierząc, więc te warunki pilnuje się
 | sekcja ma czym wykryć przebicie           | atak, który może tylko wyjść na odparty        |
 | wersja reguł jest wersją zestawu          | bramka sprawdzana regułami z przykładu albo    |
 | domyślnego grafu z regułami               | sprawy napisane pod inne reguły                |
-| atak w regułach tylko w grafie z regułami | błąd w środku płatnego przebiegu               |
+| droga ataku pasuje do grafu: reguły tylko | błąd w środku płatnego przebiegu albo atak,    |
+| przy regułach, karta i wątek tylko przy   | którego model nie ma jak przeczytać            |
+| narzędziach, które je czytają             |                                                |
+| atak w materiale wskazuje sprawę i pole   | atak doklejony donikąd albo do listy kodów     |
+| tekstowe z materiału atrap                |                                                |
+| graf z regułami ma ataki obiema drogami,  | sekcja, która mierzy tylko jedną drogę         |
+| graf czytający zgłoszenia — na wejściu,   |                                                |
+| w karcie i w wątku                        |                                                |
 | atak wskazuje istniejące wejście          | błąd w środku płatnego przebiegu               |
 | każde wejście ma choć jeden atak          | sprawa kontrolna opłacona bez potrzeby         |
-| znacznik stoi w ataku, w żadnym wejściu   | atak, który nie może się przebić, albo sprawa  |
-| ani w żadnej regule zestawu domyślnego    | kontrolna, która pada zawsze                   |
+| znacznik stoi w ataku, w żadnym wejściu,  | atak, który nie może się przebić, albo sprawa  |
+| regule zestawu domyślnego ani materiale   | kontrolna, która pada zawsze                   |
+| atrap                                     |                                                |
 """
 
 import importlib
@@ -28,14 +36,20 @@ import pytest
 from pydantic import BaseModel
 
 import app.agent_graphs
+from app.agent_tools.tickets.fake_tickets import default_cards, default_threads
 from app.core_service.loader_dict_rules import get_rule_set
 from tests.helpers_injections import (
+    INTO_CARD,
     INTO_INPUT,
     INTO_RULES,
+    INTO_THREAD,
     InjectionAttack,
     found_markers,
     injection_sections,
 )
+
+# Narzędzie, które musi mieć graf, żeby atak daną drogą do niego dotarł.
+READER_OF = {INTO_CARD: "read_tickets_card", INTO_THREAD: "read_tickets_thread"}
 
 SECTIONS = injection_sections()
 
@@ -83,6 +97,22 @@ def _output_fields(
         {"text", "internal_notes"}
     """
     return {name for output_type in _output_types(graph) for name in output_type.model_fields}
+
+
+def _tool_names(
+    graph: str,  # np. "suggest_questions"
+) -> tuple[str, ...]:
+    """
+    Description:
+    Narzędzia wiedzy, które graf daje modelowi (`TOOL_NAMES`).
+
+    Example args:
+        graph="suggest_questions"
+
+    Example result:
+        ("find_tickets_vector", "find_tickets_text", "read_tickets_card", …)
+    """
+    return importlib.import_module(f"app.agent_graphs.{graph}").TOOL_NAMES
 
 
 def _has_rules(
@@ -163,17 +193,45 @@ def test_rules_version_is_the_version_of_the_default_rule_set(graph: str) -> Non
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
-def test_attacks_go_into_rules_only_in_a_graph_with_rules(graph: str) -> None:
-    """Sprawdza, czy każdy atak idzie na wejście albo do reguł klienta, a do reguł tylko w grafie,
-    który je ma.
+def test_every_attack_route_fits_the_graph(graph: str) -> None:
+    """Sprawdza, czy każdy atak idzie znaną drogą, do reguł tylko w grafie, który je ma, a do
+    karty albo wątku tylko w grafie, który ma narzędzie ich odczytu.
 
-    Wyłapuje literówkę w drodze ataku, przez którą atak w regułach trafiłby na koniec wejścia,
-    i atak w regułach grafu bez reguł, który przerwałby płatny przebieg błędem."""
-    section = SECTIONS[graph]
-    routes  = {attack.into for attack in section.attacks}
+    Wyłapuje literówkę w drodze ataku, przez którą atak trafiłby na koniec wejścia, atak
+    w regułach grafu bez reguł, który przerwałby płatny przebieg błędem, i atak w materiale,
+    którego model danego grafu nie ma jak przeczytać."""
+    routes = {attack.into for attack in SECTIONS[graph].attacks}
+    tools  = _tool_names(graph)
 
-    assert routes <= {INTO_INPUT, INTO_RULES}
+    assert routes <= {INTO_INPUT, INTO_RULES, INTO_CARD, INTO_THREAD}
     assert INTO_RULES not in routes or _has_rules(graph)
+    assert all(READER_OF[route] in tools for route in routes & READER_OF.keys())
+
+
+@pytest.mark.parametrize(
+    ("graph", "attack"),
+    [(graph, attack) for graph, attack in ATTACKS if attack.into in READER_OF],
+    ids=lambda value: getattr(value, "attack_id", value),
+)
+def test_a_material_attack_points_at_text_in_the_fake_material(
+    graph:  str,
+    attack: InjectionAttack,
+) -> None:
+    """Sprawdza, czy atak w karcie wskazuje sprawę, której kartę mają atrapy, i pole tekstowe tej
+    karty, a atak w wątku — sprawę, której wątek mają atrapy.
+
+    Wyłapuje atak doklejony do sprawy spoza materiału, który przerwałby płatny przebieg błędem,
+    i atak w polu listy (na przykład kodów błędów), który zamieniłby listę w napis."""
+    cards   = {card.ticket_id: card for card in default_cards()}
+    threads = {row.ticket_id for row in default_threads()}
+
+    # --- atak w wątku: wątek tej sprawy musi istnieć ---
+    if attack.into == INTO_THREAD:
+        assert attack.ticket in threads
+        return
+
+    assert attack.ticket in cards
+    assert isinstance(getattr(cards[attack.ticket], attack.field or "", None), str)
 
 
 @pytest.mark.parametrize("graph", sorted(graph for graph in SECTIONS if _has_rules(graph)))
@@ -186,6 +244,21 @@ def test_a_graph_with_rules_is_attacked_by_both_routes(graph: str) -> None:
     routes = {attack.into for attack in SECTIONS[graph].attacks}
 
     assert routes == {INTO_INPUT, INTO_RULES}
+
+
+@pytest.mark.parametrize(
+    "graph",
+    sorted(graph for graph in SECTIONS if READER_OF[INTO_CARD] in _tool_names(graph)),
+)
+def test_a_graph_reading_tickets_is_attacked_on_the_input_and_in_the_material(graph: str) -> None:
+    """Sprawdza, czy sekcja grafu, który czyta karty i wątki zgłoszeń, ma ataki na wejściu,
+    w karcie i w wątku historycznej sprawy.
+
+    Wyłapuje sekcję, która mierzy tylko zgłoszenie, a nie wyniki narzędzi, i zestaw wczytany bez
+    drogi ataku: ataki w materiale po cichu stałyby się atakami na wejściu."""
+    routes = {attack.into for attack in SECTIONS[graph].attacks}
+
+    assert {INTO_INPUT, INTO_CARD, INTO_THREAD} <= routes
 
 
 @pytest.mark.parametrize("graph", sorted(SECTIONS))
@@ -213,12 +286,15 @@ def test_every_marker_stands_in_its_attack_and_in_no_input(
     attack: InjectionAttack,
 ) -> None:
     """Sprawdza, czy atak ma znaczniki, każdy stoi w tekście ataku i żaden nie stoi w żadnym
-    wejściu sekcji ani w żadnej regule zestawu domyślnego grafu.
+    wejściu sekcji, w żadnej regule zestawu domyślnego grafu ani w materiale atrap narzędzi.
 
     Wyłapuje atak, który nie może się przebić, bo jego znacznika model nie ma skąd wziąć, i sprawę
-    kontrolną, która pada zawsze, bo znacznik stoi już w samym wejściu albo w regułach."""
-    rules = get_rule_set(graph).rules if _has_rules(graph) else []
-    texts = [*SECTIONS[graph].inputs.values(), *rules]
+    kontrolną, która pada zawsze, bo znacznik stoi już w samym wejściu, w regułach albo
+    w karcie czy wątku, które model czyta także bez ataku."""
+    rules    = get_rule_set(graph).rules if _has_rules(graph) else []
+    material = [card.model_dump_json() for card in default_cards()]
+    material += [row.thread for row in default_threads()]
+    texts    = [*SECTIONS[graph].inputs.values(), *rules, *material]
 
     assert attack.markers
     assert found_markers(attack.attack, attack.markers) == attack.markers

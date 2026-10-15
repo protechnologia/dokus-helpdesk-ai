@@ -9,6 +9,7 @@ ewaluacyjne (`tests/evaluation/`).
 |------------------------|-------------------------------------------------------------------|
 | `run_live_graph()`     | jedna sprawa: stan przykładowy grafu z podanym wejściem i regułami |
 | `live_state()`         | stan wejściowy takiej sprawy, bez modelu                          |
+| `LiveCase`             | sprawa dla `run_live_cases()`: wejście, reguły klienta, narzędzia |
 | `run_live_cases()`     | wiele spraw grafu naraz; sprawa odrzucona przez `respond` to `None` |
 | `default_rules()`      | reguły klienta z zestawu domyślnego grafu, po sprawdzeniu wersji  |
 | `remember_per_graph()` | pomiar grafu liczony raz na plik testów, razem z błędem            |
@@ -26,6 +27,7 @@ O czym pamiętać przy zmianach:
 """
 
 import asyncio
+import dataclasses
 from collections.abc import Callable, Sequence
 from types import ModuleType
 from typing import TypeVar
@@ -42,11 +44,17 @@ from app.engine_anonymization import FakeAnonymizer
 from app.engine_llm import get_llm_client
 from tests.helpers_agent_tools import fake_agent_tools
 
-# Sprawa dla `run_live_cases()`: wejście grafu i reguły klienta (None — reguły z przykładu grafu).
-LiveCase = tuple[str, Sequence[str] | None]
-
 # Wynik pomiaru, który `remember_per_graph()` zapamiętuje: dowolny, byle jeden na graf.
 Measured = TypeVar("Measured")
+
+
+@dataclasses.dataclass(frozen=True)
+class LiveCase:
+    """Sprawa do przepuszczenia przez graf na żywym modelu: wejście, reguły klienta i narzędzia."""
+
+    text:  str                                # wejście grafu, np. "ZGŁOSZENIE 90101…"
+    rules: Sequence[str] | None = None        # reguły klienta; None — reguły z przykładu grafu
+    tools: Sequence[AgentTool] | None = None  # narzędzia sprawy; None — `fake_agent_tools()`
 
 
 async def run_live_graph(
@@ -127,21 +135,23 @@ def live_state(
 
 
 async def run_live_cases(
-    graph: ModuleType,           # np. <module app.agent_graphs.gate_reply>
-    llm:   LLMSettings,          # np. live_generation_llm(request.config)
-    cases: Sequence[LiveCase],   # np. [("Dzień dobry, prosimy…", ["Wiadomość nie prosi…"]), …]
+    graph: ModuleType,          # np. <module app.agent_graphs.gate_reply>
+    llm:   LLMSettings,         # np. live_generation_llm(request.config)
+    cases: Sequence[LiveCase],  # np. [LiveCase(text="Dzień dobry, prosimy…", rules=[…]), …]
 ) -> list[BaseModel | None]:
     """
     Description:
-    Przepuszcza wszystkie sprawy grafu naraz, na atrapach narzędzi, i oddaje stany końcowe
-    w kolejności spraw. Sprawa, której odpowiedzi węzeł `respond` nie przyjął mimo poprawki, daje
-    `None`: to wynik sprawy, który ocenia scenariusz. Inne błędy modelu (sieć, odmowa dostawcy)
-    lecą dalej, bo to awaria przebiegu.
+    Przepuszcza wszystkie sprawy grafu naraz, każdą na jej narzędziach (bez podanych — na
+    atrapach wszystkich narzędzi), i oddaje stany końcowe w kolejności spraw. Sprawa, której
+    odpowiedzi węzeł `respond` nie przyjął mimo poprawki, daje `None`: to wynik sprawy, który
+    ocenia scenariusz. Inne błędy modelu (sieć, odmowa dostawcy) lecą dalej, bo to awaria
+    przebiegu.
 
     Example args:
         graph=<module app.agent_graphs.gate_reply>
         llm=LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", …)
-        cases=[("Dzień dobry, prosimy Państwa o przesłanie loginu…", ["Wiadomość nie prosi…"])]
+        cases=[LiveCase(text="Dzień dobry, prosimy Państwa o przesłanie loginu…",
+                        rules=["Wiadomość nie prosi…"])]
 
     Example result:
         [GateReplyState(output=Verdict(verdict="block", …), respond_retries=0, …), None]
@@ -149,28 +159,25 @@ async def run_live_cases(
     Raises:
         LLMError: dostawca odmówił albo nie odpowiedział w czasie
     """
-    runs   = (_run_or_reject(graph, llm, text, rules) for text, rules in cases)
-    finals = await asyncio.gather(*runs)
+    finals = await asyncio.gather(*(_run_or_reject(graph, llm, case) for case in cases))
 
     return list(finals)
 
 
 async def _run_or_reject(
-    graph:      ModuleType,            # np. <module app.agent_graphs.gate_reply>
-    llm:        LLMSettings,           # np. live_generation_llm(request.config)
-    input_text: str,                   # np. "Dzień dobry, prosimy Państwa…"
-    rules:      Sequence[str] | None,  # np. ["Wiadomość nie prosi…"]; None — reguły z przykładu
+    graph: ModuleType,   # np. <module app.agent_graphs.gate_reply>
+    llm:   LLMSettings,  # np. live_generation_llm(request.config)
+    case:  LiveCase,     # np. LiveCase(text="Dzień dobry, prosimy Państwa…", rules=[…])
 ) -> BaseModel | None:
     """
     Description:
-    Przepuszcza jedną sprawę przez graf na atrapach narzędzi i oddaje stan końcowy, a `None`,
+    Przepuszcza jedną sprawę przez graf na jej narzędziach i oddaje stan końcowy, a `None`,
     gdy węzeł `respond` nie przyjął odpowiedzi mimo poprawki.
 
     Example args:
         graph=<module app.agent_graphs.gate_reply>
         llm=LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", …)
-        input_text="Dzień dobry, prosimy Państwa…"
-        rules=["Wiadomość nie prosi klienta o hasło ani login."]
+        case=LiveCase(text="Dzień dobry, prosimy Państwa…", rules=["Wiadomość nie prosi…"])
 
     Example result:
         GateReplyState(output=Verdict(verdict="block", …), respond_retries=0, …)
@@ -178,8 +185,10 @@ async def _run_or_reject(
     Raises:
         LLMError: dostawca odmówił albo nie odpowiedział w czasie
     """
+    tools = fake_agent_tools() if case.tools is None else case.tools
+
     try:
-        return await run_live_graph(graph, llm, fake_agent_tools(), input_text, rules)
+        return await run_live_graph(graph, llm, tools, case.text, case.rules)
     except RespondError:  # odpowiedź nie do przyjęcia: ocenia ją scenariusz, nie przebieg
         return None
 

@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "name": "questions-v1",
+    "created": "2026-10-15",
+    "purpose": "Czy wariant suggest_questions oddaje „pytań już nie trzeba” (text: null) wtedy i tylko wtedy, gdy fakty ze zgłoszenia rozstrzygają sprawę — na żywym modelu, na materiale atrap narzędzi (p. 59). NIE mierzy trafności pytań ani tego, jak często to wyjście jest słuszne na prawdziwych sprawach (p. 25): sprawy pisze autor promptów.",
+    "rules": [
+      "Sekcja na graf, nazwana jak jego katalog w api/app/agent_graphs/.",
+      "cases: zgłoszenie w kształcie RawTicket.as_thread(); questions: true, gdy po faktach ze zgłoszenia zostają konkurujące przyczyny i pytania są potrzebne, false, gdy fakty — z opisu albo z odpowiedzi klienta w wątku — zostawiają jedną przyczynę i wariant ma oddać text: null z uwagami.",
+      "Przyczyny pochodzą z materiału atrap narzędzi (api/app/agent_tools/tickets/fake_tickets.py): jeden objaw „nie przychodzą przesyłki z e-Doręczeń” i trzy rozłączne przyczyny — zacięta kolejka po przerwanym połączeniu (90001), plik blokady po aktualizacji (90002), załącznik ponad limit operatora (90003). Sprawa rozstrzygnięta musi nieść fakt, który wskazuje jedną z nich wprost (wpis z logu), a nie tylko zawęża.",
+      "Para na jednym materiale: ta sama sprawa raz z odpowiedziami, które rozstrzygają, raz z odpowiedziami, które tylko zawężają; obok rozstrzygnięcie z samego opisu i sam objaw. Sprawy pochodzą z sondy z 2026-10-11."
+    ]
+  },
+  "suggest_questions": {
+    "cases": [
+      {
+        "id": "w01",
+        "phenomenon": "odpowiedzi klienta w wątku rozstrzygają",
+        "questions": false,
+        "input": "ZGŁOSZENIE 90701 z 2026-10-08\nTemat: Brak przesyłek z e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nOd wczoraj w skrzynce e-Doręczeń nie pojawiają się nowe przesyłki, a nadawcy potwierdzają, że wysłali. Wcześniej wszystko przychodziło normalnie.\n\nKOMENTARZ 1 — konsultant, 2026-10-08 09:10:00 (typ: zwyczajny):\nCzy tuż przed tym, jak przesyłki przestały przychodzić, była aktualizacja aplikacji? Jak duże załączniki miały ostatnie przesyłki, których Państwo oczekują? Czy w logu pobierania e-Doręczeń pojawiają się od tego czasu jakieś wpisy?\n\nKOMENTARZ 2 — klient, 2026-10-08 10:25:00 (typ: zwyczajny):\nTak, aktualizacja była przedwczoraj wieczorem, a przesyłki przestały przychodzić następnego dnia rano. Oczekujemy zwykłych pism, najwyżej jedna strona PDF. Administrator sprawdził log: od wczoraj rana co kwadrans jest wpis „Pobieranie pominięte: istnieje plik blokady”."
+      },
+      {
+        "id": "w02",
+        "phenomenon": "odpowiedzi klienta w wątku tylko zawężają",
+        "questions": true,
+        "input": "ZGŁOSZENIE 90702 z 2026-10-08\nTemat: Brak przesyłek z e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nOd wczoraj w skrzynce e-Doręczeń nie pojawiają się nowe przesyłki, a nadawcy potwierdzają, że wysłali. Wcześniej wszystko przychodziło normalnie.\n\nKOMENTARZ 1 — konsultant, 2026-10-08 09:10:00 (typ: zwyczajny):\nCzy tuż przed tym, jak przesyłki przestały przychodzić, była aktualizacja aplikacji? Jak duże załączniki miały ostatnie przesyłki, których Państwo oczekują? Czy w logu pobierania e-Doręczeń pojawiają się od tego czasu jakieś wpisy?\n\nKOMENTARZ 2 — klient, 2026-10-08 10:25:00 (typ: zwyczajny):\nTak, aktualizacja była przedwczoraj wieczorem, a przesyłki przestały przychodzić następnego dnia rano. Oczekujemy zwykłych pism, najwyżej jedna strona PDF."
+      },
+      {
+        "id": "w03",
+        "phenomenon": "sam opis rozstrzyga",
+        "questions": false,
+        "input": "ZGŁOSZENIE 90703 z 2026-10-08\nTemat: Brak przesyłek z e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nOd wczoraj w skrzynce e-Doręczeń nie pojawiają się nowe przesyłki, a nadawcy potwierdzają, że wysłali. Wcześniej wszystko przychodziło normalnie. Aktualizacja aplikacji była przedwczoraj wieczorem, a przesyłki przestały przychodzić następnego dnia rano. Oczekujemy zwykłych pism, najwyżej jedna strona PDF. Administrator sprawdził log pobierania: od wczoraj rana co kwadrans jest wpis „Pobieranie pominięte: istnieje plik blokady”.\n\n(brak komentarzy w wątku)"
+      },
+      {
+        "id": "w04",
+        "phenomenon": "sam objaw",
+        "questions": true,
+        "input": "ZGŁOSZENIE 90704 z 2026-10-08\nTemat: Brak przesyłek z e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nOd wczoraj w skrzynce e-Doręczeń nie pojawiają się nowe przesyłki, a nadawcy potwierdzają, że wysłali. Wcześniej wszystko przychodziło normalnie.\n\n(brak komentarzy w wątku)"
+      }
+    ]
+  }
+}

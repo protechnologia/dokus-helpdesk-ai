@@ -42,7 +42,12 @@ import pytest
 from app.agent_nodes.respond import MAX_RETRIES
 from app.config import LLMSettings
 from tests.conftest import live_generation_llm
-from tests.helpers_live_graphs import default_rules, remember_per_graph, run_live_cases
+from tests.helpers_live_graphs import (
+    LiveCase,
+    default_rules,
+    remember_per_graph,
+    run_live_cases,
+)
 from tests.helpers_live_usage import LiveUsageReport
 from tests.helpers_polish import PolishOutcome, PolishReport, judge_polish_case, polish_sections
 
@@ -107,7 +112,8 @@ def _measure(
     graph   = importlib.import_module(f"app.agent_graphs.{name}")
     rules   = default_rules(name, section.rules_version)
 
-    finals = asyncio.run(run_live_cases(graph, llm, [(case.text, rules) for case in section.cases]))
+    cases  = [LiveCase(text=case.text, rules=rules) for case in section.cases]
+    finals = asyncio.run(run_live_cases(graph, llm, cases))
 
     judged: list[PolishOutcome] = []
 
