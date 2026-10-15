@@ -19,6 +19,8 @@ Pomiary:
 |--------------------|---------------------|------------------------------------------------|
 | `suggest_solution` | 0 z 1               | 2026-10-15, `gpt-6.1-sol`, w dwóch przebiegach |
 
+Licznik pytań do klienta w pierwszym pomiarze (2026-10-15, jeden przebieg): 0 z 4 spraw.
+
 Licznik kroku już wykonanego (r01) pokazuje „jest” także wtedy, gdy model pisze, że kroku nie
 proponuje, bo klient go wykonał — tak było w obu przebiegach; licznik słów nie odróżnia
 proponowania od wspomnienia, więc czyta się treść.

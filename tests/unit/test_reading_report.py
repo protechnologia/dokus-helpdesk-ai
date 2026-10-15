@@ -27,6 +27,7 @@ from tests._helpers.scenarios.reading.samples import (
     NOTES_EXCLUDED,
     NOTES_LISTED,
     NOTES_NEGATED,
+    NOTES_PARAPHRASED,
     NOTES_SHORT,
     PROPOSAL,
     code_turn,
@@ -154,6 +155,19 @@ def test_an_excluded_cause_needs_the_exclusion_word_in_the_same_line() -> None:
 
     assert excluded_in_notes(NOTES_EXCLUDED.internal_notes, facts) == ("90003",)
     assert excluded_in_notes(NOTES_LISTED.internal_notes, facts)   == ()
+
+
+def test_an_exclusion_in_the_words_of_the_model_counts() -> None:
+    """Sprawdza, czy linia, w której model wyklucza przyczynę własnymi słowami — „wyklucza
+    wariant dużego załącznika”, bez numeru sprawy — liczy się jako wykluczenie, choć w tej samej
+    linii stoi „nie wyklucza” przy innych przyczynach.
+
+    Wyłapuje licznik, który zna tylko słowa z materiału albo odrzuca całą linię po pierwszym
+    zaprzeczeniu: w przebiegu na żywym modelu raport pokazał przez to brak wykluczenia, którego
+    model dokonał wprost."""
+    facts = CASE_EXCLUDED.should_exclude
+
+    assert excluded_in_notes(NOTES_PARAPHRASED.internal_notes, facts) == ("90003",)
 
 
 def test_a_negated_exclusion_does_not_count() -> None:

@@ -19,14 +19,15 @@ Pomiary:
 
 | graf                | nieprzeczytane | pomiar                                     |
 |---------------------|----------------|--------------------------------------------|
-| `search`            | 0 z 2          | 2026-10-15, `gpt-6.1-sol`, trzy przebiegi  |
-| `suggest_questions` | 0 z 2          | 2026-10-15, `gpt-6.1-sol`, trzy przebiegi  |
-| `suggest_solution`  | 0 z 1          | 2026-10-15, `gpt-6.1-sol`, trzy przebiegi  |
+| `search`            | 0 z 2          | 2026-10-15, `gpt-6.1-sol`, pięć przebiegów |
+| `suggest_questions` | 0 z 2          | 2026-10-15, `gpt-6.1-sol`, pięć przebiegów |
+| `suggest_solution`  | 0 z 1          | 2026-10-15, `gpt-6.1-sol`, pięć przebiegów |
 
 Licznik przyczyny wykluczonej w dwóch pierwszych przebiegach liczył linie, które mówiły, że
 przyczyny nie wykluczono, a wątek c02 załącznika nie wykluczał. Po mocniejszym fakcie w wątku,
 wariantach stojących w jednej sprawie i pominięciu zaprzeczeń oba grafy wykluczyły 90003 wprost,
-a licznik to policzył.
+a licznik to policzył. W czwartym przebiegu model wykluczył „wariant dużego załącznika” bez
+numeru sprawy i licznik tego nie policzył, więc fakt dostał warianty zapisane słowami modelu.
 
 O czym pamiętać przy zmianach:
 

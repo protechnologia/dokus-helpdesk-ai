@@ -12,6 +12,7 @@ na których stoją asercje, leżą obok helpera, którego dotyczą.
 | `CASE_ORGANIZATIONAL` | sprawa, w której kod jest niepożądany                               |
 | `NOTES_EXCLUDED`      | uwagi `search`: trzy przyczyny i linia, która wyklucza 90003        |
 | `NOTES_LISTED`        | uwagi `search`: załącznik tylko na liście spraw, bez wykluczenia    |
+| `NOTES_PARAPHRASED`   | uwagi modelu: wykluczenie „wariantu dużego załącznika” bez numeru   |
 | `NOTES_NEGATED`       | uwagi, w których 90003 stoi przy wykluczeniu z zaprzeczeniem        |
 | `NOTES_SHORT`         | uwagi `search` w jednej linii, bez żadnego faktu — do raportu       |
 | `PROPOSAL`            | propozycja: ponowne zalogowanie w treści dla klienta, nie w uwagach |
@@ -62,7 +63,7 @@ CASE_EXCLUDED = ReadingCase(
     should_read          = (),
     should_not_read      = (),
     should_name          = CAUSES,
-    should_exclude       = (("90003", "limit operatora"),),
+    should_exclude       = (("90003", "limit operatora", "dużego załącznika", "duży załącznik"),),
     should_not_call_code = False,
 )
 
@@ -112,6 +113,13 @@ NOTES_LISTED = SearchNotes(internal_notes="\n".join([
     "",
     "Odpowiedź klienta niczego nie wyklucza.",
 ]))
+
+# Zdanie modelu z przebiegu na żywym modelu: wyklucza załącznik bez numeru sprawy i bez „limitu
+# operatora”, a w tej samej linii stoi zaprzeczenie przy innych przyczynach.
+NOTES_PARAPHRASED = SearchNotes(internal_notes=(
+    "Odpowiedź klienta wyklucza wariant dużego załącznika, natomiast jednoczesny brak we "
+    "wszystkich trzech skrzynkach nie wyklucza zaciętej kolejki ani pliku blokady."
+))
 
 # Uwagi, w których 90003 stoi tylko przy słowie wykluczenia z zaprzeczeniem, osobno i razem.
 NOTES_NEGATED = SearchNotes(internal_notes="\n".join([

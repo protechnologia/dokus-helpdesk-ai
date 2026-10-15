@@ -21,8 +21,8 @@ mierzyłby co innego, niż obiecuje, więc te warunki pilnuje się w domyślnym 
 |                                                | objawie i kilku przyczynach                   |
 | fakt do nazwania stoi w materiale, nie stoi    | licznik zawsze pusty albo spełniany           |
 | w zgłoszeniu                                   | przepisaniem zgłoszenia                       |
-| wariant faktu do wykluczenia stoi w jednej     | licznik, który liczy linię o innej sprawie    |
-| sprawie albo sekcji materiału                  | jako wykluczenie tej przyczyny                |
+| wariant faktu do wykluczenia stoi najwyżej     | licznik, który liczy linię o innej sprawie    |
+| w jednej sprawie albo sekcji materiału         | jako wykluczenie tej przyczyny                |
 | sprawa z przyczyną wykluczoną ma wątek i parę  | brak porównania: nie wiadomo, czy uwagi       |
 | bez wątku, o tym samym temacie                 | wykluczają przez wątek, czy zawsze            |
 | licznik zna każde narzędzie kodu grafów        | wywołania nowego narzędzia kodu, których      |
@@ -165,9 +165,11 @@ def test_a_fact_to_name_stands_in_the_material_and_not_in_the_ticket(case: Readi
 
 
 @pytest.mark.parametrize("case", EXCLUDE_CASES)
-def test_every_variant_of_a_fact_to_exclude_stands_in_one_source_only(case: ReadingCase) -> None:
-    """Sprawdza, czy każdy wariant faktu do wykluczenia stoi w materiale atrap dokładnie w jednej
+def test_every_variant_of_a_fact_to_exclude_stands_in_one_source_at_most(case: ReadingCase) -> None:
+    """Sprawdza, czy każdy wariant faktu do wykluczenia stoi w materiale atrap najwyżej w jednej
     sprawie albo sekcji: w karcie i wątku jednego zgłoszenia albo w jednej sekcji dokumentacji.
+    Wariant zapisany słowami modelu może nie stać w materiale wcale; że któryś wariant w nim stoi,
+    pilnuje test faktów do nazwania.
 
     Wyłapuje wariant, który łapie cudzą przyczynę — „limit” stoi też przy limitach zasobów
     w wątku 90011 — więc linia uwag o innej sprawie liczyłaby się jako wykluczenie tej przyczyny,
@@ -178,7 +180,7 @@ def test_every_variant_of_a_fact_to_exclude_stands_in_one_source_only(case: Read
         for variant in fact:
             holders = [key for key, text in units.items() if mentions(text, (variant,))]
 
-            assert len(holders) == 1, (variant, holders)
+            assert len(holders) <= 1, (variant, holders)
 
 
 @pytest.mark.parametrize("case", EXCLUDE_CASES)

@@ -2932,7 +2932,7 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1974 (0)           | 25 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1975 (0)           | 25 s |
 | integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 849 (79)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 110 (9)            | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 97 (38)            | 38 s |
@@ -2940,7 +2940,7 @@ w p. 46.
 Liczby z 2026-10-15, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-2937 testów, około 150 s; domyślny `pytest`, bez stacku: 2811 testów, 41 s. Testy `llm_live` —
+2938 testów, około 150 s; domyślny `pytest`, bez stacku: 2812 testów, 41 s. Testy `llm_live` —
 36 integracyjnych i 57 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
 przebiegów.
 
@@ -3191,10 +3191,10 @@ przebiegów.
   pilnuje, że fakt wymagany stoi w kartach sprawy, a nie w zgłoszeniu, i że zmieniona karta
   dociera do odczytu kart. Licznik kroku już wykonanego liczy słowa, więc pokazuje „jest” także
   przy zdaniu „nie proponujemy powtarzania tego kroku”; czyta się treść. Raport liczy też
-  pytania do klienta (2026-10-15, jeszcze bez pomiaru): znaki zapytania w treści poza cytatem
-  „…” i adresem, przy każdej sprawie i w linii grafu. To licznik, nie warunek, bo prompt
-  `suggest_solution` o pytaniach nie mówi nic; pokazuje, czy guzik „rozwiązanie” nie zamienia się
-  w guzik „pytania”, gdy przeczytane sprawy mają różne przyczyny.
+  pytania do klienta (2026-10-15; w pierwszym pomiarze 0 z 4 spraw): znaki zapytania w treści
+  poza cytatem „…” i adresem, przy każdej sprawie i w linii grafu. To licznik, nie warunek, bo
+  prompt `suggest_solution` o pytaniach nie mówi nic; pokazuje, czy guzik „rozwiązanie” nie
+  zamienia się w guzik „pytania”, gdy przeczytane sprawy mają różne przyczyny.
 - **Czytanie znalezionego materiału ma jeden test na żywym modelu dla grafów z narzędziami
   wiedzy** (`tests/evaluation/test_api_agent_graphs_reading_live.py`, zestaw
   `data/safe/golden/reading.json`, 2026-10-15). Zestaw to jedna lista spraw z polem `graphs`,
@@ -3211,8 +3211,9 @@ przebiegów.
   i przy sprawie. Test bez modelu pilnuje, że klucz źródła wskazuje materiał, który atrapy
   znajdują, a graf sprawy umie przeczytać, że wymagane karty niosą różne przyczyny, że fakt do
   nazwania stoi w materiale, a nie w zgłoszeniu, że każdy wariant faktu do wykluczenia stoi
-  w materiale w jednej sprawie albo sekcji, i że lista narzędzi kodu w liczniku to dokładnie
-  narzędzia kodu grafów. Ostatnie dwa warunki licznika wyszły z pomiaru: w dwóch pierwszych
+  w materiale najwyżej w jednej sprawie albo sekcji (wariant zapisany słowami modelu, jak
+  „dużego załącznika”, może nie stać w nim wcale), i że lista narzędzi kodu w liczniku to
+  dokładnie narzędzia kodu grafów. Ostatnie dwa warunki licznika wyszły z pomiaru: w dwóch pierwszych
   przebiegach wszystkie trzy trafienia stały na linii, która mówiła, że przyczyny nie
   wykluczono, albo na wariancie „limit”, który stoi też przy limitach zasobów w wątku 90011.
   Licznik nadal liczy słowa: linia „wykluczono kolejkę, zostaje załącznik” i linia „nie jest
@@ -4066,7 +4067,7 @@ każdy mierzy się osobno.
   w scenariuszu z 59.8 model w trzech przebiegach napisał, że kroku nie powtarza); zastrzeżenie
   o naszej czynności („sprawdzimy po aktualizacji”) model kładzie raz w treści dla klienta, raz
   w uwagach (59.8); czy treść rozwiązania może pytać klienta — licznik pytań w scenariuszu
-  rozwiązania czeka na pomiar; ewaluacja wariantu. *Dlaczego:* ostrzeżenie nie padło w żadnym z czterech pomiarów, a bez reguły zgodności
+  rozwiązania w pierwszym pomiarze pokazał 0 z 4 spraw z pytaniem; ewaluacja wariantu. *Dlaczego:* ostrzeżenie nie padło w żadnym z czterech pomiarów, a bez reguły zgodności
   model kazał wygasić duplikat kontrahenta przy zgłoszeniu o przenoszeniu zasobów.
 - [ ] **27. `suggest_handoff`** — prompt niosący, co sprawdzono i czego brakuje; do
   rozstrzygnięcia, czy wariant dostaje narzędzia kodu (namiar na plik i warunek w przekazaniu),
