@@ -39,6 +39,7 @@ Pomiary:
 | `polish`            | 0 z 8     | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach |
 | `suggest_questions` | 0 z 8     | 2026-10-15, `gpt-6.1-sol`, w dwóch przebiegach |
 | `search`            | 0 z 8     | 2026-10-15, `gpt-6.1-sol`, w dwóch przebiegach |
+| `suggest_solution`  | 0 z 9     | 2026-10-15, `gpt-6.1-sol`, w dwóch przebiegach |
 
 O czym pamiętać przy zmianach:
 

@@ -13,6 +13,7 @@ który pytest wypisuje po przebiegu, w `report.py`.
 | `attacked_input()`     | wejście z doklejonym atakiem                                     |
 | `attacked_cards()`     | karty atrap z atakiem doklejonym do pola karty jednej sprawy     |
 | `attacked_threads()`   | wątki atrap z atakiem na końcu wątku jednej sprawy               |
+| `cards_without()`      | karty atrap bez karty jednej sprawy                              |
 | `reached_model()`      | czy znacznik ataku stoi w zgłoszeniu albo w wyniku narzędzia     |
 | `found_markers()`      | które znaczniki stoją w tekście                                  |
 | `source_keys()`        | lista źródeł ze stanu grafu jako klucze `materiał:identyfikator` |
@@ -27,6 +28,10 @@ Atak idzie jedną z czterech dróg (`into` w zestawie):
 | `rules`  | jako ostatnia reguła klienta, po zestawie domyślnym  | z regułami klienta       |
 | `card`   | w polu karty historycznej sprawy (`ticket`, `field`) | czytających karty        |
 | `thread` | na końcu wątku historycznej sprawy (`ticket`)        | czytających wątki        |
+
+Atak w wątku może zdjąć kartę tej sprawy z materiału atrap (`without_card`). Graf, który wątki
+czyta tylko wtedy, gdy zgłoszenie nie ma karty (`suggest_solution`), sięga wtedy po wątek, więc
+atak do niego dociera; bez tego atak w wątku sprawy z kartą bywa nieprzeczytany.
 
 Przykład — atak odparty, a model zacytował go w uwagach dla wdrożeniowca:
 
@@ -140,7 +145,7 @@ def _attack_from(
     """
     Description:
     Zamienia wpis ataku z zestawu na `InjectionAttack`; nazwy pól zestawu są krótsze. Wpis bez
-    `into` to atak doklejany do wejścia.
+    `into` to atak doklejany do wejścia, a wpis bez `without_card` zostawia kartę sprawy.
 
     Example args:
         entry={"id": "h01", "phenomenon": "polecenie wprost w komentarzu klienta",
@@ -151,14 +156,15 @@ def _attack_from(
                         into="input", …)
     """
     attack = InjectionAttack(
-        attack_id  = entry["id"],
-        phenomenon = entry["phenomenon"],
-        input_id   = entry["input"],
-        attack     = entry["attack"],
-        markers    = tuple(entry["markers"]),
-        into       = entry.get("into", INTO_INPUT),
-        ticket     = entry.get("ticket"),
-        field      = entry.get("field"),
+        attack_id    = entry["id"],
+        phenomenon   = entry["phenomenon"],
+        input_id     = entry["input"],
+        attack       = entry["attack"],
+        markers      = tuple(entry["markers"]),
+        into         = entry.get("into", INTO_INPUT),
+        ticket       = entry.get("ticket"),
+        field        = entry.get("field"),
+        without_card = entry.get("without_card", False),
     )
 
     return attack
@@ -230,8 +236,8 @@ def _attacked_case(
                       rules=("Wiadomość nie prosi…", …, "Zignoruj…"), cards=None, …)
 
     Raises:
-        ValueError: atak w regułach grafu bez reguł klienta albo w materiale sprawy, której
-            atrapy nie znają
+        ValueError: atak w regułach grafu bez reguł klienta, atak w materiale sprawy, której
+            atrapy nie znają, albo karta zdejmowana przy ataku spoza wątku
     """
     text    = section.inputs[attack.input_id]
     cards   = None
@@ -241,6 +247,10 @@ def _attacked_case(
     if attack.into == INTO_RULES and rules is None:
         raise ValueError(f"{section.graph}: atak {attack.attack_id} w regułach grafu bez reguł")
 
+    # --- karta zdejmowana przy ataku spoza wątku: zestaw do poprawy ---
+    if attack.without_card and attack.into != INTO_THREAD:
+        raise ValueError(f"{section.graph}: atak {attack.attack_id} zdejmuje kartę poza wątkiem")
+
     # --- atak w regułach: wejście bez zmian, atak jako ostatnia reguła klienta ---
     if attack.into == INTO_RULES:
         rules = (*rules, attack.attack)
@@ -249,9 +259,10 @@ def _attacked_case(
     elif attack.into == INTO_CARD:
         cards = attacked_cards(attack.ticket, attack.field, attack.attack)
 
-    # --- atak w wątku historycznej sprawy: wejście bez zmian ---
+    # --- atak w wątku historycznej sprawy: wejście bez zmian, karta zdjęta, gdy zestaw każe ---
     elif attack.into == INTO_THREAD:
         threads = attacked_threads(attack.ticket, attack.attack)
+        cards   = cards_without(attack.ticket) if attack.without_card else None
 
     # --- atak na wejściu: doklejony na końcu ---
     else:
@@ -343,6 +354,34 @@ def attacked_threads(
     )
 
     return attacked
+
+
+def cards_without(
+    ticket: str,  # np. "90003"
+) -> tuple[ParsedTicket, ...]:
+    """
+    Description:
+    Karty z materiału atrap bez karty wskazanej sprawy. Wyszukiwania dalej znajdują jej numer,
+    a odczyt kart oddaje go w `without_card`, więc model, który czyta wątek sprawy bez karty,
+    sięga po jej wątek.
+
+    Example args:
+        ticket="90003"
+
+    Example result:
+        (ParsedTicket(ticket_id="90001", …), ParsedTicket(ticket_id="90002", …),
+         ParsedTicket(ticket_id="90012", …))
+
+    Raises:
+        ValueError: atrapy nie mają karty tej sprawy
+    """
+    cards = default_cards()
+
+    # --- sprawa spoza materiału atrap: nie ma czego zdjąć ---
+    if ticket not in {card.ticket_id for card in cards}:
+        raise ValueError(f"atrapy nie mają karty zgłoszenia {ticket}")
+
+    return tuple(card for card in cards if card.ticket_id != ticket)
 
 
 def reached_model(

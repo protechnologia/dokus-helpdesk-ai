@@ -65,6 +65,7 @@ TICKET_HEAD = "ZGŁOSZENIE 90001 z 2026-10-14\nTemat: Pisma\n\nOPIS ZGŁASZAJĄC
 # Sprawa, w której komunikat stoi tylko w kodzie: wymaga pliku przyczyny i nazwy pliku w uwagach.
 CASE_IN_CODE = CodeCase(
     case_id                   = "k01",
+    graphs                    = ("search",),
     phenomenon                = "komunikat tylko w kodzie",
     text                      = f"{TICKET_HEAD}„Jest nadmiarowy plik”",
     finds_tickets_and_docs    = False,
@@ -77,6 +78,7 @@ CASE_IN_CODE = CodeCase(
 # Sprawa, w której komunikatu nie ma nigdzie: każde cytowanie przyczyny jest błędem.
 CASE_NOWHERE = CodeCase(
     case_id                   = "k02",
+    graphs                    = ("search",),
     phenomenon                = "komunikatu nie ma nigdzie",
     text                      = f"{TICKET_HEAD}„Brak szablonu nagłówka”",
     finds_tickets_and_docs    = False,
@@ -89,6 +91,7 @@ CASE_NOWHERE = CodeCase(
 # Sprawa z wątkiem, w której klient wykluczył przyczynę z linii 35–37 pliku pobierania skrzynki.
 CASE_THREAD = CodeCase(
     case_id                   = "k03",
+    graphs                    = ("search",),
     phenomenon                = "wątek wyklucza załącznik",
     text                      = f"{TICKET_HEAD}Od wczoraj nie ma nowych przesyłek z e-Doręczeń.",
     finds_tickets_and_docs    = True,

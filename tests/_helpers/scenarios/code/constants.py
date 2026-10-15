@@ -1,6 +1,6 @@
 """
 Description:
-Stałe scenariuszy cytowania kodu: plik zestawu, klucz metryczki i nazwy narzędzi kodu,
+Stałe scenariuszy cytowania kodu: plik zestawu, klucz listy spraw i nazwy narzędzi kodu,
 po których ocena czyta rozmowę.
 """
 
@@ -11,8 +11,9 @@ from pathlib import Path
 # uruchamia się pytest.
 CODE_FILE = Path("data/safe/golden/code.json")
 
-# Klucz metryczki zestawu: przy wczytywaniu sekcji jest pomijany, bo nie nazywa żadnego grafu.
-META_KEY = "meta"
+# Klucz listy spraw zestawu; obok niego stoi tylko metryczka. Sprawa sama mówi w polu `graphs`,
+# na których grafach idzie, więc zestaw nie ma sekcji na graf.
+CASES_KEY = "cases"
 
 # Narzędzie cytowania kodu: z jego wyników ocena bierze cytowane fragmenty i ich role.
 QUOTE_TOOL = "quote_code"

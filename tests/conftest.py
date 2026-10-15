@@ -42,11 +42,10 @@ O czym pamiętać przy zmianach:
 - Testy `llm_live` zgłaszają zużycie każdej sprawy przez fixture `live_usage`, a na końcu
   przebiegu pytest wypisuje je z sumą kosztu (`pytest_terminal_summary()`). Sam raport leży
   w `tests/_helpers/live/`; tu zostają fixture i funkcja wypisująca, bo pytest szuka ich
-  tylko w `conftest.py`. Tak samo raporty scenariuszy: wstrzyknięć (fixture `injection_report`,
-  klasa w `tests/_helpers/scenarios/injections/`) i bramek (fixture `gate_report`, klasa
-  w `tests/_helpers/scenarios/gates/`), „Popraw” (fixture `polish_report`, klasa
-  w `tests/_helpers/scenarios/polish/`) i pytań (fixture `questions_report`, klasa
-  w `tests/_helpers/scenarios/questions/`); po przebiegu stoją przed zużyciem modelu.
+  tylko w `conftest.py`. Tak samo raporty scenariuszy: fixture `<scenariusz>_report`
+  (`injection_report`, `gate_report`, `polish_report`, `questions_report`, `code_report`,
+  `solution_report`), a klasa raportu w `tests/_helpers/scenarios/<scenariusz>/`; po przebiegu
+  stoją przed zużyciem modelu.
 """
 
 import os
@@ -63,6 +62,7 @@ from tests._helpers.scenarios.gates import GateReport
 from tests._helpers.scenarios.injections import InjectionReport
 from tests._helpers.scenarios.polish import PolishReport
 from tests._helpers.scenarios.questions import QuestionsReport
+from tests._helpers.scenarios.solution import SolutionReport
 
 EMBEDDER_URL_ENV     = "EMBEDDER_TEST_URL"
 EMBEDDER_URL_DEFAULT = "http://localhost:8001"
@@ -265,6 +265,33 @@ def code_report(
 
     return pytestconfig.stash[CODE_REPORT_KEY]
 
+# Miejsce raportu scenariuszy rozwiązania w konfiguracji przebiegu, na tej samej zasadzie co raport
+# zużycia.
+SOLUTION_REPORT_KEY = pytest.StashKey[SolutionReport]()
+
+
+@pytest.fixture(scope="session")
+def solution_report(
+    pytestconfig: pytest.Config,  # wstrzykiwane przez pytest; trzyma raport na cały przebieg
+) -> SolutionReport:
+    """
+    Description:
+    Raport scenariuszy rozwiązania, jeden na cały przebieg pytesta. Test rozwiązania zgłasza
+    w nim ocenę każdej sprawy, a po przebiegu pytest wypisuje ją razem z licznikami i treścią
+    propozycji.
+
+    Example args:
+        (wstrzykiwane przez pytest)
+
+    Example result:
+        SolutionReport wspólny dla wszystkich testów przebiegu
+    """
+    if SOLUTION_REPORT_KEY not in pytestconfig.stash:
+        pytestconfig.stash[SOLUTION_REPORT_KEY] = SolutionReport()
+
+    return pytestconfig.stash[SOLUTION_REPORT_KEY]
+
+
 def pytest_terminal_summary(
     terminalreporter: TerminalReporter,  # wstrzykiwane przez pytest; pisze na ekran
     config:           pytest.Config,     # wstrzykiwane przez pytest; trzyma raporty
@@ -272,17 +299,17 @@ def pytest_terminal_summary(
     """
     Description:
     Po przebiegu wypisuje raporty testów na żywym modelu: najpierw oceny spraw ze scenariuszy
-    wstrzyknięć, bramek, „Popraw”, pytań i cytowania kodu z polami wyniku, potem zużycie żywego
-    modelu z sumą kosztu. Pytest woła tę funkcję sam, po nazwie. Raport, do którego żaden test
-    niczego nie zgłosił — czyli każdy w przebiegu bez żywego modelu — nie wypisuje nic.
+    wstrzyknięć, bramek, „Popraw”, pytań, cytowania kodu i rozwiązania z polami wyniku, potem
+    zużycie żywego modelu z sumą kosztu. Pytest woła tę funkcję sam, po nazwie. Raport, do którego
+    żaden test niczego nie zgłosił — czyli każdy w przebiegu bez żywego modelu — nie wypisuje nic.
 
     Example args:
         (wstrzykiwane przez pytest)
 
     Example result:
         None — na końcu wyjścia pytesta stoją sekcje „wstrzyknięcia poleceń", „scenariusze
-        bramek", „scenariusze »Popraw«", „scenariusze pytań", „scenariusze cytowania kodu"
-        i „zużycie żywego modelu"
+        bramek", „scenariusze »Popraw«", „scenariusze pytań", „scenariusze cytowania kodu",
+        „scenariusze rozwiązania" i „zużycie żywego modelu"
     """
     sections = [
         ("wstrzyknięcia poleceń",        config.stash.get(INJECTION_REPORT_KEY, None)),
@@ -290,6 +317,7 @@ def pytest_terminal_summary(
         ("scenariusze „Popraw”",         config.stash.get(POLISH_REPORT_KEY, None)),
         ("scenariusze pytań",            config.stash.get(QUESTIONS_REPORT_KEY, None)),
         ("scenariusze cytowania kodu",   config.stash.get(CODE_REPORT_KEY, None)),
+        ("scenariusze rozwiązania",      config.stash.get(SOLUTION_REPORT_KEY, None)),
         ("zużycie żywego modelu",        config.stash.get(LIVE_USAGE_KEY, None)),
     ]
 

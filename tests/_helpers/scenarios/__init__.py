@@ -12,6 +12,7 @@ zestaw z `data/safe/golden/` wczytany do sekcji i spraw, ocena jednej sprawy, pr
 | `polish`     | `polish.json`     | czy „Popraw” zmienia formę notatek, a nie ich treść         |
 | `questions`  | `questions.json`  | czy pytania padają tylko przy konkurujących przyczynach     |
 | `code`       | `code.json`       | czy graf cytuje jako przyczynę właściwy plik kodu           |
+| `solution`   | `solution.json`   | czy propozycja niesie fakty z karty i pomija krok zrobiony  |
 
 O czym pamiętać przy zmianach:
 

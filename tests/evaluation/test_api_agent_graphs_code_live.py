@@ -4,8 +4,8 @@ Scenariusze ewaluacyjne cytowania kodu na żywym modelu (p. 59): czy graf z narz
 cytuje jako przyczynę plik, w którym stoi komunikat ze zgłoszenia, czy nie cytuje przyczyny, gdy
 komunikatu nie ma w kodzie nigdzie, choć podobny kusi, i czy cytuje tylko linie, które wcześniej
 przeczytał. Zestaw leży w `data/safe/golden/code.json`, z sekcją na graf (`search`,
-`suggest_questions`); narzędzia kodu są prawdziwe, na paczce aplikacji syntetycznej,
-a zgłoszenia i instrukcje to atrapy.
+`suggest_questions`, `suggest_solution`); narzędzia kodu są prawdziwe, na paczce aplikacji
+syntetycznej, a zgłoszenia i instrukcje to atrapy.
 
 Każdy graf z sekcją w zestawie przechodzi przez cztery testy:
 
@@ -22,6 +22,7 @@ Pomiary:
 |---------------------|---------------------|-----------------|--------------|----------------|
 | `search`            | 0 z 3               | 0 z 1           | 0 z 4        | 2026-10-15, ×3 |
 | `suggest_questions` | 0 z 1               | 0 z 1           | 0 z 2        | 2026-10-15, ×3 |
+| `suggest_solution`  | 0 z 1               | 0 z 1           | 0 z 2        | 2026-10-15, ×3 |
 
 Liczby to sprawy z błędem wśród spraw, których warunek dotyczy, w każdym z trzech przebiegów
 na `gpt-6.1-sol`.
@@ -33,8 +34,9 @@ O czym pamiętać przy zmianach:
 - Spis katalogu, nazwę pliku widocznego tylko w spisie i przyczynę wykluczoną przez wątek liczy
   raport, bez asercji; czy uwagi odróżniają stan kodu od instalacji klienta, czyta się w nich.
 - Wymaga zbudowanej paczki syntetycznej i ripgrepa na hoście, jak testy narzędzi kodu.
-- KOSZTUJE: sprawa to pętla agenta z narzędziami, 3–6 tur modelu; sześć spraw (cztery
-  w `search`, dwie w `suggest_questions`) na `gpt-6.1-sol` to szacunkowo 0,15–0,25 USD
+- KOSZTUJE: sprawa to pętla agenta z narzędziami, 3–6 tur modelu; osiem spraw (cztery
+  w `search`, po dwie w `suggest_questions` i `suggest_solution`) na `gpt-6.1-sol` to szacunkowo
+  0,2–0,3 USD
   (przebiegi z 2026-10-15 liczono razem z sekcją `search` zestawu wstrzyknięć: 0,49–0,57 USD
   za całość) i około dwóch minut. Jeden graf przez `-k <graf>`.
 """
@@ -84,7 +86,7 @@ def outcomes(
 def test_every_case_gets_an_accepted_answer(graph: str, outcomes: CodeOutcomesOf) -> None:
     """Sprawdza, czy każda sprawa kończy się na żywym modelu wynikiem, który węzeł odpowiedzi
     przyjął: uwagami dla wdrożeniowca w `search`, pytaniami albo samymi uwagami
-    w `suggest_questions`.
+    w `suggest_questions`, propozycją albo samymi uwagami w `suggest_solution`.
 
     Wyłapuje prompt, przy którym model nie umie oddać odpowiedzi w kształcie narzędzia odpowiedzi
     nawet po poprawce: wdrożeniowiec dostaje wtedy błąd zamiast wyniku."""

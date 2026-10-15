@@ -13,6 +13,7 @@ from app.agent_graphs.search.models import SearchNotes
 from tests._helpers.scenarios.code import (
     CodeFragment,
     CodeReport,
+    code_cases,
     code_quotes,
     code_sections,
     judge_code_case,
@@ -158,14 +159,15 @@ def test_the_set_reader_fills_absent_fields_with_no_requirement(tmp_path: Path) 
     na zakaz: sprawa bez wymogów kończyłaby się wtedy błędem albo fałszywym czerwonym testem."""
     path = tmp_path / "code.json"
     body = {
-        "meta":   {"name": "próba"},
-        "search": {"cases": [
-            {"id": "k09", "phenomenon": "bez wymogów", "finds_tickets_and_docs": True,
-             "input": "ZGŁOSZENIE 9"},
-            {"id": "k10", "phenomenon": "z fragmentem", "finds_tickets_and_docs": False,
+        "meta":  {"name": "próba"},
+        "cases": [
+            {"id": "k09", "graphs": ["search"], "phenomenon": "bez wymogów",
+             "finds_tickets_and_docs": True, "input": "ZGŁOSZENIE 9"},
+            {"id": "k10", "graphs": ["search"], "phenomenon": "z fragmentem",
+             "finds_tickets_and_docs": False,
              "should_not_quote_as_cause": {"path": MAILBOX, "from_line": 35, "to_line": 37},
              "input": "ZGŁOSZENIE 10"},
-        ]},
+        ],
     }
     path.write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
 
@@ -176,6 +178,34 @@ def test_the_set_reader_fills_absent_fields_with_no_requirement(tmp_path: Path) 
     assert bare.notes_should_include == ()
     assert bare.should_not_quote_as_cause is None
     assert excluded.should_not_quote_as_cause == CodeFragment(MAILBOX, 35, 37)
+
+
+def test_a_case_goes_into_the_section_of_every_graph_it_lists(tmp_path: Path) -> None:
+    """Sprawdza, czy sprawa trafia do sekcji każdego grafu z pola `graphs`, sekcje stoją
+    w kolejności pierwszego wystąpienia grafu, sprawy w sekcji — w kolejności zestawu, a lista
+    wszystkich spraw ma każdą sprawę raz.
+
+    Wyłapuje wczytanie, które bierze tylko pierwszy graf sprawy (sprawa nie szłaby na pozostałych)
+    albo myli kolejność spraw, przez co raport i testy pokazywałyby je w innym porządku niż
+    zestaw."""
+    path = tmp_path / "code.json"
+    body = {
+        "meta":  {"name": "próba"},
+        "cases": [
+            {"id": "k01", "graphs": ["search", "suggest_questions"], "phenomenon": "obu",
+             "finds_tickets_and_docs": False, "input": "ZGŁOSZENIE 1"},
+            {"id": "k02", "graphs": ["search"], "phenomenon": "jednego",
+             "finds_tickets_and_docs": False, "input": "ZGŁOSZENIE 2"},
+        ],
+    }
+    path.write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
+
+    sections = code_sections(path)
+
+    assert list(sections) == ["search", "suggest_questions"]
+    assert [case.case_id for case in sections["search"].cases] == ["k01", "k02"]
+    assert [case.case_id for case in sections["suggest_questions"].cases] == ["k01"]
+    assert [case.case_id for case in code_cases(path)] == ["k01", "k02"]
 
 
 def test_a_case_with_its_file_quoted_and_named_is_matching() -> None:

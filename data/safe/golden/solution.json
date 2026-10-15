@@ -1,0 +1,46 @@
+{
+  "meta": {
+    "name": "solution-v1",
+    "created": "2026-10-15",
+    "purpose": "Czy wariant suggest_solution niesie w treści dla klienta to, co niesie materiał: zastrzeżenie i krok nieodwracalny z karty historycznej sprawy, i nie każe powtarzać kroku, który wątek pokazuje jako już wykonany — na żywym modelu, na atrapach narzędzi (p. 59). NIE mierzy jakości rozwiązań na prawdziwych zgłoszeniach (p. 26): sprawy pisze autor promptów, a materiał to trzy karty atrap.",
+    "rules": [
+      "Sekcja na graf, nazwana jak jego katalog w api/app/agent_graphs/; graf musi mieć narzędzia wiedzy i treść dla klienta (pole text).",
+      "cases: zgłoszenie (input) w kształcie RawTicket.as_thread(); narzędzia to atrapy z materiałem wbudowanym (api/app/agent_tools/tickets/fake_tickets.py: jeden objaw e-Doręczeń, trzy przyczyny 90001–90003). card_changes podmienia pola wbudowanych kart: {numer: {pole: nowa wartość}}.",
+      "phenomenon: krótka etykieta sprawy w raporcie i w komunikacie czerwonego testu: co sprawa sprawdza i, po myślniku, czego oczekujemy po modelu.",
+      "Fakt to lista wariantów brzmienia; stoi w tekście, gdy stoi w nim którykolwiek wariant. Porównanie nie patrzy na wielkość liter, polskie znaki ani odstępy (plain() helpera „Popraw”). Pola z must_ to warunki testu, z should_ — liczniki w raporcie.",
+      "must_mention: fakty, które muszą stać w treści dla klienta (text) — każdy osobno. should_mention i should_not_mention: wzmianka, w której stoją wszystkie fakty naraz; raport pisze, czy jest. Treść dla klienta, której nie ma (same uwagi), nie niesie żadnego faktu.",
+      "Fakty z must_mention i should_mention stoją w materiale sprawy (kartach po card_changes), a fakty z must_mention nie stoją w zgłoszeniu: wzmianka ma przyjść z materiału, nie z przepisania zgłoszenia.",
+      "Pary: wątek, w którym klient pisze, że krok z karty 90003 już wykonał, i to samo zgłoszenie bez wątku; karta 90002 z krokiem nieodwracalnym i to samo zgłoszenie przy karcie bez niego (sprawa z card_changes ma parę o tym samym temacie bez zmian).",
+      "Zastrzeżenie w karcie r03 jest skierowane do klienta (przesyłki starsze niż 7 dni trzeba odebrać u operatora): zastrzeżenie, które opisuje naszą czynność, model słusznie kładzie w uwagach dla wdrożeniowca, a warunek liczy tylko treść dla klienta (pierwszy przebieg 2026-10-15)."
+    ]
+  },
+  "suggest_solution": {
+    "cases": [
+      {
+        "id":                 "r01",
+        "phenomenon":         "wątek: klient już odebrał przesyłkę z dużym załącznikiem u operatora — propozycja nie każe mu tego powtarzać",
+        "should_not_mention": [["ręczn"], ["operator"]],
+        "input":              "ZGŁOSZENIE 90731 z 2026-10-12\nTemat: Nie przychodzą przesyłki z e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nOd dwóch dni w skrzynce e-Doręczeń nie pojawiają się nowe przesyłki, a nadawcy potwierdzają, że wysłali.\n\nKOMENTARZ 1 — konsultant, 2026-10-12 09:10:00 (typ: zwyczajny):\nCzy któraś z ostatnich przesyłek miała duży załącznik?\n\nKOMENTARZ 2 — klient, 2026-10-12 09:45:00 (typ: zwyczajny):\nTak, jedna miała duży załącznik. Tę przesyłkę odebraliśmy już ręcznie u operatora, ale nowe dalej nie przychodzą."
+      },
+      {
+        "id":             "r02",
+        "phenomenon":     "para do r01 bez wątku — propozycja niesie ręczny odbiór przesyłki u operatora z karty 90003",
+        "should_mention": [["ręczn"], ["operator"]],
+        "input":          "ZGŁOSZENIE 90732 z 2026-10-12\nTemat: Nie przychodzą przesyłki z e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nOd dwóch dni w skrzynce e-Doręczeń nie pojawiają się nowe przesyłki, a nadawcy potwierdzają, że wysłali.\n\n(brak komentarzy w wątku)"
+      },
+      {
+        "id":           "r03",
+        "phenomenon":   "karta 90002 z krokiem nieodwracalnym — treść dla klienta niesie zakaz ponownego pobierania, jego nieodwracalny skutek i zastrzeżenie o przesyłkach starszych niż 7 dni",
+        "card_changes": {"90002": {"solution": "Usunięto plik blokady. Usunięcie blokady nie przywróci przesyłek starszych niż 7 dni — te trzeba odebrać ręcznie u operatora. Nie uruchamiać ręcznie ponownego pobierania przesyłek u operatora: każde ponowne pobranie zapisuje w rejestrze drugi egzemplarz przesyłek, a takich wpisów nie da się usunąć."}},
+        "must_mention": [["ponowne pobr", "ponownego pobier", "ponownie pobr", "ponowne pobier", "ponownym pobier", "ponownie pobier", "pobierać ponownie", "pobrać ponownie"], ["nie da się usunąć", "nie można usunąć", "nieodwracaln", "nie da się cofnąć", "nie można cofnąć", "nie da się wycofać", "nie można wycofać", "trwale", "na stałe"], ["7 dni", "siedmiu dni", "siedem dni", "tydzień", "tygodnia"]],
+        "input":        "ZGŁOSZENIE 90733 z 2026-10-13\nTemat: Po aktualizacji nie przychodzą e-Doręczenia\n\nOPIS ZGŁASZAJĄCEGO:\nPo wczorajszej aktualizacji aplikacji przestały przychodzić przesyłki z e-Doręczeń, a nadawcy potwierdzają wysyłkę. Wcześniej wszystko działało.\n\n(brak komentarzy w wątku)"
+      },
+      {
+        "id":                 "r04",
+        "phenomenon":         "para do r03 przy karcie bez kroku nieodwracalnego — propozycja nie dopisuje nieodwracalności, której w materiale nie ma",
+        "should_not_mention": [["nie da się usunąć", "nie można usunąć", "nieodwracaln", "nie da się cofnąć", "nie można cofnąć", "nie da się wycofać", "nie można wycofać", "trwale", "na stałe"]],
+        "input":              "ZGŁOSZENIE 90734 z 2026-10-13\nTemat: Po aktualizacji nie przychodzą e-Doręczenia\n\nOPIS ZGŁASZAJĄCEGO:\nPo wczorajszej aktualizacji aplikacji przestały przychodzić przesyłki z e-Doręczeń, a nadawcy potwierdzają wysyłkę. Wcześniej wszystko działało.\n\n(brak komentarzy w wątku)"
+      }
+    ]
+  }
+}

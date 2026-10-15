@@ -156,17 +156,22 @@ def test_a_material_attack_points_at_text_in_the_fake_material(
     attack: InjectionAttack,
 ) -> None:
     """Sprawdza, czy atak w karcie wskazuje sprawę, której kartę mają atrapy, i pole tekstowe tej
-    karty, a atak w wątku — sprawę, której wątek mają atrapy.
+    karty, a atak w wątku — sprawę, której wątek mają atrapy; atak, który zdejmuje kartę, idzie
+    w wątek i zdejmuje kartę, którą atrapy mają.
 
     Wyłapuje atak doklejony do sprawy spoza materiału, który przerwałby płatny przebieg błędem,
-    i atak w polu listy (na przykład kodów błędów), który zamieniłby listę w napis."""
+    atak w polu listy (na przykład kodów błędów), który zamieniłby listę w napis, i zdjęcie karty,
+    której nie ma, przez co model nie miałby powodu czytać wątku."""
     cards   = {card.ticket_id: card for card in default_cards()}
     threads = {row.ticket_id for row in default_threads()}
 
-    # --- atak w wątku: wątek tej sprawy musi istnieć ---
+    # --- atak w wątku: wątek tej sprawy musi istnieć, a zdejmowana karta — też ---
     if attack.into == INTO_THREAD:
         assert attack.ticket in threads
+        assert not attack.without_card or attack.ticket in cards
         return
+
+    assert not attack.without_card
 
     assert attack.ticket in cards
     assert isinstance(getattr(cards[attack.ticket], attack.field or "", None), str)

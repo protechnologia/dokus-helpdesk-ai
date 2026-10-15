@@ -10,7 +10,8 @@ a raport, który pytest wypisuje po przebiegu, w `report.py`.
 
 | co                  | do czego                                                           |
 |---------------------|--------------------------------------------------------------------|
-| `code_sections()`   | sekcje zestawu po nazwie grafu                                     |
+| `code_cases()`      | wszystkie sprawy zestawu, każda raz                                |
+| `code_sections()`   | sprawy w sekcjach po nazwie grafu, z pola `graphs` sprawy          |
 | `quoted_messages()` | komunikaty z ekranu, które zgłoszenie cytuje w „…”                 |
 | `case_tools()`      | narzędzia sprawy: atrapy zgłoszeń i instrukcji, prawdziwy kod      |
 | `code_quotes()`     | cytowania kodu z rozmowy, z tym, czy model je wcześniej przeczytał |
@@ -56,10 +57,10 @@ from app.agent_tools.base import is_error_json
 from app.engine_llm import ChatMessage
 from tests._helpers.fake_tools import fake_agent_tools, fake_agent_tools_without_material
 from tests._helpers.scenarios.code.constants import (
+    CASES_KEY,
     CAUSE_ROLE,
     CODE_FILE,
     LIST_TOOL,
-    META_KEY,
     QUOTE_TOOL,
     QUOTED_MESSAGE,
     READ_TOOLS,
@@ -72,28 +73,49 @@ from tests._helpers.scenarios.code.models.code_section import CodeSection
 from tests._helpers.synthetic_code import synthetic_code_tools
 
 
-def code_sections(
+def code_cases(
     path: Path = CODE_FILE,  # np. Path("data/safe/golden/code.json")
-) -> dict[str, CodeSection]:
+) -> tuple[CodeCase, ...]:
     """
     Description:
-    Czyta zestaw scenariuszy cytowania kodu i oddaje jego sekcje po nazwie grafu, bez metryczki.
+    Czyta wszystkie sprawy zestawu scenariuszy cytowania kodu, w kolejności zestawu, każdą raz,
+    bez względu na to, na ilu grafach idzie.
 
     Example args:
         path=Path("data/safe/golden/code.json")
 
     Example result:
-        {"search": CodeSection(graph="search", cases=(CodeCase(case_id="k01", …), …))}
+        (CodeCase(case_id="k01", graphs=("search", "suggest_questions", …), …), …)
     """
     raw = json.loads(path.read_text(encoding="utf-8"))
 
+    return tuple(_case_from(entry) for entry in raw[CASES_KEY])
+
+
+def code_sections(
+    path: Path = CODE_FILE,  # np. Path("data/safe/golden/code.json")
+) -> dict[str, CodeSection]:
+    """
+    Description:
+    Składa sprawy zestawu w sekcje po nazwie grafu: sekcja grafu ma każdą sprawę, która go
+    wymienia w `graphs`, w kolejności zestawu. Grafy stoją w kolejności pierwszego wystąpienia.
+
+    Example args:
+        path=Path("data/safe/golden/code.json")
+
+    Example result:
+        {"search": CodeSection(graph="search", cases=(CodeCase(case_id="k01", …), …)),
+         "suggest_questions": CodeSection(graph="suggest_questions", cases=(…)), …}
+    """
+    by_graph: dict[str, list[CodeCase]] = {}
+
+    for case in code_cases(path):
+        for graph in case.graphs:
+            by_graph.setdefault(graph, []).append(case)
+
     sections = {
-        graph: CodeSection(
-            graph = graph,
-            cases = tuple(_case_from(entry) for entry in body["cases"]),
-        )
-        for graph, body in raw.items()
-        if graph != META_KEY
+        graph: CodeSection(graph=graph, cases=tuple(cases))
+        for graph, cases in by_graph.items()
     }
 
     return sections
@@ -108,12 +130,14 @@ def _case_from(
     go nie sprawdza: pusta lista plików, `False` przy zakazie przyczyny albo brak fragmentu.
 
     Example args:
-        entry={"id": "k01", "phenomenon": "…", "finds_tickets_and_docs": False,
+        entry={"id": "k01", "graphs": ["search"], "phenomenon": "…",
+               "finds_tickets_and_docs": False,
                "must_quote_as_cause": ["src/lib/Urzad/Szablony/RejestrSzablonow.php"],
                "notes_should_include": ["wezwanie_stare"], "input": "ZGŁOSZENIE…"}
 
     Example result:
-        CodeCase(case_id="k01", phenomenon="…", text="ZGŁOSZENIE…", finds_tickets_and_docs=False,
+        CodeCase(case_id="k01", graphs=("search",), phenomenon="…", text="ZGŁOSZENIE…",
+                 finds_tickets_and_docs=False,
                    must_quote_as_cause=("src/lib/Urzad/Szablony/RejestrSzablonow.php",),
                    must_not_quote_any_cause=False, notes_should_include=("wezwanie_stare",),
                    should_not_quote_as_cause=None)
@@ -122,6 +146,7 @@ def _case_from(
 
     case = CodeCase(
         case_id                   = entry["id"],
+        graphs                    = tuple(entry["graphs"]),
         phenomenon                = entry["phenomenon"],
         text                      = entry["input"],
         finds_tickets_and_docs    = entry["finds_tickets_and_docs"],

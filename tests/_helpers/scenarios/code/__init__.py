@@ -10,16 +10,17 @@ i pakiet ich nie wystawia.
 """
 
 from tests._helpers.scenarios.code.constants import (
+    CASES_KEY,
     CAUSE_ROLE,
     CODE_FILE,
     LIST_TOOL,
-    META_KEY,
     QUOTE_TOOL,
     QUOTED_MESSAGE,
     READ_TOOLS,
 )
 from tests._helpers.scenarios.code.helper import (
     case_tools,
+    code_cases,
     code_quotes,
     code_sections,
     judge_code_case,
@@ -39,7 +40,9 @@ from tests._helpers.scenarios.code.report import CodeReport
 
 __all__ = [
     "case_tools",
+    "CASES_KEY",
     "CAUSE_ROLE",
+    "code_cases",
     "CODE_FILE",
     "code_quotes",
     "code_sections",
@@ -54,7 +57,6 @@ __all__ = [
     "LIST_TOOL",
     "listing_count",
     "measure_code_cases",
-    "META_KEY",
     "QUOTE_TOOL",
     "QUOTED_MESSAGE",
     "quoted_messages",

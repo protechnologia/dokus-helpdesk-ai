@@ -9,6 +9,7 @@ class CodeCase:
     Pola z `must_` są warunkami testu, pola z `should_` — licznikami w raporcie."""
 
     case_id:                   str                  # np. "k01"
+    graphs:                    tuple[str, ...]      # grafy, na których sprawa idzie
     phenomenon:                str                  # co sprawa sprawdza — czego oczekujemy
     text:                      str                  # zgłoszenie w kształcie `RawTicket.as_thread()`
     finds_tickets_and_docs:    bool                 # szukanie zgłoszeń i instrukcji coś znajduje
