@@ -1,7 +1,8 @@
 """
 Description:
 To, co wspólne dla punktów obu materiałów: identyfikator punktu liczony z identyfikatora
-źródłowego i odczyt nazwanego wektora z punktu oddanego przez Qdranta.
+źródłowego, odczyt nazwanego wektora z punktu oddanego przez Qdranta i nazwa modelu embeddera
+w payloadzie.
 
 O czym pamiętać przy zmianach:
 
@@ -9,11 +10,18 @@ O czym pamiętać przy zmianach:
   następna indeksacja zdublowałaby korpus, zamiast go nadpisać. Pilnuje tego test złotej wartości.
 - Namespace jest jeden dla zgłoszeń i dokumentacji: identyfikator punktu jest unikalny w obrębie
   kolekcji, a te materiały leżą w osobnych kolekcjach.
+- Każdy punkt niesie w payloadzie nazwę modelu embeddera (`EMBEDDING_MODEL_KEY`). Zapisują ją
+  punkty, sprawdza kolekcja, a z treści punktu wycina `payload_without_model()`.
 """
 
 import uuid
 
 from app.db_qdrant.errors import DbQdrantConfigError
+
+# Klucz payloadu z nazwą modelu embeddera, który policzył wektory punktu. Stoi w payloadzie
+# KAŻDEGO punktu, bo Qdrant 1.12 nie ma miejsca na metadane kolekcji; wektory dwóch modeli nie są
+# porównywalne, nawet przy tym samym wymiarze, a bez nazwy nie da się tego sprawdzić.
+EMBEDDING_MODEL_KEY = "embedding_model"
 
 # Qdrant przyjmuje jako identyfikator punktu tylko liczbę bez znaku albo UUID, a nasze
 # identyfikatory to teksty („33644", „adm-kancelaria-edoreczenia"). UUID5, a nie licznik, bo
@@ -68,3 +76,55 @@ def named_vector(
         )
 
     return vector
+
+
+def embedding_model_of(
+    entry: dict,  # np. {"id": "df3b…", "payload": {"ticket_id": "33644", "embedding_model": "…"}}
+) -> str:
+    """
+    Description:
+    Wyjmuje z punktu albo trafienia oddanego przez Qdranta nazwę modelu embeddera, który
+    policzył jego wektory. Punkt bez niej pochodzi z kolekcji zbudowanej przed zapisem modelu —
+    czekanie tego nie naprawi, więc to błąd konfiguracji, jak brak nazwanego wektora.
+
+    Example args:
+        entry={"id": "df3b51f3-…", "payload": {"ticket_id": "33644",
+                                               "embedding_model": "OPI-PIB/PolDense-150M"}}
+
+    Example result:
+        "OPI-PIB/PolDense-150M"
+
+    Raises:
+        DbQdrantConfigError: payload punktu nie ma nazwy modelu
+    """
+    payload = entry.get("payload")
+    model   = payload.get(EMBEDDING_MODEL_KEY) if isinstance(payload, dict) else None
+
+    if not isinstance(model, str) or not model:
+        raise DbQdrantConfigError(
+            f"punkt {entry.get('id')!r} nie ma zapisanego modelu embeddera — kolekcję "
+            f"zbudowano przed zapisem modelu; skasuj ją i odbuduj z plików"
+        )
+
+    return model
+
+
+def payload_without_model(
+    entry: dict,  # np. {"id": "df3b…", "payload": {"ticket_id": "33644", "embedding_model": "…"}}
+) -> dict:
+    """
+    Description:
+    Oddaje payload punktu oddanego przez Qdranta bez nazwy modelu, czyli to, co punkt zapisał
+    jako swoją treść: kartę zgłoszenia albo opis sekcji. Nazwa modelu nie należy do karty, a
+    karta odrzuca klucze spoza kontraktu.
+
+    Example args:
+        entry={"id": "df3b51f3-…", "payload": {"ticket_id": "33644", "embedding_model": "…"}}
+
+    Example result:
+        {"ticket_id": "33644"}
+    """
+    payload  = entry.get("payload") or {}
+    stripped = {key: value for key, value in payload.items() if key != EMBEDDING_MODEL_KEY}
+
+    return stripped

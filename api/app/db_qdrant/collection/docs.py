@@ -56,7 +56,8 @@ class DocsCollection(VectorCollection):
         """
         Description:
         Zapisuje fragmenty sekcji i oddaje, ile zapisano. Punkt tego samego fragmentu jest
-        nadpisywany.
+        nadpisywany. Przed zapisem sprawdza, czy kolekcja nie ma punktów innego modelu
+        embeddera.
 
         Example args:
             points=[DocPoint(point_id="bc925b88-…", payload={"section_id": "adm-…", …}, …)]
@@ -65,30 +66,37 @@ class DocsCollection(VectorCollection):
             1
 
         Raises:
+            DbQdrantConfigError: punkty zapisu albo kolekcji policzył inny model embeddera
             DbQdrantError: Qdrant nie odpowiedział albo odrzucił zapis
         """
+        await self._verify_write_model({point.embedding_model for point in points})
+
         written = await self._upsert([point.to_qdrant() for point in points])
 
         return written
 
     async def search(
         self,
-        vector: list[float],  # np. [0.0123, -0.0456] — z embed_query()
-        limit:  int,          # np. 5 — RAG_TOP_K; liczba sekcji, nie fragmentów
+        vector:          list[float],  # np. [0.0123, -0.0456] — z embed_query()
+        embedding_model: str,          # np. "OPI-PIB/PolDense-150M" — model wektora zapytania
+        limit:           int,          # np. 5 — RAG_TOP_K; liczba sekcji, nie fragmentów
     ) -> list[DocHit]:
         """
         Description:
         Znajduje `limit` sekcji najbliższych wektorowi, od najbardziej podobnej. Każda sekcja
-        wraca raz, z podobieństwem swojego najbliższego fragmentu.
+        wraca raz, z podobieństwem swojego najbliższego fragmentu. Odmawia, gdy trafienie
+        policzył inny model embeddera niż zapytanie.
 
         Example args:
             vector=[0.0123, -0.0456]
+            embedding_model="OPI-PIB/PolDense-150M"
             limit=5
 
         Example result:
             [DocHit(point_id="bc925b88-…", score=0.74, payload={"section_id": "adm-…", …})]
 
         Raises:
+            DbQdrantConfigError: trafienie policzył inny model albo punkt nie ma nazwy modelu
             DbQdrantError: Qdrant nie odpowiedział, nie ma kolekcji albo odpowiedź ma
                 nierozpoznany kształt
         """
@@ -99,5 +107,7 @@ class DocsCollection(VectorCollection):
             limit       = limit,
         )
         hits = [DocHit.from_qdrant(entry) for entry in entries]
+
+        self._verify_hit_models([hit.embedding_model for hit in hits], embedding_model)
 
         return hits

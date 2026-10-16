@@ -157,20 +157,22 @@ class FindTicketsVectorTool(FindTicketsVectorToolBase):
         Raises:
             EmbeddingError: embedder jest nieosiągalny albo odpowiedział błędem
             DbQdrantError: Qdrant jest nieosiągalny albo odpowiedział błędem
-            DbQdrantConfigError: payload trafienia nie ma numeru zgłoszenia
+            DbQdrantConfigError: payload trafienia nie ma numeru zgłoszenia albo kolekcję
+                policzył inny model embeddera niż zapytanie
         """
         # --- tekst i wektor zapytania ---
         text = build_embedding_text(
             problem  = query.problem,
             symptoms = query.symptoms,
         )
-        vectors = await self._embedder.embed_query([text])
+        embedded = await self._embedder.embed_query([text])
 
         # --- wyszukanie: zawsze po wektorach `problem`, nigdy `sts` ---
         hits = await self._tickets.search(
-            vector      = vectors[0],
-            vector_name = VECTOR_PROBLEM,
-            limit       = self._top_k,
+            vector          = embedded.vectors[0],
+            embedding_model = embedded.model,
+            vector_name     = VECTOR_PROBLEM,
+            limit           = self._top_k,
         )
 
         # --- próg: odcięte liczymy, zamiast gubić ---

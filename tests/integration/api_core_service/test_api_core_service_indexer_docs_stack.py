@@ -204,8 +204,12 @@ async def test_an_imported_section_is_found_by_word_and_by_meaning(
 
     # "Miejsce parkingowe rezerwuje się w recepcji najpóźniej dzień wcześniej."
     by_word = await index.table.words("recepcja miejsca parkingowego")
-    vector  = (await index.embedder.embed_query(["gdzie zarezerwować miejsce na parkingu"]))[0]
-    by_mean = await index.collection.search(vector=vector, limit=5)
+    query   = await index.embedder.embed_query(["gdzie zarezerwować miejsce na parkingu"])
+    by_mean = await index.collection.search(
+        vector          = query.vectors[0],
+        embedding_model = query.model,
+        limit           = 5,
+    )
 
     assert by_word               == ["usr-parking"]
     assert by_mean[0].section_id == "usr-parking"
@@ -225,8 +229,12 @@ async def test_a_detail_from_the_last_paragraph_has_its_own_point(
     await index.indexer.rebuild(load_doc_package(_write_package(tmp_path / "pelna")))
 
     # "Żyrafa wymienia żarówki w lampach pod sufitem."
-    vector = (await index.embedder.embed_query(["kto wymienia żarówki pod sufitem"]))[0]
-    hits   = await index.collection.search(vector=vector, limit=5)
+    query = await index.embedder.embed_query(["kto wymienia żarówki pod sufitem"])
+    hits  = await index.collection.search(
+        vector          = query.vectors[0],
+        embedding_model = query.model,
+        limit           = 5,
+    )
 
     assert hits[0].section_id == "adm-zwierzeta"
 

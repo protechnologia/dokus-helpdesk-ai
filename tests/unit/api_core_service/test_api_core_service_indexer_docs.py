@@ -13,7 +13,8 @@ from app.core_service.indexer_docs import (
 )
 from app.db_postgres import DocRow
 from app.db_qdrant import DocPoint, point_id_for
-from app.engine_embedding import EmbeddingError
+from app.engine_embedding import EmbeddingConfigError, EmbeddingError, Embeddings
+from tests._helpers.embedding import EMBEDDING_MODEL, OTHER_MODEL
 
 # Importer na paczce zbudowanej w pamięci i na atrapach embeddera, tabeli i kolekcji: sprawdzamy,
 # CO i w jakiej KOLEJNOŚCI indekser robi. Że bazy to przyjmują, sprawdza test na stacku.
@@ -32,35 +33,39 @@ class FakeEmbedder:
 
     def __init__(
         self,
-        error: Exception | None = None,  # np. EmbeddingError("Embedder timed out")
+        error:  Exception | None = None,                 # np. EmbeddingError("Embedder timed out")
+        models: tuple[str, ...]  = (EMBEDDING_MODEL,),   # np. ("model-testowy", "inny-model")
     ) -> None:
         """
         Description:
         Buduje stub z pustym zapisem wywołań; z `error` każde wywołanie kończy się tym błędem.
+        `models` to modele kolejnych wywołań; ostatni zostaje dla dalszych.
 
         Example args:
             error=None
+            models=("model-testowy",)
 
         Example result:
             FakeEmbedder z pustym `passage_batches`
         """
         self.passage_batches: list[list[str]] = []
-        self.closed = False
-        self._error = error
+        self.closed  = False
+        self._error  = error
+        self._models = models
 
     async def embed_passage(
         self,
         texts: list[str],  # np. ["Tytuł wstep\nTreść sekcji."]
-    ) -> list[list[float]]:
+    ) -> Embeddings:
         """
         Description:
-        Zapisuje paczkę i oddaje wektor na każdy tekst.
+        Zapisuje paczkę i oddaje wektor na każdy tekst, z modelem tego wywołania.
 
         Example args:
             texts=["Tytuł wstep\\nTreść sekcji."]
 
         Example result:
-            [[1.0, 1.0, 1.0, 1.0]]
+            Embeddings(model="model-testowy", vectors=[[1.0, 1.0, 1.0, 1.0]])
 
         Raises:
             Exception: błąd podany przy budowie
@@ -68,9 +73,11 @@ class FakeEmbedder:
         if self._error is not None:
             raise self._error
 
+        model = self._models[min(len(self.passage_batches), len(self._models) - 1)]
+
         self.passage_batches.append(texts)
 
-        return [[1.0] * VECTOR_SIZE for _ in texts]
+        return Embeddings(model=model, vectors=[[1.0] * VECTOR_SIZE for _ in texts])
 
     async def aclose(self) -> None:
         """
@@ -270,6 +277,7 @@ class Stack:
         synthetic:      bool = False,             # rodzaj indeksu, do którego pisze indekser
         fragment_chars: int = 1500,               # limit długości fragmentu
         embed_error:    Exception | None = None,  # błąd, którym odpowiada embedder
+        embed_models:   tuple[str, ...] = (EMBEDDING_MODEL,),  # modele kolejnych wywołań
     ) -> None:
         """
         Description:
@@ -279,12 +287,13 @@ class Stack:
             synthetic=False
             fragment_chars=1500
             embed_error=None
+            embed_models=("model-testowy",)
 
         Example result:
             Stack z `indexer`, `embedder`, `table`, `collection` i pustym `calls`
         """
         self.calls: list[str] = []
-        self.embedder   = FakeEmbedder(error=embed_error)
+        self.embedder   = FakeEmbedder(error=embed_error, models=embed_models)
         self.table      = FakeTable(self.calls)
         self.collection = FakeCollection(self.calls)
         self.indexer   = DocsIndexer(
@@ -518,6 +527,35 @@ async def test_nothing_is_dropped_when_the_embedder_fails() -> None:
         await stack.indexer.rebuild(_package(_directory("administrator")))
 
     assert stack.calls == []
+
+
+async def test_nothing_is_dropped_when_the_embedder_changes_its_model() -> None:
+    """Sprawdza, czy indeksacja, w której embedder liczy drugą paczkę fragmentów innym modelem
+    niż pierwszą, kończy się błędem konfiguracji `EmbeddingConfigError` nazywającym oba modele,
+    zanim tabela albo kolekcja dostaną jakiekolwiek wywołanie.
+
+    Wyłapuje sprawdzenie zostawione kolekcji: odmówiłaby zapisu dopiero po skasowaniu starego
+    indeksu, więc zamiast poprzedniego, działającego indeksu zostałby pusty."""
+    count   = EMBED_BATCH_SIZE + 3
+    stack   = Stack(embed_models=(EMBEDDING_MODEL, OTHER_MODEL))
+    package = _package(_directory("administrator", tuple(f"s{number}" for number in range(count))))
+
+    with pytest.raises(EmbeddingConfigError, match=f"{EMBEDDING_MODEL}.*{OTHER_MODEL}"):
+        await stack.indexer.rebuild(package)
+
+    assert stack.calls == []
+
+
+async def test_points_carry_the_model_of_the_embedder() -> None:
+    """Sprawdza, czy każdy punkt dokumentacji niesie nazwę modelu, którą oddał embedder.
+
+    Wyłapuje punkt z modelem wpisanym na sztywno albo pustym: kolekcja nie umiałaby odmówić
+    mieszania wektorów dwóch modeli, a odczyt takiego punktu kończyłby się błędem."""
+    stack = Stack()
+
+    await stack.indexer.rebuild(_package(_directory("administrator", ("a", "b"))))
+
+    assert {point.embedding_model for point in stack.collection.points} == {EMBEDDING_MODEL}
 
 
 async def test_aclose_closes_everything_the_importer_stands_on() -> None:

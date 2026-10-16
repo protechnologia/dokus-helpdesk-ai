@@ -2,35 +2,40 @@ import httpx
 import pytest
 
 from app.engine_embedding import EmbeddingClient, EmbeddingConfigError, EmbeddingError
+from tests._helpers.embedding import EMBEDDING_MODEL, embedder_answer
 from tests._helpers.transport import always, capturing, raising, with_transport
 
 BASE_URL = "http://embedder:8000"
 
-# One vector wide enough to be recognisable in assertions, narrow enough to write out.
+# Jeden wektor: dość szeroki, żeby dało się go rozpoznać w asercji, dość wąski, żeby go wypisać.
 VECTOR = [0.1, -0.2, 0.3]
 
-# The single answer this client's happy path needs. Passed explicitly rather than defaulted to,
-# because the shape is this service's contract, not a shared one.
-ONE_VECTOR = {"vectors": [VECTOR]}
+# Jedyna odpowiedź, jakiej potrzebuje udana droga tego klienta, w kształcie kontraktu usługi.
+ONE_VECTOR = embedder_answer([VECTOR])
 
-# What the embedder answers while a test inspects the REQUEST. This client speaks to one route, so
-# the map is a constant instead of a per-test literal (`routed()`'s permissive default would work
-# too, but it answers with Qdrant's shape, which would make an assertion here read as an accident).
+# Odpowiedź embeddera, gdy test sprawdza ŻĄDANIE. Klient mówi do jednej ścieżki, więc mapa jest
+# stałą; domyślna odpowiedź `routed()` ma kształt Qdranta i asercja wyglądałaby na przypadek.
 EMBED_ROUTE = {("POST", "/embed"): httpx.Response(200, json=ONE_VECTOR)}
+
+# Odpowiedzi z wektorami, ale bez poprawnej nazwy modelu, z opisem przypadku w `id`.
+WITHOUT_MODEL = [
+    pytest.param({"vectors": [VECTOR]}, id="bez pola"),
+    pytest.param({"vectors": [VECTOR], "model": ""}, id="pusta nazwa"),
+    pytest.param({"vectors": [VECTOR], "model": 768}, id="liczba zamiast nazwy"),
+]
 
 
 def _client(handler: httpx.MockTransport) -> EmbeddingClient:
     """
     Description:
-    Builds an embedder client answering from a handler instead of a socket. Only the construction
-    is local — the rigging itself lives in `with_transport()`, together with the reasoning for
-    replacing a private attribute.
+    Buduje klienta embeddera, który odpowiada z atrapy transportu zamiast z gniazda. Tu jest tylko
+    budowa — podmiana transportu i jej uzasadnienie leżą w `with_transport()`.
 
     Example args:
-        handler=always({"vectors": [[0.1, -0.2, 0.3]]})
+        handler=always({"vectors": [[0.1, -0.2, 0.3]], "model": "model-testowy"})
 
     Example result:
-        EmbeddingClient answering from the handler
+        EmbeddingClient odpowiadający z atrapy
     """
     return with_transport(EmbeddingClient(base_url=BASE_URL), handler)
 
@@ -56,14 +61,14 @@ def test_whitespace_base_url_is_refused_at_build_time() -> None:
         EmbeddingClient(base_url="   ")
 
 
-# One test per mode rather than a loop: the point is that each named method is wired to its own
-# vector space, and a parametrised failure has to say WHICH method broke without decoding an id.
+# Przypadek na tryb: każda nazwana metoda ma być wpięta w swoją przestrzeń wektorową, a błąd ma
+# od razu mówić, KTÓRA metoda się zepsuła.
 @pytest.mark.parametrize(
     ("method_name", "expected_mode"),
     [
-        ("embed_query",   "query"),    # new tickets asked against the index
-        ("embed_passage", "passage"),  # historical tickets being indexed
-        ("embed_sts",     "sts"),      # symmetric ticket-to-ticket comparison
+        ("embed_query",   "query"),    # nowe zgłoszenie jako pytanie do indeksu
+        ("embed_passage", "passage"),  # historyczne zgłoszenia przy indeksacji
+        ("embed_sts",     "sts"),      # porównanie symetryczne, zgłoszenie ze zgłoszeniem
     ],
 )
 async def test_each_method_sends_its_own_mode(method_name: str, expected_mode: str) -> None:
@@ -109,17 +114,19 @@ async def test_the_batch_goes_to_the_embed_path() -> None:
     assert [(call["method"], call["path"]) for call in seen] == [("POST", "/embed")]
 
 
-async def test_vectors_are_returned_in_submission_order() -> None:
+async def test_vectors_are_returned_in_submission_order_with_the_model() -> None:
     """Sprawdza, czy dla trzech tekstów klient oddaje trzy wektory w tej samej kolejności,
-    w jakiej przyszły w odpowiedzi embeddera.
+    w jakiej przyszły w odpowiedzi embeddera, razem z nazwą modelu z odpowiedzi.
 
-    Wyłapuje klienta, który przestawia albo gubi wektory: wołający przypisuje je do tekstów po
-    kolei, więc zgłoszenie dostałoby wektor innego zgłoszenia."""
-    client = _client(always({"vectors": [[1.0], [2.0], [3.0]]}))
+    Wyłapuje klienta, który przestawia albo gubi wektory — wołający przypisuje je do tekstów po
+    kolei, więc zgłoszenie dostałoby wektor innego zgłoszenia — oraz klienta, który gubi nazwę
+    modelu, po której Qdrant odmawia mieszania wektorów dwóch modeli."""
+    client = _client(always(embedder_answer([[1.0], [2.0], [3.0]])))
 
-    vectors = await client.embed_passage(["a", "b", "c"])
+    embedded = await client.embed_passage(["a", "b", "c"])
 
-    assert vectors == [[1.0], [2.0], [3.0]]
+    assert embedded.vectors == [[1.0], [2.0], [3.0]]
+    assert embedded.model   == EMBEDDING_MODEL
 
 
 async def test_vector_count_mismatch_is_an_error() -> None:
@@ -144,6 +151,20 @@ async def test_missing_vectors_field_is_an_error() -> None:
     client = _client(always({"model": "fake"}))
 
     with pytest.raises(EmbeddingError, match="vectors"):
+        await client.embed_passage(["a"])
+
+
+@pytest.mark.parametrize("answer", WITHOUT_MODEL)
+async def test_an_answer_without_the_model_is_an_error(answer: dict) -> None:
+    """Sprawdza, czy odpowiedź ze statusem 200 i z wektorami, ale bez nazwy modelu — bez pola,
+    z pustą nazwą albo z liczbą zamiast nazwy — kończy się błędem `EmbeddingError` wymieniającym
+    pole `model`.
+
+    Wyłapuje klienta, który oddaje wektory bez nazwy modelu: kolekcja nie mogłaby wtedy sprawdzić,
+    czy wektory pasują do punktów policzonych innym modelem o tym samym wymiarze."""
+    client = _client(always(answer))
+
+    with pytest.raises(EmbeddingError, match="model"):
         await client.embed_passage(["a"])
 
 

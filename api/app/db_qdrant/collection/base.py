@@ -6,25 +6,31 @@ materiałów (`TicketsCollection`, `DocsCollection`); każda mówi u siebie, jak
 (`VECTORS`) i jakie punkty przyjmuje.
 
 Schemat kolekcji to trzy rzeczy: nazwy wektorów (z podklasy), ich wymiar (z konfiguracji, podany
-przy budowie obiektu) i metryka (wspólna, niżej).
+przy budowie obiektu) i metryka (wspólna, niżej). Czwartą, model embeddera, niesie każdy punkt
+w payloadzie, bo Qdrant 1.12 nie ma metadanych kolekcji.
 
 Żądania do Qdranta, wszystkie pod `/collections/<nazwa>`:
 
-| metoda             | żądanie                     | co robi                                      |
-|--------------------|-----------------------------|----------------------------------------------|
-| `ensure()`         | `GET`, potem `PUT`          | sprawdza schemat albo zakłada kolekcję       |
-| `drop()`           | `GET`, potem `DELETE`       | kasuje kolekcję                              |
-| `count()`          | `POST /points/count`        | dokładna liczba punktów                      |
-| `_upsert()`        | `PUT /points`               | zapis punktów partiami                       |
-| `_search()`        | `POST /points/query`        | najbliższe punkty w jednej przestrzeni       |
-| `_search_groups()` | `POST /points/query/groups` | najbliższy punkt każdej z najbliższych grup  |
-| `_read_by_id()`    | `POST /points`              | punkty o podanych identyfikatorach i wektory |
+| metoda                  | żądanie                     | co robi                                  |
+|-------------------------|-----------------------------|------------------------------------------|
+| `ensure()`              | `GET`, potem `PUT`          | sprawdza schemat albo zakłada kolekcję   |
+| `drop()`                | `GET`, potem `DELETE`       | kasuje kolekcję                          |
+| `count()`               | `POST /points/count`        | dokładna liczba punktów                  |
+| `_verify_write_model()` | `POST /points/scroll`       | szuka punktu innego modelu przed zapisem |
+| `_upsert()`             | `PUT /points`               | zapis punktów partiami                   |
+| `_search()`             | `POST /points/query`        | najbliższe punkty w jednej przestrzeni   |
+| `_search_groups()`      | `POST /points/query/groups` | najbliższy punkt z każdej bliskiej grupy |
+| `_read_by_id()`         | `POST /points`              | punkty o podanych id, z wektorami        |
 
 O czym pamiętać przy zmianach:
 
 - Kolekcja przy rozjeździe NIE jest naprawiana. Inny wymiar albo brak nazwanego wektora znaczy,
   że zbudowano ją pod inny model; komunikat podaje obie liczby, bo samo „768 ≠ 1024" nie mówi,
   którą stronę poprawić.
+- Kolekcja trzyma wektory jednego modelu embeddera. Zapis odmawia, gdy w kolekcji jest punkt
+  innego modelu albo bez nazwy modelu (`_verify_write_model()`), a wyszukiwanie, gdy trafienie
+  policzył inny model niż zapytanie (`_verify_hit_models()`). Pomieszanie dwóch modeli o tym
+  samym wymiarze — także atrapy z prawdziwym — nie daje innego błędu, tylko gorsze wyniki.
 - Metryka `Cosine` jest wspólna: embedder oddaje wektory jednostkowe i na takich mierzono próg
   `RAG_SCORE_MIN`. Qdrant normalizuje wektor przy zapisie, więc odczytany ma ten sam kierunek,
   ale nie musi mieć tych samych liczb.
@@ -40,6 +46,7 @@ from collections.abc import Sequence
 
 from app.db_qdrant.client import QdrantClient
 from app.db_qdrant.errors import DbQdrantConfigError, DbQdrantError
+from app.db_qdrant.point.base import EMBEDDING_MODEL_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +78,9 @@ class VectorCollection:
         3. `_upsert()` zapisuje punkty, `_search()` i `_search_groups()` szukają,
            `_read_by_id()` czyta — wszystkie na słownikach, a na swoje modele zamienia je
            podklasa.
-        4. `count()` liczy punkty, `drop()` kasuje kolekcję.
+        4. Podklasa woła `_verify_write_model()` przed zapisem i `_verify_hit_models()` po
+           wyszukaniu, żeby w kolekcji nie mieszały się wektory dwóch modeli embeddera.
+        5. `count()` liczy punkty, `drop()` kasuje kolekcję.
     """
 
     # Nazwane wektory kolekcji. Podklasa podaje swoje — to jej schemat.
@@ -447,6 +456,117 @@ class VectorCollection:
         )
 
         return points
+
+    async def _verify_write_model(
+        self,
+        models: set[str],  # np. {"OPI-PIB/PolDense-150M"} — modele punktów jednego zapisu
+    ) -> None:
+        """
+        Description:
+        Pilnuje przed zapisem, żeby kolekcja trzymała wektory jednego modelu embeddera: punkty
+        jednego zapisu muszą mieć ten sam model, a w kolekcji nie może być punktu innego modelu
+        ani punktu bez nazwy modelu. Szuka jednego takiego punktu, bez liczenia wszystkich —
+        jeden wystarczy do odmowy, a jego model trafia do komunikatu.
+
+        Example args:
+            models={"OPI-PIB/PolDense-150M"}
+
+        Example result:
+            None — w kolekcji są tylko punkty tego modelu albo nie ma żadnych
+
+        Raises:
+            DbQdrantConfigError: punkty zapisu mają różne modele albo kolekcja ma punkt innego
+                modelu lub bez nazwy modelu
+            DbQdrantError: Qdrant nie odpowiedział, nie ma kolekcji albo odpowiedź ma
+                nierozpoznany kształt
+        """
+        # --- nic do zapisania ---
+        if not models:
+            return None
+
+        # --- jeden zapis, kilka modeli: embedder zmienił model w trakcie przebiegu ---
+        if len(models) > 1:
+            raise DbQdrantConfigError(
+                f"punkty jednego zapisu do kolekcji '{self._name}' policzyły różne modele "
+                f"embeddera ({', '.join(sorted(models))}) — embedder zmienił model w trakcie "
+                f"przebiegu; uruchom indeksację od nowa"
+            )
+
+        model = next(iter(models))
+
+        # Punkt bez klucza też spełnia `must_not`, więc ten sam warunek łapie indeks sprzed
+        # zapisu modelu.
+        body    = await self._client.request(
+            "POST",
+            f"{self._path}/points/scroll",
+            json={
+                "filter":       {
+                    "must_not": [{"key": EMBEDDING_MODEL_KEY, "match": {"value": model}}],
+                },
+                "limit":        1,
+                "with_payload": [EMBEDDING_MODEL_KEY],
+                "with_vector":  False,
+            },
+        )
+        result  = body.get("result")
+        entries = result.get("points") if isinstance(result, dict) else None
+
+        if not isinstance(entries, list):
+            raise DbQdrantError(
+                f"Qdrant oddał nierozpoznany wynik przeglądania kolekcji '{self._name}'"
+            )
+
+        # --- w kolekcji tylko ten model albo pusto ---
+        if not entries:
+            return None
+
+        payload = entries[0].get("payload") or {}
+        other   = payload.get(EMBEDDING_MODEL_KEY)
+
+        # --- indeks sprzed zapisu modelu ---
+        if not other:
+            raise DbQdrantConfigError(
+                f"kolekcja '{self._name}' ma punkty bez zapisanego modelu embeddera — "
+                f"zbudowano ją przed zapisem modelu; skasuj ją i odbuduj z plików"
+            )
+
+        # --- indeks innego modelu ---
+        raise DbQdrantConfigError(
+            f"kolekcja '{self._name}' ma punkty policzone modelem '{other}', a zapis — modelem "
+            f"'{model}'; wektorów dwóch modeli nie wolno mieszać — przestaw embedder na model "
+            f"kolekcji albo skasuj ją i odbuduj z plików"
+        )
+
+    def _verify_hit_models(
+        self,
+        hit_models:  Sequence[str],  # np. ["OPI-PIB/PolDense-150M", …] — modele trafień
+        query_model: str,            # np. "OPI-PIB/PolDense-150M" — model wektora zapytania
+    ) -> None:
+        """
+        Description:
+        Sprawdza, czy każde trafienie policzył ten sam model embeddera co zapytanie. Podobieństwo
+        wektorów dwóch modeli nic nie znaczy, a przy tym samym wymiarze Qdrant liczy je bez
+        błędu — wynik wyglądałby jak zwykłe, trochę gorsze trafienia.
+
+        Example args:
+            hit_models=["OPI-PIB/PolDense-150M", "OPI-PIB/PolDense-150M"]
+            query_model="OPI-PIB/PolDense-150M"
+
+        Example result:
+            None — wszystkie trafienia są z modelu zapytania
+
+        Raises:
+            DbQdrantConfigError: któreś trafienie policzył inny model niż zapytanie
+        """
+        for model in hit_models:
+            if model != query_model:
+                raise DbQdrantConfigError(
+                    f"kolekcja '{self._name}' ma punkty policzone modelem '{model}', a zapytanie "
+                    f"— modelem '{query_model}'; wektory dwóch modeli nie są porównywalne — "
+                    f"przestaw embedder na model kolekcji albo skasuj ją i odbuduj z plików"
+                )
+
+        return None
 
     def _verify_schema(
         self,

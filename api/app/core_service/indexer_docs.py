@@ -52,7 +52,7 @@ from app.core_model.docs.docs_index_report import DocsIndexReport
 from app.core_service.builder_doc_embedding_text import build_fragment_text, split_into_fragments
 from app.db_postgres import DocRow, DocsTable
 from app.db_qdrant import DocPoint, DocsCollection
-from app.engine_embedding import EmbeddingClient
+from app.engine_embedding import EmbeddingClient, EmbeddingConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +188,7 @@ class DocsIndexer:
 
         Raises:
             DocsIndexRefused: paczki nie wolno zaindeksować w tym indeksie
+            EmbeddingConfigError: embedder zmienił model w trakcie przebiegu
             EmbeddingError: embedder jest nieosiągalny albo odpowiedział błędem
             DbPostgresError: Postgres jest nieosiągalny albo odrzucił zapis
             DbQdrantError: Qdrant jest nieosiągalny albo odrzucił zapis
@@ -285,6 +286,7 @@ class DocsIndexer:
             [DocPoint(point_id="bc925b88-…", payload={"section_id": "adm-kancelaria-…", …}), …]
 
         Raises:
+            EmbeddingConfigError: paczki fragmentów policzyły dwa różne modele
             EmbeddingError: embedder jest nieosiągalny albo zwrócił inną liczbę wektorów
         """
         # Każdy fragment z sekcją, z której pochodzi, numerem w tej sekcji i tekstem do embeddingu.
@@ -300,12 +302,21 @@ class DocsIndexer:
         points: list[DocPoint] = []
 
         for start in range(0, len(fragments), EMBED_BATCH_SIZE):
-            batch   = fragments[start : start + EMBED_BATCH_SIZE]
-            vectors = await self._embedder.embed_passage([text for _, _, text in batch])
+            batch    = fragments[start : start + EMBED_BATCH_SIZE]
+            embedded = await self._embedder.embed_passage([text for _, _, text in batch])
+
+            # Tutaj, a nie dopiero przy zapisie: przebudowa kasuje stary indeks przed zapisem
+            # nowego, więc odmowa kolekcji zostawiłaby go pustym.
+            if points and points[0].embedding_model != embedded.model:
+                raise EmbeddingConfigError(
+                    f"embedder policzył fragmenty paczki dwoma modelami "
+                    f"({points[0].embedding_model}, {embedded.model}) — zmienił model w trakcie "
+                    f"przebiegu; uruchom indeksację od nowa"
+                )
 
             points.extend(
-                DocPoint.from_fragment(section, number, vector)
-                for (section, number, _), vector in zip(batch, vectors, strict=True)
+                DocPoint.from_fragment(section, number, vector, embedded.model)
+                for (section, number, _), vector in zip(batch, embedded.vectors, strict=True)
             )
 
         return points

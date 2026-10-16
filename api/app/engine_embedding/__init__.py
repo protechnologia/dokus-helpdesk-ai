@@ -1,20 +1,21 @@
 """
 Description:
-How `api` reaches the `embedder` service. Import from here
-(`from app.engine_embedding import EmbeddingClient`) rather than from the submodules — the split
-between client and errors is an internal detail, while this surface is what domain code is allowed
-to know about turning text into vectors.
+Droga `api` do usługi `embedder`. Importuj stąd (`from app.engine_embedding import
+EmbeddingClient`), nie z modułów w środku — podział na klienta, model wyniku i błędy to szczegół
+pakietu, a to, co stąd wychodzi, jest wszystkim, co kod domeny wie o zamianie tekstu na wektory.
 
-No factory here, unlike `app.engine_llm`: there is exactly one way to reach the embedder (HTTP), and
-which MODEL answers is the embedder's own configuration, not ours. What varies is a URL, and a
-URL is an argument.
+Bez fabryki, inaczej niż `app.engine_llm`: do embeddera jest jedna droga (HTTP), a to, który
+MODEL odpowiada — także czy to atrapa — jest konfiguracją usługi `embedder`, nie naszą. Zmienia
+się adres, a adres to argument. Nazwę modelu usługa oddaje w każdym wyniku (`Embeddings.model`).
 """
 
 from app.engine_embedding.client import EmbeddingClient
 from app.engine_embedding.errors import EmbeddingConfigError, EmbeddingError
+from app.engine_embedding.models import Embeddings
 
 __all__ = [
     "EmbeddingClient",
     "EmbeddingConfigError",
     "EmbeddingError",
+    "Embeddings",
 ]

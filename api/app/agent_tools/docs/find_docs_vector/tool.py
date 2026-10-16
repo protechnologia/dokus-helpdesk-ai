@@ -163,13 +163,18 @@ class FindDocsVectorTool(FindDocsVectorToolBase):
         Raises:
             EmbeddingError: embedder jest nieosiągalny albo odpowiedział błędem
             DbQdrantError: Qdrant jest nieosiągalny albo odpowiedział błędem
-            DbQdrantConfigError: payload trafienia nie spełnia kontraktu `DocSection`
+            DbQdrantConfigError: payload trafienia nie spełnia kontraktu `DocSection` albo
+                kolekcję policzył inny model embeddera niż zapytanie
         """
         # --- wektor zapytania: tryb query, bo w kolekcji leżą wektory passage ---
-        vectors = await self._embedder.embed_query([query.text])
+        embedded = await self._embedder.embed_query([query.text])
 
         # --- wyszukanie: każda sekcja raz, z najbliższym fragmentem ---
-        hits = await self._docs.search(vector=vectors[0], limit=self._top_k)
+        hits = await self._docs.search(
+            vector          = embedded.vectors[0],
+            embedding_model = embedded.model,
+            limit           = self._top_k,
+        )
 
         # --- próg: odcięte liczymy, zamiast gubić ---
         kept    = [hit for hit in hits if hit.score >= self._score_min]

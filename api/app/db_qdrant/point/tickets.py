@@ -1,14 +1,16 @@
 """
 Description:
-Punkt zgłoszenia w kolekcji Qdranta: identyfikator, dwa nazwane wektory i karta zgłoszenia
-w payloadzie. W tym kształcie zgłoszenie jest zapisywane i w tym samym wraca z odczytu po numerze.
+Punkt zgłoszenia w kolekcji Qdranta: identyfikator, dwa nazwane wektory, model embeddera, który je
+policzył, i karta zgłoszenia w payloadzie. W tym kształcie zgłoszenie jest zapisywane i w tym
+samym wraca z odczytu po numerze.
 
 Punkt w Qdrancie:
 
     {
       "id":      "df3b51f3-9eac-56f3-9f28-6253f23dd731",
       "vector":  {"problem": [0.0123, …], "sts": [0.0987, …]},
-      "payload": {"ticket_id": "33644", "date": "2026-03-14", "problem": "…", "solution": "…", …}
+      "payload": {"ticket_id": "33644", "date": "2026-03-14", "problem": "…", "solution": "…", …,
+                  "embedding_model": "OPI-PIB/PolDense-150M"}
     }
 
 O czym pamiętać przy zmianach:
@@ -23,7 +25,13 @@ O czym pamiętać przy zmianach:
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core_model.tickets.parsed_ticket import ParsedTicket
-from app.db_qdrant.point.base import named_vector, point_id_for
+from app.db_qdrant.point.base import (
+    EMBEDDING_MODEL_KEY,
+    embedding_model_of,
+    named_vector,
+    payload_without_model,
+    point_id_for,
+)
 
 # Nazwane wektory każdego punktu. `problem` to strona passage, z którą porównywane jest zapytanie
 # w runtime; `sts` to wektor symetryczny do porównań zgłoszenie ↔ zgłoszenie.
@@ -55,10 +63,12 @@ class TicketPoint(BaseModel):
     # Klucz spoza kontraktu to pomyłka, nie rozszerzenie — jak w `ParsedTicket`.
     model_config = ConfigDict(extra="forbid")
 
-    point_id:       str         = Field(examples=["df3b51f3-9eac-56f3-9f28-6253f23dd731"])
-    vector_problem: list[float] = Field(examples=[[0.0123, -0.0456]])
-    vector_sts:     list[float] = Field(examples=[[0.0987, -0.0654]])
-    payload:        dict        = Field(examples=[{"ticket_id": "33644", "component": "ePUAP"}])
+    point_id:        str         = Field(examples=["df3b51f3-9eac-56f3-9f28-6253f23dd731"])
+    vector_problem:  list[float] = Field(examples=[[0.0123, -0.0456]])
+    vector_sts:      list[float] = Field(examples=[[0.0987, -0.0654]])
+    # Model embeddera, który policzył oba wektory; w Qdrancie stoi w payloadzie, obok karty.
+    embedding_model: str         = Field(examples=["OPI-PIB/PolDense-150M"])
+    payload:         dict        = Field(examples=[{"ticket_id": "33644", "component": "ePUAP"}])
 
     @property
     def ticket_id(self) -> str:
@@ -78,19 +88,22 @@ class TicketPoint(BaseModel):
     @classmethod
     def from_ticket(
         cls,
-        ticket:         ParsedTicket,  # np. ParsedTicket(ticket_id="33644", …)
-        vector_problem: list[float],   # np. [0.0123, -0.0456] — z embed_passage()
-        vector_sts:     list[float],   # np. [0.0987, -0.0654] — z embed_sts()
+        ticket:          ParsedTicket,  # np. ParsedTicket(ticket_id="33644", …)
+        vector_problem:  list[float],   # np. [0.0123, -0.0456] — z embed_passage()
+        vector_sts:      list[float],   # np. [0.0987, -0.0654] — z embed_sts()
+        embedding_model: str,           # np. "OPI-PIB/PolDense-150M" — z wyniku embeddera
     ) -> "TicketPoint":
         """
         Description:
-        Buduje punkt jednego sparsowanego zgłoszenia. Wektory przychodzą gotowe: embedding to
-        inna granica procesu, a model transportu wołający drugą usługę związałby obie zależności.
+        Buduje punkt jednego sparsowanego zgłoszenia. Wektory i nazwa modelu przychodzą gotowe:
+        embedding to inna granica procesu, a model transportu wołający drugą usługę związałby
+        obie zależności.
 
         Example args:
             ticket=ParsedTicket(ticket_id="33644", …)
             vector_problem=[0.0123, -0.0456]
             vector_sts=[0.0987, -0.0654]
+            embedding_model="OPI-PIB/PolDense-150M"
 
         Example result:
             TicketPoint(point_id="df3b51f3-…", payload={"ticket_id": "33644", …})
@@ -116,10 +129,11 @@ class TicketPoint(BaseModel):
         }
 
         point = cls(
-            point_id       = point_id_for(ticket.ticket_id),
-            vector_problem = vector_problem,
-            vector_sts     = vector_sts,
-            payload        = payload,
+            point_id        = point_id_for(ticket.ticket_id),
+            vector_problem  = vector_problem,
+            vector_sts      = vector_sts,
+            embedding_model = embedding_model,
+            payload         = payload,
         )
 
         return point
@@ -134,21 +148,26 @@ class TicketPoint(BaseModel):
         Czyta punkt oddany przez odczyt po identyfikatorze. Wektory wracają znormalizowane przez
         Qdranta: ten sam kierunek, niekoniecznie te same liczby co przy zapisie.
 
+        Nazwa modelu idzie z payloadu do osobnego pola, więc `payload` to sama karta, jak przy
+        zapisie.
+
         Example args:
             entry={"id": "df3b51f3-…", "vector": {"problem": [0.5, 0.5], "sts": [0.5, -0.5]},
-                   "payload": {"ticket_id": "33644"}}
+                   "payload": {"ticket_id": "33644", "embedding_model": "OPI-PIB/PolDense-150M"}}
 
         Example result:
-            TicketPoint(point_id="df3b51f3-…", vector_problem=[0.5, 0.5], …)
+            TicketPoint(point_id="df3b51f3-…", vector_problem=[0.5, 0.5], …,
+                        embedding_model="OPI-PIB/PolDense-150M", payload={"ticket_id": "33644"})
 
         Raises:
-            DbQdrantConfigError: punkt nie ma któregoś z nazwanych wektorów
+            DbQdrantConfigError: punkt nie ma któregoś z nazwanych wektorów albo nazwy modelu
         """
         point = cls(
-            point_id       = str(entry.get("id", "")),
-            vector_problem = named_vector(entry, VECTOR_PROBLEM),
-            vector_sts     = named_vector(entry, VECTOR_STS),
-            payload        = entry.get("payload") or {},
+            point_id        = str(entry.get("id", "")),
+            vector_problem  = named_vector(entry, VECTOR_PROBLEM),
+            vector_sts      = named_vector(entry, VECTOR_STS),
+            embedding_model = embedding_model_of(entry),
+            payload         = payload_without_model(entry),
         )
 
         return point
@@ -173,7 +192,7 @@ class TicketPoint(BaseModel):
                 VECTOR_PROBLEM: self.vector_problem,
                 VECTOR_STS:     self.vector_sts,
             },
-            "payload": self.payload,
+            "payload": {**self.payload, EMBEDDING_MODEL_KEY: self.embedding_model},
         }
 
         return wire

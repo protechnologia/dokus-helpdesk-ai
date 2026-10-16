@@ -8,6 +8,7 @@ from app.agent_tools.docs.find_docs_vector import FindDocsVectorQuery, FindDocsV
 from app.core_model.docs.doc_section import DocSection
 from app.db_qdrant import VECTOR_SECTION, DbQdrantConfigError, DocsCollection, QdrantClient
 from app.engine_embedding import EmbeddingClient
+from tests._helpers.embedding import EMBEDDING_MODEL, OTHER_MODEL, embedder_answer, with_model
 from tests._helpers.transport import capturing, with_transport
 
 # Narzędzie stoi na prawdziwych klientach embeddera i Qdranta, a podmieniony jest tylko transport
@@ -40,7 +41,7 @@ def _hit(
     hit = {
         "id":      f"p-{section.section_id}",
         "score":   score,
-        "payload": payload if payload is not None else section.model_dump(mode="json"),
+        "payload": with_model(payload if payload is not None else section.model_dump(mode="json")),
     }
 
     return {"id": section.section_id, "hits": [hit]}
@@ -52,6 +53,7 @@ def _tool(
     top_k:         int         = 5,     # np. 5 — RAG_TOP_K
     embedder_seen: list | None = None,  # żądania do embeddera, gdy test je sprawdza
     qdrant_seen:   list | None = None,  # żądania do Qdranta, gdy test je sprawdza
+    model:         str = EMBEDDING_MODEL,  # np. "inny-model" — model w odpowiedzi embeddera
 ) -> FindDocsVectorTool:
     """
     Description:
@@ -68,7 +70,7 @@ def _tool(
         EmbeddingClient(base_url="http://embedder:8000"),
         capturing(
             embedder_seen if embedder_seen is not None else [],
-            {("POST", "/embed"): httpx.Response(200, json={"vectors": [QUERY_VECTOR]})},
+            {("POST", "/embed"): httpx.Response(200, json=embedder_answer([QUERY_VECTOR], model))},
         ),
     )
     qdrant = with_transport(
@@ -192,6 +194,19 @@ async def test_a_payload_that_is_not_a_section_is_a_config_error_naming_the_fiel
     assert "title"                       in message
     assert "docs index"                  in message
     assert broken["description"]     not in message
+
+
+async def test_sections_of_another_model_than_the_query_are_refused() -> None:
+    """Sprawdza, czy wyszukiwanie kończy się błędem konfiguracji `DbQdrantConfigError`, gdy
+    embedder policzył zapytanie innym modelem niż ten, którym zapisano fragmenty w kolekcji.
+
+    Wyłapuje narzędzie, które nie przekazuje kolekcji modelu z odpowiedzi embeddera: przy
+    embedderze na atrapie i indeksie z prawdziwego modelu agent dostawałby sekcje bez związku
+    z zapytaniem, wyglądające jak zwykłe, słabsze wyniki."""
+    tool = _tool([_hit(SECTIONS[0], 0.58)], model=OTHER_MODEL)
+
+    with pytest.raises(DbQdrantConfigError, match=OTHER_MODEL):
+        await tool.find(QUERY)
 
 
 async def test_a_dropped_hit_is_never_looked_at() -> None:

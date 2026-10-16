@@ -59,7 +59,7 @@ from app.core_model.tickets.quality_report import QualityReport
 from app.core_model.tickets.tickets_index_report import TicketsIndexReport
 from app.core_service.filter_ticket_quality import drop_rate_warning, filter_tickets
 from app.db_qdrant import TicketPoint, TicketsCollection
-from app.engine_embedding import EmbeddingClient
+from app.engine_embedding import EmbeddingClient, EmbeddingConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,9 @@ class TicketsIndexer:
 
         Raises:
             NotADirectoryError: ścieżka nie istnieje albo nie jest katalogiem
+            DbQdrantConfigError: kolekcja ma punkty innego modelu embeddera
             DbQdrantError: Qdrant jest nieosiągalny albo odrzucił zapis
+            EmbeddingConfigError: embedder zmienił model w trakcie przebiegu
             EmbeddingError: embedder jest nieosiągalny albo odpowiedział błędem
         """
         tickets = self._read(directory)
@@ -282,7 +284,9 @@ class TicketsIndexer:
             1
 
         Raises:
+            EmbeddingConfigError: wektory jednej paczki policzyły dwa różne modele
             EmbeddingError: embedder jest nieosiągalny albo zwrócił inną liczbę wektorów
+            DbQdrantConfigError: kolekcja ma punkty innego modelu embeddera
             DbQdrantError: Qdrant jest nieosiągalny albo odrzucił zapis
         """
         written = 0
@@ -293,17 +297,25 @@ class TicketsIndexer:
             # `build_embedding_text()`, żeby nie rozjechały się bezgłośnie.
             texts = [ticket.embedding_text() for ticket in batch]
 
-            problem_vectors = await self._embedder.embed_passage(texts)
-            sts_vectors     = await self._embedder.embed_sts(texts)
+            problem = await self._embedder.embed_passage(texts)
+            sts     = await self._embedder.embed_sts(texts)
+
+            # Punkt zapisuje jeden model dla obu wektorów, więc oba muszą pochodzić z tego samego.
+            if problem.model != sts.model:
+                raise EmbeddingConfigError(
+                    f"embedder policzył wektory jednej paczki dwoma modelami ({problem.model}, "
+                    f"{sts.model}) — zmienił model w trakcie przebiegu; uruchom indeksację od nowa"
+                )
 
             points = [
                 TicketPoint.from_ticket(
-                    ticket         = ticket,
-                    vector_problem = problem_vector,
-                    vector_sts     = sts_vector,
+                    ticket          = ticket,
+                    vector_problem  = problem_vector,
+                    vector_sts      = sts_vector,
+                    embedding_model = problem.model,
                 )
                 for ticket, problem_vector, sts_vector in zip(
-                    batch, problem_vectors, sts_vectors, strict=True
+                    batch, problem.vectors, sts.vectors, strict=True
                 )
             ]
 

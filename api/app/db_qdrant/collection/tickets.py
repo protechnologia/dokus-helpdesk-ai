@@ -52,7 +52,8 @@ class TicketsCollection(VectorCollection):
         """
         Description:
         Zapisuje zgłoszenia i oddaje, ile zapisano. Punkt tego samego zgłoszenia jest
-        nadpisywany, więc ponowna indeksacja nie dubluje korpusu.
+        nadpisywany, więc ponowna indeksacja nie dubluje korpusu. Przed zapisem sprawdza, czy
+        kolekcja nie ma punktów innego modelu embeddera.
 
         Example args:
             points=[TicketPoint(point_id="df3b51f3-…", payload={"ticket_id": "33644", …}, …)]
@@ -61,25 +62,30 @@ class TicketsCollection(VectorCollection):
             1
 
         Raises:
+            DbQdrantConfigError: punkty zapisu albo kolekcji policzył inny model embeddera
             DbQdrantError: Qdrant nie odpowiedział albo odrzucił zapis
         """
+        await self._verify_write_model({point.embedding_model for point in points})
+
         written = await self._upsert([point.to_qdrant() for point in points])
 
         return written
 
     async def search(
         self,
-        vector:      list[float],  # np. [0.0123, -0.0456] — z embed_query()
-        vector_name: str,          # np. VECTOR_PROBLEM — w której przestrzeni szukać
-        limit:       int,          # np. 5 — RAG_TOP_K
+        vector:          list[float],  # np. [0.0123, -0.0456] — z embed_query()
+        embedding_model: str,          # np. "OPI-PIB/PolDense-150M" — model wektora zapytania
+        vector_name:     str,          # np. VECTOR_PROBLEM — w której przestrzeni szukać
+        limit:           int,          # np. 5 — RAG_TOP_K
     ) -> list[TicketHit]:
         """
         Description:
         Znajduje `limit` zgłoszeń najbliższych wektorowi w podanej przestrzeni, od najbardziej
-        podobnego.
+        podobnego. Odmawia, gdy trafienie policzył inny model embeddera niż zapytanie.
 
         Example args:
             vector=[0.0123, -0.0456]
+            embedding_model="OPI-PIB/PolDense-150M"
             vector_name=VECTOR_PROBLEM
             limit=5
 
@@ -87,11 +93,14 @@ class TicketsCollection(VectorCollection):
             [TicketHit(point_id="df3b51f3-…", score=0.87, payload={"ticket_id": "33644", …})]
 
         Raises:
+            DbQdrantConfigError: trafienie policzył inny model albo punkt nie ma nazwy modelu
             DbQdrantError: Qdrant nie odpowiedział, nie ma kolekcji albo takiego wektora, albo
                 odpowiedź ma nierozpoznany kształt
         """
         entries = await self._search(vector=vector, vector_name=vector_name, limit=limit)
         hits    = [TicketHit.from_qdrant(entry) for entry in entries]
+
+        self._verify_hit_models([hit.embedding_model for hit in hits], embedding_model)
 
         return hits
 
@@ -111,7 +120,7 @@ class TicketsCollection(VectorCollection):
             [TicketPoint(point_id="df3b51f3-…", payload={"ticket_id": "33644", …}, …)]
 
         Raises:
-            DbQdrantConfigError: punkt nie ma któregoś z nazwanych wektorów
+            DbQdrantConfigError: punkt nie ma któregoś z nazwanych wektorów albo nazwy modelu
             DbQdrantError: Qdrant nie odpowiedział, nie ma kolekcji albo odpowiedź ma
                 nierozpoznany kształt
         """

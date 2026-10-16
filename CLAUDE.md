@@ -392,11 +392,12 @@ dokus-helpdesk-ai/
   (decyzja 2026-10-16).** Dotyczy każdej usługi, którą piszemy i stawiamy w compose: dziś
   `anonymizer` i `embedder`. W czasie działania `api` nie ma ich atrap: rozmawia z nimi zawsze
   przez klienta HTTP, a atrapy po swojej stronie (`FakeAnonymizer`, atrapy narzędzi) trzyma dla
-  testów. Usługa mówi w odpowiedzi, czy jest atrapą (`engine` w anonimizatorze), a klient
-  odmawia jej wyniku tylko tam, gdzie atrapa szkodzi: wynik atrapy silnika przy prawdziwym
-  modelu generującym poszedłby do modelu bez anonimizacji. Cena: przy atrapie modelu trasy
-  grafów potrzebują działającej usługi `anonymizer`. Nie dotyczy modelu LLM: to usługa
-  zewnętrzna, a jego atrapę wybiera `api`.
+  testów. Usługa mówi w odpowiedzi, czy jest atrapą (`engine` w anonimizatorze, `model`
+  w embedderze), a klient odmawia jej wyniku tylko tam, gdzie atrapa szkodzi: wynik atrapy
+  silnika przy prawdziwym modelu generującym poszedłby do modelu bez anonimizacji, a wektory
+  dwóch modeli embeddera w jednej kolekcji Qdranta dawałyby po cichu gorsze wyniki. Cena: przy
+  atrapie modelu trasy grafów potrzebują działającej usługi `anonymizer`. Nie dotyczy modelu
+  LLM: to usługa zewnętrzna, a jego atrapę wybiera `api`.
 - **Granica `core_model` / `core_service` działa w OBIE strony:** w `core_model/` wyłącznie modele,
   jeden na plik; w `core_service/` ani jednego modelu Pydantic. Model wychodzi z serwisu nawet
   wtedy, gdy używa go jeden serwis i zmienia się razem z nim. **Cena:** kilka importów więcej i
@@ -1635,6 +1636,10 @@ dwie różne rzeczy, stąd rozłączne nazwy.
   kilkuset tekstów blokowałby pętlę zdarzeń na sekundy.
 - **`EmbeddingClient` nie ma fabryki**, inaczej niż warstwa LLM: jest jeden sposób dotarcia (HTTP),
   a to, który model odpowiada, jest konfiguracją tamtej usługi. Zmienia się URL, a URL to argument.
+- **Klient oddaje wektory razem z nazwą modelu z odpowiedzi (`Embeddings`, 2026-10-16).**
+  Odpowiedź bez `model` to `EmbeddingError`, jak odpowiedź bez `vectors`. Atrapy embeddera klient
+  nie odrzuca: szkodzi ona dopiero przy mieszaniu modeli w jednej kolekcji, a tego pilnuje
+  Qdrant po nazwie modelu w każdym punkcie.
 - **Klient sprawdza licznik wektorów wobec liczby tekstów.** Retrieval zipuje je z powrotem na
   zgłoszenia, więc rozjazd dałby **błędne przypisanie wektora do zgłoszenia** — czyli złe
   odpowiedzi zamiast błędu.
@@ -1737,6 +1742,18 @@ wektor:
 - **Kolekcja przy rozjeździe NIE jest naprawiana** — inny wymiar albo brak named vectora to
   `DbQdrantConfigError` z **obiema liczbami** w komunikacie. Bez tego rozjazd wychodzi jako
   odrzucenie punktów w środku przebiegu, już po zapłaceniu za parsowanie LLM-em.
+- **Kolekcja trzyma wektory jednego modelu embeddera (2026-10-16).** Każdy punkt zapisuje
+  w payloadzie `embedding_model`, nazwę modelu z odpowiedzi embeddera, bo Qdrant 1.12 nie ma
+  metadanych kolekcji; punkty i trafienia wyjmują ją do osobnego pola, więc karta i opis sekcji
+  zostają bez niej. Zapis szuka jednego punktu innego modelu (`/points/scroll` z filtrem
+  `must_not`; punkt bez klucza też go spełnia, sprawdzone na 1.12.5) i przy znalezionym odmawia,
+  a wyszukiwanie odmawia, gdy trafienie policzył inny model niż zapytanie. Odczyt punktu bez
+  nazwy modelu to błąd z prośbą o przebudowę, jak brak named vectora. Wymiar tego nie łapał:
+  atrapa embeddera i PolDense mają po 768, tak samo inny model o tym wymiarze, a pomieszanie
+  dawało tylko gorsze wyniki. Indekser dokumentacji sprawdza zgodność modeli wszystkich paczek,
+  zanim skasuje stary indeks, a indekser zgłoszeń — wektory `problem` i `sts` jednej paczki.
+  Cena: indeksy zbudowane przed tą zmianą trzeba było przebudować, a każdy zapis to jedno
+  żądanie więcej.
 - **Brak kolekcji to błąd konfiguracji, pusta kolekcja to zero trafień (2026-10-16).** Klient
   czyta każde 404 z `request()` jako `DbQdrantMissingCollectionError` (odmiana
   `DbQdrantConfigError`), bo każda ścieżka żądania to ścieżka jednej kolekcji; tekst Qdranta
@@ -2983,15 +3000,15 @@ localhost:8010/search`.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2015 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 858 (83)           | 96 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2038 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 862 (86)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 124 (11)           | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 97 (38)            | 38 s |
 
 Liczby z 2026-10-16, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-3001 testów, około 150 s; domyślny `pytest`, bez stacku: 2869 testów, około 50 s. Testy `llm_live` —
+3028 testów, około 150 s; domyślny `pytest`, bez stacku: 2893 testy, około 45 s. Testy `llm_live` —
 36 integracyjnych i 57 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
 przebiegów.
 
@@ -3300,6 +3317,7 @@ przebiegów.
 | `tests/_helpers/transport/`            | test klienta HTTP: `with_transport()`, `always()`, `routed()`, `capturing()`, `raising()` |
 | `tests/_helpers/anonymization/`        | anonimizacja: zmyślone zgłoszenie z danymi osobowymi i jego postać po anonimizacji, fragmenty, których nie wolno zobaczyć w logach (`SENSITIVE`), klient usługi `anonymizer` na atrapie transportu (`anonymizer_client_on()`), odpowiedź usługi (`service_answer()`) i sprawdzenie, czy anonimizator przyjmuje wynik atrapy silnika (`accepts_the_fake_engine()`) |
 | `tests/_helpers/postgres/`             | narzędzie na prawdziwej tabeli z podmienionym klientem (`ScriptedPostgres`) |
+| `tests/_helpers/embedding/`            | embedding: nazwy modeli testowych (`EMBEDDING_MODEL`, `OTHER_MODEL`), odpowiedź usługi `embedder` w kształcie kontraktu (`embedder_answer()`) i payload punktu Qdranta z nazwą modelu (`with_model()`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
 | `tests/_helpers/live/`                 | żywy model: konfiguracja (`live_generation_llm()`), graf na nim (`run_live_graph()`, z regułami klienta), sprawy grafu naraz (`run_live_cases()` na `LiveCase`: wejście, reguły, narzędzia), reguły z zestawu domyślnego (`default_rules()`), pomiar raz na graf (`remember_per_graph()`), sprawy testu okablowania grafów (`measure_example_case()` i dwie sprawy `suggest_solution`), raport zużycia (fixture `live_usage`) i wydruk rozmowy (`run_as_lines()`) |
 | `tests/_helpers/graphs/`               | grafy aplikacji: lista pakietów (`graph_modules()`, `graph_name()` jako `ids`), typy i pola wyniku, reguły i źródła w stanie, składanie na atrapach (`fake_nodes()`, `built_from()`, `expected_edges()`) |
@@ -3500,6 +3518,12 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Węzły właściwe na atrapie modelu przy dostawcy `fake`** — atrapa modelu bez scenariusza
   odpowiada samym tekstem, więc `respond` odrzucałby każdą sprawę, a scenariusz wpisany w fabrykę
   byłby drugą atrapą grafu. Przy `fake` fabryka oddaje atrapę całego grafu.
+- **Nazwa modelu embeddera w metadanych albo w nazwie kolekcji** (2026-10-16) — Qdrant 1.12.5
+  metadanych kolekcji nie ma, a nazwa kolekcji to konfiguracja (`QDRANT_COLLECTION`); model stoi
+  w payloadzie każdego punktu. Cena: nazwa powtarza się w każdym punkcie, a zapis pyta Qdranta
+  o punkt innego modelu przed każdą paczką.
+- **Odmowa atrapy embeddera w `api`** (2026-10-16) — kolekcja w całości z atrapy jest spójna
+  i służy testom oraz startowi bez wag; szkodzi dopiero mieszanie modeli, a tego pilnuje Qdrant.
 - **Prawdziwe narzędzia w atrapie grafu** (2026-10-16) — atrapa modelu musiałaby mieć scenariusz
   wywołań z poprawnymi argumentami, a świeży stack bez indeksów kończyłby się błędem brakującego
   indeksu. Atrapa grafu woła tylko usługę `anonymizer`, bo anonimizacja to stały węzeł,
@@ -4064,23 +4088,16 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     i staje na atrapie silnika, zanim model dostanie wywołanie; reguły — „Warstwy kodu",
     „Warstwa API", „Warstwa węzłów", „Konfiguracja i deploy", „Logi i obserwowalność",
     „Testy".
-  - [ ] **19.2 Atrapa jako cecha usługi; `api` woła usługę taką, jaka jest** (decyzja
-    2026-10-16) — zasada dla każdej naszej usługi w kompozycji: dziś `anonymizer` i `embedder`,
-    potem każdej kolejnej. O atrapie decyduje konfiguracja usługi (`ANONYMIZATION_ENGINE`,
-    `EMBEDDING_BACKEND`), a `api` w czasie działania nie ma własnych atrap tych usług: rozmawia
-    z nimi zawsze przez klienta HTTP, a atrapy po swojej stronie (`FakeAnonymizer`, atrapy
-    narzędzi) trzyma wyłącznie dla testów. Usługa mówi w odpowiedzi, czy jest atrapą (`engine`,
-    `model`), a klient odmawia jej wyniku tylko tam, gdzie atrapa szkodzi. Anonimizator zrobiony
-    2026-10-16: klient zawsze, atrapa silnika przyjmowana tylko przy atrapie modelu, atrapa grafu
-    na kliencie z fabryki i bez narzędzi; reguły — „Warstwy kodu", „Warstwa API", „Warstwa
-    węzłów", „Warstwa grafów", „Testy", „Świadomie pominięte". Zostaje embedder: `api` czyta
-    `model` z odpowiedzi, każdy punkt Qdranta zapisuje model, którym go policzono, a zapis
-    i wyszukiwanie odmawiają mieszania modeli w jednej kolekcji (decyzja 2026-10-16) — inaczej
-    wektory atrapy albo innego modelu o tym samym wymiarze trafiłyby do indeksu bez błędu.
-    Kryterium: zapis i szukanie drugim modelem w kolekcji zbudowanej pierwszym kończą się błędem
-    konfiguracji na prawdziwym Qdrancie. Po wdrożeniu szkic Blueprintu na SOFA: gdzie
-    w kompozycji usługa wołająca i wołane trzymają atrapy, z ceną i zabezpieczeniem przed
-    wynikiem atrapy (wyszukanie z 2026-10-16 nie znalazło podobnego wpisu).
+  - [x] **19.2 Atrapa jako cecha usługi; `api` woła usługę taką, jaka jest** (2026-10-16) —
+    o atrapie decyduje konfiguracja naszej usługi, a `api` w czasie działania woła ją przez
+    klienta HTTP; anonimizator: klient zawsze, atrapa silnika przyjmowana tylko przy atrapie
+    modelu, atrapa grafu na kliencie z fabryki i bez narzędzi; embedder: klient czyta `model`
+    z odpowiedzi, każdy punkt Qdranta niesie model, a zapis i wyszukiwanie odmawiają mieszania
+    modeli w jednej kolekcji; indeksy `tickets` i `docs_synthetic` przebudowane; szkic
+    Blueprintu na SOFA o tym, gdzie w kompozycji trzymać atrapy, czeka na przegląd w panelu
+    (wyszukanie z 2026-10-16 nie znalazło podobnego wpisu); reguły — „Warstwy kodu", „Warstwa
+    API", „Warstwa węzłów", „Warstwa grafów", „Warstwa embeddera", „Warstwa bazy wektorowej
+    (Qdrant)", „Testy", „Świadomie pominięte".
   - [ ] **19.3 Golden set anonimizatora** — teksty z dwiema listami: co ma zniknąć, z rodzajem
     (osoba, PESEL, telefon, adres…), i co ma zostać (kody i komunikaty błędów, po których szuka
     `find_tickets_text`, wersje, nazwy usług, numery zgłoszeń). Zmyślone w `data/safe/golden/`,

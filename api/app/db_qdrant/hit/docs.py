@@ -16,12 +16,15 @@ Wpis odpowiedzi Qdranta:
 O czym pamiętać przy zmianach:
 
 - Payload zapisuje `DocPoint` (`point/docs.py`) i jest to opis sekcji z metryczki, bez treści
-  i bez numeru fragmentu.
+  i bez numeru fragmentu. Nazwa modelu embeddera idzie do pola `embedding_model`, a sprawdza ją
+  kolekcja.
 - Fragmenty tej samej sekcji zwija do jednego trafienia Qdrant, przy wyszukiwaniu
   (`DocsCollection.search()`), nie narzędzie.
 """
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.db_qdrant.point.base import embedding_model_of, payload_without_model
 
 
 class DocHit(BaseModel):
@@ -41,9 +44,11 @@ class DocHit(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    point_id: str   = Field(examples=["bc925b88-f5ba-5cda-aa43-65a036e4820d"])
-    score:    float = Field(examples=[0.74])
-    payload:  dict  = Field(examples=[{"section_id": "adm-kancelaria-edoreczenia"}])
+    point_id:        str   = Field(examples=["bc925b88-f5ba-5cda-aa43-65a036e4820d"])
+    score:           float = Field(examples=[0.74])
+    # Model embeddera, który policzył wektor fragmentu — po nim kolekcja odmawia mieszania modeli.
+    embedding_model: str   = Field(examples=["OPI-PIB/PolDense-150M"])
+    payload:         dict  = Field(examples=[{"section_id": "adm-kancelaria-edoreczenia"}])
 
     @property
     def section_id(self) -> str:
@@ -67,19 +72,26 @@ class DocHit(BaseModel):
         """
         Description:
         Czyta jeden wpis odpowiedzi wyszukiwania; brak podobieństwa czyta się jako 0.0, które
-        odrzuci każdy próg.
+        odrzuci każdy próg. Nazwa modelu idzie z payloadu do osobnego pola, więc `payload` to
+        sam opis sekcji.
 
         Example args:
             entry={"id": "bc925b88-…", "score": 0.74,
-                   "payload": {"section_id": "adm-kancelaria-edoreczenia"}}
+                   "payload": {"section_id": "adm-kancelaria-edoreczenia",
+                               "embedding_model": "OPI-PIB/PolDense-150M"}}
 
         Example result:
-            DocHit(point_id="bc925b88-…", score=0.74, payload={"section_id": "adm-…"})
+            DocHit(point_id="bc925b88-…", score=0.74, embedding_model="OPI-PIB/PolDense-150M",
+                   payload={"section_id": "adm-…"})
+
+        Raises:
+            DbQdrantConfigError: punkt nie ma nazwy modelu — kolekcję zbudowano przed jej zapisem
         """
         hit = cls(
-            point_id = str(entry.get("id", "")),
-            score    = float(entry.get("score", 0.0)),
-            payload  = entry.get("payload") or {},
+            point_id        = str(entry.get("id", "")),
+            score           = float(entry.get("score", 0.0)),
+            embedding_model = embedding_model_of(entry),
+            payload         = payload_without_model(entry),
         )
 
         return hit

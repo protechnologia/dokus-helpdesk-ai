@@ -15,6 +15,7 @@ from app.db_qdrant import (
     TicketsCollection,
     point_id_for,
 )
+from tests._helpers.embedding import EMBEDDING_MODEL, OTHER_MODEL, with_model
 from tests._helpers.transport import capturing, raising, routed, with_transport
 
 # Kolekcje testowane bez usługi, na prawdziwym kliencie z podmienionym transportem: sprawdzamy,
@@ -31,6 +32,7 @@ PATH_POINTS = f"{PATH}/points"
 PATH_QUERY  = f"{PATH_POINTS}/query"
 PATH_GROUPS = f"{PATH_QUERY}/groups"
 PATH_COUNT  = f"{PATH_POINTS}/count"
+PATH_SCROLL = f"{PATH_POINTS}/scroll"
 
 # Obie kolekcje z ich schematem: to, co wspólne, sprawdzamy na każdej.
 COLLECTIONS = [
@@ -41,13 +43,20 @@ COLLECTIONS = [
 # Punkt zbudowany ręcznie, nie z `ParsedTicket`: ten plik testuje kolekcję, a zmiana schematu
 # karty nie ma go psuć.
 TICKET_POINT = TicketPoint(
-    point_id       = point_id_for("33644"),
-    vector_problem = [0.1, -0.2],
-    vector_sts     = [0.3, -0.4],
-    payload        = {"ticket_id": "33644"},
+    point_id        = point_id_for("33644"),
+    vector_problem  = [0.1, -0.2],
+    vector_sts      = [0.3, -0.4],
+    embedding_model = EMBEDDING_MODEL,
+    payload         = {"ticket_id": "33644"},
 )
 
-DOC_POINT = DocPoint.from_fragment(default_sections()[0], 0, [0.5, 0.6])
+DOC_POINT = DocPoint.from_fragment(default_sections()[0], 0, [0.5, 0.6], EMBEDDING_MODEL)
+
+# Punkt do zapisu w każdej z kolekcji — testy wspólne dla obu zapisują ten, który do niej pasuje.
+POINTS = {
+    TicketsCollection: TICKET_POINT,
+    DocsCollection:    DOC_POINT,
+}
 
 
 def _collection(
@@ -92,14 +101,14 @@ def _description(
 
 
 def _hits(
-    *entries: dict,  # np. {"id": "a", "score": 0.87, "payload": {"ticket_id": "33644"}}
+    *entries: dict,  # np. {"id": "a", "score": 0.87, "payload": with_model({"ticket_id": "33644"})}
 ) -> httpx.Response:
     """
     Description:
     Odpowiedź Qdranta na wyszukiwanie: wpisy w zagnieżdżeniu, którego używa końcówka zapytań.
 
     Example args:
-        entries=({"id": "a", "score": 0.87, "payload": {"ticket_id": "33644"}},)
+        entries=({"id": "a", "score": 0.87, "payload": with_model({"ticket_id": "33644"})},)
 
     Example result:
         httpx.Response(200, json={"result": {"points": [{…}]}})
@@ -126,6 +135,23 @@ def _groups(
     ]
 
     return httpx.Response(200, json={"result": {"groups": groups}})
+
+
+def _scrolled(
+    *entries: dict,  # np. {"id": "a", "payload": {"embedding_model": "inny-model"}}
+) -> httpx.Response:
+    """
+    Description:
+    Odpowiedź Qdranta na przeglądanie punktów z filtrem: tutaj punkty innego modelu, o które
+    kolekcja pyta przed zapisem. Bez wpisów — w kolekcji nie ma punktu innego modelu.
+
+    Example args:
+        entries=({"id": "a", "payload": {"embedding_model": "inny-model"}},)
+
+    Example result:
+        httpx.Response(200, json={"result": {"points": [{…}], "next_page_offset": None}})
+    """
+    return httpx.Response(200, json={"result": {"points": list(entries), "next_page_offset": None}})
 
 
 def _stored(
@@ -320,17 +346,112 @@ async def test_ticket_upsert_sends_named_vectors_and_waits() -> None:
     raportuje, ile zapisała, a następny krok od razu to czyta, więc zapis zgłoszony ma być zapisem
     wykonanym."""
     seen: list = []
-    collection = _collection(TicketsCollection, capturing(seen))
+    collection = _collection(
+        TicketsCollection,
+        capturing(seen, {("POST", PATH_SCROLL): _scrolled()}),
+    )
 
     written = await collection.upsert([TICKET_POINT])
 
     assert written == 1
 
-    call = seen[0]
+    call = seen[-1]
 
     assert (call["method"], call["path"]) == ("PUT", PATH_POINTS)
     assert call["params"]["wait"]         == "true"
     assert call["body"]["points"]         == [TICKET_POINT.to_qdrant()]
+
+
+@pytest.mark.parametrize("kind, vectors", COLLECTIONS)
+async def test_upsert_first_looks_for_a_point_of_another_model(kind: type, vectors: tuple) -> None:
+    """Sprawdza, czy zapis w każdej z kolekcji najpierw prosi Qdranta o jeden punkt, którego model
+    embeddera nie jest modelem zapisywanych punktów (filtr `must_not` na `embedding_model`, bez
+    wektorów), a dopiero potem zapisuje.
+
+    Wyłapuje zapis bez tego sprawdzenia albo po nim: wektory innego modelu o tym samym wymiarze
+    trafiłyby do kolekcji bez błędu, a wyszukiwanie dawałoby po cichu gorsze wyniki."""
+    seen: list = []
+    collection = _collection(kind, capturing(seen, {("POST", PATH_SCROLL): _scrolled()}))
+
+    await collection.upsert([POINTS[kind]])
+
+    assert [(call["method"], call["path"]) for call in seen] == [
+        ("POST", PATH_SCROLL),
+        ("PUT", PATH_POINTS),
+    ]
+    assert seen[0]["body"] == {
+        "filter":       {
+            "must_not": [{"key": "embedding_model", "match": {"value": EMBEDDING_MODEL}}],
+        },
+        "limit":        1,
+        "with_payload": ["embedding_model"],
+        "with_vector":  False,
+    }
+
+
+@pytest.mark.parametrize("kind, vectors", COLLECTIONS)
+@pytest.mark.parametrize(
+    ("stored", "message"),
+    [
+        pytest.param(with_model({}, model=OTHER_MODEL), OTHER_MODEL, id="inny model"),
+        pytest.param({}, "przed zapisem modelu", id="bez modelu"),
+    ],
+)
+async def test_upsert_refuses_a_collection_of_another_model(
+    kind:    type,
+    vectors: tuple,
+    stored:  dict,
+    message: str,
+) -> None:
+    """Sprawdza, czy zapis w każdej z kolekcji kończy się błędem konfiguracji
+    `DbQdrantConfigError` i nie wysyła punktów, gdy w kolekcji jest punkt innego modelu embeddera
+    (komunikat nazywa ten model) albo punkt bez nazwy modelu (komunikat mówi o indeksie sprzed
+    zapisu modelu).
+
+    Wyłapuje kolekcję, która przyjmuje wektory drugiego modelu — także atrapy embeddera przy
+    prawdziwym indeksie: mają ten sam wymiar, więc Qdrant zapisałby je bez błędu."""
+    seen: list = []
+    collection = _collection(
+        kind,
+        capturing(seen, {("POST", PATH_SCROLL): _scrolled({"id": "a", "payload": stored})}),
+    )
+
+    with pytest.raises(DbQdrantConfigError, match=message):
+        await collection.upsert([POINTS[kind]])
+
+    assert [call["method"] for call in seen] == ["POST"]
+
+
+async def test_upsert_refuses_points_of_two_models() -> None:
+    """Sprawdza, czy zapis punktów policzonych dwoma modelami embeddera w jednym wywołaniu kończy
+    się błędem konfiguracji `DbQdrantConfigError`, który nazywa oba modele, zanim cokolwiek
+    pójdzie do Qdranta.
+
+    Wyłapuje zapis, który bierze model z pierwszego punktu i nie patrzy na resztę: embedder
+    przestawiony w trakcie przebiegu wpisałby do kolekcji wektory dwóch modeli naraz."""
+    seen: list = []
+    collection = _collection(TicketsCollection, capturing(seen))
+    other      = TICKET_POINT.model_copy(update={"embedding_model": OTHER_MODEL})
+
+    with pytest.raises(DbQdrantConfigError, match=OTHER_MODEL):
+        await collection.upsert([TICKET_POINT, other])
+
+    assert seen == []
+
+
+async def test_upsert_with_an_unrecognised_scroll_fails_with_our_message() -> None:
+    """Sprawdza, czy zapis kończy się błędem `DbQdrantError` z nazwą kolekcji, gdy Qdrant na
+    pytanie o punkty innego modelu odpowiada statusem 200, ale bez listy punktów.
+
+    Wyłapuje sprawdzenie, które nieznany kształt odpowiedzi czyta jak „brak punktów innego
+    modelu" i zapisuje mimo to."""
+    collection = _collection(
+        TicketsCollection,
+        routed({("POST", PATH_SCROLL): httpx.Response(200, json={"result": {}})}),
+    )
+
+    with pytest.raises(DbQdrantError, match=NAME):
+        await collection.upsert([TICKET_POINT])
 
 
 async def test_doc_upsert_sends_the_section_vector() -> None:
@@ -340,11 +461,11 @@ async def test_doc_upsert_sends_the_section_vector() -> None:
     Wyłapuje zapis dokumentacji, który wysyła wektor bez nazwy albo gubi opis sekcji: punkt nie
     pasowałby do kolekcji albo trafienia nie dałoby się przypisać do sekcji."""
     seen: list = []
-    collection = _collection(DocsCollection, capturing(seen))
+    collection = _collection(DocsCollection, capturing(seen, {("POST", PATH_SCROLL): _scrolled()}))
 
     assert await collection.upsert([DOC_POINT]) == 1
 
-    sent = seen[0]["body"]["points"][0]
+    sent = seen[-1]["body"]["points"][0]
 
     assert sent["vector"]                == {VECTOR_SECTION: [0.5, 0.6]}
     assert sent["payload"]["section_id"] == DOC_POINT.section_id
@@ -371,17 +492,21 @@ async def test_upsert_splits_into_batches() -> None:
     Wyłapuje zapis jednym wielkim żądaniem, przy którym jedna porażka gubi pracę całej indeksacji,
     oraz podział na partie, który gubi albo powtarza punkty."""
     seen: list = []
-    collection = _collection(TicketsCollection, capturing(seen))
+    collection = _collection(
+        TicketsCollection,
+        capturing(seen, {("POST", PATH_SCROLL): _scrolled()}),
+    )
     points     = [
         TICKET_POINT.model_copy(update={"point_id": f"id-{index}"}) for index in range(150)
     ]
 
     written = await collection.upsert(points)
+    writes  = [call for call in seen if call["method"] == "PUT"]
 
-    assert written   == 150
-    assert len(seen) > 1
+    assert written     == 150
+    assert len(writes) > 1
 
-    sent = [point["id"] for call in seen for point in call["body"]["points"]]
+    sent = [point["id"] for call in writes for point in call["body"]["points"]]
 
     assert sent == [f"id-{index}" for index in range(150)]
 
@@ -395,7 +520,12 @@ async def test_a_rejected_upsert_carries_qdrants_explanation() -> None:
     np. zły wymiar wektora."""
     collection = _collection(
         TicketsCollection,
-        routed({("PUT", PATH_POINTS): httpx.Response(400, text="Vector dimension error")}),
+        routed(
+            {
+                ("POST", PATH_SCROLL): _scrolled(),
+                ("PUT", PATH_POINTS):  httpx.Response(400, text="Vector dimension error"),
+            }
+        ),
     )
 
     with pytest.raises(DbQdrantError, match="Vector dimension error"):
@@ -481,7 +611,12 @@ async def test_ticket_search_asks_the_named_space_it_was_given(vector_name: str)
     seen: list = []
     collection = _collection(TicketsCollection, capturing(seen, {("POST", PATH_QUERY): _hits()}))
 
-    await collection.search(vector=[0.1, -0.2], vector_name=vector_name, limit=5)
+    await collection.search(
+        vector          = [0.1, -0.2],
+        embedding_model = EMBEDDING_MODEL,
+        vector_name     = vector_name,
+        limit           = 5,
+    )
 
     assert seen[0]["body"] == {
         "query":        [0.1, -0.2],
@@ -503,14 +638,19 @@ async def test_ticket_search_returns_hits_in_the_order_qdrant_gave_them() -> Non
         routed(
             {
                 ("POST", PATH_QUERY): _hits(
-                    {"id": "a", "score": 0.91, "payload": {"ticket_id": "33644"}},
-                    {"id": "b", "score": 0.42, "payload": {"ticket_id": "10718"}},
+                    {"id": "a", "score": 0.91, "payload": with_model({"ticket_id": "33644"})},
+                    {"id": "b", "score": 0.42, "payload": with_model({"ticket_id": "10718"})},
                 )
             }
         ),
     )
 
-    hits = await collection.search(vector=[0.1], vector_name=VECTOR_PROBLEM, limit=5)
+    hits = await collection.search(
+        vector          = [0.1],
+        embedding_model = EMBEDDING_MODEL,
+        vector_name     = VECTOR_PROBLEM,
+        limit           = 5,
+    )
 
     assert [hit.ticket_id for hit in hits] == ["33644", "10718"]
     assert [hit.score for hit in hits]     == [0.91, 0.42]
@@ -531,13 +671,17 @@ async def test_doc_search_asks_for_sections_not_fragments() -> None:
             seen,
             {
                 ("POST", PATH_GROUPS): _groups(
-                    {"id": DOC_POINT.point_id, "score": 0.74, "payload": DOC_POINT.payload}
+                    {
+                        "id":      DOC_POINT.point_id,
+                        "score":   0.74,
+                        "payload": with_model(DOC_POINT.payload),
+                    }
                 )
             },
         ),
     )
 
-    hits = await collection.search(vector=[0.5, 0.6], limit=3)
+    hits = await collection.search(vector=[0.5, 0.6], embedding_model=EMBEDDING_MODEL, limit=3)
 
     assert seen[0]["body"] == {
         "query":        [0.5, 0.6],
@@ -564,7 +708,7 @@ async def test_doc_search_with_an_unrecognised_body_fails_with_our_message() -> 
     )
 
     with pytest.raises(DbQdrantError, match=NAME):
-        await collection.search(vector=[0.1], limit=5)
+        await collection.search(vector=[0.1], embedding_model=EMBEDDING_MODEL, limit=5)
 
 
 async def test_search_finding_nothing_is_an_answer() -> None:
@@ -575,7 +719,59 @@ async def test_search_finding_nothing_is_an_answer() -> None:
     poprawna odpowiedź przy nowym typie problemu, a nie awaria."""
     collection = _collection(TicketsCollection, routed({("POST", PATH_QUERY): _hits()}))
 
-    assert await collection.search(vector=[0.1], vector_name=VECTOR_PROBLEM, limit=5) == []
+    hits = await collection.search(
+        vector          = [0.1],
+        embedding_model = EMBEDDING_MODEL,
+        vector_name     = VECTOR_PROBLEM,
+        limit           = 5,
+    )
+
+    assert hits == []
+
+
+async def test_search_refuses_hits_of_another_model() -> None:
+    """Sprawdza, czy wyszukiwanie w obu kolekcjach kończy się błędem konfiguracji
+    `DbQdrantConfigError`, który nazywa oba modele, gdy trafienie policzył inny model embeddera
+    niż wektor zapytania.
+
+    Wyłapuje wyszukiwanie, które oddaje takie trafienia: podobieństwo wektorów dwóch modeli nic
+    nie znaczy, a przy tym samym wymiarze wyglądałoby jak zwykłe, trochę gorsze wyniki — na
+    przykład gdy embedder chodzi na atrapie, a indeks zbudowano prawdziwym modelem."""
+    tickets = _collection(
+        TicketsCollection,
+        routed(
+            {
+                ("POST", PATH_QUERY): _hits(
+                    {"id": "a", "score": 0.9, "payload": with_model({}, model=OTHER_MODEL)}
+                )
+            }
+        ),
+    )
+    docs    = _collection(
+        DocsCollection,
+        routed(
+            {
+                ("POST", PATH_GROUPS): _groups(
+                    {
+                        "id":      DOC_POINT.point_id,
+                        "score":   0.7,
+                        "payload": with_model(DOC_POINT.payload, model=OTHER_MODEL),
+                    }
+                )
+            }
+        ),
+    )
+
+    with pytest.raises(DbQdrantConfigError, match=f"{OTHER_MODEL}.*{EMBEDDING_MODEL}"):
+        await tickets.search(
+            vector          = [0.1],
+            embedding_model = EMBEDDING_MODEL,
+            vector_name     = VECTOR_PROBLEM,
+            limit           = 5,
+        )
+
+    with pytest.raises(DbQdrantConfigError, match=f"{OTHER_MODEL}.*{EMBEDDING_MODEL}"):
+        await docs.search(vector=[0.1], embedding_model=EMBEDDING_MODEL, limit=5)
 
 
 async def test_search_of_an_unknown_named_vector_fails_loudly() -> None:
@@ -596,7 +792,12 @@ async def test_search_of_an_unknown_named_vector_fails_loudly() -> None:
     )
 
     with pytest.raises(DbQdrantError, match="does not exist"):
-        await collection.search(vector=[0.1], vector_name="problme", limit=5)
+        await collection.search(
+            vector          = [0.1],
+            embedding_model = EMBEDDING_MODEL,
+            vector_name     = "problme",
+            limit           = 5,
+        )
 
 
 async def test_search_with_an_unrecognised_body_fails_with_our_message() -> None:
@@ -612,7 +813,12 @@ async def test_search_with_an_unrecognised_body_fails_with_our_message() -> None
     )
 
     with pytest.raises(DbQdrantError, match=NAME):
-        await collection.search(vector=[0.1], vector_name=VECTOR_PROBLEM, limit=5)
+        await collection.search(
+            vector          = [0.1],
+            embedding_model = EMBEDDING_MODEL,
+            vector_name     = VECTOR_PROBLEM,
+            limit           = 5,
+        )
 
 
 # --- read_by_id ---------------------------------------------------------------------------

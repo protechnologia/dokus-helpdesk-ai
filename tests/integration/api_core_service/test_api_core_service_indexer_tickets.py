@@ -11,6 +11,8 @@ from app.db_qdrant import (
     TicketPoint,
     TicketsCollection,
 )
+from app.engine_embedding import EmbeddingConfigError, Embeddings
+from tests._helpers.embedding import EMBEDDING_MODEL, OTHER_MODEL
 
 VECTOR_SIZE = 4
 
@@ -32,68 +34,79 @@ VALID_TICKET = {
 class FakeEmbedder:
     """
     Description:
-    Stands in for `EmbeddingClient`, returning a vector per text and recording which MODE each
-    batch was sent in.
+    Zastępuje `EmbeddingClient`: oddaje wektor na tekst z nazwą modelu i zapisuje, w którym
+    TRYBIE poszła każda paczka.
 
-    A stub rather than the production fake: `FakeEncoder` lives on the other side of the HTTP
-    boundary (inside the `embedder` service), so there is no offline double for the client itself.
-    What matters here is that indexing calls passage and sts separately — a swap between them is
-    invisible afterwards, because both vectors still look valid.
+    Stub, a nie atrapa z produkcji: `FakeEncoder` stoi po drugiej stronie HTTP, w usłudze
+    `embedder`, więc klient nie ma własnej wersji offline. Liczy się tu, że indeksacja woła
+    passage i sts osobno — zamiany jednego z drugim nie widać po fakcie, bo oba wektory dalej
+    wyglądają poprawnie.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        sts_model: str = EMBEDDING_MODEL,  # np. "inny-model" — gdy test zmienia model w trybie sts
+    ) -> None:
         """
         Description:
-        Builds the stub with empty call logs.
+        Buduje stub z pustymi zapisami wywołań. Tryb passage oddaje zawsze `EMBEDDING_MODEL`,
+        a tryb sts model podany tutaj.
 
         Example args:
-            (none)
+            sts_model="model-testowy"
 
         Example result:
-            FakeEmbedder with `passage_batches` and `sts_batches` empty
+            FakeEmbedder z pustymi `passage_batches` i `sts_batches`
         """
         self.passage_batches: list[list[str]] = []
         self.sts_batches:     list[list[str]] = []
-        self.closed = False
+        self.closed     = False
+        self._sts_model = sts_model
 
-    async def embed_passage(self, texts: list[str]) -> list[list[float]]:
+    async def embed_passage(
+        self,
+        texts: list[str],  # np. ["Wysyłka przez ePUAP…"]
+    ) -> Embeddings:
         """
         Description:
-        Records the batch and returns one recognisable vector per text.
+        Zapisuje paczkę i oddaje rozpoznawalny wektor na każdy tekst.
 
         Example args:
             texts=["Wysyłka przez ePUAP…"]
 
         Example result:
-            [[1.0, 1.0, 1.0, 1.0]]
+            Embeddings(model="model-testowy", vectors=[[1.0, 1.0, 1.0, 1.0]])
         """
         self.passage_batches.append(texts)
 
-        return [[1.0] * VECTOR_SIZE for _ in texts]
+        return Embeddings(model=EMBEDDING_MODEL, vectors=[[1.0] * VECTOR_SIZE for _ in texts])
 
-    async def embed_sts(self, texts: list[str]) -> list[list[float]]:
+    async def embed_sts(
+        self,
+        texts: list[str],  # np. ["Wysyłka przez ePUAP…"]
+    ) -> Embeddings:
         """
         Description:
-        Records the batch and returns a vector distinguishable from the passage one, so a swapped
-        pair shows up in the assertions.
+        Zapisuje paczkę i oddaje wektor inny niż w trybie passage, żeby zamienioną parę było
+        widać w asercjach.
 
         Example args:
             texts=["Wysyłka przez ePUAP…"]
 
         Example result:
-            [[2.0, 2.0, 2.0, 2.0]]
+            Embeddings(model="model-testowy", vectors=[[2.0, 2.0, 2.0, 2.0]])
         """
         self.sts_batches.append(texts)
 
-        return [[2.0] * VECTOR_SIZE for _ in texts]
+        return Embeddings(model=self._sts_model, vectors=[[2.0] * VECTOR_SIZE for _ in texts])
 
     async def aclose(self) -> None:
         """
         Description:
-        Marks the stub closed.
+        Zapisuje, że stub został zamknięty.
 
         Example args:
-            (none)
+            (brak)
 
         Example result:
             None
@@ -104,23 +117,23 @@ class FakeEmbedder:
 class FakeTickets:
     """
     Description:
-    Stands in for `TicketsCollection`, recording lifecycle calls and every point written.
+    Zastępuje `TicketsCollection`: zapisuje wywołania cyklu życia i każdy zapisany punkt.
 
-    Same reasoning as `FakeEmbedder`: the real client crosses a process boundary, and what this
-    file tests is the ORDER and CONTENT of what the indexer does, not whether Qdrant stores it —
-    that is covered by `stack_qdrant`.
+    Z tego samego powodu co `FakeEmbedder`: prawdziwy klient przekracza granicę procesu, a ten
+    plik sprawdza KOLEJNOŚĆ i TREŚĆ tego, co robi indekser, a nie to, czy Qdrant to zapisze —
+    to sprawdza `stack_qdrant`.
     """
 
     def __init__(self) -> None:
         """
         Description:
-        Builds the stub with empty logs.
+        Buduje stub z pustymi zapisami.
 
         Example args:
-            (none)
+            (brak)
 
         Example result:
-            FakeTickets recording into `calls` and `points`
+            FakeTickets zapisujący do `calls` i `points`
         """
         self.calls:  list[str]         = []
         self.points: list[TicketPoint] = []
@@ -129,10 +142,10 @@ class FakeTickets:
     async def ensure(self) -> bool:
         """
         Description:
-        Records the call.
+        Zapisuje wywołanie.
 
         Example args:
-            (none)
+            (brak)
 
         Example result:
             True
@@ -144,7 +157,7 @@ class FakeTickets:
     async def upsert(self, points: list[TicketPoint]) -> int:
         """
         Description:
-        Records the batch and reports it as written.
+        Zapisuje paczkę i zgłasza ją jako zapisaną.
 
         Example args:
             points=[TicketPoint(point_id="df3b…", …)]
@@ -160,10 +173,10 @@ class FakeTickets:
     async def drop(self) -> bool:
         """
         Description:
-        Records the call.
+        Zapisuje wywołanie.
 
         Example args:
-            (none)
+            (brak)
 
         Example result:
             True
@@ -175,10 +188,10 @@ class FakeTickets:
     async def aclose(self) -> None:
         """
         Description:
-        Records the call.
+        Zapisuje wywołanie.
 
         Example args:
-            (none)
+            (brak)
 
         Example result:
             None
@@ -189,7 +202,7 @@ class FakeTickets:
 def _write(directory: Path, ticket_id: str, **overrides: object) -> None:
     """
     Description:
-    Writes one artifact into the directory under test.
+    Zapisuje jeden artefakt w badanym katalogu.
 
     Example args:
         directory=Path("/tmp/x")
@@ -197,7 +210,7 @@ def _write(directory: Path, ticket_id: str, **overrides: object) -> None:
         solution="brak"
 
     Example result:
-        None — the file exists on disk
+        None — plik leży na dysku
     """
     payload = {**VALID_TICKET, "ticket_id": ticket_id, **overrides}
 
@@ -209,14 +222,14 @@ def _write(directory: Path, ticket_id: str, **overrides: object) -> None:
 def _indexer(embedder: FakeEmbedder, tickets: FakeTickets) -> TicketsIndexer:
     """
     Description:
-    Builds the indexer over the two stubs.
+    Buduje indekser na dwóch stubach.
 
     Example args:
         embedder=FakeEmbedder()
         tickets=FakeTickets()
 
     Example result:
-        TicketsIndexer wired to the stubs
+        TicketsIndexer spięty ze stubami
     """
     return TicketsIndexer(embedder=embedder, tickets=tickets)
 
@@ -261,12 +274,14 @@ async def test_hollow_tickets_are_dropped_with_a_reason(tmp_path: Path) -> None:
 
 async def test_both_named_vectors_are_built(tmp_path: Path) -> None:
     """Sprawdza, czy zgłoszenie dostaje w indeksie oba wektory i czy każdy pochodzi z właściwego
-    trybu embeddera: wektor `problem` z trybu passage, wektor `sts` z trybu sts. Atrapa embeddera
-    oddaje w każdym trybie inne liczby, więc zamianę widać.
+    trybu embeddera: wektor `problem` z trybu passage, wektor `sts` z trybu sts, a punkt niesie
+    nazwę modelu z odpowiedzi embeddera. Atrapa embeddera oddaje w każdym trybie inne liczby,
+    więc zamianę widać.
 
     Wyłapuje wektory zamienione miejscami albo brak jednego z nich. Zamiany nie widać po fakcie,
     bo oba wektory dalej wyglądają poprawnie, a brakujący wektor oznaczałby później ponowną
-    indeksację całego korpusu."""
+    indeksację całego korpusu. Wyłapuje też punkt z modelem innym niż ten, który policzył
+    wektory: kolekcja nie umiałaby wtedy odmówić mieszania modeli."""
     _write(tmp_path, "1")
 
     embedder = FakeEmbedder()
@@ -276,8 +291,9 @@ async def test_both_named_vectors_are_built(tmp_path: Path) -> None:
 
     point = tickets.points[0]
 
-    assert point.vector_problem == [1.0] * VECTOR_SIZE  # from embed_passage
-    assert point.vector_sts     == [2.0] * VECTOR_SIZE  # from embed_sts
+    assert point.vector_problem  == [1.0] * VECTOR_SIZE  # z embed_passage
+    assert point.vector_sts      == [2.0] * VECTOR_SIZE  # z embed_sts
+    assert point.embedding_model == EMBEDDING_MODEL
     assert point.to_qdrant()["vector"].keys() == {VECTOR_PROBLEM, VECTOR_STS}
 
 
@@ -294,6 +310,23 @@ async def test_both_modes_receive_the_same_text(tmp_path: Path) -> None:
     await _indexer(embedder, FakeTickets()).build(tmp_path)
 
     assert embedder.passage_batches == embedder.sts_batches
+
+
+async def test_two_models_in_one_batch_stop_the_build(tmp_path: Path) -> None:
+    """Sprawdza, czy indeksacja kończy się błędem konfiguracji `EmbeddingConfigError`, który
+    nazywa oba modele, i niczego nie zapisuje, gdy embedder policzył wektory `problem` i `sts`
+    tej samej paczki dwoma różnymi modelami.
+
+    Wyłapuje indekser, który bierze model z jednego wywołania i nie patrzy na drugie: punkt
+    zapisałby jeden model przy wektorze `sts` policzonym innym, a tego nie wykryje już nic."""
+    _write(tmp_path, "1")
+
+    tickets = FakeTickets()
+
+    with pytest.raises(EmbeddingConfigError, match=OTHER_MODEL):
+        await _indexer(FakeEmbedder(sts_model=OTHER_MODEL), tickets).build(tmp_path)
+
+    assert tickets.points == []
 
 
 async def test_embedding_text_comes_from_the_model(tmp_path: Path) -> None:

@@ -18,6 +18,7 @@ from app.db_qdrant import (
     TicketsCollection,
     point_id_for,
 )
+from tests._helpers.embedding import EMBEDDING_MODEL, OTHER_MODEL
 from tests.conftest import qdrant_url
 
 pytestmark = [pytest.mark.stack, pytest.mark.stack_qdrant]
@@ -40,8 +41,9 @@ SECTIONS = default_sections()
 
 
 def _ticket_point(
-    ticket_id: str,          # np. "33644"
-    fill:      float = 0.1,  # każda składowa wektora `problem`
+    ticket_id: str,                    # np. "33644"
+    fill:      float = 0.1,            # każda składowa wektora `problem`
+    model:     str   = EMBEDDING_MODEL,  # np. "inny-model" — model embeddera punktu
 ) -> TicketPoint:
     """
     Description:
@@ -51,16 +53,18 @@ def _ticket_point(
     Example args:
         ticket_id="33644"
         fill=0.1
+        model="model-testowy"
 
     Example result:
         TicketPoint(point_id="df3b51f3-…", payload={"ticket_id": "33644", …})
     """
     point = TicketPoint(
-        point_id       = point_id_for(ticket_id),
-        vector_problem = [fill] * SIZE,
+        point_id        = point_id_for(ticket_id),
+        vector_problem  = [fill] * SIZE,
         # Przeciwny zwrot, żeby zamieniona para nazwanych wektorów była widoczna przy odczycie.
-        vector_sts     = [-fill] * SIZE,
-        payload        = {
+        vector_sts      = [-fill] * SIZE,
+        embedding_model = model,
+        payload         = {
             "ticket_id": ticket_id,
             "date":      "2026-03-14",
             "component": "ePUAP",
@@ -267,15 +271,21 @@ async def test_search_ranks_the_nearest_ticket_first(tickets: TicketsCollection)
     # zapisu.
     near = _ticket_point("33644", fill=0.1)
     far  = TicketPoint(
-        point_id       = point_id_for("10718"),
-        vector_problem = [0.1, 0.1, -0.1, -0.1],
-        vector_sts     = [0.2] * SIZE,
-        payload        = {"ticket_id": "10718"},
+        point_id        = point_id_for("10718"),
+        vector_problem  = [0.1, 0.1, -0.1, -0.1],
+        vector_sts      = [0.2] * SIZE,
+        embedding_model = EMBEDDING_MODEL,
+        payload         = {"ticket_id": "10718"},
     )
 
     await tickets.upsert([near, far])
 
-    hits = await tickets.search(vector=near.vector_problem, vector_name=VECTOR_PROBLEM, limit=5)
+    hits = await tickets.search(
+        vector          = near.vector_problem,
+        embedding_model = EMBEDDING_MODEL,
+        vector_name     = VECTOR_PROBLEM,
+        limit           = 5,
+    )
 
     assert [hit.ticket_id for hit in hits] == ["33644", "10718"]
     assert hits[0].payload["solution"]     == near.payload["solution"]
@@ -297,10 +307,16 @@ async def test_search_reads_the_named_space_it_was_asked_for(tickets: TicketsCol
     await tickets.upsert([point])
 
     on_problem = await tickets.search(
-        vector=point.vector_problem, vector_name=VECTOR_PROBLEM, limit=1
+        vector          = point.vector_problem,
+        embedding_model = EMBEDDING_MODEL,
+        vector_name     = VECTOR_PROBLEM,
+        limit           = 1,
     )
     on_sts     = await tickets.search(
-        vector=point.vector_problem, vector_name=VECTOR_STS, limit=1
+        vector          = point.vector_problem,
+        embedding_model = EMBEDDING_MODEL,
+        vector_name     = VECTOR_STS,
+        limit           = 1,
     )
 
     assert on_problem[0].score == pytest.approx(1.0)
@@ -319,7 +335,12 @@ async def test_search_of_an_unknown_named_vector_is_an_error(tickets: TicketsCol
     await tickets.upsert([_ticket_point("33644")])
 
     with pytest.raises(DbQdrantError):
-        await tickets.search(vector=[0.1] * SIZE, vector_name="problme", limit=5)
+        await tickets.search(
+            vector          = [0.1] * SIZE,
+            embedding_model = EMBEDDING_MODEL,
+            vector_name     = "problme",
+            limit           = 5,
+        )
 
 
 async def test_reading_from_a_missing_collection_is_an_error(tickets: TicketsCollection) -> None:
@@ -334,7 +355,12 @@ async def test_reading_from_a_missing_collection_is_an_error(tickets: TicketsCol
         await tickets.read_by_id(["33644"])
 
     with pytest.raises(DbQdrantMissingCollectionError):
-        await tickets.search(vector=[0.1] * SIZE, vector_name=VECTOR_PROBLEM, limit=5)
+        await tickets.search(
+            vector          = [0.1] * SIZE,
+            embedding_model = EMBEDDING_MODEL,
+            vector_name     = VECTOR_PROBLEM,
+            limit           = 5,
+        )
 
     with pytest.raises(DbQdrantMissingCollectionError):
         await tickets.count()
@@ -378,13 +404,17 @@ async def test_fragments_of_a_section_come_back_as_one_section(docs: DocsCollect
     await docs.ensure()
 
     section = SECTIONS[0]
-    first   = DocPoint.from_fragment(section, 0, [0.1, 0.2, 0.3, 0.4])
-    second  = DocPoint.from_fragment(section, 1, [0.4, 0.3, 0.2, 0.1])
+    first   = DocPoint.from_fragment(section, 0, [0.1, 0.2, 0.3, 0.4], EMBEDDING_MODEL)
+    second  = DocPoint.from_fragment(section, 1, [0.4, 0.3, 0.2, 0.1], EMBEDDING_MODEL)
 
     assert await docs.upsert([first, second]) == 2
     assert await docs.count()                 == 2
 
-    hits = await docs.search(vector=second.vector_section, limit=5)
+    hits = await docs.search(
+        vector          = second.vector_section,
+        embedding_model = EMBEDDING_MODEL,
+        limit           = 5,
+    )
 
     assert [hit.point_id for hit in hits]           == [second.point_id]
     assert DocSection.model_validate(hits[0].payload) == section
@@ -400,14 +430,16 @@ async def test_a_long_section_does_not_crowd_out_the_others(docs: DocsCollection
     await docs.ensure()
 
     long_section = [
-        DocPoint.from_fragment(SECTIONS[0], number, [0.4, 0.3, 0.2, 0.1 + number / 100])
+        DocPoint.from_fragment(
+            SECTIONS[0], number, [0.4, 0.3, 0.2, 0.1 + number / 100], EMBEDDING_MODEL
+        )
         for number in range(5)
     ]
-    short_section = DocPoint.from_fragment(SECTIONS[1], 0, [0.1, 0.2, 0.3, 0.4])
+    short_section = DocPoint.from_fragment(SECTIONS[1], 0, [0.1, 0.2, 0.3, 0.4], EMBEDDING_MODEL)
 
     await docs.upsert([*long_section, short_section])
 
-    hits = await docs.search(vector=[0.4, 0.3, 0.2, 0.1], limit=2)
+    hits = await docs.search(vector=[0.4, 0.3, 0.2, 0.1], embedding_model=EMBEDDING_MODEL, limit=2)
 
     assert [hit.section_id for hit in hits] == [SECTIONS[0].section_id, SECTIONS[1].section_id]
 
@@ -421,8 +453,11 @@ async def test_reimporting_the_same_fragment_overwrites_it(docs: DocsCollection)
     zostawiałby wtedy w kolekcji kilka kopii tego samego fragmentu."""
     await docs.ensure()
 
-    await docs.upsert([DocPoint.from_fragment(SECTIONS[0], 0, [0.1, 0.2, 0.3, 0.4])])
-    await docs.upsert([DocPoint.from_fragment(SECTIONS[0], 0, [0.4, 0.3, 0.2, 0.1])])
+    first  = DocPoint.from_fragment(SECTIONS[0], 0, [0.1, 0.2, 0.3, 0.4], EMBEDDING_MODEL)
+    second = DocPoint.from_fragment(SECTIONS[0], 0, [0.4, 0.3, 0.2, 0.1], EMBEDDING_MODEL)
+
+    await docs.upsert([first])
+    await docs.upsert([second])
 
     assert await docs.count() == 1
 
@@ -436,12 +471,16 @@ async def test_doc_search_ranks_the_nearest_section_first(docs: DocsCollection) 
     albo opis sekcji — agent czytałby wtedy najpierw mniej pasujące sekcje."""
     await docs.ensure()
 
-    near = DocPoint.from_fragment(SECTIONS[0], 0, [0.1, 0.1, 0.1, 0.1])
-    far  = DocPoint.from_fragment(SECTIONS[1], 0, [0.1, 0.1, -0.1, -0.1])
+    near = DocPoint.from_fragment(SECTIONS[0], 0, [0.1, 0.1, 0.1, 0.1], EMBEDDING_MODEL)
+    far  = DocPoint.from_fragment(SECTIONS[1], 0, [0.1, 0.1, -0.1, -0.1], EMBEDDING_MODEL)
 
     await docs.upsert([far, near])
 
-    hits = await docs.search(vector=near.vector_section, limit=5)
+    hits = await docs.search(
+        vector          = near.vector_section,
+        embedding_model = EMBEDDING_MODEL,
+        limit           = 5,
+    )
 
     assert [hit.section_id for hit in hits] == [SECTIONS[0].section_id, SECTIONS[1].section_id]
     assert hits[0].payload["title"]         == SECTIONS[0].title
@@ -456,7 +495,7 @@ async def test_searching_a_missing_docs_collection_is_an_error(docs: DocsCollect
     Wyłapuje brak kolekcji dokumentacji przemilczany jako pusta lista: agent uznałby, że
     instrukcje nic o sprawie nie mówią, choć indeksu dokumentacji nikt nie zbudował."""
     with pytest.raises(DbQdrantMissingCollectionError):
-        await docs.search(vector=[0.1] * SIZE, limit=5)
+        await docs.search(vector=[0.1] * SIZE, embedding_model=EMBEDDING_MODEL, limit=5)
 
 
 async def test_tickets_and_docs_share_one_client(
@@ -481,3 +520,86 @@ async def test_tickets_and_docs_share_one_client(
 
     with pytest.raises(DbQdrantConfigError):
         await DocsCollection(client, TICKETS_NAME, SIZE).ensure()
+
+
+# --- model embeddera ----------------------------------------------------------------------
+
+async def test_a_second_model_is_refused_on_write(tickets: TicketsCollection) -> None:
+    """Sprawdza, czy prawdziwy Qdrant pozwala kolekcji odmówić zapisu punktu policzonego innym
+    modelem embeddera niż punkty, które już w niej są: zapis kończy się błędem konfiguracji
+    `DbQdrantConfigError` nazywającym model kolekcji, a w kolekcji zostaje jeden punkt.
+
+    Wyłapuje filtr, który Qdrant czyta inaczej, niż zakładamy (inny kształt `must_not`, inny
+    klucz w payloadzie), przez co punkt innego modelu nie zostałby znaleziony, a wektory dwóch
+    modeli o tym samym wymiarze trafiłyby do jednej kolekcji bez błędu."""
+    await tickets.ensure()
+    await tickets.upsert([_ticket_point("33644")])
+
+    with pytest.raises(DbQdrantConfigError, match=EMBEDDING_MODEL):
+        await tickets.upsert([_ticket_point("10718", model=OTHER_MODEL)])
+
+    assert await tickets.count() == 1
+
+
+async def test_a_point_without_the_model_is_refused_on_write_and_search(
+    client:  QdrantClient,
+    tickets: TicketsCollection,
+) -> None:
+    """Sprawdza, czy punkt zapisany bez nazwy modelu — tak wygląda indeks sprzed jej zapisu —
+    blokuje zapis nowego punktu i wyszukiwanie błędem konfiguracji `DbQdrantConfigError`, który
+    każe odbudować kolekcję. Punkt bez klucza musi spełniać warunek `must_not` w filtrze
+    prawdziwego Qdranta.
+
+    Wyłapuje indeks sprzed zapisu modelu, który przechodzi bez błędu: Qdrant mógłby nie liczyć
+    punktu bez klucza jako „innego modelu", a wtedy nowe wektory mieszałyby się ze starymi, których
+    modelu nikt już nie zna."""
+    await tickets.ensure()
+
+    old = _ticket_point("33644").to_qdrant()
+    del old["payload"]["embedding_model"]
+
+    await client.request(
+        "PUT",
+        f"/collections/{TICKETS_NAME}/points",
+        params = {"wait": "true"},
+        json   = {"points": [old]},
+    )
+
+    with pytest.raises(DbQdrantConfigError, match="przed zapisem modelu"):
+        await tickets.upsert([_ticket_point("10718")])
+
+    with pytest.raises(DbQdrantConfigError, match="odbuduj"):
+        await tickets.search(
+            vector          = [0.1] * SIZE,
+            embedding_model = EMBEDDING_MODEL,
+            vector_name     = VECTOR_PROBLEM,
+            limit           = 5,
+        )
+
+
+async def test_a_query_of_another_model_is_refused(
+    tickets: TicketsCollection,
+    docs:    DocsCollection,
+) -> None:
+    """Sprawdza, czy wyszukiwanie zapytaniem policzonym innym modelem niż punkty kolekcji kończy
+    się błędem konfiguracji `DbQdrantConfigError` nazywającym oba modele, w kolekcji zgłoszeń
+    i w kolekcji dokumentacji, która szuka inną ścieżką Qdranta (grupy po sekcji).
+
+    Wyłapuje nazwę modelu, która ginie po drodze przez prawdziwego Qdranta (na przykład przy
+    grupowaniu albo przy odczycie payloadu trafienia): wyszukiwanie oddawałoby wtedy trafienia
+    innego modelu jak zwykłe, trochę gorsze wyniki."""
+    await tickets.ensure()
+    await docs.ensure()
+    await tickets.upsert([_ticket_point("33644")])
+    await docs.upsert([DocPoint.from_fragment(SECTIONS[0], 0, [0.1] * SIZE, EMBEDDING_MODEL)])
+
+    with pytest.raises(DbQdrantConfigError, match=f"{EMBEDDING_MODEL}.*{OTHER_MODEL}"):
+        await tickets.search(
+            vector          = [0.1] * SIZE,
+            embedding_model = OTHER_MODEL,
+            vector_name     = VECTOR_PROBLEM,
+            limit           = 5,
+        )
+
+    with pytest.raises(DbQdrantConfigError, match=f"{EMBEDDING_MODEL}.*{OTHER_MODEL}"):
+        await docs.search(vector=[0.1] * SIZE, embedding_model=OTHER_MODEL, limit=5)

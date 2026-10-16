@@ -15,6 +15,7 @@ from app.db_qdrant import (
     TicketPoint,
     point_id_for,
 )
+from tests._helpers.embedding import EMBEDDING_MODEL, with_model
 
 # Punkty obu materiałów: przejście z modelu dziedziny na to, co trzyma Qdrant, a dla zgłoszeń
 # także z powrotem, z tego, co Qdrant oddaje przy odczycie po identyfikatorze. Bez transportu —
@@ -58,9 +59,10 @@ def _ticket_point(
     """
     ticket = ParsedTicket(**{**VALID_TICKET, **overrides})
     point  = TicketPoint.from_ticket(
-        ticket         = ticket,
-        vector_problem = VECTOR_A,
-        vector_sts     = VECTOR_B,
+        ticket          = ticket,
+        vector_problem  = VECTOR_A,
+        vector_sts      = VECTOR_B,
+        embedding_model = EMBEDDING_MODEL,
     )
 
     return point
@@ -202,10 +204,41 @@ def test_ticket_point_without_a_named_vector_is_a_config_error(vector: object) -
 
     Wyłapuje odczyt, który taki punkt przyjmuje albo pada niejasnym wyjątkiem: brak wektora znaczy,
     że kolekcję zbudowano w innym układzie, i czekanie tego nie naprawi."""
-    entry = {"id": "a", "vector": vector, "payload": {"ticket_id": "33644"}}
+    entry = {"id": "a", "vector": vector, "payload": with_model({"ticket_id": "33644"})}
 
     with pytest.raises(DbQdrantConfigError, match="wektora"):
         TicketPoint.from_qdrant(entry)
+
+
+def test_ticket_point_without_the_model_is_a_config_error() -> None:
+    """Sprawdza, czy odczyt punktu zgłoszenia z obydwoma wektorami, ale bez nazwy modelu
+    embeddera w payloadzie, kończy się błędem konfiguracji (`DbQdrantConfigError`), który każe
+    odbudować kolekcję.
+
+    Wyłapuje odczyt, który przyjmuje punkt z indeksu sprzed zapisu modelu: nie dałoby się
+    sprawdzić, czy jego wektory pasują do zapytania, a karta takiego punktu wyglądałaby
+    poprawnie."""
+    entry = {
+        "id":      "a",
+        "vector":  {VECTOR_PROBLEM: VECTOR_A, VECTOR_STS: VECTOR_B},
+        "payload": {"ticket_id": "33644"},
+    }
+
+    with pytest.raises(DbQdrantConfigError, match="odbuduj"):
+        TicketPoint.from_qdrant(entry)
+
+
+def test_both_points_write_the_embedding_model_into_the_payload() -> None:
+    """Sprawdza, czy punkt zgłoszenia i punkt dokumentacji zapisują w payloadzie nazwę modelu
+    embeddera, którym policzono ich wektory, pod kluczem `embedding_model`.
+
+    Wyłapuje punkt zapisany bez nazwy modelu: kolekcja nie mogłaby potem odmówić mieszania
+    wektorów dwóch modeli, a odczyt takiego punktu kończyłby się błędem konfiguracji."""
+    ticket = _ticket_point().to_qdrant()
+    doc    = DocPoint.from_fragment(SECTION, 0, VECTOR_A, EMBEDDING_MODEL).to_qdrant()
+
+    assert ticket["payload"]["embedding_model"] == EMBEDDING_MODEL
+    assert doc["payload"]["embedding_model"]    == EMBEDDING_MODEL
 
 
 def test_ticket_point_refuses_an_unknown_field() -> None:
@@ -215,7 +248,14 @@ def test_ticket_point_refuses_an_unknown_field() -> None:
     Wyłapuje model, który po cichu przyjmuje albo pomija nieznane pola: dodatkowe pole to pomyłka
     w kształcie danych, której nikt by nie zauważył."""
     with pytest.raises(ValidationError):
-        TicketPoint(point_id="a", vector_problem=[0.1], vector_sts=[0.1], payload={}, score=0.5)
+        TicketPoint(
+            point_id        = "a",
+            vector_problem  = [0.1],
+            vector_sts      = [0.1],
+            embedding_model = EMBEDDING_MODEL,
+            payload         = {},
+            score           = 0.5,
+        )
 
 
 # --- punkt dokumentacji -------------------------------------------------------------------
@@ -226,7 +266,7 @@ def test_doc_point_id_comes_from_the_section_and_the_fragment() -> None:
 
     Wyłapuje identyfikator punktu liczony inaczej, po którym ponowna indeksacja nie trafia w te same
     punkty, oraz punkt bez identyfikatora sekcji: trafienie nie miałoby czym wskazać sekcji."""
-    point = DocPoint.from_fragment(SECTION, 0, VECTOR_A)
+    point = DocPoint.from_fragment(SECTION, 0, VECTOR_A, EMBEDDING_MODEL)
 
     assert point.point_id   == point_id_for(f"{SECTION.section_id}#0")
     assert point.section_id == SECTION.section_id
@@ -238,8 +278,8 @@ def test_fragments_of_one_section_are_different_points() -> None:
 
     Wyłapuje identyfikator punktu, który pomija numer fragmentu: drugi fragment nadpisałby pierwszy
     i z długiej sekcji zostałby w indeksie tylko ostatni."""
-    first  = DocPoint.from_fragment(SECTION, 0, VECTOR_A)
-    second = DocPoint.from_fragment(SECTION, 1, VECTOR_B)
+    first  = DocPoint.from_fragment(SECTION, 0, VECTOR_A, EMBEDDING_MODEL)
+    second = DocPoint.from_fragment(SECTION, 1, VECTOR_B, EMBEDDING_MODEL)
 
     assert first.point_id != second.point_id
     assert first.payload  == second.payload
@@ -252,7 +292,7 @@ def test_doc_payload_reads_back_as_the_same_section() -> None:
     Wyłapuje dane punktu, które przestały pasować do opisu sekcji: narzędzie `find_docs_vector`
     odtwarza z nich pozycję wyniku, więc wyszukiwanie w dokumentacji kończyłoby się błędem albo
     innym opisem."""
-    payload = DocPoint.from_fragment(SECTION, 0, VECTOR_A).payload
+    payload = DocPoint.from_fragment(SECTION, 0, VECTOR_A, EMBEDDING_MODEL).payload
 
     assert payload["date"]         == SECTION.date.isoformat()
     assert payload["chapter_path"] == SECTION.chapter_path
@@ -265,7 +305,7 @@ def test_doc_payload_carries_no_body() -> None:
 
     Wyłapuje treść sekcji albo fragmentu dopisaną do punktu oraz zgubione pole opisu: treść leży
     w Postgresie, a punkt ma nieść tylko opis sekcji."""
-    payload = DocPoint.from_fragment(SECTION, 0, VECTOR_A).payload
+    payload = DocPoint.from_fragment(SECTION, 0, VECTOR_A, EMBEDDING_MODEL).payload
 
     assert set(payload) == set(DocSection.model_fields)
 
@@ -276,7 +316,7 @@ def test_doc_wire_shape_names_its_vector() -> None:
 
     Wyłapuje wektor wysłany bez nazwy: taki pasuje do kolekcji bez nazwanych wektorów, a kolekcja
     dokumentacji je ma."""
-    wire = DocPoint.from_fragment(SECTION, 0, VECTOR_A).to_qdrant()
+    wire = DocPoint.from_fragment(SECTION, 0, VECTOR_A, EMBEDDING_MODEL).to_qdrant()
 
     assert set(wire)      == {"id", "vector", "payload"}
     assert wire["vector"] == {VECTOR_SECTION: VECTOR_A}

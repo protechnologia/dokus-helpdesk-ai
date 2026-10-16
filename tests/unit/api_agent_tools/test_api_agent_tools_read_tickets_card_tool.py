@@ -15,6 +15,7 @@ from app.db_qdrant import (
     TicketsCollection,
     point_id_for,
 )
+from tests._helpers.embedding import EMBEDDING_MODEL, with_model
 from tests._helpers.transport import capturing, with_transport
 
 # Narzędzie stoi na prawdziwej kolekcji i kliencie Qdranta, a podmieniony jest tylko transport —
@@ -40,10 +41,10 @@ def _stored(
     Example result:
         {"id": "…", "vector": {"problem": […], "sts": […]}, "payload": {"ticket_id": "90001", …}}
     """
-    point = TicketPoint.from_ticket(CARDS[ticket_id], VECTOR, VECTOR).to_qdrant()
+    point = TicketPoint.from_ticket(CARDS[ticket_id], VECTOR, VECTOR, EMBEDDING_MODEL).to_qdrant()
 
     if payload is not None:
-        point["payload"] = payload
+        point["payload"] = with_model(payload)
 
     return point
 

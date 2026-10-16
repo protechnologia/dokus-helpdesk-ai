@@ -1,8 +1,8 @@
 """
 Description:
 Punkt dokumentacji w kolekcji Qdranta: jeden FRAGMENT sekcji — identyfikator, nazwany wektor
-fragmentu i opis całej sekcji w payloadzie. Sekcja ma tyle punktów, na ile fragmentów pocięto
-jej treść; krótka ma jeden.
+fragmentu, model embeddera, który go policzył, i opis całej sekcji w payloadzie. Sekcja ma tyle
+punktów, na ile fragmentów pocięto jej treść; krótka ma jeden.
 
 Punkt w Qdrancie:
 
@@ -10,7 +10,8 @@ Punkt w Qdrancie:
       "id":      "bc925b88-f5ba-5cda-aa43-65a036e4820d",
       "vector":  {"section": [0.0123, …]},
       "payload": {"section_id": "adm-kancelaria-edoreczenia", "document": "Instrukcja…",
-                  "version": "4.12", "title": "Uprawnienie do kancelarii e-Doręczeń", …}
+                  "version": "4.12", "title": "Uprawnienie do kancelarii e-Doręczeń", …,
+                  "embedding_model": "OPI-PIB/PolDense-150M"}
     }
 
 O czym pamiętać przy zmianach:
@@ -28,7 +29,7 @@ O czym pamiętać przy zmianach:
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core_model.docs.doc_section import DocSection
-from app.db_qdrant.point.base import point_id_for
+from app.db_qdrant.point.base import EMBEDDING_MODEL_KEY, point_id_for
 
 # Jedyny wektor punktu dokumentacji: strona passage, z którą porównywane jest zapytanie.
 # Nazwany, choć jest jeden — dołożenie drugiego nie zmieni wtedy kształtu punktu.
@@ -53,9 +54,11 @@ class DocPoint(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    point_id:       str         = Field(examples=["bc925b88-f5ba-5cda-aa43-65a036e4820d"])
-    vector_section: list[float] = Field(examples=[[0.0123, -0.0456]])
-    payload:        dict        = Field(examples=[{"section_id": "adm-kancelaria-edoreczenia"}])
+    point_id:        str         = Field(examples=["bc925b88-f5ba-5cda-aa43-65a036e4820d"])
+    vector_section:  list[float] = Field(examples=[[0.0123, -0.0456]])
+    # Model embeddera, który policzył wektor; w Qdrancie stoi w payloadzie, obok opisu sekcji.
+    embedding_model: str         = Field(examples=["OPI-PIB/PolDense-150M"])
+    payload:         dict        = Field(examples=[{"section_id": "adm-kancelaria-edoreczenia"}])
 
     @property
     def section_id(self) -> str:
@@ -75,9 +78,10 @@ class DocPoint(BaseModel):
     @classmethod
     def from_fragment(
         cls,
-        section:        DocSection,   # np. DocSection(section_id="adm-kancelaria-edoreczenia", …)
-        fragment:       int,          # numer fragmentu w sekcji, od zera
-        vector_section: list[float],  # np. [0.0123, -0.0456] — z embed_passage()
+        section:         DocSection,   # np. DocSection(section_id="adm-kancelaria-edoreczenia", …)
+        fragment:        int,          # numer fragmentu w sekcji, od zera
+        vector_section:  list[float],  # np. [0.0123, -0.0456] — z embed_passage()
+        embedding_model: str,          # np. "OPI-PIB/PolDense-150M" — z wyniku embeddera
     ) -> "DocPoint":
         """
         Description:
@@ -89,6 +93,7 @@ class DocPoint(BaseModel):
             section=DocSection(section_id="adm-kancelaria-edoreczenia", version="4.12", …)
             fragment=0
             vector_section=[0.0123, -0.0456]
+            embedding_model="OPI-PIB/PolDense-150M"
 
         Example result:
             DocPoint(point_id="bc925b88-…", payload={"section_id": "adm-kancelaria-edoreczenia", …})
@@ -96,9 +101,10 @@ class DocPoint(BaseModel):
         point = cls(
             # `#` nie występuje w identyfikatorze sekcji, więc dwie sekcje nie dadzą tego samego
             # punktu.
-            point_id       = point_id_for(f"{section.section_id}#{fragment}"),
-            vector_section = vector_section,
-            payload        = section.model_dump(mode="json"),
+            point_id        = point_id_for(f"{section.section_id}#{fragment}"),
+            vector_section  = vector_section,
+            embedding_model = embedding_model,
+            payload         = section.model_dump(mode="json"),
         )
 
         return point
@@ -117,7 +123,7 @@ class DocPoint(BaseModel):
         wire = {
             "id":      self.point_id,
             "vector":  {VECTOR_SECTION: self.vector_section},
-            "payload": self.payload,
+            "payload": {**self.payload, EMBEDDING_MODEL_KEY: self.embedding_model},
         }
 
         return wire
