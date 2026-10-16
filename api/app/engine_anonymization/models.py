@@ -9,10 +9,10 @@ class AnonymizedText(BaseModel):
     przyjmujący `AnonymizedText` nie przyjmie surowego tekstu przez pomyłkę.
 
     Tworzy go wyłącznie anonimizator — atrapa w p. 4, usługa w p. 19 (CLAUDE.md -> „Plan").
-    Python tego nie wymusi; pilnuje tego test grafów (p. 12). Mapowanie pseudonimów na dane
-    dochodzi razem z prawdziwym anonimizatorem.
+    Python tego nie wymusi; pilnuje tego test grafów (p. 12). Mapowania znaczników na dane nie
+    ma: po anonimizacji wszystko działa na znacznikach (CLAUDE.md -> „Świadomie pominięte").
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    text: str = Field(min_length=1, examples=["{KLIENT_1} zgłasza, że przesyłki nie przychodzą."])
+    text: str = Field(min_length=1, examples=["{IMIĘ} {NAZWISKO} zgłasza brak przesyłek."])

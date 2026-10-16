@@ -2397,7 +2397,9 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   anonimizatorowi. Każda to komplet tych samych ośmiu zmiennych i nic nie dziedziczy po drugiej;
   obie domyślnie stoją na `fake`. Model anonimizujący widzi surowy tekst zgłoszeń, więc to, co
   stoi w jego konfiguracji, jest decyzją o tym, dokąd ten tekst trafia — osobnej flagi nie ma.
-  Do p. 19 nikt tego klienta nie buduje.
+  Do p. 19 nikt tego klienta nie buduje, a w p. 19.5 ta konfiguracja przenosi się do usługi
+  `anonymizer`, która woła model jako strażnika: sprawdza, czy po anonimizacji zostały dane
+  osobowe (decyzja 2026-10-16).
 - **Fabryka `get_llm_client()` buduje klienta z jednego kompletu (`LLMSettings` z
   `Settings.llm_generation()` albo `llm_anonymization()`), fail-fast** — brak klucza albo modelu
   to `LLMConfigError` przy budowie klienta, nie błąd połączenia w środku żądania. Komunikat
@@ -3438,6 +3440,21 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   konfiguracjach powtarzałaby to, co mówi sama nazwa zestawu: model w `LLM_ANONYMIZATION_*` widzi
   surowy tekst z definicji. Cena: jedynym zabezpieczeniem jest to, co w tym zestawie stoi,
   a pracy bez anonimizacji nie da się włączyć wcale (p. 19).
+- **Przywracanie danych w odpowiedziach (mapowanie znaczników na dane)** — po anonimizacji
+  wszystko działa na znacznikach (decyzja 2026-10-16): człowiek czyta to samo, co widział model,
+  więc łatwiej mu zaufać wynikowi i wyłapać lukę w anonimizacji. Cena: wdrożeniowiec sam
+  wstawia dane przed wysłaniem odpowiedzi klientowi.
+- **Numerowane znaczniki osób (`{OSOBA_1}`, `{OSOBA_2}`) i słownik osób z helpdesku** —
+  numeracja wymaga grupowania odmian nazwiska w wątku, a słownik integracji z helpdeskiem;
+  kto pisał który komentarz, model i tak wie z etykiet ról w wątku. Cena: kilku osób w jednym
+  zgłoszeniu nie da się rozróżnić, na przykład w „przenieś sprawy od `{IMIĘ} {NAZWISKO}`
+  do `{IMIĘ} {NAZWISKO}`”. Wraca, gdy pomiary grafów (p. 21–28) pokażą, że model myli osoby.
+- **Maskowanie fragmentów wskazanych przez model-strażnika zamiast zatrzymania grafu** —
+  fałszywy alarm po cichu niszczyłby wiedzę, a zatrzymanie jest jawne: każde to sygnał, co
+  poprawić we wzorcach albo w NER, i nowy przypadek do golden setu. Wraca, gdy zatrzymań będzie
+  tyle, że zaczną przeszkadzać w pracy.
+- **Model anonimizujący jako kolejny silnik zamiany** — przepisując tekst, mógłby zniszczyć
+  wiedzę albo coś dopisać; zamieniają wzorce i NER, a model tylko sprawdza wynik.
 - **Węzły właściwe na atrapie modelu przy dostawcy `fake`** — atrapa modelu bez scenariusza
   odpowiada samym tekstem, więc `respond` odrzucałby każdą sprawę, a scenariusz wpisany w fabrykę
   byłby drugą atrapą grafu. Przy `fake` fabryka oddaje atrapę całego grafu.
@@ -3717,9 +3734,10 @@ skrót — dopisz punkt** (zwykle do bloku I), zamiast zostawiać go w milczeniu
 
 **Kolejność bloków:** blok 0 jest zrobiony — cały produkt działa od wejścia do odpowiedzi na
 atrapach, bez modelu i Qdranta. Dalej po jednym punkcie na narzędzie (A) i na węzeł (B), razem
-z prawdziwym modelem (p. 18 i 17, dawny blok D), a po decyzjach (C) i anonimizacji (E) — po
-jednym na graf (F), bo treść promptów stroi się na modelu docelowym, a ten na danych klientów
-nie ruszy bez anonimizatora.
+z prawdziwym modelem (p. 18 i 17, dawny blok D), a po anonimizacji (E) — po jednym na graf (F),
+bo treść promptów stroi się na modelu docelowym, a ten na danych klientów nie ruszy bez
+anonimizatora. Blok C (decyzje) jest pusty od 2026-10-16: jego punkty okazały się sprawami
+spoza programu albo trafiły do punktów, które od nich zależą.
 
 #### Zrobione
 
@@ -3972,24 +3990,59 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   promptu to zdanie o cytatach w bramce wysyłki, a wnioski dla promptów czekają w p. 22–26;
   reguły — „Testy", „Twarde reguły promptu generacji", „Świadomie pominięte".
 
-#### C. Decyzje
-
-- [ ] **14. Które endpointy mogą widzieć surowe dane** — własny sprzęt, RunPod (Secure czy
-  Community Cloud), dostawca komercyjny. *Dlaczego:* kryterium to granica zaufania endpointu,
-  a nie to, czy model anonimizujący i generujący są tym samym modelem; odpowiedź zapisuje się
-  tym, co stoi w `LLM_ANONYMIZATION_*`.
-
 #### E. Anonimizacja — zastępuje atrapę anonimizatora z p. 4
 
-- [ ] **19. Usługa `anonymizer` w compose** — słownik osób ze źródła (z rolami), NER i regex
-  z sumami kontrolnymi, deterministycznie, na CPU; fail-closed, pseudonimy spójne w wątku,
-  mapowanie wraca do helpdesku; mierzona w dwie strony (przecieki i zniszczona wiedza — w tym
-  kody i komunikaty błędów, po których szuka `find_tickets_text`). NER może pomagać lokalny
-  model językowy (`LLM_ANONYMIZATION_*`); do rozstrzygnięcia, kto go woła — `api` czy usługa
-  `anonymizer`, do której ta konfiguracja by się wtedy przeniosła — oraz czy praca bez
-  anonimizacji dla zaufanego endpointu ma być jej jawnym ustawieniem.
-  *Dlaczego:* surowy tekst nie opuszcza sieci compose; słownik daje role tam, gdzie flaga autora
-  jest bezużyteczna (Automat mailowy), a nadgorliwość w korpusie jest nieodwracalna.
+- [ ] **19. Usługa `anonymizer` w compose** (rozpisany na podpunkty 2026-10-16) — zamiana
+  deterministyczna i na CPU, całość fail-closed. Każda znaleziona dana zamienia się na znacznik
+  swojego rodzaju (`{IMIĘ}`, `{NAZWISKO}`, `{PESEL}`, `{TELEFON}`, `{EMAIL}`…), bez numerów,
+  a po anonimizacji wszystko działa na znacznikach: odpowiedzi tras ich nie podmieniają
+  z powrotem, a mapowanie znaczników na dane nigdzie nie wraca (decyzja 2026-10-16). Każdy
+  podpunkt wchodzi od razu ze swoimi testami — jednostkowymi, integracyjnymi, a od 19.3 także
+  ewaluacyjnymi na golden secie anonimizatora z 19.2, w 19.5 na osobnym golden secie strażnika.
+  *Dlaczego:* surowy tekst nie opuszcza sieci compose, a nadgorliwość w korpusie jest
+  nieodwracalna; człowiek czyta to samo, co widział model, więc łatwiej mu zaufać wynikowi
+  i wyłapać lukę w anonimizacji.
+  - [ ] **19.1 Szkielet usługi i klient w `api`** — katalog `anonymizer/` jak `embedder/`
+    (Dockerfile, `/health`, `/anonymize`, Request-ID, handlery wyjątków, własne `Settings`, wpis
+    w compose i w `.env.example`), w środku silnik za interfejsem z atrapą, jak `Encoder`
+    i `FakeEncoder`, a w `engine_anonymization/` klient HTTP i fabryka. Atrapa silnika w usłudze
+    nie może otworzyć drogi do modelu zewnętrznego: usługa mówi, jakim silnikiem działa,
+    a fabryka w `api` odmawia, gdy to atrapa. Kryterium: graf przechodzi drogą HTTP do usługi
+    z atrapą silnika.
+  - [ ] **19.2 Golden set anonimizatora** — teksty z dwiema listami: co ma zniknąć, z rodzajem
+    (osoba, PESEL, telefon, adres…), i co ma zostać (kody i komunikaty błędów, po których szuka
+    `find_tickets_text`, wersje, nazwy usług, numery zgłoszeń). Zmyślone w `data/safe/golden/`,
+    próbka korpusu w `data/unsafe/golden/`; test ewaluacyjny liczy osobno przecieki i zniszczoną
+    wiedzę. Powstaje przed silnikami, żeby każdy kolejny mierzyć tym samym golden setem.
+  - [ ] **19.3 Wzorce z sumami kontrolnymi** — PESEL, NIP, REGON i numer konta z cyfrą
+    kontrolną, telefon i e-mail samym wzorcem. Kryterium na golden secie: numer z poprawną sumą
+    znika, a liczba tego samego kształtu bez poprawnej sumy (numer przesyłki, kod błędu) zostaje.
+  - [ ] **19.4 NER osób** — model NER na CPU zamienia imię na `{IMIĘ}`, a nazwisko na
+    `{NAZWISKO}`, bez numerów i bez grupowania odmian; ten sam znacznik nie znaczy tej samej
+    osoby. Bez słownika osób z helpdesku: lista naszych konsultantów dochodzi tylko wtedy, gdy
+    golden set pokaże, że NER gubi nasze nazwiska w podpisach. Kryterium: przecieki osób na
+    golden secie.
+  - [ ] **19.5 Model-strażnik w usłudze `anonymizer`, zawsze** (decyzja 2026-10-16) — po
+    wzorcach i NER model anonimizujący niczego nie zamienia, tylko odpowiada, czy w tekście
+    zostały dane osobowe, i wskazuje które. Wskazany fragment, którego dosłownie nie ma
+    w tekście, jest zmyśleniem modelu i się nie liczy. Każdy inny zatrzymuje graf własnym błędem:
+    nie 503, bo ponowienie nic nie da, i nie błędem konfiguracji; helpdesk dostaje rodzaje
+    znalezionych danych i same fragmenty, bo to on je przysłał, a do logu idą tylko rodzaje
+    i liczby. Awaria modelu też zatrzymuje graf (fail-closed). Osobny golden set strażnika:
+    czyste teksty po anonimizacji (muszą przejść), teksty z podrzuconą pozostałością danych (muszą
+    zostać zatrzymane) i pułapki, które muszą przejść (nazwy usług, kody błędów, same znaczniki,
+    nazwy urzędów); fałszywe alarmy liczone osobno, bo każdy zatrzymuje sprawę. Strażnik widzi
+    to, co NER przepuścił, czyli właśnie przecieki, więc jego endpoint musi być zaufany: który
+    może tu stać, rozstrzyga wdrożenie według granicy zaufania endpointu, a zapisuje
+    konfiguracja `LLM_ANONYMIZATION_*`. Woła go usługa: osiem zmiennych przenosi się z `Settings`
+    w `api` do usługi i jej wpisu w compose, usługa dostaje własnego klienta modelu, bo kodu
+    między usługami nie dzielimy, a z `api` znika `Settings.llm_anonymization()`. Do zmierzenia
+    czas: strażnik sprawdza każde żądanie, także bramki, na które człowiek czeka.
+  - [ ] **19.6 Włączenie** — fabryka w `api` przestaje odmawiać przy prawdziwym silniku; prompt
+    systemowy każdego grafu dostaje akapit: dane osobowe są zastąpione znacznikami, ten sam
+    znacznik nie znaczy tej samej osoby, znaczników się nie odtwarza, a w odpowiedzi zostawia
+    tak, jak stoją; przykłady `{KLIENT_1}` w docstringach grafów zmieniają się na znaczniki
+    rodzaju. Prompt parsujący dostaje ten akapit w p. 31.
 - [ ] **20. Detektor sekretów w tej samej usłudze** — kontekst dla haseł słownikowych, entropia
   dla losowych, odróżnia poświadczenia od haseł do archiwów. *Dlaczego:* 1,1–1,7% zgłoszeń,
   a hasło roota w cudzym API to incydent; dotąd dług przed wdrożeniem, teraz warunek pierwszego
