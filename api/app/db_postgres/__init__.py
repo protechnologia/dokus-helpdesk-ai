@@ -16,7 +16,8 @@ Każdy plik to jedna odpowiedzialność:
 | `table/`    | klasa na tabelę (`TicketsTable`, `DocsTable`) i ich mechanika | reszta aplikacji |
 | `row/`      | wiersze tabel: `TicketRow`, `DocRow`                          | reszta aplikacji |
 | `client.py` | `PostgresClient` — połączenie i wykonanie SQL-a               | tylko ten pakiet |
-| `errors.py` | `DbPostgresError`, `DbPostgresConfigError`                    | reszta aplikacji |
+| `errors.py` | `DbPostgresError`, `DbPostgresConfigError`, jego odmiana      | reszta aplikacji |
+|             | `DbPostgresMissingTableError`                                 |                  |
 
 O czym pamiętać przy zmianach:
 
@@ -33,7 +34,11 @@ i dwie klasy o tej samej nazwie w jednym pliku łatwo pomylić.
 """
 
 from app.db_postgres.client import PostgresClient
-from app.db_postgres.errors import DbPostgresConfigError, DbPostgresError
+from app.db_postgres.errors import (
+    DbPostgresConfigError,
+    DbPostgresError,
+    DbPostgresMissingTableError,
+)
 from app.db_postgres.row import DocRow, TicketRow
 from app.db_postgres.table import DOCS_TABLE, DocsTable, TicketsTable
 
@@ -41,6 +46,7 @@ __all__ = [
     "DOCS_TABLE",
     "DbPostgresConfigError",
     "DbPostgresError",
+    "DbPostgresMissingTableError",
     "DocRow",
     "DocsTable",
     "PostgresClient",

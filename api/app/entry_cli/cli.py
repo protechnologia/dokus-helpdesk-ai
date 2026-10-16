@@ -19,8 +19,7 @@ from app.entry_cli.tickets import tickets
 # | `docs validate <kat.>`    | `docs/validate.py`    | paczka dokumentacji wobec plików |
 # | `docs index <kat.>`       | `docs/index.py`       | indeks dokumentacji od zera      |
 #
-# Zaplanowane (p. 46): komendy na grafach — wyszukiwanie, parsowanie zgłoszeń, propozycje, bramki
-# i „Popraw" — we własnych obszarach.
+# Grafów (wyszukiwanie, propozycje, bramki, „Popraw") CLI nie uruchamia — robią to trasy API.
 #
 # no_args_is_help: samo `helpdesk` drukuje drzewo, zamiast błędu użycia.
 cli = typer.Typer(

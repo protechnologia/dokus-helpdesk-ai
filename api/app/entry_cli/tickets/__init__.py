@@ -6,8 +6,8 @@ indeksu, w którym agent szuka podobnych spraw. Importuj stąd
 
 Do czego:
 Plik na komendę, nazwany jak czynność (`helpdesk tickets index` → `index.py`); wspólny przebieg
-indeksacji leży w `common.py`. Parsowanie zgłoszeń i wyszukiwanie z konsoli wracają przez grafy
-(p. 46). Tutaj tylko obiekt Typer i rejestracja — moduły komend nie importują obiektu z pakietu,
+indeksacji leży w `common.py`. Parsowanie zgłoszeń do korpusu dojdzie z masowym importem
+(p. 31). Tutaj tylko obiekt Typer i rejestracja — moduły komend nie importują obiektu z pakietu,
 więc nie ma cyklu importów.
 
 | komenda                     | plik          | co robi                                          |

@@ -2,8 +2,8 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from app.db_postgres import DbPostgresConfigError, DbPostgresError
-from app.db_qdrant import DbQdrantConfigError, DbQdrantError
+from app.db_postgres import DbPostgresConfigError, DbPostgresError, DbPostgresMissingTableError
+from app.db_qdrant import DbQdrantConfigError, DbQdrantError, DbQdrantMissingCollectionError
 from app.engine_anonymization import AnonymizationConfigError, AnonymizationError
 from app.engine_embedding import EmbeddingConfigError, EmbeddingError
 from app.engine_llm import LLMConfigError, LLMError
@@ -26,7 +26,9 @@ MISCONFIGURED = [
     "/anonymization-misconfigured",
     "/embedder-misconfigured",
     "/qdrant-misconfigured",
+    "/qdrant-missing-collection",
     "/postgres-misconfigured",
+    "/postgres-missing-table",
     "/process-misconfigured",
 ]
 
@@ -87,6 +89,10 @@ def client() -> TestClient:
     async def qdrant_misconfigured() -> None:
         raise DbQdrantConfigError("punkt 'df3b' nie ma `ticket_id` w payloadzie")
 
+    @app.get("/qdrant-missing-collection")
+    async def qdrant_missing_collection() -> None:
+        raise DbQdrantMissingCollectionError("Qdrant nie ma kolekcji z żądania POST /collections/…")
+
     @app.get("/postgres-down")
     async def postgres_down() -> None:
         raise DbPostgresError("zapytanie do Postgresa nie powiodło się: 'Jan Kowalski'")
@@ -94,6 +100,10 @@ def client() -> TestClient:
     @app.get("/postgres-misconfigured")
     async def postgres_misconfigured() -> None:
         raise DbPostgresConfigError("POSTGRES_PASSWORD nie może być puste")
+
+    @app.get("/postgres-missing-table")
+    async def postgres_missing_table() -> None:
+        raise DbPostgresMissingTableError("w bazie 'helpdesk' nie ma tabeli z zapytania")
 
     @app.get("/process-down")
     async def process_down() -> None:

@@ -26,7 +26,7 @@ Co się dzieje po drodze:
 O czym pamiętać przy zmianach:
 
 - Spis nie ma argumentów ani limitu: model dostaje opisy wszystkich sekcji naraz. Czy spis
-  właściwej dokumentacji się na to nadaje, rozstrzygnie się przy niej (p. 15).
+  właściwej dokumentacji się na to nadaje, rozstrzygnie się przy niej (p. 55).
 - Kolejność ustala tabela, nie narzędzie: sekcje stoją tak, jak w dokumentach, a nie alfabetycznie
   po identyfikatorze.
 - Z tabeli wraca też treść każdej sekcji, której to narzędzie nie oddaje: do modelu idzie sam

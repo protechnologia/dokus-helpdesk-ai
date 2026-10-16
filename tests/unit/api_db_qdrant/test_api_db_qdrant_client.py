@@ -1,7 +1,12 @@
 import httpx
 import pytest
 
-from app.db_qdrant import DbQdrantConfigError, DbQdrantError, QdrantClient
+from app.db_qdrant import (
+    DbQdrantConfigError,
+    DbQdrantError,
+    DbQdrantMissingCollectionError,
+    QdrantClient,
+)
 from tests._helpers.transport import always, capturing, raising, routed, with_transport
 
 # Klient testowany bez usługi: transport odpowiada, zapisuje albo pada zamiast gniazda. Sprawdzamy
@@ -74,17 +79,40 @@ async def test_rejected_request_carries_qdrants_explanation() -> None:
         await client.request("PUT", f"{PATH}/points", json={"points": []})
 
 
-async def test_missing_resource_is_an_error_for_request() -> None:
+async def test_missing_collection_is_a_config_error_for_request() -> None:
     """Sprawdza, czy status 404 w odpowiedzi na zwykłe żądanie `request()` (tutaj liczenie punktów
-    kolekcji) kończy się błędem `DbQdrantError` z numerem statusu.
+    kolekcji) kończy się błędem `DbQdrantMissingCollectionError`, który jest błędem konfiguracji,
+    a komunikat podaje ścieżkę żądania, wyjaśnienie Qdranta i to, że indeksu nie zbudowano.
 
-    Wyłapuje klienta, który każde 404 czyta jako zwykłą odpowiedź „nie ma": tak wolno czytać tylko
-    odczytowi `get_or_none()`, a przy pozostałych żądaniach brak kolekcji jest awarią, o której
-    wołający ma się dowiedzieć."""
-    client = _client(always(status=404, text="Not found"))
+    Wyłapuje klienta, który brak kolekcji czyta jako zwykłą odpowiedź „nie ma" (tak wolno czytać
+    tylko odczytowi `get_or_none()`) albo zgłasza go jak chwilową awarię Qdranta: żądanie
+    skończyłoby się wtedy statusem 503, czyli „spróbuj później", a czekanie indeksu nie zbuduje."""
+    client = _client(always(status=404, text="Not found: Collection `tickets` doesn't exist!"))
 
-    with pytest.raises(DbQdrantError, match="404"):
+    with pytest.raises(DbQdrantMissingCollectionError) as caught:
         await client.request("POST", f"{PATH}/points/count", json={"exact": True})
+
+    message = str(caught.value)
+
+    assert isinstance(caught.value, DbQdrantConfigError)
+    assert f"{PATH}/points/count" in message
+    assert "doesn't exist"        in message
+    assert "nie został zbudowany" in message
+
+
+async def test_a_server_failure_is_not_a_missing_collection() -> None:
+    """Sprawdza, czy status 500 w odpowiedzi na `request()` kończy się zwykłym błędem
+    `DbQdrantError` z numerem statusu, a nie błędem konfiguracji ani brakiem kolekcji.
+
+    Wyłapuje klienta, który każdą odmowę Qdranta zgłasza jako brak kolekcji: chwilowa awaria
+    usługi kończyłaby wtedy żądanie jak zła konfiguracja, zamiast statusem 503, przy którym
+    helpdesk może ponowić albo zdecydować sam."""
+    client = _client(always(status=500, text="boom"))
+
+    with pytest.raises(DbQdrantError, match="500") as caught:
+        await client.request("POST", f"{PATH}/points/count", json={"exact": True})
+
+    assert not isinstance(caught.value, DbQdrantConfigError)
 
 
 # --- get_or_none --------------------------------------------------------------------------

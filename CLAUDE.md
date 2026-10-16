@@ -80,8 +80,8 @@ i werdykt bramki, nigdy automatyczna wysyłka ani nieodwołalne „nie". Werdykt
 
 **Każda funkcja produktu to osobny graf.** Bramki, wyszukiwanie, karta zgłoszenia, trzy warianty
 propozycji i „Popraw" mają ten sam przebieg: anonimizacja → pętla agenta z narzędziami → odpowiedź
-w ustalonym kształcie. Trasa API i komenda CLI tylko uruchamiają graf. Nowa funkcja to nowy katalog
-grafu, bez zmian w pozostałych.
+w ustalonym kształcie. Trasa API tylko uruchamia graf. Nowa funkcja to nowy katalog grafu, bez
+zmian w pozostałych.
 
 **Generuje mocny model zewnętrzny, a dane wychodzą do niego po anonimizacji.** Model lokalny okazał
 się za słaby, żeby generować, ale może pomagać anonimizatorowi — i jako jedyny widzi wtedy surowy
@@ -355,8 +355,9 @@ dokus-helpdesk-ai/
   `retrieval/` i `db/`).** Odkąd Postgres też wyszukuje, „retrieval" pasowało do obu, a „db" nie
   mówiło, o którą bazę chodzi. `engine_llm/` zostaje nazwą roli, bo ma interfejs i wymiennych
   dostawców; te dwa pakiety mają po jednej implementacji i piszą w języku swojej bazy. Błędy:
-  `DbQdrantError` i `DbPostgresError` z wariantami `…ConfigError`; nie `PostgresError`, bo tak
-  nazywa się klasa sterownika `asyncpg`.
+  `DbQdrantError` i `DbPostgresError` z wariantami `…ConfigError`, a brak indeksu to ich odmiany
+  w języku bazy: `DbQdrantMissingCollectionError` i `DbPostgresMissingTableError` (2026-10-16);
+  nie `PostgresError`, bo tak nazywa się klasa sterownika `asyncpg`.
 - **Programy uruchamiane jako osobny proces mają jeden pakiet, `engine_process/` (2026-10-09).**
   Uruchomienie programu przekracza granicę procesu, więc nie leży przy serwisie, który z niego
   korzysta. Na górze pakietu jest to, co wspólne (`run_program()`, błędy, `ProgramOutput`),
@@ -874,7 +875,7 @@ Odwrotna strona powyższych ryzyk — to działa zawsze i jest najtańszym zyski
 ### Instrukcje
 
 Drugi materiał obok zgłoszeń: dokumentacja aplikacji podzielona na podrozdziały. Właściwej
-dokumentacji jeszcze nie ma (p. 15, p. 55) — indeksacja i narzędzia powstają na paczce syntetycznej.
+dokumentacji jeszcze nie ma (p. 55) — indeksacja i narzędzia powstają na paczce syntetycznej.
 
 - **Jednostką jest podrozdział, w całości.** Na podrozdziały dzieli człowiek z modelem przed
   wgraniem; agent wyszukuje podrozdziały i czyta je w całości.
@@ -1472,9 +1473,9 @@ Wspólne:
   czynność to plik w nim** (`helpdesk tickets index` → `entry_cli/tickets/index.py`). Obszar to
   materiał (od 2026-10-05, wcześniej indeksacja zgłoszeń stała w osobnym obszarze `rag`):
   `tickets` — artefakty zgłoszeń i ich indeks, `docs` — paczka dokumentacji i jej indeksy.
-  Czynności nazywają się tak samo w obu (`validate`, `index`). Komendy na grafach dostaną własne
-  obszary (p. 46). Ścieżka = komenda to jedyna rzecz, która pozwala trafić z komendy do kodu bez
-  czytania `cli.py`. Kod wspólny kilku komend obszaru — w jego `common.py`.
+  Czynności nazywają się tak samo w obu (`validate`, `index`). Ścieżka = komenda to jedyna rzecz,
+  która pozwala trafić z komendy do kodu bez czytania `cli.py`. Kod wspólny kilku komend
+  obszaru — w jego `common.py`.
 - **Moduł komendy wystawia `HELP` i funkcję nazwaną od intencji (`index_artifacts`), a rejestruje
   ją `__init__.py` obszaru** (`tickets.command("index", help=index.HELP)(index.index_artifacts)`).
   Moduły nie dekorują obiektu Typer z pakietu, więc nie ma cyklu importów; funkcja nazywa się
@@ -1713,6 +1714,13 @@ wektor:
 - **Kolekcja przy rozjeździe NIE jest naprawiana** — inny wymiar albo brak named vectora to
   `DbQdrantConfigError` z **obiema liczbami** w komunikacie. Bez tego rozjazd wychodzi jako
   odrzucenie punktów w środku przebiegu, już po zapłaceniu za parsowanie LLM-em.
+- **Brak kolekcji to błąd konfiguracji, pusta kolekcja to zero trafień (2026-10-16).** Klient
+  czyta każde 404 z `request()` jako `DbQdrantMissingCollectionError` (odmiana
+  `DbQdrantConfigError`), bo każda ścieżka żądania to ścieżka jednej kolekcji; tekst Qdranta
+  zostaje w komunikacie. `get_or_none()` czyta 404 jako odpowiedź, bo tak pyta się o kolekcję
+  przed jej założeniem. Zero trafień w miejscu brakującej kolekcji wyglądałoby jak „nie ma
+  podobnych spraw" i nikt by nie zauważył, że indeksu nie zbudowano. Kolekcje zakłada wyłącznie
+  indeksacja.
 - **Qdrant normalizuje wektory przy zapisie w kolekcji `Cosine`** — zapisane `[0.1]*4` wraca jako
   `[0.5]*4` (zmierzone 2026-08-13). Nas to nie kosztuje nic (embedder oddaje wektory jednostkowe,
   a cosinus ignoruje długość), ale **asercja na równość wektora padłaby przy poprawnie działającym
@@ -1748,8 +1756,8 @@ Usługa `postgres` to drugi indeks obok Qdranta: szuka po słowach w odmianie i 
 ciągach, czego wektor nie robi. Po stronie `api` stoi pakiet `app/db_postgres/` z tabelami zgłoszeń
 i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs index`, a czytają ją `list_docs`,
 `find_docs_text` i `read_docs`. Tabelę zgłoszeń czytają `find_tickets_text`
-i `read_tickets_thread`; wypełni ją indeksacja wątków po anonimizacji (p. 19, p. 31), do tego
-czasu jest pusta.
+i `read_tickets_thread`; założy ją i wypełni indeksacja wątków po anonimizacji (p. 19, p. 31),
+a do tego czasu jej nie ma, więc oba narzędzia kończą się błędem `DbPostgresMissingTableError`.
 
 - **Trzy drogi dopasowania, każda do czego innego:** słowa (`plainto_tsquery` — dowolna kolejność
   i odmiana), fraza (`phraseto_tsquery` — cały komunikat w tej samej kolejności) i podciąg
@@ -1825,6 +1833,11 @@ czasu jest pusta.
   twardą spację osobno: `\s` tej bazy jej nie obejmuje, a ma ją 124 z 1825 zgłoszeń.
 - **Zmiana kolumn nie dociera do istniejącej tabeli** — `CREATE TABLE IF NOT EXISTS` jej nie
   rusza. Tabelę kasuje się i odbudowuje z plików.
+- **Brak tabeli to błąd konfiguracji, pusta tabela to pusty wynik (2026-10-16).** Klient zamienia
+  `UndefinedTableError` sterownika na `DbPostgresMissingTableError` (odmiana
+  `DbPostgresConfigError`), z tekstem sterownika, który nazywa tabelę. Pusty wynik w miejscu
+  brakującej tabeli wyglądałby jak „materiał nic o tym nie mówi" i nikt by nie zauważył, że
+  indeksu nie zbudowano. Tabele zakłada wyłącznie indeksacja.
 - **Nazwa tabeli jest sprawdzana wzorcem identyfikatora**, bo nie da się jej podać parametrem
   zapytania; wszystko inne — zapytanie agenta, limit — idzie parametrem. Zapytanie do podciągu
   przechodzi wcześniej przez unieszkodliwienie `%` i `_`.
@@ -2053,8 +2066,9 @@ czasu jest pusta.
 - **Narzędzia właściwe buduje `agent_tools/factory.py`, z konfiguracji (2026-10-05):** po jednym
   kliencie embeddera, Qdranta i Postgresa, wspólnym dla ośmiu narzędzi, oraz paczka kodu, jej
   opis z metryczką, jej mapa symboli i klient ripgrepa dla sześciu narzędzi kodu, w kolejności
-  `TOOL_NAMES` grafów. Powstaje wszystkie czternaście; czy instancja bez dokumentacji ma
-  pomijać jej narzędzia, rozstrzyga p. 15.
+  `TOOL_NAMES` grafów. Powstaje wszystkie czternaście, także narzędzia materiału, którego
+  indeksu nie zbudowano: brak tabeli albo kolekcji kończy ich pierwsze wywołanie błędem
+  konfiguracji, a nie pustym wynikiem (2026-10-16).
 - **Kod aplikacji liczy się jako źródło jak zgłoszenie i instrukcja, także w wariancie
   wymagającym źródeł (decyzja 2026-10-06, narzędzia w p. 62–67).** Odpowiedź opartą wyłącznie na
   kodzie wołający rozpoznaje po rodzaju źródła (`code`). Źródłem jest fragment, który model
@@ -2456,8 +2470,7 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   zwraca zużycie SWOJEJ tury (`LLMUsage`: wywołania, cztery klasy tokenów, `cost_usd`), a reduktor
   `add_usage` w `GraphState` je sumuje; trasy oddają to jako `usage`. Na atrapach wywołania są
   policzone, a tokeny i koszt wynoszą zero — prawdziwe zero, nie brak danych. Koszt każdej tury
-  stoi też we wpisie logu węzła `agent` (2026-10-09). CLI wypisze to samo razem z komendami
-  grafów (p. 46).
+  stoi też we wpisie logu węzła `agent` (2026-10-09).
 - **Cache promptu: u Claude'a włączony w każdym żądaniu (`cache_control` na górnym poziomie),
   u OpenAI działa bez naszego udziału.** Obejmuje początek żądania w kolejności narzędzia →
   prompt systemowy → wiadomości, więc w pętli z narzędziami cała dotychczasowa rozmowa jest
@@ -2730,8 +2743,9 @@ obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przy
   `data/unsafe/docs/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz
   `data/unsafe/golden/tickets-distractors.json`; sam golden set mierzy tylko połowę rozkładu
 
-**Komendy na grafach** (bramki, propozycje, „Popraw", wyszukiwanie, karta zgłoszenia) dojdą
-w p. 46.
+**Grafy (bramki, propozycje, „Popraw", wyszukiwanie, karta zgłoszenia) uruchamia się przez API**,
+nie komendą `helpdesk`: na przykład `curl -s -H 'Content-Type: application/json' -d @zgloszenie.json
+localhost:8010/search`.
 
 **Testy i jakość**
 - Lint: `ruff check .`
@@ -2917,8 +2931,8 @@ w p. 46.
   zapytania. `RespondError` z węzła `respond` dziedziczy po `LLMError`, więc też daje 503.
 - **Błąd konfiguracji NIGDY nie zamienia się w status HTTP.** `LLMConfigError`,
   `EncoderConfigError` i `AnonymizationConfigError`, a w `api` także `EmbeddingConfigError`,
-  `DbQdrantConfigError`, `DbPostgresConfigError` i `ProcessConfigError`, dziedziczą po błędzie
-  swojej warstwy, więc
+  `DbQdrantConfigError`, `DbPostgresConfigError` (z odmianami na brak kolekcji i tabeli)
+  i `ProcessConfigError`, dziedziczą po błędzie swojej warstwy, więc
   wpadłyby w handler 503 — handler **wyrzuca je z powrotem**. Powód: 503 znaczy „spróbuj za
   chwilę", a przy złym dostawcy LLM czekanie nic nie da; zielony kontener oddający uprzejme
   503 na każde żądanie jest gorszy niż głośna śmierć.
@@ -2932,15 +2946,15 @@ w p. 46.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1975 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 849 (79)           | 96 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 1979 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 853 (81)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 110 (9)            | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 97 (38)            | 38 s |
 
-Liczby z 2026-10-15, czasy z 2026-10-10: każdy folder osobno, w komplecie
+Liczby z 2026-10-16, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-2938 testów, około 150 s; domyślny `pytest`, bez stacku: 2812 testów, 41 s. Testy `llm_live` —
+2946 testów, około 150 s; domyślny `pytest`, bez stacku: 2818 testów, 41 s. Testy `llm_live` —
 36 integracyjnych i 57 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
 przebiegów.
 
@@ -3372,9 +3386,19 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Eksport zgłoszeń ze zrzutu jako komenda `helpdesk`** — skrypt woła `docker exec` na kontenerze
   ze zrzutem, a w obrazie `api` nie ma ani Dockera, ani dostępu do tego kontenera. Wraca
   z czytnikiem SQL (p. 31).
+- **Komendy `helpdesk` na grafach** (bramki, propozycje, „Popraw", wyszukiwanie, karta
+  zgłoszenia; skreślone 2026-10-16) — wołalibyśmy je tylko my, trasy oddają już koszt i log
+  przebiegu, a testy na żywym modelu całą rozmowę; komenda musiałaby powtórzyć to, co trasa robi
+  wokół grafu (reguły, słownik rozstrzygnięć, rejestr wariantów, zapytania agenta). Parsowanie
+  korpusu wchodzi z masowym importem (p. 31), a graf na pliku z eksportu z pełną rozmową wraca,
+  gdy będą go potrzebować pomiary (p. 23).
 - **Indeksacja dokumentacji dokładająca po jednym dokumencie** — zastąpienie całego indeksu nie
   zostawia sekcji usuniętych z paczki ani punktów dawnych fragmentów, a pełny przebieg to minuty.
-  Wraca, gdy indeks ma trzymać kilka wydań naraz (p. 15).
+  Kilka wydań naraz tego nie wymaga: każde to osobny katalog paczki z własnymi `section_id`.
+- **Brak indeksu jako pusty wynik narzędzia albo puste tabele i kolekcje zakładane przy starcie
+  `api`** — pusty wynik wygląda jak „materiał nic o tym nie mówi", więc brakującego indeksu nikt
+  by nie zauważył, a start `api` zależałby od baz. Brak tabeli i kolekcji to błąd konfiguracji.
+  Wraca jako jawne ustawienie, gdy instancja ma świadomie działać bez któregoś materiału.
 - **Deduplikacja rekordów przy indeksacji** — wielość rekordów jest informacją, nie nadmiarem:
   scalenie zgodnych rekordów usuwa dowód, że rozwiązanie jest sprawdzone, a rozłącznych —
   materiał do pytań. Pomiar: na 200 artefaktach 8 par o podobnym `problem` i ani jednej do
@@ -3549,6 +3573,8 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   reguły; przy opisie, który sam rozstrzyga sprawę, kazałaby pytać na siłę.
 - **Opis projektu w prompcie systemowym zamiast narzędzia** — przy narzędziu sprawa
   organizacyjna za opis nie płaci, a opis to dane paczki, nie nasz prompt.
+- **Spis dokumentacji w prompcie systemowym zamiast `list_docs`** — przy narzędziu sprawa, która
+  po dokumentację nie sięga, za spis nie płaci, a spis to dane paczki, nie nasz prompt.
 - **Mapa „które zdarzenie obsługuje która funkcja" w opisie projektu** — opis ma być ogólny
   i zwięzły; zostaje jedna ogólna reguła kliknięcia i wspólna obsługa błędów. Wraca, gdy
   przebiegi pokażą, że model gubi się na takim przejściu.
@@ -3746,7 +3772,7 @@ generacji.
   odpowiedź narzędziem `respond_<graf>`; reguły — „Warstwa grafów".
 - [x] **6. Trasy na atrapach grafów** — `/gate/close`, `/gate/reply`, `/search` (przełączony
   z `RagSearchera`), `/parse-ticket`, `/suggest` + `GET /variants` z rejestru, `/polish`; reguły
-  z `core_text/dict_rules_*`; reguły — „Warstwa API". CLI dla grafów odłożone do p. 46.
+  z `core_text/dict_rules_*`; reguły — „Warstwa API". CLI dla grafów nie powstaje (2026-10-16).
 
 #### A. Narzędzia — po jednym punkcie na narzędzie
 
@@ -3785,7 +3811,7 @@ punkty niżej to narzędzia właściwe.
   identyfikatory; `exact` jako jedna fraza; wspólny układ opisów wszystkich narzędzi; reguły —
   „Warstwa wyszukiwania tekstowego (Postgres)", „Warstwa narzędzi agenta".
 - [x] **51. `list_docs`** (2026-10-05) — `ListDocsTool` na tabeli dokumentacji: spis w kolejności
-  dokumentów, bez treści; czy spis ma iść narzędziem, czy w prompcie systemowym, rozstrzyga p. 15.
+  dokumentów, bez treści; spis idzie narzędziem, nie w prompcie systemowym (2026-10-16).
 - [x] **52. `read_docs`** (2026-10-05) — `ReadDocsTool` na tabeli dokumentacji: treść znak w znak,
   nieznany identyfikator to błąd bez wyniku częściowego; reguły — „Warstwa narzędzi agenta".
 - [x] **53. `find_tickets_text`** (2026-10-05) — `FindTicketsTextTool` na tabeli zgłoszeń,
@@ -3945,29 +3971,13 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   materiału, każdy zestaw na `gpt-6.1-sol` w co najmniej dwóch przebiegach; jedyna poprawka
   promptu to zdanie o cytatach w bramce wysyłki, a wnioski dla promptów czekają w p. 22–26;
   reguły — „Testy", „Twarde reguły promptu generacji", „Świadomie pominięte".
-- [ ] **46. CLI dla grafów** (dopisany 2026-10-02, numer spoza kolejności) — `helpdesk gate
-  close|reply`, `helpdesk suggest <wariant>`, „Popraw" i karta zgłoszenia na tej samej fabryce
-  grafów co trasy; także wyszukiwanie i parsowanie zgłoszeń do korpusu (dawne `rag search`
-  i `tickets parse`, skasowane z serwisami 2026-10-02); każda komenda wypisuje zużycie modelu
-  i koszt przebiegu (`usage` ze stanu grafu). *Dlaczego:* odłożone z p. 6 — na atrapach komenda
-  zwracałaby stałe odpowiedzi.
 
 #### C. Decyzje
 
-- [ ] **13. Czy anonimizacja jest wymogiem prawnym** — rozstrzyga IOD; alternatywą jest umowa
-  powierzenia z regionem EU i brakiem retencji. *Dlaczego:* przesądza, jak szczelny ma być
-  anonimizator, a decyzja z 2026-08-12 („kontrola dostępu, nie anonimizacja artefaktów") straciła
-  jedyny argument — lokalny LLM.
 - [ ] **14. Które endpointy mogą widzieć surowe dane** — własny sprzęt, RunPod (Secure czy
   Community Cloud), dostawca komercyjny. *Dlaczego:* kryterium to granica zaufania endpointu,
   a nie to, czy model anonimizujący i generujący są tym samym modelem; odpowiedź zapisuje się
   tym, co stoi w `LLM_ANONYMIZATION_*`.
-- [ ] **15. Czy są instrukcje i skąd** — format rozstrzygnięty 2026-10-03 (metryczka i pliki `.md`,
-  p. 49); zostaje: kto przygotowuje wydania, ile wydań trzyma indeks i czy listing mieści się
-  w prompcie. *Dlaczego:* to źródło opcjonalne, a instrukcja do starej wersji psuje odpowiedź tak
-  samo jak odmowa obalona nowszym rekordem.
-- [x] **16. Decyzje przesądzone przez blok 0 zapisane z cenami** (2026-10-04) — agent wybiera
-  materiał, każda funkcja ma własną pętlę, warianty są kodem, zapytanie do indeksu pisze agent.
 
 #### E. Anonimizacja — zastępuje atrapę anonimizatora z p. 4
 
@@ -4092,11 +4102,13 @@ każdy mierzy się osobno.
 
 #### H. Korpus
 
-- [ ] **31. Masowy import z nowszego zrzutu** — przez graf `parse_ticket` (zapis artefaktu po KAŻDYM
-      zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed parsowaniem, model
-      parsujący wybrany na podstawie `porownanie-modeli-parsowania.md`, prompt dostosowany do
-      placeholderów, czytnik SQL, wznawianie, raport, porządek w `data/unsafe/parsed/` (golden200
-      zostaje); zanonimizowany wątek idzie do tabeli wyszukiwania — do ustalenia, czy każdego
+- [ ] **31. Masowy import z nowszego zrzutu** — przez graf `parse_ticket`, komendą `helpdesk`
+      w kontenerze, na tej samej fabryce grafów co trasy, z kosztem przebiegu w raporcie (zapis
+      artefaktu po KAŻDYM zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed
+      parsowaniem, model parsujący wybrany na podstawie `porownanie-modeli-parsowania.md`, prompt
+      dostosowany do placeholderów, czytnik SQL, wznawianie, raport, porządek
+      w `data/unsafe/parsed/` (golden200 zostaje); zanonimizowany wątek idzie do tabeli
+      wyszukiwania, którą ten przebieg zakłada — do ustalenia, czy każdego
       zgłoszenia, czy tylko tych z kartą przyjętą przez filtr jakości (wątek musi mieć każdy
       numer, który oddaje wyszukiwanie po kartach); po napełnieniu tabeli powstaje zestaw
       zapytań tekstowych do zgłoszeń (komunikaty i kody błędów z wątków, w polach `exact`
@@ -4118,9 +4130,10 @@ każdy mierzy się osobno.
   na pliki `.md` i metryczkę, skrypt sprawdzający, że każda sekcja jest dosłownym podciągiem
   źródła i że sekcje pokrywają całość, przegląd opisów przez człowieka, próg ostrzeżenia
   o długiej sekcji (dziś tymczasowo 18 tys. znaków) oraz przeliczenie `RAG_DOCS_FRAGMENT_CHARS`
-  i `RAG_DOCS_SCORE_MIN`, zmierzonych dotąd tylko na paczce syntetycznej. *Dlaczego:* dokumentacja
-  wraca do promptu jako cytowane źródło, więc parafraza modelu stałaby się „tak mówi instrukcja";
-  model dzieli i opisuje, treści nie przepisuje.
+  i `RAG_DOCS_SCORE_MIN`, zmierzonych dotąd tylko na paczce syntetycznej, a gdy spis właściwej
+  dokumentacji okaże się za długi, zawężenie `list_docs` do jednego dokumentu. *Dlaczego:*
+  dokumentacja wraca do promptu jako cytowane źródło, więc parafraza modelu stałaby się „tak mówi
+  instrukcja"; model dzieli i opisuje, treści nie przepisuje.
 
 #### I. Przed produkcją
 

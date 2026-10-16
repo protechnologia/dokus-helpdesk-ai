@@ -15,6 +15,7 @@ działającego stacku.
 | `DocsTable`    | komunikat złamany między liniami       | znaleziony podciągiem, treść dosłowna  |
 | `DocsTable`    | twarda spacja w treści                 | znaleziona zwykłą spacją               |
 | obie           | ponowny zapis tych samych wierszy      | bez duplikatów                         |
+| `DocsTable`    | odczyt i szukanie w niezałożonej       | `DbPostgresMissingTableError`          |
 
 O czym pamiętać przy zmianach:
 
@@ -31,7 +32,13 @@ import pytest
 
 from app.agent_tools.docs.fake_docs import default_sections, default_texts
 from app.agent_tools.tickets.fake_tickets import default_threads
-from app.db_postgres import DocRow, DocsTable, PostgresClient, TicketsTable
+from app.db_postgres import (
+    DbPostgresMissingTableError,
+    DocRow,
+    DocsTable,
+    PostgresClient,
+    TicketsTable,
+)
 from tests.conftest import build_postgres_client
 
 pytestmark = [pytest.mark.stack, pytest.mark.stack_postgres]
@@ -288,3 +295,28 @@ async def test_a_hard_space_in_the_body_matches_a_plain_space(docs: DocsTable) -
     await docs.upsert([row])
 
     assert await docs.substring("Przekaż bufor") == [row.section_id]
+
+
+async def test_a_table_that_was_never_created_is_a_missing_table(client: PostgresClient) -> None:
+    """Sprawdza, czy spis, odczyt po identyfikatorach i oba rodzaje szukania w tabeli, której nikt
+    nie założył, kończą się błędem `DbPostgresMissingTableError`, a nie pustym wynikiem — czyli
+    czy prawdziwy Postgres odpowiada na nie błędem, który klient tak tłumaczy.
+
+    Wyłapuje brak tabeli przemilczany jako pusta lista: agent uznałby, że materiał nic o sprawie
+    nie mówi, choć indeksu nikt nie zbudował. Wyłapuje też brak tabeli zgłoszony jak chwilowa
+    awaria bazy, z którą żądanie skończyłoby się statusem 503."""
+    table = DocsTable(client, name="docs_text_never_created_test")
+
+    await table.drop()
+
+    with pytest.raises(DbPostgresMissingTableError):
+        await table.list_all()
+
+    with pytest.raises(DbPostgresMissingTableError):
+        await table.read_by_id(["adm-kancelaria-edoreczenia"])
+
+    with pytest.raises(DbPostgresMissingTableError):
+        await table.words("kancelaria")
+
+    with pytest.raises(DbPostgresMissingTableError):
+        await table.substring("kancelaria")

@@ -1,7 +1,12 @@
 import asyncpg
 import pytest
 
-from app.db_postgres import DbPostgresConfigError, DbPostgresError, PostgresClient
+from app.db_postgres import (
+    DbPostgresConfigError,
+    DbPostgresError,
+    DbPostgresMissingTableError,
+    PostgresClient,
+)
 
 # Klient testowany bez bazy: `asyncpg.create_pool` jest podmieniony, więc sprawdzamy to, co należy
 # do NAS — odmowę złej konfiguracji i tłumaczenie błędów sterownika. Że Postgres naprawdę tak
@@ -188,16 +193,46 @@ async def test_an_unreachable_database_is_a_db_error(
 
 @pytest.mark.parametrize("method", ["fetch_value", "fetch_rows", "execute"])
 async def test_a_failed_query_is_a_db_error(monkeypatch: pytest.MonkeyPatch, method: str) -> None:
-    """Sprawdza, czy zapytanie odrzucone przez bazę kończy się wyjątkiem `DbPostgresError` w każdej
-    z trzech metod klienta: `fetch_value`, `fetch_rows` i `execute`.
+    """Sprawdza, czy zapytanie odrzucone przez bazę kończy się wyjątkiem `DbPostgresError`, który
+    nie jest błędem konfiguracji, w każdej z trzech metod klienta: `fetch_value`, `fetch_rows`
+    i `execute`.
 
     Wyłapuje metodę, która wypuszcza wyjątek sterownika `asyncpg` bez tłumaczenia: reszta aplikacji
     łapie wyłącznie `DbPostgresError` i nie powinna znać typów biblioteki, przez którą klient
-    rozmawia z bazą."""
+    rozmawia z bazą. Wyłapuje też każde odrzucenie zgłoszone jako zła konfiguracja, na przykład
+    jako brak tabeli: żądanie skończyłoby się wtedy głośno, zamiast statusem 503."""
     connect_to(monkeypatch, StubPool(error=asyncpg.PostgresError("syntax error")))
 
-    with pytest.raises(DbPostgresError):
+    with pytest.raises(DbPostgresError) as caught:
         await getattr(make_client(), method)("SELECT nonsens")
+
+    assert not isinstance(caught.value, DbPostgresConfigError)
+
+
+@pytest.mark.parametrize("method", ["fetch_value", "fetch_rows", "execute"])
+async def test_a_missing_table_is_a_config_error(
+    monkeypatch: pytest.MonkeyPatch,
+    method:      str,
+) -> None:
+    """Sprawdza, czy zapytanie do tabeli, której w bazie nie ma, kończy się w każdej z trzech
+    metod klienta wyjątkiem `DbPostgresMissingTableError`, który jest błędem konfiguracji,
+    a komunikat podaje bazę, tabelę z tekstu sterownika i to, że indeksu nie zbudowano.
+
+    Wyłapuje brak tabeli zgłoszony jak chwilowa awaria bazy: żądanie skończyłoby się wtedy
+    statusem 503, czyli „spróbuj później", a czekanie indeksu nie zbuduje. Wyłapuje też komunikat
+    bez nazwy tabeli, z którego nie wynika, którego indeksu brakuje."""
+    error = asyncpg.UndefinedTableError('relation "docs_text" does not exist')
+    connect_to(monkeypatch, StubPool(error=error))
+
+    with pytest.raises(DbPostgresMissingTableError) as caught:
+        await getattr(make_client(), method)("SELECT * FROM docs_text")
+
+    message = str(caught.value)
+
+    assert isinstance(caught.value, DbPostgresConfigError)
+    assert "'helpdesk'"           in message
+    assert '"docs_text"'          in message
+    assert "nie został zbudowany" in message
 
 
 async def test_rows_come_back_as_plain_dicts(monkeypatch: pytest.MonkeyPatch) -> None:

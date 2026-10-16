@@ -10,6 +10,7 @@ from app.db_qdrant import (
     VECTOR_STS,
     DbQdrantConfigError,
     DbQdrantError,
+    DbQdrantMissingCollectionError,
     DocPoint,
     DocsCollection,
     QdrantClient,
@@ -322,15 +323,20 @@ async def test_search_of_an_unknown_named_vector_is_an_error(tickets: TicketsCol
 
 
 async def test_reading_from_a_missing_collection_is_an_error(tickets: TicketsCollection) -> None:
-    """Sprawdza, czy odczyt zgłoszenia i liczenie punktów w kolekcji, której nie ma, kończą się
-    błędem (`DbQdrantError`), a nie pustym wynikiem.
+    """Sprawdza, czy odczyt zgłoszenia, wyszukiwanie i liczenie punktów w kolekcji, której nie
+    ma, kończą się błędem `DbQdrantMissingCollectionError`, a nie pustym wynikiem — czyli czy
+    prawdziwy Qdrant odpowiada na nie statusem 404, który klient tak tłumaczy.
 
     Wyłapuje brak kolekcji przemilczany jako pusta lista albo zero: wyglądałoby to jak „nie ma
-    takiego zgłoszenia", choć w rzeczywistości nie ma całego indeksu."""
-    with pytest.raises(DbQdrantError):
+    takiego zgłoszenia", choć w rzeczywistości nie ma całego indeksu. Wyłapuje też brak kolekcji
+    zgłoszony jak chwilowa awaria, z którą żądanie skończyłoby się statusem 503."""
+    with pytest.raises(DbQdrantMissingCollectionError):
         await tickets.read_by_id(["33644"])
 
-    with pytest.raises(DbQdrantError):
+    with pytest.raises(DbQdrantMissingCollectionError):
+        await tickets.search(vector=[0.1] * SIZE, vector_name=VECTOR_PROBLEM, limit=5)
+
+    with pytest.raises(DbQdrantMissingCollectionError):
         await tickets.count()
 
 
@@ -440,6 +446,17 @@ async def test_doc_search_ranks_the_nearest_section_first(docs: DocsCollection) 
     assert [hit.section_id for hit in hits] == [SECTIONS[0].section_id, SECTIONS[1].section_id]
     assert hits[0].payload["title"]         == SECTIONS[0].title
     assert await docs.count()               == 2
+
+
+async def test_searching_a_missing_docs_collection_is_an_error(docs: DocsCollection) -> None:
+    """Sprawdza, czy wyszukiwanie sekcji w kolekcji dokumentacji, której nie ma, kończy się
+    błędem `DbQdrantMissingCollectionError`. To wyszukiwanie idzie inną ścieżką Qdranta niż
+    wyszukiwanie zgłoszeń, bo grupuje fragmenty po sekcji.
+
+    Wyłapuje brak kolekcji dokumentacji przemilczany jako pusta lista: agent uznałby, że
+    instrukcje nic o sprawie nie mówią, choć indeksu dokumentacji nikt nie zbudował."""
+    with pytest.raises(DbQdrantMissingCollectionError):
+        await docs.search(vector=[0.1] * SIZE, limit=5)
 
 
 async def test_tickets_and_docs_share_one_client(

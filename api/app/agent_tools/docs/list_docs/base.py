@@ -32,8 +32,8 @@ O czym pamiętać przy zmianach:
 - To narzędzie pomocnicze: spis mówi, GDZIE jest instrukcja, nie co w niej stoi, i niczego nie
   cytuje. Źródłem odpowiedzi jest dopiero sekcja odczytana przez `read_docs`.
 - Opis sekcji (`DocSection`) jest ten sam w obu wyszukiwaniach.
-- Spis jest stały między żądaniami. Przy małej dokumentacji taniej wstawić go do promptu
-  systemowego niż wołać narzędziem — do rozstrzygnięcia przy właściwej dokumentacji (p. 15).
+- Spis idzie narzędziem, nie w prompcie systemowym, jak opis projektu kodu: sprawa, która po
+  dokumentację nie sięga, za spis nie płaci, a spis to dane paczki, nie nasz prompt.
 """
 
 from abc import abstractmethod

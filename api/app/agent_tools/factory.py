@@ -38,8 +38,10 @@ O czym pamiętać przy zmianach:
   kolejności w każdej turze, a stały początek żądania to warunek cache promptu.
 - Kto zbudował narzędzia, ten je zamyka: `aclose()` każdego z nich. Klienci są wspólni, więc
   zamykają się po kilka razy; powtórne zamknięcie nic nie robi.
-- Powstają wszystkie. Czy instancja bez dokumentacji ma pomijać jej narzędzia, rozstrzyga
-  p. 15 (CLAUDE.md -> „Plan").
+- Powstają wszystkie, także narzędzia materiału, którego indeksu nie zbudowano. Brak tabeli albo
+  kolekcji kończy ich pierwsze wywołanie błędem konfiguracji (`DbPostgresMissingTableError`,
+  `DbQdrantMissingCollectionError`), a nie pustym wynikiem, który wyglądałby jak „materiał nic
+  o tym nie mówi".
 """
 
 from app.agent_tools.base import AgentTool

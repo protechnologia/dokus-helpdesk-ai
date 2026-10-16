@@ -17,7 +17,8 @@ Każdy plik to jedna odpowiedzialność:
 | `point/`      | punkty — to, co zapisujemy: `TicketPoint`, `DocPoint`     | reszta aplikacji |
 | `hit/`        | trafienia — wynik szukania: `TicketHit`, `DocHit`         | reszta aplikacji |
 | `client.py`   | `QdrantClient` — żądanie HTTP i tłumaczenie błędów        | tylko ten pakiet |
-| `errors.py`   | `DbQdrantError`, `DbQdrantConfigError`                    | reszta aplikacji |
+| `errors.py`   | `DbQdrantError`, `DbQdrantConfigError`, jego odmiana      | reszta aplikacji |
+|               | `DbQdrantMissingCollectionError`                          |                  |
 
 O czym pamiętać przy zmianach:
 
@@ -34,7 +35,11 @@ zmienia się adres, a adres to argument.
 
 from app.db_qdrant.client import QdrantClient
 from app.db_qdrant.collection import DocsCollection, TicketsCollection
-from app.db_qdrant.errors import DbQdrantConfigError, DbQdrantError
+from app.db_qdrant.errors import (
+    DbQdrantConfigError,
+    DbQdrantError,
+    DbQdrantMissingCollectionError,
+)
 from app.db_qdrant.hit import DocHit, TicketHit
 from app.db_qdrant.point import (
     VECTOR_PROBLEM,
@@ -51,6 +56,7 @@ __all__ = [
     "VECTOR_STS",
     "DbQdrantConfigError",
     "DbQdrantError",
+    "DbQdrantMissingCollectionError",
     "DocHit",
     "DocPoint",
     "DocsCollection",

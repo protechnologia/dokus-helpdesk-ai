@@ -3,7 +3,11 @@ import logging
 
 import asyncpg
 
-from app.db_postgres.errors import DbPostgresConfigError, DbPostgresError
+from app.db_postgres.errors import (
+    DbPostgresConfigError,
+    DbPostgresError,
+    DbPostgresMissingTableError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -277,12 +281,20 @@ class PostgresClient:
 
         Raises:
             DbPostgresConfigError: jak w `_get_pool()`
+            DbPostgresMissingTableError: zapytanie sięga do tabeli, której w bazie nie ma
             DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
         """
         pool = await self._get_pool()
 
         try:
             result = await getattr(pool, method)(sql, *args)
+        except asyncpg.UndefinedTableError as exc:  # tabeli nie ma: indeksu nikt nie zbudował
+            # Tekst sterownika nazywa tylko tabelę („relation "docs_text" does not exist"), bez
+            # danych klienta, a bez niego nie byłoby wiadomo, której brakuje.
+            raise DbPostgresMissingTableError(
+                f"w bazie '{self._database}' nie ma tabeli z zapytania ({exc}) — indeks tego "
+                f"materiału nie został zbudowany"
+            ) from exc
         except (
             OSError,                 # zerwane połączenie
             TimeoutError,            # zapytanie nie zmieściło się w czasie

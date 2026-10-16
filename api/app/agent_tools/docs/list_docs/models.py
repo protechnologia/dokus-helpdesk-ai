@@ -7,7 +7,7 @@ class ListDocsArgs(BaseModel):
     """
     Description:
     Argumenty `list_docs` — nie ma żadnych. Narzędzie zwraca cały spis treści; zawężenie do
-    jednego dokumentu dojdzie, gdy spis właściwej dokumentacji okaże się na to za długi (p. 15).
+    jednego dokumentu dojdzie, gdy spis właściwej dokumentacji okaże się na to za długi (p. 55).
     """
 
     # Nieznany argument to błąd, jak w każdym modelu zapytania.

@@ -1,6 +1,10 @@
 import httpx
 
-from app.db_qdrant.errors import DbQdrantConfigError, DbQdrantError
+from app.db_qdrant.errors import (
+    DbQdrantConfigError,
+    DbQdrantError,
+    DbQdrantMissingCollectionError,
+)
 
 
 class QdrantClient:
@@ -67,7 +71,8 @@ class QdrantClient:
     ) -> dict:
         """
         Description:
-        Wykonuje jedno żądanie i oddaje odpowiedź jako słownik. Każdy status poza 2xx to błąd.
+        Wykonuje jedno żądanie i oddaje odpowiedź jako słownik. Każdy status poza 2xx to błąd,
+        a 404 — brak kolekcji, bo każde żądanie idzie pod ścieżkę jednej kolekcji.
 
         Example args:
             method="PUT"
@@ -78,10 +83,20 @@ class QdrantClient:
             {"result": True, "status": "ok"}
 
         Raises:
-            DbQdrantError: Qdrant nie odpowiedział, odpowiedział błędem albo treścią, która nie
-                jest obiektem JSON
+            DbQdrantMissingCollectionError: Qdrant odpowiedział 404, czyli kolekcji nie ma
+            DbQdrantError: Qdrant nie odpowiedział, odpowiedział innym błędem albo treścią, która
+                nie jest obiektem JSON
         """
         response = await self._send(method, path, params=params, json=json)
+
+        # Każda ścieżka żądania to `/collections/<nazwa>/…`, więc 404 znaczy: nie ma kolekcji, czyli
+        # indeksu nikt nie zbudował. Tekst Qdranta zostaje w komunikacie — gdyby 404 znaczyło co
+        # innego, widać to od razu. `get_or_none()` czyta 404 po swojemu i tu nie zagląda.
+        if response.status_code == 404:
+            raise DbQdrantMissingCollectionError(
+                f"Qdrant nie ma kolekcji z żądania {method} {path}: {response.text[:200]} — "
+                f"indeks tego materiału nie został zbudowany"
+            )
 
         self._require_success(response, method, path)
 
