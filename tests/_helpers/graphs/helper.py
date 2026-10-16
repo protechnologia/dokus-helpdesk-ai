@@ -296,14 +296,14 @@ def expected_edges(
 
 
 def edges_of(
-    compiled: CompiledStateGraph,  # np. gate_close.build_fake_graph()
+    compiled: CompiledStateGraph,  # np. gate_close.build_fake_graph(FakeAnonymizer())
 ) -> set[tuple[str, str]]:
     """
     Description:
     Drogi między krokami w złożonym grafie, jako pary „skąd, dokąd".
 
     Example args:
-        compiled=gate_close.build_fake_graph()
+        compiled=gate_close.build_fake_graph(FakeAnonymizer())
 
     Example result:
         {("__start__", "anonymize"), ("anonymize", "agent"), ("agent", "respond"), …}
@@ -327,7 +327,8 @@ async def fake_nodes(
     Example result:
         {"anonymize": AnonymizeNode(…), "agent": FakeAgentNode(), "respond": FakeRespondNode(…)}
     """
-    final = graph.STATE(**await graph.build_fake_graph().ainvoke(graph.example_state()))
+    compiled = graph.build_fake_graph(FakeAnonymizer())
+    final    = graph.STATE(**await compiled.ainvoke(graph.example_state()))
 
     nodes: dict[str, Node] = {
         "anonymize": AnonymizeNode(FakeAnonymizer()),

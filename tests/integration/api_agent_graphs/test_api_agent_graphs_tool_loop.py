@@ -56,7 +56,8 @@ async def run_fake(
         SearchState(sources=[SourceRef(…), …], messages=[…], …)
     """
     state_type = type(graph.example_state())
-    state      = state_type(**await graph.build_fake_graph().ainvoke(graph.example_state()))
+    compiled   = graph.build_fake_graph(FakeAnonymizer())
+    state      = state_type(**await compiled.ainvoke(graph.example_state()))
 
     return state
 

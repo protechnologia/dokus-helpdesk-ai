@@ -215,7 +215,7 @@ def tool_definitions(
 
 
 async def run_graph(
-    graph: CompiledStateGraph,  # np. gate_close.build_fake_graph()
+    graph: CompiledStateGraph,  # np. gate_close.build_fake_graph(FakeAnonymizer())
     state: BaseModel,           # np. GateCloseState(input_text="…", rules=["…"])
 ) -> BaseModel:
     """
@@ -224,7 +224,7 @@ async def run_graph(
     LangGraph zwraca słownik pól, a trasy czytają `output`, `sources` i `messages` z modelu.
 
     Example args:
-        graph=gate_close.build_fake_graph()
+        graph=gate_close.build_fake_graph(FakeAnonymizer())
         state=GateCloseState(input_text="Nie przychodzą przesyłki…", rules=["…"])
 
     Example result:

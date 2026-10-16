@@ -13,22 +13,25 @@ logger = logging.getLogger(__name__)
 ANONYMIZE_PATH = "/anonymize"
 
 # Nazwa atrapy silnika w odpowiedzi usługi — ta sama, którą usługa zapisuje w `FAKE_ENGINE_NAME`.
-# Atrapa oddaje tekst bez zmian, więc jej wyniku ten klient nie oddaje nigdy.
+# Atrapa oddaje tekst bez zmian, więc jej wynik ten klient oddaje tylko wtedy, gdy mu na to
+# pozwolono (`fake_engine_allowed`).
 FAKE_ENGINE = "fake"
 
 
 class AnonymizerClient(Anonymizer):
     """
     Description:
-    Anonimizator, którego `api` używa przy prawdziwym modelu generującym: klient HTTP usługi
-    `anonymizer`. „Klient", bo przekracza granicę procesu (CLAUDE.md -> „Warstwy kodu"); to, co
-    po drugiej stronie zamienia dane na znaczniki, nazywa się silnikiem.
+    Jedyny anonimizator, którego `api` używa w czasie działania: klient HTTP usługi `anonymizer`.
+    „Klient", bo przekracza granicę procesu (CLAUDE.md -> „Warstwy kodu"); to, co po drugiej
+    stronie zamienia dane na znaczniki, nazywa się silnikiem. Czy silnik jest atrapą, decyduje
+    konfiguracja usługi, a nie `api`.
 
     Flow:
-        1. Budowany raz na proces z `Settings` (adres, limit czasu) i używany wielokrotnie.
+        1. Budowany raz na proces z `Settings` (adres, limit czasu, zgoda na atrapę silnika)
+           i używany wielokrotnie.
         2. `anonymize()` wysyła tekst do `/anonymize` i czyta odpowiedź: tekst i nazwę silnika.
-        3. Wynik atrapy silnika to `AnonymizationConfigError`, nie tekst: atrapa oddaje tekst bez
-           zmian, a ten nie może trafić do modelu zewnętrznego. Każda inna porażka to
+        3. Wynik atrapy silnika bez zgody to `AnonymizationConfigError`, nie tekst: atrapa oddaje
+           tekst bez zmian, a ten nie może trafić do modelu zewnętrznego. Każda inna porażka to
            `AnonymizationError` (fail-closed: graf staje).
         4. `aclose()` zamyka połączenia przy wyłączaniu aplikacji.
 
@@ -39,20 +42,26 @@ class AnonymizerClient(Anonymizer):
 
     def __init__(
         self,
-        base_url: str,          # np. "http://anonymizer:8000"
-        timeout:  float = 30.0, # sekundy
+        base_url:            str,           # np. "http://anonymizer:8000"
+        fake_engine_allowed: bool,          # np. True — przy atrapie modelu generującego
+        timeout:             float = 30.0,  # sekundy
     ):
         """
         Description:
         Buduje klienta jednej instancji usługi. Odmawia pustego adresu: `httpx` by go przyjął
         i padł dopiero przy żądaniu, niezrozumiałym błędem względnego adresu.
 
+        Zgoda na atrapę silnika nie ma wartości domyślnej: od niej zależy, czy surowy tekst może
+        pójść dalej, więc wołający podaje ją zawsze wprost.
+
         Example args:
             base_url="http://anonymizer:8000"
+            fake_engine_allowed=False
             timeout=30.0
 
         Example result:
-            AnonymizerClient wysyłający do http://anonymizer:8000/anonymize
+            AnonymizerClient wysyłający do http://anonymizer:8000/anonymize i odmawiający
+            wyniku atrapy silnika
 
         Raises:
             AnonymizationConfigError: `ANONYMIZATION_BASE_URL` jest puste
@@ -61,7 +70,8 @@ class AnonymizerClient(Anonymizer):
         if not base_url.strip():
             raise AnonymizationConfigError("ANONYMIZATION_BASE_URL nie może być puste")
 
-        self._client = httpx.AsyncClient(
+        self._fake_engine_allowed = fake_engine_allowed
+        self._client              = httpx.AsyncClient(
             base_url = base_url.rstrip("/"),  # ukośnik na końcu zdublowałby się ze ścieżką
             timeout  = timeout,
         )
@@ -82,7 +92,8 @@ class AnonymizerClient(Anonymizer):
             AnonymizedText(text="{IMIĘ} {NAZWISKO} zgłasza, że przesyłki nie przychodzą.")
 
         Raises:
-            AnonymizationConfigError: usługa działa na atrapie silnika
+            AnonymizationConfigError: usługa działa na atrapie silnika, a klient nie ma na nią
+                zgody
             AnonymizationError: usługa nie odpowiedziała, odpowiedziała błędem albo treścią,
                 która nie jest kontraktem
         """
@@ -130,9 +141,10 @@ class AnonymizerClient(Anonymizer):
     ) -> tuple[AnonymizedText, str]:
         """
         Description:
-        Czyta tekst i nazwę silnika z udanej odpowiedzi i odmawia wyniku atrapy. Osobno od
-        wywołania, żeby reguły kontraktu dało się sprawdzić bez transportu. Komunikaty nie
-        cytują treści: odpowiedź może nieść to, czego silnik nie złapał.
+        Czyta tekst i nazwę silnika z udanej odpowiedzi i odmawia wyniku atrapy, gdy klient nie
+        ma na nią zgody. Osobno od wywołania, żeby reguły kontraktu dało się sprawdzić bez
+        transportu. Komunikaty nie cytują treści: odpowiedź może nieść to, czego silnik nie
+        złapał.
 
         Example args:
             response=<Response [200 OK]>
@@ -141,7 +153,8 @@ class AnonymizerClient(Anonymizer):
             (AnonymizedText(text="{IMIĘ} {NAZWISKO} zgłasza…"), "patterns")
 
         Raises:
-            AnonymizationConfigError: odpowiedź pochodzi od atrapy silnika
+            AnonymizationConfigError: odpowiedź pochodzi od atrapy silnika, a klient nie ma na
+                nią zgody
             AnonymizationError: treść nie jest JSON-em albo nie ma tekstu lub nazwy silnika
         """
         # --- treść ---
@@ -160,7 +173,8 @@ class AnonymizerClient(Anonymizer):
         if not isinstance(engine, str) or not engine:
             raise AnonymizationError("odpowiedź anonimizatora nie ma nazwy silnika")
 
-        if engine == FAKE_ENGINE:
+        # Zgodę daje fabryka przy atrapie modelu: tekst nie trafia wtedy do żadnego modelu.
+        if engine == FAKE_ENGINE and not self._fake_engine_allowed:
             raise AnonymizationConfigError(
                 "usługa anonymizer działa na atrapie silnika (ANONYMIZATION_ENGINE=fake), która "
                 "oddaje tekst bez zmian — przy prawdziwym modelu generującym jej wyniku nie wolno "

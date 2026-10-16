@@ -21,6 +21,7 @@ from app.agent_graphs import merge_sources
 from app.agent_nodes.agent import FakeAgentNode
 from app.agent_tools.tickets.find_tickets_vector.fake import FakeFindTicketsVectorTool
 from app.core_model.graphs.proposal import Proposal
+from app.engine_anonymization import FakeAnonymizer
 from app.engine_llm import LLMError
 from tests._helpers.graphs import (
     ANONYMIZED,
@@ -74,7 +75,8 @@ async def test_the_fake_graph_runs_from_anonymization_to_output(graph: ModuleTyp
     Wyłapuje graf, który nie dochodzi do wyniku, oddaje wynik w cudzym typie albo nie zaczyna od
     anonimizacji, przez co surowe zgłoszenie mogłoby trafić do modelu."""
     state_type = type(graph.example_state())
-    state      = state_type(**await graph.build_fake_graph().ainvoke(graph.example_state()))
+    compiled   = graph.build_fake_graph(FakeAnonymizer())
+    state      = state_type(**await compiled.ainvoke(graph.example_state()))
 
     assert isinstance(state.output, output_types(graph)[0])
     assert state.log[0].node  == "anonymize"
@@ -88,8 +90,9 @@ async def test_the_fake_agent_answers_through_the_respond_tool(graph: ModuleType
 
     Wyłapuje atrapę, która odpowiada inaczej niż prawdziwy przebieg, na przykład samym tekstem:
     trasy i testy oparte na atrapie sprawdzałyby wtedy coś, czego produkcja nie robi."""
-    state = graph.STATE(**await graph.build_fake_graph().ainvoke(graph.example_state()))
-    call  = state.messages[-1].tool_calls[0]
+    compiled = graph.build_fake_graph(FakeAnonymizer())
+    state    = graph.STATE(**await compiled.ainvoke(graph.example_state()))
+    call     = state.messages[-1].tool_calls[0]
 
     assert call.name      == graph.RESPOND_TOOL_NAME
     assert call.arguments == state.output.model_dump(mode="json", exclude=set(filled_by(graph)))
@@ -107,9 +110,10 @@ async def test_the_fake_graph_returns_the_given_output(graph: ModuleType) -> Non
 
     Wyłapuje atrapę, która gubi albo podmienia podany wynik: test trasy, który podaje jej własny
     werdykt albo propozycję, sprawdzałby wtedy odpowiedź domyślną zamiast swojej."""
-    given = GIVEN_OUTPUTS[graph_name(graph)]
-    state = graph.STATE(**await graph.build_fake_graph(given).ainvoke(graph.example_state()))
-    call  = state.messages[-1].tool_calls[0]
+    given    = GIVEN_OUTPUTS[graph_name(graph)]
+    compiled = graph.build_fake_graph(FakeAnonymizer(), given)
+    state    = graph.STATE(**await compiled.ainvoke(graph.example_state()))
+    call     = state.messages[-1].tool_calls[0]
 
     assert state.output   == given
     assert call.name      == graph.RESPOND_TOOL_NAME
@@ -125,8 +129,9 @@ async def test_the_respond_node_reads_the_answer_of_its_graph(graph: ModuleType)
     Wyłapuje węzeł odpowiedzi spięty z cudzym narzędziem albo z cudzym typem wyniku, a w grafie
     parsującym — pola, których graf nie dokłada: odpowiedź modelu byłaby odrzucana w każdej
     sprawie, choć jest poprawna."""
-    final  = graph.STATE(**await graph.build_fake_graph().ainvoke(graph.example_state()))
-    before = final.model_copy(update={"output": None})
+    compiled = graph.build_fake_graph(FakeAnonymizer())
+    final    = graph.STATE(**await compiled.ainvoke(graph.example_state()))
+    before   = final.model_copy(update={"output": None})
 
     update = await graph.respond_node().run(before)
 
@@ -143,7 +148,7 @@ def test_every_graph_has_exactly_the_steps_of_its_shape(graph: ModuleType) -> No
     Wyłapuje graf złożony inaczej: bez drogi powrotnej, którą odpowiedź wraca do poprawki,
     z drogą omijającą anonimizację albo z krokiem narzędzi w grafie, który ma działać bez bazy
     wiedzy."""
-    compiled = graph.build_fake_graph()
+    compiled = graph.build_fake_graph(FakeAnonymizer())
 
     assert edges_of(compiled) == expected_edges(graph)
     assert ("run_tools" in compiled.get_graph().nodes) == bool(graph.TOOL_NAMES)
@@ -193,7 +198,7 @@ async def test_the_fake_graph_is_single_use(graph: ModuleType) -> None:
 
     Wyłapuje atrapę, która przy ponownym użyciu po cichu powtarzałaby starą odpowiedź: kod
     budujący graf raz na proces zamiast na każde żądanie przeszedłby wtedy niezauważony."""
-    compiled = graph.build_fake_graph()
+    compiled = graph.build_fake_graph(FakeAnonymizer())
 
     await compiled.ainvoke(graph.example_state())
 
@@ -216,8 +221,9 @@ async def test_a_variant_without_sources_answers_only_if_it_does_not_require_the
 
     Wyłapuje deklarację, której nikt nie egzekwuje: rozwiązanie bez źródeł wyszłoby do
     wołającego, albo pytania i przekazanie sprawy przestałyby działać przy pustym indeksie."""
-    final   = graph.STATE(**await graph.build_fake_graph().ainvoke(graph.example_state()))
-    cleared = {"output": None, "sources": []} if graph.TOOL_NAMES else {"output": None}
+    compiled = graph.build_fake_graph(FakeAnonymizer())
+    final    = graph.STATE(**await compiled.ainvoke(graph.example_state()))
+    cleared  = {"output": None, "sources": []} if graph.TOOL_NAMES else {"output": None}
 
     update = await graph.respond_node().run(final.model_copy(update=cleared))
 
@@ -409,7 +415,7 @@ async def test_the_turn_limit_cuts_the_loop_of_every_tool_graph(graph: ModuleTyp
 
     Wyłapuje nowy graf z pętlą, w którym zapomniano o limicie tur: model, który ciągle woła
     narzędzia, krążyłby w nim bez końca."""
-    compiled = graph.build_fake_graph(max_iterations=1)
+    compiled = graph.build_fake_graph(FakeAnonymizer(), max_iterations=1)
     state    = graph.STATE(**await compiled.ainvoke(graph.example_state()))
 
     assert [entry.node for entry in state.log] == ["anonymize", "agent", "respond"]

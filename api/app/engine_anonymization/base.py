@@ -7,10 +7,10 @@ class Anonymizer(ABC):
     """
     Description:
     Jedyna droga od surowego tekstu do `AnonymizedText`. Węzeł `anonymize` dostaje anonimizator
-    przez konstruktor i nie wie, czy pod spodem jest atrapa, czy usługa.
+    przez konstruktor i nie wie, czy pod spodem jest atrapa z testu, czy usługa.
 
     Flow:
-        1. Fabryka (`build_anonymizer`) wybiera implementację z konfiguracji.
+        1. Fabryka (`build_anonymizer`) buduje klienta usługi z konfiguracji; testy podają atrapę.
         2. Węzeł `anonymize` woła `anonymize()` na `input_text` grafu.
         3. Wynik trafia do stanu; dalej model zewnętrzny widzi wyłącznie jego.
         4. `aclose()` zwalnia to, co implementacja trzyma (połączenia klienta usługi).

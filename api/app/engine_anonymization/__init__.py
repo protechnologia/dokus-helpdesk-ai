@@ -8,11 +8,11 @@ Pakiet na usługę za granicą procesu, jak `engine_embedding/` (CLAUDE.md -> �
 (`base.py`), klient usługi `anonymizer` (`client.py`), atrapa (`fake.py`), fabryka (`factory.py`),
 błędy i typ `AnonymizedText`.
 
-| implementacja      | kiedy                                       | co robi                       |
-|--------------------|---------------------------------------------|-------------------------------|
-| `FakeAnonymizer`   | `LLM_GENERATION_PROVIDER=fake`              | oddaje tekst bez zmian        |
-| `AnonymizerClient` | każdy inny dostawca modelu generującego     | pyta usługę; odmawia atrapy   |
-|                    |                                             | silnika po jej nazwie         |
+| implementacja      | kiedy                     | co robi                                       |
+|--------------------|---------------------------|-----------------------------------------------|
+| `AnonymizerClient` | zawsze w czasie działania | pyta usługę; wynik atrapy silnika przyjmuje   |
+|                    |                           | tylko przy atrapie modelu generującego        |
+| `FakeAnonymizer`   | wyłącznie w testach       | oddaje tekst bez zmian, bez usługi            |
 """
 
 from app.engine_anonymization.base import Anonymizer

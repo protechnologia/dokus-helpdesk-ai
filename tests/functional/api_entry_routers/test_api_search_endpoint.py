@@ -83,7 +83,7 @@ def client_answering_with(
     """
     app = create_app()
     app.dependency_overrides[get_graph_builder] = lambda: (
-        lambda module: search.build_fake_graph(notes)
+        lambda module: search.build_fake_graph(FakeAnonymizer(), notes)
     )
 
     return TestClient(app)

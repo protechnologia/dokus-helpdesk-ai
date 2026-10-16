@@ -9,7 +9,7 @@ from app.agent_graphs.search.respond_tool import RESPOND_TOOL_NAME
 from app.agent_graphs.search.state import SearchState
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
-from app.engine_anonymization import FakeAnonymizer
+from app.engine_anonymization import Anonymizer
 
 # Uwagi atrapy, gdy nikt nie podał własnych — stałe, żeby test, który przypadkiem na nich
 # polega, padł głośno.
@@ -35,13 +35,16 @@ def example_state() -> SearchState:
 
 
 def build_fake_graph(
+    anonymizer:     Anonymizer,                       # np. FakeAnonymizer() — w trasach klient
     notes:          SearchNotes = DEFAULT_NOTES,      # np. SearchNotes(internal_notes="…")
     limits:         Mapping[str, int] | None = None,  # np. {"read_tickets_card": 3}
     max_iterations: int = FAKE_MAX_ITERATIONS,        # np. 2 — limit tur modelu
 ) -> CompiledStateGraph:
     """
     Description:
-    Ten sam graf co `build_graph`, złożony z atrap — do testów tras i CLI. Agent najpierw szuka
+    Ten sam graf co `build_graph`, złożony z atrap — do testów i do tras przy atrapie modelu.
+    Anonimizacja jest prawdziwym węzłem na podanym anonimizatorze: w trasach to klient usługi
+    `anonymizer` z fabryki grafów, w testach zwykle `FakeAnonymizer`. Agent najpierw szuka
     `find_tickets_vector`, potem czyta karty znalezionych zgłoszeń `read_tickets_card` (jeden
     objaw, trzy przyczyny) i wywołuje `respond_search` z uwagami w argumentach; w stanie
     zostają trzy źródła z odczytu, dwa wywołania narzędzi i podane uwagi.
@@ -51,6 +54,7 @@ def build_fake_graph(
     `max_iterations` to limit tur modelu: po tylu turach narzędzia nie są już wykonywane.
 
     Example args:
+        anonymizer=FakeAnonymizer()
         notes=SearchNotes(internal_notes="## Zgłoszenia historyczne\n- 90001 (2026-02-10): …")
         limits={"find_tickets_vector": 3, "read_tickets_card": 3}
         max_iterations=10
@@ -61,7 +65,7 @@ def build_fake_graph(
     agent, run_tools = fake_search_nodes(RESPOND_TOOL_NAME, notes, limits)
 
     graph = build_graph(
-        anonymize      = AnonymizeNode(FakeAnonymizer()),
+        anonymize      = AnonymizeNode(anonymizer),
         agent          = agent,
         run_tools      = run_tools,
         respond        = FakeRespondNode(notes),

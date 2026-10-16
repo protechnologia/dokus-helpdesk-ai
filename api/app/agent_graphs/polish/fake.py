@@ -7,7 +7,7 @@ from app.agent_graphs.polish.state import PolishState
 from app.agent_nodes.agent import FakeAgentNode, tool_call_turn
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
-from app.engine_anonymization import FakeAnonymizer
+from app.engine_anonymization import Anonymizer
 
 # Tekst atrapy, gdy nikt nie podał własnego — stały, żeby test, który przypadkiem na nim polega,
 # padł głośno.
@@ -34,16 +34,20 @@ def example_state() -> PolishState:
 
 
 def build_fake_graph(
-    polished: PolishedText = DEFAULT_TEXT,  # np. PolishedText(text="Dzień dobry, przesyłki…")
+    anonymizer: Anonymizer,                   # np. FakeAnonymizer() — w trasach klient usługi
+    polished:   PolishedText = DEFAULT_TEXT,  # np. PolishedText(text="Dzień dobry, przesyłki…")
 ) -> CompiledStateGraph:
     """
     Description:
-    Ten sam graf co `build_graph`, złożony z atrap — do testów tras i CLI. Agent wywołuje
+    Ten sam graf co `build_graph`, złożony z atrap — do testów i do tras przy atrapie modelu.
+    Anonimizacja jest prawdziwym węzłem na podanym anonimizatorze: w trasach to klient usługi
+    `anonymizer` z fabryki grafów, w testach zwykle `FakeAnonymizer`. Agent wywołuje
     `respond_polish` z tekstem w argumentach, a `respond` oddaje ten tekst.
 
     Graf jest jednorazowy: `FakeAgentNode` ma jedną turę. Na każde wywołanie buduj nowy.
 
     Example args:
+        anonymizer=FakeAnonymizer()
         polished=PolishedText(text="Dzień dobry, przesyłki już docierają…")
 
     Example result:
@@ -52,7 +56,7 @@ def build_fake_graph(
     answer = tool_call_turn(RESPOND_TOOL_NAME, polished.model_dump())
 
     graph = build_graph(
-        anonymize = AnonymizeNode(FakeAnonymizer()),
+        anonymize = AnonymizeNode(anonymizer),
         agent     = FakeAgentNode([answer]),
         respond   = FakeRespondNode(polished),
     )

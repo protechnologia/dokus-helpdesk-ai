@@ -5,27 +5,33 @@ przebieg, o który proszą trasy. To tu konfiguracja rozstrzyga, na czym graf st
 
 | `LLM_GENERATION_PROVIDER` | co oddaje fabryka                                               |
 |---------------------------|-----------------------------------------------------------------|
-| `fake` (domyślnie)        | atrapę grafu (`build_fake_graph()`): stałe odpowiedzi, nic nie  |
-|                           | wychodzi z procesu                                              |
+| `fake` (domyślnie)        | atrapę grafu (`build_fake_graph()`) na kliencie usługi          |
+|                           | `anonymizer`: stałe odpowiedzi, tekst nie trafia do modelu      |
 | prawdziwy dostawca        | graf z węzłów właściwych (`build_real_graph()`): anonimizator,  |
 |                           | model i narzędzia z konfiguracji                                |
 
-Co się dzieje po drodze przy prawdziwym dostawcy:
+Co się dzieje po drodze:
 
-1. Anonimizator powstaje pierwszy, raz na proces (`process_anonymizer()`): klient usługi
-   `anonymizer`. Z niczym się przy tym nie łączy. Gdy usługa działa na atrapie silnika, klient
-   odmawia jej wyniku przy pierwszym wywołaniu — graf staje w węźle `anonymize`, zanim cokolwiek
-   trafi do modelu.
-2. Klient modelu generującego powstaje z kompletu `LLM_GENERATION_*`.
-3. Graf z narzędziami wiedzy dostaje narzędzia na prawdziwych bazach — te same w każdym
+1. Anonimizator powstaje pierwszy, raz na proces (`process_anonymizer()`), przy każdym
+   dostawcy: klient usługi `anonymizer`. Z niczym się przy tym nie łączy. Czy usługa działa na
+   atrapie silnika, decyduje jej konfiguracja; klient przyjmuje taki wynik tylko przy atrapie
+   modelu, a przy prawdziwym odmawia przy pierwszym wywołaniu — graf staje w węźle
+   `anonymize`, zanim cokolwiek trafi do modelu.
+2. Przy atrapie modelu na tym koniec: atrapa grafu dostaje anonimizator i nic więcej.
+3. Przy prawdziwym dostawcy klient modelu generującego powstaje z kompletu `LLM_GENERATION_*`.
+4. Graf z narzędziami wiedzy dostaje narzędzia na prawdziwych bazach — te same w każdym
    żądaniu (`process_agent_tools()`) — oraz limity ich wywołań i limit tur modelu.
-4. `build_real_graph()` składa z tego węzły: `anonymize`, `agent`, w grafie z narzędziami
+5. `build_real_graph()` składa z tego węzły: `anonymize`, `agent`, w grafie z narzędziami
    `run_tools`, i `respond` z pakietu grafu.
 
 O czym pamiętać przy zmianach:
 
 - Dostawca `fake` to atrapa CAŁEGO grafu, nie węzły właściwe na atrapie modelu: atrapa modelu
   bez scenariusza odpowiada samym tekstem, więc węzeł `respond` odrzucałby każdą sprawę.
+- Atrapa grafu woła jedną prawdziwą usługę, `anonymizer`, bo anonimizacja to stały pierwszy
+  węzeł, a nie wybór modelu. Narzędzi nie wykonuje: wybiera je model, którego przy atrapie nie
+  ma, więc świeży stack odpowiada bez zbudowanych indeksów. Cena: przy atrapie modelu trasy
+  grafów potrzebują działającej usługi `anonymizer`.
 - Graf powstaje na każde żądanie: atrapa jest jednorazowa (`FakeAgentNode` ma zaplanowane tury),
   a węzły właściwe są tanie. Narzędzia na prawdziwych bazach i anonimizator żyją tyle, co
   proces, bo trzymają połączenia; zamykają je `close_process_agent_tools()`
@@ -122,14 +128,15 @@ def build_real_graph(
 def process_anonymizer() -> Anonymizer:
     """
     Description:
-    Anonimizator zbudowany raz na proces. Przy prawdziwym modelu to klient usługi `anonymizer`,
-    który trzyma połączenia HTTP — budowany na każde żądanie, zostawiałby je otwarte.
+    Anonimizator zbudowany raz na proces: klient usługi `anonymizer`, przy każdym dostawcy
+    modelu. Trzyma połączenia HTTP — budowany na każde żądanie, zostawiałby je otwarte.
 
     Example args:
         (brak)
 
     Example result:
-        AnonymizerClient(base_url="http://anonymizer:8000")
+        AnonymizerClient(base_url="http://anonymizer:8000"), bez zgody na atrapę silnika przy
+        prawdziwym modelu
 
     Raises:
         AnonymizationConfigError: pusty `ANONYMIZATION_BASE_URL`
@@ -141,8 +148,8 @@ async def close_process_anonymizer() -> None:
     """
     Description:
     Zamyka anonimizator zbudowany przez `process_anonymizer()` i zapomina go. Gdy żadnego nie
-    zbudowano — przy atrapie modelu to zwykły przypadek — nie robi nic. Woła to aplikacja przy
-    wyłączaniu.
+    zbudowano — aplikacja nie dostała ani jednego żądania do grafu — nie robi nic. Woła to
+    aplikacja przy wyłączaniu.
 
     Example args:
         (brak)
@@ -204,30 +211,35 @@ async def close_process_agent_tools() -> None:
 
 
 def _build_fake_graph(
-    graph:    ModuleType,  # np. app.agent_graphs.search
-    settings: Settings,    # np. Settings()
+    graph:      ModuleType,  # np. app.agent_graphs.search
+    anonymizer: Anonymizer,  # np. process_anonymizer()
+    settings:   Settings,    # np. Settings()
 ) -> CompiledStateGraph:
     """
     Description:
-    Buduje atrapę grafu. Graf z narzędziami dostaje z konfiguracji limity ich wywołań i limit tur
-    modelu — atrapy egzekwują je tą samą regułą co węzły właściwe.
+    Buduje atrapę grafu na podanym anonimizatorze. Graf z narzędziami dostaje z konfiguracji
+    limity ich wywołań i limit tur modelu — atrapy egzekwują je tą samą regułą co węzły właściwe.
 
     Example args:
         graph=app.agent_graphs.search
+        anonymizer=AnonymizerClient(base_url="http://anonymizer:8000", fake_engine_allowed=True)
         settings=Settings()
 
     Example result:
-        CompiledStateGraph złożony z atrap węzłów
+        CompiledStateGraph złożony z atrap węzłów i węzła `anonymize` na kliencie usługi
     """
     # --- graf bez narzędzi wiedzy: jedna tura, nie ma czego limitować ---
     if not graph.TOOL_NAMES:
-        return graph.build_fake_graph()
+        return graph.build_fake_graph(anonymizer=anonymizer)
 
     # --- graf z narzędziami: limity z konfiguracji ---
-    return graph.build_fake_graph(
+    compiled = graph.build_fake_graph(
+        anonymizer     = anonymizer,
         limits         = settings.tool_call_limits(),
         max_iterations = settings.agent_max_iterations,
     )
+
+    return compiled
 
 
 def build_function_graph(
@@ -235,9 +247,9 @@ def build_function_graph(
 ) -> CompiledStateGraph:
     """
     Description:
-    Buduje graf funkcji, o który prosi trasa. Przy atrapie modelu generującego oddaje atrapę
-    grafu, przy prawdziwym dostawcy — graf z węzłów właściwych na anonimizatorze, modelu
-    i narzędziach z konfiguracji.
+    Buduje graf funkcji, o który prosi trasa. Obie drogi stoją na kliencie usługi `anonymizer`:
+    przy atrapie modelu generującego fabryka oddaje atrapę grafu, przy prawdziwym dostawcy —
+    graf z węzłów właściwych na anonimizatorze, modelu i narzędziach z konfiguracji.
 
     Do czasu prawdziwego silnika w usłudze `anonymizer` (p. 19.4–19.5) druga droga zatrzymuje
     się w węźle `anonymize`: klient usługi odmawia wyniku atrapy silnika błędem konfiguracji,
@@ -250,7 +262,7 @@ def build_function_graph(
         CompiledStateGraph: atrapa grafu albo graf z węzłów właściwych
 
     Raises:
-        AnonymizationConfigError: pusty `ANONYMIZATION_BASE_URL` przy prawdziwym modelu
+        AnonymizationConfigError: pusty `ANONYMIZATION_BASE_URL`
         LLMConfigError: nieznany dostawca albo brak klucza czy modelu
         EmbeddingConfigError, DbQdrantConfigError, DbPostgresConfigError: zła konfiguracja
             zależności narzędzi
@@ -261,13 +273,15 @@ def build_function_graph(
     # samo czyta ją fabryka klienta modelu.
     provider = settings.llm_generation_provider.strip().lower()
 
-    # --- atrapa modelu: cały graf z atrap, nic nie wychodzi z procesu ---
-    if provider == PROVIDER_FAKE:
-        return _build_fake_graph(graph, settings)
-
-    # --- prawdziwy model: anonimizator pierwszy, żeby bez niego nie powstało nic więcej ---
+    # Anonimizator pierwszy, przy każdym dostawcy: bez niego nie powstaje nic więcej.
     anonymizer = process_anonymizer()
-    llm        = get_llm_client(settings.llm_generation())
+
+    # --- atrapa modelu: graf z atrap na kliencie usługi, tekst nie trafia do modelu ---
+    if provider == PROVIDER_FAKE:
+        return _build_fake_graph(graph, anonymizer, settings)
+
+    # --- prawdziwy model: węzły właściwe ---
+    llm = get_llm_client(settings.llm_generation())
 
     compiled = build_real_graph(
         graph          = graph,

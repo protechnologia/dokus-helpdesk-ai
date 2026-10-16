@@ -70,7 +70,7 @@ async def fake_output(
     Example result:
         Verdict(verdict="pass", reasons=["fake-gate-close-verdict"], …)
     """
-    final = await run_graph(graph.build_fake_graph(), graph.example_state())
+    final = await run_graph(graph.build_fake_graph(FakeAnonymizer()), graph.example_state())
 
     return final.output
 

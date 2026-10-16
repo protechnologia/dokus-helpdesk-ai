@@ -10,7 +10,7 @@ from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
 from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_service.loader_dict_resolution import get_resolution_classes
-from app.engine_anonymization import FakeAnonymizer
+from app.engine_anonymization import Anonymizer
 
 
 def default_ticket() -> ParsedTicket:
@@ -67,16 +67,20 @@ def example_state() -> ParseTicketState:
 
 
 def build_fake_graph(
-    ticket: ParsedTicket | None = None,  # np. ParsedTicket(ticket_id="90101", …)
+    anonymizer: Anonymizer,                  # np. FakeAnonymizer() — w trasach klient usługi
+    ticket:     ParsedTicket | None = None,  # np. ParsedTicket(ticket_id="90101", …)
 ) -> CompiledStateGraph:
     """
     Description:
-    Ten sam graf co `build_graph`, złożony z atrap — do testów tras i CLI. Agent wywołuje
+    Ten sam graf co `build_graph`, złożony z atrap — do testów i do tras przy atrapie modelu.
+    Anonimizacja jest prawdziwym węzłem na podanym anonimizatorze: w trasach to klient usługi
+    `anonymizer` z fabryki grafów, w testach zwykle `FakeAnonymizer`. Agent wywołuje
     `respond_parse_ticket` z polami karty bez `FILLED_BY_GRAPH`, a `respond` oddaje całą kartę.
 
     Graf jest jednorazowy: `FakeAgentNode` ma jedną turę. Na każde wywołanie buduj nowy.
 
     Example args:
+        anonymizer=FakeAnonymizer()
         ticket=None
 
     Example result:
@@ -89,7 +93,7 @@ def build_fake_graph(
     )
 
     graph = build_graph(
-        anonymize = AnonymizeNode(FakeAnonymizer()),
+        anonymize = AnonymizeNode(anonymizer),
         agent     = FakeAgentNode([answer]),
         respond   = FakeRespondNode(ticket),
     )

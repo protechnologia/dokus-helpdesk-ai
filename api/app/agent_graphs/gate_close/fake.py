@@ -7,7 +7,7 @@ from app.agent_nodes.agent import FakeAgentNode, tool_call_turn
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
 from app.core_model.graphs.verdict import Verdict
-from app.engine_anonymization import FakeAnonymizer
+from app.engine_anonymization import Anonymizer
 
 # Werdykt atrapy, gdy nikt nie podał własnego — stały, żeby test, który przypadkiem na nim polega,
 # padł głośno.
@@ -34,18 +34,21 @@ def example_state() -> GateCloseState:
 
 
 def build_fake_graph(
-    verdict: Verdict = DEFAULT_VERDICT,  # np. Verdict(verdict="block", reasons=["…"], hint="…")
+    anonymizer: Anonymizer,                 # np. FakeAnonymizer() — w trasach klient usługi
+    verdict:    Verdict = DEFAULT_VERDICT,  # np. Verdict(verdict="block", reasons=["…"], hint="…")
 ) -> CompiledStateGraph:
     """
     Description:
-    Ten sam graf co `build_graph`, złożony z atrap — do testów tras i CLI. Anonimizacja jest
-    prawdziwym węzłem na `FakeAnonymizer`, agent wywołuje `respond_gate_close` z werdyktem
-    w argumentach, a `respond` oddaje ten werdykt.
+    Ten sam graf co `build_graph`, złożony z atrap — do testów i do tras przy atrapie modelu.
+    Anonimizacja jest prawdziwym węzłem na podanym anonimizatorze: w trasach to klient usługi
+    `anonymizer` z fabryki grafów, w testach zwykle `FakeAnonymizer`. Agent wywołuje
+    `respond_gate_close` z werdyktem w argumentach, a `respond` oddaje ten werdykt.
 
     Graf jest jednorazowy: `FakeAgentNode` ma jedną turę, więc drugie wywołanie tego samego grafu
     kończy się błędem. Na każde wywołanie buduj nowy.
 
     Example args:
+        anonymizer=FakeAnonymizer()
         verdict=Verdict(verdict="block", reasons=["Nie widać, co zrobiono."], hint="Dopisz…")
 
     Example result:
@@ -54,7 +57,7 @@ def build_fake_graph(
     answer = tool_call_turn(RESPOND_TOOL_NAME, verdict.model_dump())
 
     graph = build_graph(
-        anonymize = AnonymizeNode(FakeAnonymizer()),
+        anonymize = AnonymizeNode(anonymizer),
         agent     = FakeAgentNode([answer]),
         respond   = FakeRespondNode(verdict),
     )

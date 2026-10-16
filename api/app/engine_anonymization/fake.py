@@ -5,9 +5,10 @@ from app.engine_anonymization.models import AnonymizedText
 class FakeAnonymizer(Anonymizer):
     """
     Description:
-    Atrapa anonimizatora: oddaje tekst BEZ ZMIAN, opakowany w `AnonymizedText`. Niczego nie
-    anonimizuje, więc wolno jej używać wyłącznie z atrapą modelu — `build_anonymizer` buduje ją
-    tylko przy `LLM_GENERATION_PROVIDER=fake`, a przy każdym innym klienta usługi `anonymizer`.
+    Atrapa anonimizatora do testów: oddaje tekst BEZ ZMIAN, opakowany w `AnonymizedText`, bez
+    usługi `anonymizer`. W czasie działania `api` jej nie używa — `build_anonymizer` buduje
+    zawsze klienta usługi, a o atrapie silnika decyduje konfiguracja usługi. Niczego nie
+    anonimizuje, więc wolno jej używać wyłącznie z atrapą modelu albo na zmyślonych danych.
 
     Flow:
         1. Każde `anonymize()` zapisuje tekst w `texts` i zwraca go bez zmian.

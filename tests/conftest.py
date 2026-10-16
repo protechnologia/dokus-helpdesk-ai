@@ -35,6 +35,9 @@ O czym pamiętać przy zmianach:
 - Poza testami `llm_live` oba modele są atrapą, cokolwiek stoi w `.env`
   (`fake_models_outside_live_tests`). Fabryka grafów przy prawdziwym dostawcy składa graf na
   prawdziwym modelu, a zwykły test trasy nie może go zawołać ani zależeć od pliku dewelopera.
+- Poza testami na stacku fabryka grafów dostaje `FakeAnonymizer` zamiast klienta usługi
+  `anonymizer` (`fake_anonymizer_outside_stack_tests`). Klienta buduje przy każdym dostawcy,
+  a domyślny przebieg usługi nie ma. Test samej drogi fabryki przywraca `build_anonymizer`.
 - Adresów nie wpisuje się w plikach testów. Konfiguracja wskazuje nazwy z sieci compose
   (`http://embedder:8000`), których z hosta nie da się rozwiązać, więc każdy test spoza kontenera
   potrzebuje podmiany; powielona w plikach rozjeżdżała się po zmianie portu w jednym miejscu.
@@ -50,13 +53,16 @@ O czym pamiętać przy zmianach:
 """
 
 import os
+from collections.abc import Iterator
 from urllib.parse import urlsplit
 
 import pytest
 from _pytest.terminal import TerminalReporter  # pytest 8.3 nie wystawia tego typu pod `pytest.`
 
+from app.agent_graphs import factory as graph_factory
 from app.config import Settings
 from app.db_postgres import PostgresClient
+from app.engine_anonymization import FakeAnonymizer
 from tests._helpers.live import LLM_LIVE_MARKER, LiveUsageReport
 from tests._helpers.scenarios.code import CodeReport
 from tests._helpers.scenarios.gates import GateReport
@@ -65,6 +71,10 @@ from tests._helpers.scenarios.polish import PolishReport
 from tests._helpers.scenarios.questions import QuestionsReport
 from tests._helpers.scenarios.reading import ReadingReport
 from tests._helpers.scenarios.solution import SolutionReport
+
+# Parasol testów, które potrzebują działającej usługi: tylko one rozmawiają z prawdziwym
+# anonimizatorem.
+STACK_MARKER = "stack"
 
 EMBEDDER_URL_ENV     = "EMBEDDER_TEST_URL"
 EMBEDDER_URL_DEFAULT = "http://localhost:8001"
@@ -114,6 +124,41 @@ def fake_models_outside_live_tests(
 
     monkeypatch.setenv("LLM_GENERATION_PROVIDER", "fake")
     monkeypatch.setenv("LLM_ANONYMIZATION_PROVIDER", "fake")
+
+
+@pytest.fixture(autouse=True)
+def fake_anonymizer_outside_stack_tests(
+    request:     pytest.FixtureRequest,  # wstrzykiwane przez pytest; niesie markery testu
+    monkeypatch: pytest.MonkeyPatch,     # wstrzykiwane przez pytest; cofa podmianę po teście
+) -> Iterator[None]:
+    """
+    Description:
+    Podstawia fabryce grafów `FakeAnonymizer` w każdym teście poza testami na stacku.
+
+    Fabryka buduje klienta usługi `anonymizer` przy każdym dostawcy modelu, także przy atrapie,
+    bo w czasie działania `api` nie ma własnej atrapy tej usługi. Domyślny przebieg usługi nie
+    ma, więc bez podmiany każdy test trasy grafu kończyłby się błędem połączenia. Anonimizator
+    jest zapamiętywany na cały proces, więc pamięć fabryki czyści się przed testem i po nim.
+    Test, który sprawdza samą drogę fabryki, przywraca `build_anonymizer` sam.
+
+    Example args:
+        (wstrzykiwane przez pytest)
+
+    Example result:
+        None — `process_anonymizer()` w teście oddaje `FakeAnonymizer`
+    """
+    # --- test na stacku ma rozmawiać z prawdziwą usługą ---
+    if request.node.get_closest_marker(STACK_MARKER) is not None:
+        yield
+
+        return
+
+    monkeypatch.setattr(graph_factory, "build_anonymizer", lambda settings: FakeAnonymizer())
+    graph_factory.process_anonymizer.cache_clear()
+
+    yield
+
+    graph_factory.process_anonymizer.cache_clear()
 
 
 # Miejsce raportu w konfiguracji przebiegu: fixture go tam wkłada, a podsumowanie stamtąd bierze.

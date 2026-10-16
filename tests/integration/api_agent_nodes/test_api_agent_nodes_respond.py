@@ -119,7 +119,7 @@ async def expected_answer(
         (ChatMessage(role="assistant", tool_calls=[ToolCall(name="respond_gate_close", …)]),
          Verdict(verdict="pass", reasons=["fake-gate-close-verdict"], …))
     """
-    final = await run_graph(graph.build_fake_graph(), graph.example_state())
+    final = await run_graph(graph.build_fake_graph(FakeAnonymizer()), graph.example_state())
 
     return final.messages[-1], final.output
 

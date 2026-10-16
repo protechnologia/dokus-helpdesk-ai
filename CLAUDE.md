@@ -387,7 +387,16 @@ dokus-helpdesk-ai/
   w dwóch usługach. Tak samo przy anonimizacji: w `api` kontrakt `Anonymizer` i klient
   `AnonymizerClient`, w usłudze `anonymizer` silnik `Engine` i `FakeEngine`. Wzorzec za to jest
   ten sam po obu stronach: interfejs + implementacja offline (`Fake…`) + fabryka po ENV
-  z fail-fast.
+  z fail-fast. Atrapa po stronie `api` służy jednak wyłącznie testom.
+- **O atrapie naszej usługi decyduje konfiguracja tej usługi, a `api` woła ją taką, jaka jest
+  (decyzja 2026-10-16).** Dotyczy każdej usługi, którą piszemy i stawiamy w compose: dziś
+  `anonymizer` i `embedder`. W czasie działania `api` nie ma ich atrap: rozmawia z nimi zawsze
+  przez klienta HTTP, a atrapy po swojej stronie (`FakeAnonymizer`, atrapy narzędzi) trzyma dla
+  testów. Usługa mówi w odpowiedzi, czy jest atrapą (`engine` w anonimizatorze), a klient
+  odmawia jej wyniku tylko tam, gdzie atrapa szkodzi: wynik atrapy silnika przy prawdziwym
+  modelu generującym poszedłby do modelu bez anonimizacji. Cena: przy atrapie modelu trasy
+  grafów potrzebują działającej usługi `anonymizer`. Nie dotyczy modelu LLM: to usługa
+  zewnętrzna, a jego atrapę wybiera `api`.
 - **Granica `core_model` / `core_service` działa w OBIE strony:** w `core_model/` wyłącznie modele,
   jeden na plik; w `core_service/` ani jednego modelu Pydantic. Model wychodzi z serwisu nawet
   wtedy, gdy używa go jeden serwis i zmienia się razem z nim. **Cena:** kilka importów więcej i
@@ -1590,14 +1599,15 @@ Wspólne:
   w logu usługi, nie w odpowiedzi.
 - **Trasy biorą graf z `agent_graphs/factory.py` (`get_graph_builder()`, zależność FastAPI),
   budowany na każde żądanie, a z czego jest złożony, rozstrzyga `LLM_GENERATION_PROVIDER`
-  (2026-10-05).** Przy `fake` fabryka oddaje atrapę grafu: stałe odpowiedzi, nic nie wychodzi
-  z procesu. Przy prawdziwym dostawcy składa graf z węzłów właściwych (`build_real_graph()`) na
-  anonimizatorze, kliencie modelu i narzędziach z konfiguracji. Anonimizator to klient usługi
-  `anonymizer`; dopóki usługa ma tylko atrapę silnika (do p. 19.4), klient odmawia jej wyniku,
-  więc trasy grafów oddają 500, a `/health` działa. Narzędzia na bazach i anonimizator powstają
-  raz na proces, bo trzymają połączenia, i są zamykane przy wyłączaniu aplikacji. Test
-  podmienia zależność przez `dependency_overrides`,
-  wstawiając własny graf.
+  (2026-10-05).** Obie drogi stoją na kliencie usługi `anonymizer` (od 2026-10-16). Przy `fake`
+  fabryka oddaje atrapę grafu: stałe odpowiedzi, tekst nie trafia do żadnego modelu, a narzędzia
+  nie są wykonywane, więc trasa działa bez zbudowanych indeksów, ale nie bez usługi
+  `anonymizer` (jej awaria to 503). Przy prawdziwym dostawcy fabryka składa graf z węzłów
+  właściwych (`build_real_graph()`) na anonimizatorze, kliencie modelu i narzędziach
+  z konfiguracji; dopóki usługa ma tylko atrapę silnika (do p. 19.4), klient odmawia jej
+  wyniku, więc trasy grafów oddają 500, a `/health` działa. Narzędzia na bazach i anonimizator
+  powstają raz na proces, bo trzymają połączenia, i są zamykane przy wyłączaniu aplikacji. Test
+  podmienia zależność przez `dependency_overrides`, wstawiając własny graf.
 
 ### Warstwa embeddera
 
@@ -2223,13 +2233,14 @@ a do tego czasu jej nie ma, więc oba narzędzia kończą się błędem `DbPostg
   `engine_embedding/` (kontrakt `Anonymizer`, klient usługi `AnonymizerClient`, `FakeAnonymizer`,
   fabryka `build_anonymizer`). Osobny typ zamiast `str`, żeby granica była widoczna
   w sygnaturach: kod przyjmujący `AnonymizedText` nie przyjmie surowego tekstu przez pomyłkę.
-- **`FakeAnonymizer` oddaje tekst BEZ ZMIAN, więc `build_anonymizer` buduje go wyłącznie przy
-  `LLM_GENERATION_PROVIDER=fake`; przy każdym innym buduje klienta usługi `anonymizer`
-  (2026-10-16, wcześniej odmowa przy budowie).** Klient odmawia wyniku atrapy silnika usługi
-  (`engine: "fake"`) błędem `AnonymizationConfigError` przy pierwszym wywołaniu — fabryka
-  z niczym się nie łączy, więc który silnik działa, wie dopiero odpowiedź — i graf staje
+- **`build_anonymizer` buduje zawsze klienta usługi `anonymizer`, a `FakeAnonymizer`, który
+  oddaje tekst BEZ ZMIAN, służy tylko testom (2026-10-16).** Wynik atrapy silnika usługi
+  (`engine: "fake"`) klient przyjmuje tylko przy `LLM_GENERATION_PROVIDER=fake`: zgodę
+  (`fake_engine_allowed`) daje fabryka, bo tekst nie trafia wtedy do żadnego modelu. Przy
+  prawdziwym modelu klient odmawia błędem `AnonymizationConfigError` przy pierwszym wywołaniu —
+  fabryka z niczym się nie łączy, więc który silnik działa, wie dopiero odpowiedź — i graf staje
   w węźle `anonymize`, zanim cokolwiek trafi do modelu. Rozstrzyga dostawca modelu
-  generującego; konfiguracja modelu anonimizującego o wyborze nie decyduje.
+  generującego; konfiguracja modelu anonimizującego o zgodzie nie decyduje.
 - **Węzeł `anonymize` nie ma atrapy — od razu jest właściwy (`AnonymizeNode`) i nie łapie błędów
   anonimizatora** (fail-closed). Atrapa węzła byłaby drugą drogą obok anonimizacji; test kontraktu
   węzłów pilnuje, że w `anonymize/` jest tylko `node.py`.
@@ -2288,15 +2299,19 @@ nowe zgłoszenie (surowy tekst)
   2026-10-02) — bez pól `FILLED_BY_GRAPH` (`ticket_id`, `date`, wersja słownika), które dokłada graf
   ze stanu.
 - **Atrapa grafu (`build_fake_graph()`) jest jednorazowa** — `FakeAgentNode` ma zaplanowane tury,
-  więc trasa i CLI budują ją na każde wywołanie. `ainvoke` zwraca słownik, nie model stanu.
+  więc trasa buduje ją na każde wywołanie. `ainvoke` zwraca słownik, nie model stanu.
+- **Atrapa grafu dostaje anonimizator argumentem i nie wykonuje narzędzi (2026-10-16).** Trasa
+  podaje jej klienta usługi `anonymizer` z fabryki, a test zwykle `FakeAnonymizer`; atrapa nie
+  tworzy go u siebie. Anonimizacja to stały pierwszy węzeł, więc atrapa woła tę jedną usługę.
+  Narzędzi nie wykonuje, bo wybiera je model, którego przy atrapie nie ma.
 - **Każdy graf wystawia to samo API** — `STATE`, `TOOL_NAMES`, `system_prompt()`,
   `user_prompt(state)`, `model_tools(tools, limits)`, `respond_node()`, `build_graph(…)`,
-  `build_fake_graph()`, `example_state()` (oraz `respond_tool()`, a w `suggest_*` `LABEL`
-  i `REQUIRES_HITS`). `test_api_agent_graphs_contract.py` sam znajduje grafy w `app/agent_graphs/`
-  i sprawdza je wszystkie, więc nowy graf jest objęty bez dopisywania i nie ma osobnych plików
-  testów na graf. Świadomie dopisuje się go w dwóch miejscach: w tabelce tego testu, które
-  grafy mają narzędzia wiedzy, i w `GIVEN_OUTPUTS` próbek helpera grafów
-  (`tests/_helpers/graphs/samples.py`), jaki wynik podać jego atrapie.
+  `build_fake_graph(anonymizer, …)`, `example_state()` (oraz `respond_tool()`, a w `suggest_*`
+  `LABEL` i `REQUIRES_HITS`). `test_api_agent_graphs_contract.py` sam znajduje grafy
+  w `app/agent_graphs/` i sprawdza je wszystkie, więc nowy graf jest objęty bez dopisywania
+  i nie ma osobnych plików testów na graf. Świadomie dopisuje się go w dwóch miejscach:
+  w tabelce tego testu, które grafy mają narzędzia wiedzy, i w `GIVEN_OUTPUTS` próbek helpera
+  grafów (`tests/_helpers/graphs/samples.py`), jaki wynik podać jego atrapie.
 - **Dwa kształty przebiegu.** Bez narzędzi wiedzy: anonymize → agent → respond. Z nimi: pętla
   agent ⇄ run_tools, a o kierunku po turze modelu decyduje wspólne `route_after_agent()` z
   `agent_graphs/base.py` — po tym, CO model wywołał, i po limicie tur: narzędzia wiedzy →
@@ -2883,7 +2898,9 @@ localhost:8010/search`.
 - **Prawdziwy `LLM_GENERATION_PROVIDER` bez prawdziwego silnika anonimizacji kładzie trasy grafów
   (2026-10-05, od 2026-10-16 przez klienta usługi)** — klient usługi `anonymizer` odmawia wyniku
   atrapy silnika przy każdym żądaniu (`AnonymizationConfigError`, 500), a `/health` odpowiada
-  dalej. Do p. 19.4 stack stoi na `fake`. Testom `llm_live` wystarczy
+  dalej. Do p. 19.4 trasy grafów na stacku działają tylko na atrapie modelu: na chwilę
+  wystarczy `LLM_GENERATION_PROVIDER=fake docker compose up -d api`, a samo
+  `docker compose up -d api` wraca do `.env`. Testom `llm_live` wystarczy
   dostawca podany w poleceniu (`LLM_GENERATION_PROVIDER=openai pytest … -m llm_live`); klucz
   i model mogą zostać w `.env`.
 - **Powłoka przebija `.env`** — przy `${VAR:-default}` Compose stawia zmienną powłoki **wyżej**
@@ -2966,15 +2983,15 @@ localhost:8010/search`.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2011 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 857 (82)           | 96 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2015 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 858 (83)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 124 (11)           | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 97 (38)            | 38 s |
 
 Liczby z 2026-10-16, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-2996 testów, około 150 s; domyślny `pytest`, bez stacku: 2865 testów, 44 s. Testy `llm_live` —
+3001 testów, około 150 s; domyślny `pytest`, bez stacku: 2869 testów, około 50 s. Testy `llm_live` —
 36 integracyjnych i 57 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
 przebiegów.
 
@@ -3096,6 +3113,12 @@ przebiegów.
   syntetycznej z repo ma się zgadzać z paczką z jej źródła. Plik z 300 metodami pilnuje numerów
   linii przed błędem pamięci tree-sittera 0.26.0. Cena: domyślny `pytest` wymaga tree-sittera
   w `.venv`.
+- **Poza testami na stacku fabryka grafów dostaje `FakeAnonymizer` (2026-10-16, fixture
+  `fake_anonymizer_outside_stack_tests` w `tests/conftest.py`).** Fabryka buduje klienta usługi
+  `anonymizer` przy każdym dostawcy, a domyślny przebieg usługi nie ma. Test samej drogi
+  fabryki przywraca `build_anonymizer` i podstawia klientowi atrapę transportu, a test na
+  stacku idzie przez fabrykę do żywej usługi. Trasy grafu na kontenerze `api` test nie woła:
+  po p. 19.4, przy prawdziwym modelu w `.env`, zawołałby płatny model.
 - **Testy `llm_live` biorą model przez `live_generation_llm()`** (`tests/_helpers/live/`) —
   konfigurację modelu generującego, czyli tego, na którym produkt ma chodzić. Odmawia błędem,
   gdy wybór testów nie wymienia `llm_live` (płatne wywołanie nie może być skutkiem ubocznym
@@ -3275,7 +3298,7 @@ przebiegów.
 |----------------------------------------|-------------------------------------------------------------------------|
 | `tests/conftest.py`                    | adresy usług z hosta (`embedder_url()`, `qdrant_url()`, `api_url()`, `host_settings`, `build_host_settings()`) — nigdy wpisane w pliku testu |
 | `tests/_helpers/transport/`            | test klienta HTTP: `with_transport()`, `always()`, `routed()`, `capturing()`, `raising()` |
-| `tests/_helpers/anonymization/`        | anonimizacja: zmyślone zgłoszenie z danymi osobowymi i jego postać po anonimizacji, fragmenty, których nie wolno zobaczyć w logach (`SENSITIVE`), klient usługi `anonymizer` na atrapie transportu (`anonymizer_client_on()`) i odpowiedź usługi (`service_answer()`) |
+| `tests/_helpers/anonymization/`        | anonimizacja: zmyślone zgłoszenie z danymi osobowymi i jego postać po anonimizacji, fragmenty, których nie wolno zobaczyć w logach (`SENSITIVE`), klient usługi `anonymizer` na atrapie transportu (`anonymizer_client_on()`), odpowiedź usługi (`service_answer()`) i sprawdzenie, czy anonimizator przyjmuje wynik atrapy silnika (`accepts_the_fake_engine()`) |
 | `tests/_helpers/postgres/`             | narzędzie na prawdziwej tabeli z podmienionym klientem (`ScriptedPostgres`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
 | `tests/_helpers/live/`                 | żywy model: konfiguracja (`live_generation_llm()`), graf na nim (`run_live_graph()`, z regułami klienta), sprawy grafu naraz (`run_live_cases()` na `LiveCase`: wejście, reguły, narzędzia), reguły z zestawu domyślnego (`default_rules()`), pomiar raz na graf (`remember_per_graph()`), sprawy testu okablowania grafów (`measure_example_case()` i dwie sprawy `suggest_solution`), raport zużycia (fixture `live_usage`) i wydruk rozmowy (`run_as_lines()`) |
@@ -3477,6 +3500,16 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Węzły właściwe na atrapie modelu przy dostawcy `fake`** — atrapa modelu bez scenariusza
   odpowiada samym tekstem, więc `respond` odrzucałby każdą sprawę, a scenariusz wpisany w fabrykę
   byłby drugą atrapą grafu. Przy `fake` fabryka oddaje atrapę całego grafu.
+- **Prawdziwe narzędzia w atrapie grafu** (2026-10-16) — atrapa modelu musiałaby mieć scenariusz
+  wywołań z poprawnymi argumentami, a świeży stack bez indeksów kończyłby się błędem brakującego
+  indeksu. Atrapa grafu woła tylko usługę `anonymizer`, bo anonimizacja to stały węzeł,
+  a narzędzia wybiera model.
+- **Atrapa anonimizatora w `api` w czasie działania** (2026-10-16) — nie byłoby widać, czy
+  usługa `anonymizer` w ogóle odpowiada, a atrapę i tak ma usługa (`ANONYMIZATION_ENGINE=fake`).
+  `FakeAnonymizer` zostaje dla testów.
+- **Test kontenera `api` na trasie grafu** (2026-10-16) — wynik zależy od `.env` dewelopera, a po
+  p. 19.4, przy prawdziwym modelu, test zawołałby płatny model. Drogę przez usługę sprawdza test
+  fabryki na stacku, a kontener — ręczna sonda przy zmianie.
 - **Poprawka dla wariantu wymagającego źródeł, gdy źródeł nie ma** — brak źródeł nie jest błędem
   formatu, a w sprawie bez podobnych zgłoszeń dodatkowa tura niczego nie zmieni. Wraca, gdy
   pomiar pokaże, że model kończy przed odczytem (p. 26).
@@ -4037,24 +4070,17 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     `EMBEDDING_BACKEND`), a `api` w czasie działania nie ma własnych atrap tych usług: rozmawia
     z nimi zawsze przez klienta HTTP, a atrapy po swojej stronie (`FakeAnonymizer`, atrapy
     narzędzi) trzyma wyłącznie dla testów. Usługa mówi w odpowiedzi, czy jest atrapą (`engine`,
-    `model`), a klient odmawia jej wyniku tylko tam, gdzie atrapa szkodzi. Anonimizator:
-    `build_anonymizer()` zawsze buduje klienta, klient przyjmuje atrapę silnika wyłącznie przy
-    atrapie modelu generującego (nic nie wychodzi wtedy z procesu), atrapy grafów dostają
-    anonimizator od fabryki zamiast tworzyć `FakeAnonymizer` u siebie, a autouse fixture
-    podstawia go poza testami na stacku, więc domyślny `pytest` nadal nie potrzebuje usługi.
-    Embedder: w czasie działania `api` już woła go takim, jaki jest (`EmbeddingClient` nie ma
-    atrapy), a atrapa grafu nie wykonuje narzędzi, więc embeddera nie woła; do rozstrzygnięcia,
-    czy przy atrapie modelu graf ma wykonywać prawdziwe narzędzia — wtedy świeży stack bez
-    zbudowanych indeksów kończy się błędem brakującego indeksu, a to przeczy dzisiejszej zasadzie
-    „atrapa grafu nie sięga po żadną zależność” i wpisowi o węzłach właściwych na atrapie modelu
-    w „Świadomie pominiętych” — oraz czy `api` ma czytać `model` z odpowiedzi embeddera, na
-    przykład żeby nie mieszać wektorów atrapy z prawdziwymi w jednym indeksie. Kryterium: przy
-    atrapie modelu `docker compose up` przechodzi przez usługę `anonymizer` do końca, przy
-    prawdziwym zatrzymuje się na atrapie silnika. Cena: `api` potrzebuje usługi `anonymizer`
-    także na atrapie modelu, a atrapa grafu ma jedną prawdziwą zależność HTTP. Po wdrożeniu
-    szkic Blueprintu na SOFA: gdzie w kompozycji usługa wołająca i wołane trzymają atrapy,
-    z ceną i zabezpieczeniem przed wynikiem atrapy — najpierw wyszukanie, czy podobny post już
-    jest.
+    `model`), a klient odmawia jej wyniku tylko tam, gdzie atrapa szkodzi. Anonimizator zrobiony
+    2026-10-16: klient zawsze, atrapa silnika przyjmowana tylko przy atrapie modelu, atrapa grafu
+    na kliencie z fabryki i bez narzędzi; reguły — „Warstwy kodu", „Warstwa API", „Warstwa
+    węzłów", „Warstwa grafów", „Testy", „Świadomie pominięte". Zostaje embedder: `api` czyta
+    `model` z odpowiedzi, każdy punkt Qdranta zapisuje model, którym go policzono, a zapis
+    i wyszukiwanie odmawiają mieszania modeli w jednej kolekcji (decyzja 2026-10-16) — inaczej
+    wektory atrapy albo innego modelu o tym samym wymiarze trafiłyby do indeksu bez błędu.
+    Kryterium: zapis i szukanie drugim modelem w kolekcji zbudowanej pierwszym kończą się błędem
+    konfiguracji na prawdziwym Qdrancie. Po wdrożeniu szkic Blueprintu na SOFA: gdzie
+    w kompozycji usługa wołająca i wołane trzymają atrapy, z ceną i zabezpieczeniem przed
+    wynikiem atrapy (wyszukanie z 2026-10-16 nie znalazło podobnego wpisu).
   - [ ] **19.3 Golden set anonimizatora** — teksty z dwiema listami: co ma zniknąć, z rodzajem
     (osoba, PESEL, telefon, adres…), i co ma zostać (kody i komunikaty błędów, po których szuka
     `find_tickets_text`, wersje, nazwy usług, numery zgłoszeń). Zmyślone w `data/safe/golden/`,

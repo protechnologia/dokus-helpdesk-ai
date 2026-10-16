@@ -27,16 +27,21 @@ BROKEN_ANSWERS = [
 ]
 
 
-async def test_the_text_goes_to_the_service_and_comes_back_anonymized() -> None:
+@pytest.mark.parametrize("fake_engine_allowed", [False, True], ids=["bez zgody", "ze zgodą"])
+async def test_the_text_goes_to_the_service_and_comes_back_anonymized(
+    fake_engine_allowed: bool,
+) -> None:
     """Sprawdza, czy klient wysyła tekst jednym żądaniem `POST /anonymize` z treścią
     `{"text": …}` i oddaje tekst z odpowiedzi usługi jako `AnonymizedText`, gdy odpowiedział
-    silnik inny niż atrapa.
+    silnik inny niż atrapa — tak samo bez zgody na atrapę silnika i z nią.
 
     Wyłapuje klienta, który zmienia tekst po drodze, pyta inną ścieżkę albo oddaje coś innego niż
-    wynik usługi: do modelu poszedłby wtedy tekst, którego anonimizator nie widział."""
+    wynik usługi: do modelu poszedłby wtedy tekst, którego anonimizator nie widział. Wyłapuje też
+    zgodę na atrapę, która zmienia obsługę prawdziwego silnika."""
     seen: list = []
     client     = anonymizer_client_on(
-        capturing(seen, {("POST", "/anonymize"): httpx.Response(200, json=service_answer())})
+        capturing(seen, {("POST", "/anonymize"): httpx.Response(200, json=service_answer())}),
+        fake_engine_allowed = fake_engine_allowed,
     )
 
     result = await client.anonymize(RAW_TEXT)
@@ -48,17 +53,33 @@ async def test_the_text_goes_to_the_service_and_comes_back_anonymized() -> None:
 
 
 async def test_the_fake_engine_is_refused_as_a_config_error() -> None:
-    """Sprawdza, czy odpowiedź usługi działającej na atrapie silnika (`engine: "fake"`) kończy się
-    błędem konfiguracji `AnonymizationConfigError`, który nazywa `ANONYMIZATION_ENGINE`, zamiast
-    oddać tekst.
+    """Sprawdza, czy klient bez zgody na atrapę silnika (tak jak przy prawdziwym modelu) kończy
+    odpowiedź usługi działającej na atrapie (`engine: "fake"`) błędem konfiguracji
+    `AnonymizationConfigError`, który nazywa `ANONYMIZATION_ENGINE`, zamiast oddać tekst.
 
-    Wyłapuje klienta, który przyjmuje wynik atrapy: atrapa oddaje tekst bez zmian, więc surowe
-    zgłoszenie poszłoby do modelu zewnętrznego. Wyłapuje też zgłoszenie tego jak chwilowej awarii
-    (503), przy której wołający czekałby na coś, czego czekanie nie naprawi."""
+    Wyłapuje klienta, który przyjmuje wynik atrapy bez zgody: atrapa oddaje tekst bez zmian, więc
+    surowe zgłoszenie poszłoby do modelu zewnętrznego. Wyłapuje też zgłoszenie tego jak chwilowej
+    awarii (503), przy której wołający czekałby na coś, czego czekanie nie naprawi."""
     client = anonymizer_client_on(always(payload=service_answer(engine=FAKE_ENGINE, text=RAW_TEXT)))
 
     with pytest.raises(AnonymizationConfigError, match="ANONYMIZATION_ENGINE"):
         await client.anonymize(RAW_TEXT)
+
+
+async def test_with_consent_the_fake_engine_result_is_returned() -> None:
+    """Sprawdza, czy klient ze zgodą na atrapę silnika (tak jak przy atrapie modelu) oddaje tekst
+    z odpowiedzi atrapy, czyli tekst wysłany, bez zmian.
+
+    Wyłapuje klienta, który odmawia atrapy mimo zgody: przy atrapie modelu każda trasa grafu
+    kończyłaby się błędem konfiguracji, choć tekst nie trafia wtedy do żadnego modelu."""
+    client = anonymizer_client_on(
+        always(payload=service_answer(engine=FAKE_ENGINE, text=RAW_TEXT)),
+        fake_engine_allowed = True,
+    )
+
+    result = await client.anonymize(RAW_TEXT)
+
+    assert result.text == RAW_TEXT
 
 
 @pytest.mark.parametrize("handler", BROKEN_ANSWERS)
@@ -125,7 +146,7 @@ def test_an_empty_address_is_refused_at_build_time(blank: str) -> None:
     Wyłapuje klienta, który przyjmuje pusty adres: tak compose podstawia brakującą zmienną,
     a pomyłka wyszłaby dopiero przy pierwszym zgłoszeniu, jako niejasny błąd połączenia."""
     with pytest.raises(AnonymizationConfigError, match="ANONYMIZATION_BASE_URL"):
-        AnonymizerClient(base_url=blank)
+        AnonymizerClient(base_url=blank, fake_engine_allowed=False)
 
 
 async def test_aclose_closes_the_connections_and_may_be_repeated() -> None:

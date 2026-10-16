@@ -77,7 +77,8 @@ async def loop_graph(
         CompiledStateGraph: anonymize → agent ⇄ run_tools (oba właściwe) → respond
     """
     tools  = list(tools) if tools is not None else fake_agent_tools()
-    output = (await run_graph(graph.build_fake_graph(), graph.example_state())).output
+    fake   = graph.build_fake_graph(FakeAnonymizer())
+    output = (await run_graph(fake, graph.example_state())).output
 
     compiled = graph.build_graph(
         anonymize      = AnonymizeNode(FakeAnonymizer()),

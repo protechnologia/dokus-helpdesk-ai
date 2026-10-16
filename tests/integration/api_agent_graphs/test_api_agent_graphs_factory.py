@@ -17,16 +17,17 @@ from app.agent_graphs.factory import (
 from app.agent_graphs.search.fake import DEFAULT_NOTES
 from app.agent_nodes.agent import tool_call_turn
 from app.config import Settings
-from app.engine_anonymization import AnonymizationConfigError, FakeAnonymizer
+from app.engine_anonymization import AnonymizationConfigError, FakeAnonymizer, build_anonymizer
 from app.engine_llm import ChatMessage, FakeLLMClient
 from tests._helpers.fake_tools import fake_agent_tools
 from tests._helpers.transport import capturing, with_transport
 
 # Fabryka grafów: co konfiguracja robi z grafem, o który prosi trasa. Przy atrapie modelu ma
-# wyjść atrapa grafu, przy prawdziwym dostawcy graf z węzłów właściwych — a dopóki usługa
-# `anonymizer` ma tylko atrapę silnika, zatrzymanie w węźle `anonymize`. Zależności prawdziwej
-# drogi (anonimizator, klient modelu, narzędzia na bazach) testy podmieniają na atrapy, bo
-# sprawdzają składanie, nie usługi.
+# wyjść atrapa grafu na kliencie usługi `anonymizer`, przy prawdziwym dostawcy graf z węzłów
+# właściwych — a dopóki usługa ma tylko atrapę silnika, zatrzymanie w węźle `anonymize`.
+# Zależności prawdziwej drogi (klient modelu, narzędzia na bazach) testy podmieniają na atrapy,
+# bo sprawdzają składanie, nie usługi; klient anonimizatora zostaje prawdziwy na atrapie
+# transportu tam, gdzie test sprawdza drogę do usługi.
 
 GRAPHS = [
     importlib.import_module(f"app.agent_graphs.{module.name}")
@@ -121,15 +122,29 @@ def use_fake_dependencies(
 
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
-async def test_with_the_fake_model_the_factory_gives_a_fake_graph(graph: ModuleType) -> None:
-    """Sprawdza, czy przy atrapie modelu fabryka oddaje dla każdego grafu przebieg, który dochodzi
-    do wyniku bez żadnej zależności: bez klienta modelu, anonimizatora i narzędzi na bazach.
+async def test_with_the_fake_model_the_fake_graph_goes_through_the_service(
+    graph:       ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sprawdza, czy przy atrapie modelu fabryka oddaje dla każdego grafu atrapę, która wysyła
+    zgłoszenie do usługi `anonymizer` (jedno żądanie na `/anonymize`), przyjmuje wynik atrapy
+    silnika i dochodzi do wyniku bez klienta modelu i bez narzędzi na bazach.
 
-    Wyłapuje fabrykę, która przy domyślnej konfiguracji sięga po prawdziwe zależności: świeżo
-    postawiony stack nie odpowiadałby na żadne żądanie, a zwykły test trasy wołałby usługi."""
+    Wyłapuje atrapę grafu z własną atrapą anonimizatora, która omija usługę: w czasie działania
+    `api` nie byłoby widać, czy usługa w ogóle odpowiada. Wyłapuje też atrapę, która odmawia
+    atrapy silnika, choć tekst nie trafia do modelu, i taką, która sięga po narzędzia: świeżo
+    postawiony stack bez indeksów nie odpowiadałby na żadne żądanie."""
+    # Droga fabryki bez podmiany z conftestu, tylko z atrapą transportu zamiast gniazda.
+    monkeypatch.setattr(factory, "build_anonymizer", build_anonymizer)
+
+    seen:   list = []
+    answers      = {("POST", "/anonymize"): httpx.Response(200, json=FAKE_ENGINE_BODY)}
+    with_transport(process_anonymizer(), capturing(seen, answers))
+
     final = await run_graph(build_function_graph(graph), graph.example_state())
 
     assert final.output is not None
+    assert [call["path"] for call in seen] == ["/anonymize"]
     assert process_agent_tools.cache_info().currsize == 0
 
 
@@ -166,7 +181,10 @@ async def test_a_real_model_stops_at_the_fake_engine_before_the_model(
     monkeypatch.setattr(factory, "get_llm_client", lambda settings: llm)
     monkeypatch.setattr(factory, "build_agent_tools", lambda settings: fake_agent_tools())
 
-    # Anonimizator z prawdziwej drogi fabryki, tylko z atrapą transportu zamiast gniazda.
+    # Anonimizator z prawdziwej drogi fabryki, bez podmiany z conftestu, tylko z atrapą transportu
+    # zamiast gniazda.
+    monkeypatch.setattr(factory, "build_anonymizer", build_anonymizer)
+
     seen:   list = []
     answers      = {("POST", "/anonymize"): httpx.Response(200, json=FAKE_ENGINE_BODY)}
     with_transport(process_anonymizer(), capturing(seen, answers))

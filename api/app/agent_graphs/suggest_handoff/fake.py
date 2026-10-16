@@ -7,7 +7,7 @@ from app.agent_nodes.agent import FakeAgentNode, tool_call_turn
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
 from app.core_model.graphs.proposal import Proposal
-from app.engine_anonymization import FakeAnonymizer
+from app.engine_anonymization import Anonymizer
 
 # Propozycja atrapy, gdy nikt nie podał własnej — stała, żeby test, który przypadkiem na niej
 # polega, padł głośno.
@@ -36,16 +36,20 @@ def example_state() -> SuggestHandoffState:
 
 
 def build_fake_graph(
-    proposal: Proposal = DEFAULT_PROPOSAL,  # np. Proposal(text="Przekazujemy…", …)
+    anonymizer: Anonymizer,                   # np. FakeAnonymizer() — w trasach klient usługi
+    proposal:   Proposal = DEFAULT_PROPOSAL,  # np. Proposal(text="Przekazujemy…", …)
 ) -> CompiledStateGraph:
     """
     Description:
-    Ten sam graf co `build_graph`, złożony z atrap — do testów tras i CLI. Agent wywołuje
+    Ten sam graf co `build_graph`, złożony z atrap — do testów i do tras przy atrapie modelu.
+    Anonimizacja jest prawdziwym węzłem na podanym anonimizatorze: w trasach to klient usługi
+    `anonymizer` z fabryki grafów, w testach zwykle `FakeAnonymizer`. Agent wywołuje
     `respond_suggest_handoff` z propozycją w argumentach, a `respond` oddaje tę propozycję.
 
     Graf jest jednorazowy: `FakeAgentNode` ma jedną turę. Na każde wywołanie buduj nowy.
 
     Example args:
+        anonymizer=FakeAnonymizer()
         proposal=Proposal(text="Przekazujemy sprawę do serwisu…", internal_notes="")
 
     Example result:
@@ -54,7 +58,7 @@ def build_fake_graph(
     answer = tool_call_turn(RESPOND_TOOL_NAME, proposal.model_dump())
 
     graph = build_graph(
-        anonymize = AnonymizeNode(FakeAnonymizer()),
+        anonymize = AnonymizeNode(anonymizer),
         agent     = FakeAgentNode([answer]),
         respond   = FakeRespondNode(proposal),
     )

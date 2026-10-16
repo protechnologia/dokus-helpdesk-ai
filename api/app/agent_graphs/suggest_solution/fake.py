@@ -9,7 +9,7 @@ from app.agent_graphs.suggest_solution.state import SuggestSolutionState
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
 from app.core_model.graphs.proposal import Proposal
-from app.engine_anonymization import FakeAnonymizer
+from app.engine_anonymization import Anonymizer
 
 # Propozycja atrapy, gdy nikt nie podał własnej — stała, żeby test, który przypadkiem na niej
 # polega, padł głośno.
@@ -38,13 +38,16 @@ def example_state() -> SuggestSolutionState:
 
 
 def build_fake_graph(
+    anonymizer:     Anonymizer,                       # np. FakeAnonymizer() — w trasach klient
     proposal:       Proposal = DEFAULT_PROPOSAL,      # np. Proposal(text="…", internal_notes="…")
     limits:         Mapping[str, int] | None = None,  # np. {"read_tickets_card": 3}
     max_iterations: int = FAKE_MAX_ITERATIONS,        # np. 2 — limit tur modelu
 ) -> CompiledStateGraph:
     """
     Description:
-    Ten sam graf co `build_graph`, złożony z atrap — do testów tras i CLI. Agent najpierw szuka
+    Ten sam graf co `build_graph`, złożony z atrap — do testów i do tras przy atrapie modelu.
+    Anonimizacja jest prawdziwym węzłem na podanym anonimizatorze: w trasach to klient usługi
+    `anonymizer` z fabryki grafów, w testach zwykle `FakeAnonymizer`. Agent najpierw szuka
     `find_tickets_vector`, potem czyta karty znalezionych zgłoszeń `read_tickets_card` (jeden
     objaw, trzy przyczyny) i wywołuje `respond_suggest_solution` z propozycją
     w argumentach; w stanie zostają trzy źródła z odczytu.
@@ -54,6 +57,7 @@ def build_fake_graph(
     `max_iterations` to limit tur modelu: po tylu turach narzędzia nie są już wykonywane.
 
     Example args:
+        anonymizer=FakeAnonymizer()
         proposal=Proposal(text="…", internal_notes="…")
         limits={"find_tickets_vector": 3, "read_tickets_card": 3}
         max_iterations=10
@@ -64,7 +68,7 @@ def build_fake_graph(
     agent, run_tools = fake_search_nodes(RESPOND_TOOL_NAME, proposal, limits)
 
     graph = build_graph(
-        anonymize      = AnonymizeNode(FakeAnonymizer()),
+        anonymize      = AnonymizeNode(anonymizer),
         agent          = agent,
         run_tools      = run_tools,
         respond        = FakeRespondNode(proposal),
