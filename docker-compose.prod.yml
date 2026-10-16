@@ -25,3 +25,7 @@ services:
   embedder:
     volumes: !reset []
     command: ["uvicorn", "embedder_app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  anonymizer:
+    volumes: !reset []
+    command: ["uvicorn", "anonymizer_app.main:app", "--host", "0.0.0.0", "--port", "8000"]

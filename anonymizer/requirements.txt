@@ -1,0 +1,7 @@
+# Zależności RUNTIME usługi `anonymizer` — trafiają DO obrazu. Te same wersje co w `embedder`:
+# obie usługi stoją na tym samym rusztowaniu FastAPI, a różne wersje dawałyby różne zachowania
+# tych samych handlerów.
+pydantic==2.10.5
+pydantic-settings==2.7.1
+fastapi==0.140.0
+uvicorn[standard]==0.51.0

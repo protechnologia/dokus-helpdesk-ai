@@ -6,14 +6,15 @@ funkcjonalne i ewaluacyjne — różni je to, czego dowodzą, a nie sposób dota
 
 Rodzaj testu to jego folder, a marker mówi, czego test potrzebuje do uruchomienia:
 
-| marker           | czego wymaga                 | adres dla testu z hosta   |
-|------------------|------------------------------|---------------------------|
-| `stack`          | działającej usługi (parasol) | —                         |
-| `stack_api`      | usługi `api`                 | `api_url()`               |
-| `stack_qdrant`   | Qdranta                      | `qdrant_url()`            |
-| `stack_embedder` | usługi `embedder`            | `embedder_url()`          |
-| `stack_postgres` | Postgresa ze słownikiem      | `build_postgres_client()` |
-| `llm_live`       | prawdziwego, płatnego modelu | — (z konfiguracji)        |
+| marker             | czego wymaga                 | adres dla testu z hosta   |
+|--------------------|------------------------------|---------------------------|
+| `stack`            | działającej usługi (parasol) | —                         |
+| `stack_api`        | usługi `api`                 | `api_url()`               |
+| `stack_qdrant`     | Qdranta                      | `qdrant_url()`            |
+| `stack_embedder`   | usługi `embedder`            | `embedder_url()`          |
+| `stack_anonymizer` | usługi `anonymizer`          | `anonymizer_url()`        |
+| `stack_postgres`   | Postgresa ze słownikiem      | `build_postgres_client()` |
+| `llm_live`         | prawdziwego, płatnego modelu | — (z konfiguracji)        |
 
 Marker nosi tylko test, który potrzebuje działającej usługi albo płatnego modelu. Jednostkowe nie
 mają go nigdy, a w pozostałych rodzajach ma go mniejszość: większość testów integracyjnych
@@ -37,8 +38,8 @@ O czym pamiętać przy zmianach:
 - Adresów nie wpisuje się w plikach testów. Konfiguracja wskazuje nazwy z sieci compose
   (`http://embedder:8000`), których z hosta nie da się rozwiązać, więc każdy test spoza kontenera
   potrzebuje podmiany; powielona w plikach rozjeżdżała się po zmianie portu w jednym miejscu.
-- Każdy adres da się nadpisać zmienną środowiskową (`EMBEDDER_TEST_URL`, `QDRANT_TEST_URL`,
-  `API_TEST_URL`, `POSTGRES_TEST_DSN`).
+- Każdy adres da się nadpisać zmienną środowiskową (`EMBEDDER_TEST_URL`, `ANONYMIZER_TEST_URL`,
+  `QDRANT_TEST_URL`, `API_TEST_URL`, `POSTGRES_TEST_DSN`).
 - Testy `llm_live` zgłaszają zużycie każdej sprawy przez fixture `live_usage`, a na końcu
   przebiegu pytest wypisuje je z sumą kosztu (`pytest_terminal_summary()`). Sam raport leży
   w `tests/_helpers/live/`; tu zostają fixture i funkcja wypisująca, bo pytest szuka ich
@@ -67,6 +68,10 @@ from tests._helpers.scenarios.solution import SolutionReport
 
 EMBEDDER_URL_ENV     = "EMBEDDER_TEST_URL"
 EMBEDDER_URL_DEFAULT = "http://localhost:8001"
+
+# Zgodne z DOCKER_ANONYMIZER_PORT w `.env.example`.
+ANONYMIZER_URL_ENV     = "ANONYMIZER_TEST_URL"
+ANONYMIZER_URL_DEFAULT = "http://localhost:8002"
 
 QDRANT_URL_ENV       = "QDRANT_TEST_URL"
 QDRANT_URL_DEFAULT   = "http://localhost:6333"
@@ -376,6 +381,20 @@ def embedder_url() -> str:
         "http://localhost:8001"
     """
     return os.environ.get(EMBEDDER_URL_ENV, EMBEDDER_URL_DEFAULT)
+
+
+def anonymizer_url() -> str:
+    """
+    Description:
+    Adres, pod którym usługa `anonymizer` odpowiada z hosta.
+
+    Example args:
+        (brak)
+
+    Example result:
+        "http://localhost:8002"
+    """
+    return os.environ.get(ANONYMIZER_URL_ENV, ANONYMIZER_URL_DEFAULT)
 
 
 def qdrant_url() -> str:

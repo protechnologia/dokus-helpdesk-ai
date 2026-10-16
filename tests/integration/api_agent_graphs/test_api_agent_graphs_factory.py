@@ -3,6 +3,7 @@ import pkgutil
 from collections.abc import Iterator
 from types import ModuleType
 
+import httpx
 import pytest
 
 import app.agent_graphs
@@ -11,6 +12,7 @@ from app.agent_graphs.factory import (
     build_function_graph,
     close_process_agent_tools,
     process_agent_tools,
+    process_anonymizer,
 )
 from app.agent_graphs.search.fake import DEFAULT_NOTES
 from app.agent_nodes.agent import tool_call_turn
@@ -18,11 +20,13 @@ from app.config import Settings
 from app.engine_anonymization import AnonymizationConfigError, FakeAnonymizer
 from app.engine_llm import ChatMessage, FakeLLMClient
 from tests._helpers.fake_tools import fake_agent_tools
+from tests._helpers.transport import capturing, with_transport
 
 # Fabryka grafów: co konfiguracja robi z grafem, o który prosi trasa. Przy atrapie modelu ma
-# wyjść atrapa grafu, przy prawdziwym dostawcy graf z węzłów właściwych — a dopóki nie ma
-# prawdziwego anonimizatora, odmowa. Zależności prawdziwej drogi (anonimizator, klient modelu,
-# narzędzia na bazach) testy podmieniają na atrapy, bo sprawdzają składanie, nie usługi.
+# wyjść atrapa grafu, przy prawdziwym dostawcy graf z węzłów właściwych — a dopóki usługa
+# `anonymizer` ma tylko atrapę silnika, zatrzymanie w węźle `anonymize`. Zależności prawdziwej
+# drogi (anonimizator, klient modelu, narzędzia na bazach) testy podmieniają na atrapy, bo
+# sprawdzają składanie, nie usługi.
 
 GRAPHS = [
     importlib.import_module(f"app.agent_graphs.{module.name}")
@@ -32,6 +36,9 @@ GRAPHS = [
 
 # Tura modelu z samym tekstem: przyjmuje ją tylko atrapa węzła odpowiedzi.
 PLAIN_TEXT = ChatMessage(role="assistant", content="Odpowiadam zwykłym tekstem.")
+
+# Odpowiedź usługi `anonymizer` działającej na atrapie silnika.
+FAKE_ENGINE_BODY = {"text": "Tekst bez zmian.", "engine": "fake"}
 
 
 def name_of(
@@ -54,20 +61,23 @@ def name_of(
 def no_tools_left_between_tests() -> Iterator[None]:
     """
     Description:
-    Czyści narzędzia zapamiętane przez fabrykę przed testem i po nim: są zapamiętywane na cały
-    proces, więc bez tego jeden test dostawałby narzędzia zbudowane w innym.
+    Czyści narzędzia i anonimizator zapamiętane przez fabrykę przed testem i po nim: są
+    zapamiętywane na cały proces, więc bez tego jeden test dostawałby zależności zbudowane
+    w innym.
 
     Example args:
         (brak)
 
     Example result:
-        None — `process_agent_tools()` w teście buduje narzędzia od nowa
+        None — `process_agent_tools()` i `process_anonymizer()` w teście budują od nowa
     """
     process_agent_tools.cache_clear()
+    process_anonymizer.cache_clear()
 
     yield
 
     process_agent_tools.cache_clear()
+    process_anonymizer.cache_clear()
 
 
 def use_a_real_provider(
@@ -130,7 +140,7 @@ async def test_the_provider_name_is_read_regardless_of_case_and_spaces(
     czyta go fabryka klienta modelu.
 
     Wyłapuje dwie fabryki, które tę samą wartość czytają różnie: klient modelu byłby atrapą,
-    a fabryka grafów szłaby drogą prawdziwego dostawcy i kończyła odmową anonimizatora."""
+    a fabryka grafów szłaby drogą prawdziwego dostawcy i kończyła błędem anonimizatora."""
     monkeypatch.setenv("LLM_GENERATION_PROVIDER", " Fake ")
 
     final = await run_graph(build_function_graph(gate_close), gate_close.example_state())
@@ -139,21 +149,34 @@ async def test_the_provider_name_is_read_regardless_of_case_and_spaces(
 
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=name_of)
-def test_a_real_model_without_a_real_anonymizer_is_refused(
+async def test_a_real_model_stops_at_the_fake_engine_before_the_model(
     graph:       ModuleType,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Sprawdza, czy przy prawdziwym dostawcy modelu fabryka odmawia zbudowania każdego grafu
-    błędem konfiguracji anonimizatora i nie buduje przy tym narzędzi.
+    """Sprawdza, czy przy prawdziwym dostawcy modelu każdy graf wysyła zgłoszenie do usługi
+    `anonymizer` (jedno żądanie na `/anonymize`), a gdy ta odpowie atrapą silnika, kończy się
+    błędem konfiguracji anonimizatora, zanim model dostanie choćby jedno wywołanie.
 
-    Wyłapuje graf, który ruszyłby na prawdziwym modelu z atrapą anonimizatora: surowe zgłoszenie
-    z danymi klienta wyszłoby do zewnętrznego dostawcy."""
+    Wyłapuje graf, który na prawdziwym modelu pomija anonimizator albo przyjmuje wynik atrapy
+    silnika: atrapa oddaje tekst bez zmian, więc surowe zgłoszenie z danymi klienta wyszłoby do
+    zewnętrznego dostawcy."""
     use_a_real_provider(monkeypatch)
 
-    with pytest.raises(AnonymizationConfigError):
-        build_function_graph(graph)
+    llm = FakeLLMClient()
+    monkeypatch.setattr(factory, "get_llm_client", lambda settings: llm)
+    monkeypatch.setattr(factory, "build_agent_tools", lambda settings: fake_agent_tools())
 
-    assert process_agent_tools.cache_info().currsize == 0
+    # Anonimizator z prawdziwej drogi fabryki, tylko z atrapą transportu zamiast gniazda.
+    seen:   list = []
+    answers      = {("POST", "/anonymize"): httpx.Response(200, json=FAKE_ENGINE_BODY)}
+    with_transport(process_anonymizer(), capturing(seen, answers))
+
+    with pytest.raises(AnonymizationConfigError):
+        await run_graph(build_function_graph(graph), graph.example_state())
+
+    assert [call["path"] for call in seen] == ["/anonymize"]
+    assert llm.turn_calls == []
+    assert llm.calls      == []
 
 
 async def test_a_real_model_gets_a_graph_of_real_nodes(monkeypatch: pytest.MonkeyPatch) -> None:

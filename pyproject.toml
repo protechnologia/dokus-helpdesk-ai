@@ -33,7 +33,7 @@ testpaths = ["tests"]
 # test import their pure logic (e.g. `embedder_app.vectors`) without installing them.
 # `scripts` is here for the same reason: the repo scripts are plain files, not a package, and
 # their tests import them by module name (`import build_code_package`).
-pythonpath = ["embedder", "scripts"]
+pythonpath = ["embedder", "anonymizer", "scripts"]
 
 # importlib mode is required: the same file name may exist in two test folders, which makes the
 # default prepend mode fail with "import file mismatch".
@@ -55,6 +55,7 @@ markers = [
     "stack_api: requires a reachable api service",
     "stack_qdrant: requires a reachable Qdrant instance",
     "stack_embedder: requires a reachable embedder service",
+    "stack_anonymizer: requires a reachable anonymizer service",
     "stack_postgres: requires a reachable Postgres with the Polish dictionary",
     "llm_live: hits a real, billable LLM — outside the stack umbrella on purpose",
 ]
@@ -99,4 +100,4 @@ ignore = [
 [tool.ruff.lint.isort]
 # Without this, `app` is taken for a third-party library and lands in the same block as pytest;
 # declaring it keeps our own imports in a separate, last group.
-known-first-party = ["app", "embedder_app"]
+known-first-party = ["app", "embedder_app", "anonymizer_app"]

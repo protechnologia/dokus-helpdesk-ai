@@ -58,6 +58,9 @@ services:
       LLM_ANONYMIZATION_TIMEOUT_SECONDS:   ${LLM_ANONYMIZATION_TIMEOUT_SECONDS:-60}
       LLM_ANONYMIZATION_NUM_CTX:           ${LLM_ANONYMIZATION_NUM_CTX:-8192}
       LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS: ${LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS:-1500}
+      # Usługa `anonymizer`: dokąd `api` wysyła tekst przed modelem zewnętrznym (p. 19).
+      ANONYMIZATION_BASE_URL:        ${ANONYMIZATION_BASE_URL:-http://anonymizer:8000}
+      ANONYMIZATION_TIMEOUT_SECONDS: ${ANONYMIZATION_TIMEOUT_SECONDS:-30}
       EMBEDDING_BASE_URL:        ${EMBEDDING_BASE_URL:-http://embedder:8000}
       EMBEDDING_VECTOR_SIZE:     ${EMBEDDING_VECTOR_SIZE:-768}
       EMBEDDING_TIMEOUT_SECONDS: ${EMBEDDING_TIMEOUT_SECONDS:-120}
@@ -146,6 +149,29 @@ services:
       # read them from hf_cache and come up in seconds. Too short a period here marks a container
       # unhealthy for doing exactly what it is supposed to do on first run.
       start_period: 300s
+    restart: unless-stopped
+
+  # --- anonymizer: dane osobowe na znaczniki, zanim tekst wyjdzie do modelu (p. 19) ---
+  anonymizer:
+    build: ./anonymizer
+    # Port hosta jest wystawiony dla testów na stacku, jak przy embedderze. Na adresie z
+    # DOCKER_BIND_ADDR, domyślnie tylko lokalnie: ta usługa przyjmuje SUROWE zgłoszenia.
+    ports:
+      - "${DOCKER_BIND_ADDR:-127.0.0.1}:${DOCKER_ANONYMIZER_PORT:-8002}:8000"
+    volumes:
+      - ./anonymizer/anonymizer_app:/code/anonymizer_app
+    # ANONYMIZATION_ENGINE czyta tylko ta usługa. Domyślnie `fake`, bo prawdziwego silnika
+    # jeszcze nie ma (p. 19.4–19.5); `api` nie przepuści wyniku atrapy do prawdziwego modelu.
+    environment:
+      LOG_LEVEL:            ${LOG_LEVEL:-INFO}
+      ANONYMIZATION_ENGINE: ${ANONYMIZATION_ENGINE:-fake}
+    command: ["uvicorn", "anonymizer_app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    healthcheck:
+      test:         ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"]
+      interval:     10s
+      timeout:      3s
+      retries:      3
+      start_period: 30s
     restart: unless-stopped
 
   # --- qdrant: the index, never the source of truth (rule 8) ---

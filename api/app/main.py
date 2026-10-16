@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Request, Response
 
-from app.agent_graphs.factory import close_process_agent_tools
+from app.agent_graphs.factory import close_process_agent_tools, close_process_anonymizer
 from app.config import Settings
 from app.entry_routers.gate.router import router as gate_router
 from app.entry_routers.health.router import router as health_router
@@ -48,17 +48,19 @@ async def _lifespan(
     Description:
     Cykl życia aplikacji. Przy starcie nic nie robi — klienci powstają przy pierwszym żądaniu,
     które ich potrzebuje. Przy wyłączaniu zamyka narzędzia agenta zbudowane na prawdziwych
-    bazach, czyli pulę połączeń Postgresa i połączenia HTTP do embeddera i Qdranta.
+    bazach, czyli pulę połączeń Postgresa i połączenia HTTP do embeddera i Qdranta, oraz
+    połączenia klienta usługi `anonymizer`.
 
     Example args:
         app=FastAPI()
 
     Example result:
-        None — po wyjściu z bloku połączenia narzędzi są zamknięte
+        None — po wyjściu z bloku połączenia narzędzi i anonimizatora są zamknięte
     """
     yield
 
     await close_process_agent_tools()
+    await close_process_anonymizer()
 
 
 def create_app() -> FastAPI:

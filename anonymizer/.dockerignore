@@ -1,0 +1,5 @@
+# Kontekst budowania to tylko ten katalog; do obrazu nie wchodzi nic poza kodem uruchomieniowym.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/

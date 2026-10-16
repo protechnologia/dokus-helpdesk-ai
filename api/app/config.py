@@ -96,6 +96,11 @@ class Settings(BaseSettings):
     llm_anonymization_num_ctx:           int        = 8192    # musi mieścić się w oknie modelu
     llm_anonymization_max_output_tokens: int        = 1500    # część `num_ctx`, nie dodatek
 
+    # --- usługa anonymizer (osobna usługa compose, przez REST; p. 19) ---
+    anonymization_base_url:        str   = "http://anonymizer:8000"
+    # Bramki czekają na anonimizację razem z modelem, a człowiek czeka na bramkę.
+    anonymization_timeout_seconds: float = 30.0  # sekundy
+
     # --- embedder service (own compose service, reached over REST) ---
     embedding_base_url:        str   = "http://embedder:8000"
     embedding_vector_size:     int   = 768              # must match the Qdrant collection

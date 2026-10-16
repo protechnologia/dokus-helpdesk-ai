@@ -44,6 +44,7 @@ from typing import Any
 import yaml
 from pydantic_settings import BaseSettings
 
+from anonymizer_app.config import Settings as AnonymizerSettings
 from app.config import Settings as ApiSettings
 from embedder_app.config import Settings as EmbedderSettings
 
@@ -57,15 +58,20 @@ COMPOSE_VAR_PATTERN = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)[^}]*\}")
 # One `.env.example` is the contract for the WHOLE compose project, so the comparison must cover
 # every service that reads it — not just `api`. A variable owned by another service (e.g.
 # EMBEDDING_BACKEND) is a valid entry, and one owned by nobody is a dead entry.
-SERVICE_SETTINGS: tuple[type[BaseSettings], ...] = (ApiSettings, EmbedderSettings)
+SERVICE_SETTINGS: tuple[type[BaseSettings], ...] = (
+    ApiSettings,
+    EmbedderSettings,
+    AnonymizerSettings,
+)
 
 # Which compose service is configured by which Settings class. Qdrant and Postgres are absent on
 # purpose: both run third-party software with its own contract (our Postgres image only adds a
 # dictionary), so none of our classes describes them. The POSTGRES_* names the database container
 # receives are still covered — `api` reads the same variables, so edges (2) and (4) see them.
 SETTINGS_BY_SERVICE: dict[str, type[BaseSettings]] = {
-    "api":      ApiSettings,
-    "embedder": EmbedderSettings,
+    "api":        ApiSettings,
+    "embedder":   EmbedderSettings,
+    "anonymizer": AnonymizerSettings,
 }
 
 # Variables consumed by `docker compose` itself rather than by any application: they are
@@ -254,8 +260,8 @@ def _variables_interpolated_in_compose() -> set[str]:
 
 
 def test_every_settings_field_is_declared_in_env_example() -> None:
-    """Sprawdza, czy każde pole konfiguracji (`Settings`) usług `api` i `embedder` ma wpis o tej
-    samej nazwie w `.env.example` (numer 1 na mapie u góry pliku).
+    """Sprawdza, czy każde pole konfiguracji (`Settings`) usług `api`, `embedder` i `anonymizer`
+    ma wpis o tej samej nazwie w `.env.example` (numer 1 na mapie u góry pliku).
 
     Wyłapuje ustawienie dodane w kodzie, ale nieopisane w `.env.example`: osoba wdrażająca nie
     wie wtedy, że taka zmienna istnieje."""
@@ -339,9 +345,9 @@ def test_no_settings_field_claims_the_compose_only_prefix() -> None:
 
 
 def test_every_env_key_in_compose_is_readable_by_the_service_it_targets() -> None:
-    """Sprawdza, czy każda zmienna, którą `docker-compose.yml` podaje usłudze `api` albo
-    `embedder`, ma odpowiadające jej pole w konfiguracji (`Settings`) tej właśnie usługi (numer 7
-    na mapie u góry pliku).
+    """Sprawdza, czy każda zmienna, którą `docker-compose.yml` podaje usłudze `api`, `embedder`
+    albo `anonymizer`, ma odpowiadające jej pole w konfiguracji (`Settings`) tej właśnie usługi
+    (numer 7 na mapie u góry pliku).
 
     Wyłapuje literówkę w nazwie zmiennej albo zmienną podaną nie tej usłudze: usługa po cichu
     pomija nazwę, której nie zna, więc ustawiona wartość nigdy nie zaczyna działać."""
@@ -356,9 +362,9 @@ def test_every_env_key_in_compose_is_readable_by_the_service_it_targets() -> Non
 
 
 def test_every_settings_field_is_supplied_to_its_service() -> None:
-    """Sprawdza, czy każde pole konfiguracji (`Settings`) usługi `api` i usługi `embedder` jest
-    w `docker-compose.yml` podawane tej właśnie usłudze, bez żadnych wyjątków (numer 8 na mapie
-    u góry pliku).
+    """Sprawdza, czy każde pole konfiguracji (`Settings`) usług `api`, `embedder` i `anonymizer`
+    jest w `docker-compose.yml` podawane tej właśnie usłudze, bez żadnych wyjątków (numer 8 na
+    mapie u góry pliku).
 
     Wyłapuje pole, którego usługa nigdy nie dostaje. Taka usterka niczym się nie objawia: każde
     pole ma wartość domyślną, więc usługa startuje, zgłasza się jako zdrowa i po cichu działa na
