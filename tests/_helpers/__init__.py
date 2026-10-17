@@ -7,17 +7,18 @@ oraz `__init__.py`, który wystawia całość poza próbkami. Testy importują z
 (`from tests._helpers.fake_tools import fake_agent_tools`), nigdy z plików w nim wprost; próbki
 z ich modułu (`from tests._helpers.scenarios.gates.samples import BLOCK`).
 
-| helper           | kiedy go brać                                                               |
-|------------------|-----------------------------------------------------------------------------|
-| `fake_tools`     | komplet atrap narzędzi agenta i warianty, narzędzie z padniętym embedderem  |
-| `synthetic_code` | aplikacja syntetyczna: paczka, źródło, opis, mapa symboli, zapytania        |
-| `synthetic_docs` | dokumentacja syntetyczna: indeks wobec paczki, pomiary obu wyszukiwań       |
-| `golden_tickets` | golden set zgłoszeń: pomiar wyszukiwania po znaczeniu i filtra jakości      |
-| `graphs`         | grafy aplikacji: odczyt po nazwie i składanie na atrapach                   |
-| `postgres`       | narzędzie na prawdziwej tabeli z podmienionym klientem                      |
-| `transport`      | test klienta HTTP z podmienionym transportem                                |
-| `live`           | żywy model: konfiguracja, graf na nim, sprawy testu okablowania, raport     |
-| `scenarios`      | scenariusze grafów z p. 59, folder na scenariusz                            |
+| helper                 | kiedy go brać                                                           |
+|------------------------|-------------------------------------------------------------------------|
+| `fake_tools`           | atrapy narzędzi agenta z wariantami, narzędzie z padniętym embedderem   |
+| `synthetic_code`       | aplikacja syntetyczna: paczka, źródło, opis, mapa symboli, zapytania    |
+| `synthetic_docs`       | dokumentacja syntetyczna: indeks wobec paczki, pomiary obu wyszukiwań   |
+| `golden_tickets`       | golden set zgłoszeń: pomiar wyszukiwania po znaczeniu i filtra jakości  |
+| `golden_anonymization` | golden set anonimizatora: ocena przecieków i zniszczonej wiedzy         |
+| `graphs`               | grafy aplikacji: odczyt po nazwie i składanie na atrapach               |
+| `postgres`             | narzędzie na prawdziwej tabeli z podmienionym klientem                  |
+| `transport`            | test klienta HTTP z podmienionym transportem                            |
+| `live`                 | żywy model: konfiguracja, graf na nim, sprawy testu okablowania, raport |
+| `scenarios`            | scenariusze grafów z p. 59, folder na scenariusz                        |
 
 O czym pamiętać przy zmianach:
 

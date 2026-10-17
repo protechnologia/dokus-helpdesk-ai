@@ -324,7 +324,7 @@ dokus-helpdesk-ai/
 │       ├── main.py               # montaż aplikacji
 │       ├── config.py             # Settings tej usługi
 │       ├── models.py             # kontrakt HTTP: AnonymizeRequest/AnonymizeResponse
-│       ├── engine/               # Engine + fabryka + FakeEngine — tu wchodzą wzorce i NER
+│       ├── engine/               # Engine + fabryka + FakeEngine — tu wchodzą wzorce i model wskazujący osoby
 │       └── routers/              # /health, /anonymize
 ├── postgres/                     # kolejna usługa: Postgres z polskim słownikiem
 │   ├── Dockerfile                # pobiera słownik sjp.pl (commit + suma kontrolna)
@@ -2444,9 +2444,9 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   anonimizatorowi. Każda to komplet tych samych ośmiu zmiennych i nic nie dziedziczy po drugiej;
   obie domyślnie stoją na `fake`. Model anonimizujący widzi surowy tekst zgłoszeń, więc to, co
   stoi w jego konfiguracji, jest decyzją o tym, dokąd ten tekst trafia — osobnej flagi nie ma.
-  Do p. 19 nikt tego klienta nie buduje, a w p. 19.6 ta konfiguracja przenosi się do usługi
-  `anonymizer`, która woła model jako strażnika: sprawdza, czy po anonimizacji zostały dane
-  osobowe (decyzja 2026-10-16).
+  Do p. 19 nikt tego klienta nie buduje, a w p. 19.5 ta konfiguracja przenosi się do usługi
+  `anonymizer`, która woła model, żeby wskazał imiona i nazwiska do zamiany (decyzja
+  2026-10-17; wcześniej model miał tylko sprawdzać wynik jako strażnik).
 - **Fabryka `get_llm_client()` buduje klienta z jednego kompletu (`LLMSettings` z
   `Settings.llm_generation()` albo `llm_anonymization()`), fail-fast** — brak klucza albo modelu
   to `LLMConfigError` przy budowie klienta, nie błąd połączenia w środku żądania. Komunikat
@@ -3000,15 +3000,15 @@ localhost:8010/search`.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2038 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 862 (86)           | 96 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2057 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 921 (86)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 124 (11)           | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 97 (38)            | 38 s |
 
-Liczby z 2026-10-16, czasy z 2026-10-10: każdy folder osobno, w komplecie
+Liczby z 2026-10-17, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-3028 testów, około 150 s; domyślny `pytest`, bez stacku: 2893 testy, około 45 s. Testy `llm_live` —
+3106 testów, około 150 s; domyślny `pytest`, bez stacku: 2971 testów, około 45 s. Testy `llm_live` —
 36 integracyjnych i 57 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
 przebiegów.
 
@@ -3028,8 +3028,9 @@ przebiegów.
   Takie testy uruchamia się świadomie. Test odmawia startu także wtedy, gdy usługa odpowiada,
   ale nie ta: prefiksów trybów embeddera nie da się sprawdzić na atrapie, więc plik pada twardym
   `assert` wskazującym `EMBEDDING_BACKEND` — pominięcie dałoby zielony zestaw bez jedynego faktu,
-  dla którego istnieje. Wyjątek: test ewaluacyjny na korpusie z `data/` pomija się bez danych,
-  bo `data/` celowo nie ma w repo.
+  dla którego istnieje. Wyjątek: test na danych klienta z `data/unsafe/` (ewaluacyjny na
+  korpusie albo integracyjny spójności zestawu) pomija się bez danych, bo tego folderu celowo
+  nie ma w repo.
 - **Bez `importorskip` dla zadeklarowanych zależności** — ich brak ma być głośnym
   `ImportError`; `importorskip` tylko dla zależności naprawdę opcjonalnych.
 - **Kontrakt w procesie, a po HTTP to, czego prawdziwość mieszka poza naszym kodem.** Offline:
@@ -3110,7 +3111,27 @@ przebiegów.
   w `data/unsafe/golden/` nie mają dopisku paczki (do 2026-10-15 `-dokus`): instancja obsługuje
   jeden produkt, więc dane klienta są zawsze z tej samej paczki (`tickets.json`,
   `tickets-distractors.json`, `code.json`). `code.json` w `unsafe` to sprawy dla agenta na
-  prawdziwym kodzie, ten sam rodzaj co `code.json` w `safe` na aplikacji syntetycznej.
+  prawdziwym kodzie, ten sam rodzaj co `code.json` w `safe` na aplikacji syntetycznej. Tak samo
+  `anonymization.json` (2026-10-17): golden set anonimizatora w jednym kształcie, zmyślony
+  w `safe` i próbka korpusu w `unsafe`.
+- **Golden set anonimizatora (2026-10-17, p. 19.3): przypadek to tekst z danymi, które mają
+  zniknąć (`remove`), i wiedzą, która ma zostać (`keep`), obie zapisane po rodzaju.** Zestaw
+  zmyślony ma 20 przypadków: cytowaną historię maili z adresami w `<…>`, dane złamane między
+  liniami, odmianę i wołacz, numery z poprawną sumą obok liczb tego samego kształtu bez niej
+  i pułapki. Próbka korpusu to 32 wątki dobrane warstwami według układu danych, w tym oba wątki
+  korpusu z PESEL-em osoby trzeciej; numeru konta ani dowodu w niej nie ma, dlatego zestaw
+  zmyślony musi mieć każdy rodzaj. Ocena porównuje słowa: ciągi liter i cyfr, bez wielkości
+  liter i polskich znaków. Dana wycieka, gdy stoi w wyniku w całości albo gdy jej słowo stoi
+  w wyniku częściej, niż stało w wejściu poza zaznaczeniami — to łapie przeciek częściowy
+  („{TELEFON} 456”) bez fałszywego alarmu na tej samej liczbie gdzie indziej. Dana wewnątrz
+  dłuższej (imię w adresie e-mail) należy do dłuższej, inaczej same wzorce, bez wykrywania osób,
+  zawyżałyby przecieki e-maili. Wiedza jest zniszczona, gdy stoi w wyniku rzadziej niż w wejściu. Czego nie ma na
+  listach (login, nazwa i adres urzędu, adres IP, daty, inicjały), ocena nie sprawdza, a
+  znacznika w wyniku nie sprawdza wcale. Test bez silnika pilnuje zaznaczeń
+  (`annotation_problems()`), tego, że wzorcowa zamiana wychodzi bez błędu, i tego, że atrapa
+  silnika przepuszcza każdą daną; test ewaluacyjny z progami na rodzaj wchodzi z pierwszym
+  silnikiem (p. 19.4). Przy próbce korpusu ocena i komunikaty nazywają fragment rodzajem
+  z numerem, nigdy treścią.
 - **Narzędzia kodu: integracyjne bez modelu na aplikacji syntetycznej, ewaluacyjne na kodzie
   Dokusa.** Zapytania z zestawu syntetycznego idą przez prawdziwy węzeł `run_tools`, bo odmowa
   bywa dziełem modelu zapytania albo narzędzia, a model ma w obu przypadkach dostać błąd
@@ -3331,6 +3352,7 @@ przebiegów.
 | `tests/_helpers/synthetic_code/`       | aplikacja syntetyczna: zbudowana paczka, jej źródło i reguły, opis projektu, mapa symboli, zapytania z zestawu syntetycznego i prawdziwe narzędzia kodu na niej (`synthetic_code_tools()`) |
 | `tests/_helpers/synthetic_docs/`       | dokumentacja syntetyczna: indeks wobec paczki (`table_differences()`, `collection_differences()`) i pomiary obu wyszukiwań w dokumentacji |
 | `tests/_helpers/golden_tickets/`       | golden set zgłoszeń: zapytania, dystraktory, korpus odniesienia, pomiar `find_tickets_vector` i filtra jakości |
+| `tests/_helpers/golden_anonymization/` | golden set anonimizatora: oba zestawy, ocena przecieków i zniszczonej wiedzy, pomiar z licznikami na rodzaj (`measure_anonymization()`), kontrola zaznaczeń (`annotation_problems()`) i wzorcowa zamiana (`ideal_anonymizer()`) |
 
 - **Każdy helper ma folder w `tests/_helpers/`, także bez modeli — dla spójności (2026-10-15,
   wcześniej pliki `tests/helpers_*.py`).** W folderze `helper.py` z logiką, `models/`
@@ -3511,10 +3533,25 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   do `{IMIĘ} {NAZWISKO}`”. Wraca, gdy pomiary grafów (p. 21–28) pokażą, że model myli osoby.
 - **Maskowanie fragmentów wskazanych przez model-strażnika zamiast zatrzymania grafu** —
   fałszywy alarm po cichu niszczyłby wiedzę, a zatrzymanie jest jawne: każde to sygnał, co
-  poprawić we wzorcach albo w NER, i nowy przypadek do golden setu. Wraca, gdy zatrzymań będzie
-  tyle, że zaczną przeszkadzać w pracy.
-- **Model anonimizujący jako kolejny silnik zamiany** — przepisując tekst, mógłby zniszczyć
-  wiedzę albo coś dopisać; zamieniają wzorce i NER, a model tylko sprawdza wynik.
+  poprawić we wzorcach albo w prompcie modelu, i nowy przypadek do golden setu. Wraca, gdy
+  zatrzymań będzie tyle, że zaczną przeszkadzać w pracy.
+- **Przepisywanie tekstu modelem anonimizującym, także z wyrównaniem wyniku do wejścia**
+  (decyzja 2026-10-17) — model kopiuje całe wątki bez zmian, zwłaszcza gdy stoją w nich już
+  znaczniki, a poza tym poprawia i przeredagowuje tekst: na 32 wątkach zgubił 300–420 słów
+  i przepuścił 12–16 imion. Model wskazuje osoby, a zamienia kod (p. 19.5).
+- **NER osób (spaCy `pl_core_news_lg`, PolDeepNer2) zamiast modelu anonimizującego**
+  (2026-10-17) — spaCy przepuszczał nazwiska i niszczył nazwy usług (8 z 36), a PolDeepNer2
+  przepuszczał więcej osób niż model i liczył na CPU ponad 10 s na wątek. Wraca, gdy instancja
+  nie może mieć zaufanego endpointu modelu.
+- **Model jako sędzia listy kandydatów** (osoby ze spaCy, każde słowo z wielkiej litery albo
+  własna lista do odfiltrowania) — odrzuca prawdziwe nazwiska, a przy długiej liście gubi się
+  całkiem (do 24 z 45 nazwisk przecieku przy 1421 kandydatach).
+- **Drugi przebieg modelu „tekst jest już zanonimizowany, upewnij się”** — domknął 4 z 4
+  przecieków, ale zamienił 215 fragmentów bez danej i podwoił czas; te same przecieki domyka
+  bez wywołania rozprowadzenie wskazanych słów po wątku (p. 19.5).
+- **Adres w zadaniu modelu, obok osób** — dokładał najwyżej jeden adres na 13 z zestawu
+  adresów, a na próbce korpusu kosztował 1 imię i 1 nazwisko przecieku; adres zostaje wzorcom
+  (p. 19.4).
 - **Węzły właściwe na atrapie modelu przy dostawcy `fake`** — atrapa modelu bez scenariusza
   odpowiada samym tekstem, więc `respond` odrzucałby każdą sprawę, a scenariusz wpisany w fabrykę
   byłby drugą atrapą grafu. Przy `fake` fabryka oddaje atrapę całego grafu.
@@ -3742,6 +3779,18 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   poprawia się w prompcie, a próg z zerem tylko udawałby strojenie. Cena: jedna dziwna
   odpowiedź niedeterministycznego modelu daje czerwony test; wtedy czyta się surowe odpowiedzi
   z raportu. Wraca w jednym miejscu, gdyby w grafach z pętlą zero okazało się nieosiągalne.
+- **Zakresy znaków z wyrównaniem wyniku do wejścia w golden secie anonimizatora** — pozycje
+  źle się pisze i czyta, a zmiana tekstu je rozsypuje; wystarczają fragment z rodzajem
+  i porównanie słów. Cena: przeciek słowa, które stoi w tekście także poza zaznaczeniem,
+  wychodzi tylko wtedy, gdy tego słowa w wyniku przybywa.
+- **Sam fragment w całości jako miara przecieku** — „{TELEFON} 456” wyszłoby jako szczelne.
+- **Sprawdzanie znacznika w wyniku anonimizacji** — nazwy znaczników ustalą silniki
+  (p. 19.4–19.5); rodzaj w golden secie służy dziś tylko liczeniu przecieków osobno.
+- **Login, nazwa i adres urzędu oraz adres IP w danych do usunięcia golden setu** (decyzja
+  2026-10-17) — loginu nie złapie żaden planowany silnik, a urząd i serwer nie są danymi
+  osobowymi; zostają poza oceną.
+- **Kod pocztowy jako osobny wzorzec** — sam nie wskazuje osoby, a w korpusie stoi 292 razy
+  na 325 zaraz po ulicy albo numerze, czyli w adresie; jest kotwicą wzorca adresu (p. 19.4).
 - **Wielkie litery jako wykrywacz nazw dopisanych przez „Popraw"** — odmiana i „Państwo"
   dawałyby fałszywe alarmy; dopisane nazwy łapią pułapki przy sprawie, a liczby porównanie
   z notatkami.
@@ -4068,13 +4117,15 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
 
 #### E. Anonimizacja — zastępuje atrapę anonimizatora z p. 4
 
-- [ ] **19. Usługa `anonymizer` w compose** (rozpisany na podpunkty 2026-10-16) — zamiana
-  deterministyczna i na CPU, całość fail-closed. Każda znaleziona dana zamienia się na znacznik
-  swojego rodzaju (`{IMIĘ}`, `{NAZWISKO}`, `{PESEL}`, `{TELEFON}`, `{EMAIL}`…), bez numerów,
-  a po anonimizacji wszystko działa na znacznikach: odpowiedzi tras ich nie podmieniają
-  z powrotem, a mapowanie znaczników na dane nigdzie nie wraca (decyzja 2026-10-16). Każdy
-  podpunkt wchodzi od razu ze swoimi testami — jednostkowymi, integracyjnymi, a od 19.4 także
-  ewaluacyjnymi na golden secie anonimizatora z 19.3, w 19.6 na osobnym golden secie strażnika.
+- [ ] **19. Usługa `anonymizer` w compose** (rozpisany na podpunkty 2026-10-16) — dane
+  o stałym kształcie zamieniają wzorce, osoby wskazuje model anonimizujący, a zamienia je kod
+  (od 2026-10-17, wcześniej NER na CPU); całość fail-closed. Każda znaleziona dana zamienia
+  się na znacznik swojego rodzaju (`{IMIĘ}`, `{NAZWISKO}`, `{PESEL}`, `{TELEFON}`, `{EMAIL}`…),
+  bez numerów, a po anonimizacji wszystko działa na znacznikach: odpowiedzi tras ich nie
+  podmieniają z powrotem, a mapowanie znaczników na dane nigdzie nie wraca (decyzja
+  2026-10-16). Każdy podpunkt wchodzi od razu ze swoimi testami — jednostkowymi,
+  integracyjnymi, a od 19.4 także ewaluacyjnymi na golden secie anonimizatora z 19.3,
+  a strażnik, jeśli zostanie, na osobnym.
   *Dlaczego:* surowy tekst nie opuszcza sieci compose, a nadgorliwość w korpusie jest
   nieodwracalna; człowiek czyta to samo, co widział model, więc łatwiej mu zaufać wynikowi
   i wyłapać lukę w anonimizacji.
@@ -4098,35 +4149,118 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     (wyszukanie z 2026-10-16 nie znalazło podobnego wpisu); reguły — „Warstwy kodu", „Warstwa
     API", „Warstwa węzłów", „Warstwa grafów", „Warstwa embeddera", „Warstwa bazy wektorowej
     (Qdrant)", „Testy", „Świadomie pominięte".
-  - [ ] **19.3 Golden set anonimizatora** — teksty z dwiema listami: co ma zniknąć, z rodzajem
-    (osoba, PESEL, telefon, adres…), i co ma zostać (kody i komunikaty błędów, po których szuka
-    `find_tickets_text`, wersje, nazwy usług, numery zgłoszeń). Zmyślone w `data/safe/golden/`,
-    próbka korpusu w `data/unsafe/golden/`; test ewaluacyjny liczy osobno przecieki i zniszczoną
-    wiedzę. Powstaje przed silnikami, żeby każdy kolejny mierzyć tym samym golden setem.
-  - [ ] **19.4 Wzorce z sumami kontrolnymi** — PESEL, NIP, REGON i numer konta z cyfrą
-    kontrolną, telefon i e-mail samym wzorcem. Kryterium na golden secie: numer z poprawną sumą
-    znika, a liczba tego samego kształtu bez poprawnej sumy (numer przesyłki, kod błędu) zostaje.
-  - [ ] **19.5 NER osób** — model NER na CPU zamienia imię na `{IMIĘ}`, a nazwisko na
-    `{NAZWISKO}`, bez numerów i bez grupowania odmian; ten sam znacznik nie znaczy tej samej
-    osoby. Bez słownika osób z helpdesku: lista naszych konsultantów dochodzi tylko wtedy, gdy
-    golden set pokaże, że NER gubi nasze nazwiska w podpisach. Kryterium: przecieki osób na
-    golden secie.
-  - [ ] **19.6 Model-strażnik w usłudze `anonymizer`, zawsze** (decyzja 2026-10-16) — po
-    wzorcach i NER model anonimizujący niczego nie zamienia, tylko odpowiada, czy w tekście
-    zostały dane osobowe, i wskazuje które. Wskazany fragment, którego dosłownie nie ma
-    w tekście, jest zmyśleniem modelu i się nie liczy. Każdy inny zatrzymuje graf własnym błędem:
-    nie 503, bo ponowienie nic nie da, i nie błędem konfiguracji; helpdesk dostaje rodzaje
-    znalezionych danych i same fragmenty, bo to on je przysłał, a do logu idą tylko rodzaje
-    i liczby. Awaria modelu też zatrzymuje graf (fail-closed). Osobny golden set strażnika:
-    czyste teksty po anonimizacji (muszą przejść), teksty z podrzuconą pozostałością danych (muszą
-    zostać zatrzymane) i pułapki, które muszą przejść (nazwy usług, kody błędów, same znaczniki,
-    nazwy urzędów); fałszywe alarmy liczone osobno, bo każdy zatrzymuje sprawę. Strażnik widzi
-    to, co NER przepuścił, czyli właśnie przecieki, więc jego endpoint musi być zaufany: który
-    może tu stać, rozstrzyga wdrożenie według granicy zaufania endpointu, a zapisuje
-    konfiguracja `LLM_ANONYMIZATION_*`. Woła go usługa: osiem zmiennych przenosi się z `Settings`
-    w `api` do usługi i jej wpisu w compose, usługa dostaje własnego klienta modelu, bo kodu
-    między usługami nie dzielimy, a z `api` znika `Settings.llm_anonymization()`. Do zmierzenia
-    czas: strażnik sprawdza każde żądanie, także bramki, na które człowiek czeka.
+  - [x] **19.3 Golden set anonimizatora** (2026-10-17) — `anonymization.json` w obu folderach
+    `golden/`: 20 zmyślonych tekstów i 32 wątki korpusu, każdy z danymi do usunięcia
+    i wiedzą do zachowania po rodzaju (10 rodzajów danych, w tym numer dowodu i paszportu,
+    6 rodzajów wiedzy); helper `golden_anonymization` z oceną przecieków (także częściowych)
+    i zniszczonej wiedzy, pomiarem z licznikami na rodzaj i kontrolą zaznaczeń; testy bez
+    silnika, a test ewaluacyjny przechodzi do 19.4; zaznaczenia próbki pisał model i czekają na
+    przegląd człowieka, zanim próbka posłuży za odniesienie; reguły — „Testy”, „Świadomie
+    pominięte”.
+  - [ ] **19.4 Wzorce z sumami kontrolnymi** — dane o stałym kształcie zamienia wzorzec,
+    a tam, gdzie jest suma kontrolna, także jej sprawdzenie:
+
+    | rodzaj     | kształt                                                  | sprawdzenie       |
+    |------------|----------------------------------------------------------|-------------------|
+    | `PESEL`    | 11 cyfr                                                  | suma kontrolna    |
+    | `NIP`      | 10 cyfr, także z myślnikami (3-3-2-2, 3-2-2-3)           | suma kontrolna    |
+    | `REGON`    | 9 albo 14 cyfr                                           | suma kontrolna    |
+    | `KONTO`    | 26 cyfr, z PL albo bez, ze spacjami co 4 albo bez        | suma IBAN         |
+    | `DOKUMENT` | dowód: 3 litery i 6 cyfr; paszport: 2 litery i 7 cyfr    | cyfra kontrolna   |
+    | `TELEFON`  | 9 cyfr ze spacjami, z myślnikami albo bez odstępów,      | sam wzorzec       |
+    |            | z +48; stacjonarny z kierunkowym, także w nawiasie;      |                   |
+    |            | kilka numerów po jednej etykiecie                        |                   |
+    | `EMAIL`    | adres, także w `<…>` i w `[mailto:…]`                    | sam wzorzec       |
+    | `ADRES`    | ulica z numerem (z literą, „/”, „m.”, „lok.”), kod       | sam wzorzec       |
+    |            | pocztowy, miejscowość; kotwica: kod pocztowy albo „ul.”, |                   |
+    |            | „al.”, „pl.”, „os.” z numerem                            |                   |
+
+    Numer wewnętrzny bez kierunkowego („tel. 6013”) wzorzec pomija. Sam kod pocztowy nie
+    wskazuje osoby, ale jest kotwicą adresu: od niego wzorzec bierze w lewo ulicę z numerem,
+    a w prawo miejscowość. Druga kotwica to „ul.”, „al.”, „pl.”, „os.” z numerem, bez kodu; za
+    numerem wzorzec dobiera miejscowość po przecinku, bo w takim kształcie stoi jedyny prywatny
+    adres próbki korpusu. Kod z miejscowością na początku linii łapie adres złamany między
+    liniami. Wzorzec wytnie przy tym adresy urzędów i firm, których golden set nie ocenia.
+    Adres zostaje wzorcom, bez modelu: w sondzie z 2026-10-17 (raport
+    `data/unsafe/docs/sonda-bielik-anonimizacja-2026-10-17.md`) szkic tych kotwic przepuścił
+    3 z 13 adresów zestawu adresów, a model w wywołaniu z osobami dokładał najwyżej jeden adres,
+    kosztem 1 imienia i 1 nazwiska przecieku na próbce. Nie łapie nikt notatki małymi literami
+    („na lipowej 3 w otwocku”) ani miejscowości po „w” za ulicą bez kodu. Przypadki zestawu
+    adresów (`addresses.json` w materiałach raportu, z imionami innymi niż w przykładach promptu
+    z 19.5) dochodzą do zmyślonego golden setu. Kryterium na golden secie: numer z poprawną
+    sumą znika, a liczba tego samego kształtu bez poprawnej sumy (numer przesyłki, kod błędu)
+    zostaje, także liczba w kształcie kodu pocztowego poza adresem. Tu wchodzi test ewaluacyjny golden setu
+    anonimizatora: pomiar silnika z progami na rodzaj i raport, który przy próbce korpusu nie
+    pokazuje fragmentów; razem z nim domyślny `ANONYMIZATION_ENGINE` przestaje być atrapą.
+  - [ ] **19.5 Osoby: model anonimizujący wskazuje, kod zamienia** (decyzja 2026-10-17,
+    wcześniej NER na CPU) — jedno wywołanie modelu na tekst po wzorcach: imiona i nazwiska
+    w JSON-ie, każde słowo osobno, w formie z tekstu. Kod szuka każdego fragmentu dosłownie,
+    a gdy go nie ma — po rdzeniu słowa, i zamienia każde wskazane słowo w każdej odmianie
+    w całym wątku: imię na `{IMIĘ}`, nazwisko na `{NAZWISKO}`, bez numerów i bez grupowania
+    odmian; ten sam znacznik nie znaczy tej samej osoby. Linii etykiet wątku, zwrotów („Pani”)
+    ani słów ról („klient”, „konsultant”) kod nie zamienia. Model tekstu nie przepisuje, więc
+    nie może zgubić wiedzy. Prompt to krótka lista częstych błędów i dwa zmyślone przykłady
+    jako wcześniejsza rozmowa (z osobami i bez nich); pełny tekst stoi w raporcie sondy. Bez
+    słownika osób z helpdesku: lista naszych konsultantów dochodzi tylko wtedy, gdy golden set
+    pokaże, że model gubi nasze nazwiska w podpisach. Sonda z 2026-10-17 na 32 wątkach próbki
+    (nie pomiar, raport `data/unsafe/docs/sonda-bielik-anonimizacja-2026-10-17.md`, skrypty
+    i wyniki w `data/unsafe/docs/sondy-anonimizacji-2026-10-17/`), model
+    `speakleash/Bielik-11B-v3.0-Instruct-FP8-Dynamic` na vLLM, wzorce zastąpione wzorcową
+    zamianą z zestawu:
+
+    | sposób                                       | imiona  | nazwiska | zniszczona wiedza | czas                  |
+    |----------------------------------------------|---------|----------|-------------------|-----------------------|
+    | model wskazuje, kod zamienia (dwa przebiegi) | 0 z 49  | 0 z 45   | 1 nazwa usługi    | do 9 s na wątek (GPU) |
+    | spaCy `pl_core_news_lg`                      | 0 z 49  | 2 z 45   | 8 z 36 usług      | 3,6 s na 32 (CPU)     |
+    | PolDeepNer2 `pdn2_v08_nkjp_large`            | 5 z 49  | 6 z 45   | brak              | 165 s na 32 (CPU)     |
+    | model przepisuje tekst ze znacznikami        | 12–16   | 11–14    | 300 słów zgubione | —                     |
+
+    Na zestawie zmyślonym model przepuścił 0 z 19 imion i 0 z 19 nazwisk. Czas był mierzony przy
+    16 żądaniach naraz. Model podaje imię w mianowniku i „imię nazwisko” naraz, mimo zasady
+    w prompcie: mianownik naprawia dopasowanie po rdzeniu, a rozdzielanie — przykłady
+    w rozmowie (bez nich połowa fragmentów to „imię nazwisko”). W tekście bez osób wskazuje to,
+    co stoi w miejscu wyciętego nazwiska: stanowisko w podpisie, nazwę urzędu. Sonda NER:
+    `data/unsafe/docs/sonda-ner-2026-10-17.md`. Kroki:
+    1. Silnik w usłudze `anonymizer`: prompt w pliku `.md` przy silniku z testem-strażnikiem,
+       schemat odpowiedzi, dopasowanie i rozprowadzenie w kodzie, test ewaluacyjny na golden
+       secie. Konfiguracja `LLM_ANONYMIZATION_*` przenosi się z `api` do usługi: osiem
+       zmiennych do jej `Settings` i wpisu w compose, własny klient modelu, bo kodu między
+       usługami nie dzielimy, a z `api` znika `Settings.llm_anonymization()`. Model widzi surowy
+       tekst, więc jego endpoint musi być zaufany: który może tu stać, rozstrzyga wdrożenie
+       według granicy zaufania endpointu. Licencja modelu do sprawdzenia, jak przy embedderze
+       (p. 40).
+    2. Prawdziwa morfologia wobec reguły rdzenia (wspólny początek bez dwóch ostatnich liter,
+       najwyżej 4 litery końcówki): Morfeusz2 albo słownik sjp.pl z obrazu Postgresa. Reguła
+       rdzenia gubi przy krótkich słowach wymianę głoski (Ewa → Ewie) i może złapać słowo
+       o tym samym początku co imię; krótkie nazwiska bywają zwykłymi słowami (Lis, Kot, Bąk,
+       Mróz), także na początku zdania. Te przypadki dochodzą najpierw do golden setu.
+    3. Golden set dostaje też wątek bez osób ze stanowiskiem i nazwą urzędu w miejscu podpisu
+       oraz słowa ról w `keep`; imion z przykładów promptu w zestawie nie ma, a w próbce
+       korpusu brakuje jednej odmiany imienia, którą znalazła sonda.
+    4. Czas jednego wątku przy jednym żądaniu naraz (bramki, na które człowiek czeka)
+       i zachowanie przy niedostępnym endpoincie: anonimizacja staje, a z nią każdy graf. To
+       cena wobec NER-a na CPU: anonimizacja zależy od endpointu z GPU.
+  - [ ] **19.6 Model-strażnik: do ponownej decyzji** (decyzja 2026-10-16: zawsze, po wzorcach
+    i NER) — po zamianie model miał tylko odpowiadać, czy zostały dane osobowe, i wskazywać
+    które; fragment, którego dosłownie nie ma w tekście, by się nie liczył, a każdy inny
+    zatrzymywałby graf własnym błędem (nie 503 i nie błędem konfiguracji; helpdesk dostaje
+    rodzaje i fragmenty, log same rodzaje i liczby), także przy awarii modelu. Sonda
+    z 2026-10-17 (ten sam raport) sprawdziła trzy postaci strażnika na wynikach strategii
+    z 19.5:
+
+    | strażnik                                         | czysty tekst: zatrzymałby | z osobami: wykrył |
+    |--------------------------------------------------|---------------------------|-------------------|
+    | ryzyko „niskie, średnie, wysokie”, stop: wysokie | 6 z 32                    | 8 z 24            |
+    | TAK albo NIE, stop przy P(TAK) ≥ 0,5             | 1 z 32                    | 2 z 24            |
+    | wypisanie osób, stop przy fragmencie w tekście   | 13 z 32                   | 24 z 24           |
+
+    Zdanie, że tekst jest już zanonimizowany, robi model ślepym na osoby, które stoją, a model
+    wypisujący osoby w tekście bez osób bierze za osobę stanowisko z podpisu. Odkąd ten sam
+    model wskazuje osoby w 19.5, strażnik o tym samym zadaniu nie jest niezależnym
+    sprawdzeniem. Do rozstrzygnięcia przed 19.7: czy strażnik zostaje, a jeśli tak, to jaki
+    (inny model, inna postać) i ile fałszywych zatrzymań jest do przyjęcia; wtedy osobny golden
+    set strażnika (czyste teksty, teksty z podrzuconą pozostałością danych, pułapki: nazwy
+    usług, kody błędów, znaczniki, nazwy urzędów) z fałszywymi alarmami liczonymi osobno.
   - [ ] **19.7 Włączenie** — klient w `api` przepuszcza wynik prawdziwego silnika bez zmian
     w kodzie, więc zostają prompty: prompt systemowy każdego grafu dostaje akapit — dane osobowe
     są zastąpione znacznikami, ten sam znacznik nie znaczy tej samej osoby, znaczników się nie

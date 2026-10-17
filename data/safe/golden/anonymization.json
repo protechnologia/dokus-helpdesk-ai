@@ -1,0 +1,277 @@
+{
+  "meta": {
+    "name": "anonymization-v1",
+    "created": "2026-10-17",
+    "synthetic": true,
+    "purpose": "Golden set anonimizatora na zmyślonych tekstach (p. 19.3): co ma zniknąć i co ma zostać. Pilnuje oceny i zjawisk, których w próbce korpusu może zabraknąć. NIE mierzy skuteczności na prawdziwych zgłoszeniach: to robi próbka korpusu w data/unsafe/golden/anonymization.json.",
+    "rules": [
+      "Przypadek: id, phenomenon (zjawisko, bez cytowania danych), text (wątek w kształcie RawTicket.as_thread() albo sama wiadomość), remove i keep: fragmenty zapisane po rodzaju.",
+      "remove: dane, które mają zniknąć, rodzaje z REMOVE_KINDS (tests/_helpers/golden_anonymization/constants.py). Fragment to sama dana, bez etykiety: „600 123 456”, nie „tel. 600 123 456”. Każda forma odmiany osobno („Katarzyna”, „Katarzyno”); wielkość liter i polskie znaki nie mają znaczenia.",
+      "Telefon, e-mail i numery z sumą kontrolną znikają zawsze, także służbowe, funkcyjne i urzędu; nazwisko konsultanta znika tak samo jak nazwisko klienta. PESEL podany z błędną sumą też znika, bo to wpisana z pomyłką dana osoby.",
+      "keep: wiedza, która ma zostać, rodzaje z KEEP_KINDS. NUMER to liczba, która nie jest daną osobową, także w kształcie danej bez poprawnej sumy kontrolnej.",
+      "Poza oceną zostaje to, czego nie ma na żadnej liście: login, nazwa i adres urzędu, adres IP, daty, inicjały.",
+      "Słowa fragmentu z remove w każdym miejscu tekstu muszą być daną; pułapkę z tym samym słowem w zwykłym znaczeniu pisze się inną formą („Mróz” obok „mrozy”).",
+      "Ocena porównuje słowa, czyli ciągi liter i cyfr. Fragment wycieka, gdy stoi w wyniku w całości albo gdy jego słowo zostaje w wyniku ponad to, co stało poza zaznaczeniami; wiedza jest zniszczona, gdy stoi w wyniku rzadziej niż w wejściu."
+    ]
+  },
+  "cases": [
+    {
+      "id": "s01",
+      "phenomenon": "podpisy klienta i konsultanta, wołacz, telefon i e-mail w stopce, kod błędu i wersja",
+      "text": "ZGŁOSZENIE 90101 z 2026-05-12\nTemat: Błąd przy wysyłce przez e-Doręczenia\n\nOPIS ZGŁASZAJĄCEGO:\nDzień dobry,\nod rana przy wysyłce pisma przez e-Doręczenia pojawia się komunikat „Nie udało się skomunikować z serwerem”. W logu widać ORA-00942.\nPozdrawiam\nKatarzyna Zielińska\ninspektor ds. kancelarii\ntel. 81 532 10 15\nk.zielinska@ugzalesie.pl\n\nKOMENTARZ 1 — konsultant, 2026-05-12 10:14:03 (typ: komentarz):\nPani Katarzyno, proszę o informację, czy problem dotyczy wszystkich pism. Wersja 4.12.3 ma poprawkę tego błędu.\nTomasz Wróbel\nDokus – wsparcie",
+      "remove": {
+        "IMIĘ": ["Katarzyna", "Katarzyno", "Tomasz"],
+        "NAZWISKO": ["Zielińska", "Wróbel"],
+        "TELEFON": ["81 532 10 15"],
+        "EMAIL": ["k.zielinska@ugzalesie.pl"]
+      },
+      "keep": {
+        "KOMUNIKAT": ["Nie udało się skomunikować z serwerem"],
+        "KOD_BŁĘDU": ["ORA-00942"],
+        "WERSJA": ["4.12.3"],
+        "USŁUGA": ["e-Doręczenia"],
+        "NUMER": ["90101"]
+      }
+    },
+    {
+      "id": "s02",
+      "phenomenon": "automat mailowy: cytowana historia z nagłówkami Od, Wysłano, Do, DW i adresami w nawiasach <>",
+      "text": "ZGŁOSZENIE 90102 z 2026-06-20\nTemat: RE: Aktualizacja środowiska testowego\n\nOPIS ZGŁASZAJĄCEGO:\nDzień dobry, po aktualizacji nie działa podgląd pisma w kancelarii.\n\nOd: Marek Kowalczyk <m.kowalczyk@starostwo-lipno.pl>\nWysłano: piątek, 19 czerwca 2026 14:02\nDo: helpdesk@dokus.pl\nDW: Ewa Mazur <ewa.mazur@starostwo-lipno.pl>\nTemat: Aktualizacja środowiska testowego\n\nSzanowni Państwo,\ninformujemy, że w dniu 22.06 środowisko testowe zostanie zaktualizowane do wersji 4.13.0.\nZ poważaniem\nZespół wdrożeń",
+      "remove": {
+        "IMIĘ": ["Marek", "Ewa"],
+        "NAZWISKO": ["Kowalczyk", "Mazur"],
+        "EMAIL": ["m.kowalczyk@starostwo-lipno.pl", "helpdesk@dokus.pl", "ewa.mazur@starostwo-lipno.pl"]
+      },
+      "keep": {
+        "WERSJA": ["4.13.0"],
+        "NUMER": ["90102"]
+      }
+    },
+    {
+      "id": "s03",
+      "phenomenon": "cytowanie z „>”: imię i nazwisko złamane między liniami, nazwisko przed imieniem, wielkie litery",
+      "text": "ZGŁOSZENIE 90103 z 2026-04-03\nTemat: Brak sprawy na liście\n\nOPIS ZGŁASZAJĄCEGO:\nProszę o pilną pomoc, sprawa nadal nie jest widoczna.\n\n> W dniu 02.04.2026 o 09:15, Anna\n> Wiśniewska pisze:\n> Sprawa ZS.6220.4.2026 zniknęła z listy po zmianie referenta.\n> Pozdrawiam\n> Anna\n> Wiśniewska\n> Referat Ochrony Środowiska\n\nKOMENTARZ 1 — klient, 2026-04-03 11:02:40 (typ: komentarz):\nW załączeniu zrzut ekranu. WIŚNIEWSKA ANNA, pok. 12",
+      "remove": {
+        "IMIĘ": ["Anna"],
+        "NAZWISKO": ["Wiśniewska"]
+      },
+      "keep": {
+        "NUMER": ["ZS.6220.4.2026"],
+        "SŁOWO": ["Referat Ochrony Środowiska"]
+      }
+    },
+    {
+      "id": "s04",
+      "phenomenon": "wiadomość do klienta: odmiana imion i nazwisk, wołacz, skrót „p.” przed nazwiskiem",
+      "text": "Szanowna Pani Agnieszko,\nw nawiązaniu do rozmowy z Panem Piotrem Lewandowskim przekazuję, że uprawnienia do rejestru zostały nadane. Pani Joannie Kamińskiej proszę przekazać, że konto będzie aktywne od jutra. Kopię wiadomości otrzymuje p. Lewandowski.\nZ wyrazami szacunku\nMichał Dąbrowski",
+      "remove": {
+        "IMIĘ": ["Agnieszko", "Piotrem", "Joannie", "Michał"],
+        "NAZWISKO": ["Lewandowskim", "Kamińskiej", "Lewandowski", "Dąbrowski"]
+      },
+      "keep": {}
+    },
+    {
+      "id": "s05",
+      "phenomenon": "dane osoby trzeciej w treści sprawy: PESEL i adres zamieszkania, obok numeru przesyłki i liczby w kształcie kodu pocztowego poza adresem",
+      "text": "ZGŁOSZENIE 90105 z 2026-03-17\nTemat: Nie można zarejestrować pisma od mieszkanki\n\nOPIS ZGŁASZAJĄCEGO:\nPrzy rejestracji pisma od Pani Barbary Szymańskiej, PESEL 85030512840, zam. ul. Lipowa 12/4, 21-100 Lubartów, system odrzuca kontrahenta z komunikatem „Kontrahent o podanym identyfikatorze już istnieje”. Pismo przyszło przesyłką nr 00659007734210852345. Ten sam błąd mamy przy kartach 10-150 w dzienniku podawczym.",
+      "remove": {
+        "IMIĘ": ["Barbary"],
+        "NAZWISKO": ["Szymańskiej"],
+        "PESEL": ["85030512840"],
+        "ADRES": ["Lipowa 12/4, 21-100 Lubartów"]
+      },
+      "keep": {
+        "KOMUNIKAT": ["Kontrahent o podanym identyfikatorze już istnieje"],
+        "NUMER": ["00659007734210852345", "10-150", "90105"]
+      }
+    },
+    {
+      "id": "s06",
+      "phenomenon": "NIP, REGON 9 i 14 cyfr z poprawną sumą obok liczb tego samego kształtu bez niej",
+      "text": "ZGŁOSZENIE 90106 z 2026-02-09\nTemat: Duplikat kontrahenta\n\nOPIS ZGŁASZAJĄCEGO:\nW słowniku kontrahentów są dwa wpisy tej samej firmy: NIP 742-136-51-80, REGON 431025874, a dla oddziału REGON 43102587400016. Faktura do zamówienia nr 123-456-78-90 trafiła na drugi wpis. Identyfikator transakcji z KSeF: 43102587400010.",
+      "remove": {
+        "NIP": ["742-136-51-80"],
+        "REGON": ["431025874", "43102587400016"]
+      },
+      "keep": {
+        "NUMER": ["123-456-78-90", "43102587400010", "90106"],
+        "USŁUGA": ["KSeF"]
+      }
+    },
+    {
+      "id": "s07",
+      "phenomenon": "telefony w kilku zapisach: ze spacjami, z +48 i myślnikami, stacjonarny z kierunkowym w nawiasie, bez odstępów, sklejony z etykietą",
+      "text": "Proszę o kontakt pod nr 600 100 200 lub +48 512-345-678, w godzinach pracy także stacjonarnie (22) 456 78 90 wew. 115. W pilnych sprawach 501234567 albo kom.694111222. Załącznik ma 18 MB, a limit ePUAP to 3,5 MB.",
+      "remove": {
+        "TELEFON": ["600 100 200", "+48 512-345-678", "(22) 456 78 90", "501234567", "694111222"]
+      },
+      "keep": {
+        "NUMER": ["18 MB", "3,5 MB"],
+        "USŁUGA": ["ePUAP"]
+      }
+    },
+    {
+      "id": "s08",
+      "phenomenon": "e-mail z imieniem i nazwiskiem w części lokalnej, w [mailto:…] i prywatny z rokiem",
+      "text": "ZGŁOSZENIE 90108 z 2026-05-28\nTemat: Zmiana adresu powiadomień\n\nOPIS ZGŁASZAJĄCEGO:\nProszę o zmianę adresu powiadomień z [mailto:jan.kowalski@gmina-bory.pl] na kowalski.jan1980@gmail.com, bo służbowa skrzynka jest pełna.\nJan Kowalski\nsekretarz gminy",
+      "remove": {
+        "IMIĘ": ["Jan"],
+        "NAZWISKO": ["Kowalski"],
+        "EMAIL": ["jan.kowalski@gmina-bory.pl", "kowalski.jan1980@gmail.com"]
+      },
+      "keep": {
+        "NUMER": ["90108"]
+      }
+    },
+    {
+      "id": "s09",
+      "phenomenon": "numer dowodu osobistego i paszportu w treści sprawy",
+      "text": "ZGŁOSZENIE 90109 z 2026-01-21\nTemat: Wniosek o udostępnienie akt\n\nOPIS ZGŁASZAJĄCEGO:\nDo wniosku wnioskodawca dołączył skan dowodu osobistego CBF248213, a pełnomocnik legitymował się paszportem nr EA0417295. Przy zapisie skanu system zgłasza „Przekroczono dopuszczalny rozmiar pliku”.",
+      "remove": {
+        "DOKUMENT": ["CBF248213", "EA0417295"]
+      },
+      "keep": {
+        "KOMUNIKAT": ["Przekroczono dopuszczalny rozmiar pliku"],
+        "NUMER": ["90109"]
+      }
+    },
+    {
+      "id": "s10",
+      "phenomenon": "pułapki: nazwiska, które są zwykłymi słowami, obok tych słów w innej formie i nazw usług",
+      "text": "ZGŁOSZENIE 90110 z 2026-01-05\nTemat: Numeracja pism po nowym roku\n\nOPIS ZGŁASZAJĄCEGO:\nOd 2 stycznia nie nadaje się numeracja w rejestrze. Pani Mróz z sekretariatu mówi, że rok temu było tak samo, a przez mrozy nikt nie przyszedł do kancelarii. Kierownik Lis prosi o pilne sprawdzenie, bo w kolejce do Poczty Polskiej czeka 40 pism.",
+      "remove": {
+        "NAZWISKO": ["Mróz", "Lis"]
+      },
+      "keep": {
+        "SŁOWO": ["mrozy"],
+        "USŁUGA": ["Poczty Polskiej"],
+        "NUMER": ["40 pism"]
+      }
+    },
+    {
+      "id": "s11",
+      "phenomenon": "nazwy usług i komunikaty, które wyglądają jak nazwy własne, obok imienia i nazwiska konsultanta",
+      "text": "ZGŁOSZENIE 90111 z 2026-06-02\nTemat: Wysyłka nie dochodzi\n\nOPIS ZGŁASZAJĄCEGO:\nePUAP zwraca „Adresat nie posiada Elektronicznej Skrzynki Podawczej”, eNadawca pokazuje status „W toku”, a KSeF odrzuca fakturę kodem 21405.\n\nKOMENTARZ 1 — konsultant, 2026-06-02 13:40:11 (typ: rozwiazanie):\nAdresat korzysta już z e-Doręczeń, więc wysyłkę trzeba przestawić na ten kanał. Paweł Grabowski",
+      "remove": {
+        "IMIĘ": ["Paweł"],
+        "NAZWISKO": ["Grabowski"]
+      },
+      "keep": {
+        "USŁUGA": ["ePUAP", "eNadawca", "KSeF", "e-Doręczeń"],
+        "KOMUNIKAT": ["Adresat nie posiada Elektronicznej Skrzynki Podawczej", "W toku"],
+        "KOD_BŁĘDU": ["21405"]
+      }
+    },
+    {
+      "id": "s12",
+      "phenomenon": "NIP wewnątrz komunikatu bazy danych: kod i komunikat zostają, dana znika; login poza oceną",
+      "text": "ZGŁOSZENIE 90112 z 2026-04-14\nTemat: Błąd przy zapisie kontrahenta\n\nOPIS ZGŁASZAJĄCEGO:\nUżytkownik jnowak dostaje przy zapisie:\nSQLSTATE[23505]: Unique violation: 7 ERROR: duplicate key value violates unique constraint \"kontrahent_nip_key\" DETAIL: Key (nip)=(5213012076) already exists.",
+      "remove": {
+        "NIP": ["5213012076"]
+      },
+      "keep": {
+        "KOD_BŁĘDU": ["SQLSTATE[23505]", "kontrahent_nip_key"],
+        "KOMUNIKAT": ["duplicate key value violates unique constraint"],
+        "NUMER": ["90112"]
+      }
+    },
+    {
+      "id": "s13",
+      "phenomenon": "numer konta w zapisie z PL i bez, ze spacjami i bez",
+      "text": "Opłatę skarbową proszę wpłacić na rachunek urzędu 92 1020 1026 0000 1502 0345 6789. Dla wpłat z zagranicy: PL30116022020000000312458701. Tytuł: opłata skarbowa, sprawa GK.6831.12.2026.",
+      "remove": {
+        "KONTO": ["92 1020 1026 0000 1502 0345 6789", "PL30116022020000000312458701"]
+      },
+      "keep": {
+        "NUMER": ["GK.6831.12.2026"]
+      }
+    },
+    {
+      "id": "s14",
+      "phenomenon": "krótka wiadomość do klienta: imię w wołaczu, samo imię w podpisie, telefon",
+      "text": "Pani Moniko, proszę ponowić wysyłkę po godzinie 15. W razie pytań proszę dzwonić: 693 120 456.\nŁukasz",
+      "remove": {
+        "IMIĘ": ["Moniko", "Łukasz"],
+        "TELEFON": ["693 120 456"]
+      },
+      "keep": {}
+    },
+    {
+      "id": "s15",
+      "phenomenon": "notatki wdrożeniowca: małe litery, bez polskich znaków, nazwisko po „pani”",
+      "text": "dzwonila pani wojcik z ug bory, ksef nie wysyla faktur od wczoraj, blad 21405 przy kazdej. oddzwonic na 605 404 303 albo mail a.wojcik@ugbory.pl, wersja u nich 4.11.8",
+      "remove": {
+        "NAZWISKO": ["wojcik"],
+        "TELEFON": ["605 404 303"],
+        "EMAIL": ["a.wojcik@ugbory.pl"]
+      },
+      "keep": {
+        "USŁUGA": ["ksef"],
+        "KOD_BŁĘDU": ["21405"],
+        "WERSJA": ["4.11.8"]
+      }
+    },
+    {
+      "id": "s16",
+      "phenomenon": "wątek bez danych osobowych: kody, wersje i liczby, które kształtem przypominają dane",
+      "text": "ZGŁOSZENIE 90116 z 2026-07-07\nTemat: Wysyłka hybrydowa odrzucona\n\nOPIS ZGŁASZAJĄCEGO:\nPo aktualizacji do wersji 2026.06.1 operator odrzuca pliki z komunikatem „Nieprawidłowe marginesy dokumentu”. W logu serwera: java.lang.OutOfMemoryError oraz No CRL/OCSP address/data. Limit sumy załączników to 15 MB, a marginesy muszą mieć 10/8/15 mm.\n\nKOMENTARZ 1 — konsultant, 2026-07-07 09:12:55 (typ: rozwiazanie):\nZwiększyliśmy pamięć usługi do 2048 MB i przywróciliśmy dostęp do listy unieważnień na porcie 8443. Proszę wysłać ponownie paczkę 1180-2026.",
+      "remove": {},
+      "keep": {
+        "WERSJA": ["2026.06.1"],
+        "KOMUNIKAT": ["Nieprawidłowe marginesy dokumentu", "No CRL/OCSP address/data"],
+        "KOD_BŁĘDU": ["java.lang.OutOfMemoryError"],
+        "NUMER": ["15 MB", "10/8/15 mm", "2048 MB", "8443", "1180-2026", "90116"]
+      }
+    },
+    {
+      "id": "s17",
+      "phenomenon": "przekazana wiadomość z angielskimi nagłówkami From, Sent, To i nazwą skrzynki w cudzysłowie",
+      "text": "ZGŁOSZENIE 90117 z 2026-06-08\nTemat: FW: ePUAP UPO\n\nOPIS ZGŁASZAJĄCEGO:\nPrzesyłam dalej, brak UPO od tygodnia.\n\n-----Original Message-----\nFrom: Rafał Pawlak <r.pawlak@mops-zalesie.pl>\nSent: Monday, June 8, 2026 9:41 AM\nTo: 'Dokus Helpdesk' <helpdesk@dokus.pl>\nSubject: ePUAP UPO\n\nDzień dobry, od 1 czerwca nie dostajemy UPO dla pism wysłanych przez ePUAP.\nRafał Pawlak\nMOPS Zalesie",
+      "remove": {
+        "IMIĘ": ["Rafał"],
+        "NAZWISKO": ["Pawlak"],
+        "EMAIL": ["r.pawlak@mops-zalesie.pl", "helpdesk@dokus.pl"]
+      },
+      "keep": {
+        "USŁUGA": ["ePUAP", "UPO"],
+        "NUMER": ["90117"]
+      }
+    },
+    {
+      "id": "s18",
+      "phenomenon": "dwie osoby w jednym zdaniu w dopełniaczu, obok nazwy komórki",
+      "text": "ZGŁOSZENIE 90118 z 2026-03-30\nTemat: Przeniesienie spraw\n\nOPIS ZGŁASZAJĄCEGO:\nProszę przenieść wszystkie sprawy od Krzysztofa Wójcika do Małgorzaty Kaczmarek z Wydziału Finansowego, bo pan Krzysztof od poniedziałku jest na emeryturze.",
+      "remove": {
+        "IMIĘ": ["Krzysztofa", "Małgorzaty", "Krzysztof"],
+        "NAZWISKO": ["Wójcika", "Kaczmarek"]
+      },
+      "keep": {
+        "NUMER": ["90118"],
+        "SŁOWO": ["Wydziału Finansowego"]
+      }
+    },
+    {
+      "id": "s19",
+      "phenomenon": "nazwisko dwuczłonowe z łącznikiem i inicjał imienia (inicjał poza oceną)",
+      "text": "ZGŁOSZENIE 90119 z 2026-02-25\nTemat: Akceptacja pisma\n\nOPIS ZGŁASZAJĄCEGO:\nPismo czeka na akceptację, a sprawę prowadzi p. A. Nowak-Jeziorańska, która nie widzi go na liście do akceptacji.",
+      "remove": {
+        "NAZWISKO": ["Nowak-Jeziorańska"]
+      },
+      "keep": {
+        "NUMER": ["90119"]
+      }
+    },
+    {
+      "id": "s20",
+      "phenomenon": "PESEL w komunikacie walidacji, z poprawną i z błędną sumą, obok liczby jedenastocyfrowej, która nie jest PESEL-em",
+      "text": "ZGŁOSZENIE 90120 z 2026-05-06\nTemat: Walidacja PESEL przy rejestracji\n\nOPIS ZGŁASZAJĄCEGO:\nPrzy rejestracji pisma od pana 92112304576 przechodzi, ale wpisany wcześniej numer daje „Numer PESEL 85030512843 jest nieprawidłowy”. W rejestrze ta sama sprawa ma identyfikator 20260506118.",
+      "remove": {
+        "PESEL": ["92112304576", "85030512843"]
+      },
+      "keep": {
+        "KOMUNIKAT": ["jest nieprawidłowy"],
+        "NUMER": ["20260506118", "90120"]
+      }
+    }
+  ]
+}
