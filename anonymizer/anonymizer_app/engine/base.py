@@ -17,8 +17,9 @@ class Engine(ABC):
         2. Trasa woła `anonymize()` z tekstem z żądania.
         3. Silnik oddaje tekst ze znacznikami i zapisuje wywołanie przez `_log_call()`.
 
-    Implementacje są async, choć atrapa niczego nie czeka: prawdziwy silnik (wzorce, NER) będzie
-    liczył na CPU i trafi do wątku roboczego, a trasa nie ma się wtedy zmieniać.
+    Implementacje są async, choć atrapa niczego nie czeka: prawdziwy silnik (p. 19.5) czeka na
+    model wskazujący osoby, a trasa nie ma się wtedy zmieniać. Krok wzorców liczy wątek korpusu
+    w milisekundach, więc wątku roboczego nie potrzebuje.
     """
 
     @property

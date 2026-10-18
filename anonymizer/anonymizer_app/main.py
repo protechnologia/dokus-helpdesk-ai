@@ -24,7 +24,7 @@ from fastapi import FastAPI, Request, Response
 
 from anonymizer_app.config import get_settings
 from anonymizer_app.engine import get_engine
-from anonymizer_app.errors import REQUEST_ID_HEADER, register_exception_handlers
+from anonymizer_app.errors.handlers import REQUEST_ID_HEADER, register_exception_handlers
 from anonymizer_app.routers import anonymize, health
 
 logger = logging.getLogger(__name__)

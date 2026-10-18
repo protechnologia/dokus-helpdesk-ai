@@ -22,7 +22,7 @@ SENSITIVE = (
 BASE_URL = "http://anonymizer:8000"
 
 # Nazwa silnika innego niż atrapa w odpowiedziach testowych. Prawdziwego silnika jeszcze nie ma
-# (p. 19.4–19.5), więc to tylko nazwa, której klient nie odrzuca.
+# (p. 19.5), więc to tylko nazwa, której klient nie odrzuca.
 REAL_ENGINE = "patterns"
 
 # Nazwa atrapy silnika w odpowiedzi usługi — tę klient `api` odrzuca.

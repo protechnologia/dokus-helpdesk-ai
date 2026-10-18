@@ -1,9 +1,9 @@
 """
 Description:
 Testy oceny golden setu anonimizatora (`tests/_helpers/golden_anonymization/`), czyli tego, na
-czym stanie test ewaluacyjny silników z p. 19.4–19.5. Bez silnika — wynik anonimizacji podaje
-test, a próbki leżą w `samples.py` helpera. Plik stoi w korzeniu folderu, bo ocena nie należy do
-żadnego pakietu aplikacji.
+czym stoi test ewaluacyjny wzorców (p. 19.4) i stanie test silnika (p. 19.5). Bez silnika —
+wynik anonimizacji podaje test, a próbki leżą w `samples.py` helpera. Plik stoi w korzeniu
+folderu, bo ocena nie należy do żadnego pakietu aplikacji.
 """
 
 import pytest
@@ -93,7 +93,7 @@ def test_a_name_inside_an_email_belongs_to_the_email(output: str, leaked: list[s
     zostawiony adres to przeciek e-maila, a nie imienia i nazwiska, a zostawione imię przed
     nazwiskiem to przeciek imienia, a nie adresu.
 
-    Wyłapuje przypisanie przecieku niewłaściwemu rodzajowi: bez NER-a (p. 19.4) każde imię
+    Wyłapuje przypisanie przecieku niewłaściwemu rodzajowi: bez kroku osób (p. 19.5) każde imię
     w adresie zawyżałoby przecieki e-maili, a liczniki na rodzaj wskazywałyby nie ten silnik."""
     assert kinds(judge_anonymization(CASE, output).leaked) == leaked
 

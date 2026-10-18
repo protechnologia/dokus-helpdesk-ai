@@ -8,11 +8,11 @@ Silnik anonimizacji usługi, niezależny od tego, co pod spodem. Importuj stąd
 | `base.py`    | kontrakt `Engine`: nazwa, `anonymize()`, wpis w logu        |
 | `fake.py`    | `FakeEngine` — oddaje tekst bez zmian                       |
 | `factory.py` | `build_engine()` i `get_engine()` po `ANONYMIZATION_ENGINE` |
-| `errors.py`  | `EngineError`, `EngineConfigError`                          |
+
+Błędy silnika leżą w `errors/`, a kroki, z których prawdziwy silnik się składa, w `steps/`.
 """
 
 from anonymizer_app.engine.base import Engine
-from anonymizer_app.engine.errors import EngineConfigError, EngineError
 from anonymizer_app.engine.factory import SUPPORTED_ENGINES, build_engine, get_engine
 from anonymizer_app.engine.fake import FAKE_ENGINE_NAME, FakeEngine
 
@@ -20,8 +20,6 @@ __all__ = [
     "FAKE_ENGINE_NAME",
     "SUPPORTED_ENGINES",
     "Engine",
-    "EngineConfigError",
-    "EngineError",
     "FakeEngine",
     "build_engine",
     "get_engine",

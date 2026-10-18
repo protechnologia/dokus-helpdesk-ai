@@ -4,8 +4,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from anonymizer_app.engine import EngineConfigError, EngineError
-from anonymizer_app.models import ErrorResponse
+from anonymizer_app.errors.engine_config_error import EngineConfigError
+from anonymizer_app.errors.engine_error import EngineError
+from anonymizer_app.models.error_response import ErrorResponse
 
 logger = logging.getLogger(__name__)
 

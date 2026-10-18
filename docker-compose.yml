@@ -161,7 +161,7 @@ services:
     volumes:
       - ./anonymizer/anonymizer_app:/code/anonymizer_app
     # ANONYMIZATION_ENGINE czyta tylko ta usługa. Domyślnie `fake`, bo prawdziwego silnika
-    # jeszcze nie ma (p. 19.4–19.5); `api` nie przepuści wyniku atrapy do prawdziwego modelu.
+    # jeszcze nie ma (p. 19.5); `api` nie przepuści wyniku atrapy do prawdziwego modelu.
     environment:
       LOG_LEVEL:            ${LOG_LEVEL:-INFO}
       ANONYMIZATION_ENGINE: ${ANONYMIZATION_ENGINE:-fake}

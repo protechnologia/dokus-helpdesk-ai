@@ -1,7 +1,9 @@
 import pytest
 
 from anonymizer_app.config import Settings
-from anonymizer_app.engine import EngineConfigError, EngineError, FakeEngine, build_engine
+from anonymizer_app.engine import FakeEngine, build_engine
+from anonymizer_app.errors.engine_config_error import EngineConfigError
+from anonymizer_app.errors.engine_error import EngineError
 
 
 @pytest.mark.parametrize("engine", ["fake", " Fake "])

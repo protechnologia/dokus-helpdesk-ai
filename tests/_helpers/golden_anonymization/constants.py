@@ -15,8 +15,8 @@ SAFE_FILE = Path("data/safe/golden/anonymization.json")
 UNSAFE_FILE = Path("data/unsafe/golden/anonymization.json")
 
 # Rodzaje danych, które mają zniknąć. Nazwy to nazwy znaczników z p. 19, bez nawiasów; znacznika
-# w wyniku ocena nie sprawdza, a rodzaj służy do liczenia przecieków osobno. `DOKUMENT` to numer
-# dowodu osobistego albo paszportu.
+# w wyniku ocena nie sprawdza, a rodzaj służy do liczenia przecieków osobno. `DOWÓD` to numer
+# dowodu osobistego.
 REMOVE_KINDS = (
     "IMIĘ",
     "NAZWISKO",
@@ -24,9 +24,11 @@ REMOVE_KINDS = (
     "NIP",
     "REGON",
     "KONTO",
-    "DOKUMENT",
+    "DOWÓD",
+    "PASZPORT",
     "TELEFON",
     "EMAIL",
+    "ADRES_EDOR",
     "ADRES",
 )
 

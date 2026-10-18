@@ -3,7 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from anonymizer_app.engine import Engine, get_engine
-from anonymizer_app.models import AnonymizeRequest, AnonymizeResponse
+from anonymizer_app.models.anonymize_request import AnonymizeRequest
+from anonymizer_app.models.anonymize_response import AnonymizeResponse
 
 router = APIRouter(tags=["anonymization"])
 

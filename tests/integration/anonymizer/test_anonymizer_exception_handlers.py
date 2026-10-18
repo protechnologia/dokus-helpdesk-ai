@@ -4,8 +4,9 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from anonymizer_app.engine import EngineConfigError, EngineError
-from anonymizer_app.errors import register_exception_handlers
+from anonymizer_app.errors.engine_config_error import EngineConfigError
+from anonymizer_app.errors.engine_error import EngineError
+from anonymizer_app.errors.handlers import register_exception_handlers
 from tests._helpers.anonymization import RAW_TEXT, SENSITIVE
 
 

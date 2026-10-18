@@ -11,7 +11,7 @@ class FakeEngine(Engine):
     Description:
     Domyślny silnik (`ANONYMIZATION_ENGINE=fake`) i ten, na którym chodzą testy: oddaje tekst BEZ
     ZMIAN. Służy temu, żeby usługa stała i dała się sprawdzić, zanim powstanie prawdziwy silnik
-    (p. 19.4–19.5). Niczego nie anonimizuje, więc `api` nie przepuści jego wyniku do prawdziwego
+    (p. 19.5). Niczego nie anonimizuje, więc `api` nie przepuści jego wyniku do prawdziwego
     modelu — rozpoznaje go po nazwie w odpowiedzi.
 
     Flow:

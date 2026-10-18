@@ -2,10 +2,10 @@ from functools import lru_cache
 
 from anonymizer_app.config import Settings, get_settings
 from anonymizer_app.engine.base import Engine
-from anonymizer_app.engine.errors import EngineConfigError
 from anonymizer_app.engine.fake import FAKE_ENGINE_NAME, FakeEngine
+from anonymizer_app.errors.engine_config_error import EngineConfigError
 
-# Silniki, które ta wersja umie zbudować. Prawdziwy dochodzi w p. 19.4–19.5 (CLAUDE.md -> „Plan").
+# Silniki, które ta wersja umie zbudować. Prawdziwy dochodzi w p. 19.5 (CLAUDE.md -> „Plan").
 SUPPORTED_ENGINES = (FAKE_ENGINE_NAME,)
 
 

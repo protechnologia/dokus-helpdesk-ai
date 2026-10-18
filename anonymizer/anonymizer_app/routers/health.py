@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from anonymizer_app.models import HealthResponse
+from anonymizer_app.models.health_response import HealthResponse
 
 router = APIRouter(tags=["health"])
 

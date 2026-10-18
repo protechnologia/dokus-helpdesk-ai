@@ -251,7 +251,7 @@ def build_function_graph(
     przy atrapie modelu generującego fabryka oddaje atrapę grafu, przy prawdziwym dostawcy —
     graf z węzłów właściwych na anonimizatorze, modelu i narzędziach z konfiguracji.
 
-    Do czasu prawdziwego silnika w usłudze `anonymizer` (p. 19.4–19.5) druga droga zatrzymuje
+    Do czasu prawdziwego silnika w usłudze `anonymizer` (p. 19.5) druga droga zatrzymuje
     się w węźle `anonymize`: klient usługi odmawia wyniku atrapy silnika błędem konfiguracji,
     więc surowe zgłoszenie nie wychodzi z procesu.
 

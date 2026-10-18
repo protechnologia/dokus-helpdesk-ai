@@ -128,7 +128,8 @@
       "phenomenon": "numer dowodu osobistego i paszportu w treści sprawy",
       "text": "ZGŁOSZENIE 90109 z 2026-01-21\nTemat: Wniosek o udostępnienie akt\n\nOPIS ZGŁASZAJĄCEGO:\nDo wniosku wnioskodawca dołączył skan dowodu osobistego CBF248213, a pełnomocnik legitymował się paszportem nr EA0417295. Przy zapisie skanu system zgłasza „Przekroczono dopuszczalny rozmiar pliku”.",
       "remove": {
-        "DOKUMENT": ["CBF248213", "EA0417295"]
+        "DOWÓD": ["CBF248213"],
+        "PASZPORT": ["EA0417295"]
       },
       "keep": {
         "KOMUNIKAT": ["Przekroczono dopuszczalny rozmiar pliku"],
@@ -435,6 +436,51 @@
         "USŁUGA": ["KSeF"],
         "KOD_BŁĘDU": ["21405"],
         "SŁOWO": ["Inspektor ds. obsługi mieszkańców", "Biuro Rady Gminy", "konsultant"]
+      }
+    },
+    {
+      "id": "s35",
+      "phenomenon": "telefony w zapisach z korpusu: twarda spacja między grupami, kierunkowy z zerem w nawiasie, „(+48)”, siedem cyfr ciągiem z numerem wewnętrznym doklejonym po „w.” i sam numer wewnętrzny po „tel.”, obok czterocyfrowego kodu bez etykiety",
+      "text": "Proszę dzwonić pod (081) 532 10 15 albo na komórkę +48 600 100 200. Sekretariat: (+48) 22 456 78 90, tel. 81 5321015w.12. Kancelaria wewnętrznie: tel. 6013. Błąd ma kod 4013 od wersji 5.2.0.",
+      "remove": {
+        "TELEFON": ["(081) 532 10 15", "+48 600 100 200", "(+48) 22 456 78 90", "81 5321015w.12", "6013"]
+      },
+      "keep": {
+        "KOD_BŁĘDU": ["4013"],
+        "WERSJA": ["5.2.0"]
+      }
+    },
+    {
+      "id": "s36",
+      "phenomenon": "e-mail zapisany słowem w nawiasie zamiast „@” obok linii śladu stosu z gołym „at”",
+      "text": "Proszę pisać na k.zielinska (at) ugzalesie.pl albo sekretariat[at]ugzalesie.pl. W logu serwera: java.lang.IllegalStateException at pl.dokus.kancelaria.Rejestr.zapisz(Rejestr.java:212).",
+      "remove": {
+        "EMAIL": ["k.zielinska (at) ugzalesie.pl", "sekretariat[at]ugzalesie.pl"]
+      },
+      "keep": {
+        "KOD_BŁĘDU": ["java.lang.IllegalStateException at pl.dokus.kancelaria.Rejestr.zapisz"]
+      }
+    },
+    {
+      "id": "s37",
+      "phenomenon": "adres i NIP z twardymi spacjami oraz NIP z odstępami mieszanymi: spacja, myślnik i bez odstępu",
+      "text": "Decyzję doręczono na adres ul. Ogrodowa 12, 26-600 Radom. Firma ma NIP 954 287 13 39, a oddział 813-026-9153.",
+      "remove": {
+        "ADRES": ["Ogrodowa 12, 26-600 Radom"],
+        "NIP": ["954 287 13 39", "813-026-9153"]
+      },
+      "keep": {}
+    },
+    {
+      "id": "s38",
+      "phenomenon": "adres do e-Doręczeń mieszkańca i urzędu obok nazwy usługi i kodu błędu",
+      "text": "Pismo do mieszkańca wysłane na adres AE:PL-48213-90517-KLMNP-07 wróciło z błędem 4011, a odpowiedź z urzędu przyszła z ae:pl-10203-40506-ABCDE-11. Proszę sprawdzić konfigurację e-Doręczeń.",
+      "remove": {
+        "ADRES_EDOR": ["AE:PL-48213-90517-KLMNP-07", "ae:pl-10203-40506-ABCDE-11"]
+      },
+      "keep": {
+        "USŁUGA": ["e-Doręczeń"],
+        "KOD_BŁĘDU": ["4011"]
       }
     }
   ]

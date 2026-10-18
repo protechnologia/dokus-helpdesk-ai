@@ -17,7 +17,7 @@ pytestmark = [pytest.mark.stack, pytest.mark.stack_anonymizer]
 # Grafy na kliencie prawdziwej usługi `anonymizer`. Warunek testów: usługa na stacku działa na
 # atrapie silnika (`ANONYMIZATION_ENGINE=fake`, domyślnie w compose). Pełny przebieg grafu na
 # węzłach właściwych przez usługę przychodzi z pierwszym prawdziwym silnikiem (CLAUDE.md ->
-# „Plan", p. 19.4).
+# „Plan", p. 19.5).
 
 
 async def test_a_graph_reaches_the_service_and_stops_at_its_fake_engine() -> None:

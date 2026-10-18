@@ -27,6 +27,7 @@
   - [Warstwa CLI](#warstwa-cli)
   - [Warstwa API](#warstwa-api)
   - [Warstwa embeddera](#warstwa-embeddera)
+  - [Usługa `anonymizer`](#usługa-anonymizer)
   - [Warstwa bazy wektorowej (Qdrant)](#warstwa-bazy-wektorowej-qdrant)
   - [Warstwa wyszukiwania tekstowego (Postgres)](#warstwa-wyszukiwania-tekstowego-postgres)
   - [Warstwa narzędzi agenta (`agent_tools/`)](#warstwa-narzędzi-agenta-agent_tools)
@@ -323,8 +324,11 @@ dokus-helpdesk-ai/
 │   └── anonymizer_app/           # pakiet nazwany rozłącznie z `app` i `embedder_app`
 │       ├── main.py               # montaż aplikacji
 │       ├── config.py             # Settings tej usługi
-│       ├── models.py             # kontrakt HTTP: AnonymizeRequest/AnonymizeResponse
-│       ├── engine/               # Engine + fabryka + FakeEngine — tu wchodzą wzorce i model wskazujący osoby
+│       ├── models/               # model na plik: kontrakt HTTP (AnonymizeRequest/AnonymizeResponse…) i Found
+│       ├── errors/               # błąd na plik (EngineError, EngineConfigError) i handlery wyjątków
+│       ├── engine/               # Engine + fabryka + FakeEngine — tu wchodzi silnik z kroków (p. 19.5)
+│       ├── steps/                # kroki silnika: replace_patterns.py, a od p. 19.5 model wskazujący osoby i adresy
+│       ├── patterns/             # wzorzec na plik (pesel.py, phone_number.py, address.py…), wariant na funkcję
 │       └── routers/              # /health, /anonymize
 ├── postgres/                     # kolejna usługa: Postgres z polskim słownikiem
 │   ├── Dockerfile                # pobiera słownik sjp.pl (commit + suma kontrolna)
@@ -1690,6 +1694,76 @@ wektor:
   używa, ale zostaje — nie kasować go jako niewykorzystanego. Budowa kosztuje jedno wywołanie
   embeddera na rekord, a usunięcie i powrót kosztowałyby pełny re-index.
 
+### Usługa `anonymizer`
+
+Dwie strony granicy procesu, jak przy embedderze: w `api` kontrakt `Anonymizer` i klient
+`AnonymizerClient`, w usłudze silnik `Engine`. Prawdziwy silnik (p. 19.5) składa się z kroków
+w `steps/`: wzorce (p. 19.4), a po nich dwa wywołania modelu, jedno na osoby, drugie na adresy,
+których wzorce nie łapią (p. 19.5). Dziś stoi pierwszy krok, a usługa nadal działa na atrapie
+silnika.
+
+- **Wzorce nie są silnikiem do wyboru w `ANONYMIZATION_ENGINE` (decyzja 2026-10-18).** Nie łapią
+  imion i nazwisk, a klient w `api` odmawia tylko atrapy, więc silnik z samych wzorców wysłałby
+  osoby do modelu zewnętrznego. Domyślny silnik przestaje być atrapą w p. 19.5, razem z krokiem
+  osób.
+- **Wzorzec to plik w `patterns/`, wariant to funkcja w nim (2026-10-18).** Plik ma `KIND` (rodzaj,
+  zarazem nazwa znacznika) i `VARIANTS`; wariant przyjmuje tekst i zwraca miejsca (`Found`: rodzaj
+  i zakres znaków). Docstring wzorca ma tabelę przykładów „przed → po” dla każdego wariantu,
+  a wynik „po” pochodzi z uruchomionej funkcji. Zamiana (`steps/replace_patterns.py`) zbiera
+  miejsca wszystkich wariantów, z zachodzących na siebie bierze najdłuższe (adres z kodem zamiast
+  samej ulicy), przy równej długości wcześniejszy wzorzec w `PATTERNS` (wzorce z sumą kontrolną
+  stoją przed telefonem), i zamienia od końca tekstu. Nazwa pliku to rodzaj danej po angielsku,
+  bez przedrostków grupujących.
+
+  | plik              | znacznik     | warianty                                               | sprawdzenie     |
+  |-------------------|--------------|--------------------------------------------------------|-----------------|
+  | `pesel.py`        | `PESEL`      | z poprawną sumą; z błędną sumą zaraz po „PESEL”        | suma kontrolna  |
+  | `nip.py`          | `NIP`        | 3-3-2-2 albo 3-2-2-3, każdy odstęp opcjonalny          | suma kontrolna  |
+  | `regon.py`        | `REGON`      | 9 cyfr; 14 cyfr                                        | suma kontrolna  |
+  | `bank_account.py` | `KONTO`      | 26 cyfr, z „PL” albo bez, spacje co 4 opcjonalne       | suma IBAN       |
+  | `id_card.py`      | `DOWÓD`      | 3 litery i 6 cyfr                                      | cyfra kontrolna |
+  | `passport.py`     | `PASZPORT`   | 2 litery i 7 cyfr                                      | cyfra kontrolna |
+  | `phone_number.py` | `TELEFON`    | komórkowy 3-3-3; stacjonarny z kierunkowym, także      | sam kształt     |
+  |                   |              | z zerem i w nawiasie, 3-2-2 albo ciągiem, z „wew.”;    |                 |
+  |                   |              | wewnętrzny 3–5 cyfr zaraz po „tel.” albo „wew.”        |                 |
+  | `email.py`        | `EMAIL`      | z „@”; ze słowem w nawiasie: „(at)”, „[at]”, „(małpa)” | sam kształt     |
+  | `edor.py`         | `ADRES_EDOR` | adres do e-Doręczeń „AE:PL-00000-00000-AAAAA-00”       | sam kształt     |
+  | `address.py`      | `ADRES`      | od kodu pocztowego: w prawo miejscowość, w lewo ulica  | kotwica         |
+  |                   |              | z numerem albo początek linii; od słowa przed ulicą    |                 |
+  |                   |              | („ul.”, „ul”, „ulicy”, „rondo”): w prawo ulica         |                 |
+  |                   |              | z numerem i opcjonalnie miejscowość; numer mieszkania  |                 |
+  |                   |              | po „/”, „m.”, „lok”, „lokal”, „mieszk.”                |                 |
+
+- **Liczba bez poprawnej sumy zostaje, a PESEL z błędną sumą po etykiecie znika.** Jedenaście
+  cyfr bez etykiety i bez sumy to zwykle identyfikator z rejestru; po słowie „PESEL” to PESEL
+  wpisany z pomyłką.
+- **Telefonu i adresu nie chroni suma kontrolna, więc chronią je granice i kotwice.** Przed
+  telefonem nie stoi litera ani cyfra („ZS600100200” to kod); skrót ulicy bez kropki łapie się
+  tylko małymi literami, bo „OS Windows 10” wyglądałoby jak osiedle; „at” bez nawiasu nie jest
+  e-mailem, bo tak wygląda linia śladu stosu („Exception at com.foo.Bar”).
+- **Odstępem w numerze i adresie jest też twarda spacja (2026-10-18).** Stoi w 124 z 1825
+  zgłoszeń. Przed poprawkami wzorce przepuszczały 17 z 28 telefonów próbki korpusu: 6 przez
+  twardą spację, 5 przez kierunkowy z zerem w nawiasie, 3 przez siedem cyfr ciągiem po
+  kierunkowym, 2 numery wewnętrzne po „tel.” i 1 przez „(+48)”.
+- **Adres ma dwie kotwice, a każda to jedna funkcja (2026-10-18).** Kod pocztowy rozciąga się
+  w prawo na miejscowość, a w lewo na ulicę z numerem albo do początku linii; słowo przed ulicą
+  (lista `STREET_PREFIXES` z grupami `PREFIXES_ULICA`, `PREFIXES_PLAC`…) w prawo na ulicę
+  z numerem i opcjonalnie miejscowość. Wszystko w jednej linii, a przecinek kończy nazwę ulicy.
+  Pięć wcześniejszych wariantów dawało na 1895 tekstach (korpus i oba golden sety) te same
+  miejsca, co dwie funkcje. Listy słów (`STREET_PREFIXES`, `FLAT_MARKERS`) stoją w pliku nad
+  kawałkami wyrażeń i podają każdy zapis wprost, także z kropką.
+- **Adres do e-Doręczeń znika zawsze, także adres urzędu, jak e-mail (2026-10-18).** W korpusie
+  stoi 32 razy w 17 zgłoszeniach. Ostatnie dwie cyfry to suma kontrolna, ale jej algorytmu nie
+  opublikowano, więc wzorzec sprawdza sam kształt.
+- **Wynik z 2026-10-18:** zestaw zmyślony bez przecieku poza dwoma znanymi brakami adresu (bez
+  kotwicy i w notatce małymi literami), próbka korpusu bez przecieku w każdym rodzaju, który w niej
+  stoi (PESEL 2, NIP 17, REGON 14, telefon 28, e-mail 51, adres 1), i bez zniszczonej wiedzy
+  w obu. 32 wątki próbki zamieniają się w 80 ms (najdłuższy ma 5,9 tys. znaków), więc zamiana nie
+  idzie do wątku roboczego.
+- **Modele usługi leżą w `models/`, błędy w `errors/`, po jednym na plik (2026-10-18)**, jak
+  w `core_model/` w `api`; importuje się je z modułów, a pliki `__init__.py` tylko wymieniają
+  zawartość. Handlery wyjątków stoją w `errors/handlers.py`.
+
 ### Warstwa bazy wektorowej (Qdrant)
 
 - **Pakiet `api/app/db_qdrant/`: klient, kolekcje, punkty, trafienia — a reszta aplikacji używa
@@ -2446,7 +2520,8 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   stoi w jego konfiguracji, jest decyzją o tym, dokąd ten tekst trafia — osobnej flagi nie ma.
   Do p. 19 nikt tego klienta nie buduje, a w p. 19.5 ta konfiguracja przenosi się do usługi
   `anonymizer`, która woła model, żeby wskazał imiona i nazwiska do zamiany (decyzja
-  2026-10-17; wcześniej model miał tylko sprawdzać wynik jako strażnik).
+  2026-10-17; wcześniej model miał tylko sprawdzać wynik jako strażnik), a drugim wywołaniem
+  adresy, których nie łapią wzorce (2026-10-18).
 - **Fabryka `get_llm_client()` buduje klienta z jednego kompletu (`LLMSettings` z
   `Settings.llm_generation()` albo `llm_anonymization()`), fail-fast** — brak klucza albo modelu
   to `LLMConfigError` przy budowie klienta, nie błąd połączenia w środku żądania. Komunikat
@@ -3000,15 +3075,15 @@ localhost:8010/search`.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2057 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 935 (86)           | 96 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2208 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 939 (86)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 124 (11)           | 10 s |
-| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 97 (38)            | 38 s |
+| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 104 (38)           | 38 s |
 
 Liczby z 2026-10-18, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-3120 testów, około 150 s; domyślny `pytest`, bez stacku: 2985 testów, około 45 s. Testy `llm_live` —
+3282 testy, około 150 s; domyślny `pytest`, bez stacku: 3147 testów, około 50 s. Testy `llm_live` —
 36 integracyjnych i 57 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
 przebiegów.
 
@@ -3116,14 +3191,16 @@ przebiegów.
   w `safe` i próbka korpusu w `unsafe`.
 - **Golden set anonimizatora (2026-10-17, p. 19.3): przypadek to tekst z danymi, które mają
   zniknąć (`remove`), i wiedzą, która ma zostać (`keep`), obie zapisane po rodzaju.** Zestaw
-  zmyślony ma 34 przypadki: cytowaną historię maili z adresami w `<…>`, dane złamane między
+  zmyślony ma 38 przypadków: cytowaną historię maili z adresami w `<…>`, dane złamane między
   liniami, odmianę i wołacz, numery z poprawną sumą obok liczb tego samego kształtu bez niej
   i pułapki, a od 2026-10-18 także przypadki z sond anonimizacji: adresy bez kodu, bez kotwicy
   i w notatce małymi literami, samo nazwisko po zwrocie i na początku zdania, krótkie imiona
   i nazwiska w odmianie obok słów o tym samym początku, wątek bez osób i słowa ról z etykiet
-  komentarzy w `keep`. Próbka korpusu to 32 wątki dobrane warstwami według układu danych, w tym oba wątki
-  korpusu z PESEL-em osoby trzeciej; numeru konta ani dowodu w niej nie ma, dlatego zestaw
-  zmyślony musi mieć każdy rodzaj. Ocena porównuje słowa: ciągi liter i cyfr, bez wielkości
+  komentarzy w `keep`, a także zapisy, które wzorce przepuszczały w próbce korpusu (telefony
+  z twardą spacją i kierunkowym w nawiasie, e-mail z „(at)”, adres do e-Doręczeń). Próbka
+  korpusu to 32 wątki dobrane warstwami według układu danych, w tym oba wątki korpusu z PESEL-em
+  osoby trzeciej; numeru konta, dowodu, paszportu ani adresu do e-Doręczeń w niej nie ma, dlatego
+  zestaw zmyślony musi mieć każdy rodzaj. Ocena porównuje słowa: ciągi liter i cyfr, bez wielkości
   liter i polskich znaków. Dana wycieka, gdy stoi w wyniku w całości albo gdy jej słowo stoi
   w wyniku częściej, niż stało w wejściu poza zaznaczeniami — to łapie przeciek częściowy
   („{TELEFON} 456”) bez fałszywego alarmu na tej samej liczbie gdzie indziej. Dana wewnątrz
@@ -3132,9 +3209,15 @@ przebiegów.
   listach (login, nazwa i adres urzędu, adres IP, daty, inicjały), ocena nie sprawdza, a
   znacznika w wyniku nie sprawdza wcale. Test bez silnika pilnuje zaznaczeń
   (`annotation_problems()`), tego, że wzorcowa zamiana wychodzi bez błędu, i tego, że atrapa
-  silnika przepuszcza każdą daną; test ewaluacyjny z progami na rodzaj wchodzi z pierwszym
-  silnikiem (p. 19.4). Przy próbce korpusu ocena i komunikaty nazywają fragment rodzajem
-  z numerem, nigdy treścią.
+  silnika przepuszcza każdą daną. Test ewaluacyjny wzorców (p. 19.4,
+  `test_anonymizer_patterns_golden.py`) mierzy na obu zestawach rodzaje od wzorców, bez imion
+  i nazwisk, z progiem na rodzaj równym zmierzonej liczbie, bo wzorce są deterministyczne,
+  i wymaga zera zniszczonej wiedzy. Przy próbce korpusu ocena i komunikaty nazywają fragment
+  rodzajem z numerem, nigdy treścią.
+- **Wzorce testuje się wariantem: tekst przed i po zamianie miejscami z jednej funkcji
+  (2026-10-18).** Plik testu na plik wzorca, w nim dwie listy parametrów: co wariant zamienia
+  i co ma zostawić (liczba z błędną sumą, kod, data, liczba w kształcie danej). Test zamiany
+  pilnuje, że każdy plik wzorca stoi w `PATTERNS`, a każdy wariant zwraca tylko swój rodzaj.
 - **Narzędzia kodu: integracyjne bez modelu na aplikacji syntetycznej, ewaluacyjne na kodzie
   Dokusa.** Zapytania z zestawu syntetycznego idą przez prawdziwy węzeł `run_tools`, bo odmowa
   bywa dziełem modelu zapytania albo narzędzia, a model ma w obu przypadkach dostać błąd
@@ -3356,6 +3439,7 @@ przebiegów.
 | `tests/_helpers/synthetic_docs/`       | dokumentacja syntetyczna: indeks wobec paczki (`table_differences()`, `collection_differences()`) i pomiary obu wyszukiwań w dokumentacji |
 | `tests/_helpers/golden_tickets/`       | golden set zgłoszeń: zapytania, dystraktory, korpus odniesienia, pomiar `find_tickets_vector` i filtra jakości |
 | `tests/_helpers/golden_anonymization/` | golden set anonimizatora: oba zestawy, ocena przecieków i zniszczonej wiedzy, pomiar z licznikami na rodzaj (`measure_anonymization()`), kontrola zaznaczeń (`annotation_problems()`) i wzorcowa zamiana (`ideal_anonymizer()`) |
+| `tests/_helpers/patterns/`            | wzorce usługi `anonymizer`: tekst po zamianie miejscami z jednego wariantu (`replaced_by()`), zamiana wszystkimi wzorcami jako funkcja do pomiaru golden setu (`anonymize_with_patterns()`), rodzaje od wzorców, progi przecieków na zestaw i odczyt pomiaru (`kinds_over_threshold()`, `leaked_fragments()`, `destroyed_fragments()`, `removed_kinds()`) |
 
 - **Każdy helper ma folder w `tests/_helpers/`, także bez modeli — dla spójności (2026-10-15,
   wcześniej pliki `tests/helpers_*.py`).** W folderze `helper.py` z logiką, `models/`
@@ -3552,9 +3636,11 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Drugi przebieg modelu „tekst jest już zanonimizowany, upewnij się”** — domknął 4 z 4
   przecieków, ale zamienił 215 fragmentów bez danej i podwoił czas; te same przecieki domyka
   bez wywołania rozprowadzenie wskazanych słów po wątku (p. 19.5).
-- **Adres w zadaniu modelu, obok osób** — dokładał najwyżej jeden adres na 13 z zestawu
-  adresów, a na próbce korpusu kosztował 1 imię i 1 nazwisko przecieku; adres zostaje wzorcom
-  (p. 19.4).
+- **Adres we wspólnym wywołaniu modelu z osobami** (sondy z 2026-10-17 i 2026-10-18) — na
+  próbce korpusu kosztował w każdym przebiegu 1 imię i 1 nazwisko przecieku (osoby same: 0 i 0);
+  adresy, których nie łapią wzorce, wskazuje osobne wywołanie (p. 19.5).
+- **Długa lista przykładów adresów w prompcie** (2026-10-18) — nic nie dodała wobec dwóch
+  przykładów w rozmowie, a przed filtrami w kodzie brała za adres nazwę urzędu.
 - **Węzły właściwe na atrapie modelu przy dostawcy `fake`** — atrapa modelu bez scenariusza
   odpowiada samym tekstem, więc `respond` odrzucałby każdą sprawę, a scenariusz wpisany w fabrykę
   byłby drugą atrapą grafu. Przy `fake` fabryka oddaje atrapę całego grafu.
@@ -3794,6 +3880,29 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   osobowymi; zostają poza oceną.
 - **Kod pocztowy jako osobny wzorzec** — sam nie wskazuje osoby, a w korpusie stoi 292 razy
   na 325 zaraz po ulicy albo numerze, czyli w adresie; jest kotwicą wzorca adresu (p. 19.4).
+- **Wzorce jako osobny silnik w `ANONYMIZATION_ENGINE`** (decyzja 2026-10-18) — nie łapią osób,
+  a klient w `api` odmawia tylko atrapy, więc nazwiska poszłyby do modelu zewnętrznego; wzorce
+  są pierwszym krokiem silnika z p. 19.5.
+- **Wzorce karty płatniczej, IBAN-u zagranicznego, numeru rejestracyjnego, loginu i numeru
+  księgi wieczystej** (przegląd 2026-10-18) — w 1825 zgłoszeniach korpusu: kart 0 (dwa
+  trafienia sumy Luhna to dwunastocyfrowe numery bez słowa „karta”), IBAN-u zagranicznego 0,
+  numeru rejestracyjnego po etykiecie 1, loginu po etykiecie 7, księgi wieczystej 0. Login
+  zostaje poza oceną z decyzji 2026-10-17. Wracają, gdy któryś rodzaj pojawi się w korpusie
+  albo w golden secie.
+- **Trzecia kotwica adresu: oznaczenie lokalu albo miejscowość z SIMC (TERYT)** (2026-10-18) —
+  w 1825 zgłoszeniach korpusu obie nie znalazły żadnego adresu ponad dwie obecne kotwice:
+  „lok”, „lokal” i „mieszk.” nie stoją w korpusie ani razu, „m.” dało 2 trafienia w jednym
+  zgłoszeniu, a „ulica z numerem, miejscowość z SIMC” (36 263 nazwy) 0 nowych. SIMC kosztowałby
+  plik 5,5 MB w obrazie, odświeżanie i nazwy będące zwykłymi słowami (Góra, Kolonia, Wola).
+  Adresy bez kodu pocztowego i bez słowa przed ulicą wskazuje model (p. 19.5).
+- **„at” bez nawiasu zamiast „@” w e-mailu** — tak wygląda linia śladu stosu („Exception at
+  com.foo.Bar”), a jej zamiana zniszczyłaby kod błędu; łapie się tylko słowo w nawiasie.
+- **Skrót ulicy bez kropki pisany wielkimi literami** — „OS Windows 10” wyglądałoby jak osiedle
+  z numerem; bez kropki łapie się tylko skrót małymi literami.
+- **Suma kontrolna adresu do e-Doręczeń** — jej algorytmu nie opublikowano; wzorzec sprawdza
+  kształt, a przedrostek „AE:PL-” wystarcza.
+- **Przedrostki grupujące w nazwach plików wzorców** (`id_`, `doc_`, `digital_`) — przy
+  dziesięciu plikach spis katalogu czyta się bez nich, a nazwa pliku to rodzaj danej.
 - **Wielkie litery jako wykrywacz nazw dopisanych przez „Popraw"** — odmiana i „Państwo"
   dawałyby fałszywe alarmy; dopisane nazwy łapią pułapki przy sprawie, a liczby porównanie
   z notatkami.
@@ -4121,7 +4230,8 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
 #### E. Anonimizacja — zastępuje atrapę anonimizatora z p. 4
 
 - [ ] **19. Usługa `anonymizer` w compose** (rozpisany na podpunkty 2026-10-16) — dane
-  o stałym kształcie zamieniają wzorce, osoby wskazuje model anonimizujący, a zamienia je kod
+  o stałym kształcie zamieniają wzorce, osoby i adresy, których wzorce nie łapią, wskazuje model
+  anonimizujący, a zamienia je kod
   (od 2026-10-17, wcześniej NER na CPU); całość fail-closed. Każda znaleziona dana zamienia
   się na znacznik swojego rodzaju (`{IMIĘ}`, `{NAZWISKO}`, `{PESEL}`, `{TELEFON}`, `{EMAIL}`…),
   bez numerów, a po anonimizacji wszystko działa na znacznikach: odpowiedzi tras ich nie
@@ -4153,49 +4263,28 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     API", „Warstwa węzłów", „Warstwa grafów", „Warstwa embeddera", „Warstwa bazy wektorowej
     (Qdrant)", „Testy", „Świadomie pominięte".
   - [x] **19.3 Golden set anonimizatora** (2026-10-17) — `anonymization.json` w obu folderach
-    `golden/`: 20 zmyślonych tekstów (od 2026-10-18 34) i 32 wątki korpusu, każdy z danymi do usunięcia
-    i wiedzą do zachowania po rodzaju (10 rodzajów danych, w tym numer dowodu i paszportu,
-    6 rodzajów wiedzy); helper `golden_anonymization` z oceną przecieków (także częściowych)
+    `golden/`: 20 zmyślonych tekstów (od 2026-10-18 38) i 32 wątki korpusu, każdy z danymi do
+    usunięcia i wiedzą do zachowania po rodzaju (10 rodzajów danych, od 2026-10-18 12: osobno
+    dowód i paszport oraz adres do e-Doręczeń; 6 rodzajów wiedzy); helper `golden_anonymization` z oceną przecieków (także częściowych)
     i zniszczonej wiedzy, pomiarem z licznikami na rodzaj i kontrolą zaznaczeń; testy bez
     silnika, a test ewaluacyjny przechodzi do 19.4; zaznaczenia próbki pisał model i czekają na
     przegląd człowieka, zanim próbka posłuży za odniesienie; reguły — „Testy”, „Świadomie
     pominięte”.
-  - [ ] **19.4 Wzorce z sumami kontrolnymi** — dane o stałym kształcie zamienia wzorzec,
-    a tam, gdzie jest suma kontrolna, także jej sprawdzenie:
-
-    | rodzaj     | kształt                                                  | sprawdzenie       |
-    |------------|----------------------------------------------------------|-------------------|
-    | `PESEL`    | 11 cyfr                                                  | suma kontrolna    |
-    | `NIP`      | 10 cyfr, także z myślnikami (3-3-2-2, 3-2-2-3)           | suma kontrolna    |
-    | `REGON`    | 9 albo 14 cyfr                                           | suma kontrolna    |
-    | `KONTO`    | 26 cyfr, z PL albo bez, ze spacjami co 4 albo bez        | suma IBAN         |
-    | `DOKUMENT` | dowód: 3 litery i 6 cyfr; paszport: 2 litery i 7 cyfr    | cyfra kontrolna   |
-    | `TELEFON`  | 9 cyfr ze spacjami, z myślnikami albo bez odstępów,      | sam wzorzec       |
-    |            | z +48; stacjonarny z kierunkowym, także w nawiasie;      |                   |
-    |            | kilka numerów po jednej etykiecie                        |                   |
-    | `EMAIL`    | adres, także w `<…>` i w `[mailto:…]`                    | sam wzorzec       |
-    | `ADRES`    | ulica z numerem (z literą, „/”, „m.”, „lok.”), kod       | sam wzorzec       |
-    |            | pocztowy, miejscowość; kotwica: kod pocztowy albo „ul.”, |                   |
-    |            | „al.”, „pl.”, „os.” z numerem                            |                   |
-
-    Numer wewnętrzny bez kierunkowego („tel. 6013”) wzorzec pomija. Sam kod pocztowy nie
-    wskazuje osoby, ale jest kotwicą adresu: od niego wzorzec bierze w lewo ulicę z numerem,
-    a w prawo miejscowość. Druga kotwica to „ul.”, „al.”, „pl.”, „os.” z numerem, bez kodu; za
-    numerem wzorzec dobiera miejscowość po przecinku, bo w takim kształcie stoi jedyny prywatny
-    adres próbki korpusu. Kod z miejscowością na początku linii łapie adres złamany między
-    liniami. Wzorzec wytnie przy tym adresy urzędów i firm, których golden set nie ocenia.
-    Adres zostaje wzorcom, bez modelu: w sondzie z 2026-10-17 (raport
-    `data/unsafe/docs/sonda-bielik-anonimizacja-2026-10-17.md`) szkic tych kotwic przepuścił
-    3 z 13 adresów zestawu adresów, a model w wywołaniu z osobami dokładał najwyżej jeden adres,
-    kosztem 1 imienia i 1 nazwiska przecieku na próbce. Nie łapie nikt notatki małymi literami
-    („na lipowej 3 w otwocku”) ani miejscowości po „w” za ulicą bez kodu. Przypadki zestawu
-    adresów stoją w zmyślonym golden secie (s21–s29, od 2026-10-18). Kryterium na golden secie:
-    numer z poprawną sumą znika, a liczba tego samego kształtu bez poprawnej sumy (numer
-    przesyłki, kod błędu) zostaje, także liczba w kształcie kodu pocztowego poza adresem. Tu
-    wchodzi test ewaluacyjny golden setu anonimizatora: pomiar silnika z progami na rodzaj i raport, który przy próbce korpusu nie
-    pokazuje fragmentów; razem z nim domyślny `ANONYMIZATION_ENGINE` przestaje być atrapą.
-  - [ ] **19.5 Osoby: model anonimizujący wskazuje, kod zamienia** (decyzja 2026-10-17,
-    wcześniej NER na CPU) — jedno wywołanie modelu na tekst po wzorcach: imiona i nazwiska
+  - [x] **19.4 Wzorce** (2026-10-18) — dziesięć wzorców w `anonymizer_app/patterns/` (plik na
+    wzorzec, funkcja na wariant, tabela przykładów w docstringu) i krok zamiany
+    `steps/replace_patterns.py`; `DOWÓD` i `PASZPORT` zamiast wspólnego `DOKUMENT`, nowy rodzaj
+    `ADRES_EDOR` (adres do e-Doręczeń); poprawki z próbki korpusu: twarda spacja, kierunkowy
+    z zerem w nawiasie, „(+48)”, siedem cyfr ciągiem, numer wewnętrzny po etykiecie, e-mail
+    z „(at)”, odstępy mieszane w NIP-ie i telefonie, ulica po pełnym słowie i po skrócie bez
+    kropki, numer mieszkania po każdym oznaczeniu lokalu, miejscowość bez przecinka; modele usługi w `models/`, błędy w `errors/`, plik na model i błąd; golden set
+    zmyślony ma 38 przypadków (s35–s38); test ewaluacyjny wzorców z progami na rodzaj; przegląd
+    w sieci i w korpusie innych rodzajów (karta płatnicza, IBAN zagraniczny, numer rejestracyjny,
+    login, księga wieczysta) bez nowych wzorców poza adresem do e-Doręczeń; wzorce nie są
+    silnikiem do wyboru, więc `ANONYMIZATION_ENGINE` zostaje `fake` do 19.5; reguły — „Usługa
+    `anonymizer`”, „Testy”, „Świadomie pominięte”.
+  - [ ] **19.5 Osoby i adresy bez kotwicy: model anonimizujący wskazuje, kod zamienia** (decyzja
+    2026-10-17, wcześniej NER na CPU; adresy od 2026-10-18) — jedno wywołanie modelu na tekst
+    po wzorcach: imiona i nazwiska
     w JSON-ie, każde słowo osobno, w formie z tekstu. Kod szuka każdego fragmentu dosłownie,
     a gdy go nie ma — po rdzeniu słowa, i zamienia każde wskazane słowo w każdej odmianie
     w całym wątku: imię na `{IMIĘ}`, nazwisko na `{NAZWISKO}`, bez numerów i bez grupowania
@@ -4222,10 +4311,39 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     w prompcie: mianownik naprawia dopasowanie po rdzeniu, a rozdzielanie — przykłady
     w rozmowie (bez nich połowa fragmentów to „imię nazwisko”). W tekście bez osób wskazuje to,
     co stoi w miejscu wyciętego nazwiska: stanowisko w podpisie, nazwę urzędu. Sonda NER:
-    `data/unsafe/docs/sonda-ner-2026-10-17.md`. Kroki:
-    1. Silnik w usłudze `anonymizer`: prompt w pliku `.md` przy silniku z testem-strażnikiem,
-       schemat odpowiedzi, dopasowanie i rozprowadzenie w kodzie, test ewaluacyjny na golden
-       secie. Konfiguracja `LLM_ANONYMIZATION_*` przenosi się z `api` do usługi: osiem
+    `data/unsafe/docs/sonda-ner-2026-10-17.md`.
+
+    Adresy, których nie łapią wzorce (bez kodu pocztowego i bez słowa przed ulicą, notatki
+    małymi literami, adres złamany na dwie linie, w odmianie), wskazuje drugie wywołanie modelu
+    na tym samym tekście po wzorcach, równoległe z wywołaniem osób, więc czas oczekiwania się
+    nie wydłuża; kosztem jest drugie wywołanie GPU. Krótki prompt i dwa przykłady w rozmowie
+    (z adresem w odmianie i złamanym na dwie linie oraz bez adresu, z pułapkami), odpowiedź to
+    lista napisów. Kod dopasowuje adres dosłownie, bez względu na odstępy i wielkość liter,
+    częściami między przecinkami i liniami, a na końcu po rdzeniu, bo model podaje czasem adres
+    w mianowniku („Brzozowa 12” zamiast „brzozowej 12”). Trzy filtry w kodzie: fragment ze
+    znacznikiem odpada (model powtarza adres zamieniony już przez wzorce), sam kod pocztowy
+    odpada, a fragment bez cyfry zostaje tylko wtedy, gdy styka się z ulicą z numerem albo stoi
+    w linii tuż obok niej. Sonda z 2026-10-18 (raport
+    `data/unsafe/docs/sonda-bielik-adresy-2026-10-18.md`, materiał
+    w `data/unsafe/docs/sondy-anonimizacji-2026-10-18/`), wzorce prawdziwe, dwa przebiegi:
+
+    | materiał                                   | same wzorce | wzorce i model z filtrami                |
+    |--------------------------------------------|-------------|------------------------------------------|
+    | zestaw trudnych adresów (12 fragmentów)    | 12          | 0 przecieków, 0 zniszczonej wiedzy       |
+    | golden set zmyślony (15 adresów)           | 2           | 0 przecieków, 0 zniszczonej, 0 nadmiaru  |
+    | próbka korpusu (1 adres)                   | 0           | 0 przecieków, 0 zniszczonej, 0 nadmiaru  |
+
+    Bez filtrów model brał za adres „Urząd Skarbowy w Toruniu” i kod w polu wyszukiwania, a w
+    próbce wskazał 24 fragmenty spoza zaznaczeń (15 ze znacznikiem, 9 bez cyfry). Wywołanie
+    wspólne z osobami adresy łapie tak samo, ale kosztuje 1 imię i 1 nazwisko przecieku.
+    Kroki:
+    1. Silnik w usłudze `anonymizer`: prompty w plikach `.md` przy silniku z testem-strażnikiem,
+       schematy odpowiedzi, dopasowanie, rozprowadzenie osób i filtry adresów w kodzie, test
+       ewaluacyjny na golden secie, do którego wchodzi zestaw trudnych adresów z sondy (h01–h15,
+       przykłady w prompcie zostają z nim rozłączne). Silnik składa kroki ze `steps/` (wzorce,
+       potem osoby i adresy) i staje się domyślnym
+       `ANONYMIZATION_ENGINE`, a klient w `api` przyjmuje jego wynik, bo odmawia tylko atrapy.
+       Konfiguracja `LLM_ANONYMIZATION_*` przenosi się z `api` do usługi: osiem
        zmiennych do jej `Settings` i wpisu w compose, własny klient modelu, bo kodu między
        usługami nie dzielimy, a z `api` znika `Settings.llm_anonymization()`. Model widzi surowy
        tekst, więc jego endpoint musi być zaufany: który może tu stać, rozstrzyga wdrożenie
@@ -4244,6 +4362,12 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     3. Czas jednego wątku przy jednym żądaniu naraz (bramki, na które człowiek czeka)
        i zachowanie przy niedostępnym endpoincie: anonimizacja staje, a z nią każdy graf. To
        cena wobec NER-a na CPU: anonimizacja zależy od endpointu z GPU.
+    4. Zapętlona odpowiedź modelu: na dwóch wątkach próbki wywołanie adresów powtarzało jeden
+       fragment ze znacznikiem 285 razy, około 40 s. Limit 300 tokenów odpowiedzi skraca
+       najdłuższe wywołanie do 10 s bez straty adresu, ale ucina JSON, więc kod musi wyłuskać
+       pełne napisy i rozpoznać ucięcie (`finish_reason: "length"`). Zakaz klamr w schemacie
+       usuwa te dwa zapętlenia, ale w próbce podwaja wskazania nadmiarowe (54) i daje inne
+       wywołanie na 37 s. Do rozstrzygnięcia: limit, kształt schematu i to samo przy osobach.
   - [ ] **19.6 Model-strażnik: do ponownej decyzji** (decyzja 2026-10-16: zawsze, po wzorcach
     i NER) — po zamianie model miał tylko odpowiadać, czy zostały dane osobowe, i wskazywać
     które; fragment, którego dosłownie nie ma w tekście, by się nie liczył, a każdy inny
