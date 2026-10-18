@@ -272,6 +272,170 @@
         "KOMUNIKAT": ["jest nieprawidłowy"],
         "NUMER": ["20260506118", "90120"]
       }
+    },
+    {
+      "id": "s21",
+      "phenomenon": "adres zamieszkania z kodem i numerem mieszkania po „m.”, przy imieniu i nazwisku w dopełniaczu",
+      "text": "ZGŁOSZENIE 90121 z 2026-03-02\nTemat: Kontrahent bez adresu\n\nOPIS ZGŁASZAJĄCEGO:\nPrzy rejestracji pisma od Pana Henryka Zawadzkiego, zam. ul. Słoneczna 7 m. 3, 05-420 Józefów, system nie zapisuje kontrahenta.",
+      "remove": {
+        "IMIĘ": ["Henryka"],
+        "NAZWISKO": ["Zawadzkiego"],
+        "ADRES": ["Słoneczna 7 m. 3, 05-420 Józefów"]
+      },
+      "keep": {
+        "NUMER": ["90121"]
+      }
+    },
+    {
+      "id": "s22",
+      "phenomenon": "adres bez kodu w odmianie po „przy” i miejscowość w miejscowniku po „w” za ulicą; słowo „Mieszkanka”, które nie jest osobą",
+      "text": "Mieszkanka, która mieszka przy ul. Polnej 15, nie dostała decyzji, a przesyłka do drugiej strony wróciła z adresu przy al. Wyzwolenia 3/5 w Szczecinie. Proszę sprawdzić status w eNadawcy.",
+      "remove": {
+        "ADRES": ["Polnej 15", "Wyzwolenia 3/5 w Szczecinie"]
+      },
+      "keep": {
+        "USŁUGA": ["eNadawcy"],
+        "SŁOWO": ["Mieszkanka"]
+      }
+    },
+    {
+      "id": "s23",
+      "phenomenon": "adres bez żadnej kotwicy (bez „ul.” i bez kodu) i adres z „lok.” bez przecinka przed kodem",
+      "text": "W polu adresu do doręczeń wpisano: Zielona 4/2, Garwolin. Po zapisie pole się czyści, a przy drugim kontrahencie, Mickiewicza 20 lok. 5 00-950 Warszawa, zapis działa.",
+      "remove": {
+        "ADRES": ["Zielona 4/2, Garwolin", "Mickiewicza 20 lok. 5 00-950 Warszawa"]
+      },
+      "keep": {}
+    },
+    {
+      "id": "s24",
+      "phenomenon": "adres na wsi (miejscowość z numerem i kod z pocztą) i adres w nawiasie po nazwisku, z literą w numerze domu",
+      "text": "Pismo do mieszkańca, adres Wólka 12, 08-400 Garwolin, wróciło z adnotacją „adresat nieznany”. Decyzję dla p. Lucyny Majewskiej (Klonowa 11a, 62-800 Kalisz) trzeba wysłać ponownie.",
+      "remove": {
+        "IMIĘ": ["Lucyny"],
+        "NAZWISKO": ["Majewskiej"],
+        "ADRES": ["Wólka 12, 08-400 Garwolin", "Klonowa 11a, 62-800 Kalisz"]
+      },
+      "keep": {
+        "KOMUNIKAT": ["adresat nieznany"]
+      }
+    },
+    {
+      "id": "s25",
+      "phenomenon": "adres złamany między liniami pod imieniem i nazwiskiem w cytowanym piśmie",
+      "text": "W załączniku skan pisma:\n> Witold Wróblewski\n> ul. Kwiatowa 3\n> 26-600 Radom\n> Wniosek o wydanie zaświadczenia",
+      "remove": {
+        "IMIĘ": ["Witold"],
+        "NAZWISKO": ["Wróblewski"],
+        "ADRES": ["Kwiatowa 3", "26-600 Radom"]
+      },
+      "keep": {}
+    },
+    {
+      "id": "s26",
+      "phenomenon": "notatka małymi literami: ulica w odmianie i miejscowość, bez „ul.” i bez kodu",
+      "text": "klientka mieszka na lipowej 3 w otwocku, prosi o odbior osobisty decyzji, kod bledu 21405",
+      "remove": {
+        "ADRES": ["lipowej 3 w otwocku"]
+      },
+      "keep": {
+        "KOD_BŁĘDU": ["21405"]
+      }
+    },
+    {
+      "id": "s27",
+      "phenomenon": "wykaz adresatów: nazwisko przed imieniem, krótkie nazwisko będące zwykłym słowem, adres na osiedlu po „os.”, prywatny adres na ulicy nazwanej od osoby i urząd, który zostaje",
+      "text": "Lista zwrotów:\nAdresat: Nowicka Ewa, Leśna 9, 87-100 Toruń – zwrot 14.03\nAdresat: Bogdan Sowa, os. Tysiąclecia 14/27, 31-610 Kraków – zwrot 15.03\nAdresat: zam. ul. Kościuszki 8, 33-100 Tarnów – brak nazwiska w imporcie\nAdresat: Urząd Skarbowy w Toruniu – doręczone",
+      "remove": {
+        "IMIĘ": ["Ewa", "Bogdan"],
+        "NAZWISKO": ["Nowicka", "Sowa"],
+        "ADRES": ["Leśna 9, 87-100 Toruń", "Tysiąclecia 14/27, 31-610 Kraków", "Kościuszki 8, 33-100 Tarnów"]
+      },
+      "keep": {
+        "SŁOWO": ["Urząd Skarbowy w Toruniu"]
+      }
+    },
+    {
+      "id": "s28",
+      "phenomenon": "podpis konsultantki z adresem urzędu na ulicy nazwanej od osoby (adres urzędu poza oceną) i słowo roli w etykiecie komentarza",
+      "text": "KOMENTARZ 2 — konsultant, 2026-05-11 (typ: odpowiedz):\nPrzesyłam poprawioną konfigurację skrzynki ePUAP.\nPozdrawiam\nMonika Szczepańska\nUrząd Gminy Pcim, ul. Jana Pawła II 5, 32-432 Pcim",
+      "remove": {
+        "IMIĘ": ["Monika"],
+        "NAZWISKO": ["Szczepańska"]
+      },
+      "keep": {
+        "USŁUGA": ["ePUAP"],
+        "SŁOWO": ["konsultant"]
+      }
+    },
+    {
+      "id": "s29",
+      "phenomenon": "pułapki bez adresu i bez osoby: artykuł i ustęp, pokój, sygnatura, wersja, komunikat o polu ulicy, ścieżka menu „Adresy” i kod pocztowy w polu wyszukiwania",
+      "text": "Zgodnie z art. 5 ust. 2 pismo trafia do pok. 12. Sprawa GK.6831.12.2026, wersja 5.12.1. Przy zapisie komunikat „Pole Ulica i numer domu jest wymagane”. W Kancelaria > Słowniki > Adresy wyszukiwanie po kodzie 05-400 daje pustą listę.",
+      "remove": {},
+      "keep": {
+        "NUMER": ["GK.6831.12.2026", "05-400"],
+        "WERSJA": ["5.12.1"],
+        "KOMUNIKAT": ["Pole Ulica i numer domu jest wymagane"],
+        "SŁOWO": ["art. 5 ust. 2", "pok. 12", "Kancelaria > Słowniki > Adresy"]
+      }
+    },
+    {
+      "id": "s30",
+      "phenomenon": "samo nazwisko w odmianie po zwrocie, bez imienia, w tym nazwisko będące zwykłym słowem",
+      "text": "Rozmawiałem dziś z Panem Wojciechowskim o duplikatach w rejestrze. Kopię ustaleń przekażę Pani Kani, bo to ona prowadzi kancelarię.",
+      "remove": {
+        "NAZWISKO": ["Wojciechowskim", "Kani"]
+      },
+      "keep": {}
+    },
+    {
+      "id": "s31",
+      "phenomenon": "samo nazwisko jako podmiot na początku zdania, bez imienia i bez zwrotu, w tym nazwisko będące zwykłym słowem",
+      "text": "Kania powiedział, że po aktualizacji do wersji 4.14.0 eNadawca odrzuca przesyłki z błędem 30112. Wojciechowski dzwonił rano z tym samym problemem.",
+      "remove": {
+        "NAZWISKO": ["Kania", "Wojciechowski"]
+      },
+      "keep": {
+        "WERSJA": ["4.14.0"],
+        "USŁUGA": ["eNadawca"],
+        "KOD_BŁĘDU": ["30112"]
+      }
+    },
+    {
+      "id": "s32",
+      "phenomenon": "krótkie imię z wymianą głoski i krótkie nazwiska będące zwykłymi słowami, w odmianie i bez imienia; słowo roli w etykiecie komentarza",
+      "text": "KOMENTARZ 3 — klient, 2026-06-02 (typ: komentarz):\nProszę przekazać Ewie, że uprawnienia nadał już pan Bąk. Wcześniej rozmawiałem z panem Kotem, a od Lisa wiem, że Bąkowi też to nie działało.",
+      "remove": {
+        "IMIĘ": ["Ewie"],
+        "NAZWISKO": ["Bąk", "Kotem", "Lisa", "Bąkowi"]
+      },
+      "keep": {
+        "SŁOWO": ["klient"]
+      }
+    },
+    {
+      "id": "s33",
+      "phenomenon": "krótkie imię i krótkie nazwisko obok zwykłych słów o tym samym początku, pisanych wielką literą na początku zdania",
+      "text": "Pani Ala z kadr zgłosiła, że Lista zwrotów w kancelarii jest pusta od wczoraj. Alarm o braku miejsca na dysku wraca co godzinę, a pan Lis prosi o pilny kontakt.",
+      "remove": {
+        "IMIĘ": ["Ala"],
+        "NAZWISKO": ["Lis"]
+      },
+      "keep": {
+        "SŁOWO": ["Lista zwrotów", "Alarm o braku miejsca na dysku"]
+      }
+    },
+    {
+      "id": "s34",
+      "phenomenon": "wątek bez żadnej osoby: w miejscu podpisu samo stanowisko i nazwa komórki urzędu; słowo roli w etykiecie komentarza",
+      "text": "KOMENTARZ 2 — konsultant, 2026-04-14 (typ: rozwiazanie):\nPo zmianie certyfikatu w ustawieniach KSeF faktury wysyłają się poprawnie. Błąd 21405 nie wraca.\nPozdrawiam\nInspektor ds. obsługi mieszkańców\nBiuro Rady Gminy",
+      "remove": {},
+      "keep": {
+        "USŁUGA": ["KSeF"],
+        "KOD_BŁĘDU": ["21405"],
+        "SŁOWO": ["Inspektor ds. obsługi mieszkańców", "Biuro Rady Gminy", "konsultant"]
+      }
     }
   ]
 }

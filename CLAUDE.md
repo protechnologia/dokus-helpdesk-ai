@@ -3001,14 +3001,14 @@ localhost:8010/search`.
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
 | jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2057 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 921 (86)           | 96 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 935 (86)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 124 (11)           | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 97 (38)            | 38 s |
 
-Liczby z 2026-10-17, czasy z 2026-10-10: każdy folder osobno, w komplecie
+Liczby z 2026-10-18, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-3106 testów, około 150 s; domyślny `pytest`, bez stacku: 2971 testów, około 45 s. Testy `llm_live` —
+3120 testów, około 150 s; domyślny `pytest`, bez stacku: 2985 testów, około 45 s. Testy `llm_live` —
 36 integracyjnych i 57 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
 przebiegów.
 
@@ -3116,9 +3116,12 @@ przebiegów.
   w `safe` i próbka korpusu w `unsafe`.
 - **Golden set anonimizatora (2026-10-17, p. 19.3): przypadek to tekst z danymi, które mają
   zniknąć (`remove`), i wiedzą, która ma zostać (`keep`), obie zapisane po rodzaju.** Zestaw
-  zmyślony ma 20 przypadków: cytowaną historię maili z adresami w `<…>`, dane złamane między
+  zmyślony ma 34 przypadki: cytowaną historię maili z adresami w `<…>`, dane złamane między
   liniami, odmianę i wołacz, numery z poprawną sumą obok liczb tego samego kształtu bez niej
-  i pułapki. Próbka korpusu to 32 wątki dobrane warstwami według układu danych, w tym oba wątki
+  i pułapki, a od 2026-10-18 także przypadki z sond anonimizacji: adresy bez kodu, bez kotwicy
+  i w notatce małymi literami, samo nazwisko po zwrocie i na początku zdania, krótkie imiona
+  i nazwiska w odmianie obok słów o tym samym początku, wątek bez osób i słowa ról z etykiet
+  komentarzy w `keep`. Próbka korpusu to 32 wątki dobrane warstwami według układu danych, w tym oba wątki
   korpusu z PESEL-em osoby trzeciej; numeru konta ani dowodu w niej nie ma, dlatego zestaw
   zmyślony musi mieć każdy rodzaj. Ocena porównuje słowa: ciągi liter i cyfr, bez wielkości
   liter i polskich znaków. Dana wycieka, gdy stoi w wyniku w całości albo gdy jej słowo stoi
@@ -4150,7 +4153,7 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     API", „Warstwa węzłów", „Warstwa grafów", „Warstwa embeddera", „Warstwa bazy wektorowej
     (Qdrant)", „Testy", „Świadomie pominięte".
   - [x] **19.3 Golden set anonimizatora** (2026-10-17) — `anonymization.json` w obu folderach
-    `golden/`: 20 zmyślonych tekstów i 32 wątki korpusu, każdy z danymi do usunięcia
+    `golden/`: 20 zmyślonych tekstów (od 2026-10-18 34) i 32 wątki korpusu, każdy z danymi do usunięcia
     i wiedzą do zachowania po rodzaju (10 rodzajów danych, w tym numer dowodu i paszportu,
     6 rodzajów wiedzy); helper `golden_anonymization` z oceną przecieków (także częściowych)
     i zniszczonej wiedzy, pomiarem z licznikami na rodzaj i kontrolą zaznaczeń; testy bez
@@ -4186,11 +4189,10 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     3 z 13 adresów zestawu adresów, a model w wywołaniu z osobami dokładał najwyżej jeden adres,
     kosztem 1 imienia i 1 nazwiska przecieku na próbce. Nie łapie nikt notatki małymi literami
     („na lipowej 3 w otwocku”) ani miejscowości po „w” za ulicą bez kodu. Przypadki zestawu
-    adresów (`addresses.json` w materiałach raportu, z imionami innymi niż w przykładach promptu
-    z 19.5) dochodzą do zmyślonego golden setu. Kryterium na golden secie: numer z poprawną
-    sumą znika, a liczba tego samego kształtu bez poprawnej sumy (numer przesyłki, kod błędu)
-    zostaje, także liczba w kształcie kodu pocztowego poza adresem. Tu wchodzi test ewaluacyjny golden setu
-    anonimizatora: pomiar silnika z progami na rodzaj i raport, który przy próbce korpusu nie
+    adresów stoją w zmyślonym golden secie (s21–s29, od 2026-10-18). Kryterium na golden secie:
+    numer z poprawną sumą znika, a liczba tego samego kształtu bez poprawnej sumy (numer
+    przesyłki, kod błędu) zostaje, także liczba w kształcie kodu pocztowego poza adresem. Tu
+    wchodzi test ewaluacyjny golden setu anonimizatora: pomiar silnika z progami na rodzaj i raport, który przy próbce korpusu nie
     pokazuje fragmentów; razem z nim domyślny `ANONYMIZATION_ENGINE` przestaje być atrapą.
   - [ ] **19.5 Osoby: model anonimizujący wskazuje, kod zamienia** (decyzja 2026-10-17,
     wcześniej NER na CPU) — jedno wywołanie modelu na tekst po wzorcach: imiona i nazwiska
@@ -4228,16 +4230,18 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
        usługami nie dzielimy, a z `api` znika `Settings.llm_anonymization()`. Model widzi surowy
        tekst, więc jego endpoint musi być zaufany: który może tu stać, rozstrzyga wdrożenie
        według granicy zaufania endpointu. Licencja modelu do sprawdzenia, jak przy embedderze
-       (p. 40).
+       (p. 40). Przykłady w prompcie dostają imiona i nazwiska spoza obu zestawów: szkic
+       z sondy ma kilka wspólnych z zestawem zmyślonym (Jan Kowalski, Anna Wiśniewska, Tomasz,
+       Joanna, Nowak) i pospolite imiona wspólne z próbką, więc wynik sondy mógł być przez to
+       trochę łatwiejszy.
     2. Prawdziwa morfologia wobec reguły rdzenia (wspólny początek bez dwóch ostatnich liter,
        najwyżej 4 litery końcówki): Morfeusz2 albo słownik sjp.pl z obrazu Postgresa. Reguła
        rdzenia gubi przy krótkich słowach wymianę głoski (Ewa → Ewie) i może złapać słowo
-       o tym samym początku co imię; krótkie nazwiska bywają zwykłymi słowami (Lis, Kot, Bąk,
-       Mróz), także na początku zdania. Te przypadki dochodzą najpierw do golden setu.
-    3. Golden set dostaje też wątek bez osób ze stanowiskiem i nazwą urzędu w miejscu podpisu
-       oraz słowa ról w `keep`; imion z przykładów promptu w zestawie nie ma, a w próbce
-       korpusu brakuje jednej odmiany imienia, którą znalazła sonda.
-    4. Czas jednego wątku przy jednym żądaniu naraz (bramki, na które człowiek czeka)
+       o tym samym początku co imię („Ala” i „Alarm”); krótkie nazwiska bywają zwykłymi słowami
+       (Lis, Kot, Bąk, Kania), także na początku zdania. Te przypadki stoją w zmyślonym golden
+       secie (s30–s33, od 2026-10-18), razem z wątkiem bez osób ze stanowiskiem w miejscu
+       podpisu (s34) i słowami ról w `keep`.
+    3. Czas jednego wątku przy jednym żądaniu naraz (bramki, na które człowiek czeka)
        i zachowanie przy niedostępnym endpoincie: anonimizacja staje, a z nią każdy graf. To
        cena wobec NER-a na CPU: anonimizacja zależy od endpointu z GPU.
   - [ ] **19.6 Model-strażnik: do ponownej decyzji** (decyzja 2026-10-16: zawsze, po wzorcach
@@ -4413,6 +4417,15 @@ każdy mierzy się osobno.
 
 #### I. Przed produkcją
 
+- [ ] **74. Pamięć anonimizacji tego samego wątku** (dopisany 2026-10-18, numer spoza
+  kolejności) — gdy wdrożeniowiec klika kolejny guzik (wyszukiwanie, pytania, rozwiązanie,
+  bramka), a treść wątku się nie zmieniła, usługa `anonymizer` oddaje zapamiętany wynik zamiast
+  wołać wzorce i model od nowa. Klucz to skrót surowego tekstu razem z wersją silnika (wzorce,
+  prompt, model), więc zmiana któregokolwiek unieważnia wpis; pamiętany jest tylko wynik po
+  anonimizacji, nie surowy tekst. Do rozstrzygnięcia: gdzie (pamięć usługi czy Postgres) i jak
+  długo. *Dlaczego:* model to do kilku sekund i koszt GPU na każde kliknięcie, a przy
+  niedeterministycznym modelu ten sam wątek mógłby za drugim razem wyjść inaczej
+  zanonimizowany.
 - [ ] **36. Uwierzytelnianie API i własne hasło Postgresa.** *Dlaczego:* endpointy są otwarte,
   reguły bramek będą edytowalne, a compose ma dla bazy hasło dev-owe.
 - [ ] **37. Budżet i limity wywołań zewnętrznych** — limity wywołań narzędzi na przebieg
