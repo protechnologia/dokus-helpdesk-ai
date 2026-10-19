@@ -34,7 +34,7 @@
   - [Warstwa węzłów (`agent_nodes/`)](#warstwa-węzłów-agent_nodes)
   - [Warstwa grafów (`agent_graphs/`)](#warstwa-grafów-agent_graphs)
   - [Warstwa LLM](#warstwa-llm)
-  - [Frontend (jeszcze nie budujemy)](#frontend-jeszcze-nie-budujemy)
+  - [Frontend](#frontend)
 - [Uruchamianie i utrzymanie](#uruchamianie-i-utrzymanie)
   - [Commands](#commands)
   - [Konfiguracja i deploy](#konfiguracja-i-deploy)
@@ -2882,16 +2882,19 @@ i katalogu z jej kartami.
   ocenę, niż zasługuje — zaniża to wyniki **wszystkim po równo**, więc ranking zostaje uczciwy,
   ale liczby bezwzględnej nie wolno czytać jako „skuteczności produktu".
 
-### Frontend (jeszcze nie budujemy)
+### Frontend
 
-Na tym etapie projekt to **API + CLI**; UI dochodzi później (p. 45). Gdy dojdzie,
-obowiązują poniższe zasady — spisane teraz, żeby decyzja nie zapadła przypadkiem:
+Front pokazowy powstaje w p. 75–77. Obowiązują go zasady spisane wcześniej, żeby decyzja nie
+zapadła przypadkiem:
 
-- Front to **statyka wpiekana w `api`** (`api/app/static/`), nie osobna usługa compose — dlatego nie
-  występuje w warstwach compose (wyjątek od zasady 3: to nie komponent gadający REST-em).
+- Front to **statyka wpiekana w `api`**, nie osobna usługa compose — dlatego nie
+  występuje w warstwach compose (wyjątek od zasady 3: to nie komponent gadający REST-em). Źródło
+  leży w `api/frontend/`, zbudowane pliki w `api/app/static/` (poza commitem), a obraz `api`
+  buduje je w osobnym etapie z Node.
 - Pełny React (SPA) + Ant Design v6 (React ≥18; `antd` i `@ant-design/icons` w tej samej generacji
   major). Bez komponentów za paywallem.
-- Pliki statyczne z React serwowane przez FastAPI — z tego samego origin. Dev: Vite z proxy `/api`.
+- Pliki statyczne z React serwowane przez FastAPI — z tego samego origin, pod `/ui`. Trasy API
+  zostają bez przedrostka, a w dev Vite przekazuje do `api` wszystko spoza `/ui`.
 - Wygląd przez tokeny antd w `ConfigProvider`. Bez Tailwinda.
 - Nie rozbijaj małych komponentów na kilkanaście plików (np. nawigacja jako dane w configu, nie
   JSX).
@@ -3605,7 +3608,6 @@ Rejestr odrzuconych rozwiązań — narzędzi/podejść, które celowo pominęli
 taką decyzję w trakcie pracy, **dopisz ją tu** (co + jednozdaniowe dlaczego). Jeśli zadanie
 wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 
-- **Frontend (React SPA)** — na starcie API + CLI; UI to p. 45.
 - **Warstwa `docker-compose.gpu.yml`** — nie powstaje: embedder chodzi na CPU, a LLM jest
   zewnętrznym endpointem. Gdy pojawi się maszyna z kartą, warstwa to jeden plik i zero zmian
   w bazie.
@@ -3671,7 +3673,8 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Brak indeksu jako pusty wynik narzędzia albo puste tabele i kolekcje zakładane przy starcie
   `api`** — pusty wynik wygląda jak „materiał nic o tym nie mówi", więc brakującego indeksu nikt
   by nie zauważył, a start `api` zależałby od baz. Brak tabeli i kolekcji to błąd konfiguracji.
-  Wraca jako jawne ustawienie, gdy instancja ma świadomie działać bez któregoś materiału.
+  Wraca w p. 76 jako jawne ustawienie: graf dostaje tylko narzędzia zbudowanych materiałów,
+  a pominięte nazywa log przebiegu.
 - **Deduplikacja rekordów przy indeksacji** — wielość rekordów jest informacją, nie nadmiarem:
   scalenie zgodnych rekordów usuwa dowód, że rozwiązanie jest sprawdzone, a rozłącznych —
   materiał do pytań. Pomiar: na 200 artefaktach 8 par o podobnym `problem` i ani jednej do
@@ -4101,13 +4104,15 @@ odłożonych — numeracja jest wspólna.**
 kryterium; po zakończeniu oznaczamy `[x]` i zwijamy do jednej linii — ale najpierw przenosimy trwałe
 ustalenia do właściwej sekcji (reguła → sekcja tematyczna, odrzucona opcja → „Świadomie pominięte",
 pułapka → „Gotchas" warstwy). **Gdy natrafisz na lukę „ostatniej mili" albo tworzysz świadomy
-skrót — dopisz punkt** (zwykle do bloku I), zamiast zostawiać go w milczeniu.
+skrót — dopisz punkt** (zwykle do bloku J), zamiast zostawiać go w milczeniu.
 
 **Kolejność bloków:** blok 0 jest zrobiony — cały produkt działa od wejścia do odpowiedzi na
 atrapach, bez modelu i Qdranta. Dalej po jednym punkcie na narzędzie (A) i na węzeł (B), razem
-z prawdziwym modelem (p. 18 i 17, dawny blok D), a po anonimizacji (E) — po jednym na graf (F),
-bo treść promptów stroi się na modelu docelowym, a ten na danych klientów nie ruszy bez
-anonimizatora. Blok C (decyzje) jest pusty od 2026-10-16: jego punkty okazały się sprawami
+z prawdziwym modelem (p. 18 i 17, dawny blok D), a po anonimizacji (E) i froncie pokazowym (F)
+— po jednym na graf (G), bo treść promptów stroi się na modelu docelowym, a ten na danych
+klientów nie ruszy bez anonimizatora. Front stoi przed grafami, bo przy ich strojeniu pozwala
+oglądać przebieg sprawy krok po kroku. Litery bloków F–J przesunęły się o jedną 2026-10-19,
+gdy doszedł front. Blok C (decyzje) jest pusty od 2026-10-16: jego punkty okazały się sprawami
 spoza programu albo trafiły do punktów, które od nich zależą.
 
 #### Zrobione
@@ -4440,7 +4445,70 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   a hasło roota w cudzym API to incydent; dotąd dług przed wdrożeniem, teraz warunek pierwszego
   wywołania zewnętrznego.
 
-#### F. Grafy — po jednym punkcie na graf: treść promptu i pomiar
+#### F. Frontend pokazowy — przebieg grafu widoczny na żywo
+
+Prosta aplikacja w React, na razie do pokazów: zbiorcze liczby u góry, pod nimi pas guzików
+grafów, a niżej zgłoszenie po lewej, odpowiedź pośrodku i konsola przebiegu po prawej. Szkic układu z 2026-10-19:
+https://claude.ai/artifact/W4dAs5PUin6A47vfA5Gnty. Pokaz chodzi na tym, co instancja ma w danej
+chwili: na atrapie grafu albo na prawdziwym modelu z indeksami, które są zbudowane.
+
+- [ ] **75. Strumień przebiegu z tras grafów** — trasa grafu odpowiada strumieniem SSE, gdy
+  wołający poprosi o niego nagłówkiem `Accept: text/event-stream`; bez nagłówka odpowiada
+  JSON-em jak dziś. Zdarzenie `step` niesie jeden krok grafu: węzeł, wpis logu, czas startu
+  i trwania oraz zużycie tury, a krok narzędzi także każde wywołanie z argumentami, wynikiem,
+  który dostał model, i czasem trwania, mierzonym w węźle `run_tools`. Zdarzenie `result`
+  niesie tę samą treść co odpowiedź
+  JSON, a zdarzenie `error` — `ErrorResponse` przy awarii zależności; błąd konfiguracji zrywa
+  strumień, tak jak dziś daje 500. Kroki daje `astream` LangGrapha obok `run_graph()`, a stan na
+  odpowiedź mapuje dalej jedno miejsce. Treści zgłoszenia w kroku nie ma, jak w `log`: argumenty
+  narzędzi pisze model z tekstu po anonimizacji (`/search` oddaje je już dziś w `queries`),
+  a wynik narzędzia to materiał z indeksów, który model i tak czyta.
+  Testy na atrapach węzłów: kolejność zdarzeń i `result` równy odpowiedzi JSON. *Dlaczego:*
+  sprawa na kodzie Dokusa trwa 35–166 s, a konsola ma pokazywać, co dzieje się teraz; graf
+  zostaje przy jednej trasie, więc kontrakt się nie rozjeżdża.
+- [ ] **76. Narzędzia na tym, co jest zbudowane** — ustawienie instancji: graf dostaje tylko
+  narzędzia, których materiał w chwili żądania istnieje (kolekcja Qdranta, tabela Postgresa,
+  paczka kodu z opisem i mapą symboli). Domyślnie zostaje dzisiejsza reguła: brak indeksu to
+  błąd konfiguracji. Pominięte materiały nazywa pierwszy wpis logu przebiegu, a trasa
+  `GET /instance` podaje model generujący i materiały zbudowane w tej chwili, więc brak indeksu
+  nadal widać. Prompty się nie zmieniają: model nie dostaje definicji pominiętych narzędzi,
+  a wywołanie takiego narzędzia wraca do niego jako błąd. Dziś pokaz miałby karty golden200 bez
+  wątków (tabela wątków powstaje w p. 31), kod Dokusa i żadnej dokumentacji, bo jest tylko
+  indeks syntetyczny (p. 55). Karty golden200 nie są zanonimizowane, więc pokaz na nich zostaje
+  w zespole. Anonimizacji ustawienie nie dotyczy: prawdziwy model generujący wymaga prawdziwego
+  silnika, a bez niego pokaz chodzi na atrapie grafu. *Dlaczego:* bez tego graf na prawdziwym
+  modelu kończy się błędem przy pierwszym wywołaniu narzędzia materiału, którego nie
+  zbudowano, a nowy indeks ma wejść do pokazu bez restartu `api`.
+- [ ] **77. Aplikacja w React z czterema panelami** — jeden widok, zasady budowy w sekcji
+  „Frontend"; test w procesie: `/ui` oddaje stronę, a trasy API odpowiadają jak dotąd.
+
+  | panel     | co pokazuje                                                                         |
+  |-----------|-------------------------------------------------------------------------------------|
+  | górny     | koszt LLM, wywołania modelu, tokeny, wywołania narzędzi, przebiegi i czas, liczone  |
+  |           | od otwarcia strony; model i materiały z `GET /instance`                             |
+  | guziki    | pas przez całą szerokość pod górnym, wyróżniony jak główne akcje: rozpoznanie,      |
+  |           | warianty z `GET /variants`, karta zgłoszenia, bramka zamknięcia                     |
+  | lewy      | zgłoszenie: numer, data, temat, treść i komentarze wątku (rola i treść, dodawanie   |
+  |           | i usuwanie); zmyślone przykłady z wątkami do wczytania                              |
+  | środkowy  | odpowiedź ostatniego przebiegu w zakładkach: dla klienta, dla wdrożeniowca, źródła  |
+  | prawy     | konsola: przebiegi sesji, w każdym tury modelu, a pod nimi ich wywołania narzędzi;  |
+  |           | wiersz ma start, krok, koszt i czas trwania, a kliknięty otwiera dialog szczegółów; |
+  |           | krok w toku wynika z poprzedniego (po turze z wywołaniami trwają narzędzia,         |
+  |           | po narzędziach kolejna tura modelu)                                                 |
+
+  Zakładka „Dla klienta" niesie `text` wariantu albo wynik „Popraw". Da się ją edytować,
+  a guziki pod nią puszczają na jej treści bramkę wysyłki i „Popraw". Zakładka „Dla
+  wdrożeniowca" niesie uwagi (Markdown), werdykt bramki z brakami i wskazówką albo kartę
+  zgłoszenia, a „Źródła" — przeczytane zgłoszenia i sekcje oraz kod zacytowany jako przyczyna.
+  Komentarze są w pierwszej wersji, bo bez nich karta zgłoszenia i bramka zamknięcia nie mają
+  z czego pracować: przyczynę, rozwiązanie i to, co zrobiono, oba grafy biorą z wątku. Datę
+  komentarza dodanego ręcznie wpisuje front. Wiersze konsoli się nie rozwijają: kliknięty wiersz
+  otwiera dialog nad stroną. Przy wywołaniu narzędzia dialog pokazuje zapytanie, a pod nim
+  odpowiedź, którą dostał model; przy turze — tokeny w czterech klasach. Długa odpowiedź jest
+  skrócona, z guzikiem „Pokaż całość". *Dlaczego:* przebieg agenta widać dziś tylko w raporcie testu
+  albo w polu `log` po fakcie, a pokaz ma pokazać obie nogi produktu na jednej sprawie.
+
+#### G. Grafy — po jednym punkcie na graf: treść promptu i pomiar
 
 Na prawdziwym modelu i anonimizatorze (p. 17–18 i blok E). Każdy pomiar ≥2 przebiegi, z czytaniem
 surowych odpowiedzi i raportem z datą i wersją promptu; przy generacji do
@@ -4534,7 +4602,7 @@ każdy mierzy się osobno.
   w zakresie. *Dlaczego:* jedyna funkcja zwracająca tekst do wysłania, więc dodany fakt trafia
   prosto do klienta.
 
-#### G. Reguły i powrót do korpusu
+#### H. Reguły i powrót do korpusu
 
 - [ ] **29. Magazyn reguł w SQL** — osobny schemat i osobna rola w Postgresie z p. 48, nie nowa
   usługa; wersje, audyt werdyktów, kontrola dostępu do edycji; później też magazyn notatek.
@@ -4545,7 +4613,7 @@ każdy mierzy się osobno.
   fakty trafiają do bazy z akceptacją człowieka; poza nią ścieżka runtime jest wobec indeksu tylko
   do odczytu.
 
-#### H. Korpus
+#### I. Korpus
 
 - [ ] **31. Masowy import z nowszego zrzutu** — przez graf `parse_ticket`, komendą `helpdesk`
       w kontenerze, na tej samej fabryce grafów co trasy, z kosztem przebiegu w raporcie (zapis
@@ -4580,7 +4648,7 @@ każdy mierzy się osobno.
   dokumentacja wraca do promptu jako cytowane źródło, więc parafraza modelu stałaby się „tak mówi
   instrukcja"; model dzieli i opisuje, treści nie przepisuje.
 
-#### I. Przed produkcją
+#### J. Przed produkcją
 
 - [ ] **74. Pamięć anonimizacji tego samego wątku** (dopisany 2026-10-18, numer spoza
   kolejności) — gdy wdrożeniowiec klika kolejny guzik (wyszukiwanie, pytania, rozwiązanie,
@@ -4623,7 +4691,7 @@ Rzeczy odłożone świadomie, bez miejsca w kolejności planu. Każdy punkt: cel
   (odczyt zgłoszeń i sekcji po identyfikatorze jest już narzędziem agenta — p. 52, 56, 57).
   *Dlaczego:* odłożone świadomie; kontrakt narzędzia pomocniczego z p. 1 i magazyn z p. 29 mają je
   przyjąć bez zmian we wspólnych węzłach.
-- [ ] **45. Rozszerzenia** — reranker, frontend,
+- [ ] **45. Rozszerzenia** — reranker,
   rozbicie wątków-projektów, kolejność diagnostyczna w `questions`. *Dlaczego:* każde czeka na
   pomiar, który pokaże, że jest potrzebne.
 - [ ] **58. Narzędzie: instancja testowa** — dostęp do instancji testowej, na której agent
