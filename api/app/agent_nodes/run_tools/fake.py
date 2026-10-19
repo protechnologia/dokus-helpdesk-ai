@@ -3,7 +3,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.agent_nodes.run_tools.base import RunToolsNodeBase
+from app.agent_nodes.models import ToolTiming
+from app.agent_nodes.run_tools.base import RunToolsNodeBase, start_clock, tool_timing
 from app.agent_nodes.run_tools.limits import calls_over_limit, limit_exceeded_text
 from app.agent_tools import SourceRef
 
@@ -33,8 +34,8 @@ class FakeRunToolsNode(RunToolsNodeBase):
         1. Test tworzy ją z odpowiedzią domyślną (tekst i opcjonalne źródła) albo z odpowiedziami
            na konkretne narzędzia (`answers`) — tak odtwarza się przebieg „szukaj, potem czytaj",
            w którym źródła dokłada dopiero odczyt.
-        2. `run()` zapisuje stan w `calls` i zwraca po jednej wiadomości `tool` na każde
-           wywołanie, z jego `call_id` — tą samą zmianą stanu co węzeł właściwy
+        2. `run()` zapisuje stan w `calls` i zwraca po jednej wiadomości `tool` i jednym pomiarze
+           czasu na każde wywołanie, z jego `call_id` — tą samą zmianą stanu co węzeł właściwy
            (`results_update()`).
         3. Wywołanie ponad limit swojego narzędzia (`limits`) dostaje błąd zamiast odpowiedzi
            i nie dokłada źródeł — tą samą regułą, którą stosuje węzeł właściwy (`limits.py`).
@@ -94,17 +95,26 @@ class FakeRunToolsNode(RunToolsNodeBase):
         calls   = state.messages[-1].tool_calls if state.messages else []
         refused = calls_over_limit(state.messages, self._limits)
 
+        answers: list[FakeToolAnswer] = []
+        timings: list[ToolTiming]     = []
+
         # Wywołanie ponad limit dostaje błąd i nie dokłada źródeł; pozostałe swoją odpowiedź.
-        answers = [
-            FakeToolAnswer(text=limit_exceeded_text(call.name, self._limits[call.name]))
-            if call.call_id in refused
-            else self._answers.get(call.name, self._default)
-            for call in calls
-        ]
+        # Czas atrapa mierzy tak samo jak węzeł właściwy, choć niczego nie wykonuje.
+        for call in calls:
+            started = start_clock()
+            answer  = self._answers.get(call.name, self._default)
+
+            if call.call_id in refused:
+                refusal = limit_exceeded_text(call.name, self._limits[call.name])
+                answer  = FakeToolAnswer(text=refusal)
+
+            answers.append(answer)
+            timings.append(tool_timing(call.call_id, *started))
 
         update = self.results_update(
             calls      = calls,
             texts      = [answer.text for answer in answers],
+            timings    = timings,
             sources    = [ref for answer in answers for ref in answer.sources],
             over_limit = len(refused),
         )

@@ -1,35 +1,40 @@
 """
 Description:
-Próbki do testów mapowania stanu końcowego grafu na odpowiedź trasy
-(`tests/unit/api_entry_routers/test_api_entry_routers_*_mapping.py`): stany końcowe grafów
-z wynikiem, źródłem, zużyciem i logiem oraz rozmowa grafu `search` z zapytaniami, które trasa ma
-z niej wyciągnąć. Dzięki nim plik testu to same testy, a dane, na których stoją asercje, leżą
-obok helpera.
+Próbki do testów tras HTTP w `tests/unit/api_entry_routers/` i `tests/functional/`: stany końcowe
+grafów z wynikiem, źródłem, zużyciem i logiem, rozmowa grafu `search` z zapytaniami, które trasa
+ma z niej wyciągnąć, kroki przebiegu do zdarzeń strumienia i żądania do wszystkich tras grafów.
+Dzięki nim plik testu to same testy, a dane, na których stoją asercje, leżą obok helpera.
 
-| co                  | do czego                                                            |
-|---------------------|---------------------------------------------------------------------|
-| `SOURCE`            | źródło odczytane przez agenta                                       |
-| `USAGE`, `LOG`      | zużycie modelu i log przebiegu w każdym stanie końcowym             |
-| `BLOCK`             | werdykt bramki z uzasadnieniem, brakiem i wskazówką                 |
-| `CARD`              | karta zgłoszenia, w której każde pole ma inną wartość               |
-| `PROPOSAL`, `NOTES` | propozycja z treścią dla klienta i same uwagi dla wdrożeniowca      |
-| `final_state()`     | stan końcowy grafu: przykładowy stan z wynikiem, zużyciem i logiem  |
-| `search_messages()` | rozmowa `search`: wyszukania, odczyt, tura ucięta i odpowiedź       |
-| `SEARCH_QUERIES`    | zapytania agenta, które trasa ma wyciągnąć z tej rozmowy            |
+| co                       | do czego                                                       |
+|--------------------------|----------------------------------------------------------------|
+| `SOURCE`                 | źródło odczytane przez agenta                                  |
+| `USAGE`, `LOG`           | zużycie modelu i log przebiegu w każdym stanie końcowym        |
+| `BLOCK`                  | werdykt bramki z uzasadnieniem, brakiem i wskazówką            |
+| `CARD`                   | karta zgłoszenia, w której każde pole ma inną wartość          |
+| `PROPOSAL`, `NOTES`      | propozycja z treścią dla klienta i same uwagi dla wdrożeniowca |
+| `final_state()`          | stan końcowy grafu: przykładowy stan z wynikiem, zużyciem      |
+|                          | i logiem                                                       |
+| `search_messages()`      | rozmowa `search`: wyszukania, odczyt, tura ucięta i odpowiedź  |
+| `SEARCH_QUERIES`         | zapytania agenta, które trasa ma wyciągnąć z tej rozmowy       |
+| `TOOL_STEP`, `AGENT_STEP`| krok narzędzi z dwoma wpisami logu i krok tury modelu          |
+| `TICKET`                 | zgłoszenie do tras, które je przyjmują                         |
+| `GRAPH_REQUESTS`         | trasa grafu → żądanie do niej                                  |
 
 O czym pamiętać przy zmianach:
 
 - Próbek nie wystawia `__init__.py` pakietu: test importuje je z tego modułu.
 - Dane są zmyślone, nie kopiowane z korpusu (PII).
+- Nowa trasa grafu to wpis w `GRAPH_REQUESTS`: test strumienia sprawdza, że każda trasa
+  z wariantem strumienia ma tu swoje żądanie.
 """
 
-from datetime import date
+from datetime import UTC, date, datetime
 from types import ModuleType
 from typing import Any
 
 from pydantic import BaseModel
 
-from app.agent_graphs import parse_ticket
+from app.agent_graphs import GraphStep, ToolCallRun, parse_ticket
 from app.agent_graphs.search import RESPOND_TOOL_NAME
 from app.agent_nodes.agent import tool_call_turn
 from app.agent_nodes.models import LogEntry
@@ -152,3 +157,50 @@ def search_messages() -> list[ChatMessage]:
     ]
 
     return messages
+
+
+# Początek kroków przebiegu w próbkach.
+STEP_STARTED_AT = datetime(2026, 10, 19, 12, 3, 15, tzinfo=UTC)
+
+# Krok narzędzi z dwoma wpisami logu i czasami z ogonem do zaokrąglenia.
+TOOL_STEP = GraphStep(
+    node        = "run_tools",
+    started_at  = STEP_STARTED_AT,
+    duration_ms = 85.04,
+    log         = [
+        LogEntry(node="run_tools", message="wywołania: read_tickets_card; źródła: 1"),
+        LogEntry(node="run_tools", message="drugi wpis"),
+    ],
+    tool_calls  = [
+        ToolCallRun(
+            call_id     = "call_1",
+            tool        = "read_tickets_card",
+            arguments   = READ,
+            result      = READ_RESULT,
+            started_at  = STEP_STARTED_AT,
+            duration_ms = 84.26,
+        ),
+    ],
+)
+
+# Krok tury modelu: jeden wpis logu i zużycie tury.
+AGENT_STEP = GraphStep(
+    node        = "agent",
+    started_at  = STEP_STARTED_AT,
+    duration_ms = 2140.6,
+    log         = [LogEntry(node="agent", message="tura 2: narzędzia: read_tickets_card")],
+    usage       = USAGE,
+)
+
+# Zgłoszenie do tras, które je przyjmują; opis ze słowem, którego nie ma w żadnym wpisie logu.
+TICKET = {"ticket_id": "41002", "body": "Od wczoraj nie przychodzą przesyłki z e-Doręczeń."}
+
+# Trasa grafu → żądanie do niej. Każda trasa z wariantem strumienia ma tu stać.
+GRAPH_REQUESTS: dict[str, dict[str, Any]] = {
+    "/search":       TICKET,
+    "/gate/close":   TICKET,
+    "/gate/reply":   {"ticket_id": "41002", "message": "Dzień dobry, kolejka już działa."},
+    "/parse-ticket": TICKET,
+    "/suggest":      {**TICKET, "variant": "questions"},
+    "/polish":       {"ticket_id": "41002", "text": "kolejka stala, juz dziala"},
+}

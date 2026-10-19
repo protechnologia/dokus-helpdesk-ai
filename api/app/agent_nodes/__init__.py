@@ -3,7 +3,8 @@ Description:
 Wspólne węzły grafów. Importuj stąd (`from app.agent_nodes import Node`).
 
 Do czego:
-Kontrakt węzła (`base.py`) i wpis logu, który dopisuje każdy węzeł (`LogEntry` w `models.py`).
+Kontrakt węzła (`base.py`), wpis logu, który dopisuje każdy węzeł, i czas wywołania narzędzia,
+który zapisuje `run_tools` (`LogEntry` i `ToolTiming` w `models.py`).
 Stanu tu nie ma — pola wspólne to `GraphState` w `app/agent_graphs/base.py`, a każdy graf ma własny
 `state.py`. W katalogu każdego węzła: implementacja (`node.py`) i atrapa (`fake.py`), a gdy mają
 część wspólną — także `base.py`. Węzeł używany przez jeden graf mieszka w katalogu tego grafu, nie
@@ -22,9 +23,10 @@ Węzły — wszystkie cztery mają wersję właściwą, a trzy z nich także atr
 """
 
 from app.agent_nodes.base import Node
-from app.agent_nodes.models import LogEntry
+from app.agent_nodes.models import LogEntry, ToolTiming
 
 __all__ = [
     "LogEntry",
     "Node",
+    "ToolTiming",
 ]

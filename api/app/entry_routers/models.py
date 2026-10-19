@@ -1,4 +1,6 @@
 from datetime import date as Date
+from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -92,6 +94,46 @@ class LogItem(BaseModel):
 
     node:    str = Field(examples=["agent"])
     message: str = Field(examples=["tura 1: narzędzia: find_tickets_vector; 0,0041 USD"])
+
+
+class ToolCallItem(BaseModel):
+    """
+    Description:
+    Jedno wywołanie narzędzia w kroku przebiegu: które narzędzie, z jakimi argumentami, co
+    dostał model w odpowiedzi i ile to trwało. `call_id` łączy je z turą modelu, która je
+    zleciła.
+
+    `result` to tekst, który dostał model, znak w znak: wynik narzędzia w JSON-ie albo błąd
+    `{"error": …}`. Argumenty pisze model z tekstu po anonimizacji, a wynik pochodzi z indeksów,
+    więc pole niesie materiał, który model czytał, a nie zgłoszenie sprzed anonimizacji.
+    """
+
+    call_id:     str            = Field(examples=["call_1"])
+    tool:        str            = Field(examples=["find_tickets_vector"])
+    arguments:   dict[str, Any] = Field(examples=[{"problem": "Brak przesyłek"}])
+    result:      str            = Field(examples=['{"tickets": [], "dropped_below_threshold": 3}'])
+    started_at:  datetime       = Field(examples=["2026-10-19T12:03:15.120000Z"])
+    duration_ms: float          = Field(examples=[84.2])
+
+
+class StepItem(BaseModel):
+    """
+    Description:
+    Jeden krok przebiegu grafu w strumieniu trasy (zdarzenie `step`): który węzeł, co zrobił,
+    kiedy zaczął i ile trwał. Tura modelu niesie zużycie tej tury, krok narzędzi — wywołania
+    z argumentami i wynikami.
+
+    Kroki przychodzą w trakcie przebiegu, więc wołający widzi, co dzieje się teraz; odpowiedź
+    trasy przychodzi na końcu, w zdarzeniu `result`. `message` to wpis logu przebiegu — tekst dla
+    człowieka, bez treści zgłoszenia, nie do parsowania.
+    """
+
+    node:        str                = Field(examples=["agent"])
+    message:     str                = Field(examples=["tura 1: narzędzia: find_tickets_vector; …"])
+    started_at:  datetime           = Field(examples=["2026-10-19T12:03:14.902000Z"])
+    duration_ms: float              = Field(examples=[2140.6])
+    usage:       UsageItem | None   = None
+    tool_calls:  list[ToolCallItem] = Field(default_factory=list)
 
 
 class ErrorResponse(BaseModel):

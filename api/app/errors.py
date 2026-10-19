@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -32,14 +33,14 @@ TOOL_DEPENDENCIES: dict[type[Exception], tuple[type[Exception], str]] = {
 }
 
 
-def _request_id_of(
+def request_id_of(
     request: Request,  # np. Request z ustawionym state.request_id
 ) -> str | None:
     """
     Description:
     Czyta identyfikator korelacji zapisany na żądaniu przez middleware. Zwraca None, gdy handler
     działa bez tego middleware'u (np. naga aplikacja w teście), żeby obsługa błędu nie padała na
-    braku identyfikatora.
+    braku identyfikatora. Czytają go handlery wyjątków i strumień przebiegu grafu.
 
     Example args:
         request=Request(scope={...})
@@ -70,7 +71,7 @@ async def _handle_http_exception(
     # Sygnatura z `Exception`, bo rejestr handlerów FastAPI jest nietypowany; zawężamy tutaj.
     assert isinstance(exc, HTTPException)
 
-    request_id = _request_id_of(request)
+    request_id = request_id_of(request)
     logger.warning(
         "http_error status=%s path=%s detail=%s request_id=%s",
         exc.status_code,
@@ -102,7 +103,7 @@ async def _handle_validation_error(
     """
     assert isinstance(exc, RequestValidationError)
 
-    request_id = _request_id_of(request)
+    request_id = request_id_of(request)
     # Pełna lista błędów tylko na DEBUG: cytuje przysłane wartości, czyli potencjalnie dane klienta.
     logger.warning(
         "validation_error path=%s error_count=%d request_id=%s",
@@ -117,22 +118,24 @@ async def _handle_validation_error(
     return JSONResponse(status_code=422, content=body.model_dump())
 
 
-async def _handle_llm_error(
-    request: Request,    # np. Request(scope={...})
-    exc:     Exception,  # np. LLMError("Read timed out after 60s")
-) -> JSONResponse:
+def _llm_failure(
+    exc:        Exception,   # np. LLMError("Read timed out after 60s")
+    path:       str,         # np. "/search"
+    request_id: str | None,  # np. "8f14e45fceea167a5a36dedd4bea2543"
+) -> ErrorResponse:
     """
     Description:
-    Obsługuje awarię warstwy LLM: to, co rzuca SDK dostawcy, jest już przetłumaczone na
+    Opisuje awarię warstwy LLM: to, co rzuca SDK dostawcy, jest już przetłumaczone na
     `LLMError`, a tu przestaje być gołym 500. Komunikat celowo ogólny — tekst wyjątku dostawcy
     potrafi cytować prompt, czyli zgłoszenie klienta.
 
     Example args:
-        request=Request(scope={...})
         exc=LLMError("Read timed out after 60s")
+        path="/search"
+        request_id="8f14e45fceea167a5a36dedd4bea2543"
 
     Example result:
-        JSONResponse(status_code=503, content={"detail": "Language model call failed", …})
+        ErrorResponse(detail="Language model call failed", request_id="8f14…")
 
     Raises:
         LLMConfigError: puszczany dalej bez zmian — patrz niżej
@@ -143,38 +146,30 @@ async def _handle_llm_error(
     if isinstance(exc, LLMConfigError):
         raise exc
 
-    assert isinstance(exc, LLMError)
-
-    request_id = _request_id_of(request)
     # Treść wyjątku na ERROR, bo jest nasza (bez tekstu klienta) — w odróżnieniu od promptu.
-    logger.error(
-        "llm_error path=%s error=%s request_id=%s",
-        request.url.path,
-        exc,
-        request_id,
-    )
+    logger.error("llm_error path=%s error=%s request_id=%s", path, exc, request_id)
 
-    body = ErrorResponse(detail="Language model call failed", request_id=request_id)
-
-    return JSONResponse(status_code=DEPENDENCY_FAILURE_STATUS, content=body.model_dump())
+    return ErrorResponse(detail="Language model call failed", request_id=request_id)
 
 
-async def _handle_anonymization_error(
-    request: Request,    # np. Request(scope={...})
-    exc:     Exception,  # np. AnonymizationError("usługa anonimizacji nie odpowiada")
-) -> JSONResponse:
+def _anonymization_failure(
+    exc:        Exception,   # np. AnonymizationError("usługa anonimizacji nie odpowiada")
+    path:       str,         # np. "/search"
+    request_id: str | None,  # np. "8f14e45fceea167a5a36dedd4bea2543"
+) -> ErrorResponse:
     """
     Description:
-    Obsługuje porażkę anonimizacji. Graf staje przed modelem (fail-closed), więc nic nie wyszło —
-    dla wołającego to awaria zależności, nie błędne żądanie: 503, a o reszcie decyduje helpdesk.
+    Opisuje porażkę anonimizacji. Graf staje przed modelem (fail-closed), więc nic nie wyszło —
+    dla wołającego to awaria zależności, nie błędne żądanie, a o reszcie decyduje helpdesk.
     Treść wyjątku tylko w logu, bo anonimizator mógłby zacytować fragment tekstu.
 
     Example args:
-        request=Request(scope={...})
         exc=AnonymizationError("usługa anonimizacji nie odpowiada")
+        path="/search"
+        request_id="8f14e45fceea167a5a36dedd4bea2543"
 
     Example result:
-        JSONResponse(status_code=503, content={"detail": "Anonymization failed", …})
+        ErrorResponse(detail="Anonymization failed", request_id="8f14…")
 
     Raises:
         AnonymizationConfigError: puszczany dalej bez zmian — z tego samego powodu co przy LLM
@@ -183,39 +178,35 @@ async def _handle_anonymization_error(
     if isinstance(exc, AnonymizationConfigError):
         raise exc
 
-    assert isinstance(exc, AnonymizationError)
-
-    request_id = _request_id_of(request)
     # Bez treści wyjątku: komunikat anonimizatora może zawierać fragment danych klienta.
     logger.error(
         "anonymization_error path=%s error_type=%s request_id=%s",
-        request.url.path,
+        path,
         type(exc).__name__,
         request_id,
     )
 
-    body = ErrorResponse(detail="Anonymization failed", request_id=request_id)
-
-    return JSONResponse(status_code=DEPENDENCY_FAILURE_STATUS, content=body.model_dump())
+    return ErrorResponse(detail="Anonymization failed", request_id=request_id)
 
 
-async def _handle_tool_dependency_error(
-    request: Request,    # np. Request(scope={...})
-    exc:     Exception,  # np. DbQdrantError("Qdrant nie odpowiedział w czasie: POST /…")
-) -> JSONResponse:
+def _tool_dependency_failure(
+    exc:        Exception,   # np. DbQdrantError("Qdrant nie odpowiedział w czasie: POST /…")
+    path:       str,         # np. "/search"
+    request_id: str | None,  # np. "8f14e45fceea167a5a36dedd4bea2543"
+) -> ErrorResponse:
     """
     Description:
-    Obsługuje awarię zależności, na których stoją narzędzia agenta: embeddera, Qdranta,
+    Opisuje awarię zależności, na których stoją narzędzia agenta: embeddera, Qdranta,
     Postgresa i programu, którym szuka się w kodzie. Węzeł `run_tools` takiego błędu nie łapie,
-    więc przebieg grafu staje, a wołający dostaje 503 zamiast gołego 500 — z opisem, która
-    zależność zawiodła.
+    więc przebieg grafu staje, a wołający dostaje opis, która zależność zawiodła.
 
     Example args:
-        request=Request(scope={...})
         exc=DbQdrantError("Qdrant nie odpowiedział w czasie: POST /collections/tickets/…")
+        path="/search"
+        request_id="8f14e45fceea167a5a36dedd4bea2543"
 
     Example result:
-        JSONResponse(status_code=503, content={"detail": "Vector index call failed", …})
+        ErrorResponse(detail="Vector index call failed", request_id="8f14…")
 
     Raises:
         EmbeddingConfigError, DbQdrantConfigError, DbPostgresConfigError, ProcessConfigError:
@@ -230,18 +221,82 @@ async def _handle_tool_dependency_error(
     if isinstance(exc, config_error):
         raise exc
 
-    request_id = _request_id_of(request)
     # Treść wyjątku tylko na DEBUG: Qdrant, Postgres i ripgrep potrafią zacytować w błędzie
     # fragment zapytania, czyli dane klienta.
     logger.error(
         "tool_dependency_error path=%s error_type=%s request_id=%s",
-        request.url.path,
+        path,
         type(exc).__name__,
         request_id,
     )
     logger.debug("tool_dependency_error details=%s", exc)
 
-    body = ErrorResponse(detail=detail, request_id=request_id)
+    return ErrorResponse(detail=detail, request_id=request_id)
+
+
+# Funkcja, która loguje awarię zależności i opisuje ją dla wołającego: (wyjątek, ścieżka, id).
+DescribeFailure = Callable[[Exception, str, str | None], ErrorResponse]
+
+# Awaria zależności: rodzina błędów warstwy → funkcja, która ją loguje i opisuje dla wołającego.
+# Trzy funkcje zamiast jednej, bo każda warstwa inaczej pilnuje danych klienta w logu.
+DEPENDENCY_FAILURES: dict[type[Exception], DescribeFailure] = {
+    LLMError:           _llm_failure,
+    AnonymizationError: _anonymization_failure,
+    **{error: _tool_dependency_failure for error in TOOL_DEPENDENCIES},
+}
+
+
+def dependency_failure(
+    exc:        Exception,   # np. EmbeddingError("embedder nie odpowiedział w czasie")
+    path:       str,         # np. "/search"
+    request_id: str | None,  # np. "8f14e45fceea167a5a36dedd4bea2543"
+) -> ErrorResponse:
+    """
+    Description:
+    Opisuje awarię zależności w trakcie żądania: loguje ją i oddaje błąd we wspólnym kształcie.
+    Wołają ją handler poniżej, który odpowiada statusem 503, i strumień przebiegu grafu, który po
+    wysłaniu nagłówków statusu już nie zmieni i oddaje błąd jako zdarzenie.
+
+    Example args:
+        exc=EmbeddingError("embedder nie odpowiedział w czasie")
+        path="/search"
+        request_id="8f14e45fceea167a5a36dedd4bea2543"
+
+    Example result:
+        ErrorResponse(detail="Embedding service call failed", request_id="8f14…")
+
+    Raises:
+        LLMConfigError, AnonymizationConfigError, EmbeddingConfigError, DbQdrantConfigError,
+        DbPostgresConfigError, ProcessConfigError: błąd konfiguracji nie udaje chwilowej awarii
+    """
+    describe = next(
+        failure for error, failure in DEPENDENCY_FAILURES.items() if isinstance(exc, error)
+    )
+
+    return describe(exc, path, request_id)
+
+
+async def _handle_dependency_error(
+    request: Request,    # np. Request(scope={...})
+    exc:     Exception,  # np. LLMError("Read timed out after 60s")
+) -> JSONResponse:
+    """
+    Description:
+    Obsługuje awarię zależności: model, anonimizator i zależności narzędzi agenta. Wołający
+    dostaje 503 we wspólnym kształcie błędu zamiast gołego 500, a o reszcie decyduje sam.
+
+    Example args:
+        request=Request(scope={...})
+        exc=LLMError("Read timed out after 60s")
+
+    Example result:
+        JSONResponse(status_code=503, content={"detail": "Language model call failed", …})
+
+    Raises:
+        LLMConfigError, AnonymizationConfigError, EmbeddingConfigError, DbQdrantConfigError,
+        DbPostgresConfigError, ProcessConfigError: puszczane dalej bez zmian
+    """
+    body = dependency_failure(exc, request.url.path, request_id_of(request))
 
     return JSONResponse(status_code=DEPENDENCY_FAILURE_STATUS, content=body.model_dump())
 
@@ -264,8 +319,5 @@ def register_exception_handlers(
     app.add_exception_handler(RequestValidationError, _handle_validation_error)
     # Rejestrowane zawsze, nie „gdy powstanie pierwszy wołający": to handler sprawia, że awaria
     # zależności jest udokumentowanym 503, a nie tym, co autor trasy akurat pamiętał złapać.
-    app.add_exception_handler(LLMError, _handle_llm_error)
-    app.add_exception_handler(AnonymizationError, _handle_anonymization_error)
-
-    for error in TOOL_DEPENDENCIES:
-        app.add_exception_handler(error, _handle_tool_dependency_error)
+    for error in DEPENDENCY_FAILURES:
+        app.add_exception_handler(error, _handle_dependency_error)

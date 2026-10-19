@@ -1,11 +1,19 @@
 from datetime import date as Date
 
+from app.agent_graphs.models import GraphStep
 from app.agent_nodes.models import LogEntry
 from app.agent_tools import SourceRef
 from app.core_model.tickets.raw_comment import RawComment
 from app.core_model.tickets.raw_ticket import RawTicket
 from app.engine_llm import LLMUsage
-from app.entry_routers.models import LogItem, SourceItem, TicketRequest, UsageItem
+from app.entry_routers.models import (
+    LogItem,
+    SourceItem,
+    StepItem,
+    TicketRequest,
+    ToolCallItem,
+    UsageItem,
+)
 
 # Mapowanie modeli API na domenowe i z powrotem, wspólne dla tras. Pisane ręcznie, nie kopiowaniem
 # pól hurtem: oba modele wolno rozjechać, a automat przekazałby dalej wszystko, co API akurat
@@ -20,6 +28,10 @@ UNKNOWN_TIME = ""
 # Do ilu miejsc po przecinku koszt wraca w odpowiedzi. Suma ułamków z kilku tur ma na końcu szum
 # (0.006000000000000001), a jedno wywołanie taniego modelu kosztuje ułamki centa.
 COST_DIGITS = 6
+
+# Do ilu miejsc po przecinku czas trwania kroku wraca w strumieniu: dziesiąte części milisekundy
+# wystarczą, a reszta to szum pomiaru.
+DURATION_DIGITS = 1
 
 
 def to_raw_ticket(
@@ -125,3 +137,45 @@ def to_log_items(
     items = [LogItem(node=entry.node, message=entry.message) for entry in log]
 
     return items
+
+
+def to_step_item(
+    step: GraphStep,  # np. GraphStep(node="run_tools", …, tool_calls=[ToolCallRun(…)])
+) -> StepItem:
+    """
+    Description:
+    Zamienia krok przebiegu grafu na zdarzenie strumienia trasy, pole po polu; czasy trwania
+    zaokrągla. Węzeł dopisuje jeden wpis logu na wywołanie, więc `message` to zwykle ten jeden
+    wpis; gdyby było ich więcej, stoją po kolei, rozdzielone średnikiem.
+
+    Example args:
+        step=GraphStep(node="run_tools", started_at=…, duration_ms=85.04,
+                       log=[LogEntry(node="run_tools", message="wywołania: …")],
+                       tool_calls=[ToolCallRun(call_id="call_1", tool="find_tickets_vector", …)])
+
+    Example result:
+        StepItem(node="run_tools", message="wywołania: …", duration_ms=85.0,
+                 tool_calls=[ToolCallItem(call_id="call_1", tool="find_tickets_vector", …)])
+    """
+    tool_calls = [
+        ToolCallItem(
+            call_id     = run.call_id,
+            tool        = run.tool,
+            arguments   = run.arguments,
+            result      = run.result,
+            started_at  = run.started_at,
+            duration_ms = round(run.duration_ms, DURATION_DIGITS),
+        )
+        for run in step.tool_calls
+    ]
+
+    item = StepItem(
+        node        = step.node,
+        message     = "; ".join(entry.message for entry in step.log),
+        started_at  = step.started_at,
+        duration_ms = round(step.duration_ms, DURATION_DIGITS),
+        usage       = to_usage_item(step.usage) if step.usage is not None else None,
+        tool_calls  = tool_calls,
+    )
+
+    return item

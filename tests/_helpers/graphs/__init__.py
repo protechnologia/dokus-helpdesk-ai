@@ -30,6 +30,8 @@ from tests._helpers.graphs.helper import (
     has_sources,
     output_fields,
     output_types,
+    ran_fake,
+    streamed_fake,
 )
 
 __all__ = [
@@ -51,6 +53,8 @@ __all__ = [
     "has_sources",
     "output_fields",
     "output_types",
+    "ran_fake",
+    "streamed_fake",
     "TOOL_NAME_IN_PROMPT",
     "WITHOUT_MARKERS_PARAGRAPH",
 ]

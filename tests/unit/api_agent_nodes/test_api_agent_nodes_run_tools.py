@@ -1,4 +1,7 @@
+import asyncio
 import json
+from datetime import timedelta
+from itertools import pairwise
 from typing import Annotated
 
 import pytest
@@ -343,3 +346,83 @@ def test_a_badly_assembled_node_is_refused(tools: list[AgentTool], limits: dict[
     bez końca, a z dwóch o jednej nazwie wykonywałoby się to, które akurat stoi dalej na liście."""
     with pytest.raises(ValueError):
         RunToolsNode(tools, limits)
+
+
+async def test_every_call_gets_a_timing_also_when_refused() -> None:
+    """Sprawdza, czy każde z trzech wywołań tury — odczyt karty, narzędzie, którego węzeł nie ma,
+    i odczyt wątku o nieznanym numerze — dostaje pomiar czasu ze swoim identyfikatorem,
+    w kolejności wywołań, z początkiem w strefie UTC, nie wcześniejszym niż początek poprzedniego.
+
+    Wyłapuje pomiar tylko wykonanych wywołań albo w innej kolejności: strumień przebiegu nie
+    złożyłby wtedy wywołania z jego wynikiem i czasem, a odmowy znikałyby z konsoli przebiegu."""
+    tools = make_tools()
+    turn  = ChatMessage(
+        role       = "assistant",
+        tool_calls = [
+            ToolCall(call_id="a", name="read_tickets_card", arguments={"ticket_ids": ["90001"]}),
+            ToolCall(call_id="b", name="find_code_text", arguments={"exact": "błąd"}),
+            ToolCall(call_id="c", name="read_tickets_thread", arguments={"ticket_id": "90019"}),
+        ],
+    )
+
+    update  = await RunToolsNode(list(tools.values()), LIMITS).run(state_with(turn))
+    timings = update["tool_timings"]
+
+    assert [timing.call_id for timing in timings] == ["a", "b", "c"]
+    assert all(timing.started_at.utcoffset() == timedelta(0) for timing in timings)
+    assert all(later.started_at >= earlier.started_at for earlier, later in pairwise(timings))
+
+
+async def test_a_call_over_the_limit_gets_a_timing() -> None:
+    """Sprawdza, czy wywołanie odrzucone, bo przekroczyło limit swojego narzędzia, też dostaje
+    pomiar czasu ze swoim identyfikatorem.
+
+    Wyłapuje pomiar pomijany przy odmowie z limitu: wiadomość `tool` z odmową nie miałaby swojego
+    pomiaru i krok narzędzi w strumieniu przebiegu nie dałby się złożyć."""
+    node   = RunToolsNode(list(make_tools().values()), {**LIMITS, "find_tickets_vector": 1})
+    first  = tool_call_turn("find_tickets_vector", SEARCH_ARGUMENTS, call_id="call_1")
+    second = tool_call_turn("find_tickets_vector", SEARCH_ARGUMENTS, call_id="call_2")
+
+    done    = await node.run(state_with(first))
+    refused = await node.run(state_with(first, *done["messages"], second))
+
+    assert [timing.call_id for timing in refused["tool_timings"]] == ["call_2"]
+
+
+async def test_the_timing_spans_the_tool_call(
+    monkeypatch: pytest.MonkeyPatch,  # wstrzykiwane przez pytest; podmienia odczyt na wolny
+) -> None:
+    """Sprawdza, czy pomiar obejmuje wykonanie narzędzia: odczyt kart, który trwa 50 ms, ma
+    pomiar co najmniej 50 ms.
+
+    Wyłapuje pomiar zamknięty przed wywołaniem narzędzia albo liczony od złego początku: konsola
+    przebiegu pokazywałaby zera przy narzędziach, które naprawdę zajęły sprawie najwięcej czasu."""
+    tools  = make_tools()
+    reader = tools["read_tickets_card"]
+    search = reader.search
+
+    async def slow_search(query: ReadTicketsCardQuery) -> object:
+        """Odczyt kart atrapy po 50 ms czekania, jak odczyt z wolnej bazy."""
+        await asyncio.sleep(0.05)
+
+        return await search(query)
+
+    monkeypatch.setattr(reader, "search", slow_search)
+    turn = tool_call_turn("read_tickets_card", {"ticket_ids": ["90001"]})
+
+    update = await RunToolsNode(list(tools.values()), LIMITS).run(state_with(turn))
+
+    assert update["tool_timings"][0].duration_ms >= 50
+
+
+def test_timings_that_do_not_match_the_calls_are_refused() -> None:
+    """Sprawdza, czy złożenie zmiany stanu z pomiarami, które nie odpowiadają wywołaniom tury
+    (tu brak pomiaru jedynego wywołania), kończy się błędem.
+
+    Wyłapuje węzeł, który po zmianie gubi albo przestawia pomiar, a mimo to oddaje zmianę stanu:
+    strumień przebiegu pokazałby wtedy czas przy niewłaściwym wywołaniu albo padł na końcu."""
+    call = ToolCall(call_id="a", name="read_tickets_card", arguments={"ticket_ids": ["90001"]})
+    node = RunToolsNode(list(make_tools().values()), LIMITS)
+
+    with pytest.raises(ValueError):
+        node.results_update(calls=[call], texts=['{"cards": []}'], timings=[], sources=[])

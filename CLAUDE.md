@@ -292,8 +292,9 @@ dokus-helpdesk-ai/
 │       ├── main.py               # montaż aplikacji, middleware, handlery wyjątków
 │       ├── config.py             # Settings (pydantic-settings)
 │       ├── entry_routers/        # trasy: katalog na zasób (router.py + models.py z modelami API
-│       │                         #   + mapping.py: stan grafu na odpowiedź); wspólne modele API
-│       │                         #   i mapowanie na górze pakietu
+│       │                         #   + mapping.py: stan grafu na odpowiedź); wspólne modele API,
+│       │                         #   mapowanie i odpowiedź JSON-em albo strumieniem
+│       │                         #   (streaming.py) na górze pakietu
 │       │                         # --- nasza strona: podział po RODZAJU obiektu ---
 │       ├── core_model/           # tickets/, docs/, code/, dicts/, graphs/ — folder na temat, plik nazwany jak model
 │       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, indexer_*, factory_*
@@ -450,9 +451,11 @@ dokus-helpdesk-ai/
   moduł `router.py`, więc `main.py` importuje go pełną ścieżką.
 - **W `router.py` stoją same trasy; stan końcowy grafu na odpowiedź zamienia
   `entry_routers/<zasób>/mapping.py` (2026-10-19)**, po jednej funkcji na odpowiedź
-  (`to_search_response`, `to_verdict_response`…). Trasa składa stan, woła graf i loguje, a tę samą
-  odpowiedź złoży każda droga, którą trasa ją oddaje: JSON i zdarzenie `result` strumienia
-  (p. 75). Nazwa od czynności, jak plik wspólny obok, nie `helper.py`.
+  (`to_search_response`, `to_verdict_response`…). Nazwa od czynności, jak plik wspólny obok, nie
+  `helper.py`. Trasa składa stan i w swoim ciele definiuje `finish(final)`: mapowanie i wpis
+  w logu usługi. Oddaje ją `GraphResponder`, który woła ją po przebiegu JSON-em albo na końcu
+  strumienia, więc obie drogi dają tę samą odpowiedź i ten sam wpis w logu. Funkcja w ciele
+  trasy, a nie w module, bo log zostaje przy trasie, a plik mapowania ma jedną rolę.
 - **Katalog z samymi danymi (`core_text/`) potrzebuje `__init__.py`**, choć nikt go nie importuje:
   `[tool.setuptools.packages.find]` wykrywa pakiety po tym pliku, a bez niego treść wypada
   z dystrybucji i `FileNotFoundError` wychodzi dopiero w runtime. Powód jest zapisany w samym
@@ -1580,6 +1583,22 @@ Wspólne:
   (`node`, `message`), w kolejności wywołań węzłów, zawsze, bez flagi w żądaniu. `message` jest
   tekstem dla człowieka, nie do parsowania; treści zgłoszenia w nim nie ma (pilnuje test trasy
   `/search`).
+- **Każda trasa grafu odpowiada też strumieniem przebiegu, gdy `Accept` wymienia
+  `text/event-stream` (2026-10-19, p. 75).** To ta sama trasa, nie osobna: graf, budowa stanu
+  i odpowiedź zostają w jednym miejscu. Strumień to SSE: zdarzenie `step` (`StepItem`) po każdym
+  kroku grafu — węzeł, wpis logu, początek, czas trwania, w turze modelu zużycie tury, w kroku
+  narzędzi wywołania z argumentami, wynikiem, który dostał model, i czasem — a na końcu `result`
+  z dokładnie tą treścią, którą trasa oddaje JSON-em. Status to zawsze 200, bo nagłówki wychodzą
+  przed pierwszym krokiem: awarię zależności niesie zdarzenie `error` (`ErrorResponse`) zamiast
+  `result`, a błąd konfiguracji zrywa strumień. 422 (walidacja, nieznany wariant) pada przed
+  startem strumienia, więc zostaje zwykłą odpowiedzią. Treści zgłoszenia w krokach nie ma, jak
+  w `log`; argumenty narzędzi pisze model z tekstu po anonimizacji, a wynik pochodzi z indeksów.
+  OpenAPI pokazuje obie postacie przy odpowiedzi 200 (`STREAM_RESPONSES`). Czy kiedyś rozdzielić
+  strumień na osobne trasy, rozstrzygnie budowa frontu (p. 77).
+  - **Middleware żądań loguje czas do wysłania nagłówków, nie do końca strumienia.**
+  - **Błąd konfiguracji w strumieniu wychodzi w logu jako `RuntimeError: Caught handled
+    exception, but response already started`** — rodzina błędu ma handler, a odpowiedź już
+    ruszyła; właściwy błąd jest jego przyczyną, niżej w śladzie.
 - **Źródła w odpowiedzi to materiał, który agent ODCZYTAŁ, i nie mają `score` (2026-10-04).**
   Odczyt po numerze nie zna podobieństwa; widzi je tylko model, w wyniku wyszukiwania. `/search`
   oddaje więc karty przeczytane przez agenta, a nie wszystko, co wyszukiwanie znalazło. Źródło
@@ -2303,7 +2322,8 @@ a do tego czasu jej nie ma, więc oba narzędzia kończą się błędem `DbPostg
   właściwy mają ten sam kontrakt.
 - **Pola wspólne stanu w `GraphState` (`agent_graphs/base.py`), `state.py` grafu dziedziczy i
   dokłada swoje**: `input_text`,
-  `anonymized`, `messages`, `iterations`, `respond_retries`, `usage`, `log` są w bazie; `output`
+  `anonymized`, `messages`, `iterations`, `respond_retries`, `usage`, `log`, `tool_timings` są
+  w bazie; `output`
   w typie wyniku (`Verdict`,
   `ParsedTicket`…), `sources` (tylko grafy z narzędziami wiedzy) i dane wejściowe (`rules`) — w
   grafie. LangGraph czyta reduktory z pól odziedziczonych (sprawdzone). Pułapka serializacji
@@ -2372,6 +2392,12 @@ a do tego czasu jej nie ma, więc oba narzędzia kończą się błędem `DbPostg
   a trasa oddaje 503. Wykonuje narzędzia, które dostał w konstruktorze; że jest to lista grafu,
   pilnuje składający, podając tę samą listę `model_tools()`. Zapis odpowiedzi w stanie
   (wiadomości, źródła, wpis w logu z licznikami) jest wspólny z atrapą (`run_tools/base.py`).
+- **`run_tools` mierzy każde wywołanie narzędzia, także odrzucone (`tool_timings`,
+  2026-10-19).** Pomiar (`ToolTiming`: `call_id`, początek w UTC, czas w ms) stoi w polu stanu
+  `GraphState`, osobno od rozmowy: wiadomości idą do dostawcy, a metryki nie mają tam czego
+  szukać. Krok narzędzi trwa tyle, ile jego wywołania razem, więc dopiero pomiar na wywołanie
+  pokazuje, które narzędzie zajęło sprawie najwięcej. Atrapa mierzy tak samo, a zapis odrzuca
+  pomiary, które nie odpowiadają wywołaniom tury.
 - **Węzeł `respond` jest właściwy (`RespondNode`, 2026-10-05).** Ostatnia tura modelu musi być
   jednym wywołaniem `respond_<graf>`, a jego argumenty, razem z polami, które dokłada graf, muszą
   przejść walidację modelu wyniku. Wszystko inne wraca do modelu do poprawki: błędne argumenty,
@@ -2474,6 +2500,13 @@ nowe zgłoszenie (surowy tekst)
   ze stanu.
 - **Atrapa grafu (`build_fake_graph()`) jest jednorazowa** — `FakeAgentNode` ma zaplanowane tury,
   więc trasa buduje ją na każde wywołanie. `ainvoke` zwraca słownik, nie model stanu.
+- **`stream_graph()` obok `run_graph()` oddaje przebieg krok po kroku (2026-10-19):** po każdym
+  węźle krok (`GraphStep` z `agent_graphs/models.py`) razem ze stanem po nim, a stan po ostatnim
+  kroku to stan końcowy `run_graph()`. Stoi na `astream` LangGrapha w trybach `updates`
+  (zmiana stanu węzła) i `values` (cały stan po nim; pierwszy przychodzi przed pierwszym
+  węzłem). Krok zaczyna się tam, gdzie skończył się poprzedni, bo węzły grafów w `api` idą po
+  kolei. Krok narzędzi łączy pomiar czasu z wywołaniem z ostatniej tury modelu i z wynikiem po
+  `call_id`; tylko z ostatniej tury, bo atrapa modelu numeruje wywołania od nowa w każdej turze.
 - **Atrapa grafu dostaje anonimizator argumentem i nie wykonuje narzędzi (2026-10-16).** Trasa
   podaje jej klienta usługi `anonymizer` z fabryki, a test zwykle `FakeAnonymizer`; atrapa nie
   tworzy go u siebie. Anonimizacja to stały pierwszy węzeł, więc atrapa woła tę jedną usługę.
@@ -3159,6 +3192,8 @@ localhost:8010/search`.
   komunikat biblioteki modelu potrafi zacytować wejście, czyli dane klienta. Przy zależnościach
   narzędzi treść idzie tylko na DEBUG: Qdrant i Postgres potrafią zacytować w błędzie fragment
   zapytania. `RespondError` z węzła `respond` dziedziczy po `LLMError`, więc też daje 503.
+  Opis i log awarii składa jedna funkcja, `dependency_failure()` w `errors.py` (2026-10-19):
+  woła ją handler 503 i strumień przebiegu, który oddaje błąd jako zdarzenie `error`.
 - **Błąd konfiguracji NIGDY nie zamienia się w status HTTP.** `LLMConfigError`,
   `EncoderConfigError` i `AnonymizationConfigError`, a w `api` także `EmbeddingConfigError`,
   `DbQdrantConfigError`, `DbPostgresConfigError` (z odmianami na brak kolekcji i tabeli)
@@ -3178,15 +3213,15 @@ localhost:8010/search`.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2331 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 963 (86)           | 96 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 126 (11)           | 10 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2349 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 1005 (86)          | 96 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 149 (11)           | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 108 (38)           | 38 s |
 
 Liczby z 2026-10-19, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-3431 testów, około 150 s; domyślny `pytest`, bez stacku: 3296 testów, około 50 s. Testy
+3514 testów, około 150 s; domyślny `pytest`, bez stacku: 3379 testów, około 50 s. Testy
 `llm_live` — 36 integracyjnych i 61 ewaluacyjnych — liczą się do folderu, ale nie chodzą
 w żadnym z tych przebiegów. 2026-10-19 komplet trwał 8–11 min, choć same testy na stacku
 zajęły 121 s, a bez stacku około 100 s; przyczyny nie ustalono — do sprawdzenia po restarcie
@@ -3547,8 +3582,8 @@ silnika `agent` z osiągalnym modelem anonimizującym.
 | `tests/_helpers/embedding/`            | embedding: nazwy modeli testowych (`EMBEDDING_MODEL`, `OTHER_MODEL`), odpowiedź usługi `embedder` w kształcie kontraktu (`embedder_answer()`) i payload punktu Qdranta z nazwą modelu (`with_model()`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
 | `tests/_helpers/live/`                 | żywy model: konfiguracja (`live_generation_llm()`), graf na nim (`run_live_graph()`, z regułami klienta), sprawy grafu naraz (`run_live_cases()` na `LiveCase`: wejście, reguły, narzędzia), reguły z zestawu domyślnego (`default_rules()`), pomiar raz na graf (`remember_per_graph()`), sprawy testu okablowania grafów (`measure_example_case()` i dwie sprawy `suggest_solution`), raport zużycia (fixture `live_usage`) i wydruk rozmowy (`run_as_lines()`) |
-| `tests/_helpers/graphs/`               | grafy aplikacji: lista pakietów (`graph_modules()`, `graph_name()` jako `ids`), typy i pola wyniku, reguły i źródła w stanie, składanie na atrapach (`fake_nodes()`, `built_from()`, `expected_edges()`) |
-| `tests/_helpers/routers/`              | mapowanie stanu na odpowiedź trasy: same próbki w `samples.py` — stan końcowy grafu (`final_state()`), rozmowa `search` z zapytaniami do wyciągnięcia (`search_messages()`, `SEARCH_QUERIES`), werdykt, karta, propozycja i same uwagi |
+| `tests/_helpers/graphs/`               | grafy aplikacji: lista pakietów (`graph_modules()`, `graph_name()` jako `ids`), typy i pola wyniku, reguły i źródła w stanie, składanie na atrapach (`fake_nodes()`, `built_from()`, `expected_edges()`), przebieg atrapy krok po kroku i w całości (`streamed_fake()`, `ran_fake()`) i próbki kroku przebiegu |
+| `tests/_helpers/routers/`              | trasy HTTP: rozbiór strumienia SSE (`sse_events()`), aplikacja z atrapami grafów na podanym anonimizatorze (`app_on_fake_graphs()`) i z modelem, który zawodzi w środku `search` (`app_with_model_failing_after_tools()`); próbki w `samples.py` — stan końcowy grafu (`final_state()`), rozmowa `search` z zapytaniami do wyciągnięcia, kroki przebiegu, żądania do tras grafów (`GRAPH_REQUESTS`) |
 | `tests/_helpers/scenarios/injections/` | zestaw wstrzyknięć, sprawy sekcji z atakiem także w materiale atrap, kontrola dotarcia (`reached_model()`), ocena sprawy i raport (fixture `injection_report`) |
 | `tests/_helpers/scenarios/gates/`      | zestaw scenariuszy bramek, ocena werdyktu i raport (fixture `gate_report`) |
 | `tests/_helpers/scenarios/polish/`     | zestaw scenariuszy „Popraw", ocena tekstu i raport (fixture `polish_report`) |
@@ -3717,6 +3752,17 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   a grzeczna formułka bez treści to udokumentowana patologia korpusu. Nie dotyczy eskalacji do
   operatora zewnętrznego (ePUAP, Poczta Polska): tam tekst ma nieść, co sprawdzono i czego
   brakuje. Dotyczy tak samo wariantu `handoff`.
+- **Osobne trasy strumienia** (`/search/stream`…) — zostajemy przy jednej trasie na graf
+  z nagłówkiem `Accept` (decyzja 2026-10-19): różnica dotyczy sposobu oddania wyniku, nie
+  funkcji, a osobne trasy powieliłyby budowę stanu sześć razy. Wraca, gdy budowa frontu albo
+  wpięcie w helpdesk (p. 38) pokażą konkretny powód, na przykład klienta HTTP, który nie ustawi
+  nagłówka.
+- **Czas wywołania narzędzia w wiadomości `tool`** — prostsze łączenie z wynikiem, ale model
+  rozmowy idzie do dostawców, a metryki nie mają tam czego szukać; pomiar stoi w osobnym polu
+  stanu (`tool_timings`).
+- **Wpis w logu trasy w `mapping.py` albo jeden ogólny wpis we wspólnej obsłudze strumienia** —
+  pierwsze dałoby plikowi mapowania drugą rolę, drugie zgubiłoby szczegóły tras (werdykt, liczba
+  źródeł, długość uwag); trasa ma funkcję `finish` w swoim ciele.
 - **Osobny endpoint na każdy wariant** (`/suggest/questions`, `/suggest/solution`…) — nowy guzik
   to nowy katalog grafu, a nie nowa trasa.
 - **Bramki oparte o RAG** (porównywanie zamknięcia z historycznymi rozwiązaniami) — uzależniłoby
@@ -4405,20 +4451,12 @@ grafów, a niżej zgłoszenie po lewej, odpowiedź pośrodku i konsola przebiegu
 https://claude.ai/artifact/W4dAs5PUin6A47vfA5Gnty. Pokaz chodzi na tym, co instancja ma w danej
 chwili: na atrapie grafu albo na prawdziwym modelu z indeksami, które są zbudowane.
 
-- [ ] **75. Strumień przebiegu z tras grafów** — trasa grafu odpowiada strumieniem SSE, gdy
-  wołający poprosi o niego nagłówkiem `Accept: text/event-stream`; bez nagłówka odpowiada
-  JSON-em jak dziś. Zdarzenie `step` niesie jeden krok grafu: węzeł, wpis logu, czas startu
-  i trwania oraz zużycie tury, a krok narzędzi także każde wywołanie z argumentami, wynikiem,
-  który dostał model, i czasem trwania, mierzonym w węźle `run_tools`. Zdarzenie `result`
-  niesie tę samą treść co odpowiedź
-  JSON, a zdarzenie `error` — `ErrorResponse` przy awarii zależności; błąd konfiguracji zrywa
-  strumień, tak jak dziś daje 500. Kroki daje `astream` LangGrapha obok `run_graph()`, a stan na
-  odpowiedź mapuje dalej jedno miejsce. Treści zgłoszenia w kroku nie ma, jak w `log`: argumenty
-  narzędzi pisze model z tekstu po anonimizacji (`/search` oddaje je już dziś w `queries`),
-  a wynik narzędzia to materiał z indeksów, który model i tak czyta.
-  Testy na atrapach węzłów: kolejność zdarzeń i `result` równy odpowiedzi JSON. *Dlaczego:*
-  sprawa na kodzie Dokusa trwa 35–166 s, a konsola ma pokazywać, co dzieje się teraz; graf
-  zostaje przy jednej trasie, więc kontrakt się nie rozjeżdża.
+- [x] **75. Strumień przebiegu z tras grafów** (2026-10-19) — sześć tras grafów odpowiada
+  strumieniem SSE przy `Accept: text/event-stream`: `step` po każdym kroku, na końcu `result`
+  równy odpowiedzi JSON albo `error`; `stream_graph()` na `astream` LangGrapha, czasy wywołań
+  narzędzi z `run_tools` (`tool_timings`), wspólna obsługa `GraphResponder` z funkcją `finish`
+  trasy, opis awarii z `dependency_failure()`; reguły — „Warstwa API", „Warstwy kodu", „Warstwa
+  węzłów", „Warstwa grafów", „Logi i obserwowalność", „Świadomie pominięte".
 - [ ] **76. Narzędzia na tym, co jest zbudowane** — ustawienie instancji: graf dostaje tylko
   narzędzia, których materiał w chwili żądania istnieje (kolekcja Qdranta, tabela Postgresa,
   paczka kodu z opisem i mapą symboli). Domyślnie zostaje dzisiejsza reguła: brak indeksu to

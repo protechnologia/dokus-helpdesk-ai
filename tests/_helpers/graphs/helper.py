@@ -24,6 +24,8 @@ grafów na żywym modelu.
 | `edges_of()`            | drogi między krokami w złożonym grafie                              |
 | `fake_nodes()`          | węzły, z których da się złożyć graf, pod argumentami `build_graph`  |
 | `built_from()`          | graf złożony z podanych węzłów                                      |
+| `streamed_fake()`       | kroki i stan końcowy atrapy grafu przepuszczonej krok po kroku      |
+| `ran_fake()`            | stan końcowy atrapy grafu przepuszczonej w całości                  |
 
 Przykład:
 
@@ -50,6 +52,7 @@ from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel
 
 import app.agent_graphs
+from app.agent_graphs import GraphStep, run_graph, stream_graph
 from app.agent_graphs.fake import FAKE_MAX_ITERATIONS
 from app.agent_nodes import Node
 from app.agent_nodes.agent import FakeAgentNode
@@ -58,7 +61,7 @@ from app.agent_nodes.respond import FakeRespondNode
 from app.agent_nodes.run_tools import FakeRunToolsNode
 from app.agent_tools import AgentTool
 from app.config import Settings
-from app.engine_anonymization import AnonymizedText, FakeAnonymizer
+from app.engine_anonymization import AnonymizedText, Anonymizer, FakeAnonymizer
 from tests._helpers.fake_tools import fake_agent_tools
 from tests._helpers.graphs.constants import ANONYMIZED, GRAPHS_PACKAGE
 
@@ -366,3 +369,48 @@ def built_from(
         return graph.build_graph(**nodes, max_iterations=FAKE_MAX_ITERATIONS)
 
     return graph.build_graph(**nodes)
+
+
+async def streamed_fake(
+    graph:      ModuleType,               # np. <module app.agent_graphs.search>
+    anonymizer: Anonymizer | None = None,  # np. FakeAnonymizer() z podmienionym, wolnym anonymize
+) -> tuple[list[GraphStep], BaseModel]:
+    """
+    Description:
+    Przepuszcza stan przykładowy przez atrapę grafu krok po kroku (`stream_graph()`) i oddaje
+    kroki oraz stan po ostatnim z nich. Atrapa grafu jest jednorazowa, więc na każde wywołanie
+    powstaje nowa; anonimizator, gdy nie podano innego, to `FakeAnonymizer`.
+
+    Example args:
+        graph=<module app.agent_graphs.gate_close>
+        anonymizer=None
+
+    Example result:
+        ([GraphStep(node="anonymize", …), GraphStep(node="agent", …),
+          GraphStep(node="respond", …)], GateCloseState(…, output=Verdict(…)))
+    """
+    compiled = graph.build_fake_graph(anonymizer or FakeAnonymizer())
+    steps    = []
+
+    async for step, after in stream_graph(compiled, graph.example_state()):
+        steps.append(step)
+        final = after
+
+    return steps, final
+
+
+async def ran_fake(
+    graph: ModuleType,  # np. <module app.agent_graphs.search>
+) -> BaseModel:
+    """
+    Description:
+    Przepuszcza stan przykładowy przez nową atrapę grafu w całości (`run_graph()`) i oddaje stan
+    końcowy — do porównania z przebiegiem krok po kroku.
+
+    Example args:
+        graph=<module app.agent_graphs.gate_close>
+
+    Example result:
+        GateCloseState(…, output=Verdict(verdict="pass"), log=[LogEntry(…), …])
+    """
+    return await run_graph(graph.build_fake_graph(FakeAnonymizer()), graph.example_state())

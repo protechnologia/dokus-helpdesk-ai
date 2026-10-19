@@ -5,7 +5,9 @@ Importuj wspólne elementy stąd (`from app.agent_graphs import GraphState`).
 
 Do czego:
 Tutaj (`base.py`) to, czego potrzebują stany wszystkich grafów: pola wspólne (`GraphState`)
-i reduktor `merge_sources` dla grafów ze źródłami. W katalogu każdego grafu: przebieg
+i reduktor `merge_sources` dla grafów ze źródłami, oraz uruchomienie grafu: w całości
+(`run_graph`) albo krok po kroku (`stream_graph`, kroki to `GraphStep` z `models.py`). W katalogu
+każdego grafu: przebieg
 (`graph.py`), stan dziedziczący po `GraphState` (`state.py`), atrapa grafu (`fake.py`), prompty
 i opis narzędzia odpowiedzi (`.md`). Opisy narzędzi agenta leżą przy narzędziach, w `agent_tools/`.
 
@@ -42,12 +44,15 @@ import langsmith
 
 from app.agent_graphs.base import (
     GraphState,
+    graph_step,
     merge_sources,
     route_after_agent,
     route_after_respond,
     run_graph,
+    stream_graph,
     tool_definitions,
 )
+from app.agent_graphs.models import GraphStep, ToolCallRun
 
 # LangSmith zablokowany jawnie: przy LANGSMITH_TRACING=true LangGraph wysyła do chmury stan
 # każdego węzła, także `input_text` sprzed anonimizacji. Przełącznik globalny wygrywa z ENV.
@@ -55,9 +60,13 @@ langsmith.configure(enabled=False)
 
 __all__ = [
     "GraphState",
+    "GraphStep",
+    "ToolCallRun",
+    "graph_step",
     "merge_sources",
     "route_after_agent",
     "route_after_respond",
     "run_graph",
+    "stream_graph",
     "tool_definitions",
 ]

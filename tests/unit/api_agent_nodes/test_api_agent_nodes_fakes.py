@@ -129,6 +129,22 @@ async def test_run_tools_refuses_a_call_over_the_limit() -> None:
     assert refused["log"][0].message.endswith("ponad limit: 1")
 
 
+async def test_run_tools_gives_every_call_a_timing() -> None:
+    """Sprawdza, czy atrapa węzła `run_tools` oddaje przy każdym wywołaniu tury pomiar czasu z jego
+    identyfikatorem, w kolejności wywołań, tak jak węzeł właściwy.
+
+    Wyłapuje atrapę bez pomiarów: strumień przebiegu na atrapie grafu nie złożyłby kroku narzędzi,
+    a testy strumienia nie sprawdzałyby tego, co przychodzi przy prawdziwym przebiegu."""
+    turn = ChatMessage(
+        role       = "assistant",
+        tool_calls = [*SEARCH.tool_calls, *tool_call_turn("read_docs", {}, "call_2").tool_calls],
+    )
+
+    update = await FakeRunToolsNode().run(State(input_text="x", messages=[turn]))
+
+    assert [timing.call_id for timing in update["tool_timings"]] == ["call_1", "call_2"]
+
+
 async def test_run_tools_without_sources_leaves_the_field_alone() -> None:
     """Sprawdza, czy atrapa węzła `run_tools` zbudowana bez źródeł w ogóle nie zwraca pola
     `sources`.

@@ -1,12 +1,15 @@
 import operator
-from collections.abc import Mapping, Sequence
-from typing import Annotated, Literal
+import time
+from collections.abc import AsyncIterator, Mapping, Sequence
+from datetime import UTC, datetime
+from typing import Annotated, Any, Literal
 
 from langgraph.graph import END
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.agent_nodes import LogEntry
+from app.agent_graphs.models import GraphStep, ToolCallRun
+from app.agent_nodes import LogEntry, ToolTiming
 from app.agent_tools import AgentTool, SourceRef
 from app.agent_tools.base import arguments_model_of
 from app.core_util.json_schema import json_schema_without_docs
@@ -37,8 +40,8 @@ class GraphState(BaseModel):
     """
     Description:
     Pola stanu, które czytają albo piszą wspólne węzły każdego grafu: wejście, jego wersja po
-    anonimizacji, rozmowa z modelem, licznik tur, licznik poprawek odpowiedzi, zużycie modelu
-    i log przebiegu.
+    anonimizacji, rozmowa z modelem, licznik tur, licznik poprawek odpowiedzi, zużycie modelu,
+    log przebiegu i czasy wywołań narzędzi.
 
     Do czego:
     `state.py` każdego grafu dziedziczy po tej klasie i dokłada własne pola — `output` w typie
@@ -58,6 +61,7 @@ class GraphState(BaseModel):
     respond_retries: int                                        = 0                            # ile razy węzeł `respond` odesłał odpowiedź do poprawki
     usage:           Annotated[LLMUsage, add_usage]             = Field(default_factory=LLMUsage)  # tokeny i koszt wywołań modelu; reduktor sumuje tury
     log:             Annotated[list[LogEntry], operator.add]    = Field(default_factory=list)  # przebieg: po wpisie od każdego wywołania węzła
+    tool_timings:    Annotated[list[ToolTiming], operator.add]  = Field(default_factory=list)  # czas każdego wywołania narzędzia; dopisuje węzeł `run_tools`
 
 
 def merge_sources(
@@ -235,3 +239,107 @@ async def run_graph(
     final = type(state)(**result)
 
     return final
+
+
+async def stream_graph(
+    graph: CompiledStateGraph,  # np. search.build_fake_graph(FakeAnonymizer())
+    state: BaseModel,           # np. SearchState(input_text="ZGŁOSZENIE 41002…")
+) -> AsyncIterator[tuple[GraphStep, BaseModel]]:
+    """
+    Description:
+    Przepuszcza stan wejściowy przez graf jak `run_graph()`, ale oddaje go krok po kroku: po
+    każdym węźle krok (`GraphStep`) razem ze stanem po nim, jako model klasy stanu wejściowego.
+    Stan po ostatnim kroku to stan końcowy, ten sam, który oddałby `run_graph()`.
+
+    LangGraph daje po węźle dwie rzeczy: jego zmianę stanu (`updates`) i cały stan po nim
+    (`values`); pierwszy cały stan przychodzi jeszcze przed pierwszym węzłem. Czas kroku liczy
+    się od końca poprzedniego kroku do nadejścia zmiany stanu, bo węzły grafu idą po kolei.
+
+    Example args:
+        graph=search.build_fake_graph(FakeAnonymizer())
+        state=SearchState(input_text="ZGŁOSZENIE 41002\nOd wczoraj nie przychodzą przesyłki.")
+
+    Example result:
+        (GraphStep(node="anonymize", …), SearchState(…)), (GraphStep(node="agent", …), …), …
+    """
+    started_at = datetime.now(UTC)
+    started    = time.perf_counter()
+    pending:   list[tuple[str, dict[str, Any], datetime, float]] = []
+
+    async for mode, chunk in graph.astream(state, stream_mode=["updates", "values"]):
+        # --- węzeł skończył: jego zmiana stanu i czas od końca poprzedniego kroku ---
+        if mode == "updates":
+            duration_ms = (time.perf_counter() - started) * 1000
+            pending     = [
+                (node, update or {}, started_at, duration_ms) for node, update in chunk.items()
+            ]
+            started_at  = datetime.now(UTC)
+            started     = time.perf_counter()
+            continue
+
+        # --- cały stan po kroku; ten sprzed pierwszego węzła nie zamyka żadnego kroku ---
+        after = type(state)(**chunk)
+
+        for node, update, step_started_at, duration_ms in pending:
+            yield graph_step(node, update, after.messages, step_started_at, duration_ms), after
+
+        pending = []
+
+
+def graph_step(
+    node:        str,                # np. "run_tools"
+    update:      dict[str, Any],     # np. {"messages": [ChatMessage(role="tool", …)], …}
+    messages:    list[ChatMessage],  # rozmowa po kroku, np. [ChatMessage(role="user", …), …]
+    started_at:  datetime,           # np. datetime(2026, 10, 19, 12, 3, 15, tzinfo=UTC)
+    duration_ms: float,              # np. 84.9
+) -> GraphStep:
+    """
+    Description:
+    Składa krok przebiegu ze zmiany stanu, którą oddał węzeł. Z tury modelu bierze zużycie,
+    a z kroku `run_tools` wywołania narzędzi: każdy pomiar czasu z `tool_timings` łączy po
+    `call_id` z wywołaniem z ostatniej tury modelu i z wiadomością `tool` z wynikiem. Wywołania
+    szuka tylko w ostatniej turze, bo identyfikatory bywają powtarzane między turami.
+
+    Example args:
+        node="run_tools"
+        update={"messages": [ChatMessage(role="tool", call_id="call_1", content='{"tickets": []}')],
+                "log": [LogEntry(node="run_tools", message="wywołania: find_tickets_vector; …")],
+                "tool_timings": [ToolTiming(call_id="call_1", started_at=…, duration_ms=84.2)]}
+        messages=[…, tool_call_turn("find_tickets_vector", {…}), ChatMessage(role="tool", …)]
+        started_at=datetime(2026, 10, 19, 12, 3, 15, tzinfo=UTC)
+        duration_ms=84.9
+
+    Example result:
+        GraphStep(node="run_tools", …, tool_calls=[ToolCallRun(call_id="call_1",
+                  tool="find_tickets_vector", arguments={…}, result='{"tickets": []}', …)])
+    """
+    turns   = [message for message in messages if message.role == "assistant"]
+    calls   = {call.call_id: call for call in turns[-1].tool_calls} if turns else {}
+    results = {
+        message.call_id: message.content
+        for message in update.get("messages", [])
+        if message.role == "tool"
+    }
+
+    tool_calls = [
+        ToolCallRun(
+            call_id     = timing.call_id,
+            tool        = calls[timing.call_id].name,
+            arguments   = calls[timing.call_id].arguments,
+            result      = results[timing.call_id],
+            started_at  = timing.started_at,
+            duration_ms = timing.duration_ms,
+        )
+        for timing in update.get("tool_timings", [])
+    ]
+
+    step = GraphStep(
+        node        = node,
+        started_at  = started_at,
+        duration_ms = duration_ms,
+        log         = update.get("log", []),
+        usage       = update.get("usage"),
+        tool_calls  = tool_calls,
+    )
+
+    return step

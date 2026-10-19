@@ -1,11 +1,13 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 
-from app.agent_graphs import run_graph
+from app.agent_graphs import GraphState
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
 from app.agent_graphs.registry import variant_graphs
 from app.entry_routers.mapping import to_raw_ticket
+from app.entry_routers.streaming import STREAM_RESPONSES, GraphResponder, get_graph_responder
 from app.entry_routers.suggest.mapping import to_suggest_response
 from app.entry_routers.suggest.models import (
     SuggestRequest,
@@ -40,15 +42,18 @@ async def list_variants() -> VariantsResponse:
     return VariantsResponse(variants=variants)
 
 
-@router.post("/suggest", response_model=SuggestResponse)
+@router.post("/suggest", response_model=SuggestResponse, responses=STREAM_RESPONSES)
 async def suggest_answer(
-    request: SuggestRequest,
-    build:   GraphBuilder = Depends(get_graph_builder),
-) -> SuggestResponse:
+    request:   SuggestRequest,
+    build:     GraphBuilder   = Depends(get_graph_builder),
+    responder: GraphResponder = Depends(get_graph_responder),
+) -> SuggestResponse | StreamingResponse:
     """
     Description:
     Propozycja odpowiedzi w wariancie, który wybrał człowiek — graf `suggest_<wariant>`. Wariant
-    jest parametrem, nie trasą: nowy guzik to nowy katalog grafu bez zmiany tego pliku.
+    jest parametrem, nie trasą: nowy guzik to nowy katalog grafu bez zmiany tego pliku. Przy
+    `Accept: text/event-stream` odpowiedzią jest strumień przebiegu, a propozycja przychodzi
+    w nim na końcu; nieznany wariant to 422 także wtedy, bo pada przed startem strumienia.
 
     Example args:
         request=SuggestRequest(ticket_id="41002", body="Nie przychodzą przesyłki…",
@@ -72,18 +77,34 @@ async def suggest_answer(
         detail = f"nieznany wariant {request.variant!r}; dostępne: {', '.join(sorted(graphs))}"
         raise HTTPException(status_code=422, detail=detail)
 
-    graph    = graphs[request.variant]
-    state    = graph.STATE(input_text=to_raw_ticket(request).as_thread())
-    final    = await run_graph(build(graph), state)
-    response = to_suggest_response(final, request.variant)
+    graph = graphs[request.variant]
+    state = graph.STATE(input_text=to_raw_ticket(request).as_thread())
 
-    logger.info(
-        "suggest ticket_id=%s variant=%s sources=%d proposal=%s notes=%s",
-        request.ticket_id,
-        request.variant,
-        len(response.sources),
-        response.text is not None,
-        bool(response.internal_notes),
-    )
+    def finish(
+        final: GraphState,  # np. SuggestQuestionsState(…, sources=[…], output=Proposal(…))
+    ) -> SuggestResponse:
+        """
+        Description:
+        Odpowiedź trasy ze stanu końcowego i wpis w logu usługi — wspólne dla JSON-a
+        i strumienia.
 
-    return response
+        Example args:
+            final=SuggestQuestionsState(input_text="…", sources=[…], output=Proposal(…))
+
+        Example result:
+            SuggestResponse(variant="questions", text="1. Od kiedy…", internal_notes="1: …")
+        """
+        response = to_suggest_response(final, request.variant)
+
+        logger.info(
+            "suggest ticket_id=%s variant=%s sources=%d proposal=%s notes=%s",
+            request.ticket_id,
+            request.variant,
+            len(response.sources),
+            response.text is not None,
+            bool(response.internal_notes),
+        )
+
+        return response
+
+    return await responder.answer(build(graph), state, finish)

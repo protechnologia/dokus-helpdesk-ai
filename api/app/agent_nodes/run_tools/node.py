@@ -21,6 +21,8 @@ Po — zmiana stanu (tu na atrapach narzędzi):
         "log":      [LogEntry(node="run_tools",
                               message="wywołania: read_tickets_card, read_tickets_thread; "
                                       "źródła: 1; błędy: 1")],
+        "tool_timings": [ToolTiming(call_id="call_2", started_at=…, duration_ms=0.4),
+                         ToolTiming(call_id="call_3", started_at=…, duration_ms=0.1)],
         "sources":  [SourceRef(source="tickets", item_id="90001",
                                title="Nie przychodzą przesyłki z e-Doręczeń",
                                date=date(2026, 2, 10))],
@@ -40,7 +42,8 @@ Co się dzieje po drodze, dla każdego wywołania po kolei:
 O czym pamiętać przy zmianach:
 
 - Każde wywołanie dostaje dokładnie jedną wiadomość `tool` ze swoim `call_id`, także odrzucone:
-  dostawca nie przyjmie rozmowy z wywołaniem bez odpowiedzi.
+  dostawca nie przyjmie rozmowy z wywołaniem bez odpowiedzi. Tak samo jeden pomiar czasu
+  (`ToolTiming`): po nim strumień przebiegu pokazuje, ile trwało każde wywołanie.
 - Do modelu wraca wyłącznie `ToolCallError`. Awarii embeddera, Qdranta albo Postgresa węzeł nie
   łapie: zatrzymuje przebieg, a trasa oddaje 503 — poprawione wywołanie nic by tam nie zmieniło.
 - Źródła powstają tylko z wykonanych wywołań źródeł wiedzy. Narzędzie pomocnicze nie ma
@@ -59,7 +62,8 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from app.agent_nodes.run_tools.base import RunToolsNodeBase
+from app.agent_nodes.models import ToolTiming
+from app.agent_nodes.run_tools.base import RunToolsNodeBase, start_clock, tool_timing
 from app.agent_nodes.run_tools.limits import calls_over_limit, limit_exceeded_text
 from app.agent_tools import AgentTool, KnowledgeSource, SourceRef, ToolCallError
 from app.agent_tools.base import arguments_model_of, error_as_json
@@ -195,6 +199,7 @@ class RunToolsNode(RunToolsNodeBase):
             {"messages": [ChatMessage(role="tool", call_id="call_1", content='{"cards": […]}')],
              "log": [LogEntry(node="run_tools",
                               message="wywołania: read_tickets_card; źródła: 3")],
+             "tool_timings": [ToolTiming(call_id="call_1", started_at=…, duration_ms=84.2)],
              "sources": [SourceRef(source="tickets", item_id="90001", …), …]}
 
         Raises:
@@ -205,34 +210,43 @@ class RunToolsNode(RunToolsNodeBase):
         calls      = state.messages[-1].tool_calls if state.messages else []
         over_limit = calls_over_limit(state.messages, self._limits)
 
-        texts:   list[str]       = []
-        sources: list[SourceRef] = []
-        failed:  int             = 0
+        texts:   list[str]        = []
+        timings: list[ToolTiming] = []
+        sources: list[SourceRef]  = []
+        failed:  int              = 0
 
         for call in calls:
-            # --- ponad limit: odmowa zamiast wykonania ---
-            if call.call_id in over_limit:
-                texts.append(limit_exceeded_text(call.name, self._limits[call.name]))
-                continue
+            started = start_clock()
 
-            # --- wykonanie ---
+            # Pomiar w `finally`, bo każda gałąź kończy się `continue`, a czas ma mieć każde
+            # wywołanie, także odrzucone. Przy awarii zależności pomiar ginie razem z przebiegiem.
             try:
-                text, refs = await self._execute(call)
-            except ToolCallError as exc:  # wywołania nie da się wykonać: błąd wraca do modelu
-                failed += 1
-                texts.append(error_as_json(str(exc)))
+                # --- ponad limit: odmowa zamiast wykonania ---
+                if call.call_id in over_limit:
+                    texts.append(limit_exceeded_text(call.name, self._limits[call.name]))
+                    continue
 
-                # Sama nazwa na INFO; komunikat może cytować argumenty, czyli dane klienta.
-                logger.info("run_tools tool=%s call_error", call.name)
-                logger.debug("run_tools tool=%s call_error=%s", call.name, exc)
-                continue
+                # --- wykonanie ---
+                try:
+                    text, refs = await self._execute(call)
+                except ToolCallError as exc:  # wywołania nie da się wykonać: błąd wraca do modelu
+                    failed += 1
+                    texts.append(error_as_json(str(exc)))
 
-            texts.append(text)
-            sources.extend(refs)
+                    # Sama nazwa na INFO; komunikat może cytować argumenty, czyli dane klienta.
+                    logger.info("run_tools tool=%s call_error", call.name)
+                    logger.debug("run_tools tool=%s call_error=%s", call.name, exc)
+                    continue
+
+                texts.append(text)
+                sources.extend(refs)
+            finally:
+                timings.append(tool_timing(call.call_id, *started))
 
         update = self.results_update(
             calls      = calls,
             texts      = texts,
+            timings    = timings,
             sources    = sources,
             over_limit = len(over_limit),
             failed     = failed,
