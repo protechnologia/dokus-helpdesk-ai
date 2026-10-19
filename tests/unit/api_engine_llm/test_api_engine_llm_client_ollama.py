@@ -68,7 +68,7 @@ class StubResponse:
 
 
 # Przedrostek zmiennych roli, której klient służy w tych testach — nim nazywa zmienne w błędach.
-ENV_PREFIX = "LLM_ANONYMIZATION_"
+ENV_PREFIX = "LLM_GENERATION_"
 
 
 def make_client() -> OllamaLLMClient:
@@ -221,16 +221,16 @@ def test_input_longer_than_the_window_is_refused():
 
 def test_the_refusal_names_the_settings_to_change():
     """Sprawdza, czy komunikat odmowy przy za długim wejściu wymienia obie zmienne konfiguracji, od
-    których zależy limit, z przedrostkiem roli, której klient służy: `LLM_ANONYMIZATION_NUM_CTX`
-    i `LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS`.
+    których zależy limit, z przedrostkiem roli, której klient służy: `LLM_GENERATION_NUM_CTX`
+    i `LLM_GENERATION_MAX_OUTPUT_TOKENS`.
 
     Wyłapuje komunikat bez tych nazw albo z nazwą zmiennej innej roli: osoba uruchamiająca
     przebieg nie wiedziałaby, które ustawienie podnieść, albo podniosłaby nie to."""
     with pytest.raises(LLMError) as exc:
         make_client()._reject_if_too_long("x" * 87_000, system=None)
 
-    assert "LLM_ANONYMIZATION_NUM_CTX"           in str(exc.value)
-    assert "LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS" in str(exc.value)
+    assert "LLM_GENERATION_NUM_CTX"           in str(exc.value)
+    assert "LLM_GENERATION_MAX_OUTPUT_TOKENS" in str(exc.value)
 
 
 def test_system_prompt_counts_towards_the_limit():
@@ -277,12 +277,12 @@ def test_answer_filling_the_whole_window_is_rejected():
 def test_answer_budget_larger_than_the_window_fails_at_build_time():
     """Sprawdza, czy klienta nie da się zbudować, gdy limit odpowiedzi jest równy oknu kontekstu
     (oba po 1000 tokenów): budowa kończy się wyjątkiem `LLMConfigError`, który wymienia
-    `LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS`.
+    `LLM_GENERATION_MAX_OUTPUT_TOKENS`.
 
     Wyłapuje brak tego sprawdzenia przy starcie: na zgłoszenie nie zostawałoby w oknie żadne
     miejsce i każde wywołanie padałoby z błędem, który wygląda na problem z danymi, a nie
     z konfiguracją."""
-    with pytest.raises(LLMConfigError, match="LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS"):
+    with pytest.raises(LLMConfigError, match="LLM_GENERATION_MAX_OUTPUT_TOKENS"):
         OllamaLLMClient(model=MODEL, env_prefix=ENV_PREFIX, num_ctx=1000, max_output_tokens=1000)
 
 
@@ -363,7 +363,7 @@ def test_detects_truncation_even_when_the_window_is_misconfigured():
 
 def test_the_message_points_at_the_window_setting():
     """Sprawdza, czy komunikat błędu o tym, że serwer przeczytał mniej, niż wysłaliśmy, wymienia
-    zmienną `LLM_ANONYMIZATION_NUM_CTX`.
+    zmienną `LLM_GENERATION_NUM_CTX`.
 
     Wyłapuje komunikat, który jej nie nazywa: przyczyną jest tu źle ustawione okno kontekstu,
     a nie treść zgłoszenia, więc bez tej wskazówki szukałoby się błędu w złym miejscu."""
@@ -377,7 +377,7 @@ def test_the_message_points_at_the_window_setting():
     with pytest.raises(LLMError) as exc:
         client._to_completion(_answer(16386), elapsed_ms=6000, sent_chars=92175)
 
-    assert "LLM_ANONYMIZATION_NUM_CTX" in str(exc.value)
+    assert "LLM_GENERATION_NUM_CTX" in str(exc.value)
 
 
 def test_intact_calls_are_not_flagged():

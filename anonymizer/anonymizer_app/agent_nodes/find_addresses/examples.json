@@ -1,0 +1,14 @@
+[
+  {
+    "text": "Proszę wysłać decyzję na Akacjową 9/1, Węgrów. Mieszkanka podała też drugi adres:\nWierzbowa 6\nKutno\nTel. {TELEFON}",
+    "answer": {
+      "adresy": ["Akacjową 9/1, Węgrów", "Wierzbowa 6", "Kutno"]
+    }
+  },
+  {
+    "text": "Po aktualizacji do wersji 5.3 Urząd Gminy Zgierz nie widzi pism w module Kancelaria > Słowniki > Adresy, pokój 7. Zgodnie z art. 14 ust. 3 sprawa czeka. Adres {ADRES} był poprawny.",
+    "answer": {
+      "adresy": []
+    }
+  }
+]

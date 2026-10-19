@@ -1,6 +1,6 @@
 import pytest
 
-from anonymizer_app.patterns.pesel import (
+from anonymizer_app.core_patterns.pesel import (
     find_pesel_by_checksum,
     find_pesel_with_error_after_label,
 )

@@ -34,9 +34,8 @@ services:
       # zapisu, więc ten wpis nakłada na sam jej folder tryb tylko do odczytu: narzędzia kodu
       # dostają ścieżki od modelu i nie mogą mieć jak niczego w paczce zmienić.
       - ./data/unsafe/code:/code/data/unsafe/code:ro
-    # Sześć wartości LLM niżej (BASE_URL, API_KEY i MODEL obu ról) interpoluje się do PUSTEGO
-    # TEKSTU, dopóki dostawcą jest `fake` — celowo: są opcjonalne i wypełnia je dopiero prawdziwy
-    # dostawca. Pusty tekst nie dociera do klienta, bo `_drop_blank_values` w Settings zamienia go
+    # Trzy wartości LLM niżej (BASE_URL, API_KEY i MODEL) interpolują się do PUSTEGO TEKSTU, dopóki
+    # dostawcą jest `fake` — celowo: są opcjonalne i wypełnia je dopiero prawdziwy dostawca. Pusty tekst nie dociera do klienta, bo `_drop_blank_values` w Settings zamienia go
     # z powrotem na wartość domyślną; po to ten walidator istnieje, to nie przeoczenie.
     environment:
       LOG_LEVEL:                 ${LOG_LEVEL:-INFO}
@@ -49,15 +48,6 @@ services:
       LLM_GENERATION_TIMEOUT_SECONDS:   ${LLM_GENERATION_TIMEOUT_SECONDS:-60}
       LLM_GENERATION_NUM_CTX:           ${LLM_GENERATION_NUM_CTX:-8192}
       LLM_GENERATION_MAX_OUTPUT_TOKENS: ${LLM_GENERATION_MAX_OUTPUT_TOKENS:-1500}
-      # Rola anonimizująca: model pomagający anonimizatorowi; widzi SUROWY tekst zgłoszeń.
-      LLM_ANONYMIZATION_PROVIDER:          ${LLM_ANONYMIZATION_PROVIDER:-fake}
-      LLM_ANONYMIZATION_BASE_URL:          ${LLM_ANONYMIZATION_BASE_URL:-}
-      LLM_ANONYMIZATION_API_KEY:           ${LLM_ANONYMIZATION_API_KEY:-}
-      LLM_ANONYMIZATION_MODEL:             ${LLM_ANONYMIZATION_MODEL:-}
-      LLM_ANONYMIZATION_TEMPERATURE:       ${LLM_ANONYMIZATION_TEMPERATURE:-0}
-      LLM_ANONYMIZATION_TIMEOUT_SECONDS:   ${LLM_ANONYMIZATION_TIMEOUT_SECONDS:-60}
-      LLM_ANONYMIZATION_NUM_CTX:           ${LLM_ANONYMIZATION_NUM_CTX:-8192}
-      LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS: ${LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS:-1500}
       # Usługa `anonymizer`: dokąd `api` wysyła tekst przed modelem zewnętrznym (p. 19).
       ANONYMIZATION_BASE_URL:        ${ANONYMIZATION_BASE_URL:-http://anonymizer:8000}
       ANONYMIZATION_TIMEOUT_SECONDS: ${ANONYMIZATION_TIMEOUT_SECONDS:-30}
@@ -160,11 +150,20 @@ services:
       - "${DOCKER_BIND_ADDR:-127.0.0.1}:${DOCKER_ANONYMIZER_PORT:-8002}:8000"
     volumes:
       - ./anonymizer/anonymizer_app:/code/anonymizer_app
-    # ANONYMIZATION_ENGINE czyta tylko ta usługa. Domyślnie `fake`, bo prawdziwego silnika
-    # jeszcze nie ma (p. 19.5); `api` nie przepuści wyniku atrapy do prawdziwego modelu.
+    # ANONYMIZATION_ENGINE i model anonimizujący czyta tylko ta usługa. Domyślnie silnik `agent`:
+    # wzorce i model, który widzi SUROWY tekst zgłoszeń — bez adresu i nazwy modelu usługa nie
+    # wstanie, i tak ma być, bo dokąd idzie surowy tekst, wpisuje się świadomie. Start bez modelu:
+    # ANONYMIZATION_ENGINE=fake (atrapa; `api` nie przepuści jej wyniku do prawdziwego modelu).
+    # BASE_URL, API_KEY i MODEL interpolują się do pustego tekstu, gdy ich nie ustawiono.
     environment:
-      LOG_LEVEL:            ${LOG_LEVEL:-INFO}
-      ANONYMIZATION_ENGINE: ${ANONYMIZATION_ENGINE:-fake}
+      LOG_LEVEL:                         ${LOG_LEVEL:-INFO}
+      ANONYMIZATION_ENGINE:              ${ANONYMIZATION_ENGINE:-agent}
+      LLM_ANONYMIZATION_BASE_URL:        ${LLM_ANONYMIZATION_BASE_URL:-}
+      LLM_ANONYMIZATION_API_KEY:         ${LLM_ANONYMIZATION_API_KEY:-}
+      LLM_ANONYMIZATION_MODEL:           ${LLM_ANONYMIZATION_MODEL:-}
+      LLM_ANONYMIZATION_TEMPERATURE:     ${LLM_ANONYMIZATION_TEMPERATURE:-0}
+      LLM_ANONYMIZATION_TIMEOUT_SECONDS: ${LLM_ANONYMIZATION_TIMEOUT_SECONDS:-60}
+      LLM_ANONYMIZATION_NUM_CTX:         ${LLM_ANONYMIZATION_NUM_CTX:-16384}
     command: ["uvicorn", "anonymizer_app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     healthcheck:
       test:         ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"]

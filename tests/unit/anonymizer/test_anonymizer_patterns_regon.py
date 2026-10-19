@@ -1,6 +1,6 @@
 import pytest
 
-from anonymizer_app.patterns.regon import find_regon_9_by_checksum, find_regon_14_by_checksum
+from anonymizer_app.core_patterns.regon import find_regon_9_by_checksum, find_regon_14_by_checksum
 from tests._helpers.patterns import Variant, replaced_by
 
 # Tekst, który wariant zamienia, i wynik zamiany.

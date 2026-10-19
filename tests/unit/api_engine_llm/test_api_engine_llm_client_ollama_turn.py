@@ -11,7 +11,7 @@ from app.engine_llm.client.ollama import OllamaLLMClient
 # serwerze tura Ollamy nie była sprawdzana.
 
 MODEL      = "model-lokalny:tag"
-ENV_PREFIX = "LLM_ANONYMIZATION_"
+ENV_PREFIX = "LLM_GENERATION_"
 
 SYSTEM = "Jesteś asystentem wdrożeniowca helpdesku."
 

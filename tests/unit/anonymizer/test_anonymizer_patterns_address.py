@@ -1,6 +1,6 @@
 import pytest
 
-from anonymizer_app.patterns.address import (
+from anonymizer_app.core_patterns.address import (
     find_address_at_postal_code,
     find_address_at_street_prefix,
 )

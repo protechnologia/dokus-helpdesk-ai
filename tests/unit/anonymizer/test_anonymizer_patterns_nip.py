@@ -1,6 +1,6 @@
 import pytest
 
-from anonymizer_app.patterns.nip import find_nip_by_checksum
+from anonymizer_app.core_patterns.nip import find_nip_by_checksum
 from tests._helpers.patterns import replaced_by
 
 # Tekst, który wariant zamienia, i wynik zamiany.

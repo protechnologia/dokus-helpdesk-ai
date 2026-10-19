@@ -20,3 +20,6 @@ matplotlib==3.11.1
 tree-sitter==0.26.0
 tree-sitter-php==0.25.1
 tree-sitter-javascript==0.25.0
+# Usługa `anonymizer` nie jest instalowana w `.venv`, a jej testy idą w tym samym procesie pytest:
+# słownik morfologiczny z jej `requirements.txt`.
+morfeusz2==1.99.15

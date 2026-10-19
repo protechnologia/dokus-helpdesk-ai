@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from anonymizer_app.engine import FAKE_ENGINE_NAME, FakeEngine
+from anonymizer_app.core_engine import FAKE_ENGINE_NAME, FakeEngine
 from tests._helpers.anonymization import FAKE_ENGINE, RAW_TEXT, SENSITIVE
 
 

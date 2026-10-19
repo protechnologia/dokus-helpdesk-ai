@@ -5,3 +5,14 @@ pydantic==2.10.5
 pydantic-settings==2.7.1
 fastapi==0.140.0
 uvicorn[standard]==0.51.0
+# Klient modelu anonimizującego (Chat Completions zgodne z OpenAI), wprost na REST, bez SDK
+# dostawcy. Ta sama wersja co w `api`.
+httpx==0.28.1
+# Silnik przebiegu grafu anonimizacji (`agent_graphs/`). Te same wersje co w `api`; LangSmith
+# przypięty, bo import pakietu grafów wyłącza go jawnie (`langsmith.configure`).
+langgraph==1.2.12
+langsmith==0.14.3
+# Słownik morfologiczny (SGJP) do reguły odmian osób: lematy i to, czy słowo to imię albo
+# nazwisko (`core_service/analyzer_morphology.py`). Koło niesie słownik w bibliotece, około 9 MB;
+# licencja BSD.
+morfeusz2==1.99.15

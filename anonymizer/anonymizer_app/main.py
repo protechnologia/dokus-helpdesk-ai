@@ -9,6 +9,9 @@ logów nie trafia z niego nic poza długością (CLAUDE.md -> „Plan", p. 19).
 | `GET /health`     | sonda życia, bez konfiguracji                            |
 | `POST /anonymize` | tekst ze znacznikami i nazwa silnika, który go wytworzył |
 
+Silnik wybiera `ANONYMIZATION_ENGINE`: `llm` to wzorce i model anonimizujący (p. 19.5), `fake` —
+atrapa, która oddaje tekst bez zmian.
+
 O czym pamiętać przy zmianach:
 
 - Usługa nie dzieli kodu z `api` ani z `embedder`: middleware, handlery i walidator konfiguracji
@@ -18,14 +21,16 @@ O czym pamiętać przy zmianach:
 
 import logging
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request, Response
 
 from anonymizer_app.config import get_settings
-from anonymizer_app.engine import get_engine
-from anonymizer_app.errors.handlers import REQUEST_ID_HEADER, register_exception_handlers
-from anonymizer_app.routers import anonymize, health
+from anonymizer_app.core_engine import Engine, get_engine
+from anonymizer_app.core_errors.handlers import REQUEST_ID_HEADER, register_exception_handlers
+from anonymizer_app.entry_routers import anonymize, health
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +52,39 @@ def _configure_logging(level: str) -> None:  # np. "DEBUG"
         format = "%(asctime)s %(levelname)s %(name)s %(message)s",
         force  = True,
     )
+
+
+def _lifespan(
+    engine: Engine,  # np. AgentEngine(…) — silnik, który usługa zamknie przy wyłączaniu
+):
+    """
+    Description:
+    Buduje cykl życia aplikacji: nic przy starcie (silnik powstaje wcześniej, w `create_app()`),
+    a przy wyłączaniu zamyka silnik, czyli jego połączenia z modelem.
+
+    Example args:
+        engine=AgentEngine(…)
+
+    Example result:
+        funkcja cyklu życia dla `FastAPI(lifespan=…)`
+    """
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        """
+        Description:
+        Cykl życia aplikacji: oddaje sterowanie na czas pracy usługi i zamyka silnik po niej.
+
+        Example args:
+            app=FastAPI()
+
+        Example result:
+            None — po wyjściu silnik jest zamknięty
+        """
+        yield
+        await engine.aclose()
+
+    return lifespan
 
 
 def create_app() -> FastAPI:
@@ -73,8 +111,9 @@ def create_app() -> FastAPI:
     engine = get_engine()
 
     app = FastAPI(
-        title   = "dokus-anonymizer",
-        version = "0.1.0",
+        title    = "dokus-anonymizer",
+        version  = "0.1.0",
+        lifespan = _lifespan(engine),
     )
 
     # --- identyfikator żądania: przyjęty od `api`, a gdy go nie ma — nadany ---

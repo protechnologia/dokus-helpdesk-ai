@@ -93,6 +93,7 @@ ignore = [
 # a wyrównany typ `messages` sam zajmuje 89 znaków.
 "api/app/agent_graphs/base.py"    = ["E501"]
 "api/app/agent_graphs/*/state.py" = ["E501"]
+"anonymizer/anonymizer_app/agent_graphs/*/state.py" = ["E501"]
 # Tabela przypadków (tekst w bazie, zapytanie, oczekiwanie) czyta się wierszami; przełamana na
 # kilka linii przestaje być tabelą.
 "tests/integration/postgres/test_postgres_text_search_stack.py" = ["E501"]

@@ -1,6 +1,6 @@
 import pytest
 
-from anonymizer_app.patterns.email import find_email, find_email_with_at_word
+from anonymizer_app.core_patterns.email import find_email, find_email_with_at_word
 from tests._helpers.patterns import Variant, replaced_by
 
 # Tekst, który wariant zamienia, i wynik zamiany.

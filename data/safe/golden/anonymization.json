@@ -482,6 +482,169 @@
         "USŁUGA": ["e-Doręczeń"],
         "KOD_BŁĘDU": ["4011"]
       }
+    },
+    {
+      "id": "s39",
+      "phenomenon": "adres bez kotwicy: ulica z numerem i miejscowość po przecinku",
+      "text": "W polu adresu do doręczeń wpisano: Zielona 4/2, Garwolin. Po zapisie pole się czyści.",
+      "remove": {
+        "ADRES": ["Zielona 4/2, Garwolin"]
+      },
+      "keep": {}
+    },
+    {
+      "id": "s40",
+      "phenomenon": "notatka małymi literami: ulica w odmianie i miejscowość po „w”",
+      "text": "klientka mieszka na lipowej 3 w otwocku, prosi o odbior osobisty decyzji, kod bledu 21405",
+      "remove": {
+        "ADRES": ["lipowej 3 w otwocku"]
+      },
+      "keep": {
+        "KOD_BŁĘDU": ["21405"]
+      }
+    },
+    {
+      "id": "s41",
+      "phenomenon": "adres bez kotwicy złamany na dwie linie: ulica z numerem, miejscowość w następnej",
+      "text": "Adres do korespondencji:\nKasztanowa 7\nPiaseczno\nProszę o zmianę w kartotece.",
+      "remove": {
+        "ADRES": ["Kasztanowa 7", "Piaseczno"]
+      },
+      "keep": {}
+    },
+    {
+      "id": "s42",
+      "phenomenon": "notatka małymi literami złamana na dwie linie",
+      "text": "pani dzwonila, mieszka na brzozowej 12\nw sulejowie, pismo nie doszlo",
+      "remove": {
+        "ADRES": ["brzozowej 12", "sulejowie"]
+      },
+      "keep": {}
+    },
+    {
+      "id": "s43",
+      "phenomenon": "ulica w odmianie bez „ul.” z miejscowością w miejscowniku",
+      "text": "Decyzja trafiła na Słowackiego 14 w Radomiu, a wróciła z adnotacją „adresat wyprowadził się”.",
+      "remove": {
+        "ADRES": ["Słowackiego 14 w Radomiu"]
+      },
+      "keep": {
+        "KOMUNIKAT": ["adresat wyprowadził się"]
+      }
+    },
+    {
+      "id": "s44",
+      "phenomenon": "ulica w odmianie po „przy”, bez miejscowości",
+      "text": "Mieszkam przy Długiej 5/3 i nie dostałam decyzji.",
+      "remove": {
+        "ADRES": ["Długiej 5/3"]
+      },
+      "keep": {}
+    },
+    {
+      "id": "s45",
+      "phenomenon": "adres na wsi z gminą, bez kodu",
+      "text": "Wysłano na adres Stara Wieś 45, gmina Celestynów, ale przesyłka wróciła.",
+      "remove": {
+        "ADRES": ["Stara Wieś 45, gmina Celestynów"]
+      },
+      "keep": {}
+    },
+    {
+      "id": "s46",
+      "phenomenon": "ulica z lokalem i miejscowość z dwóch słów, bez kodu i bez „ul.”",
+      "text": "Kontrahent: Polna 20 lok. 5, Mińsk Mazowiecki – brak kodu w imporcie.",
+      "remove": {
+        "ADRES": ["Polna 20 lok. 5, Mińsk Mazowiecki"]
+      },
+      "keep": {}
+    },
+    {
+      "id": "s47",
+      "phenomenon": "miejscowość przed ulicą",
+      "text": "Adres zamieszkania: Garwolin, Kościelna 8. Proszę poprawić.",
+      "remove": {
+        "ADRES": ["Garwolin, Kościelna 8"]
+      },
+      "keep": {}
+    },
+    {
+      "id": "s48",
+      "phenomenon": "adres z importu małymi literami i bez polskich znaków",
+      "text": "adres z importu: kosciuszki 8/2, tarnow – system odrzuca",
+      "remove": {
+        "ADRES": ["kosciuszki 8/2, tarnow"]
+      },
+      "keep": {}
+    },
+    {
+      "id": "s49",
+      "phenomenon": "pułapki bez adresu: wersja, pokój, artykuł",
+      "text": "Po aktualizacji do wersji 4.14.0 moduł Kancelaria w pokoju 12 nie drukuje, a zgodnie z art. 5 ust. 2 pismo czeka.",
+      "remove": {},
+      "keep": {
+        "WERSJA": ["4.14.0"],
+        "SŁOWO": ["pokoju 12", "art. 5 ust. 2"]
+      }
+    },
+    {
+      "id": "s50",
+      "phenomenon": "pułapka: pola formularza adresu z liczbami",
+      "text": "W polu Ulica wpisano 0, a w polu Numer domu 15 — system odrzuca rekord z błędem 30112.",
+      "remove": {},
+      "keep": {
+        "KOD_BŁĘDU": ["30112"],
+        "SŁOWO": ["Numer domu 15"]
+      }
+    },
+    {
+      "id": "s51",
+      "phenomenon": "pułapka: nazwa urzędu z miejscowością i numer pisma",
+      "text": "Urząd Skarbowy w Toruniu przyjął pismo nr 15/2026 z eNadawcy.",
+      "remove": {},
+      "keep": {
+        "SŁOWO": ["Urząd Skarbowy w Toruniu"],
+        "NUMER": ["15/2026"],
+        "USŁUGA": ["eNadawcy"]
+      }
+    },
+    {
+      "id": "s52",
+      "phenomenon": "pułapka: system z liczbą, port i wersja",
+      "text": "Na serwerze Windows Server 2019 działa eNadawca 4.12, port 8443.",
+      "remove": {},
+      "keep": {
+        "SŁOWO": ["Windows Server 2019"],
+        "NUMER": ["8443"],
+        "USŁUGA": ["eNadawca"],
+        "WERSJA": ["4.12"]
+      }
+    },
+    {
+      "id": "s53",
+      "phenomenon": "pułapka: plik i katalog z nazwą ulicy, kolejka z liczbą",
+      "text": "Plik Lista_zwrotów_12.csv leży w katalogu Polna/Import, a kolejka Poczty Polskiej ma 40 pism.",
+      "remove": {},
+      "keep": {
+        "SŁOWO": ["Lista_zwrotów_12.csv", "Polna/Import"],
+        "USŁUGA": ["Poczty Polskiej"],
+        "NUMER": ["40 pism"]
+      }
+    },
+    {
+      "id": "s54",
+      "phenomenon": "cytowany mail: nagłówek „Do:” z osobą i skrzynką nazwaną jak aplikacja, nazwa aplikacji w treści w odmianie",
+      "text": "ZGŁOSZENIE 90154 z 2026-07-02\nTemat: Przywrócenie usuniętej sprawy\n\nOPIS ZGŁASZAJĄCEGO:\nDzień dobry, proszę o przywrócenie sprawy usuniętej w Dokusie.\n\nOd: Wiesława Zawadzka <w.zawadzka@gmina-lipno.pl>\nWysłane: środa, 1 lipca 2026 09:12\nDo: Romuald Kęsicki <r.kesicki@wsparcie-systemu.pl>; dokus <pomoc@wsparcie-systemu.pl>\nDW: sekretariat <sekretariat@gmina-lipno.pl>\nTemat: Przywrócenie sprawy\n\nPanie Romualdzie, sprawa zniknęła po aktualizacji Dokusa do wersji 4.15.\nPozdrawiam\nWiesława Zawadzka\n\nKOMENTARZ 1 — konsultant, 2026-07-02 10:05:00 (typ: komentarz):\nPrzywróciłem sprawę z kopii w module Dokus Archiwum.\nRomuald Kęsicki",
+      "remove": {
+        "IMIĘ": ["Wiesława", "Romuald", "Romualdzie"],
+        "NAZWISKO": ["Zawadzka", "Kęsicki"],
+        "EMAIL": ["w.zawadzka@gmina-lipno.pl", "r.kesicki@wsparcie-systemu.pl", "pomoc@wsparcie-systemu.pl", "sekretariat@gmina-lipno.pl"]
+      },
+      "keep": {
+        "USŁUGA": ["Dokus", "Dokusie", "Dokusa"],
+        "WERSJA": ["4.15"],
+        "NUMER": ["90154"]
+      }
     }
   ]
 }

@@ -107,10 +107,10 @@ przede wszystkim gdy zgłoszenie niesie komunikat albo kod błędu. Kandydat bez
 dostęp do instancji testowej, na której agent sprawdzi opisany objaw. Byłoby to pierwsze
 narzędzie, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzji o granicach.
 
-**Stan na dziś.** Szkielet stoi w całości, a atrapą jest już tylko anonimizator. Wszystkie węzły
-są właściwe i każdy graf przeszedł na prawdziwym modelu (OpenAI), na zmyślonych zgłoszeniach
-i atrapach narzędzi. Trasy biorą graf z węzłów właściwych, gdy model generujący nie jest atrapą,
-ale bez prawdziwego anonimizatora taka konfiguracja odmawia, więc na danych klientów nic jeszcze
+**Stan na dziś.** Szkielet stoi w całości. Wszystkie węzły są właściwe i każdy graf przeszedł
+na prawdziwym modelu (OpenAI), na zmyślonych zgłoszeniach i atrapach narzędzi. Anonimizator ma
+prawdziwy silnik `agent` (p. 19.5: wzorce i model anonimizujący, Bielik na własnym serwerze), ale
+prompty grafów nie wiedzą jeszcze o znacznikach (p. 19.7), więc na danych klientów nic jeszcze
 nie rusza. Wszystkie czternaście narzędzi ma wersję właściwą: osiem na zgłoszeniach
 i instrukcjach oraz sześć narzędzi kodu: opis projektu, szukanie, spis katalogu, odczyt pliku,
 odczyt symbolu i cytowanie fragmentu.
@@ -195,7 +195,7 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
 - Deploy: Docker Compose
 
 Usługi w compose: `api` (FastAPI + CLI), `embedder` (model PL za REST-em), `anonymizer` (dane
-osobowe na znaczniki; od p. 19.1, dziś na atrapie silnika), `qdrant`, `postgres`. LLM jest
+osobowe na znaczniki: wzorce i model anonimizujący, p. 19), `qdrant`, `postgres`. LLM jest
 **zewnętrznym endpointem**, nie usługą w bazowym compose.
 
 ## Zasady ogólne
@@ -324,12 +324,16 @@ dokus-helpdesk-ai/
 │   └── anonymizer_app/           # pakiet nazwany rozłącznie z `app` i `embedder_app`
 │       ├── main.py               # montaż aplikacji
 │       ├── config.py             # Settings tej usługi
-│       ├── models/               # model na plik: kontrakt HTTP (AnonymizeRequest/AnonymizeResponse…) i Found
-│       ├── errors/               # błąd na plik (EngineError, EngineConfigError) i handlery wyjątków
-│       ├── engine/               # Engine + fabryka + FakeEngine — tu wchodzi silnik z kroków (p. 19.5)
-│       ├── steps/                # kroki silnika: replace_patterns.py, a od p. 19.5 model wskazujący osoby i adresy
-│       ├── patterns/             # wzorzec na plik (pesel.py, phone_number.py, address.py…), wariant na funkcję
-│       └── routers/              # /health, /anonymize
+│       ├── agent_graphs/         # graf anonimizacji silnika `agent`: anonymize/ (graph.py, state.py)
+│       ├── agent_nodes/          # węzeł na katalog (node.py, prompt_system.md, examples.json, exceptions.json), Node, ask_model.py
+│       ├── core_engine/          # Engine + fabryka + FakeEngine + AgentEngine (uruchamia graf)
+│       ├── core_errors/          # błąd na plik (EngineError, EngineConfigError, LLMError) i handlery wyjątków
+│       ├── core_model/           # model na plik: kontrakt HTTP, Found, wiadomość i odpowiedź modelu, wpis przebiegu
+│       ├── core_patterns/        # wzorzec na plik (pesel.py, phone_number.py, address.py…), wariant na funkcję
+│       ├── core_service/         # znaczniki, odmiany osób (Morfeusz2), wybór i zamiana miejsc danych
+│       ├── core_util/            # uniwersalne: składanie liter, części tekstu, zakresy, odczyt dokumentu
+│       ├── engine_llm/           # klient modelu anonimizującego (Chat Completions, httpx) i odczyt odpowiedzi
+│       └── entry_routers/        # /health, /anonymize
 ├── postgres/                     # kolejna usługa: Postgres z polskim słownikiem
 │   ├── Dockerfile                # pobiera słownik sjp.pl (commit + suma kontrolna)
 │   ├── dictionary/               # build.sh z poprawkami słownika, custom_words.txt z nazwami własnymi
@@ -1697,19 +1701,92 @@ wektor:
 ### Usługa `anonymizer`
 
 Dwie strony granicy procesu, jak przy embedderze: w `api` kontrakt `Anonymizer` i klient
-`AnonymizerClient`, w usłudze silnik `Engine`. Prawdziwy silnik (p. 19.5) składa się z kroków
-w `steps/`: wzorce (p. 19.4), a po nich dwa wywołania modelu, jedno na osoby, drugie na adresy,
-których wzorce nie łapią (p. 19.5). Dziś stoi pierwszy krok, a usługa nadal działa na atrapie
-silnika.
+`AnonymizerClient`, w usłudze silnik `Engine`. Prawdziwy silnik `agent` (p. 19.5) uruchamia graf
+anonimizacji (`agent_graphs/anonymize/`), węzeł na krok (`agent_nodes/`):
 
+    START → replace_patterns → split_chunks ─┬→ find_persons ───┬→ replace_found → END
+                                             └→ find_addresses ─┘
+
+Wzorce (p. 19.4) zamieniają dane o stałym kształcie, tekst po nich dzieli się na części, model
+anonimizujący wskazuje w nich osoby i adresy dwoma równoległymi wywołaniami, a kod znajduje
+wskazane fragmenty w całym tekście i zamienia je na znaczniki. Model tekstu nie przepisuje.
+
+- **Pakiety usługi mają przedrostki jak w `api` (2026-10-19):** `agent_graphs/`, `agent_nodes/`,
+  `core_engine/` (silnik i fabryka), `core_errors/`, `core_model/`, `core_patterns/` (wzorce),
+  `core_service/` (znaczniki, odmiany osób, morfologia, wybór i zamiana miejsc — nazwy
+  `<rola>_<przedmiot>`), `core_util/` (tylko uniwersalne: składanie liter, części tekstu,
+  zakresy, odczyt dokumentu), `engine_llm/` (klient modelu) i `entry_routers/`. Prompt węzła
+  z modelem leży w jego katalogu: `prompt_system.md` z nagłówkami Markdown (Zadanie, Zasady,
+  Częste błędy, Format odpowiedzi jako JSON z wcięciami), przykłady w `examples.json`.
+- **Silnik `agent` stoi na LangGraph, choć przebieg nie ma pętli (decyzja 2026-10-19).** Graf
+  pokazuje kolejne kroki anonimizacji wprost, a każdy węzeł dopisuje wpis do przebiegu, który
+  silnik zapisuje w logu usługi (`anonymize_step node=find_persons 7 fragmentów → 19 miejsc`):
+  same liczby i rodzaje. Import `agent_graphs/` wyłącza LangSmith, jak w `api`, bo stan grafu
+  to surowe zgłoszenie; pilnuje tego test. Cena: LangGraph w obrazie usługi.
 - **Wzorce nie są silnikiem do wyboru w `ANONYMIZATION_ENGINE` (decyzja 2026-10-18).** Nie łapią
   imion i nazwisk, a klient w `api` odmawia tylko atrapy, więc silnik z samych wzorców wysłałby
-  osoby do modelu zewnętrznego. Domyślny silnik przestaje być atrapą w p. 19.5, razem z krokiem
-  osób.
-- **Wzorzec to plik w `patterns/`, wariant to funkcja w nim (2026-10-18).** Plik ma `KIND` (rodzaj,
+  osoby do modelu zewnętrznego. Domyślnym silnikiem w compose i `.env.example` jest `agent`;
+  w kodzie domyślnie `fake`, żeby test bez konfiguracji nie potrzebował modelu.
+- **Usługa ma własnego klienta modelu, `engine_llm/LLMClient`, a `api` traci rolę
+  anonimizującą (decyzja 2026-10-19).** Usługi nie dzielą kodu, a klient w `api` zapisuje prompt
+  i odpowiedź na DEBUG, tu zaś promptem jest surowe zgłoszenie: klient usługi nie zapisuje treści
+  na żadnym poziomie. To jedno wywołanie Chat Completions zgodnego z OpenAI (vLLM, Ollama) przez
+  `httpx`, ze schematem JSON w `response_format`. Konfiguracja to sześć zmiennych
+  `LLM_ANONYMIZATION_*`, czytanych tylko przez usługę: bez dostawcy (innej drogi do modelu nie
+  ma) i bez limitu odpowiedzi (należy do promptu węzła). Brak adresu albo modelu to błąd przy
+  starcie, a odpowiedź 401, 403 albo 404 — błąd konfiguracji przy pierwszym wywołaniu, nie 503;
+  z modelem przy starcie usługa się nie łączy, bo pod z GPU bywa wyłączony.
+- **Długi tekst dzieli się na części po 6000 znaków (`CHUNK_CHARS`, 2026-10-19).** Wątki korpusu
+  w tokenach Bielika: mediana 337, p99 2827, najdłuższy około 40 tys., czyli więcej niż okno
+  16 384; dzieli się 18 wątków z 1825. Model w części tylko wskazuje, a kod szuka w całym
+  tekście, więc podział niczego nie gubi. Fabryka przy starcie sprawdza, czy prompt z przykładami,
+  największa część (liczona 1,3 znaku na token; najmniej w korpusie 1,37) i limit odpowiedzi
+  mieszczą się w `LLM_ANONYMIZATION_NUM_CTX`; 8192 nie wystarcza węzłowi osób.
+- **Odpowiedź uciętą limitem czyta się do ostatniego pełnego elementu (`answer_items()`).**
+  Limit to 1500 tokenów w węźle osób i 300 w węźle adresów, bo model zapętla listę adresów: na
+  całym korpusie limit uciął 27 z 1859 wywołań adresów i żadnego wywołania osób (największa
+  odpowiedź 439 tokenów). Odpowiedź spoza schematu bez ucięcia to `LLMError` (503), nigdy pusta
+  lista, bo pusta lista znaczy „w tekście nie ma danych”.
+- **Węzeł osób rozprowadza każde wskazane słowo na odmiany w całym wątku (`find_word_forms()`),
+  poza liniami etykiet `RawTicket.as_thread()` i zwrotami („Pani”, „klient”).** Węzeł adresów
+  dopasowuje fragment dosłownie, bez względu na wielkość liter, częściami i po początku słów,
+  a odsiewa fragment ze znacznikiem, sam kod pocztowy i miejsce bez cyfry, które nie styka się
+  z ulicą z numerem ani nie stoi w linii obok niej — filtr działa na miejscu, nie na fragmencie.
+  Oba węzły oddają każde miejsce raz; z zachodzących wygrywa dłuższe, przy remisie adres.
+- **Przykłady w promptach nie dzielą żadnego słowa z golden setem** (zestaw zmyślony i próbka
+  korpusu); pilnuje tego test promptów. W sondzie z 2026-10-17 część imion się nakładała.
+- **Odmiany osób rozstrzyga słownik Morfeusz2 razem ze wspólnym początkiem (decyzja 2026-10-19,
+  `core_service/finder_word_forms.py`).** Słowo jest odmianą, gdy ma ze wskazanym wspólny lemat,
+  albo gdy pasuje po wspólnym początku, a słownik zna je jako imię lub nazwisko albo go nie zna.
+  Sam lemat gubi zdrobnienie („Iza” obok „Izabela”), sam początek łapie zwykłe słowa („Alarm”
+  obok „Ala”, „Lista” obok „Lis”). Na odpowiedziach modelu dla golden setu zniszczona wiedza
+  zestawu zmyślonego spadła z 2 do 0, bez nowego przecieku. Słownik (koło `morfeusz2`, 9 MB,
+  licencja BSD) ładuje fabryka silnika przy starcie (0,44 s); analiza słowa to 0,25 ms
+  i jest pamiętana. Zostaje „Nowego” na początku zdania obok „Nowak”, bo słownik zna też
+  nazwisko „Nowy” — pomyłka w stronę zamiany.
+- **Nazwy aplikacji i systemów tej instalacji nie są osobami: `exceptions.json` obok promptu
+  węzła osób (2026-10-19).** Lista trafia do promptu jako osobna sekcja (miejsce
+  `{{exceptions}}`) i do filtra w kodzie: słowa z niej i ich odmiany (wspólny początek, także
+  krótsza forma „Doręczeń”) nie są zamieniane, nawet gdy model je wskaże. Bez tego w jednym
+  wątku próbki model brał nazwę skrzynki „dokus” za nazwisko, a jej odmiany niszczyły nazwę
+  aplikacji w całym wątku (13 z 15 przebiegów), albo pomijał całą linię nagłówka z osobą (2 z 15);
+  przykład nagłówka z kilkoma adresatami i lista dały 0 i 0. Na liście stoją systemy z co
+  najmniej kilkunastu zgłoszeń (Dokus, ESOD, e-Doręczenia, ePUAP, eObywatel, eNadawca, EZD,
+  KSeF, AnyDesk). Wpis musi być wąski: prawdziwe nazwisko na liście przeciekałoby zawsze, czego
+  pilnuje test na golden secie.
+- **Pomiar z 2026-10-19 na Bieliku 11B v3 (vLLM; raport
+  `data/unsafe/docs/pomiar-silnika-agent-2026-10-19.md`):** po strojeniu (przykład nagłówka
+  z kilkoma adresatami, lista nazw, które nie są osobami, reguła odmian z Morfeuszem2) zestaw
+  zmyślony (54 przypadki, w tym trudne adresy z sondy) i próbka korpusu bez przecieku w każdym
+  rodzaju i bez zniszczonej wiedzy w czterech przebiegach po kolei; wątek próbki, który wcześniej
+  przepuszczał osobę z nagłówka „Do:”, bez przecieku w 15 przebiegach. Jedno żądanie naraz:
+  tekst zmyślony średnio 1,0 s (maks. 3,8 s), wątek korpusu 2,0 s (maks. 6,5 s). Cały korpus przy
+  16 naraz (przed strojeniem): 403 s, mediana 1,6 s, a jedno wywołanie padło pod obciążeniem
+  (503, fail-closed).
+- **Wzorzec to plik w `core_patterns/`, wariant to funkcja w nim (2026-10-18).** Plik ma `KIND` (rodzaj,
   zarazem nazwa znacznika) i `VARIANTS`; wariant przyjmuje tekst i zwraca miejsca (`Found`: rodzaj
   i zakres znaków). Docstring wzorca ma tabelę przykładów „przed → po” dla każdego wariantu,
-  a wynik „po” pochodzi z uruchomionej funkcji. Zamiana (`steps/replace_patterns.py`) zbiera
+  a wynik „po” pochodzi z uruchomionej funkcji. Zamiana (węzeł `replace_patterns`) zbiera
   miejsca wszystkich wariantów, z zachodzących na siebie bierze najdłuższe (adres z kodem zamiast
   samej ulicy), przy równej długości wcześniejszy wzorzec w `PATTERNS` (wzorce z sumą kontrolną
   stoją przed telefonem), i zamienia od końca tekstu. Nazwa pliku to rodzaj danej po angielsku,
@@ -1760,9 +1837,9 @@ silnika.
   stoi (PESEL 2, NIP 17, REGON 14, telefon 28, e-mail 51, adres 1), i bez zniszczonej wiedzy
   w obu. 32 wątki próbki zamieniają się w 80 ms (najdłuższy ma 5,9 tys. znaków), więc zamiana nie
   idzie do wątku roboczego.
-- **Modele usługi leżą w `models/`, błędy w `errors/`, po jednym na plik (2026-10-18)**, jak
-  w `core_model/` w `api`; importuje się je z modułów, a pliki `__init__.py` tylko wymieniają
-  zawartość. Handlery wyjątków stoją w `errors/handlers.py`.
+- **Modele usługi leżą w `core_model/`, błędy w `core_errors/`, po jednym na plik
+  (2026-10-18)**, jak w `core_model/` w `api`; importuje się je z modułów, a pliki `__init__.py`
+  tylko wymieniają zawartość. Handlery wyjątków stoją w `core_errors/handlers.py`.
 
 ### Warstwa bazy wektorowej (Qdrant)
 
@@ -2513,20 +2590,17 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 
 - **Jeden plik importuje SDK dostawcy** — reszta kodu tylko przez `LLMClient` (zasada 4).
   Zmiana API komercyjne → model on-prem = zmiana konfiguracji/klienta, nie logiki.
-- **Dwie osobne konfiguracje LLM, po jednej na rolę (2026-10-05):** `LLM_GENERATION_*` dla
-  modelu, który pisze odpowiedzi w grafach, i `LLM_ANONYMIZATION_*` dla modelu, który pomaga
-  anonimizatorowi. Każda to komplet tych samych ośmiu zmiennych i nic nie dziedziczy po drugiej;
-  obie domyślnie stoją na `fake`. Model anonimizujący widzi surowy tekst zgłoszeń, więc to, co
-  stoi w jego konfiguracji, jest decyzją o tym, dokąd ten tekst trafia — osobnej flagi nie ma.
-  Do p. 19 nikt tego klienta nie buduje, a w p. 19.5 ta konfiguracja przenosi się do usługi
-  `anonymizer`, która woła model, żeby wskazał imiona i nazwiska do zamiany (decyzja
-  2026-10-17; wcześniej model miał tylko sprawdzać wynik jako strażnik), a drugim wywołaniem
-  adresy, których nie łapią wzorce (2026-10-18).
+- **Dwie osobne konfiguracje LLM, po jednej na rolę i na usługę (2026-10-05, od 2026-10-19 rola
+  anonimizująca w usłudze `anonymizer`):** `LLM_GENERATION_*` czyta `api` — model, który pisze
+  odpowiedzi w grafach, domyślnie `fake` — a `LLM_ANONYMIZATION_*` czyta wyłącznie usługa
+  `anonymizer`, własnym klientem (sekcja „Usługa `anonymizer`”). Model anonimizujący widzi surowy
+  tekst zgłoszeń, więc to, co stoi w jego konfiguracji, jest decyzją o tym, dokąd ten tekst
+  trafia — osobnej flagi nie ma. Test pilnuje, że `api` nie ma żadnego pola tej roli.
 - **Fabryka `get_llm_client()` buduje klienta z jednego kompletu (`LLMSettings` z
-  `Settings.llm_generation()` albo `llm_anonymization()`), fail-fast** — brak klucza albo modelu
-  to `LLMConfigError` przy budowie klienta, nie błąd połączenia w środku żądania. Komunikat
-  nazywa zmienną z przedrostkiem roli (`LLM_ANONYMIZATION_API_KEY`); klient Ollamy dostaje ten
-  przedrostek po to samo.
+  `Settings.llm_generation()`), fail-fast** — brak klucza albo modelu to `LLMConfigError` przy
+  budowie klienta, nie błąd połączenia w środku żądania. Komunikat nazywa zmienną
+  z przedrostkiem roli (`LLM_GENERATION_API_KEY`); klient Ollamy dostaje ten przedrostek po to
+  samo.
 - **SDK dostawców importowane LENIWIE, wewnątrz builderów** — świadomy wyjątek od „importy na
   górze". Powód zmierzony: `anthropic` ładuje się ~5,5 s, `openai` ~3,3 s, bo oba budują modele
   Pydantic **całego swojego API** (typy beta, tool runner, streaming, Vertex) już przy imporcie.
@@ -2913,6 +2987,10 @@ localhost:8010/search`.
 - Scenariusze czytania znalezionego materiału (`search`, `suggest_questions`,
   `suggest_solution`, p. 59): `pytest tests/evaluation/test_api_agent_graphs_reading_live.py
   -m llm_live` — **kosztuje, pytaj przed**; jeden graf przez `-k <graf>`
+- Silnik `agent` usługi `anonymizer` na golden secie (p. 19.5):
+  `pytest tests/evaluation/test_anonymizer_agent_golden_live.py -m llm_live` — woła model
+  anonimizujący z `.env` (`LLM_ANONYMIZATION_*`, pod z GPU), **pytaj przed**; oba zestawy po
+  kolei to około 2 minut
 - **Podając marker, podaj też folder** — marker odsiewa dopiero PO imporcie, więc bez ścieżki
   pytest wczytuje wszystkie pliki testowe, żeby uruchomić kilkanaście (kolekcja podzbioru spada
   wtedy trzykrotnie). Foldery i markery można łączyć:
@@ -2929,7 +3007,9 @@ localhost:8010/search`.
   `LLM_GENERATION_*`, `LLM_ANONYMIZATION_*`, `ANONYMIZATION_*`, `EMBEDDING_*`, `QDRANT_*`,
   `POSTGRES_*`, `RAG_*`, `CODE_*`, `AGENT_*`). `.env` w `.gitignore`, **`.env.example` w repo =
   kontrakt** — każda zmienna z compose i `Settings` musi tam być. Bez `.env.prod`/`.env.dev` —
-  różnice środowisk przez warstwy compose i ENV na maszynie docelowej.
+  różnice środowisk przez warstwy compose i ENV na maszynie docelowej. `LLM_ANONYMIZATION_*`
+  i `ANONYMIZATION_ENGINE` czyta usługa `anonymizer`, a `ANONYMIZATION_BASE_URL`
+  i `ANONYMIZATION_TIMEOUT_SECONDS` — `api`.
 - **Progi i parametry retrievalu (`RAG_TOP_K`, `RAG_SCORE_MIN`…) idą do ENV** — to strojenie,
   nie logika.
 - **ENV do kontenerów jawnie przez `environment:`**, nie `env_file:` — wtedy `docker compose
@@ -2976,7 +3056,8 @@ localhost:8010/search`.
   **pusty string**. Bez walidatora „pusty/biały → `None`" w `Settings` dostajesz
   `Client(base_url="")` → błąd połączenia zamiast czytelnego błędu configu.
   - **U nas pustych jest sześć wpisów i to stan docelowy, nie usterka:** `BASE_URL`, `API_KEY`
-    i `MODEL` obu konfiguracji LLM przy dostawcy `fake`. `docker compose config` pokazuje przy
+    i `MODEL` modelu generującego przy dostawcy `fake` w `api` i te same trzy modelu
+    anonimizującego w usłudze `anonymizer`, dopóki nikt ich nie ustawi. `docker compose config` pokazuje przy
     nich `""`, a walidator zamienia je na `None` (zweryfikowane w kontenerze). **Usunięcie ich
     z compose łamie test „każde pole `Settings` jest podane usłudze"**, więc to nie jest
     sprzątanie — to zmiana dwóch reguł naraz.
@@ -2990,11 +3071,15 @@ localhost:8010/search`.
 - **Prawdziwy `LLM_GENERATION_PROVIDER` bez prawdziwego silnika anonimizacji kładzie trasy grafów
   (2026-10-05, od 2026-10-16 przez klienta usługi)** — klient usługi `anonymizer` odmawia wyniku
   atrapy silnika przy każdym żądaniu (`AnonymizationConfigError`, 500), a `/health` odpowiada
-  dalej. Do p. 19.4 trasy grafów na stacku działają tylko na atrapie modelu: na chwilę
-  wystarczy `LLM_GENERATION_PROVIDER=fake docker compose up -d api`, a samo
-  `docker compose up -d api` wraca do `.env`. Testom `llm_live` wystarczy
-  dostawca podany w poleceniu (`LLM_GENERATION_PROVIDER=openai pytest … -m llm_live`); klucz
-  i model mogą zostać w `.env`.
+  dalej. Od p. 19.5 domyślny silnik to `agent`, który bez `LLM_ANONYMIZATION_BASE_URL`
+  i `LLM_ANONYMIZATION_MODEL` w ogóle nie wstaje; start bez modelu to
+  `ANONYMIZATION_ENGINE=fake docker compose up -d anonymizer`, a przy wyłączonym podzie każda
+  trasa grafu oddaje 503. Testom `llm_live` grafów wystarczy dostawca podany w poleceniu
+  (`LLM_GENERATION_PROVIDER=openai pytest … -m llm_live`); klucz i model mogą zostać w `.env`.
+- **`LLM_ANONYMIZATION_API_KEY` idzie do serwera modelu w nagłówku `Authorization`
+  (2026-10-19).** Nie przepisuje się tam klucza dostawcy komercyjnego: `.env` sprzed p. 19.5 miał
+  pod tą zmienną klucz OpenAI, który przy adresie poda poszedłby do RunPoda. Serwer bez
+  `--api-key` klucza nie potrzebuje.
 - **Powłoka przebija `.env`** — przy `${VAR:-default}` Compose stawia zmienną powłoki **wyżej**
   niż `.env`, cicho; jedno `set -a; . ./.env` zamraża stare wartości na resztę sesji. Stąd:
   **weryfikuj `docker compose config`, nie `.env`**.
@@ -3075,17 +3160,20 @@ localhost:8010/search`.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2208 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 939 (86)           | 96 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 124 (11)           | 10 s |
-| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 104 (38)           | 38 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2301 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 963 (86)           | 96 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 126 (11)           | 10 s |
+| ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 108 (38)           | 38 s |
 
-Liczby z 2026-10-18, czasy z 2026-10-10: każdy folder osobno, w komplecie
+Liczby z 2026-10-19, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-3282 testy, około 150 s; domyślny `pytest`, bez stacku: 3147 testów, około 50 s. Testy `llm_live` —
-36 integracyjnych i 57 ewaluacyjnych — liczą się do folderu, ale nie chodzą w żadnym z tych
-przebiegów.
+3401 testów, około 150 s; domyślny `pytest`, bez stacku: 3266 testów, około 50 s. Testy
+`llm_live` — 36 integracyjnych i 61 ewaluacyjnych — liczą się do folderu, ale nie chodzą
+w żadnym z tych przebiegów. 2026-10-19 komplet trwał 8–11 min, choć same testy na stacku
+zajęły 121 s, a bez stacku około 100 s; przyczyny nie ustalono — do sprawdzenia po restarcie
+maszyny, zanim te czasy się zmieni. Od p. 19.5 testy na stacku usługi `anonymizer` potrzebują jej
+silnika `agent` z osiągalnym modelem anonimizującym.
 
 #### Zasady ogólne
 
@@ -3191,13 +3279,15 @@ przebiegów.
   w `safe` i próbka korpusu w `unsafe`.
 - **Golden set anonimizatora (2026-10-17, p. 19.3): przypadek to tekst z danymi, które mają
   zniknąć (`remove`), i wiedzą, która ma zostać (`keep`), obie zapisane po rodzaju.** Zestaw
-  zmyślony ma 38 przypadków: cytowaną historię maili z adresami w `<…>`, dane złamane między
+  zmyślony ma 54 przypadki: cytowaną historię maili z adresami w `<…>`, dane złamane między
   liniami, odmianę i wołacz, numery z poprawną sumą obok liczb tego samego kształtu bez niej
   i pułapki, a od 2026-10-18 także przypadki z sond anonimizacji: adresy bez kodu, bez kotwicy
   i w notatce małymi literami, samo nazwisko po zwrocie i na początku zdania, krótkie imiona
   i nazwiska w odmianie obok słów o tym samym początku, wątek bez osób i słowa ról z etykiet
   komentarzy w `keep`, a także zapisy, które wzorce przepuszczały w próbce korpusu (telefony
-  z twardą spacją i kierunkowym w nawiasie, e-mail z „(at)”, adres do e-Doręczeń). Próbka
+  z twardą spacją i kierunkowym w nawiasie, e-mail z „(at)”, adres do e-Doręczeń), a od
+  2026-10-19 zestaw trudnych adresów z sondy (s39–s53) i nagłówek „Do:” z osobą i skrzynką
+  nazwaną jak aplikacja, z nazwą aplikacji w `keep` (s54). Próbka
   korpusu to 32 wątki dobrane warstwami według układu danych, w tym oba wątki korpusu z PESEL-em
   osoby trzeciej; numeru konta, dowodu, paszportu ani adresu do e-Doręczeń w niej nie ma, dlatego
   zestaw zmyślony musi mieć każdy rodzaj. Ocena porównuje słowa: ciągi liter i cyfr, bez wielkości
@@ -3218,6 +3308,15 @@ przebiegów.
   (2026-10-18).** Plik testu na plik wzorca, w nim dwie listy parametrów: co wariant zamienia
   i co ma zostawić (liczba z błędną sumą, kod, data, liczba w kształcie danej). Test zamiany
   pilnuje, że każdy plik wzorca stoi w `PATTERNS`, a każdy wariant zwraca tylko swój rodzaj.
+- **Silnik `agent` testuje się na kliencie modelu z atrapą transportu, która odpowiada węzłowi
+  osób i węzłowi adresów tym, co podał test (`scripted_llm()`, 2026-10-19).** Rozpoznaje węzeł po
+  nazwie schematu w żądaniu, więc oba pytają ten sam klient równolegle, jak w grafie; klient
+  i odczyt odpowiedzi chodzą wtedy naprawdę. Test promptów pilnuje zdania o danych, klucza
+  odpowiedzi zgodnego ze schematem, przykładów w kształcie schematu (z jednym bez danych) i tego,
+  że żadne słowo przykładów nie stoi w golden secie. Test ewaluacyjny
+  (`test_anonymizer_agent_golden_live.py`, `llm_live`) woła model anonimizujący z `.env` przez
+  `live_agent_settings()` i mierzy oba zestawy po kolei, z progiem na rodzaj równym najgorszemu
+  wynikowi kolejnych przebiegów, bo model nie jest deterministyczny.
 - **Narzędzia kodu: integracyjne bez modelu na aplikacji syntetycznej, ewaluacyjne na kodzie
   Dokusa.** Zapytania z zestawu syntetycznego idą przez prawdziwy węzeł `run_tools`, bo odmowa
   bywa dziełem modelu zapytania albo narzędzia, a model ma w obu przypadkach dostać błąd
@@ -3246,8 +3345,10 @@ przebiegów.
 - **Testy `llm_live` biorą model przez `live_generation_llm()`** (`tests/_helpers/live/`) —
   konfigurację modelu generującego, czyli tego, na którym produkt ma chodzić. Odmawia błędem,
   gdy wybór testów nie wymienia `llm_live` (płatne wywołanie nie może być skutkiem ubocznym
-  `-m ""`) i gdy dostawcą jest `fake`. Poza tymi testami oba modele są atrapą, cokolwiek stoi
-  w `.env` (`fake_models_outside_live_tests`); test innego dostawcy ustawia go sam. Odpowiedzi
+  `-m ""`) i gdy dostawcą jest `fake`. Poza tymi testami model generujący jest atrapą, cokolwiek
+  stoi w `.env` (`fake_models_outside_live_tests`); test innego dostawcy ustawia go sam. Model
+  anonimizujący bierze test usługi `anonymizer` przez `live_agent_settings()`
+  (`tests/_helpers/anonymizer_llm/`), z tym samym strażnikiem `-m llm_live`. Odpowiedzi
   modelu plik liczy raz i dzieli między testy, a sprawa grafu liczy się dopiero, gdy potrzebuje
   jej test, więc `-k <graf>` opłaca jeden graf.
 - **Testy grafów na żywym modelu sprawdzają okablowanie:** czy model odpowiada narzędziem grafu
@@ -3439,6 +3540,7 @@ przebiegów.
 | `tests/_helpers/synthetic_docs/`       | dokumentacja syntetyczna: indeks wobec paczki (`table_differences()`, `collection_differences()`) i pomiary obu wyszukiwań w dokumentacji |
 | `tests/_helpers/golden_tickets/`       | golden set zgłoszeń: zapytania, dystraktory, korpus odniesienia, pomiar `find_tickets_vector` i filtra jakości |
 | `tests/_helpers/golden_anonymization/` | golden set anonimizatora: oba zestawy, ocena przecieków i zniszczonej wiedzy, pomiar z licznikami na rodzaj (`measure_anonymization()`), kontrola zaznaczeń (`annotation_problems()`) i wzorcowa zamiana (`ideal_anonymizer()`) |
+| `tests/_helpers/anonymizer_llm/`      | model anonimizujący usługi `anonymizer`: odpowiedź Chat Completions (`chat_answer()`), klient modelu na atrapie transportu (`model_client_on()`) i odpowiadający węzłom osób i adresów (`scripted_llm()`), konfiguracja z `.env` dla `llm_live` (`live_agent_settings()`), pomiar silnika `agent` na golden secie (`measure_agent()`), przecieki ponad próg i progi |
 | `tests/_helpers/patterns/`            | wzorce usługi `anonymizer`: tekst po zamianie miejscami z jednego wariantu (`replaced_by()`), zamiana wszystkimi wzorcami jako funkcja do pomiaru golden setu (`anonymize_with_patterns()`), rodzaje od wzorców, progi przecieków na zestaw i odczyt pomiaru (`kinds_over_threshold()`, `leaked_fragments()`, `destroyed_fragments()`, `removed_kinds()`) |
 
 - **Każdy helper ma folder w `tests/_helpers/`, także bez modeli — dla spójności (2026-10-15,
@@ -3633,6 +3735,15 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Model jako sędzia listy kandydatów** (osoby ze spaCy, każde słowo z wielkiej litery albo
   własna lista do odfiltrowania) — odrzuca prawdziwe nazwiska, a przy długiej liście gubi się
   całkiem (do 24 z 45 nazwisk przecieku przy 1421 kandydatach).
+- **Model-strażnik po anonimizacji** (decyzja 2026-10-16: zawsze; skreślony 2026-10-19, dawny
+  p. 19.6) — model miał po zamianie odpowiadać, czy zostały dane osobowe, i zatrzymywać graf.
+  Ten sam model wskazuje osoby w silniku `agent`, więc nie byłby niezależnym sprawdzeniem, a
+  w sondzie z 2026-10-17 każda postać wypadła źle: ocena ryzyka zatrzymałaby 6 z 32 czystych
+  tekstów i wykryła 8 z 24 z osobami, TAK albo NIE — 1 z 32 i 2 z 24, wypisanie osób — 13 z 32
+  i 24 z 24. Po strojeniu z 2026-10-19 golden set nie ma przecieku. Wraca, gdy pomiar na pełnym
+  korpusie albo produkcja pokażą przecieki — wtedy inny model albo strażnik bez modelu
+  (słowa, które słownik zna tylko jako imię lub nazwisko), z własnym golden setem i liczonymi
+  fałszywymi zatrzymaniami.
 - **Drugi przebieg modelu „tekst jest już zanonimizowany, upewnij się”** — domknął 4 z 4
   przecieków, ale zamienił 215 fragmentów bez danej i podwoił czas; te same przecieki domyka
   bez wywołania rozprowadzenie wskazanych słów po wątku (p. 19.5).
@@ -3641,6 +3752,29 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   adresy, których nie łapią wzorce, wskazuje osobne wywołanie (p. 19.5).
 - **Długa lista przykładów adresów w prompcie** (2026-10-18) — nic nie dodała wobec dwóch
   przykładów w rozmowie, a przed filtrami w kodzie brała za adres nazwę urzędu.
+- **Wspólny klient modelu dla `api` i usługi `anonymizer`** (2026-10-19) — usługi nie dzielą
+  kodu, a klient w `api` zapisuje treść na DEBUG; usługa ma własne jedno wywołanie Chat
+  Completions bez treści w logach.
+- **`LLM_ANONYMIZATION_PROVIDER` i `LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS` w usłudze**
+  (2026-10-19) — do modelu jest jedna droga (Chat Completions zgodne z OpenAI), a limit
+  odpowiedzi to część promptu węzła (1500 osób, 300 adresów).
+- **Sprawdzenie modelu przy starcie usługi** — pod z GPU bywa wyłączony, a usługa ma wtedy
+  wstać i odpowiadać 503; zły model albo klucz wychodzi przy pierwszym wywołaniu jako błąd
+  konfiguracji.
+- **Schemat z `maxItems` i zakazem klamr zamiast limitu odpowiedzi adresów** (sonda
+  z 2026-10-18) — kończył zapętlenia, ale w próbce korpusu podwoił wskazania nadmiarowe, a inne
+  wywołanie trwało 37 s; jest limit 300 tokenów i odczyt pełnych elementów uciętej odpowiedzi.
+- **Odrzucanie całej odpowiedzi uciętej limitem** — wątek straciłby wszystkie wskazane adresy,
+  a ucięcie w korpusie to zapętlenie na fragmencie, który filtr i tak odrzuca.
+- **Sam Morfeusz2 albo sama reguła rdzenia przy odmianach osób** (2026-10-19) — sam lemat gubi
+  zdrobnienie („Iza” obok „Izabela”, przeciek w próbce korpusu), sam początek niszczy zwykłe słowa
+  („Alarm”, „Lista”); reguła bierze z obu to, co pewne. Słownika sjp.pl z obrazu Postgresa nie
+  mierzono: nie ma kwalifikatora imienia i nazwiska, na którym reguła stoi.
+- **„Poczta Polska” na liście wyjątków węzła osób** — słowo „Polska” po wspólnym początku
+  złapałoby nazwisko „Polski”, a osoba z listy wyjątków przeciekałaby zawsze.
+- **Część tekstu liczona z okna modelu zamiast stałej** — wyniki węzła osób stoją na wątkach do
+  5,9 tys. znaków, a dłuższych części nikt nie mierzył; stała 6000 znaków ze sprawdzeniem okna
+  przy starcie.
 - **Węzły właściwe na atrapie modelu przy dostawcy `fake`** — atrapa modelu bez scenariusza
   odpowiada samym tekstem, więc `respond` odrzucałby każdą sprawę, a scenariusz wpisany w fabrykę
   byłby drugą atrapą grafu. Przy `fake` fabryka oddaje atrapę całego grafu.
@@ -4282,113 +4416,20 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
     login, księga wieczysta) bez nowych wzorców poza adresem do e-Doręczeń; wzorce nie są
     silnikiem do wyboru, więc `ANONYMIZATION_ENGINE` zostaje `fake` do 19.5; reguły — „Usługa
     `anonymizer`”, „Testy”, „Świadomie pominięte”.
-  - [ ] **19.5 Osoby i adresy bez kotwicy: model anonimizujący wskazuje, kod zamienia** (decyzja
-    2026-10-17, wcześniej NER na CPU; adresy od 2026-10-18) — jedno wywołanie modelu na tekst
-    po wzorcach: imiona i nazwiska
-    w JSON-ie, każde słowo osobno, w formie z tekstu. Kod szuka każdego fragmentu dosłownie,
-    a gdy go nie ma — po rdzeniu słowa, i zamienia każde wskazane słowo w każdej odmianie
-    w całym wątku: imię na `{IMIĘ}`, nazwisko na `{NAZWISKO}`, bez numerów i bez grupowania
-    odmian; ten sam znacznik nie znaczy tej samej osoby. Linii etykiet wątku, zwrotów („Pani”)
-    ani słów ról („klient”, „konsultant”) kod nie zamienia. Model tekstu nie przepisuje, więc
-    nie może zgubić wiedzy. Prompt to krótka lista częstych błędów i dwa zmyślone przykłady
-    jako wcześniejsza rozmowa (z osobami i bez nich); pełny tekst stoi w raporcie sondy. Bez
-    słownika osób z helpdesku: lista naszych konsultantów dochodzi tylko wtedy, gdy golden set
-    pokaże, że model gubi nasze nazwiska w podpisach. Sonda z 2026-10-17 na 32 wątkach próbki
-    (nie pomiar, raport `data/unsafe/docs/sonda-bielik-anonimizacja-2026-10-17.md`, skrypty
-    i wyniki w `data/unsafe/docs/sondy-anonimizacji-2026-10-17/`), model
-    `speakleash/Bielik-11B-v3.0-Instruct-FP8-Dynamic` na vLLM, wzorce zastąpione wzorcową
-    zamianą z zestawu:
-
-    | sposób                                       | imiona  | nazwiska | zniszczona wiedza | czas                  |
-    |----------------------------------------------|---------|----------|-------------------|-----------------------|
-    | model wskazuje, kod zamienia (dwa przebiegi) | 0 z 49  | 0 z 45   | 1 nazwa usługi    | do 9 s na wątek (GPU) |
-    | spaCy `pl_core_news_lg`                      | 0 z 49  | 2 z 45   | 8 z 36 usług      | 3,6 s na 32 (CPU)     |
-    | PolDeepNer2 `pdn2_v08_nkjp_large`            | 5 z 49  | 6 z 45   | brak              | 165 s na 32 (CPU)     |
-    | model przepisuje tekst ze znacznikami        | 12–16   | 11–14    | 300 słów zgubione | —                     |
-
-    Na zestawie zmyślonym model przepuścił 0 z 19 imion i 0 z 19 nazwisk. Czas był mierzony przy
-    16 żądaniach naraz. Model podaje imię w mianowniku i „imię nazwisko” naraz, mimo zasady
-    w prompcie: mianownik naprawia dopasowanie po rdzeniu, a rozdzielanie — przykłady
-    w rozmowie (bez nich połowa fragmentów to „imię nazwisko”). W tekście bez osób wskazuje to,
-    co stoi w miejscu wyciętego nazwiska: stanowisko w podpisie, nazwę urzędu. Sonda NER:
-    `data/unsafe/docs/sonda-ner-2026-10-17.md`.
-
-    Adresy, których nie łapią wzorce (bez kodu pocztowego i bez słowa przed ulicą, notatki
-    małymi literami, adres złamany na dwie linie, w odmianie), wskazuje drugie wywołanie modelu
-    na tym samym tekście po wzorcach, równoległe z wywołaniem osób, więc czas oczekiwania się
-    nie wydłuża; kosztem jest drugie wywołanie GPU. Krótki prompt i dwa przykłady w rozmowie
-    (z adresem w odmianie i złamanym na dwie linie oraz bez adresu, z pułapkami), odpowiedź to
-    lista napisów. Kod dopasowuje adres dosłownie, bez względu na odstępy i wielkość liter,
-    częściami między przecinkami i liniami, a na końcu po rdzeniu, bo model podaje czasem adres
-    w mianowniku („Brzozowa 12” zamiast „brzozowej 12”). Trzy filtry w kodzie: fragment ze
-    znacznikiem odpada (model powtarza adres zamieniony już przez wzorce), sam kod pocztowy
-    odpada, a fragment bez cyfry zostaje tylko wtedy, gdy styka się z ulicą z numerem albo stoi
-    w linii tuż obok niej. Sonda z 2026-10-18 (raport
-    `data/unsafe/docs/sonda-bielik-adresy-2026-10-18.md`, materiał
-    w `data/unsafe/docs/sondy-anonimizacji-2026-10-18/`), wzorce prawdziwe, dwa przebiegi:
-
-    | materiał                                   | same wzorce | wzorce i model z filtrami                |
-    |--------------------------------------------|-------------|------------------------------------------|
-    | zestaw trudnych adresów (12 fragmentów)    | 12          | 0 przecieków, 0 zniszczonej wiedzy       |
-    | golden set zmyślony (15 adresów)           | 2           | 0 przecieków, 0 zniszczonej, 0 nadmiaru  |
-    | próbka korpusu (1 adres)                   | 0           | 0 przecieków, 0 zniszczonej, 0 nadmiaru  |
-
-    Bez filtrów model brał za adres „Urząd Skarbowy w Toruniu” i kod w polu wyszukiwania, a w
-    próbce wskazał 24 fragmenty spoza zaznaczeń (15 ze znacznikiem, 9 bez cyfry). Wywołanie
-    wspólne z osobami adresy łapie tak samo, ale kosztuje 1 imię i 1 nazwisko przecieku.
-    Kroki:
-    1. Silnik w usłudze `anonymizer`: prompty w plikach `.md` przy silniku z testem-strażnikiem,
-       schematy odpowiedzi, dopasowanie, rozprowadzenie osób i filtry adresów w kodzie, test
-       ewaluacyjny na golden secie, do którego wchodzi zestaw trudnych adresów z sondy (h01–h15,
-       przykłady w prompcie zostają z nim rozłączne). Silnik składa kroki ze `steps/` (wzorce,
-       potem osoby i adresy) i staje się domyślnym
-       `ANONYMIZATION_ENGINE`, a klient w `api` przyjmuje jego wynik, bo odmawia tylko atrapy.
-       Konfiguracja `LLM_ANONYMIZATION_*` przenosi się z `api` do usługi: osiem
-       zmiennych do jej `Settings` i wpisu w compose, własny klient modelu, bo kodu między
-       usługami nie dzielimy, a z `api` znika `Settings.llm_anonymization()`. Model widzi surowy
-       tekst, więc jego endpoint musi być zaufany: który może tu stać, rozstrzyga wdrożenie
-       według granicy zaufania endpointu. Licencja modelu do sprawdzenia, jak przy embedderze
-       (p. 40). Przykłady w prompcie dostają imiona i nazwiska spoza obu zestawów: szkic
-       z sondy ma kilka wspólnych z zestawem zmyślonym (Jan Kowalski, Anna Wiśniewska, Tomasz,
-       Joanna, Nowak) i pospolite imiona wspólne z próbką, więc wynik sondy mógł być przez to
-       trochę łatwiejszy.
-    2. Prawdziwa morfologia wobec reguły rdzenia (wspólny początek bez dwóch ostatnich liter,
-       najwyżej 4 litery końcówki): Morfeusz2 albo słownik sjp.pl z obrazu Postgresa. Reguła
-       rdzenia gubi przy krótkich słowach wymianę głoski (Ewa → Ewie) i może złapać słowo
-       o tym samym początku co imię („Ala” i „Alarm”); krótkie nazwiska bywają zwykłymi słowami
-       (Lis, Kot, Bąk, Kania), także na początku zdania. Te przypadki stoją w zmyślonym golden
-       secie (s30–s33, od 2026-10-18), razem z wątkiem bez osób ze stanowiskiem w miejscu
-       podpisu (s34) i słowami ról w `keep`.
-    3. Czas jednego wątku przy jednym żądaniu naraz (bramki, na które człowiek czeka)
-       i zachowanie przy niedostępnym endpoincie: anonimizacja staje, a z nią każdy graf. To
-       cena wobec NER-a na CPU: anonimizacja zależy od endpointu z GPU.
-    4. Zapętlona odpowiedź modelu: na dwóch wątkach próbki wywołanie adresów powtarzało jeden
-       fragment ze znacznikiem 285 razy, około 40 s. Limit 300 tokenów odpowiedzi skraca
-       najdłuższe wywołanie do 10 s bez straty adresu, ale ucina JSON, więc kod musi wyłuskać
-       pełne napisy i rozpoznać ucięcie (`finish_reason: "length"`). Zakaz klamr w schemacie
-       usuwa te dwa zapętlenia, ale w próbce podwaja wskazania nadmiarowe (54) i daje inne
-       wywołanie na 37 s. Do rozstrzygnięcia: limit, kształt schematu i to samo przy osobach.
-  - [ ] **19.6 Model-strażnik: do ponownej decyzji** (decyzja 2026-10-16: zawsze, po wzorcach
-    i NER) — po zamianie model miał tylko odpowiadać, czy zostały dane osobowe, i wskazywać
-    które; fragment, którego dosłownie nie ma w tekście, by się nie liczył, a każdy inny
-    zatrzymywałby graf własnym błędem (nie 503 i nie błędem konfiguracji; helpdesk dostaje
-    rodzaje i fragmenty, log same rodzaje i liczby), także przy awarii modelu. Sonda
-    z 2026-10-17 (ten sam raport) sprawdziła trzy postaci strażnika na wynikach strategii
-    z 19.5:
-
-    | strażnik                                         | czysty tekst: zatrzymałby | z osobami: wykrył |
-    |--------------------------------------------------|---------------------------|-------------------|
-    | ryzyko „niskie, średnie, wysokie”, stop: wysokie | 6 z 32                    | 8 z 24            |
-    | TAK albo NIE, stop przy P(TAK) ≥ 0,5             | 1 z 32                    | 2 z 24            |
-    | wypisanie osób, stop przy fragmencie w tekście   | 13 z 32                   | 24 z 24           |
-
-    Zdanie, że tekst jest już zanonimizowany, robi model ślepym na osoby, które stoją, a model
-    wypisujący osoby w tekście bez osób bierze za osobę stanowisko z podpisu. Odkąd ten sam
-    model wskazuje osoby w 19.5, strażnik o tym samym zadaniu nie jest niezależnym
-    sprawdzeniem. Do rozstrzygnięcia przed 19.7: czy strażnik zostaje, a jeśli tak, to jaki
-    (inny model, inna postać) i ile fałszywych zatrzymań jest do przyjęcia; wtedy osobny golden
-    set strażnika (czyste teksty, teksty z podrzuconą pozostałością danych, pułapki: nazwy
-    usług, kody błędów, znaczniki, nazwy urzędów) z fałszywymi alarmami liczonymi osobno.
+  - [x] **19.5 Osoby i adresy bez kotwicy: model wskazuje, kod zamienia** (2026-10-19) — silnik
+    `agent` na grafie LangGraph (`replace_patterns` → `split_chunks` → `find_persons`
+    ∥ `find_addresses` → `replace_found`), domyślny w compose; model anonimizujący wskazuje osoby
+    i adresy w JSON-ie, a kod je dopasowuje, rozprowadza odmiany (Morfeusz2 ze wspólnym początkiem)
+    i zamienia; lista nazw, które nie są osobami (`exceptions.json`); podział długiego tekstu na
+    części ze sprawdzeniem okna przy starcie; odpowiedź ucięta limitem czytana do ostatniego
+    pełnego elementu; własny klient modelu w usłudze i sześć zmiennych `LLM_ANONYMIZATION_*`,
+    a z `api` zniknęła rola anonimizująca; przedrostki pakietów usługi jak w `api`; golden set
+    zmyślony do 54 przypadków; test ewaluacyjny `llm_live` z progami zerowymi i testy na stacku
+    przez żywy kontener; sondy wcześniejszych strategii (NER, przepisywanie, strażnik) w raportach
+    `sonda-ner-2026-10-17.md`, `sonda-bielik-anonimizacja-2026-10-17.md`
+    i `sonda-bielik-adresy-2026-10-18.md`; licencja modelu nadal do sprawdzenia (p. 40); reguły —
+    „Usługa `anonymizer`”, „Warstwa LLM”, „Konfiguracja i deploy”, „Testy”, „Świadomie
+    pominięte”.
   - [ ] **19.7 Włączenie** — klient w `api` przepuszcza wynik prawdziwego silnika bez zmian
     w kodzie, więc zostają prompty: prompt systemowy każdego grafu dostaje akapit — dane osobowe
     są zastąpione znacznikami, ten sam znacznik nie znaczy tej samej osoby, znaczników się nie

@@ -289,57 +289,40 @@ def test_ollama_accepts_a_custom_address() -> None:
     assert "192.168.1.10" in str(client._client.base_url)
 
 
-def test_each_role_builds_its_client_from_its_own_settings() -> None:
-    """Sprawdza, czy dwie role dają dwóch różnych klientów, każdego ze swojego kompletu ustawień:
-    przy modelu generującym z OpenAI i anonimizującym z Ollamy fabryka buduje klienta OpenAI dla
-    pierwszej roli i klienta Ollamy, celującego w jej własny adres, dla drugiej.
+def test_the_generation_role_defaults_to_the_offline_fake() -> None:
+    """Sprawdza, czy bez żadnej konfiguracji model generujący jest atrapą.
 
-    Wyłapuje konfigurację, w której jedna rola bierze wartości drugiej: model anonimizujący widzi
-    surowy tekst zgłoszeń, więc pomyłka wysłałaby go do dostawcy modelu generującego."""
-    settings = Settings(
-        llm_generation_provider    = "openai",
-        llm_generation_api_key     = "sk-proj-test",
-        llm_generation_model       = "gpt-5.4-mini",
-        llm_anonymization_provider = "ollama",
-        llm_anonymization_model    = "model-lokalny:tag",
-        llm_anonymization_base_url = "http://192.168.1.10:11434/v1",
-        _env_file                  = None,
-    )
-
-    generation    = get_llm_client(settings.llm_generation())
-    anonymization = get_llm_client(settings.llm_anonymization())
-
-    assert isinstance(generation, OpenAILLMClient)
-    assert isinstance(anonymization, OllamaLLMClient)
-    assert "192.168.1.10" in str(anonymization._client.base_url)
-
-
-def test_both_roles_default_to_the_offline_fake() -> None:
-    """Sprawdza, czy bez żadnej konfiguracji obie role, generująca i anonimizująca, dostają atrapę
-    modelu.
-
-    Wyłapuje wartość domyślną, która dla którejś roli wskazuje prawdziwego dostawcę: świeżo
-    uruchomiona aplikacja i testy wysyłałyby wtedy dane poza maszynę."""
+    Wyłapuje wartość domyślną, która wskazuje prawdziwego dostawcę: świeżo uruchomiona aplikacja
+    i testy wysyłałyby wtedy dane poza maszynę."""
     settings = Settings(_env_file=None)
 
     assert isinstance(get_llm_client(settings.llm_generation()), FakeLLMClient)
-    assert isinstance(get_llm_client(settings.llm_anonymization()), FakeLLMClient)
+
+
+def test_api_does_not_read_the_anonymization_model() -> None:
+    """Sprawdza, czy konfiguracja `api` nie ma żadnego pola modelu anonimizującego
+    (`llm_anonymization_*`): ten model konfiguruje wyłącznie usługa `anonymizer`.
+
+    Wyłapuje powrót drugiej roli do `api`: model, który widzi surowy tekst zgłoszeń, byłby wtedy
+    konfigurowany w dwóch usługach, a zmiana w jednej nie zmieniałaby drugiej."""
+    fields = [name for name in Settings.model_fields if name.startswith("llm_anonymization_")]
+
+    assert fields == []
 
 
 def test_a_config_error_names_the_variable_of_its_role() -> None:
-    """Sprawdza, czy błąd konfiguracji roli anonimizującej (tu `openai` bez klucza) nazywa zmienną
-    tej roli, `LLM_ANONYMIZATION_API_KEY`, a nie zmienną roli generującej.
+    """Sprawdza, czy błąd konfiguracji modelu generującego (tu `openai` bez klucza) nazywa zmienną
+    z przedrostkiem roli, `LLM_GENERATION_API_KEY`.
 
-    Wyłapuje komunikat wskazujący nie tę konfigurację: przy dwóch kompletach operator poprawiałby
-    klucz modelu generującego, a błąd by nie znikał."""
+    Wyłapuje komunikat bez przedrostka: w jednym `.env` stoją zmienne kilku usług, a samo „brakuje
+    klucza" nie mówi, którą poprawić."""
     settings = Settings(
-        llm_anonymization_provider = "openai",
-        llm_anonymization_model    = "gpt-5.4-mini",
-        _env_file                  = None,
+        llm_generation_provider = "openai",
+        llm_generation_model    = "gpt-5.4-mini",
+        _env_file               = None,
     )
 
     with pytest.raises(LLMConfigError) as exc:
-        get_llm_client(settings.llm_anonymization())
+        get_llm_client(settings.llm_generation())
 
-    assert "LLM_ANONYMIZATION_API_KEY" in str(exc.value)
-    assert "LLM_GENERATION"            not in str(exc.value)
+    assert "LLM_GENERATION_API_KEY" in str(exc.value)

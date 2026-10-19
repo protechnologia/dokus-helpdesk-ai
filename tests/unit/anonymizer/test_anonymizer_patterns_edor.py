@@ -1,6 +1,6 @@
 import pytest
 
-from anonymizer_app.patterns.edor import find_e_delivery_address
+from anonymizer_app.core_patterns.edor import find_e_delivery_address
 from tests._helpers.patterns import replaced_by
 
 # Tekst, który wariant zamienia, i wynik zamiany.

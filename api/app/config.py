@@ -11,13 +11,13 @@ class LLMSettings(BaseModel):
     Konfiguracja jednego modelu językowego: komplet ustawień jednej roli, wyjęty z `Settings`.
 
     Do czego:
-    `Settings` trzyma dwa takie komplety, każdy pod własnym przedrostkiem zmiennych:
-    `LLM_GENERATION_*` dla modelu, który pisze odpowiedzi w grafach, i `LLM_ANONYMIZATION_*` dla
-    modelu, który pomaga anonimizatorowi. Fabryka klienta (`get_llm_client()`) dostaje jeden
-    komplet i nie musi wiedzieć, której roli służy.
+    `Settings` trzyma komplet modelu generującego (`LLM_GENERATION_*`), który pisze odpowiedzi
+    w grafach. Model anonimizujący (`LLM_ANONYMIZATION_*`) konfiguruje od p. 19.5 usługa
+    `anonymizer`, która ma własnego klienta. Fabryka klienta (`get_llm_client()`) dostaje komplet
+    i nie musi wiedzieć, której roli służy.
 
     `env_prefix` niesie przedrostek zmiennych tego kompletu tylko po to, żeby komunikat błędu
-    nazwał właściwą zmienną: przy dwóch kompletach samo „brakuje klucza" nie mówi, którego.
+    nazwał właściwą zmienną: w jednym `.env` stoją zmienne kilku usług.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -48,8 +48,8 @@ class Settings(BaseSettings):
         3. Field types and defaults apply; a missing required value fails fast at construction.
 
     Field names map to ENV names by upper-casing: `qdrant_url` <- `QDRANT_URL`. The prefixes
-    (`LLM_GENERATION_`, `LLM_ANONYMIZATION_`, `EMBEDDING_`, `QDRANT_`, `POSTGRES_`, `RAG_`,
-    `CODE_`, `AGENT_`) are the only namespacing — there is one `.env` for the whole compose
+    (`LLM_GENERATION_`, `ANONYMIZATION_`, `EMBEDDING_`, `QDRANT_`, `POSTGRES_`, `RAG_`, `CODE_`,
+    `AGENT_`) are the only namespacing — there is one `.env` for the whole compose
     project, not one per service.
     """
 
@@ -65,9 +65,9 @@ class Settings(BaseSettings):
     # --- observability ---
     log_level: str = "INFO"                             # e.g. "DEBUG"
 
-    # --- LLM: dwie osobne konfiguracje, po jednej na rolę ---
-    # Każda rola ma własny komplet tych samych ośmiu ustawień i nic nie dziedziczy po drugiej.
-    # Obie domyślnie stoją na atrapie, więc `up` i `pytest` nic nie wysyłają i nic nie kosztują.
+    # --- LLM: model generujący ---
+    # Domyślnie atrapa, więc `up` i `pytest` nic nie wysyłają i nic nie kosztują. Model
+    # anonimizujący (`LLM_ANONYMIZATION_*`) czyta od p. 19.5 usługa `anonymizer`, nie `api`.
     #
     # `num_ctx` i `max_output_tokens` to budżet kontekstu w tokenach. Dostawcy chmurowi oba
     # ignorują; liczą się przy modelu self-hosted (Ollama, vLLM), gdzie okno ustawiamy sami,
@@ -83,18 +83,6 @@ class Settings(BaseSettings):
     llm_generation_timeout_seconds:   float      = 60.0    # sekundy
     llm_generation_num_ctx:           int        = 8192    # musi mieścić się w oknie modelu
     llm_generation_max_output_tokens: int        = 1500    # część `num_ctx`, nie dodatek
-
-    # Rola anonimizująca: model, który pomaga anonimizatorowi rozpoznawać dane osobowe (p. 19).
-    # Widzi SUROWY tekst zgłoszeń, więc to, co tu wpiszesz, jest decyzją o tym, dokąd ten tekst
-    # trafia — ma to być model pod naszą kontrolą, nie dostawca komercyjny.
-    llm_anonymization_provider:          str        = "fake"  # np. "ollama"
-    llm_anonymization_base_url:          str | None = None    # np. "http://ollama:11434/v1"
-    llm_anonymization_api_key:           str | None = None    # Ollama klucza nie potrzebuje
-    llm_anonymization_model:             str | None = None    # np. "model-lokalny:tag"
-    llm_anonymization_temperature:       float      = 0.0     # rozpoznawanie ma być powtarzalne
-    llm_anonymization_timeout_seconds:   float      = 60.0    # sekundy
-    llm_anonymization_num_ctx:           int        = 8192    # musi mieścić się w oknie modelu
-    llm_anonymization_max_output_tokens: int        = 1500    # część `num_ctx`, nie dodatek
 
     # --- usługa anonymizer (osobna usługa compose, przez REST; p. 19) ---
     anonymization_base_url:        str   = "http://anonymizer:8000"
@@ -263,32 +251,6 @@ class Settings(BaseSettings):
             timeout_seconds   = self.llm_generation_timeout_seconds,
             num_ctx           = self.llm_generation_num_ctx,
             max_output_tokens = self.llm_generation_max_output_tokens,
-        )
-
-        return llm
-
-    def llm_anonymization(self) -> LLMSettings:
-        """
-        Description:
-        Konfiguracja modelu anonimizującego — tego, który pomaga anonimizatorowi i widzi surowy
-        tekst zgłoszeń — jako jeden komplet dla fabryki klienta.
-
-        Example args:
-            (brak)
-
-        Example result:
-            LLMSettings(env_prefix="LLM_ANONYMIZATION_", provider="ollama", …)
-        """
-        llm = LLMSettings(
-            env_prefix        = "LLM_ANONYMIZATION_",
-            provider          = self.llm_anonymization_provider,
-            base_url          = self.llm_anonymization_base_url,
-            api_key           = self.llm_anonymization_api_key,
-            model             = self.llm_anonymization_model,
-            temperature       = self.llm_anonymization_temperature,
-            timeout_seconds   = self.llm_anonymization_timeout_seconds,
-            num_ctx           = self.llm_anonymization_num_ctx,
-            max_output_tokens = self.llm_anonymization_max_output_tokens,
         )
 
         return llm

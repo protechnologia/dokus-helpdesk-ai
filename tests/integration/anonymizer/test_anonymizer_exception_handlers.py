@@ -4,9 +4,10 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from anonymizer_app.errors.engine_config_error import EngineConfigError
-from anonymizer_app.errors.engine_error import EngineError
-from anonymizer_app.errors.handlers import register_exception_handlers
+from anonymizer_app.core_errors.engine_config_error import EngineConfigError
+from anonymizer_app.core_errors.engine_error import EngineError
+from anonymizer_app.core_errors.handlers import register_exception_handlers
+from anonymizer_app.core_errors.llm_error import LLMError
 from tests._helpers.anonymization import RAW_TEXT, SENSITIVE
 
 
@@ -22,7 +23,7 @@ def client() -> TestClient:
         (brak)
 
     Example result:
-        TestClient nad aplikacją z /boom, /engine-down i /engine-misconfigured
+        TestClient nad aplikacją z /boom, /engine-down, /model-down i /engine-misconfigured
     """
     app = FastAPI()
     register_exception_handlers(app)
@@ -34,6 +35,10 @@ def client() -> TestClient:
     @app.get("/engine-down")
     async def engine_down() -> None:
         raise EngineError(f"model NER padł na tekście: {RAW_TEXT}")
+
+    @app.get("/model-down")
+    async def model_down() -> None:
+        raise LLMError("serwer modelu odpowiedział HTTP 502")
 
     @app.get("/engine-misconfigured")
     async def engine_misconfigured() -> None:
@@ -84,3 +89,15 @@ def test_a_config_error_is_not_dressed_up_as_a_transient_failure(client: TestCli
     response = client.get("/engine-misconfigured")
 
     assert response.status_code == 500
+
+
+def test_a_model_failure_is_503_like_any_engine_failure(client: TestClient) -> None:
+    """Sprawdza, czy awaria modelu anonimizującego (`LLMError`, na przykład 502 przy wyłączonym
+    podzie) wraca jako 503 we wspólnym kształcie, tak jak każda awaria silnika.
+
+    Wyłapuje `LLMError` wyjęty spod `EngineError`: trasa oddałaby surowe 500, a `api` nie
+    odróżniłoby chwilowo niedostępnego modelu od błędu w żądaniu."""
+    response = client.get("/model-down")
+
+    assert response.status_code     == 503
+    assert response.json()["detail"] == "Anonymization failed"

@@ -137,7 +137,7 @@ class AnonymizerClient(Anonymizer):
 
     def _read_response(
         self,
-        response: httpx.Response,  # np. 200 z {"text": "{IMIĘ} …", "engine": "patterns"}
+        response: httpx.Response,  # np. 200 z {"text": "{IMIĘ} …", "engine": "agent"}
     ) -> tuple[AnonymizedText, str]:
         """
         Description:
@@ -150,7 +150,7 @@ class AnonymizerClient(Anonymizer):
             response=<Response [200 OK]>
 
         Example result:
-            (AnonymizedText(text="{IMIĘ} {NAZWISKO} zgłasza…"), "patterns")
+            (AnonymizedText(text="{IMIĘ} {NAZWISKO} zgłasza…"), "agent")
 
         Raises:
             AnonymizationConfigError: odpowiedź pochodzi od atrapy silnika, a klient nie ma na

@@ -8,8 +8,8 @@ rodzaje ponad próg, ich przecieki i zniszczona wiedza, nazwane rodzajem z numer
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
-from anonymizer_app.models.found import Found
-from anonymizer_app.steps.replace_patterns import replace_patterns
+from anonymizer_app.agent_nodes.replace_patterns.node import replace_patterns
+from anonymizer_app.core_model.found import Found
 from tests._helpers.golden_anonymization import AnonymizationMeasurement, anonymization_set
 from tests._helpers.patterns.constants import PATTERN_KINDS
 

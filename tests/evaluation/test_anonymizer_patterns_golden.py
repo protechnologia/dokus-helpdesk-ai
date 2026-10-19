@@ -7,7 +7,7 @@ test nie liczy.
 
 | co mierzy                         | próg                                | zmierzone dziś |
 |-----------------------------------|-------------------------------------|----------------|
-| przecieki w zestawie zmyślonym    | `MAX_LEAKS_SAFE`: adresy 2, inne 0  | jak próg       |
+| przecieki w zestawie zmyślonym    | `MAX_LEAKS_SAFE`: adresy 14, inne 0 | jak próg       |
 | przecieki w próbce korpusu        | `MAX_LEAKS_UNSAFE`: 0 w każdym      | jak próg       |
 | zniszczona wiedza w obu zestawach | 0                                   | 0              |
 
@@ -26,7 +26,8 @@ O czym pamiętać przy zmianach:
 
 - Wzorce są deterministyczne, więc próg to zmierzona liczba: nowy przeciek albo zniszczona
   wiedza daje czerwony test, a poprawa wzorca każe obniżyć próg.
-- Dwa adresy zestawu zmyślonego to znane braki: adres bez kotwicy i notatka małymi literami.
+- Adresy zestawu zmyślonego bez kotwicy, małymi literami i złamane na linie (14) to znane braki
+  wzorców: wskazuje je model (p. 19.5).
 - Przy próbce korpusu komunikat nazywa fragment rodzajem z numerem, nigdy treścią.
 - `data/unsafe/` nie ma w repo (PII), więc bez próbki korpusu jej przypadki się pomija.
 """
@@ -90,7 +91,7 @@ def test_pattern_leaks_stay_within_the_threshold_of_each_kind(
     max_leaks:   Mapping[str, int],
 ) -> None:
     """Sprawdza, czy w każdym rodzaju danej o stałym kształcie przez zamianę wzorcami przechodzi
-    najwyżej tyle fragmentów, ile mówi próg zestawu: w zestawie zmyślonym 2 adresy i zero
+    najwyżej tyle fragmentów, ile mówi próg zestawu: w zestawie zmyślonym 14 adresów i zero
     pozostałych, w próbce korpusu zero w każdym rodzaju, który w niej stoi.
 
     Wyłapuje wzorzec, który po zmianie przestał łapać zapis stojący w zestawie (numer z twardą

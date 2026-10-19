@@ -15,8 +15,7 @@ def build_anonymizer(
     Fabryka rozstrzyga tylko, czy klient może przyjąć wynik atrapy silnika: tak przy atrapie
     modelu generującego, bo tekst nie trafia wtedy do żadnego modelu; nie przy prawdziwym —
     tam klient odmawia przy pierwszym wywołaniu. Rozstrzyga dostawca modelu GENERUJĄCEGO, bo to
-    do niego idzie tekst po anonimizacji. Model anonimizujący (`LLM_ANONYMIZATION_*`) widzi
-    surowy tekst z założenia i tu nie decyduje.
+    do niego idzie tekst po anonimizacji. Model anonimizujący konfiguruje usługa `anonymizer`.
 
     Example args:
         settings=Settings(llm_generation_provider="openai")

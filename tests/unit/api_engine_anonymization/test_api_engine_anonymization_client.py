@@ -8,6 +8,7 @@ from tests._helpers.anonymization import (
     ANONYMIZED_TEXT,
     FAKE_ENGINE,
     RAW_TEXT,
+    REAL_ENGINE,
     SENSITIVE,
     anonymizer_client_on,
     service_answer,
@@ -20,7 +21,7 @@ BROKEN_ANSWERS = [
     pytest.param(always(text="<html>proxy error</html>"), id="treść spoza JSON-a"),
     pytest.param(always(payload=["{IMIĘ}"]), id="lista zamiast obiektu"),
     pytest.param(always(payload={"text": ANONYMIZED_TEXT}), id="bez nazwy silnika"),
-    pytest.param(always(payload={"engine": "patterns"}), id="bez tekstu"),
+    pytest.param(always(payload={"engine": REAL_ENGINE}), id="bez tekstu"),
     pytest.param(always(payload=service_answer(text="")), id="pusty tekst"),
     pytest.param(raising(httpx.ConnectError("connection refused")), id="brak połączenia"),
     pytest.param(raising(httpx.ReadTimeout("timed out")), id="przekroczony czas"),
@@ -134,7 +135,7 @@ async def test_the_log_carries_lengths_and_the_engine_only(
     with caplog.at_level(logging.DEBUG):
         await client.anonymize(RAW_TEXT)
 
-    assert "engine=patterns" in caplog.text
+    assert f"engine={REAL_ENGINE}" in caplog.text
     assert not [fragment for fragment in SENSITIVE if fragment in caplog.text]
 
 

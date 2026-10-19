@@ -97,7 +97,7 @@ class OllamaLLMClient(LLMClient):
     def __init__(
         self,
         model:       str,                                   # e.g. "bielik-4.5b-v3.0-instruct:Q8_0"
-        env_prefix:  str,                                   # np. "LLM_ANONYMIZATION_"
+        env_prefix:  str,                                   # np. "LLM_GENERATION_"
         base_url:    str   = "http://localhost:11434/v1",   # Ollama's OpenAI-compatible endpoint
         timeout:     float = 1800.0,                        # seconds — 30 min, see below
         temperature: float = 0.0,                           # local models accept it without fuss
@@ -120,11 +120,11 @@ class OllamaLLMClient(LLMClient):
 
         `env_prefix` to przedrostek zmiennych roli, której klient służy. Potrzebny wyłącznie
         komunikatom błędów: przy dwóch konfiguracjach LLM mają nazwać zmienną do poprawienia
-        (`LLM_ANONYMIZATION_NUM_CTX`), a nie zostawić operatora z pytaniem, której roli dotyczą.
+        (`LLM_GENERATION_NUM_CTX`), a nie zostawić operatora z pytaniem, której roli dotyczą.
 
         Example args:
             model="SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0"
-            env_prefix="LLM_ANONYMIZATION_"
+            env_prefix="LLM_GENERATION_"
             base_url="http://localhost:11434/v1"
             timeout=1800.0
             temperature=0.0

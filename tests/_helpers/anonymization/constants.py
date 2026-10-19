@@ -21,9 +21,9 @@ SENSITIVE = (
 # Adres usługi, z którym test buduje klienta; atrapa transportu i tak nie wychodzi z procesu.
 BASE_URL = "http://anonymizer:8000"
 
-# Nazwa silnika innego niż atrapa w odpowiedziach testowych. Prawdziwego silnika jeszcze nie ma
-# (p. 19.5), więc to tylko nazwa, której klient nie odrzuca.
-REAL_ENGINE = "patterns"
+# Nazwa prawdziwego silnika usługi w odpowiedziach testowych (`ANONYMIZATION_ENGINE=agent`,
+# p. 19.5) — tej klient nie odrzuca.
+REAL_ENGINE = "agent"
 
 # Nazwa atrapy silnika w odpowiedzi usługi — tę klient `api` odrzuca.
 FAKE_ENGINE = "fake"

@@ -1,6 +1,6 @@
 import pytest
 
-from anonymizer_app.patterns.id_card import find_id_card_by_check_digit
+from anonymizer_app.core_patterns.id_card import find_id_card_by_check_digit
 from tests._helpers.patterns import replaced_by
 
 # Tekst, który wariant zamienia, i wynik zamiany.

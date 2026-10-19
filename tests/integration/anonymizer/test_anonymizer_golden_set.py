@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from anonymizer_app.engine import FakeEngine
+from anonymizer_app.core_engine import FakeEngine
 from tests._helpers.golden_anonymization import (
     KEEP_KINDS,
     REMOVE_KINDS,

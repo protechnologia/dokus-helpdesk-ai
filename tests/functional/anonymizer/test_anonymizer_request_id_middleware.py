@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from anonymizer_app.errors.handlers import REQUEST_ID_HEADER
+from anonymizer_app.core_errors.handlers import REQUEST_ID_HEADER
 from anonymizer_app.main import create_app
 
 

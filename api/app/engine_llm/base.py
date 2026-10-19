@@ -35,7 +35,7 @@ class LLMClient(ABC):
 
     Flow:
         1. `get_llm_client()` (`factory.py`) buduje implementację wskazaną przez dostawcę z
-           kompletu ustawień roli (`LLM_GENERATION_PROVIDER` albo `LLM_ANONYMIZATION_PROVIDER`)
+           kompletu ustawień modelu generującego (`LLM_GENERATION_PROVIDER`)
            i odmawia, gdy jej konfiguracja jest niepełna.
         2. Wołający podaje gotowy prompt (`complete()`) albo rozmowę z narzędziami
            (`complete_turn()`, woła ją węzeł `agent`).

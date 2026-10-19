@@ -1,6 +1,6 @@
 import pytest
 
-from anonymizer_app.patterns.phone_number import (
+from anonymizer_app.core_patterns.phone_number import (
     find_extension_after_label,
     find_landline,
     find_mobile,

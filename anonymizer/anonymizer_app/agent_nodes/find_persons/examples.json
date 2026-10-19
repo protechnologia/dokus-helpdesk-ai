@@ -1,0 +1,21 @@
+[
+  {
+    "text": "Od: Leszek Dudziak <{EMAIL}>\nDo: {EMAIL}\nDzień dobry Pani Bronisławo, przesyłam zrzut z eNadawcy. Rozmawiałem też z p. Sobczakową.\nPozdrawiam\nLESZEK DUDZIAK\nStarszy referent, Wydział Geodezji",
+    "answer": {
+      "dane": [
+        {"tekst": "Leszek", "rodzaj": "IMIĘ"},
+        {"tekst": "Dudziak", "rodzaj": "NAZWISKO"},
+        {"tekst": "Bronisławo", "rodzaj": "IMIĘ"},
+        {"tekst": "Sobczakową", "rodzaj": "NAZWISKO"},
+        {"tekst": "LESZEK", "rodzaj": "IMIĘ"},
+        {"tekst": "DUDZIAK", "rodzaj": "NAZWISKO"}
+      ]
+    }
+  },
+  {
+    "text": "KOMENTARZ 2 — konsultant, 2026-03-02 (typ: odpowiedz):\nPo aktualizacji do wersji 5.3 Urząd Gminy Kłoczew widzi pisma z KSeF. Kierownik referatu potwierdził, że błąd 31007 nie wraca.\nPozdrawiam\n{IMIĘ} {NAZWISKO}\nWdrożeniowiec",
+    "answer": {
+      "dane": []
+    }
+  }
+]

@@ -53,28 +53,6 @@ def test_the_client_gets_the_address_and_timeout_from_the_config() -> None:
     assert anonymizer._client.timeout.read  == 7.5
 
 
-async def test_the_anonymization_model_does_not_decide_about_the_fake_engine() -> None:
-    """Sprawdza, czy o zgodzie na atrapę silnika rozstrzyga wyłącznie model generujący: prawdziwy
-    model anonimizujący przy atrapie modelu generującego daje klienta ze zgodą, a atrapa modelu
-    anonimizującego przy prawdziwym modelu generującym — klienta bez zgody.
-
-    Wyłapuje fabrykę, która czyta konfigurację nie tej roli: atrapa modelu anonimizującego
-    przepuściłaby wynik atrapy silnika do prawdziwego modelu generującego."""
-    local_helper = Settings(
-        llm_generation_provider    = "fake",
-        llm_anonymization_provider = "ollama",
-        _env_file                  = None,
-    )
-    real_writer = Settings(
-        llm_generation_provider    = "openai",
-        llm_anonymization_provider = "fake",
-        _env_file                  = None,
-    )
-
-    assert await accepts_the_fake_engine(build_anonymizer(local_helper)) is True
-    assert await accepts_the_fake_engine(build_anonymizer(real_writer)) is False
-
-
 async def test_the_fake_passes_text_through_unchanged() -> None:
     """Sprawdza, czy atrapa anonimizatora oddaje podany tekst bez zmian, opakowany
     w `AnonymizedText`, i zapisuje go na swojej liście `texts`.

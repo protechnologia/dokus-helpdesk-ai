@@ -26,7 +26,7 @@ def anonymizer_client_on(
     Bez zgody na atrapę silnika, jak przy prawdziwym modelu, chyba że test poda ją wprost.
 
     Example args:
-        handler=always({"text": "{IMIĘ} …", "engine": "patterns"})
+        handler=always({"text": "{IMIĘ} …", "engine": "agent"})
         fake_engine_allowed=False
 
     Example result:

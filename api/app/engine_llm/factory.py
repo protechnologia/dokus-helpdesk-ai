@@ -141,7 +141,7 @@ def _build_ollama_client(
     wartości, której nie da się zgadnąć.
 
     Example args:
-        llm=LLMSettings(env_prefix="LLM_ANONYMIZATION_", provider="ollama",
+        llm=LLMSettings(env_prefix="LLM_GENERATION_", provider="ollama",
                         model="bielik-4.5b-v3.0-instruct:Q8_0", …)
 
     Example result:
@@ -174,10 +174,9 @@ def get_llm_client(
 ) -> LLMClient:
     """
     Description:
-    Buduje klienta modelu z jednego kompletu ustawień — tego samego kodu używają obie role:
-    model generujący (`Settings().llm_generation()`) i model anonimizujący
-    (`Settings().llm_anonymization()`). Którą rolę klient obsłuży, rozstrzyga wołający tym, który
-    komplet poda.
+    Buduje klienta modelu z jednego kompletu ustawień — dziś modelu generującego
+    (`Settings().llm_generation()`). Model anonimizujący ma własnego klienta w usłudze
+    `anonymizer`.
 
     Fail-fast: nieznany dostawca albo prawdziwy dostawca bez klucza czy modelu kończy się błędem
     tutaj, przy budowie, a nie błędem połączenia w środku żądania.

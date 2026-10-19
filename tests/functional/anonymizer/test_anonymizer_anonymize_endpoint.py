@@ -3,8 +3,12 @@ import logging
 import pytest
 from fastapi.testclient import TestClient
 
+from anonymizer_app.core_engine import AgentEngine, get_engine
+from anonymizer_app.engine_llm import LLMClient
 from anonymizer_app.main import create_app
-from tests._helpers.anonymization import FAKE_ENGINE, RAW_TEXT, SENSITIVE
+from tests._helpers.anonymization import ANONYMIZED_TEXT, FAKE_ENGINE, RAW_TEXT, SENSITIVE
+from tests._helpers.anonymizer_llm import model_client_on, scripted_llm
+from tests._helpers.transport import always
 
 
 @pytest.fixture
@@ -81,3 +85,53 @@ def test_no_request_logs_the_text(
         client.post("/anonymize", json=body)
 
     assert not [fragment for fragment in SENSITIVE if fragment in caplog.text]
+
+
+def agent_client(
+    llm: LLMClient,  # np. scripted_llm(persons=[{"tekst": "Nowak", "rodzaj": "NAZWISKO"}])
+) -> TestClient:
+    """
+    Description:
+    Usługa w procesie z silnikiem `agent` na podanym kliencie modelu, podstawionym trasie przez
+    `dependency_overrides` — bez serwera modelu i bez zmiany konfiguracji.
+
+    Example args:
+        llm=scripted_llm(persons=[{"tekst": "Nowak", "rodzaj": "NAZWISKO"}])
+
+    Example result:
+        TestClient, którego `POST /anonymize` idzie przez graf anonimizacji
+    """
+    app = create_app()
+    app.dependency_overrides[get_engine] = lambda: AgentEngine(llm)
+
+    return TestClient(app)
+
+
+def test_the_agent_engine_answers_with_markers_and_its_name() -> None:
+    """Sprawdza, czy `POST /anonymize` na silniku `agent` odpowiada statusem 200, tekstem ze
+    znacznikami (telefon od wzorców, imię i nazwisko od modelu) i nazwą silnika „agent”.
+
+    Wyłapuje trasę, która nie przenosi wyniku grafu albo nazwy silnika: klient w `api` przyjmuje
+    wynik tylko po nazwie innej niż „fake”."""
+    persons = [{"tekst": "Jan", "rodzaj": "IMIĘ"}, {"tekst": "Nowak", "rodzaj": "NAZWISKO"}]
+    client  = agent_client(scripted_llm(persons=persons))
+
+    response = client.post("/anonymize", json={"text": RAW_TEXT})
+
+    assert response.status_code == 200
+    assert response.json()      == {"text": ANONYMIZED_TEXT, "engine": "agent"}
+
+
+def test_a_model_failure_is_503_without_text() -> None:
+    """Sprawdza, czy awaria serwera modelu kończy żądanie statusem 503, a odpowiedź nie niesie
+    żadnego fragmentu zgłoszenia.
+
+    Wyłapuje odpowiedź 200 z tekstem po samych wzorcach (osoby poszłyby do modelu zewnętrznego)
+    i odpowiedź błędu, która cytuje zgłoszenie."""
+    llm = model_client_on(always({"error": "pod down"}, status=502))
+
+    response = agent_client(llm).post("/anonymize", json={"text": RAW_TEXT})
+
+    assert response.status_code == 503
+    for fragment in SENSITIVE:
+        assert fragment not in response.text

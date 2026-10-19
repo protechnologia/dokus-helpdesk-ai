@@ -32,7 +32,7 @@ O czym pamiętać przy zmianach:
 - Komplet testów to `pytest -m "not llm_live"`. `pytest -m ""` zdejmuje wszystkie wykluczenia,
   więc wybiera też testy `llm_live`. Te biorą model przez `live_generation_llm()`, które przy
   takim wyborze odmawia: płatnego modelu nie da się zawołać bez wpisania `llm_live` w `-m`.
-- Poza testami `llm_live` oba modele są atrapą, cokolwiek stoi w `.env`
+- Poza testami `llm_live` model generujący jest atrapą, cokolwiek stoi w `.env`
   (`fake_models_outside_live_tests`). Fabryka grafów przy prawdziwym dostawcy składa graf na
   prawdziwym modelu, a zwykły test trasy nie może go zawołać ani zależeć od pliku dewelopera.
 - Poza testami na stacku fabryka grafów dostaje `FakeAnonymizer` zamiast klienta usługi
@@ -104,7 +104,8 @@ def fake_models_outside_live_tests(
 ) -> None:
     """
     Description:
-    Ustawia oba modele na atrapę w każdym teście poza `llm_live`, niezależnie od pliku `.env`.
+    Ustawia model generujący na atrapę w każdym teście poza `llm_live`, niezależnie od pliku
+    `.env`.
 
     Konfiguracja aplikacji czyta `.env` z katalogu roboczego, a tam deweloper trzyma prawdziwego
     dostawcę dla testów na żywym modelu. Fabryka grafów składa wtedy graf na prawdziwym modelu,
@@ -116,14 +117,13 @@ def fake_models_outside_live_tests(
         (wstrzykiwane przez pytest)
 
     Example result:
-        None — `Settings()` w teście oddaje `fake` dla obu modeli
+        None — `Settings()` w teście oddaje `fake` dla modelu generującego
     """
     # --- test na żywym modelu ma czytać konfigurację dewelopera ---
     if request.node.get_closest_marker(LLM_LIVE_MARKER) is not None:
         return
 
     monkeypatch.setenv("LLM_GENERATION_PROVIDER", "fake")
-    monkeypatch.setenv("LLM_ANONYMIZATION_PROVIDER", "fake")
 
 
 @pytest.fixture(autouse=True)
