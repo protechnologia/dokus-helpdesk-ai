@@ -3,9 +3,11 @@ Description:
 Trasy HTTP — cienkie adaptery: żądanie → stan grafu → graf → odpowiedź, zero logiki w trasie.
 
 Do czego:
-Katalog na zasób: `router.py` z trasami i `models.py` z modelami API tylko tego zasobu. Tutaj
-modele wspólne kilku tras (`models.py`: zgłoszenie, źródło, błąd) i mapowanie modeli API na
-domenowe (`mapping.py`). Modele API są odrębne od domenowych (CLAUDE.md -> „Warstwy kodu").
+Katalog na zasób: `router.py` z trasami, `models.py` z modelami API tylko tego zasobu
+i `mapping.py`, który zamienia stan końcowy grafu na odpowiedź trasy. Tutaj modele wspólne
+kilku tras (`models.py`: zgłoszenie, źródło, błąd) i mapowanie wspólne (`mapping.py`: żądanie
+na zgłoszenie, źródła, zużycie, log). Modele API są odrębne od domenowych (CLAUDE.md ->
+„Warstwy kodu").
 
 | zasób           | trasy                                  | graf                       |
 |-----------------|----------------------------------------|----------------------------|

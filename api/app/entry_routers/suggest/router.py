@@ -5,13 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.agent_graphs import run_graph
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
 from app.agent_graphs.registry import variant_graphs
-from app.core_model.graphs.proposal import Proposal
-from app.entry_routers.mapping import (
-    to_log_items,
-    to_raw_ticket,
-    to_source_items,
-    to_usage_item,
-)
+from app.entry_routers.mapping import to_raw_ticket
+from app.entry_routers.suggest.mapping import to_suggest_response
 from app.entry_routers.suggest.models import (
     SuggestRequest,
     SuggestResponse,
@@ -77,28 +72,10 @@ async def suggest_answer(
         detail = f"nieznany wariant {request.variant!r}; dostępne: {', '.join(sorted(graphs))}"
         raise HTTPException(status_code=422, detail=detail)
 
-    graph = graphs[request.variant]
-    state = graph.STATE(input_text=to_raw_ticket(request).as_thread())
-    final = await run_graph(build(graph), state)
-
-    # Wariant bez narzędzi wiedzy nie ma pola `sources` — wraca z pustą listą, i to jest informacja.
-    sources = getattr(final, "sources", [])
-
-    # Bez odczytanych źródeł wariant, który ich wymaga, oddaje same uwagi (`ProposalNotes`), a gdy
-    # jego graf nie zostawia nawet ich — nic. Same uwagi oddaje też wariant z pytaniami, gdy pytań
-    # już nie trzeba. Treść dla klienta jest tylko w pełnej propozycji.
-    output         = final.output
-    text           = output.text if isinstance(output, Proposal) else None
-    internal_notes = output.internal_notes if output is not None else ""
-
-    response = SuggestResponse(
-        variant        = request.variant,
-        text           = text,
-        internal_notes = internal_notes,
-        sources        = to_source_items(sources),
-        usage          = to_usage_item(final.usage),
-        log            = to_log_items(final.log),
-    )
+    graph    = graphs[request.variant]
+    state    = graph.STATE(input_text=to_raw_ticket(request).as_thread())
+    final    = await run_graph(build(graph), state)
+    response = to_suggest_response(final, request.variant)
 
     logger.info(
         "suggest ticket_id=%s variant=%s sources=%d proposal=%s notes=%s",

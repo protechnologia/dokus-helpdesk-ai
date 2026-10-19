@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends
 from app.agent_graphs import parse_ticket, run_graph
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
 from app.core_service.loader_dict_resolution import get_resolution_classes
-from app.entry_routers.mapping import to_log_items, to_raw_ticket, to_usage_item
+from app.entry_routers.mapping import to_raw_ticket
 from app.entry_routers.models import TicketRequest
+from app.entry_routers.parse_ticket.mapping import to_ticket_card
 from app.entry_routers.parse_ticket.models import TicketCard
 
 logger = logging.getLogger(__name__)
@@ -37,23 +38,8 @@ async def read_ticket_card(
         date       = raw.date,
         vocabulary = get_resolution_classes(),
     )
-    final = await run_graph(build(parse_ticket), state)
-    card  = final.output
-
-    response = TicketCard(
-        ticket_id         = card.ticket_id,
-        date              = card.date,
-        component         = card.component,
-        problem           = card.problem,
-        symptoms          = card.symptoms,
-        error_codes       = card.error_codes,
-        cause             = card.cause,
-        solution          = card.solution,
-        resolution        = card.resolution,
-        questions_summary = card.questions_summary,
-        usage             = to_usage_item(final.usage),
-        log               = to_log_items(final.log),
-    )
+    final    = await run_graph(build(parse_ticket), state)
+    response = to_ticket_card(final)
 
     logger.info("parse_ticket ticket_id=%s", request.ticket_id)
 

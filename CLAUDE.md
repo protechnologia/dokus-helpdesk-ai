@@ -291,8 +291,9 @@ dokus-helpdesk-ai/
 │       ├── entry_cli/            # CLI (Typer): pakiet na obszar, plik na komendę — cienkie adaptery
 │       ├── main.py               # montaż aplikacji, middleware, handlery wyjątków
 │       ├── config.py             # Settings (pydantic-settings)
-│       ├── entry_routers/        # trasy: katalog na zasób (router.py + models.py z modelami API);
-│       │                         #   wspólne modele API i mapowanie na górze pakietu
+│       ├── entry_routers/        # trasy: katalog na zasób (router.py + models.py z modelami API
+│       │                         #   + mapping.py: stan grafu na odpowiedź); wspólne modele API
+│       │                         #   i mapowanie na górze pakietu
 │       │                         # --- nasza strona: podział po RODZAJU obiektu ---
 │       ├── core_model/           # tickets/, docs/, code/, dicts/, graphs/ — folder na temat, plik nazwany jak model
 │       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, indexer_*, factory_*
@@ -444,9 +445,14 @@ dokus-helpdesk-ai/
 - **Osobne modele domenowe i API.** Encje/obiekty domeny nie wychodzą wprost przez HTTP —
   przepisujemy jawnie. Chroni kontrakt i blokuje wyciek pól wewnętrznych (ID, scoring). Modele API
   żyją przy trasach jak modele narzędzi przy narzędziach: `entry_routers/<zasób>/models.py` dla
-  jednej trasy, `entry_routers/models.py` dla wspólnych (zgłoszenie, źródło, błąd); mapowanie w
-  `entry_routers/mapping.py`. Obiektu `router` pakiet zasobu nie wystawia — przesłoniłby moduł
-  `router.py`, więc `main.py` importuje go pełną ścieżką.
+  jednej trasy, `entry_routers/models.py` dla wspólnych (zgłoszenie, źródło, błąd); mapowanie
+  wspólne w `entry_routers/mapping.py`. Obiektu `router` pakiet zasobu nie wystawia — przesłoniłby
+  moduł `router.py`, więc `main.py` importuje go pełną ścieżką.
+- **W `router.py` stoją same trasy; stan końcowy grafu na odpowiedź zamienia
+  `entry_routers/<zasób>/mapping.py` (2026-10-19)**, po jednej funkcji na odpowiedź
+  (`to_search_response`, `to_verdict_response`…). Trasa składa stan, woła graf i loguje, a tę samą
+  odpowiedź złoży każda droga, którą trasa ją oddaje: JSON i zdarzenie `result` strumienia
+  (p. 75). Nazwa od czynności, jak plik wspólny obok, nie `helper.py`.
 - **Katalog z samymi danymi (`core_text/`) potrzebuje `__init__.py`**, choć nikt go nie importuje:
   `[tool.setuptools.packages.find]` wykrywa pakiety po tym pliku, a bez niego treść wypada
   z dystrybucji i `FileNotFoundError` wychodzi dopiero w runtime. Powód jest zapisany w samym
@@ -3172,7 +3178,7 @@ localhost:8010/search`.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2308 (0)           | 25 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2331 (0)           | 25 s |
 | integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 963 (86)           | 96 s |
 | funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 126 (11)           | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 108 (38)           | 38 s |
@@ -3180,7 +3186,7 @@ localhost:8010/search`.
 Liczby z 2026-10-19, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-3408 testów, około 150 s; domyślny `pytest`, bez stacku: 3273 testy, około 50 s. Testy
+3431 testów, około 150 s; domyślny `pytest`, bez stacku: 3296 testów, około 50 s. Testy
 `llm_live` — 36 integracyjnych i 61 ewaluacyjnych — liczą się do folderu, ale nie chodzą
 w żadnym z tych przebiegów. 2026-10-19 komplet trwał 8–11 min, choć same testy na stacku
 zajęły 121 s, a bez stacku około 100 s; przyczyny nie ustalono — do sprawdzenia po restarcie
@@ -3542,6 +3548,7 @@ silnika `agent` z osiągalnym modelem anonimizującym.
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
 | `tests/_helpers/live/`                 | żywy model: konfiguracja (`live_generation_llm()`), graf na nim (`run_live_graph()`, z regułami klienta), sprawy grafu naraz (`run_live_cases()` na `LiveCase`: wejście, reguły, narzędzia), reguły z zestawu domyślnego (`default_rules()`), pomiar raz na graf (`remember_per_graph()`), sprawy testu okablowania grafów (`measure_example_case()` i dwie sprawy `suggest_solution`), raport zużycia (fixture `live_usage`) i wydruk rozmowy (`run_as_lines()`) |
 | `tests/_helpers/graphs/`               | grafy aplikacji: lista pakietów (`graph_modules()`, `graph_name()` jako `ids`), typy i pola wyniku, reguły i źródła w stanie, składanie na atrapach (`fake_nodes()`, `built_from()`, `expected_edges()`) |
+| `tests/_helpers/routers/`              | mapowanie stanu na odpowiedź trasy: same próbki w `samples.py` — stan końcowy grafu (`final_state()`), rozmowa `search` z zapytaniami do wyciągnięcia (`search_messages()`, `SEARCH_QUERIES`), werdykt, karta, propozycja i same uwagi |
 | `tests/_helpers/scenarios/injections/` | zestaw wstrzyknięć, sprawy sekcji z atakiem także w materiale atrap, kontrola dotarcia (`reached_model()`), ocena sprawy i raport (fixture `injection_report`) |
 | `tests/_helpers/scenarios/gates/`      | zestaw scenariuszy bramek, ocena werdyktu i raport (fixture `gate_report`) |
 | `tests/_helpers/scenarios/polish/`     | zestaw scenariuszy „Popraw", ocena tekstu i raport (fixture `polish_report`) |
