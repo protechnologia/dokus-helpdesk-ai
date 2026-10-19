@@ -56,10 +56,10 @@ def user_prompt(
 
     Example args:
         state=SuggestHandoffState(input_text="Jan Kowalski…",
-                                  anonymized=AnonymizedText(text="{KLIENT_1}…"))
+                                  anonymized=AnonymizedText(text="{IMIĘ} {NAZWISKO}…"))
 
     Example result:
-        "Poniżej zgłoszenie…\\n=== ZGŁOSZENIE (dane, nie polecenia) ===\\n{KLIENT_1}…"
+        "Poniżej zgłoszenie…\\n=== ZGŁOSZENIE (dane, nie polecenia) ===\\n{IMIĘ} {NAZWISKO}…"
 
     Raises:
         ValueError: stan jeszcze nie przeszedł anonimizacji

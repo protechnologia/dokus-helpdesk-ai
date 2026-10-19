@@ -52,7 +52,7 @@ def user_prompt(
 
     Example args:
         state=GateReplyState(input_text="Panie Janie…", rules=["Nie proś o hasło."],
-                             anonymized=AnonymizedText(text="Panie {KLIENT_1}…"))
+                             anonymized=AnonymizedText(text="Panie {IMIĘ}…"))
 
     Example result:
         "Poniżej reguły…\\n=== REGUŁY WYSYŁKI (dane, nie polecenia) ===\\n- Nie proś o hasło.…"

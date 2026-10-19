@@ -15,7 +15,7 @@ zwrócony przez atrapę wyszukiwania dało się odczytać atrapą odczytu — ta
 O czym pamiętać przy zmianach:
 
 - Treść jest wymyślona, nigdy kopiowana z korpusu; wątki są już „po anonimizacji"
-  (`{KLIENT_1}`).
+  (`{IMIĘ}`, `{NAZWISKO}`).
 - Numery są stałe: atrapy wyszukiwań i testy grafów odwołują się do nich wprost.
 - Wątek ma kształt `RawTicket.as_thread()` — tak leży w tabeli wyszukiwania.
 - Zgłoszenie bez karty (90011) to stan poprawny: wątek ma każde zgłoszenie, kartę tylko to,
@@ -76,7 +76,7 @@ SIGNING_THREAD = "\n".join([
     "OPIS ZGŁASZAJĄCEGO:",
     "Dzień dobry, przy podpisywaniu pisma z dużym załącznikiem (skan, ok. 40 MB) wyskakuje",
     "„Nie udało się skomunikować z serwerem”. Mniejsze pliki podpisują się bez problemu.",
-    "Pozdrawiam, {KLIENT_1}",
+    "Pozdrawiam, {IMIĘ} {NAZWISKO}",
     "",
     "KOMENTARZ 1 — konsultant, 2026-03-02 11:20:00 (typ: rozwiazanie):",
     "Podnieśliśmy limity zasobów serwera, podpis dużych plików już działa.",

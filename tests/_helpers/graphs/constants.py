@@ -1,7 +1,7 @@
 """
 Description:
-Stałe helpera grafów: pakiet aplikacji, w którym leżą grafy, znacznik tekstu po anonimizacji
-i wzór nazwy narzędzia w prompcie.
+Stałe helpera grafów: pakiet aplikacji, w którym leżą grafy, znacznik tekstu po anonimizacji,
+wzór nazwy narzędzia w prompcie i grafy bez akapitu o znacznikach anonimizacji.
 """
 
 # Pakiet aplikacji z katalogiem na graf: z niego `graph_module()` importuje pakiet grafu po nazwie.
@@ -14,3 +14,7 @@ ANONYMIZED = "ZANONIMIZOWANE-7f3a"
 # Nazwa narzędzia podana w prompcie: w grawisach i zaczyna się od czynności narzędzia. Po tym
 # test kontraktu odróżnia nazwy narzędzi od nazw pól, które prompt też pisze w grawisach.
 TOOL_NAME_IN_PROMPT = r"`((?:find|read|list|quote|describe|respond)_[a-z_]+)`"
+
+# Grafy, których prompt systemowy nie mówi jeszcze modelowi o znacznikach anonimizacji. Prompt
+# parsujący jest kontraktem artefaktu i dostaje ten akapit w p. 31, razem z masowym importem.
+WITHOUT_MARKERS_PARAGRAPH = {"parse_ticket"}

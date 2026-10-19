@@ -52,7 +52,7 @@ def user_prompt(
 
     Example args:
         state=GateCloseState(input_text="Jan Kowalski…", rules=["Opis musi wskazywać problem."],
-                             anonymized=AnonymizedText(text="{KLIENT_1}…"))
+                             anonymized=AnonymizedText(text="{IMIĘ} {NAZWISKO}…"))
 
     Example result:
         "Poniżej reguły…\\n=== REGUŁY ZAMKNIĘCIA (dane, nie polecenia) ===\\n- Opis musi…"

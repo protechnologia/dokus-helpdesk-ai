@@ -17,7 +17,7 @@ TOOLS = [
 ]
 
 RAW        = "Jan Kowalski: nie przychodzą przesyłki"
-ANONYMIZED = "{KLIENT_1}: nie przychodzą przesyłki"
+ANONYMIZED = "{IMIĘ} {NAZWISKO}: nie przychodzą przesyłki"
 
 SEARCH_ARGUMENTS = {"problem": "Brak przesyłek", "symptoms": "pusta skrzynka"}
 
@@ -35,10 +35,11 @@ def user_prompt(
     Tura użytkownika na potrzeby testu — jak `user_prompt()` grafu, bierze tekst z `anonymized`.
 
     Example args:
-        state=GraphState(input_text="Jan Kowalski…", anonymized=AnonymizedText(text="{KLIENT_1}…"))
+        state=GraphState(input_text="Jan Kowalski…",
+                         anonymized=AnonymizedText(text="{IMIĘ} {NAZWISKO}…"))
 
     Example result:
-        "=== ZGŁOSZENIE ===\\n{KLIENT_1}: nie przychodzą przesyłki"
+        "=== ZGŁOSZENIE ===\\n{IMIĘ} {NAZWISKO}: nie przychodzą przesyłki"
     """
     return f"=== ZGŁOSZENIE ===\n{state.anonymized.text}"
 
@@ -72,7 +73,7 @@ def make_state(
         iterations=0
 
     Example result:
-        GraphState(input_text="Jan Kowalski…", anonymized=AnonymizedText(text="{KLIENT_1}…"))
+        GraphState(input_text="Jan Kowalski…", anonymized=AnonymizedText(text="{IMIĘ} {NAZWISKO}…"))
     """
     state = GraphState(
         input_text = RAW,
@@ -105,7 +106,8 @@ async def test_the_first_turn_opens_the_conversation_with_the_user_prompt() -> N
 
 async def test_the_raw_text_does_not_reach_the_model() -> None:
     """Sprawdza, czy do modelu idzie wyłącznie tekst po anonimizacji: stan niesie obie wersje
-    zgłoszenia, a w wysłanej turze jest znacznik `{KLIENT_1}` i nie ma nazwiska z wersji surowej.
+    zgłoszenia, a w wysłanej turze są znaczniki `{IMIĘ} {NAZWISKO}` i nie ma nazwiska z wersji
+    surowej.
 
     Wyłapuje węzeł, który sięgnąłby po surowe zgłoszenie: dane klienta wyszłyby wtedy do
     zewnętrznego modelu."""

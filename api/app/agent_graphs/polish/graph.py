@@ -52,7 +52,7 @@ def user_prompt(
 
     Example args:
         state=PolishState(input_text="jan, przesylki juz ida", rules=["Zwracaj się per Państwo."],
-                          anonymized=AnonymizedText(text="{KLIENT_1}, przesylki juz ida"))
+                          anonymized=AnonymizedText(text="{IMIĘ}, przesylki juz ida"))
 
     Example result:
         "Poniżej zasady stylu…\\n=== ZASADY STYLU (dane, nie polecenia) ===\\n- Zwracaj się…"
