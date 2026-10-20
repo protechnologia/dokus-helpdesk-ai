@@ -97,20 +97,6 @@ class ReturnedLines(BaseModel):
     end_of_file:  bool = Field(examples=[False])
 
 
-class CodeLine(BaseModel):
-    """
-    Description:
-    Jedna linia pliku oddana przez `read_code_file`: numer i treść. Pola nazywają się jak
-    w wyniku `find_code_text`, a numer wraca w kształcie, w jakim model poda go `quote_code`.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    line: int = Field(ge=1, examples=[18])
-    # Znak w znak, z wcięciem: w odczycie wcięcie pokazuje, w którym bloku linia leży.
-    text: str = Field(examples=["        if (!$sekwencja) {"])
-
-
 class ReadCodeFileResult(BaseModel):
     """
     Description:
@@ -118,15 +104,20 @@ class ReadCodeFileResult(BaseModel):
     oddany i linie z numerami. Ścieżka wraca w jednej postaci — względna wobec kodu aplikacji,
     bez `..` — tej samej, którą przyjmuje `quote_code`.
 
+    Linie stoją w jednym tekście, każda z numerem i tabulatorem przed treścią, jak `cat -n`:
+    model czyta kod jak kod, a nie jako listę obiektów. Taki tekst zajmuje w wyniku około
+    połowy znaków listy obiektów `{"line", "text"}`.
+
     Zakresy są dwa, bo zwykle się zgadzają, ale nie zawsze: prośbę o linie 12–40 pliku na 14
     linii kończy plik, a prośbę o cały plik na 441 linii urywa limit.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    path:      str            = Field(min_length=1, examples=["src/lib/Urzad/Http/Klient.php"])
-    file_info: CodeFileInfo
-    requested: RequestedLines
-    returned:  ReturnedLines
-    # Nigdy pusta: odczyt, który nie ma ani jednej linii do oddania, kończy się błędem.
-    lines:     list[CodeLine] = Field(min_length=1)
+    path:           str           = Field(min_length=1, examples=["src/lib/Urzad/Http/Klient.php"])
+    file_info:      CodeFileInfo
+    requested:      RequestedLines
+    returned:       ReturnedLines
+    # Numer, tabulator i treść znak w znak, z wcięciem. Nigdy pusty: odczyt, który nie ma ani
+    # jednej linii do oddania, kończy się błędem.
+    numbered_lines: str           = Field(min_length=1, examples=["12\t{\n13\t    return $numer;"])

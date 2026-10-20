@@ -1,6 +1,6 @@
 import pytest
 
-from app.core_util.text import contains_all
+from app.core_util.text import contains_all, number_lines
 
 LINE = "throw new Blad('Z serwerem usługi nie udało się skomunikować');"
 
@@ -56,3 +56,37 @@ def test_the_case_flag_has_no_default_and_goes_by_name() -> None:
 
     with pytest.raises(TypeError):
         contains_all(LINE, ["serwerem"], True)  # type: ignore[misc]
+
+
+def test_each_line_gets_its_number_from_the_first_one() -> None:
+    """Sprawdza, czy każda linia dostaje numer, kolejny od podanego pierwszego, z tabulatorem po
+    numerze, a linie stoją w jednym tekście rozdzielone znakiem nowej linii, bez znaku na końcu.
+
+    Wyłapuje numery liczone od zera albo od jedynki zamiast od pierwszej linii zakresu: model
+    cytowałby wtedy linie przesunięte względem tych, które przeczytał."""
+    assert number_lines(["    {", "        return $numer;", "    }"], first=12) == (
+        "12\t    {\n13\t        return $numer;\n14\t    }"
+    )
+
+
+def test_the_text_of_a_line_stays_as_it_was() -> None:
+    """Sprawdza, czy treść linii zostaje znak w znak: wcięcie, spacje na końcu, tabulator
+    w środku, linia pusta i linia zaczynająca się od cyfr — a numer od treści oddziela zawsze
+    pierwszy tabulator.
+
+    Wyłapuje zdejmowanie wcięcia albo pustych linii: numery przestałyby odpowiadać liniom pliku,
+    a bez wcięcia nie widać, w którym bloku linia leży."""
+    lines = ["\tif ($a) {  ", "", "404;\t// kod", "}"]
+
+    numbered = number_lines(lines, first=1).split("\n")
+
+    assert [line.split("\t", 1) for line in numbered] == [
+        ["1", "\tif ($a) {  "], ["2", ""], ["3", "404;\t// kod"], ["4", "}"],
+    ]
+
+
+def test_no_lines_give_an_empty_text() -> None:
+    """Sprawdza, czy pusta lista linii daje pusty tekst.
+
+    Wyłapuje numer bez linii („1\t") w miejscu, gdzie nie ma nic do pokazania."""
+    assert number_lines([], first=1) == ""

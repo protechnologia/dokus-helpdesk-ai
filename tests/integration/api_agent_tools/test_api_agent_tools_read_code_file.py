@@ -46,6 +46,7 @@ from app.agent_tools.code.read_code_file import (
 )
 from app.config import Settings
 from app.engine_process.ripgrep import RipgrepClient
+from tests._helpers.numbered_lines import line_numbers, line_texts, numbered_pairs
 from tests._helpers.synthetic_code import (
     line_of,
     synthetic_absent_paths,
@@ -130,7 +131,7 @@ async def _result(
         {"path": "src/web/js/_global/bledy.js", "file_info": {"total_lines": 13},
          "requested": {"from_line": 1, "to_line": None},
          "returned": {"from_line": 1, "to_line": 13, "cut_by_limit": False, "end_of_file": True},
-         "lines": [{"line": 1, "text": "…"}, …]}
+         "numbered_lines": "1\t…\n2\t…"}
     """
     update = await _call(arguments)
     text   = update["messages"][0].content
@@ -160,7 +161,7 @@ async def test_a_read_shows_what_the_set_expects(case: dict[str, Any]) -> None:
     model ma czytać dalej."""
     expected = case["expected"]
     result   = await _result(_arguments(case["query"]))
-    text     = "\n".join(line["text"] for line in result["lines"])
+    text     = "\n".join(line_texts(result["numbered_lines"]))
 
     for fragment in expected.get("contains", []):
         assert fragment in text
@@ -188,13 +189,13 @@ async def test_the_lines_are_the_lines_of_the_file_under_their_numbers(
     result   = await _result(arguments)
     returned = result["returned"]
 
-    assert [line["line"] for line in result["lines"]] == list(
+    assert line_numbers(result["numbered_lines"]) == list(
         range(returned["from_line"], returned["to_line"] + 1),
     )
     assert result["file_info"]["total_lines"] == len(in_file)
 
-    for line in result["lines"]:
-        assert line["text"] == in_file[line["line"] - 1]
+    for number, text in numbered_pairs(result["numbered_lines"]):
+        assert text == in_file[number - 1]
 
 
 @pytest.mark.parametrize("case", CUT, ids=lambda case: case["id"])
@@ -211,9 +212,9 @@ async def test_a_read_cut_by_the_limit_can_be_continued(case: dict[str, Any]) ->
 
     second = await _result({"path": arguments["path"], "from_line": next_line})
 
-    assert len(first["lines"])              == MAX_LINES_PER_READ
-    assert second["lines"][0]["line"]       == next_line
-    assert second["requested"]["from_line"] == next_line
+    assert len(line_numbers(first["numbered_lines"])) == MAX_LINES_PER_READ
+    assert line_numbers(second["numbered_lines"])[0]  == next_line
+    assert second["requested"]["from_line"]           == next_line
 
 
 @pytest.mark.parametrize("case", REFUSED, ids=lambda case: case["id"])
@@ -281,10 +282,11 @@ async def test_a_line_found_by_the_search_can_be_read_and_then_quoted() -> None:
         around = await read.read(
             ReadCodeFileQuery(path=hit.path, from_line=max(1, hit.line - 3), to_line=hit.line + 3),
         )
-        [same] = [line for line in around.lines if line.line == hit.line]
+        lines  = numbered_pairs(around.numbered_lines)
+        [same] = [text for number, text in lines if number == hit.line]
 
-        assert around.path       == hit.path
-        assert same.text.strip() == hit.text
+        assert around.path  == hit.path
+        assert same.strip() == hit.text
 
         # --- cytowanie: dokładnie ten zakres, który odczyt oddał ---
         [ref] = quote.cite(await quote.search(QuoteCodeQuery(

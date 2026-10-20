@@ -32,3 +32,26 @@ def contains_all(
     folded = text.casefold()
 
     return all(part.casefold() in folded for part in parts)
+
+
+def number_lines(
+    lines: Sequence[str],  # np. ["    {", "        return $numer;", "    }"]
+    first: int,            # np. 12 — numer pierwszej linii
+) -> str:
+    """
+    Description:
+    Skleja linie w jeden tekst, każdą poprzedzoną numerem i tabulatorem, jak `cat -n`: kolejne
+    numery od `first`, linie rozdzielone znakiem nowej linii. Treść linii zostaje znak w znak,
+    z wcięciem; tabulator po numerze oddziela go od niej także wtedy, gdy linia zaczyna się od
+    cyfr albo jest pusta.
+
+    Example args:
+        lines=["    {", "        return $numer;", "    }"]
+        first=12
+
+    Example result:
+        "12\t    {\n13\t        return $numer;\n14\t    }"
+    """
+    numbered = "\n".join(f"{number}\t{line}" for number, line in enumerate(lines, start=first))
+
+    return numbered

@@ -2125,16 +2125,21 @@ a do tego czasu jej nie ma, więc oba narzędzia kończą się błędem `DbPostg
   nazywają się jak w `quote_code`, więc model cytuje przeczytany fragment bez przeliczania;
   bez numerów prosi o cały plik. Jedno wywołanie oddaje najwyżej 300 linii (stała w modelu
   zapytania), a limit to 10 odczytów na sprawę; w sondzie było ich 4–10 przy 150 liniach.
-  Wynik ma `path`, `file_info.total_lines`, `requested`, `returned` i `lines[]` z polami
-  `line` i `text`, tymi samymi co w szukaniu. Odczyt może oddać mniej, niż żądano, więc
+  Wynik ma `path`, `file_info.total_lines`, `requested`, `returned` i `numbered_lines`: linie
+  jednym tekstem, każda z numerem i tabulatorem przed treścią, jak `cat -n` (od 2026-10-20,
+  wcześniej lista obiektów `line`, `text`). Odczyt może oddać mniej, niż żądano, więc
   powód nazywają dwie flagi w `returned`: `cut_by_limit` (limit urwał żądany
   zakres, dalej czyta się od `to_line` + 1) i `end_of_file` (oddano ostatnią linię pliku).
   Liczy je razem z zakresem jedna funkcja, wspólna z atrapą. Treść linii wraca znak w znak,
   z wcięciem i bez ucinania. Koniec zakresu za końcem pliku nie jest błędem, bo model nie zna
   długości pliku przed odczytem; jako błąd wracają: ścieżka spoza paczki, katalog albo brak
   pliku, początek za końcem pliku, plik pusty i odwrócony zakres. Narzędzie jest pomocnicze,
-  bez `cite()`: źródła nie tworzy. Cena: linia kodu jako obiekt zajmuje 2,34 razy tyle znaków
-  co goły tekst, więc typowy odczyt 150 linii to około 12,5 tys. znaków.
+  bez `cite()`: źródła nie tworzy. Linie jednym tekstem, bo model czyta kod jak kod, a nie jak
+  listę obiektów; tekst z numerami zajmuje 1,15 razy tyle znaków co goły kod, lista obiektów
+  2,1 razy, więc mediana odczytu 150 linii w paczce Dokusa spadła z 11,4 do 6,3 tys. znaków.
+  Numery tworzy `number_lines()` z `core_util/text.py`, wspólne z odczytem symbolu. Cena: numer
+  i treść linii rozdziela tylko tabulator, a model musi wiedzieć, że numer nie należy do kodu
+  (mówi o tym opis narzędzia).
 - **Spis katalogu kodu, `list_code_files` (2026-10-10), przyjmuje opcjonalne `path` i `depth`,
   a oddaje płaską listę pozycji z pełną ścieżką i rodzajem (`dir` albo `file`).** Bez `path`
   spisuje katalog główny kodu, bez `depth` dwa poziomy. Ścieżki pozycji przyjmują bez
@@ -2172,18 +2177,19 @@ a do tego czasu jej nie ma, więc oba narzędzia kończą się błędem `DbPostg
   `APP.pisma.wyslijHandler`, także z `->`), z zachowaniem wielkości liter. Przestrzeń nazw PHP
   przed nazwą klasy jest pomijana, bo mapa jej nie trzyma: `Urzad\Numeracja\GeneratorNumeru`
   wskazuje klasę `GeneratorNumeru`. Jedna pasująca definicja wraca w `symbol` (plik, nazwa,
-  miejsce, rodzaj, linie) z liniami w kształcie odczytu pliku (`line`, `text`), najwyżej 300, z
-  `returned.cut_by_limit`; resztę czyta się `read_code_file`. Kilka wraca w `candidates`, najwyżej
-  20, z `omitted_over_limit`, a `symbol` i `returned` to wtedy `null`: model zawęża `path` do pliku
-  kandydata, a kandydatów z jednego pliku czyta odczytem pliku po ich liniach. Brak definicji to
-  błąd wracający do modelu, w czterech brzmieniach: definicje są poza ścieżką (z liczbą), klasa nie
-  ma takiej metody, ale sama nazwa jest (z liczbą), nazwy nie ma w kodzie wcale, plik odrzucił
-  parser. Nazwa z klasą, która takiej metody nie ma, nie jest po cichu zamieniana na samą nazwę.
-  Definicja, której linie wychodzą poza plik, to błąd konfiguracji: mapa powstała z innego kodu.
-  Narzędzie jest pomocnicze, bez `cite()`; limit to 10 odczytów na sprawę. Na paczce Dokusa metodę
-  odziedziczoną z klasy bazowej oddaje jedno wywołanie z katalogiem modułu, a `__construct` bez
-  ścieżki daje 20 kandydatów i 1603 pominiętych. Cena: sama nazwa wskazuje jedną definicję tylko
-  dla 27% funkcji, więc wywołanie bez ścieżki bywa zużyte na listę kandydatów.
+  miejsce, rodzaj, linie) z liniami w `numbered_lines`, jak w odczycie pliku, najwyżej 300, z
+  `returned.cut_by_limit`; resztę czyta się `read_code_file`. Kilka wraca w `candidates`,
+  najwyżej 20, z `omitted_over_limit`, a `symbol`, `returned` i `numbered_lines` to wtedy
+  `null`: model zawęża `path` do pliku kandydata, a kandydatów z jednego pliku czyta odczytem
+  pliku po ich liniach. Brak definicji to błąd wracający do modelu, w czterech brzmieniach:
+  definicje są poza ścieżką (z liczbą), klasa nie ma takiej metody, ale sama nazwa jest (z
+  liczbą), nazwy nie ma w kodzie wcale, plik odrzucił parser. Nazwa z klasą, która takiej metody
+  nie ma, nie jest po cichu zamieniana na samą nazwę. Definicja, której linie wychodzą poza plik,
+  to błąd konfiguracji: mapa powstała z innego kodu. Narzędzie jest pomocnicze, bez `cite()`;
+  limit to 10 odczytów na sprawę. Na paczce Dokusa metodę odziedziczoną z klasy bazowej oddaje
+  jedno wywołanie z katalogiem modułu, a `__construct` bez ścieżki daje 20 kandydatów i 1603
+  pominiętych. Cena: sama nazwa wskazuje jedną definicję tylko dla 27% funkcji, więc wywołanie bez
+  ścieżki bywa zużyte na listę kandydatów.
 - **`find_code_text` podaje przy każdej linii nazwę funkcji, w której linia leży (`symbol`,
   2026-10-13).** To nazwa najgłębszej definicji z mapy symboli, która obejmuje linię: metoda,
   a nie jej klasa; `null`, gdy linia leży poza definicjami albo plik nie ma symboli. Nazwę
@@ -3632,6 +3638,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/scenarios/code/`       | zestaw scenariuszy cytowania kodu (sprawy z listą grafów), narzędzia sprawy (`case_tools()`), cytowania kodu z rozmowy, ocena i raport (fixture `code_report`) |
 | `tests/_helpers/scenarios/solution/`   | zestaw scenariuszy rozwiązania, karty sprawy ze zmianami (`case_cards()`), fakty w treści dla klienta (`mentions()`), ocena i raport (fixture `solution_report`) |
 | `tests/_helpers/scenarios/reading/`    | zestaw scenariuszy czytania (sprawy z listą grafów), materiał, który atrapy znajdują (`found_material()`), wywołania narzędzi kodu z rozmowy (`code_calls()`), przyczyny wykluczone w uwagach, ocena i raport (fixture `reading_report`) |
+| `tests/_helpers/numbered_lines/`       | linie z numerami z wyniku `read_code_file` i `read_code_symbol` rozebrane z powrotem na pary „numer, treść" (`numbered_pairs()`), same numery (`line_numbers()`) albo samą treść (`line_texts()`) |
 | `tests/_helpers/synthetic_code/`       | aplikacja syntetyczna: zbudowana paczka, jej źródło i reguły, opis projektu, mapa symboli, zapytania z zestawu syntetycznego i prawdziwe narzędzia kodu na niej (`synthetic_code_tools()`) |
 | `tests/_helpers/synthetic_docs/`       | dokumentacja syntetyczna: indeks wobec paczki (`table_differences()`, `collection_differences()`) i pomiary obu wyszukiwań w dokumentacji |
 | `tests/_helpers/golden_tickets/`       | golden set zgłoszeń: zapytania, dystraktory, korpus odniesienia, pomiar `find_tickets_vector` i filtra jakości |
@@ -3964,9 +3971,11 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **`offset` i `limit` w `read_code_file`** — tak pytał prototyp z sondy; `from_line`
   i `to_line` nazywają się jak w `quote_code`, więc model cytuje przeczytany zakres bez
   przeliczania.
-- **Linie odczytu jako lista napisów „numer: treść" albo jeden napis** — 1,33 i 1,16 razy tyle
-  znaków co goły tekst, wobec 2,34 przy liście obiektów; obiekty mają te same pola co wynik
-  szukania (`line`, `text`). Wraca, gdy pomiar pokaże, że koszt odczytów boli (p. 59).
+- **Linie odczytu jako lista obiektów `{line, text}`** (tak było do 2026-10-20) — te same pola
+  co wynik szukania, ale funkcja pocięta na obiekty czyta się jak dane, nie jak kod, i zajmuje
+  w wyniku 2,1 razy tyle znaków co goły kod, wobec 1,15 przy jednym tekście z numerami.
+- **Lista napisów „numer: treść" w odczycie kodu** — 1,33 razy tyle znaków co goły kod
+  i dalej lista; jeden tekst jest krótszy i czyta się jak plik.
 - **Flaga `truncated` albo sama para „żądane, oddane" w wyniku odczytu** — żadna nie mówi, czy
   skończył się plik, czy zadziałał limit; mówią to `cut_by_limit` i `end_of_file`.
 - **Ucinanie długich linii i budżet znaków w odczycie pliku** — linii dłuższych niż 500 znaków

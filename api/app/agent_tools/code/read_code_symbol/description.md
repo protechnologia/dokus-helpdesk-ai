@@ -52,8 +52,7 @@ JSON z jedną definicją i jej liniami albo z listą kandydatów:
 | returned.from_line     | pierwsza oddana linia                    |
 | returned.to_line       | ostatnia oddana linia                    |
 | returned.cut_by_limit  | `true`: limit urwał definicję            |
-| lines[].line           | numer linii w pliku, liczony od 1        |
-| lines[].text           | treść linii, z wcięciem                  |
+| numbered_lines         | linie z numerami; `null`: kilka          |
 | candidates             | pasujące definicje, gdy jest ich kilka   |
 | candidates[].path      | plik kandydata                           |
 | candidates[].name      | nazwa kandydata                          |
@@ -91,8 +90,11 @@ JSON z jedną definicją i jej liniami albo z listą kandydatów:
   w kodzie gdzie indziej. Gdy nie ma jej wcale, może pochodzić
   z biblioteki albo powstawać w trakcie działania: poszukaj jej
   narzędziem `find_code_text`.
-- Ścieżkę z `symbol.path` i numery z `lines[].line` podajesz
-  narzędziu `quote_code`, gdy cytujesz przeczytany fragment.
+- Każda linia w `numbered_lines` to numer linii w pliku (od 1),
+  tabulator i treść linii z wcięciem. Numer nie należy do kodu.
+- Ścieżkę z `symbol.path` i numery linii z `numbered_lines`
+  podajesz narzędziu `quote_code`, gdy cytujesz przeczytany
+  fragment.
 - Sam odczyt nie trafia na listę źródeł odpowiedzi. Źródłem jest
   dopiero fragment zacytowany narzędziem `quote_code` jako
   przyczyna.

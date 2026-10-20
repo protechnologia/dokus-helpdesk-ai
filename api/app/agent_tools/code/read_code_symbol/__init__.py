@@ -36,7 +36,6 @@ from app.agent_tools.code.read_code_symbol.models import (
     RequestedSymbol,
     ReturnedSymbolLines,
     SymbolDefinition,
-    SymbolLine,
 )
 from app.agent_tools.code.read_code_symbol.tool import ReadCodeSymbolTool
 
@@ -52,7 +51,6 @@ __all__ = [
     "RequestedSymbol",
     "ReturnedSymbolLines",
     "SymbolDefinition",
-    "SymbolLine",
     "UnknownSymbolPathError",
     "find_symbol_and_build_result",
 ]

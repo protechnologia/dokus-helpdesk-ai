@@ -1,9 +1,10 @@
 """
 Description:
-Narzędzie pomocnicze: plik z kodu aplikacji albo zakres jego linii, każda z numerem. Drugi krok
-po szukaniu (`find_code_text`): linia znaleziona szukaniem mówi, gdzie tekst stoi, a odczyt
-pokazuje, w jakiej funkcji leży i przy jakim warunku kod do niej dochodzi. Niczego nie cytuje —
-źródłem odpowiedzi jest dopiero fragment wskazany jako przyczyna narzędziem `quote_code`.
+Narzędzie pomocnicze: plik z kodu aplikacji albo zakres jego linii, jednym tekstem, każda linia
+z numerem. Drugi krok po szukaniu (`find_code_text`): linia znaleziona szukaniem mówi, gdzie
+tekst stoi, a odczyt pokazuje, w jakiej funkcji leży i przy jakim warunku kod do niej dochodzi.
+Niczego nie cytuje — źródłem odpowiedzi jest dopiero fragment wskazany jako przyczyna narzędziem
+`quote_code`.
 
 | plik             | co zawiera                                                                |
 |------------------|---------------------------------------------------------------------------|
@@ -31,7 +32,6 @@ from app.agent_tools.code.read_code_file.fake import FakeReadCodeFileTool
 from app.agent_tools.code.read_code_file.models import (
     MAX_LINES_PER_READ,
     CodeFileInfo,
-    CodeLine,
     ReadCodeFileQuery,
     ReadCodeFileResult,
     RequestedLines,
@@ -42,7 +42,6 @@ from app.agent_tools.code.read_code_file.tool import ReadCodeFileTool
 __all__ = [
     "MAX_LINES_PER_READ",
     "CodeFileInfo",
-    "CodeLine",
     "FakeReadCodeFileTool",
     "NoSuchCodeFileError",
     "ReadCodeFileQuery",

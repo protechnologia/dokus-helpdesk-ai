@@ -14,15 +14,15 @@ Przed — zapytanie agenta:
 Po — wynik `read()`:
 
     ReadCodeSymbolResult(
-        requested = RequestedSymbol(name="executeZapisz",
-                                    path="src/apps/frontend/modules/kontrahenci"),
-        symbol    = SymbolDefinition(
+        requested      = RequestedSymbol(name="executeZapisz",
+                                         path="src/apps/frontend/modules/kontrahenci"),
+        symbol         = SymbolDefinition(
             path="src/apps/frontend/modules/kontrahenci/actions/actions.class.php",
             name="executeZapisz", scope="kontrahenciActions", kind="method",
             from_line=13, to_line=27,
         ),
-        returned  = ReturnedSymbolLines(from_line=13, to_line=27, cut_by_limit=False),
-        lines     = [SymbolLine(line=13, text="    public function executeZapisz(…"), …],
+        returned       = ReturnedSymbolLines(from_line=13, to_line=27, cut_by_limit=False),
+        numbered_lines = "13\t    public function executeZapisz(sfWebRequest $request)\n14\t…",
     )
 
 To samo zapytanie bez `path` oddaje trzech kandydatów: akcję `executeZapisz` mają trzy moduły.
@@ -118,7 +118,7 @@ class ReadCodeSymbolTool(ReadCodeSymbolToolBase):
             ReadCodeSymbolResult(requested=RequestedSymbol(name="nastepnyNumer", path="src/…"),
                                  symbol=SymbolDefinition(path="src/…/GeneratorNumeru.php", …),
                                  returned=ReturnedSymbolLines(from_line=13, to_line=26, …),
-                                 lines=[SymbolLine(line=13, text="    public function …"), …])
+                                 numbered_lines="13\t    public function …\n…")
 
         Raises:
             UnknownSymbolPathError: `path` nie wskazuje pliku ani katalogu w paczce
@@ -151,7 +151,7 @@ class ReadCodeSymbolTool(ReadCodeSymbolToolBase):
             result.symbol is not None,
             len(result.candidates),
             result.omitted_over_limit,
-            len(result.lines),
+            result.returned.to_line - result.returned.from_line + 1 if result.returned else 0,
         )
 
         return result

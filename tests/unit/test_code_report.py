@@ -82,6 +82,24 @@ def test_a_quote_reaching_beyond_the_lines_read_is_unread() -> None:
     assert [quote.read for quote in code_quotes(messages)] == [False, False]
 
 
+def test_a_quote_of_exactly_the_lines_read_counts_as_read() -> None:
+    """Sprawdza granice odczytanego zakresu: cytowanie od pierwszej do ostatniej linii odczytu
+    pliku albo symbolu jest odczytane, a cytowanie sięgające jedną linię dalej — nie.
+
+    Wyłapuje zakres odczytu liczony bez ostatniej linii albo z linią za nią: model, który
+    zacytował dokładnie przeczytaną funkcję, wychodziłby na cytującego na ślepo, albo odwrotnie."""
+    messages = conversation(
+        [read_file("c1", TEMPLATES, 1, 20), read_symbol("c2", MAILBOX, 17, 32)],
+        [
+            quote("c3", TEMPLATES, 1, 20, "cause"),
+            quote("c4", MAILBOX, 17, 32, "cause"),
+            quote("c5", TEMPLATES, 20, 21, "cause"),
+        ],
+    )
+
+    assert [quote.read for quote in code_quotes(messages)] == [True, True, False]
+
+
 def test_a_symbol_read_counts_like_a_file_read() -> None:
     """Sprawdza, czy linie oddane przez odczyt symbolu liczą się jako odczytane, tak jak linie
     z odczytu pliku.

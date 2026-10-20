@@ -6,6 +6,7 @@ from app.agent_tools.code.read_code_file import (
     StartOutOfFileError,
     select_lines_and_build_result,
 )
+from tests._helpers.numbered_lines import line_numbers, line_texts
 
 # Wybieranie linii jest wspólne dla narzędzia i atrapy, więc sprawdzamy je raz, na liniach
 # podanych wprost: plik to lista napisów, bez dysku. Linia numer N ma treść „linia N", więc po
@@ -43,8 +44,8 @@ def _file(
 
 def test_a_range_inside_the_file_comes_back_as_asked() -> None:
     """Sprawdza, czy zakres leżący w środku pliku wraca dokładnie taki, o jaki proszono: te same
-    numery w zakresie żądanym i oddanym, każda linia ze swoim numerem i swoją treścią, obie flagi
-    fałszywe, a długość pliku podana osobno.
+    numery w zakresie żądanym i oddanym, każda linia w jednym tekście ze swoim numerem, tabulatorem
+    i swoją treścią, obie flagi fałszywe, a długość pliku podana osobno.
 
     Wyłapuje numery przesunięte o jeden względem treści: model cytowałby wtedy linię sąsiednią
     do tej, którą przeczytał, i źródło wskazywałoby złe miejsce w kodzie."""
@@ -54,9 +55,7 @@ def test_a_range_inside_the_file_comes_back_as_asked() -> None:
         _file(14),
     )
 
-    assert [(line.line, line.text) for line in result.lines] == [
-        (5, "linia 5"), (6, "linia 6"), (7, "linia 7"),
-    ]
+    assert result.numbered_lines == "5\tlinia 5\n6\tlinia 6\n7\tlinia 7"
     assert (result.requested.from_line, result.requested.to_line) == (5, 7)
     assert (result.returned.from_line, result.returned.to_line)   == (5, 7)
     assert (result.returned.cut_by_limit, result.returned.end_of_file) == (False, False)
@@ -72,7 +71,7 @@ def test_a_whole_short_file_ends_at_the_end_of_the_file() -> None:
     model próbowałby czytać dalej i dostawał błąd."""
     result = select_lines_and_build_result(ReadCodeFileQuery(path=PATH), PATH, _file(14))
 
-    assert [line.line for line in result.lines] == list(range(1, 15))
+    assert line_numbers(result.numbered_lines) == list(range(1, 15))
     assert result.requested.to_line is None
     assert (result.returned.to_line, result.returned.end_of_file) == (14, True)
     assert result.returned.cut_by_limit is False
@@ -91,8 +90,8 @@ def test_a_whole_long_file_is_cut_by_the_limit() -> None:
         _file(MAX_LINES_PER_READ + 141),
     )
 
-    assert len(result.lines)       == MAX_LINES_PER_READ
-    assert result.returned.to_line == MAX_LINES_PER_READ
+    assert len(line_numbers(result.numbered_lines)) == MAX_LINES_PER_READ
+    assert result.returned.to_line                  == MAX_LINES_PER_READ
     assert (result.returned.cut_by_limit, result.returned.end_of_file) == (True, False)
     assert result.file_info.total_lines == MAX_LINES_PER_READ + 141
 
@@ -112,7 +111,8 @@ def test_asking_for_exactly_the_limit_cuts_nothing() -> None:
         ReadCodeFileQuery(path=PATH, from_line=11, to_line=11 + MAX_LINES_PER_READ), PATH, lines,
     )
 
-    assert len(at_the_limit.lines) == len(one_more.lines) == MAX_LINES_PER_READ
+    assert len(line_numbers(at_the_limit.numbered_lines)) == MAX_LINES_PER_READ
+    assert len(line_numbers(one_more.numbered_lines))     == MAX_LINES_PER_READ
     assert at_the_limit.returned.cut_by_limit is False
     assert one_more.returned.cut_by_limit     is True
     assert one_more.returned.to_line          == 10 + MAX_LINES_PER_READ
@@ -131,7 +131,7 @@ def test_a_range_past_the_end_of_the_file_stops_at_the_last_line() -> None:
         _file(14),
     )
 
-    assert [line.line for line in result.lines] == [12, 13, 14]
+    assert line_numbers(result.numbered_lines) == [12, 13, 14]
     assert result.requested.to_line == 40
     assert result.returned.to_line  == 14
     assert (result.returned.cut_by_limit, result.returned.end_of_file) == (False, True)
@@ -152,7 +152,7 @@ def test_a_file_as_long_as_the_limit_is_read_whole() -> None:
     )
 
     for result in (whole, past_end):
-        assert len(result.lines) == MAX_LINES_PER_READ
+        assert len(line_numbers(result.numbered_lines)) == MAX_LINES_PER_READ
         assert (result.returned.cut_by_limit, result.returned.end_of_file) == (False, True)
 
 
@@ -176,11 +176,11 @@ def test_the_flags_always_agree_with_the_numbers() -> None:
         )
 
         returned   = result.returned
-        numbers    = [line.line for line in result.lines]
+        numbers    = line_numbers(result.numbered_lines)
         wanted_end = total if to_line is None else min(to_line, total)
 
         assert numbers               == list(range(from_line, returned.to_line + 1)), case
-        assert len(result.lines)     <= MAX_LINES_PER_READ, case
+        assert len(numbers)          <= MAX_LINES_PER_READ, case
         assert returned.end_of_file  == (returned.to_line == total), case
         assert returned.cut_by_limit == (returned.to_line < wanted_end), case
         assert not (returned.cut_by_limit and returned.end_of_file), case
@@ -198,7 +198,7 @@ def test_the_text_of_a_line_comes_back_as_it_is_in_the_file() -> None:
 
     result = select_lines_and_build_result(ReadCodeFileQuery(path=PATH), PATH, lines)
 
-    assert [line.text for line in result.lines] == lines
+    assert line_texts(result.numbered_lines) == lines
 
 
 def test_a_start_past_the_end_of_the_file_is_an_error() -> None:
@@ -217,7 +217,7 @@ def test_a_start_past_the_end_of_the_file_is_an_error() -> None:
 
     assert caught.value.line_count == 14
     assert "14" in str(caught.value) and "15" in str(caught.value)
-    assert [line.line for line in last.lines] == [14]
+    assert line_numbers(last.numbered_lines) == [14]
 
 
 def test_an_empty_file_is_an_error_that_says_so() -> None:

@@ -10,6 +10,7 @@ from app.agent_tools.code.read_code_file import (
     StartOutOfFileError,
 )
 from app.core_service.loader_code_package import CodePackage, CodePackageConfigError
+from tests._helpers.numbered_lines import line_texts, numbered_pairs
 
 # Narzędzie stoi na prawdziwym czytniku paczki, a paczka to kilka linii w katalogu tymczasowym —
 # sprawdzamy więc, co narzędzie robi z plikiem i z odmową czytnika. Wybieranie zakresu i flagi
@@ -67,9 +68,7 @@ async def test_a_range_of_a_file_comes_back_with_its_line_numbers(tmp_path: Path
     result = await _tool(tmp_path).read(query)
 
     assert result.path == GENERATOR
-    assert [(line.line, line.text) for line in result.lines] == [
-        (4, CODE[3]), (5, CODE[4]), (6, CODE[5]),
-    ]
+    assert numbered_pairs(result.numbered_lines) == [(4, CODE[3]), (5, CODE[4]), (6, CODE[5])]
 
 
 async def test_a_file_without_a_range_comes_back_whole(tmp_path: Path) -> None:
@@ -80,8 +79,8 @@ async def test_a_file_without_a_range_comes_back_whole(tmp_path: Path) -> None:
     a narzędzie cytujące odpowiedziałoby, że plik takiej linii nie ma."""
     result = await _tool(tmp_path).read(ReadCodeFileQuery(path=GENERATOR))
 
-    assert [line.text for line in result.lines] == CODE
-    assert result.file_info.total_lines         == 7
+    assert line_texts(result.numbered_lines) == CODE
+    assert result.file_info.total_lines      == 7
     assert (result.returned.to_line, result.returned.end_of_file) == (7, True)
 
 

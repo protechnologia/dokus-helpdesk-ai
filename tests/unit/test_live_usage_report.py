@@ -112,18 +112,18 @@ def test_a_case_recorded_without_the_conversation_prints_the_log_alone() -> None
 
 def test_the_result_is_described_by_numbers_and_flags_not_by_its_content() -> None:
     """Sprawdza opis wyniku narzędzia na wyniku odczytu pliku kodu: pola w grupach stoją pod
-    pełną ścieżką, liczby i flagi z wartością (`true`, `null` jak w JSON-ie), lista linii jest
-    zastąpiona liczbą pozycji, a długi tekst swoją długością. Treści linii kodu w opisie nie ma.
+    pełną ścieżką, liczby i flagi z wartością (`true`, `null` jak w JSON-ie), a długi tekst —
+    linie kodu z numerami — swoją długością. Treści linii kodu w opisie nie ma.
 
     Wyłapuje opis, który wkleja treść wyniku (raport po kilku odczytach miałby tysiące linii)
     albo gubi flagi zakresu: po nich widać, czy model dostał cały plik, czy odczyt urwał limit."""
     content = json.dumps({
-        "path":      "src/a.php",
-        "file_info": {"total_lines": 441},
-        "requested": {"from_line": 1, "to_line": None},
-        "returned":  {"from_line": 1, "to_line": 300, "cut_by_limit": True, "end_of_file": False},
-        "lines":     [{"line": 1, "text": "<?php"}, {"line": 2, "text": "tajna_tresc();"}],
-        "notes":     "x" * 200,
+        "path":           "src/a.php",
+        "file_info":      {"total_lines": 441},
+        "requested":      {"from_line": 1, "to_line": None},
+        "returned":       {"from_line": 1, "to_line": 300, "cut_by_limit": True,
+                           "end_of_file": False},
+        "numbered_lines": "1\t<?php\n2\ttajna_tresc();\n" + "3\t//\n" * 50,
     })
 
     summary = result_as_summary(content)
@@ -131,7 +131,7 @@ def test_the_result_is_described_by_numbers_and_flags_not_by_its_content() -> No
     assert summary == (
         "path: src/a.php, file_info.total_lines: 441, requested.from_line: 1, "
         "requested.to_line: null, returned.from_line: 1, returned.to_line: 300, "
-        "returned.cut_by_limit: true, returned.end_of_file: false, lines: 2, notes: 200 zn."
+        "returned.cut_by_limit: true, returned.end_of_file: false, numbered_lines: 275 zn."
     )
     assert "tajna_tresc" not in summary
 

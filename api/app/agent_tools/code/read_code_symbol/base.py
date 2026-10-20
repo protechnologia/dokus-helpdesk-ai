@@ -28,21 +28,12 @@ Po — tekst dla modelu, gdy pasuje jedna definicja (linie skrócone do dwóch):
         "to_line": 13,
         "cut_by_limit": false
       },
-      "lines": [
-        {
-          "line": 5,
-          "text": "    public function nastepnyNumer($rok)"
-        },
-        {
-          "line": 6,
-          "text": "    {"
-        }
-      ],
+      "numbered_lines": "5\t    public function nastepnyNumer($rok)\n6\t    {\n…",
       "candidates": [],
       "omitted_over_limit": 0
     }
 
-Gdy pasuje kilka definicji, `symbol` i `returned` to `null`, `lines` jest puste, a pasujące
+Gdy pasuje kilka definicji, `symbol`, `returned` i `numbered_lines` to `null`, a pasujące
 definicje stoją w `candidates`, bez treści.
 
 Jak nazwa z zapytania pasuje do definicji z mapy:
@@ -87,12 +78,12 @@ from app.agent_tools.code.read_code_symbol.models import (
     RequestedSymbol,
     ReturnedSymbolLines,
     SymbolDefinition,
-    SymbolLine,
 )
 from app.core_model.code.code_symbol import CodeSymbol
 from app.core_model.code.code_symbol_map import CodeSymbolMap
 from app.core_service.loader_code_package import CodePackageConfigError
 from app.core_util.path import is_path_under
+from app.core_util.text import number_lines
 
 # Czym w zapytaniu bywa oddzielone miejsce od nazwy: `Klasa::metoda`, `$obiekt->metoda`,
 # `APP.pisma.wyslij`.
@@ -235,7 +226,7 @@ def find_symbol_and_build_result(
                              symbol=SymbolDefinition(path="src/lib/…/GeneratorNumeru.php", …),
                              returned=ReturnedSymbolLines(from_line=5, to_line=13,
                                                           cut_by_limit=False),
-                             lines=[SymbolLine(line=5, text="    public function …"), …],
+                             numbered_lines="5\t    public function …\n6\t    {\n…",
                              candidates=[], omitted_over_limit=0)
 
     Raises:
@@ -283,17 +274,14 @@ def find_symbol_and_build_result(
 
     last   = min(symbol.to_line, symbol.from_line + MAX_LINES_PER_SYMBOL - 1)
     result = ReadCodeSymbolResult(
-        requested = requested,
-        symbol    = symbol,
-        returned  = ReturnedSymbolLines(
+        requested      = requested,
+        symbol         = symbol,
+        returned       = ReturnedSymbolLines(
             from_line    = symbol.from_line,
             to_line      = last,
             cut_by_limit = last < symbol.to_line,  # definicja jest dłuższa niż limit linii
         ),
-        lines     = [
-            SymbolLine(line=number, text=text)
-            for number, text in enumerate(lines[symbol.from_line - 1:last], start=symbol.from_line)
-        ],
+        numbered_lines = number_lines(lines[symbol.from_line - 1:last], first=symbol.from_line),
     )
 
     return result
@@ -335,7 +323,7 @@ class ReadCodeSymbolToolBase(AuxiliaryTool):
             ReadCodeSymbolResult(requested=RequestedSymbol(name="nastepnyNumer", path="src/…"),
                                  symbol=SymbolDefinition(path="src/…/GeneratorNumeru.php", …),
                                  returned=ReturnedSymbolLines(from_line=5, to_line=13, …),
-                                 lines=[SymbolLine(line=5, text="    public function …"), …])
+                                 numbered_lines="5\t    public function …\n…")
         """
 
     async def run(
@@ -353,7 +341,7 @@ class ReadCodeSymbolToolBase(AuxiliaryTool):
             {"requested": {"name": "nastepnyNumer", "path": null},
              "symbol": {"path": "src/lib/Urzad/Numeracja/GeneratorNumeru.php", …},
              "returned": {"from_line": 5, "to_line": 13, "cut_by_limit": false},
-             "lines": [{"line": 5, "text": "    public function nastepnyNumer($rok)"}, …],
+             "numbered_lines": "5\t    public function nastepnyNumer($rok)\n6\t    {\n…",
              "candidates": [], "omitted_over_limit": 0}
         """
         result = await self.read(args)

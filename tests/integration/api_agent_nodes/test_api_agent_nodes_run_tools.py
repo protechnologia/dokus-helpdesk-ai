@@ -25,6 +25,7 @@ from app.engine_anonymization import FakeAnonymizer
 from app.engine_embedding import EmbeddingError
 from app.engine_llm import ChatMessage, FakeLLMClient, ToolCall
 from tests._helpers.fake_tools import fake_agent_tools, find_tickets_vector_with_dead_embedder
+from tests._helpers.numbered_lines import line_numbers, line_texts
 
 # Prawdziwy węzeł `run_tools` wpięty w grafy z pętlą i uruchomiony przez LangGraph, razem
 # z prawdziwym węzłem agenta. Model to atrapa, która oddaje zaplanowane tury, narzędzia to atrapy
@@ -243,8 +244,8 @@ async def test_of_code_found_read_and_quoted_only_the_quote_is_a_source(graph: M
     final    = await run_graph(await loop_graph(graph, llm), graph.example_state())
     read_out = json.loads(llm.turn_calls[2].messages[-1].content)
 
-    assert [line["line"] for line in read_out["lines"]] == list(range(5, 13))
-    assert "if (!$sekwencja) {" in read_out["lines"][3]["text"]
+    assert line_numbers(read_out["numbered_lines"]) == list(range(5, 13))
+    assert "if (!$sekwencja) {" in line_texts(read_out["numbered_lines"])[3]
     assert [ref.key for ref in final.sources] == [f"code:{GENERATOR_PATH}:8-10"]
     assert [entry.message for entry in final.log if entry.node == "run_tools"] == [
         "wywołania: find_code_text; źródła: 0",

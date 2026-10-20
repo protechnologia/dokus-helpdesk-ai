@@ -80,7 +80,7 @@ class FakeReadCodeSymbolTool(ReadCodeSymbolToolBase):
                                  symbol=SymbolDefinition(path="src/…/GeneratorNumeru.php", …),
                                  returned=ReturnedSymbolLines(from_line=5, to_line=13,
                                                               cut_by_limit=False),
-                                 lines=[SymbolLine(line=5, text="    public function …"), …])
+                                 numbered_lines="5\t    public function …\n…")
 
         Raises:
             UnknownSymbolPathError: atrapa nie zna żadnego pliku pod tą ścieżką

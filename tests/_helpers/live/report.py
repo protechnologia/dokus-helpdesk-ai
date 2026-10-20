@@ -286,11 +286,11 @@ def result_as_summary(
     Example args:
         content='{"path": "src/a.php", "file_info": {"total_lines": 14},
                   "returned": {"from_line": 1, "to_line": 14, "end_of_file": true},
-                  "lines": [{"line": 1, "text": "<?php"}, …]}'
+                  "numbered_lines": "1\t<?php\n2\t…"}'
 
     Example result:
         "path: src/a.php, file_info.total_lines: 14, returned.from_line: 1, "
-        "returned.to_line: 14, returned.end_of_file: true, lines: 14"
+        "returned.to_line: 14, returned.end_of_file: true, numbered_lines: 412 zn."
     """
     # --- błąd narzędzia: komunikat w całości, bo po nim widać, co model zrobił źle ---
     if is_error_json(content):

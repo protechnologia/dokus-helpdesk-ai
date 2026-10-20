@@ -25,20 +25,7 @@ Po — tekst dla modelu:
         "cut_by_limit": false,
         "end_of_file": true
       },
-      "lines": [
-        {
-          "line": 12,
-          "text": "        return $sekwencja->nastepny . '/' . $rok;"
-        },
-        {
-          "line": 13,
-          "text": "    }"
-        },
-        {
-          "line": 14,
-          "text": "}"
-        }
-      ]
+      "numbered_lines": "12\t        return $sekwencja->nastepny . '/' . $rok;\n13\t    }\n14\t}"
     }
 
 Co mówi para flag w `returned`:
@@ -60,8 +47,10 @@ O czym pamiętać przy zmianach:
   `MAX_LINES_PER_READ` linii limit osiąga, ale niczego nie urywa.
 - Koniec zakresu za końcem pliku to nie błąd: agent nie zna długości pliku przed pierwszym
   odczytem. Błędem jest dopiero początek za końcem pliku.
-- Treść linii wraca znak w znak, z wcięciem, i nie jest ucinana — inaczej niż w wyniku
-  `find_code_text`, który pokazuje samo miejsce trafienia.
+- Linie wracają jednym tekstem z numerami (`number_lines()`), nie listą obiektów: model czyta
+  kod jak kod, a tekst zajmuje około połowy znaków listy. Treść linii jest znak w znak,
+  z wcięciem, i nie jest ucinana — inaczej niż w wyniku `find_code_text`, który pokazuje samo
+  miejsce trafienia.
 - Ścieżka i numery linii są te same, które przyjmuje `quote_code`.
 - Ten tekst jest częścią promptu — jego kształt stroi się pomiarem razem z promptami grafów.
 """
@@ -74,12 +63,12 @@ from app.agent_tools.code.read_code_file.errors import StartOutOfFileError
 from app.agent_tools.code.read_code_file.models import (
     MAX_LINES_PER_READ,
     CodeFileInfo,
-    CodeLine,
     ReadCodeFileQuery,
     ReadCodeFileResult,
     RequestedLines,
     ReturnedLines,
 )
+from app.core_util.text import number_lines
 
 
 def select_lines_and_build_result(
@@ -109,7 +98,7 @@ def select_lines_and_build_result(
                            requested=RequestedLines(from_line=12, to_line=40),
                            returned=ReturnedLines(from_line=12, to_line=14, cut_by_limit=False,
                                                   end_of_file=True),
-                           lines=[CodeLine(line=12, text="        return $sekwencja->…"), …])
+                           numbered_lines="12\t        return $sekwencja->…\n13\t    }\n14\t}")
 
     Raises:
         StartOutOfFileError: odczyt zaczyna się za ostatnią linią pliku albo plik jest pusty
@@ -126,19 +115,16 @@ def select_lines_and_build_result(
     last       = min(wanted_end, limit_end)
 
     result = ReadCodeFileResult(
-        path      = path,
-        file_info = CodeFileInfo(total_lines=total),
-        requested = RequestedLines(from_line=query.from_line, to_line=query.to_line),
-        returned  = ReturnedLines(
+        path           = path,
+        file_info      = CodeFileInfo(total_lines=total),
+        requested      = RequestedLines(from_line=query.from_line, to_line=query.to_line),
+        returned       = ReturnedLines(
             from_line    = query.from_line,
             to_line      = last,
             cut_by_limit = last < wanted_end,  # zabrakło linii, o które agent prosił
             end_of_file  = last == total,      # ostatnia oddana linia jest ostatnią w pliku
         ),
-        lines     = [
-            CodeLine(line=number, text=text)
-            for number, text in enumerate(lines[query.from_line - 1:last], start=query.from_line)
-        ],
+        numbered_lines = number_lines(lines[query.from_line - 1:last], first=query.from_line),
     )
 
     return result
@@ -182,7 +168,7 @@ class ReadCodeFileToolBase(AuxiliaryTool):
                                file_info=CodeFileInfo(total_lines=14),
                                requested=RequestedLines(from_line=12, to_line=40),
                                returned=ReturnedLines(from_line=12, to_line=14, …),
-                               lines=[CodeLine(line=12, text="        return …"), …])
+                               numbered_lines="12\t        return …\n13\t    }\n14\t}")
         """
 
     async def run(
@@ -201,7 +187,7 @@ class ReadCodeFileToolBase(AuxiliaryTool):
              "requested": {"from_line": 1, "to_line": null},
              "returned": {"from_line": 1, "to_line": 8, "cut_by_limit": false,
                           "end_of_file": true},
-             "lines": [{"line": 1, "text": "$(document).ajaxError(function (…) {"}, …]}
+             "numbered_lines": "1\t$(document).ajaxError(function (…) {\n2\t…"}
         """
         result = await self.read(args)
         text   = result_as_json(result)

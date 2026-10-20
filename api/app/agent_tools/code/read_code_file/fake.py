@@ -68,7 +68,7 @@ class FakeReadCodeFileTool(ReadCodeFileToolBase):
                                requested=RequestedLines(from_line=7, to_line=9),
                                returned=ReturnedLines(from_line=7, to_line=9, cut_by_limit=False,
                                                       end_of_file=False),
-                               lines=[CodeLine(line=7, text="        $sekwencja = …"), …])
+                               numbered_lines="7\t        $sekwencja = …\n8\t…\n9\t…")
 
         Raises:
             NoSuchCodeFileError: atrapa nie zna pliku pod tą ścieżką

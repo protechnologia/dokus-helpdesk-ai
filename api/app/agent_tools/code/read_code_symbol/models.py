@@ -88,32 +88,21 @@ class ReturnedSymbolLines(BaseModel):
     cut_by_limit: bool = Field(examples=[False])
 
 
-class SymbolLine(BaseModel):
-    """
-    Description:
-    Jedna linia definicji oddana przez `read_code_symbol`: numer i treść. Pola nazywają się jak
-    w wynikach `read_code_file` i `find_code_text`.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    line: int = Field(ge=1, examples=[13])
-    # Znak w znak, z wcięciem, jak w odczycie pliku.
-    text: str = Field(examples=["    public function nastepnyNumer($rok)"])
-
-
 class ReadCodeSymbolResult(BaseModel):
     """
     Description:
     Co daje jeden odczyt `read_code_symbol`. Wynik ma dwie postaci, zależnie od tego, ile
     definicji pasuje do nazwy:
 
-    | pasuje | `symbol` | `returned` | `lines`   | `candidates`         |
-    |--------|----------|------------|-----------|----------------------|
-    | jedna  | ona      | jej zakres | jej linie | pusta                |
-    | kilka  | `None`   | `None`     | pusta     | pasujące, bez treści |
+    | pasuje | `symbol` | `returned` | `numbered_lines` | `candidates`         |
+    |--------|----------|------------|------------------|----------------------|
+    | jedna  | ona      | jej zakres | jej linie        | pusta                |
+    | kilka  | `None`   | `None`     | `None`           | pasujące, bez treści |
 
     Gdy nie pasuje żadna, wyniku nie ma: narzędzie zgłasza błąd, który wraca do modelu.
+
+    Linie definicji stoją w jednym tekście, każda z numerem i tabulatorem przed treścią, jak
+    w wyniku `read_code_file`: model czyta funkcję w całości, jak kod.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -122,7 +111,8 @@ class ReadCodeSymbolResult(BaseModel):
     # Jedyna pasująca definicja; `None`, gdy pasuje ich kilka.
     symbol:             SymbolDefinition | None
     returned:           ReturnedSymbolLines | None
-    lines:              list[SymbolLine]       = Field(default_factory=list)
+    # Numer, tabulator i treść znak w znak, jak w `read_code_file`; `None` przy kandydatach.
+    numbered_lines:     str | None             = Field(default=None, examples=["5\tfunction a()"])
     # Pasujące definicje, gdy jest ich kilka: po ścieżce i linii, najwyżej `MAX_CANDIDATES`.
     candidates:         list[SymbolDefinition] = Field(default_factory=list)
     # Ilu kandydatów nie zmieściło się na liście.

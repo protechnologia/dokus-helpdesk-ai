@@ -12,6 +12,7 @@ from app.agent_tools.code.read_code_file import (
     StartOutOfFileError,
 )
 from app.core_service.loader_code_package import split_lines
+from tests._helpers.numbered_lines import line_numbers, line_texts, numbered_pairs
 
 CONDITION = ReadCodeFileQuery(path=GENERATOR_PATH, from_line=7, to_line=9)
 
@@ -28,30 +29,30 @@ async def test_the_fake_returns_the_lines_that_were_asked_for() -> None:
     fragment = await tool.read(CONDITION)
     whole    = await tool.read(ReadCodeFileQuery(path=ERRORS_PATH))
 
-    assert [(line.line, line.text) for line in fragment.lines] == list(
+    assert numbered_pairs(fragment.numbered_lines) == list(
         enumerate(split_lines(files[GENERATOR_PATH])[6:9], start=7),
     )
-    assert [line.text for line in whole.lines] == split_lines(files[ERRORS_PATH])
-    assert (fragment.path, whole.path)         == (GENERATOR_PATH, ERRORS_PATH)
+    assert line_texts(whole.numbered_lines) == split_lines(files[ERRORS_PATH])
+    assert (fragment.path, whole.path)      == (GENERATOR_PATH, ERRORS_PATH)
 
 
 async def test_the_model_reads_the_result_as_json_with_both_ranges() -> None:
     """Sprawdza, czy tekst, który model dostaje od atrapy, to JSON z pięcioma częściami: ścieżką,
-    długością pliku, zakresem żądanym, zakresem oddanym z dwiema flagami i liniami z numerem
-    i treścią.
+    długością pliku, zakresem żądanym, zakresem oddanym z dwiema flagami i liniami w jednym
+    tekście, każdą z numerem i treścią.
 
     Wyłapuje atrapę z własnym kształtem tekstu dla modelu: test grafu na atrapie sprawdzałby
     wtedy inny tekst niż ten, który model czyta na produkcji."""
     body = json.loads(await FakeReadCodeFileTool().run(CONDITION))
 
-    assert set(body)             == {"path", "file_info", "requested", "returned", "lines"}
-    assert body["file_info"]     == {"total_lines": 14}
-    assert body["requested"]     == {"from_line": 7, "to_line": 9}
-    assert body["returned"]      == {
+    assert set(body) == {"path", "file_info", "requested", "returned", "numbered_lines"}
+    assert body["file_info"] == {"total_lines": 14}
+    assert body["requested"] == {"from_line": 7, "to_line": 9}
+    assert body["returned"]  == {
         "from_line": 7, "to_line": 9, "cut_by_limit": False, "end_of_file": False,
     }
-    assert set(body["lines"][0]) == {"line", "text"}
-    assert "if (!$sekwencja) {" in body["lines"][1]["text"]
+    assert numbered_pairs(body["numbered_lines"])[1][0] == 8
+    assert "if (!$sekwencja) {" in numbered_pairs(body["numbered_lines"])[1][1]
 
 
 async def test_an_unknown_path_is_an_error() -> None:
@@ -80,7 +81,7 @@ async def test_a_start_past_the_end_of_a_known_file_is_an_error() -> None:
     last = await tool.read(ReadCodeFileQuery(path=GENERATOR_PATH, from_line=14))
 
     assert caught.value.line_count == 14
-    assert [line.line for line in last.lines] == [14]
+    assert line_numbers(last.numbered_lines) == [14]
 
 
 async def test_a_fake_built_without_files_knows_none() -> None:
@@ -123,10 +124,10 @@ async def test_the_three_code_fakes_agree_on_paths_and_lines() -> None:
 
     for found in default_matched():
         query  = ReadCodeFileQuery(path=found.path, from_line=found.line, to_line=found.line)
-        [line] = (await read.read(query)).lines
+        [(number, text)] = numbered_pairs((await read.read(query)).numbered_lines)
 
-        assert (line.line, line.text.strip()) == (found.line, found.text)
+        assert (number, text.strip()) == (found.line, found.text)
 
         await quote.search(
-            QuoteCodeQuery(path=found.path, from_line=line.line, to_line=line.line, role="cause"),
+            QuoteCodeQuery(path=found.path, from_line=number, to_line=number, role="cause"),
         )

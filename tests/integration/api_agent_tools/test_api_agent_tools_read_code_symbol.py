@@ -46,6 +46,7 @@ from app.agent_tools.code.read_code_symbol import (
 )
 from app.config import Settings
 from app.engine_process.ripgrep import RipgrepClient
+from tests._helpers.numbered_lines import line_numbers, line_texts, numbered_pairs
 from tests._helpers.synthetic_code import (
     synthetic_code_cases,
     synthetic_code_description,
@@ -122,7 +123,7 @@ async def _result(
          "symbol": {"path": "src/lib/Urzad/Numeracja/GeneratorNumeru.php", "name": "nastepnyNumer",
                     "scope": "GeneratorNumeru", "kind": "method", "from_line": 13, "to_line": 26},
          "returned": {"from_line": 13, "to_line": 26, "cut_by_limit": False},
-         "lines": [{"line": 13, "text": "…"}, …], "candidates": [], "omitted_over_limit": 0}
+         "numbered_lines": "13\t…\n14\t…", "candidates": [], "omitted_over_limit": 0}
     """
     update = await _call(arguments)
     text   = update["messages"][0].content
@@ -151,7 +152,7 @@ async def test_a_name_gives_the_definition_the_set_expects(case: dict[str, Any])
     kandydatów tam, gdzie nazwa z miejscem wskazuje jedną definicję."""
     expected = case["expected"]
     result   = await _result(case["query"])
-    text     = "\n".join(line["text"] for line in result["lines"])
+    text     = "\n".join(line_texts(result["numbered_lines"]))
     symbol   = result["symbol"]
 
     assert {key: symbol[key] for key in ("path", "scope", "kind")} == expected["symbol"]
@@ -176,12 +177,12 @@ async def test_the_lines_are_the_lines_of_the_file_under_their_numbers(
     numerami, pod którymi w pliku stoi co innego."""
     result  = await _result(case["query"])
     in_file = synthetic_code_package().read_lines(result["symbol"]["path"])
-    numbers = [line["line"] for line in result["lines"]]
+    numbers = line_numbers(result["numbered_lines"])
 
     assert numbers == list(range(result["symbol"]["from_line"], result["returned"]["to_line"] + 1))
 
-    for line in result["lines"]:
-        assert line["text"] == in_file[line["line"] - 1]
+    for number, text in numbered_pairs(result["numbered_lines"]):
+        assert text == in_file[number - 1]
 
 
 @pytest.mark.parametrize("case", CUT, ids=lambda case: case["id"])
@@ -202,7 +203,7 @@ async def test_a_definition_cut_by_the_limit_can_be_continued_by_the_file_read(
         ReadCodeFileQuery(path=first["symbol"]["path"], from_line=next_line, to_line=last_line),
     )
 
-    assert len(first["lines"]) == MAX_LINES_PER_SYMBOL
+    assert len(line_numbers(first["numbered_lines"])) == MAX_LINES_PER_SYMBOL
     assert (rest.returned.from_line, rest.returned.to_line) == (next_line, last_line)
 
 
@@ -217,7 +218,7 @@ async def test_a_name_with_several_definitions_gives_candidates_without_any_line
     mają trzy moduły i tylko model wie, o który chodzi w zgłoszeniu."""
     result = await _result(case["query"])
 
-    assert (result["symbol"], result["returned"], result["lines"]) == (None, None, [])
+    assert (result["symbol"], result["returned"], result["numbered_lines"]) == (None, None, None)
     assert [[c["path"], c["scope"]] for c in result["candidates"]] == case["expected"]["candidates"]
     assert all(c["from_line"] <= c["to_line"] for c in result["candidates"])
 
@@ -237,7 +238,7 @@ async def test_every_candidate_can_be_read_by_narrowing_the_path_to_its_file(
         narrowed = await _result({"name": case["query"]["name"], "path": candidate["path"]})
 
         assert narrowed["symbol"] == candidate
-        assert narrowed["lines"]
+        assert narrowed["numbered_lines"]
 
 
 async def test_every_definition_with_a_place_reads_the_same_by_place_and_by_file() -> None:
@@ -264,7 +265,7 @@ async def test_every_definition_with_a_place_reads_the_same_by_place_and_by_file
             assert by_place.symbol is not None, with_place
             assert (by_place.symbol.path, by_place.symbol.from_line) == (path, symbol.from_line)
             assert by_place.symbol == by_file.symbol, with_place
-            assert by_place.lines  == by_file.lines, with_place
+            assert by_place.numbered_lines == by_file.numbered_lines, with_place
 
     # Paczka ma kilkadziesiąt takich definicji; zero znaczyłoby, że test niczego nie sprawdził.
     assert checked > 40
@@ -325,10 +326,11 @@ async def test_the_function_of_a_found_line_can_be_read_and_then_quoted() -> Non
     for hit in named:
         # --- odczyt: nazwa funkcji i ścieżka dokładnie w brzmieniu z wyniku szukania ---
         read   = await _tool().read(ReadCodeSymbolQuery(name=hit.symbol, path=hit.path))
-        [same] = [line for line in read.lines if line.line == hit.line]
+        lines  = numbered_pairs(read.numbered_lines)
+        [same] = [text for number, text in lines if number == hit.line]
 
-        assert read.symbol.path  == hit.path
-        assert same.text.strip() == hit.text
+        assert read.symbol.path == hit.path
+        assert same.strip()     == hit.text
 
         # --- cytowanie: dokładnie ten zakres, który odczyt oddał ---
         [ref] = quote.cite(await quote.search(QuoteCodeQuery(

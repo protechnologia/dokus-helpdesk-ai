@@ -37,7 +37,6 @@ from app.agent_tools.code.find_code_text.models import FindCodeTextResult, Match
 from app.agent_tools.code.quote_code.models import QuoteCodeResult
 from app.agent_tools.code.read_code_file.models import (
     CodeFileInfo,
-    CodeLine,
     ReadCodeFileResult,
     RequestedLines,
     ReturnedLines,
@@ -47,8 +46,8 @@ from app.agent_tools.code.read_code_symbol.models import (
     RequestedSymbol,
     ReturnedSymbolLines,
     SymbolDefinition,
-    SymbolLine,
 )
+from app.core_util.text import number_lines
 from app.engine_llm import ChatMessage, ToolCall
 from tests._helpers.scenarios.code.models.code_case import CodeCase
 from tests._helpers.scenarios.code.models.code_fragment import CodeFragment
@@ -124,19 +123,19 @@ def read_file(
 
     Example result:
         (ToolCall(call_id="c1", name="read_code_file", …),
-         ChatMessage(role="tool", call_id="c1", content='{"path": "src/lib/…", "lines": […]}'))
+         ChatMessage(role="tool", call_id="c1", content='{"path": "src/lib/…", …}'))
     """
     result = ReadCodeFileResult(
-        path      = path,
-        file_info = CodeFileInfo(total_lines=to_line),
-        requested = RequestedLines(from_line=from_line, to_line=to_line),
-        returned  = ReturnedLines(
+        path           = path,
+        file_info      = CodeFileInfo(total_lines=to_line),
+        requested      = RequestedLines(from_line=from_line, to_line=to_line),
+        returned       = ReturnedLines(
             from_line    = from_line,
             to_line      = to_line,
             cut_by_limit = False,
             end_of_file  = True,
         ),
-        lines     = [CodeLine(line=line, text="…") for line in range(from_line, to_line + 1)],
+        numbered_lines = number_lines(["…"] * (to_line - from_line + 1), first=from_line),
     )
     call = ToolCall(call_id=call_id, name="read_code_file", arguments={"path": path})
 
@@ -167,8 +166,8 @@ def read_symbol(
          ChatMessage(role="tool", call_id="c1", content='{"symbol": {"path": "src/lib/…"}, …}'))
     """
     result = ReadCodeSymbolResult(
-        requested = RequestedSymbol(name="wczytaj", path=path),
-        symbol    = SymbolDefinition(
+        requested      = RequestedSymbol(name="wczytaj", path=path),
+        symbol         = SymbolDefinition(
             path      = path,
             name      = "wczytaj",
             scope     = "RejestrSzablonow",
@@ -176,8 +175,9 @@ def read_symbol(
             from_line = from_line,
             to_line   = to_line,
         ),
-        returned  = ReturnedSymbolLines(from_line=from_line, to_line=to_line, cut_by_limit=False),
-        lines     = [SymbolLine(line=line, text="…") for line in range(from_line, to_line + 1)],
+        returned       = ReturnedSymbolLines(from_line=from_line, to_line=to_line,
+                                             cut_by_limit=False),
+        numbered_lines = number_lines(["…"] * (to_line - from_line + 1), first=from_line),
     )
     call = ToolCall(call_id=call_id, name="read_code_symbol", arguments={"name": "wczytaj"})
 

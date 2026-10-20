@@ -6,7 +6,6 @@ from app.agent_tools.code.read_code_symbol import (
     RequestedSymbol,
     ReturnedSymbolLines,
     SymbolDefinition,
-    SymbolLine,
 )
 
 # Opis `read_code_symbol` dla modelu podaje trzy rzeczy, które kod trzyma gdzie indziej: limit
@@ -22,7 +21,7 @@ RESULT_FIELDS = [
     "symbol",
     *[f"symbol.{name}" for name in SymbolDefinition.model_fields],
     *[f"returned.{name}" for name in ReturnedSymbolLines.model_fields],
-    *[f"lines[].{name}" for name in SymbolLine.model_fields],
+    "numbered_lines",
     "candidates",
     *[f"candidates[].{name}" for name in SymbolDefinition.model_fields],
     "omitted_over_limit",
@@ -49,7 +48,7 @@ def test_the_description_explains_every_field_of_the_result() -> None:
     returns = DESCRIPTION.split("# Co zwraca")[1].split("# Zasady")[0]
 
     assert set(ReadCodeSymbolResult.model_fields) == {
-        "requested", "symbol", "returned", "lines", "candidates", "omitted_over_limit",
+        "requested", "symbol", "returned", "numbered_lines", "candidates", "omitted_over_limit",
     }
 
     for field in RESULT_FIELDS:

@@ -17,6 +17,7 @@ from app.agent_tools.code.read_code_symbol.base import (
 from app.core_model.code.code_symbol import CodeSymbol
 from app.core_model.code.code_symbol_map import CodeSymbolMap
 from app.core_service.loader_code_package import CodePackageConfigError
+from tests._helpers.numbered_lines import line_numbers, numbered_pairs
 
 # Zmyślona mapa symboli: ta sama akcja w dwóch modułach, funkcje JS pod wspólnym obiektem
 # i dwie funkcje o tej samej nazwie w jednym pliku. Liczy się wyłącznie mapa — plików nie ma,
@@ -224,7 +225,7 @@ def test_a_class_given_with_its_namespace_reads_like_the_class_alone(
 
     assert by_namespace.symbol is not None
     assert by_namespace.symbol         == by_plain.symbol
-    assert by_namespace.lines          == by_plain.lines
+    assert by_namespace.numbered_lines == by_plain.numbered_lines
     assert by_namespace.requested.name == with_namespace
 
 
@@ -241,7 +242,7 @@ def test_one_definition_comes_back_with_exactly_its_lines() -> None:
         "from_line": 14, "to_line": 20,
     }
     assert result.returned.model_dump() == {"from_line": 14, "to_line": 20, "cut_by_limit": False}
-    assert [(line.line, line.text) for line in result.lines] == [
+    assert numbered_pairs(result.numbered_lines) == [
         (number, f"{SPRAWY} linia {number}") for number in range(14, 21)
     ]
     assert (result.candidates, result.omitted_over_limit) == ([], 0)
@@ -273,9 +274,9 @@ def test_a_name_with_its_place_reads_the_same_definition_as_the_name_with_the_fi
     by_file  = _result(name, path)
 
     assert by_place.symbol is not None
-    assert by_place.symbol   == by_file.symbol
-    assert by_place.returned == by_file.returned
-    assert by_place.lines    == by_file.lines
+    assert by_place.symbol         == by_file.symbol
+    assert by_place.returned       == by_file.returned
+    assert by_place.numbered_lines == by_file.numbered_lines
 
 
 def test_a_name_defined_in_two_files_gives_candidates_without_any_line() -> None:
@@ -287,7 +288,7 @@ def test_a_name_defined_in_two_files_gives_candidates_without_any_line() -> None
     innego modułu niż ten, o który chodzi, i nie wiedziałby, że były inne."""
     result = _result("executeZapisz")
 
-    assert (result.symbol, result.returned, result.lines) == (None, None, [])
+    assert (result.symbol, result.returned, result.numbered_lines) == (None, None, None)
     assert [(c.path, c.scope, c.from_line, c.to_line) for c in result.candidates] == [
         (PISMA,  "pismaActions",  5, 15),
         (SPRAWY, "sprawyActions", 5, 12),
@@ -306,7 +307,7 @@ def test_a_path_narrows_the_candidates_to_one_definition(path: str) -> None:
 
     assert (result.symbol.path, result.symbol.scope) == (SPRAWY, "sprawyActions")
     assert result.requested.model_dump() == {"name": "executeZapisz", "path": path}
-    assert result.lines and not result.candidates
+    assert result.numbered_lines and not result.candidates
 
 
 def test_two_definitions_of_one_file_stay_candidates_with_their_own_lines() -> None:
@@ -378,7 +379,7 @@ def test_a_definition_longer_than_the_limit_is_cut_and_says_so(
 
     assert result.symbol.to_line == length
     assert (result.returned.to_line, result.returned.cut_by_limit) == (returned_to, cut)
-    assert len(result.lines) == returned_to
+    assert len(line_numbers(result.numbered_lines)) == returned_to
 
 
 @pytest.mark.parametrize(

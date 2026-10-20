@@ -13,6 +13,7 @@ from app.core_model.code.code_symbol import CodeSymbol
 from app.core_model.code.code_symbol_map import CodeSymbolMap
 from app.core_service.loader_code_package import CodePackage, CodePackageConfigError
 from app.core_service.loader_code_symbols import CodeSymbols
+from tests._helpers.numbered_lines import numbered_pairs
 
 # Mała paczka w katalogu tymczasowym: dwa pliki PHP w `repo/` i ręcznie zapisana mapa symboli
 # obok, więc test nie potrzebuje parsera ani paczki zbudowanej skryptem.
@@ -89,7 +90,7 @@ async def test_a_method_comes_back_with_the_lines_of_its_file(tmp_path: Path) ->
     result = await _tool(tmp_path).read(ReadCodeSymbolQuery(name="nastepny", path=NUMER))
 
     assert (result.symbol.scope, result.symbol.from_line, result.symbol.to_line) == ("Numer", 4, 7)
-    assert [(line.line, line.text) for line in result.lines] == [
+    assert numbered_pairs(result.numbered_lines) == [
         (number, CODE[NUMER][number - 1]) for number in range(4, 8)
     ]
 

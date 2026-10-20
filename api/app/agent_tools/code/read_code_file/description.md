@@ -47,8 +47,7 @@ JSON z liniami pliku i z tym, który zakres dostałeś:
 | returned.to_line      | ostatnia oddana linia                    |
 | returned.cut_by_limit | `true`: limit urwał żądany zakres        |
 | returned.end_of_file  | `true`: oddano plik do ostatniej linii   |
-| lines[].line          | numer linii w pliku, liczony od 1        |
-| lines[].text          | treść linii, z wcięciem                  |
+| numbered_lines        | linie kodu: numer, tabulator, treść      |
 
 # Zasady
 
@@ -64,8 +63,10 @@ JSON z liniami pliku i z tym, który zakres dostałeś:
 - Gdy `returned.end_of_file` jest `true`, plik się skończył i dalej
   nic nie ma. Gdy obie flagi są `false`, dostałeś dokładnie żądany
   zakres, a plik ma dalsze linie.
-- Ścieżkę z `path` i numery z `lines[].line` podajesz narzędziu
-  `quote_code`, gdy cytujesz przeczytany fragment.
+- Każda linia w `numbered_lines` to numer linii w pliku (od 1),
+  tabulator i treść linii z wcięciem. Numer nie należy do kodu.
+- Ścieżkę z `path` i numery linii z `numbered_lines` podajesz
+  narzędziu `quote_code`, gdy cytujesz przeczytany fragment.
 - Sam odczyt nie trafia na listę źródeł odpowiedzi. Źródłem jest
   dopiero fragment zacytowany narzędziem `quote_code` jako
   przyczyna.

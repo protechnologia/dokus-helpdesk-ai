@@ -1,7 +1,6 @@
 from app.agent_tools.code.read_code_file import (
     MAX_LINES_PER_READ,
     CodeFileInfo,
-    CodeLine,
     FakeReadCodeFileTool,
     ReadCodeFileResult,
     RequestedLines,
@@ -21,7 +20,7 @@ RESULT_FIELDS = [
     *[f"file_info.{name}" for name in CodeFileInfo.model_fields],
     *[f"requested.{name}" for name in RequestedLines.model_fields],
     *[f"returned.{name}" for name in ReturnedLines.model_fields],
-    *[f"lines[].{name}" for name in CodeLine.model_fields],
+    "numbered_lines",
 ]
 
 
@@ -44,7 +43,7 @@ def test_the_description_explains_every_field_of_the_result() -> None:
     returns = DESCRIPTION.split("# Co zwraca")[1].split("# Zasady")[0]
 
     assert set(ReadCodeFileResult.model_fields) == {
-        "path", "file_info", "requested", "returned", "lines",
+        "path", "file_info", "requested", "returned", "numbered_lines",
     }
 
     for field in RESULT_FIELDS:

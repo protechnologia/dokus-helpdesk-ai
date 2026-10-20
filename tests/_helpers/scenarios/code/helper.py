@@ -213,7 +213,7 @@ def code_quotes(
 
     Example args:
         messages=[ChatMessage(role="assistant", tool_calls=[ToolCall(name="read_code_file", …)]),
-                  ChatMessage(role="tool", content='{"path": "src/a.php", "lines": […]}'), …]
+                  ChatMessage(role="tool", content='{"path": "src/a.php", "returned": {…}, …}'), …]
 
     Example result:
         [CodeQuote(fragment=CodeFragment(path="src/a.php", from_line=3, to_line=7),
@@ -248,22 +248,24 @@ def code_quotes(
 
 
 def _read_lines(
-    body: Mapping[str, Any],  # np. {"path": "src/a.php", "lines": [{"line": 1, …}], …}
+    body: Mapping[str, Any],  # np. {"path": "src/a.php", "returned": {"from_line": 1, …}, …}
 ) -> tuple[str, set[int]]:
     """
     Description:
     Ścieżka i numery linii z wyniku odczytu: pliku (`path` na górze) albo symbolu (`symbol.path`).
-    Odczyt symbolu, który oddał listę kandydatów zamiast definicji, nie odczytał żadnej linii.
+    Numery to oddany zakres (`returned`): linie z treścią stoją dokładnie w nim. Odczyt symbolu,
+    który oddał listę kandydatów zamiast definicji, nie odczytał żadnej linii.
 
     Example args:
-        body={"symbol": {"path": "src/a.php", …}, "lines": [{"line": 4, "text": "…"}], …}
+        body={"symbol": {"path": "src/a.php", …}, "returned": {"from_line": 4, "to_line": 5, …}}
 
     Example result:
-        ("src/a.php", {4})
+        ("src/a.php", {4, 5})
     """
     symbol = body.get("symbol")
     path   = body.get("path") or (symbol or {}).get("path", "")
-    lines  = {line["line"] for line in body.get("lines", [])}
+    shown  = body.get("returned")
+    lines  = set(range(shown["from_line"], shown["to_line"] + 1)) if shown else set()
 
     return path, lines
 

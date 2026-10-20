@@ -15,6 +15,7 @@ from app.agent_tools.code.read_code_symbol import (
     ReadCodeSymbolQuery,
     UnknownSymbolPathError,
 )
+from tests._helpers.numbered_lines import numbered_pairs
 
 METHOD = ReadCodeSymbolQuery(name="nastepnyNumer")
 
@@ -31,7 +32,7 @@ async def test_the_built_in_method_comes_back_with_its_lines() -> None:
     assert (result.symbol.path, result.symbol.scope, result.symbol.kind) == (
         GENERATOR_PATH, "GeneratorNumeru", "method",
     )
-    assert [(line.line, line.text) for line in result.lines] == [
+    assert numbered_pairs(result.numbered_lines) == [
         (number, code[number - 1]) for number in range(5, 14)
     ]
 
@@ -115,15 +116,16 @@ async def test_own_files_without_a_map_have_no_definitions() -> None:
 
 async def test_the_model_reads_the_result_as_json_with_the_symbol_and_its_lines() -> None:
     """Sprawdza, czy tekst, który model dostaje od atrapy, to JSON z sześcioma częściami wyniku,
-    w którym definicja ma plik, nazwę, miejsce, rodzaj i linie, a każda linia numer i treść.
+    w którym definicja ma plik, nazwę, miejsce, rodzaj i linie, a linie stoją w jednym tekście,
+    każda z numerem i treścią.
 
     Wyłapuje atrapę z własnym kształtem tekstu dla modelu: test grafu na atrapie sprawdzałby
     wtedy inny tekst niż ten, który model czyta na produkcji."""
     body = json.loads(await FakeReadCodeSymbolTool().run(METHOD))
 
     assert set(body) == {
-        "requested", "symbol", "returned", "lines", "candidates", "omitted_over_limit",
+        "requested", "symbol", "returned", "numbered_lines", "candidates", "omitted_over_limit",
     }
-    assert set(body["symbol"])   == {"path", "name", "scope", "kind", "from_line", "to_line"}
-    assert set(body["lines"][0]) == {"line", "text"}
-    assert body["requested"]     == {"name": "nastepnyNumer", "path": None}
+    assert set(body["symbol"]) == {"path", "name", "scope", "kind", "from_line", "to_line"}
+    assert body["requested"]   == {"name": "nastepnyNumer", "path": None}
+    assert numbered_pairs(body["numbered_lines"])[0][0] == body["symbol"]["from_line"]

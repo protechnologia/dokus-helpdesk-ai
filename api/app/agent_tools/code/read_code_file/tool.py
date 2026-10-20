@@ -12,11 +12,12 @@ Przed — zapytanie agenta (plik ma 441 linii):
 Po — wynik `read()`:
 
     ReadCodeFileResult(
-        path      = "src/apps/frontend/modules/sprawy/actions/actions.class.php",
-        file_info = CodeFileInfo(total_lines=441),
-        requested = RequestedLines(from_line=1, to_line=None),
-        returned  = ReturnedLines(from_line=1, to_line=300, cut_by_limit=True, end_of_file=False),
-        lines     = [CodeLine(line=1, text="<?php"), …],  # 300 pozycji
+        path           = "src/apps/frontend/modules/sprawy/actions/actions.class.php",
+        file_info      = CodeFileInfo(total_lines=441),
+        requested      = RequestedLines(from_line=1, to_line=None),
+        returned       = ReturnedLines(from_line=1, to_line=300, cut_by_limit=True,
+                                       end_of_file=False),
+        numbered_lines = "1\t<?php\n2\t\n3\tclass sprawyActions …",  # 300 linii
     )
 
 Co się dzieje po drodze:
@@ -102,7 +103,7 @@ class ReadCodeFileTool(ReadCodeFileToolBase):
                                file_info=CodeFileInfo(total_lines=27),
                                requested=RequestedLines(from_line=12, to_line=40),
                                returned=ReturnedLines(from_line=12, to_line=27, …),
-                               lines=[CodeLine(line=12, text="…"), …])
+                               numbered_lines="12\t…\n13\t…")
 
         Raises:
             NoSuchCodeFileError: ścieżka nie wskazuje pliku w paczce
@@ -122,7 +123,7 @@ class ReadCodeFileTool(ReadCodeFileToolBase):
         # Same liczby: ścieżkę podaje model, a wskazuje ona miejsce w kodzie klienta.
         logger.info(
             "read_code_file lines=%d of=%d cut_by_limit=%s end_of_file=%s",
-            len(result.lines),
+            result.returned.to_line - result.returned.from_line + 1,
             result.file_info.total_lines,
             result.returned.cut_by_limit,
             result.returned.end_of_file,
