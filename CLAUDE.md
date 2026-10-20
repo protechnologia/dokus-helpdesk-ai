@@ -3041,6 +3041,10 @@ te same trasy co helpdesk, a przebieg czyta ich strumieniem (p. 75).
   w trakcie przebiegu tyka co 200 ms, więc zamiast tego pulsuje powoli przez cały przebieg.
 - **Dialog szczegółów przesuwa się za nagłówek i zmienia rozmiar za róg** — przeciąganie na
   zdarzeniach wskaźnika, rozmiar z CSS `resize`, bez biblioteki.
+- **Szerokość trzech kolumn reguluje się suwakami** (`pages/Columns.tsx`, `Splitter` z antd,
+  2026-10-20): przeglądarka pamięta je w procentach (`localStorage`, z try/catch), a podwójne
+  kliknięcie suwaka przywraca domyślne. Poniżej `xl` (1200 px) suwaków nie ma i kolumny stają
+  jedna pod drugą.
 - **Kolejność wariantów w pasie ustala front** (`VARIANT_ORDER`: pytania, odpowiedź,
   przekazanie): `GET /variants` oddaje je alfabetycznie, a kolejność to wygląd, nie kontrakt.
 - **Każdą niewygodę kontraktu waży się osobno: obejście we froncie czy mała korekta w `api`.**

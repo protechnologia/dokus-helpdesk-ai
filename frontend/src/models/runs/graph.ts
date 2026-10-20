@@ -21,7 +21,7 @@
  * | `parse_ticket` | Karta zgłoszenia                        | `TicketCard`      |
  * | `gate_close`   | Bramka zamknięcia                       | `VerdictResponse` |
  * | `gate_reply`   | Sprawdź przed wysyłką (pod treścią)     | `VerdictResponse` |
- * | `polish`       | Popraw (pod treścią)                    | `PolishResponse`  |
+ * | `polish`       | Popraw stylistycznie (pod treścią)      | `PolishResponse`  |
  *
  * Przykład — środkowy panel rozpoznaje wynik po nazwie grafu:
  *

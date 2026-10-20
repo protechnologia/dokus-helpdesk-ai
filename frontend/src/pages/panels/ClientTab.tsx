@@ -1,9 +1,9 @@
 /**
  * Description:
  * Zakładka „Dla klienta": szkic wiadomości do klienta, który można poprawić przed wysyłką, i trzy
- * guziki pod nim — bramka wysyłki („Sprawdź przed wysyłką"), „Popraw" i kopiowanie. Szkic to
- * tekst pokazanego przebiegu (propozycja odpowiedzi, wynik „Popraw", szkic sprawdzony bramką),
- * ale można go też pisać z ręki.
+ * guziki pod nim — bramka wysyłki („Sprawdź przed wysyłką"), „Popraw" („Popraw stylistycznie")
+ * i, osobno po prawej, kopiowanie. Szkic to tekst pokazanego przebiegu (propozycja odpowiedzi,
+ * wynik „Popraw", szkic sprawdzony bramką), ale można go też pisać z ręki.
  *
  * Kto czyta: `AnswerPanel.tsx` rysuje zakładkę; szkic trzyma `pages/App.tsx` i on uruchamia bramkę
  * wysyłki i „Popraw" na treści szkicu.
@@ -46,7 +46,8 @@ interface ClientTabProps {
  *     onPolish=() => runOnDraft("polish")
  *
  * Example result:
- *     pole tekstu z guzikami „Sprawdź przed wysyłką", „Popraw" i „Kopiuj"
+ *     pole tekstu, pod nim po lewej „Sprawdź przed wysyłką" i „Popraw stylistycznie", po prawej
+ *     „Kopiuj"
  */
 export function ClientTab({ draft, run, busy, onChange, onCheck, onPolish }: ClientTabProps) {
     const { message } = AntApp.useApp();
@@ -91,17 +92,20 @@ export function ClientTab({ draft, run, busy, onChange, onCheck, onPolish }: Cli
                 <span className="muted">Treść dla klienta — można ją poprawić przed wysyłką</span>
                 <Input.TextArea value={draft} rows={12} style={RESIZABLE} onChange={(event) => onChange(event.target.value)} />
             </label>
-            <Space wrap>
-                <Button icon={<CheckCircleOutlined />} disabled={empty || busy} onClick={onCheck}>
-                    Sprawdź przed wysyłką
-                </Button>
-                <Button icon={<EditOutlined />} disabled={empty || busy} onClick={onPolish}>
-                    Popraw
-                </Button>
+            {/* Grafy na szkicu po lewej, kopiowanie osobno po prawej: nie woła modelu. */}
+            <div className="client-actions">
+                <Space wrap>
+                    <Button icon={<CheckCircleOutlined />} disabled={empty || busy} onClick={onCheck}>
+                        Sprawdź przed wysyłką
+                    </Button>
+                    <Button icon={<EditOutlined />} disabled={empty || busy} onClick={onPolish}>
+                        Popraw stylistycznie
+                    </Button>
+                </Space>
                 <Button icon={<CopyOutlined />} disabled={empty} onClick={copy}>
                     Kopiuj
                 </Button>
-            </Space>
+            </div>
         </Space>
     );
 }

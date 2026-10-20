@@ -38,6 +38,7 @@ import type { InstanceResponse } from "../models/api/instance";
 import type { VariantInfo } from "../models/api/suggest";
 import type { TicketRequest } from "../models/api/ticket";
 import type { GraphAction } from "../models/runs/graph";
+import { Columns } from "./Columns";
 import { AnswerPanel } from "./panels/AnswerPanel";
 import { ConsolePanel } from "./panels/ConsolePanel";
 import { GraphButtons } from "./panels/GraphButtons";
@@ -139,7 +140,7 @@ export function App() {
         const body  = kind === "gate_reply"
             ? { ticket_id: ticket.ticket_id, message: draft }
             : { ticket_id: ticket.ticket_id, text: draft };
-        const title = kind === "gate_reply" ? "Sprawdź przed wysyłką" : "Popraw";
+        const title = kind === "gate_reply" ? "Sprawdź przed wysyłką" : "Popraw stylistycznie";
 
         setShownId(null);
         await start(kind, title, ticket.ticket_id, body, draft);
@@ -150,7 +151,7 @@ export function App() {
         <div className="page">
             <TopBar instance={instance} totals={sessionTotals(runs, now)} running={running} />
             <GraphButtons variants={variants} ticket={ticket} disabled={running} onRun={runOnTicket} />
-            <div className="columns">
+            <Columns>
                 <TicketPanel ticket={ticket} onChange={setTicket} />
                 <AnswerPanel
                     run={shown}
@@ -161,7 +162,7 @@ export function App() {
                     onDraftRun={runOnDraft}
                 />
                 <ConsolePanel runs={runs} now={now} shownId={shown?.id ?? null} onShow={setShownId} />
-            </div>
+            </Columns>
         </div>
     );
 }

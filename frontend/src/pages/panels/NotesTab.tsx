@@ -85,7 +85,7 @@ export function NotesTab({ outcome }: { outcome: GraphOutcome }) {
         case "polish":
             return (
                 <Typography.Paragraph type="secondary">
-                    „Popraw" nie ma uwag: poprawiony tekst stoi w zakładce „Dla klienta”.
+                    „Popraw stylistycznie” nie ma uwag: poprawiony tekst stoi w zakładce „Dla klienta”.
                 </Typography.Paragraph>
             );
     }

@@ -246,9 +246,33 @@ body {
     font-weight: 600;
 }
 
-/* --- wąski ekran: kolumny jedna pod drugą, przewija się strona --- */
+/* Kolumny z suwakami (`pages/Columns.tsx`, szeroki ekran): każda kolumna wypełnia swój panel
+   i przewija się sama, a odstęp między kolumnami daje panel, po obu stronach suwaka. */
+.columns-split {
+    flex: 1;
+    min-height: 0;
+}
 
-@media (max-width: 1100px) {
+.columns-split > .ant-splitter-panel {
+    overflow: hidden;
+    padding: 0 8px;
+}
+
+.columns-split > .ant-splitter-panel:first-child {
+    padding-left: 0;
+}
+
+.columns-split > .ant-splitter-panel:last-child {
+    padding-right: 0;
+}
+
+.columns-split .column {
+    height: 100%;
+}
+
+/* --- wąski ekran: kolumny jedna pod drugą, przewija się strona; granica to `xl` z antd --- */
+
+@media (max-width: 1199.98px) {
     .page {
         height: auto;
         min-height: 100vh;
@@ -483,6 +507,15 @@ body {
 
 @keyframes live-pulse {
     50% { opacity: 0.25; }
+}
+
+/* Guziki pod szkicem dla klienta (`ClientTab.tsx`): grafy po lewej, „Kopiuj" po prawej. */
+.client-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
 }
 
 /* --- dialog kroku: przesuwany za nagłówek (`StepDialog.tsx`) --- */
