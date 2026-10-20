@@ -170,12 +170,13 @@ def to_step_item(
     ]
 
     item = StepItem(
-        node        = step.node,
-        message     = "; ".join(entry.message for entry in step.log),
-        started_at  = step.started_at,
-        duration_ms = round(step.duration_ms, DURATION_DIGITS),
-        usage       = to_usage_item(step.usage) if step.usage is not None else None,
-        tool_calls  = tool_calls,
+        node            = step.node,
+        message         = "; ".join(entry.message for entry in step.log),
+        started_at      = step.started_at,
+        duration_ms     = round(step.duration_ms, DURATION_DIGITS),
+        usage           = to_usage_item(step.usage) if step.usage is not None else None,
+        requested_tools = list(step.requested_tools),
+        tool_calls      = tool_calls,
     )
 
     return item

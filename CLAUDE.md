@@ -1596,8 +1596,10 @@ Wspólne:
 - **Każda trasa grafu odpowiada też strumieniem przebiegu, gdy `Accept` wymienia
   `text/event-stream` (2026-10-19, p. 75).** To ta sama trasa, nie osobna: graf, budowa stanu
   i odpowiedź zostają w jednym miejscu. Strumień to SSE: zdarzenie `step` (`StepItem`) po każdym
-  kroku grafu — węzeł, wpis logu, początek, czas trwania, w turze modelu zużycie tury, w kroku
-  narzędzi wywołania z argumentami, wynikiem, który dostał model, i czasem — a na końcu `result`
+  kroku grafu — węzeł, wpis logu, początek, czas trwania, w turze modelu zużycie tury i nazwy
+  narzędzi, o które model poprosił (`requested_tools`, z `respond_<graf>`; 2026-10-20, żeby front
+  wiedział, co trwa po turze, bez czytania wpisu logu), w kroku narzędzi wywołania
+  z argumentami, wynikiem, który dostał model, i czasem — a na końcu `result`
   z dokładnie tą treścią, którą trasa oddaje JSON-em. Status to zawsze 200, bo nagłówki wychodzą
   przed pierwszym krokiem: awarię zależności niesie zdarzenie `error` (`ErrorResponse`) zamiast
   `result`, a błąd konfiguracji zrywa strumień. 422 (walidacja, nieznany wariant) pada przed
@@ -2519,6 +2521,8 @@ nowe zgłoszenie (surowy tekst)
   węzłem). Krok zaczyna się tam, gdzie skończył się poprzedni, bo węzły grafów w `api` idą po
   kolei. Krok narzędzi łączy pomiar czasu z wywołaniem z ostatniej tury modelu i z wynikiem po
   `call_id`; tylko z ostatniej tury, bo atrapa modelu numeruje wywołania od nowa w każdej turze.
+  Nazwy zleconych narzędzi krok tury bierze ze swojej zmiany stanu, nie z rozmowy: krok narzędzi
+  ma w rozmowie tę samą ostatnią turę i powtórzyłby je.
 - **Atrapa grafu dostaje anonimizator argumentem i nie wykonuje narzędzi (2026-10-16).** Trasa
   podaje jej klienta usługi `anonymizer` z fabryki, a test zwykle `FakeAnonymizer`; atrapa nie
   tworzy go u siebie. Anonimizacja to stały pierwszy węzeł, więc atrapa woła tę jedną usługę.

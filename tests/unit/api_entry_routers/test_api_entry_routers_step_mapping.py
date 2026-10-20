@@ -55,3 +55,16 @@ def test_only_a_model_turn_goes_out_with_usage() -> None:
     assert agent.usage.llm_calls     == USAGE.calls
     assert agent.usage.prompt_tokens == USAGE.prompt_tokens
     assert tools.usage is None
+
+
+def test_a_model_turn_goes_out_with_the_tools_it_asked_for() -> None:
+    """Sprawdza, czy krok tury modelu wychodzi z nazwami narzędzi, o które model poprosił,
+    a krok narzędzi z pustą listą.
+
+    Wyłapuje nazwy zgubione w mapowaniu: front nie powiedziałby, co trwa po turze modelu, i
+    musiałby czytać wpis logu, który jest tekstem dla człowieka."""
+    agent = to_step_item(AGENT_STEP)
+    tools = to_step_item(TOOL_STEP)
+
+    assert agent.requested_tools == ["read_tickets_card"]
+    assert tools.requested_tools == []

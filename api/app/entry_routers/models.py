@@ -120,20 +120,23 @@ class StepItem(BaseModel):
     """
     Description:
     Jeden krok przebiegu grafu w strumieniu trasy (zdarzenie `step`): który węzeł, co zrobił,
-    kiedy zaczął i ile trwał. Tura modelu niesie zużycie tej tury, krok narzędzi — wywołania
-    z argumentami i wynikami.
+    kiedy zaczął i ile trwał. Tura modelu niesie zużycie tej tury i nazwy narzędzi, o które model
+    w niej poprosił (`requested_tools`, z narzędziem odpowiedzi `respond_<graf>`); krok narzędzi
+    — wywołania z argumentami i wynikami.
 
     Kroki przychodzą w trakcie przebiegu, więc wołający widzi, co dzieje się teraz; odpowiedź
     trasy przychodzi na końcu, w zdarzeniu `result`. `message` to wpis logu przebiegu — tekst dla
-    człowieka, bez treści zgłoszenia, nie do parsowania.
+    człowieka, bez treści zgłoszenia, nie do parsowania; co trwa po turze modelu, mówi
+    `requested_tools`.
     """
 
-    node:        str                = Field(examples=["agent"])
-    message:     str                = Field(examples=["tura 1: narzędzia: find_tickets_vector; …"])
-    started_at:  datetime           = Field(examples=["2026-10-19T12:03:14.902000Z"])
-    duration_ms: float              = Field(examples=[2140.6])
-    usage:       UsageItem | None   = None
-    tool_calls:  list[ToolCallItem] = Field(default_factory=list)
+    node:            str                = Field(examples=["agent"])
+    message:         str                = Field(examples=["tura 1: narzędzia: find_tickets_vector"])
+    started_at:      datetime           = Field(examples=["2026-10-19T12:03:14.902000Z"])
+    duration_ms:     float              = Field(examples=[2140.6])
+    usage:           UsageItem | None   = None
+    requested_tools: list[str]          = Field(default_factory=list, examples=[["read_docs"]])
+    tool_calls:      list[ToolCallItem] = Field(default_factory=list)
 
 
 class ErrorResponse(BaseModel):

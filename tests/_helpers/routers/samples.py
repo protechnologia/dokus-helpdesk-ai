@@ -183,13 +183,14 @@ TOOL_STEP = GraphStep(
     ],
 )
 
-# Krok tury modelu: jeden wpis logu i zużycie tury.
+# Krok tury modelu: jeden wpis logu, zużycie tury i nazwa narzędzia, o które poprosił model.
 AGENT_STEP = GraphStep(
-    node        = "agent",
-    started_at  = STEP_STARTED_AT,
-    duration_ms = 2140.6,
-    log         = [LogEntry(node="agent", message="tura 2: narzędzia: read_tickets_card")],
-    usage       = USAGE,
+    node            = "agent",
+    started_at      = STEP_STARTED_AT,
+    duration_ms     = 2140.6,
+    log             = [LogEntry(node="agent", message="tura 2: narzędzia: read_tickets_card")],
+    usage           = USAGE,
+    requested_tools = ["read_tickets_card"],
 )
 
 # Zgłoszenie do tras, które je przyjmują; opis ze słowem, którego nie ma w żadnym wpisie logu.

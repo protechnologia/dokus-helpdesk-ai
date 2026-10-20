@@ -295,10 +295,11 @@ def graph_step(
 ) -> GraphStep:
     """
     Description:
-    Składa krok przebiegu ze zmiany stanu, którą oddał węzeł. Z tury modelu bierze zużycie,
-    a z kroku `run_tools` wywołania narzędzi: każdy pomiar czasu z `tool_timings` łączy po
-    `call_id` z wywołaniem z ostatniej tury modelu i z wiadomością `tool` z wynikiem. Wywołania
-    szuka tylko w ostatniej turze, bo identyfikatory bywają powtarzane między turami.
+    Składa krok przebiegu ze zmiany stanu, którą oddał węzeł. Z tury modelu bierze zużycie
+    i nazwy narzędzi, o które model poprosił, a z kroku `run_tools` wywołania narzędzi: każdy
+    pomiar czasu z `tool_timings` łączy po `call_id` z wywołaniem z ostatniej tury modelu
+    i z wiadomością `tool` z wynikiem. Wywołania szuka tylko w ostatniej turze, bo
+    identyfikatory bywają powtarzane między turami.
 
     Example args:
         node="run_tools"
@@ -321,6 +322,15 @@ def graph_step(
         if message.role == "tool"
     }
 
+    # Turę modelu dokłada do rozmowy tylko krok, który ją wykonał, więc nazwy zleconych narzędzi
+    # bierze się ze zmiany stanu, nie z całej rozmowy: krok narzędzi ma tę samą ostatnią turę.
+    requested = [
+        call.name
+        for message in update.get("messages", [])
+        if message.role == "assistant"
+        for call in message.tool_calls
+    ]
+
     tool_calls = [
         ToolCallRun(
             call_id     = timing.call_id,
@@ -334,12 +344,13 @@ def graph_step(
     ]
 
     step = GraphStep(
-        node        = node,
-        started_at  = started_at,
-        duration_ms = duration_ms,
-        log         = update.get("log", []),
-        usage       = update.get("usage"),
-        tool_calls  = tool_calls,
+        node            = node,
+        started_at      = started_at,
+        duration_ms     = duration_ms,
+        log             = update.get("log", []),
+        usage           = update.get("usage"),
+        requested_tools = requested,
+        tool_calls      = tool_calls,
     )
 
     return step

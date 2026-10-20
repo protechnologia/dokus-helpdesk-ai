@@ -45,6 +45,29 @@ def test_a_model_turn_carries_its_usage_and_no_tool_calls() -> None:
     assert step.tool_calls == []
 
 
+def test_a_model_turn_names_the_tools_it_asked_for() -> None:
+    """Sprawdza, czy krok tury modelu niesie nazwy narzędzi, o które model w niej poprosił
+    (odczyt kart z drugiej tury), a nie narzędzi z wcześniejszej tury rozmowy.
+
+    Wyłapuje krok tury bez tych nazw albo z nazwami wziętymi z całej rozmowy: konsola przebiegu
+    nie powiedziałaby, czy po turze trwają narzędzia, czy odpowiedź, albo pokazałaby wyszukanie
+    z pierwszej tury jako zlecone w drugiej."""
+    step = graph_step("agent", agent_update(), two_turns()[:4], STEP_STARTED_AT, 2140.6)
+
+    assert step.requested_tools == ["read_tickets_card"]
+
+
+def test_a_tool_step_repeats_no_requested_tools() -> None:
+    """Sprawdza, czy krok narzędzi nie ma nazw zleconych narzędzi, choć ostatnia tura rozmowy je
+    zleca: mówi o nich krok tury, a krok narzędzi niesie ich wykonanie.
+
+    Wyłapuje nazwy brane z ostatniej tury rozmowy zamiast ze zmiany stanu kroku: po kroku
+    narzędzi konsola uznałaby, że narzędzia nadal trwają."""
+    step = graph_step("run_tools", run_tools_update(), two_turns(), STEP_STARTED_AT, 85.0)
+
+    assert step.requested_tools == []
+
+
 def test_a_step_carries_its_node_times_and_log() -> None:
     """Sprawdza, czy krok niesie nazwę węzła, podany początek i czas trwania oraz wpisy logu
     ze zmiany stanu, a krok bez tury modelu nie ma zużycia.

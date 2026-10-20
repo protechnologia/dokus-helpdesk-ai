@@ -118,6 +118,24 @@ async def test_only_model_turns_carry_usage(
     assert [step.usage is not None for step in steps] == [step.node == "agent" for step in steps]
 
 
+async def test_a_model_turn_names_what_the_next_step_runs() -> None:
+    """Sprawdza, czy w grafie `search` każdy krok tury modelu niesie nazwy narzędzi, które
+    wykonuje następny krok, a ostatnia tura — narzędzie odpowiedzi `respond_search`; kroki inne
+    niż tura modelu nazw nie niosą.
+
+    Wyłapuje nazwy przesunięte o turę albo przypisane krokowi narzędzi: konsola przebiegu
+    pokazywałaby w toku inne narzędzia niż te, które naprawdę się wykonują, albo nie wiedziałaby,
+    że po ostatniej turze trwa już odpowiedź."""
+    steps, _ = await streamed_fake(search)
+    turns    = [(index, step) for index, step in enumerate(steps) if step.node == "agent"]
+
+    for index, turn in turns[:-1]:
+        assert turn.requested_tools == [run.tool for run in steps[index + 1].tool_calls]
+
+    assert turns[-1][1].requested_tools == [search.RESPOND_TOOL_NAME]
+    assert all(not step.requested_tools for step in steps if step.node != "agent")
+
+
 async def test_tool_steps_carry_the_calls_with_arguments_and_results() -> None:
     """Sprawdza, czy w grafie `search` kroki narzędzi niosą wykonane wywołania: najpierw
     wyszukanie, potem odczyt kart, każde z argumentami, które podał model, i z wynikiem, który

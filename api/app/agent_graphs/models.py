@@ -33,8 +33,9 @@ class GraphStep(BaseModel):
     """
     Description:
     Jeden krok przebiegu grafu, czyli jedno wywołanie węzła: który węzeł, kiedy zaczął, ile
-    trwał, jego wpisy logu, a w turze modelu także zużycie tej tury. Krok `run_tools` niesie
-    wywołania narzędzi z wynikami i czasami.
+    trwał, jego wpisy logu, a w turze modelu także zużycie tej tury i nazwy narzędzi, o które
+    model w niej poprosił (`requested_tools`, z narzędziem odpowiedzi `respond_<graf>`). Krok
+    `run_tools` niesie wywołania narzędzi z argumentami, wynikami i czasami.
 
     Do czego:
     `stream_graph()` oddaje kroki w trakcie przebiegu, więc wołający widzi, co dzieje się teraz,
@@ -42,14 +43,17 @@ class GraphStep(BaseModel):
     grafu idą po kolei; pierwszy — przy starcie przebiegu.
 
     Treści zgłoszenia ani odpowiedzi modelu tu nie ma, jak w `log`: tura modelu niesie tylko
-    zużycie, a odpowiedź grafu przychodzi osobno, ze stanem końcowym.
+    zużycie i nazwy zleconych narzędzi, bez argumentów, a odpowiedź grafu przychodzi osobno, ze
+    stanem końcowym. Nazwy pozwalają wołającemu powiedzieć, co trwa po turze — narzędzia albo
+    odpowiedź — bez czytania wpisu logu, który jest tekstem dla człowieka.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    node:        str               = Field(min_length=1, examples=["agent"])
-    started_at:  datetime          = Field(examples=["2026-10-19T12:03:14.902000Z"])
-    duration_ms: float             = Field(ge=0, examples=[2140.6])
-    log:         list[LogEntry]    = Field(default_factory=list)
-    usage:       LLMUsage | None   = None
-    tool_calls:  list[ToolCallRun] = Field(default_factory=list)
+    node:            str               = Field(min_length=1, examples=["agent"])
+    started_at:      datetime          = Field(examples=["2026-10-19T12:03:14.902000Z"])
+    duration_ms:     float             = Field(ge=0, examples=[2140.6])
+    log:             list[LogEntry]    = Field(default_factory=list)
+    usage:           LLMUsage | None   = None
+    requested_tools: list[str]         = Field(default_factory=list, examples=[["read_docs"]])
+    tool_calls:      list[ToolCallRun] = Field(default_factory=list)
