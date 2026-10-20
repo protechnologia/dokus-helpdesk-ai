@@ -147,6 +147,58 @@ def test_an_unreadable_manifest_is_a_configuration_error(
         _description(tmp_path, manifest=manifest).read_package_info()
 
 
+def test_the_file_count_comes_from_the_manifest(tmp_path: Path) -> None:
+    """Sprawdza, czy liczba plików paczki wraca z sekcji `package` metryczki (11 424), choć
+    w katalogu paczki nie ma ani jednego pliku kodu.
+
+    Wyłapuje czytnik, który liczy pliki na dysku albo bierze inną liczbę z metryczki (na
+    przykład linie): belka `GET /instance` pokazywałaby nie to, co zapisał skrypt paczki."""
+    manifest = {
+        "branch":   "/main",
+        "built_on": "2026-10-07",
+        "package":  {"files": 11424, "lines": 1178912},
+    }
+
+    assert _description(tmp_path, manifest=manifest).read_file_count() == 11424
+
+
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        None,
+        "to nie jest JSON",
+        {"branch": "/main", "built_on": "2026-10-07"},
+        {"package": {"lines": 993}},
+        {"package": ["files", 30]},
+        {"package": {"files": "30"}},
+        {"package": {"files": True}},
+        {"package": {"files": -1}},
+    ],
+    ids=[
+        "brak pliku",
+        "nie JSON",
+        "bez sekcji package",
+        "bez liczby plików",
+        "package jako lista",
+        "liczba jako tekst",
+        "liczba jako prawda",
+        "liczba ujemna",
+    ],
+)
+def test_a_manifest_without_a_file_count_is_a_configuration_error(
+    tmp_path: Path,
+    manifest: object,
+) -> None:
+    """Sprawdza, czy brak metryczki, plik, który nie jest JSON-em, metryczka bez sekcji `package`
+    albo bez liczby plików, sekcja zapisana jako lista oraz liczba plików jako tekst, wartość
+    logiczna albo liczba ujemna kończą się wyjątkiem `CodePackageConfigError`.
+
+    Wyłapuje czytnik, który z niepełnej metryczki oddaje zero albo cokolwiek, co w niej stoi:
+    paczka wyglądałaby na belce jak pusta albo zbudowana, choć skrypt jej nie zbudował."""
+    with pytest.raises(CodePackageConfigError):
+        _description(tmp_path, manifest=manifest).read_file_count()
+
+
 def test_the_error_names_the_file_that_is_missing(tmp_path: Path) -> None:
     """Sprawdza, czy komunikat błędu przy braku opisu podaje ścieżkę pliku `project.md`,
     a przy braku metryczki ścieżkę pliku `manifest.json`.

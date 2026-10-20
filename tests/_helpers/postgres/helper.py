@@ -12,6 +12,7 @@ Klient rozpoznaje rodzaj zapytania po treści SQL-a i zapisuje je w `calls`:
 | `read_by_id()`   | `("read", [klucze])`    | wiersze o tych kluczach, w kolejności żądania    |
 | `substring()`    | `("substring", fraza)`  | klucze ustalone dla tej frazy                    |
 | `words()`        | `("words", słowa)`      | klucze ustalone dla tych słów                    |
+| `count()`        | `("count", None)`       | liczbę wierszy albo błąd podany w `count_error`  |
 
 Przykład — dwa zgłoszenia w tabeli, fraza trafia w jedno:
 
@@ -48,11 +49,13 @@ class ScriptedPostgres:
 
     Do czego:
     Stoi w miejscu `PostgresClient` pod prawdziwą tabelą w testach jednostkowych narzędzi
-    Postgresa. Ma te metody klienta, których tabela używa przy czytaniu i szukaniu.
+    Postgresa i serwisu, który liczy indeksy. Ma te metody klienta, których tabela używa przy
+    czytaniu, szukaniu i liczeniu.
 
     Flow:
         1. Test podaje kolumnę klucza, wiersze tabeli i odpowiedzi na frazy oraz słowa.
-        2. `fetch_rows()` rozpoznaje rodzaj zapytania, dopisuje wpis do `calls` i odpowiada.
+        2. `fetch_rows()` rozpoznaje rodzaj zapytania, dopisuje wpis do `calls` i odpowiada;
+           `fetch_value()` liczy wiersze albo zgłasza błąd podany w `count_error`.
         3. Test sprawdza wynik narzędzia i `calls`.
     """
 
@@ -60,10 +63,11 @@ class ScriptedPostgres:
 
     def __init__(
         self,
-        key:       str,                                    # np. "ticket_id"
-        rows:      Sequence[dict] = (),                    # np. [TicketRow(…).model_dump()]
-        substring: Mapping[str, list[str]] | None = None,  # np. {"ORA-00942": ["90011"]}
-        words:     Mapping[str, list[str]] | None = None,  # np. {"załącznik": ["90003"]}
+        key:         str,                                    # np. "ticket_id"
+        rows:        Sequence[dict] = (),                    # np. [TicketRow(…).model_dump()]
+        substring:   Mapping[str, list[str]] | None = None,  # np. {"ORA-00942": ["90011"]}
+        words:       Mapping[str, list[str]] | None = None,  # np. {"załącznik": ["90003"]}
+        count_error: Exception | None = None,                # np. DbPostgresMissingTableError("…")
     ):
         """
         Description:
@@ -74,14 +78,16 @@ class ScriptedPostgres:
             rows=[TicketRow.from_thread("90011", date(2026, 3, 2), "…").model_dump()]
             substring={"ORA-00942": ["90011"]}
             words=None
+            count_error=None
 
         Example result:
             ScriptedPostgres z jednym zgłoszeniem, odpowiadający nim na frazę „ORA-00942"
         """
-        self._key       = key
-        self._rows      = list(rows)
-        self._substring = dict(substring or {})
-        self._words     = dict(words or {})
+        self._key         = key
+        self._rows        = list(rows)
+        self._substring   = dict(substring or {})
+        self._words       = dict(words or {})
+        self._count_error = count_error
 
         self.calls: list[tuple[str, object]] = []
         self.closed = False
@@ -128,6 +134,34 @@ class ScriptedPostgres:
         self.calls.append(("words", value))
 
         return [{self._key: key} for key in self._words.get(value, [])]
+
+    async def fetch_value(
+        self,
+        sql:   str,     # np. 'SELECT count(*) FROM "tickets_text"'
+        *args: object,  # np. ()
+    ) -> int:
+        """
+        Description:
+        Odpowiada na liczenie wierszy tabeli: zapisuje je i oddaje liczbę wierszy podanych
+        klientowi albo zgłasza błąd podany w `count_error` — brak tabeli albo awarię bazy.
+
+        Example args:
+            sql='SELECT count(*) FROM "tickets_text"'
+            args=()
+
+        Example result:
+            2
+
+        Raises:
+            Exception: błąd podany w `count_error`
+        """
+        self.calls.append(("count", None))
+
+        # --- tabela, której nie ma, albo baza, która nie odpowiada ---
+        if self._count_error is not None:
+            raise self._count_error
+
+        return len(self._rows)
 
     async def aclose(self) -> None:
         """

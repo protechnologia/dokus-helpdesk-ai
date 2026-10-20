@@ -127,7 +127,7 @@ class TextTable:
            pasujących wierszy.
         4. `_read_by_id()` i `_list()` czytają: oddają wiersze jako słowniki kolumna → wartość,
            bez kolumn wyliczanych, a na swój model zamienia je podklasa.
-        5. `drop()` kasuje tabelę, `aclose()` zamyka jej klienta.
+        5. `count()` liczy wiersze, `drop()` kasuje tabelę, `aclose()` zamyka jej klienta.
     """
 
     def __init__(
@@ -172,6 +172,26 @@ class TextTable:
             "docs_text"
         """
         return self._name
+
+    async def count(self) -> int:
+        """
+        Description:
+        Liczy wiersze tabeli. Pusta tabela to zero; brak tabeli to błąd, jak przy szukaniu, bo
+        zero w miejscu brakującej tabeli wyglądałoby jak zbudowany, pusty indeks.
+
+        Example args:
+            (brak)
+
+        Example result:
+            1825
+
+        Raises:
+            DbPostgresMissingTableError: tabeli nie ma — indeksu nikt nie zbudował
+            DbPostgresError: baza nie odpowiedziała albo odrzuciła zapytanie
+        """
+        counted = await self._client.fetch_value(f"SELECT count(*) FROM {self._sql_name}")
+
+        return counted
 
     async def drop(self) -> None:
         """

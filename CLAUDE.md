@@ -296,8 +296,8 @@ dokus-helpdesk-ai/
 │       │                         #   mapowanie i odpowiedź JSON-em albo strumieniem
 │       │                         #   (streaming.py) na górze pakietu
 │       │                         # --- nasza strona: podział po RODZAJU obiektu ---
-│       ├── core_model/           # tickets/, docs/, code/, dicts/, graphs/ — folder na temat, plik nazwany jak model
-│       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, indexer_*, factory_*
+│       ├── core_model/           # tickets/, docs/, code/, dicts/, graphs/, instance/ — folder na temat, plik nazwany jak model
+│       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, indexer_*, inspector_*, factory_*
 │       ├── core_text/            # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
 │       ├── core_util/            # html, validation_text, time, text, path
 │       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
@@ -417,11 +417,12 @@ dokus-helpdesk-ai/
   **bezgłośnie**.
 - **Nazwa pliku mówi, CO ROBI, nie czego dotyczy** — `validator_ticket_parsed.py`, nie
   `artifacts.py`. W `core_service/` oś `<rola>_<przedmiot>` (`parser_`, `validator_`, `builder_`,
-  `loader_`, `filter_`, `normalizer_`, `indexer_`, `factory_`), a przedmiot mówi,
+  `loader_`, `filter_`, `normalizer_`, `indexer_`, `inspector_`, `factory_`), a przedmiot mówi,
   którego materiału plik dotyczy (`builder_ticket_embedding_text.py` obok
   `builder_doc_embedding_text.py`). W `core_model/` folder na temat (od 2026-10-05): `tickets/`
   i `docs/` na materiały, jak w `agent_tools/` i w pakietach baz, `dicts/` na słowniki i zestawy
-  reguł klienta, `graphs/` na wyniki wspólne dla kilku grafów. Plik nazywa się jak jego model
+  reguł klienta, `graphs/` na wyniki wspólne dla kilku grafów, `instance/` na stan instancji
+  (od 2026-10-20). Plik nazywa się jak jego model
   (`RawTicket` → `tickets/raw_ticket.py`, `Verdict` → `graphs/verdict.py`).
   - **Gdy reguł jest wiele i przybywa ich szybciej niż logiki wokół nich, idą do osobnego pliku**
     (`filter_ticket_quality.py` + `filter_ticket_quality_rules.py`): dwa różne rytmy zmian, a plik
@@ -1543,6 +1544,15 @@ Wspólne:
 ### Warstwa API
 
 - **`/health` mówi „ok" tylko o samym API** — o stanie zależności nie mówi nic.
+- **`GET /instance` mówi, na czym stoi instancja (2026-10-20, p. 76):** model generujący
+  (dostawca i nazwa; przy atrapie bez nazwy, nawet gdy `.env` ją ma) i stan pięciu indeksów
+  narzędzi — karty i wątki zgłoszeń, sekcje i fragmenty dokumentacji, paczka kodu — jako
+  `missing`, `empty` albo `built` z liczbą elementów, a obok gałąź i dzień budowy paczki kodu.
+  Liczy przy każdym żądaniu (`IndexInspector` z `core_service/inspector_indexes.py`), więc nowy
+  indeks widać bez restartu. Brak tabeli albo kolekcji to stan, a awaria bazy to 503: „nie wiem"
+  nie może wyglądać jak „nie ma". Serwis ma własnych klientów baz, budowanych raz na proces, bo
+  przy atrapie modelu narzędzia nie powstają wcale. W przeciwieństwie do `/health` zdradza
+  dostawcę i model, ale nie adresy ani klucze; trasy chroni dopiero p. 36.
 - **Bramki i „Popraw" nie mają dostępu do retrievalu** — ich grafy nie mają narzędzi wiedzy na
   liście dozwolonych. To nie jest oszczędność, tylko gwarancja: te endpointy mają działać przy
   pustym indeksie i przy padniętym embedderze.
@@ -1935,8 +1945,9 @@ wskazane fragmenty w całym tekście i zamienia je na znaczniki. Model tekstu ni
   `DbQdrantConfigError`), bo każda ścieżka żądania to ścieżka jednej kolekcji; tekst Qdranta
   zostaje w komunikacie. `get_or_none()` czyta 404 jako odpowiedź, bo tak pyta się o kolekcję
   przed jej założeniem. Zero trafień w miejscu brakującej kolekcji wyglądałoby jak „nie ma
-  podobnych spraw" i nikt by nie zauważył, że indeksu nie zbudowano. Kolekcje zakłada wyłącznie
-  indeksacja.
+  podobnych spraw" i nikt by nie zauważył, że indeksu nie zbudowano. Kolekcje zakłada
+  indeksacja, a na instancji pokazowej także człowiek, ręcznie i puste (p. 76); pustą kolekcję
+  od brakującej odróżnia `GET /instance`.
 - **Qdrant normalizuje wektory przy zapisie w kolekcji `Cosine`** — zapisane `[0.1]*4` wraca jako
   `[0.5]*4` (zmierzone 2026-08-13). Nas to nie kosztuje nic (embedder oddaje wektory jednostkowe,
   a cosinus ignoruje długość), ale **asercja na równość wektora padłaby przy poprawnie działającym
@@ -2053,7 +2064,8 @@ a do tego czasu jej nie ma, więc oba narzędzia kończą się błędem `DbPostg
   `UndefinedTableError` sterownika na `DbPostgresMissingTableError` (odmiana
   `DbPostgresConfigError`), z tekstem sterownika, który nazywa tabelę. Pusty wynik w miejscu
   brakującej tabeli wyglądałby jak „materiał nic o tym nie mówi" i nikt by nie zauważył, że
-  indeksu nie zbudowano. Tabele zakłada wyłącznie indeksacja.
+  indeksu nie zbudowano. Tabele zakłada indeksacja, a na instancji pokazowej także człowiek,
+  ręcznie i puste (p. 76); pustą tabelę od brakującej odróżnia `GET /instance`.
 - **Nazwa tabeli jest sprawdzana wzorcem identyfikatora**, bo nie da się jej podać parametrem
   zapytania; wszystko inne — zapytanie agenta, limit — idzie parametrem. Zapytanie do podciągu
   przechodzi wcześniej przez unieszkodliwienie `%` i `_`.
@@ -2984,6 +2996,31 @@ zapadła przypadkiem:
 - Indeksacja dokumentacji: `helpdesk docs index <katalog>` (zastępuje tabelę i kolekcję;
   **wymaga stacku**); paczka syntetyczna do osobnego indeksu:
   `helpdesk docs index data/safe/instruction --synthetic`
+- Puste indeksy brakujących materiałów na instancji pokazowej (p. 76), w kontenerze `api`; to,
+  co już stoi, zostaje bez zmian, a stan po wszystkim pokazuje `curl -s localhost:8010/instance`:
+  ```bash
+  docker compose exec -T api python - <<'EOF'
+  import asyncio
+  from app.config import Settings
+  from app.db_postgres import DocsTable, PostgresClient, TicketsTable
+  from app.db_qdrant import DocsCollection, QdrantClient, TicketsCollection
+
+  async def main():
+      s  = Settings()
+      pg = PostgresClient(host=s.postgres_host, port=s.postgres_port, database=s.postgres_db,
+                          user=s.postgres_user, password=s.postgres_password,
+                          timeout=s.postgres_timeout_seconds)
+      qd = QdrantClient(base_url=s.qdrant_url, timeout=s.qdrant_timeout_seconds)
+      await TicketsTable(pg).create()
+      await DocsTable(pg).create()
+      await TicketsCollection(qd, s.qdrant_collection, s.embedding_vector_size).ensure()
+      await DocsCollection(qd, s.qdrant_docs_collection, s.embedding_vector_size).ensure()
+      await pg.aclose()
+      await qd.aclose()
+
+  asyncio.run(main())
+  EOF
+  ```
 - Ewaluacja embeddera: `python scripts/eval_embeddings.py recall --model <nazwa>`
   (repo-level, nie CLI usługi — ładuje modele wprost, bez stawiania stacku)
 - Pomiar progu odcięcia: `python scripts/eval_threshold.py table` (rozkłady + tabela koszt/zysk
@@ -3213,20 +3250,19 @@ localhost:8010/search`.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2349 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 1005 (86)          | 96 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 149 (11)           | 10 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2383 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 1006 (87)          | 96 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 155 (12)           | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 108 (38)           | 38 s |
 
-Liczby z 2026-10-19, czasy z 2026-10-10: każdy folder osobno, w komplecie
+Liczby z 2026-10-20, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-3514 testów, około 150 s; domyślny `pytest`, bez stacku: 3379 testów, około 50 s. Testy
+3555 testów, około 190 s; domyślny `pytest`, bez stacku: 3418 testów, około 50 s. Testy
 `llm_live` — 36 integracyjnych i 61 ewaluacyjnych — liczą się do folderu, ale nie chodzą
-w żadnym z tych przebiegów. 2026-10-19 komplet trwał 8–11 min, choć same testy na stacku
-zajęły 121 s, a bez stacku około 100 s; przyczyny nie ustalono — do sprawdzenia po restarcie
-maszyny, zanim te czasy się zmieni. Od p. 19.5 testy na stacku usługi `anonymizer` potrzebują jej
-silnika `agent` z osiągalnym modelem anonimizującym.
+w żadnym z tych przebiegów. 2026-10-19 komplet trwał 8–11 min, a 2026-10-20 już 193 s, bez
+zmian w testach, które by to tłumaczyły; przyczyny nie ustalono. Od p. 19.5 testy na stacku
+usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anonimizującym.
 
 #### Zasady ogólne
 
@@ -3578,7 +3614,8 @@ silnika `agent` z osiągalnym modelem anonimizującym.
 | `tests/conftest.py`                    | adresy usług z hosta (`embedder_url()`, `qdrant_url()`, `api_url()`, `host_settings`, `build_host_settings()`) — nigdy wpisane w pliku testu |
 | `tests/_helpers/transport/`            | test klienta HTTP: `with_transport()`, `always()`, `routed()`, `capturing()`, `raising()` |
 | `tests/_helpers/anonymization/`        | anonimizacja: zmyślone zgłoszenie z danymi osobowymi i jego postać po anonimizacji, fragmenty, których nie wolno zobaczyć w logach (`SENSITIVE`), klient usługi `anonymizer` na atrapie transportu (`anonymizer_client_on()`), odpowiedź usługi (`service_answer()`) i sprawdzenie, czy anonimizator przyjmuje wynik atrapy silnika (`accepts_the_fake_engine()`) |
-| `tests/_helpers/postgres/`             | narzędzie na prawdziwej tabeli z podmienionym klientem (`ScriptedPostgres`) |
+| `tests/_helpers/postgres/`             | narzędzie na prawdziwej tabeli z podmienionym klientem (`ScriptedPostgres`), także liczenie wierszy albo jego błąd (`count_error`) |
+| `tests/_helpers/instance/`             | stan instancji: serwis liczący indeksy na atrapach Qdranta i Postgresa (`scripted_inspector()`, `inspector_on()`, klienci `counting_*` i `failing_*`), aplikacja z podanym serwisem (`app_with_inspector()`); próbki `sample_*()` w `samples.py` — raport stanu, paczka kodu, konfiguracja modelu |
 | `tests/_helpers/embedding/`            | embedding: nazwy modeli testowych (`EMBEDDING_MODEL`, `OTHER_MODEL`), odpowiedź usługi `embedder` w kształcie kontraktu (`embedder_answer()`) i payload punktu Qdranta z nazwą modelu (`with_model()`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
 | `tests/_helpers/live/`                 | żywy model: konfiguracja (`live_generation_llm()`), graf na nim (`run_live_graph()`, z regułami klienta), sprawy grafu naraz (`run_live_cases()` na `LiveCase`: wejście, reguły, narzędzia), reguły z zestawu domyślnego (`default_rules()`), pomiar raz na graf (`remember_per_graph()`), sprawy testu okablowania grafów (`measure_example_case()` i dwie sprawy `suggest_solution`), raport zużycia (fixture `live_usage`) i wydruk rozmowy (`run_as_lines()`) |
@@ -3725,8 +3762,14 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Brak indeksu jako pusty wynik narzędzia albo puste tabele i kolekcje zakładane przy starcie
   `api`** — pusty wynik wygląda jak „materiał nic o tym nie mówi", więc brakującego indeksu nikt
   by nie zauważył, a start `api` zależałby od baz. Brak tabeli i kolekcji to błąd konfiguracji.
-  Wraca w p. 76 jako jawne ustawienie: graf dostaje tylko narzędzia zbudowanych materiałów,
-  a pominięte nazywa log przebiegu.
+  Na instancji pokazowej puste indeksy zakłada się ręcznie, a który materiał jest pusty, mówi
+  `GET /instance` (p. 76).
+- **Narzędzia tylko zbudowanych materiałów jako ustawienie instancji** (decyzja 2026-10-20) —
+  graf dostawałby tylko narzędzia istniejących indeksów, a pominięte nazywałby log przebiegu.
+  Pokaz chodziłby wtedy na układzie, którego produkcja nie ma: prompt wymienia narzędzia,
+  których model nie dostał. Puste indeksy zakładane ręcznie dają to samo bez kodu w `api`.
+  Cena: model robi puste wywołania, a odczyt wątku zgłoszenia znalezionego po karcie kończy się
+  błędem, dopóki tabela wątków jest pusta.
 - **Deduplikacja rekordów przy indeksacji** — wielość rekordów jest informacją, nie nadmiarem:
   scalenie zgodnych rekordów usuwa dowód, że rozwiązanie jest sprawdzone, a rozłącznych —
   materiał do pytań. Pomiar: na 200 artefaktach 8 par o podobnym `problem` i ani jednej do
@@ -4457,19 +4500,14 @@ chwili: na atrapie grafu albo na prawdziwym modelu z indeksami, które są zbudo
   narzędzi z `run_tools` (`tool_timings`), wspólna obsługa `GraphResponder` z funkcją `finish`
   trasy, opis awarii z `dependency_failure()`; reguły — „Warstwa API", „Warstwy kodu", „Warstwa
   węzłów", „Warstwa grafów", „Logi i obserwowalność", „Świadomie pominięte".
-- [ ] **76. Narzędzia na tym, co jest zbudowane** — ustawienie instancji: graf dostaje tylko
-  narzędzia, których materiał w chwili żądania istnieje (kolekcja Qdranta, tabela Postgresa,
-  paczka kodu z opisem i mapą symboli). Domyślnie zostaje dzisiejsza reguła: brak indeksu to
-  błąd konfiguracji. Pominięte materiały nazywa pierwszy wpis logu przebiegu, a trasa
-  `GET /instance` podaje model generujący i materiały zbudowane w tej chwili, więc brak indeksu
-  nadal widać. Prompty się nie zmieniają: model nie dostaje definicji pominiętych narzędzi,
-  a wywołanie takiego narzędzia wraca do niego jako błąd. Dziś pokaz miałby karty golden200 bez
-  wątków (tabela wątków powstaje w p. 31), kod Dokusa i żadnej dokumentacji, bo jest tylko
-  indeks syntetyczny (p. 55). Karty golden200 nie są zanonimizowane, więc pokaz na nich zostaje
-  w zespole. Anonimizacji ustawienie nie dotyczy: prawdziwy model generujący wymaga prawdziwego
-  silnika, a bez niego pokaz chodzi na atrapie grafu. *Dlaczego:* bez tego graf na prawdziwym
-  modelu kończy się błędem przy pierwszym wywołaniu narzędzia materiału, którego nie
-  zbudowano, a nowy indeks ma wejść do pokazu bez restartu `api`.
+- [x] **76. Puste indeksy i stan instancji** (2026-10-20) — na stacku dev brakujące tabele
+  wątków i dokumentacji oraz kolekcja dokumentacji założone ręcznie, puste; trasa
+  `GET /instance` z modelem generującym i stanem pięciu indeksów (`IndexInspector`, `count()`
+  tabel, liczba plików z metryczki paczki kodu); narzędzia tylko zbudowanych materiałów
+  odrzucone. Pokaz ma dziś karty golden200 (niezanonimizowane, więc zostaje w zespole), pustą
+  tabelę wątków (p. 31), pustą dokumentację (p. 55) i kod Dokusa; reguły — „Warstwa API",
+  „Warstwa bazy wektorowej (Qdrant)", „Warstwa wyszukiwania tekstowego (Postgres)", „Warstwy
+  kodu", „Commands", „Świadomie pominięte".
 - [ ] **77. Aplikacja w React z czterema panelami** — jeden widok, zasady budowy w sekcji
   „Frontend"; test w procesie: `/ui` oddaje stronę, a trasy API odpowiadają jak dotąd.
 

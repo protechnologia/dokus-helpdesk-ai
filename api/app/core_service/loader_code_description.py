@@ -7,7 +7,8 @@ od modelu: oba pliki leżą w stałych miejscach.
 | plik w katalogu paczki | kto go pisze                      | co z niego bierzemy      |
 |------------------------|-----------------------------------|--------------------------|
 | `project.md`           | człowiek, ręcznie                 | opis projektu, w całości |
-| `manifest.json`        | skrypt paczki, przy każdej budowie | gałąź i dzień budowy     |
+| `manifest.json`        | skrypt paczki, przy każdej budowie | gałąź, dzień budowy      |
+|                        |                                    | i liczba plików          |
 
 Przed — dwa pliki paczki z aplikacji syntetycznej:
 
@@ -18,6 +19,7 @@ Po:
 
     description.read_text()          →  "Zmyślona aplikacja urzędu na Symfony 1: backend…"
     description.read_package_info()  →  CodePackageInfo(branch=None, built_on=date(2026, 10, 11))
+    description.read_file_count()    →  30
 
 Co jest sprawdzane:
 
@@ -25,6 +27,7 @@ Co jest sprawdzane:
 |-------------------------------------------------------|--------------------------|
 | opisu projektu nie ma, jest pusty albo nie w UTF-8    | `CodePackageConfigError` |
 | metryczki nie ma albo nie niesie gałęzi i dnia budowy | `CodePackageConfigError` |
+| metryczka nie niesie liczby plików paczki             | `CodePackageConfigError` |
 
 O czym pamiętać przy zmianach:
 
@@ -65,13 +68,15 @@ class CodeDescription:
 
     Do czego:
     Na niej stoi narzędzie agenta `describe_code`, a `quote_code` bierze z niej gałąź do tytułu
-    źródła. Osobno od `CodePackage`, bo robi coś innego: tamta pilnuje, żeby ścieżka od modelu
-    nie wyszła poza `repo/`, a tu nie ma ani ścieżki od modelu, ani kodu. Tylko do odczytu.
+    źródła. Stan paczki na trasie `GET /instance` też stąd: gałąź i liczba plików. Osobno od
+    `CodePackage`, bo robi coś innego: tamta pilnuje, żeby ścieżka od modelu nie wyszła poza
+    `repo/`, a tu nie ma ani ścieżki od modelu, ani kodu. Tylko do odczytu.
 
     Flow:
         1. Konstruktor zapamiętuje katalog paczki; dysku nie dotyka.
         2. `read_text()` oddaje opis projektu bez komentarzy redakcyjnych.
         3. `read_package_info()` oddaje gałąź i dzień budowy z metryczki.
+        4. `read_file_count()` oddaje liczbę plików paczki z metryczki.
     """
 
     def __init__(
@@ -132,7 +137,8 @@ class CodeDescription:
         Description:
         Oddaje z metryczki paczki (`manifest.json`) to, co mówi, z której wersji kodu paczka
         powstała: gałąź repozytorium i dzień budowy. Reszty metryczki — liczb plików, listy
-        pominiętych — nie czyta.
+        pominiętych — nie czyta: liczbę plików oddaje `read_file_count()`, bo model jej nie
+        dostaje.
 
         Example args:
             (brak)
@@ -160,3 +166,42 @@ class CodeDescription:
             ) from exc
 
         return info
+
+    def read_file_count(self) -> int:
+        """
+        Description:
+        Oddaje z metryczki paczki liczbę plików kodu, które skrypt skopiował do `repo/` — tę,
+        którą zapisał przy budowie, bez liczenia plików na dysku.
+
+        Example args:
+            (brak)
+
+        Example result:
+            11424
+
+        Raises:
+            CodePackageConfigError: metryczki nie ma albo nie niesie liczby plików paczki
+        """
+        try:
+            raw   = json.loads(self._manifest.read_text(encoding="utf-8"))
+            files = raw["package"]["files"]
+        except (
+            OSError,               # pliku nie ma albo nie da się go otworzyć
+            UnicodeDecodeError,    # plik w innym kodowaniu niż UTF-8
+            json.JSONDecodeError,  # plik nie jest JSON-em
+            KeyError,              # metryczka bez sekcji `package` albo bez liczby plików
+            TypeError,             # JSON albo sekcja `package` nie jest obiektem
+        ) as exc:
+            raise CodePackageConfigError(
+                f"metryczka paczki kodu aplikacji nie niesie liczby plików: {self._manifest} — "
+                f"zbuduj paczkę od nowa (scripts/build_code_package.py)"
+            ) from exc
+
+        # `True` też jest liczbą całkowitą w Pythonie, a liczbą plików nie jest.
+        if isinstance(files, bool) or not isinstance(files, int) or files < 0:
+            raise CodePackageConfigError(
+                f"metryczka paczki kodu aplikacji ma liczbę plików w złym kształcie: "
+                f"{self._manifest} — zbuduj paczkę od nowa (scripts/build_code_package.py)"
+            )
+
+        return files

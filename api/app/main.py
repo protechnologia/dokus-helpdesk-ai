@@ -8,8 +8,10 @@ from fastapi import FastAPI, Request, Response
 
 from app.agent_graphs.factory import close_process_agent_tools, close_process_anonymizer
 from app.config import Settings
+from app.core_service.factory_index_inspector import close_process_index_inspector
 from app.entry_routers.gate.router import router as gate_router
 from app.entry_routers.health.router import router as health_router
+from app.entry_routers.instance.router import router as instance_router
 from app.entry_routers.parse_ticket.router import router as parse_ticket_router
 from app.entry_routers.polish.router import router as polish_router
 from app.entry_routers.search.router import router as search_router
@@ -48,19 +50,21 @@ async def _lifespan(
     Description:
     Cykl życia aplikacji. Przy starcie nic nie robi — klienci powstają przy pierwszym żądaniu,
     które ich potrzebuje. Przy wyłączaniu zamyka narzędzia agenta zbudowane na prawdziwych
-    bazach, czyli pulę połączeń Postgresa i połączenia HTTP do embeddera i Qdranta, oraz
-    połączenia klienta usługi `anonymizer`.
+    bazach, czyli pulę połączeń Postgresa i połączenia HTTP do embeddera i Qdranta, połączenia
+    klienta usługi `anonymizer` i połączenia serwisu, który liczy indeksy dla `/instance`.
 
     Example args:
         app=FastAPI()
 
     Example result:
-        None — po wyjściu z bloku połączenia narzędzi i anonimizatora są zamknięte
+        None — po wyjściu z bloku połączenia narzędzi, anonimizatora i serwisu indeksów są
+        zamknięte
     """
     yield
 
     await close_process_agent_tools()
     await close_process_anonymizer()
+    await close_process_index_inspector()
 
 
 def create_app() -> FastAPI:
@@ -74,8 +78,8 @@ def create_app() -> FastAPI:
         (brak)
 
     Example result:
-        FastAPI z /health, /search, /gate/close, /gate/reply, /parse-ticket, /suggest, /variants
-        i /polish
+        FastAPI z /health, /instance, /search, /gate/close, /gate/reply, /parse-ticket, /suggest,
+        /variants i /polish
     """
     settings = Settings()
 
@@ -129,6 +133,7 @@ def create_app() -> FastAPI:
 
     for router in (
         health_router,        # /health
+        instance_router,      # /instance
         search_router,        # /search
         gate_router,          # /gate/close, /gate/reply
         parse_ticket_router,  # /parse-ticket

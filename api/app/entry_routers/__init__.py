@@ -12,6 +12,7 @@ na zgłoszenie, źródła, zużycie, log). Modele API są odrębne od domenowych
 | zasób           | trasy                                  | graf                       |
 |-----------------|----------------------------------------|----------------------------|
 | `health/`       | `GET /health`                          | —                          |
+| `instance/`     | `GET /instance`                        | —                          |
 | `search/`       | `POST /search`                         | `search`                   |
 | `gate/`         | `POST /gate/close`, `POST /gate/reply` | `gate_close`, `gate_reply` |
 | `parse_ticket/` | `POST /parse-ticket`                   | `parse_ticket`             |

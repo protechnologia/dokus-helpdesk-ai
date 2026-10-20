@@ -15,7 +15,9 @@ działającego stacku.
 | `DocsTable`    | komunikat złamany między liniami       | znaleziony podciągiem, treść dosłowna  |
 | `DocsTable`    | twarda spacja w treści                 | znaleziona zwykłą spacją               |
 | obie           | ponowny zapis tych samych wierszy      | bez duplikatów                         |
-| `DocsTable`    | odczyt i szukanie w niezałożonej       | `DbPostgresMissingTableError`          |
+| obie           | liczenie wierszy: zapisane i pusta     | 2 i 0                                  |
+| `DocsTable`    | odczyt, szukanie i liczenie            | `DbPostgresMissingTableError`          |
+|                | w niezałożonej                         |                                        |
 
 O czym pamiętać przy zmianach:
 
@@ -178,6 +180,29 @@ async def test_writing_the_same_tickets_twice_duplicates_nothing(tickets: Ticket
     assert found == [row.ticket_id for row in ROWS]
 
 
+async def test_count_gives_the_rows_written_and_zero_for_an_empty_table(
+    tickets: TicketsTable,
+    client:  PostgresClient,
+) -> None:
+    """Sprawdza, czy liczenie wierszy oddaje 2 dla tabeli zgłoszeń z dwoma zapisanymi
+    zgłoszeniami i 0 dla tabeli założonej, ale pustej.
+
+    Wyłapuje liczbę, której prawdziwy Postgres nie oddaje jako zwykłej liczby całkowitej, albo
+    pustą tabelę, która nie daje zera: `GET /instance` pomyliłby wtedy indeks pusty
+    ze zbudowanym."""
+    empty = DocsTable(client, name="docs_text_empty_stack_test")
+
+    await empty.drop()
+    await empty.create()
+
+    try:
+        counts = (await tickets.count(), await empty.count())
+    finally:
+        await empty.drop()
+
+    assert counts == (2, 0)
+
+
 async def test_the_listing_follows_the_documents(docs: DocsTable) -> None:
     """Sprawdza, czy spis sekcji wychodzi z tabeli dokument po dokumencie, a w dokumencie według
     miejsca sekcji: cztery sekcje z dwóch dokumentów są tu zapisane w odwrotnej kolejności,
@@ -298,13 +323,15 @@ async def test_a_hard_space_in_the_body_matches_a_plain_space(docs: DocsTable) -
 
 
 async def test_a_table_that_was_never_created_is_a_missing_table(client: PostgresClient) -> None:
-    """Sprawdza, czy spis, odczyt po identyfikatorach i oba rodzaje szukania w tabeli, której nikt
-    nie założył, kończą się błędem `DbPostgresMissingTableError`, a nie pustym wynikiem — czyli
-    czy prawdziwy Postgres odpowiada na nie błędem, który klient tak tłumaczy.
+    """Sprawdza, czy spis, odczyt po identyfikatorach, oba rodzaje szukania i liczenie wierszy
+    w tabeli, której nikt nie założył, kończą się błędem `DbPostgresMissingTableError`, a nie
+    pustym wynikiem albo zerem — czyli czy prawdziwy Postgres odpowiada na nie błędem, który
+    klient tak tłumaczy.
 
     Wyłapuje brak tabeli przemilczany jako pusta lista: agent uznałby, że materiał nic o sprawie
-    nie mówi, choć indeksu nikt nie zbudował. Wyłapuje też brak tabeli zgłoszony jak chwilowa
-    awaria bazy, z którą żądanie skończyłoby się statusem 503."""
+    nie mówi, choć indeksu nikt nie zbudował, a `GET /instance` pokazałby pusty indeks zamiast
+    brakującego. Wyłapuje też brak tabeli zgłoszony jak chwilowa awaria bazy, z którą żądanie
+    skończyłoby się statusem 503."""
     table = DocsTable(client, name="docs_text_never_created_test")
 
     await table.drop()
@@ -317,6 +344,9 @@ async def test_a_table_that_was_never_created_is_a_missing_table(client: Postgre
 
     with pytest.raises(DbPostgresMissingTableError):
         await table.words("kancelaria")
+
+    with pytest.raises(DbPostgresMissingTableError):
+        await table.count()
 
     with pytest.raises(DbPostgresMissingTableError):
         await table.substring("kancelaria")

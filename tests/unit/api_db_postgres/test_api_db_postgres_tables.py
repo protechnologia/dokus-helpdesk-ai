@@ -375,6 +375,21 @@ async def test_sections_are_listed_in_the_order_of_the_documents() -> None:
 
 
 @pytest.mark.parametrize("table", TABLES)
+async def test_count_asks_the_table_for_its_number_of_rows(table: type) -> None:
+    """Sprawdza, czy liczenie wierszy wysyła do bazy jedno zapytanie `SELECT count(*)` o tabelę
+    pod jej nazwą w cudzysłowie i oddaje liczbę, którą baza zwróciła — dla obu tabel.
+
+    Wyłapuje liczenie w innej tabeli niż ta, której dotyczy obiekt (na przykład zawsze w tabeli
+    domyślnej), i nazwę bez cudzysłowu: trasa `GET /instance` pokazałaby stan cudzego indeksu."""
+    client = StubClient(value=1825)
+
+    counted = await table(client, name="probna_tabela").count()
+
+    assert counted      == 1825
+    assert client.calls == [('SELECT count(*) FROM "probna_tabela"',)]
+
+
+@pytest.mark.parametrize("table", TABLES)
 async def test_aclose_closes_the_client_the_table_stands_on(table: type) -> None:
     """Sprawdza, czy `aclose()` wywołane na tabeli zgłoszeń albo dokumentacji zamyka klienta bazy,
     na którym ta tabela stoi.
