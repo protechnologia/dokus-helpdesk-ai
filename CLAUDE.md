@@ -107,7 +107,8 @@ przede wszystkim gdy zgłoszenie niesie komunikat albo kod błędu. Kandydat bez
 dostęp do instancji testowej, na której agent sprawdzi opisany objaw. Byłoby to pierwsze
 narzędzie, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzji o granicach.
 
-**Stan na dziś.** Szkielet stoi w całości. Wszystkie węzły są właściwe i każdy graf przeszedł
+**Stan na dziś.** Szkielet stoi w całości, a front pokazowy (p. 77) pokazuje przebieg każdego
+grafu na żywo. Wszystkie węzły są właściwe i każdy graf przeszedł
 na prawdziwym modelu (OpenAI), na zmyślonych zgłoszeniach i atrapach narzędzi. Anonimizator ma
 prawdziwy silnik `agent` (wzorce i model anonimizujący, Bielik na własnym serwerze), a prompty
 grafów wiedzą o znacznikach, które wstawia (p. 19.7). Sekretów w treści nikt jeszcze nie
@@ -2974,9 +2975,21 @@ i katalogu z jej kartami.
 
 ### Frontend
 
-Front pokazowy (p. 77): jedna strona w React do pokazów — belka z modelem, materiałami
+Front pokazowy (p. 77): jedna strona w React do pokazów — belka z modelami, materiałami
 i licznikami, pas guzików grafów, a pod nimi zgłoszenie, odpowiedź i konsola przebiegu. Woła
-te same trasy co helpdesk, a przebieg czyta ich strumieniem (p. 75).
+te same trasy co helpdesk, a przebieg czyta ich strumieniem (p. 75). Powstał, bo przebieg
+agenta było widać tylko w raporcie testu albo w polu `log` po fakcie, a pokaz ma pokazać obie
+nogi produktu na jednej sprawie.
+
+- **Lewy panel ma komentarze wątku (rola i treść, dodawanie i usuwanie) od pierwszej wersji:**
+  karta zgłoszenia i bramka zamknięcia biorą przyczynę, rozwiązanie i to, co zrobiono, z wątku,
+  więc bez komentarzy nie miałyby z czego pracować. Datę komentarza dodanego ręcznie wpisuje
+  front, a zmyślone przykłady niosą wątki do wczytania.
+- **Wiersze konsoli się nie rozwijają: kliknięty wiersz otwiera dialog nad stroną.** Przy
+  wywołaniu narzędzia dialog pokazuje zapytanie, a pod nim odpowiedź, którą dostał model (JSON
+  ze zwijanymi kluczami, inny tekst skrócony z guzikiem „Pokaż całość"); przy turze — tokeny
+  w czterech klasach i zlecone wywołania. Krok w toku wynika z poprzedniego: po turze
+  z wywołaniami trwają narzędzia, po narzędziach kolejna tura modelu.
 
 - **Osobna usługa compose `frontend` (decyzja 2026-10-20; wcześniej: statyka wpiekana w `api`
   pod `/ui`).** Folder = usługa: Node i `node_modules` nie trafiają do `api/`, przebudowa frontu
@@ -4653,38 +4666,14 @@ chwili: na atrapie grafu albo na prawdziwym modelu z indeksami, które są zbudo
   tabelę wątków (p. 31), pustą dokumentację (p. 55) i kod Dokusa; reguły — „Warstwa API",
   „Warstwa bazy wektorowej (Qdrant)", „Warstwa wyszukiwania tekstowego (Postgres)", „Warstwy
   kodu", „Commands", „Świadomie pominięte".
-- [ ] **77. Aplikacja w React z czterema panelami** — jeden widok, zasady budowy w sekcji
-  „Frontend": osobna usługa `frontend` z proxy `/api`, Vitest dla czystej logiki i test
-  kontenera (`stack_frontend`). Kod, testy i kompozycja są gotowe, a po pierwszym obejrzeniu
-  strony w przeglądarce doszły poprawki (2026-10-20): pokazany przebieg wczytywany z konsoli,
-  ramka „w toku" zamiast zakładek, tekst po anonimizacji, przesuwany dialog, czyszczenie konsoli.
-
-  | panel     | co pokazuje                                                                         |
-  |-----------|-------------------------------------------------------------------------------------|
-  | górny     | koszt LLM, wywołania modelu, tokeny, wywołania narzędzi, przebiegi i czas, liczone  |
-  |           | od otwarcia strony; model i materiały z `GET /instance`                             |
-  | guziki    | pas przez całą szerokość pod górnym, wyróżniony jak główne akcje: rozpoznanie,      |
-  |           | warianty z `GET /variants`, karta zgłoszenia, bramka zamknięcia                     |
-  | lewy      | zgłoszenie: numer, data, temat, treść i komentarze wątku (rola i treść, dodawanie   |
-  |           | i usuwanie); zmyślone przykłady z wątkami do wczytania                              |
-  | środkowy  | odpowiedź ostatniego przebiegu w zakładkach: dla klienta, dla wdrożeniowca, źródła  |
-  | prawy     | konsola: przebiegi sesji, w każdym tury modelu, a pod nimi ich wywołania narzędzi;  |
-  |           | wiersz ma start, krok, koszt i czas trwania, a kliknięty otwiera dialog szczegółów; |
-  |           | krok w toku wynika z poprzedniego (po turze z wywołaniami trwają narzędzia,         |
-  |           | po narzędziach kolejna tura modelu)                                                 |
-
-  Zakładka „Dla klienta" niesie `text` wariantu albo wynik „Popraw". Da się ją edytować,
-  a guziki pod nią puszczają na jej treści bramkę wysyłki i „Popraw". Zakładka „Dla
-  wdrożeniowca" niesie uwagi (Markdown), werdykt bramki z brakami i wskazówką albo kartę
-  zgłoszenia, a „Źródła" — przeczytane zgłoszenia i sekcje oraz kod zacytowany jako przyczyna.
-  Kolumny przewijają się niezależnie, a na wąskim ekranie układają się jedna pod drugą.
-  Komentarze są w pierwszej wersji, bo bez nich karta zgłoszenia i bramka zamknięcia nie mają
-  z czego pracować: przyczynę, rozwiązanie i to, co zrobiono, oba grafy biorą z wątku. Datę
-  komentarza dodanego ręcznie wpisuje front. Wiersze konsoli się nie rozwijają: kliknięty wiersz
-  otwiera dialog nad stroną. Przy wywołaniu narzędzia dialog pokazuje zapytanie, a pod nim
-  odpowiedź, którą dostał model; przy turze — tokeny w czterech klasach. Długa odpowiedź jest
-  skrócona, z guzikiem „Pokaż całość". *Dlaczego:* przebieg agenta widać dziś tylko w raporcie testu
-  albo w polu `log` po fakcie, a pokaz ma pokazać obie nogi produktu na jednej sprawie.
+- [x] **77. Aplikacja w React z czterema panelami** (2026-10-20) — osobna usługa `frontend`
+  (React 19, antd 6, TypeScript, Vite; nginx na prod, proxy `/api` do `api`): belka z modelami,
+  materiałami i licznikami sesji, pas guzików grafów, trzy kolumny z suwakami — zgłoszenie
+  z wątkiem, odpowiedź pokazanego przebiegu w czterech zakładkach i konsola przebiegu na żywo ze
+  strumienia, z dialogiem kroku; pod front w `api`: `requested_tools` w kroku tury, model
+  anonimizujący w `/instance` (`GET /info` usługi `anonymizer`) i tekst po anonimizacji w kroku
+  `anonymize`; 38 testów Vitest i test kontenera; reguły — „Frontend", „Warstwa API", „Usługa
+  `anonymizer`", „Konfiguracja i deploy", „Testy", „Świadomie pominięte".
 
 #### G. Grafy — po jednym punkcie na graf: treść promptu i pomiar
 
