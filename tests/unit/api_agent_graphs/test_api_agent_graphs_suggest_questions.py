@@ -92,7 +92,7 @@ def test_questions_become_a_proposal() -> None:
 
     Wyłapuje zamianę, która gubi pytania albo uwagi po drodze od odpowiedzi modelu do wyniku
     grafu."""
-    answer = QuestionsAnswer(text="1. Od kiedy?", internal_notes="1: odcina zacięcie kolejki")
+    answer = QuestionsAnswer(text="1. Od kiedy?", internal_notes="Ad. 1. odcina zacięcie kolejki")
 
     assert to_output(answer) == Proposal(**answer.model_dump())
 

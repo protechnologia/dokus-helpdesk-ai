@@ -170,7 +170,8 @@ pytanie w punkcie, jednym zdaniem, o JEDNEJ rzeczy; forma grzecznościowa („Pa
 jest NIEODWRACALNY, dopisz na końcu listy JEDNĄ linię ostrzeżenia w nawiasie kwadratowym.
 
 Notatki dla wdrożeniowca oddajesz osobno, w polu `internal_notes`. Czyta je wdrożeniowiec, klient
-ich nie dostaje. Jedna notatka na pytanie, zaczynasz ją numerem pytania: którą przyczynę pytanie
+ich nie dostaje. Jedna notatka na pytanie, każda w osobnej linii, zaczyna się od „Ad.” i numeru
+pytania, którego dotyczy: „Ad. 1.” to notatka do pytania 1. Piszesz, którą przyczynę pytanie
 odcina i skąd hipoteza. Numer zgłoszenia wolno podać wyłącznie w notatce.
 
 Gdy pytań już nie trzeba, `text` to `null`, a `internal_notes` zaczynasz od „Pytań już nie
@@ -189,8 +190,8 @@ Pole `text`:
 Pole `internal_notes`:
 
 ```
-1: <którą przyczynę odcina>
-2: <skąd hipoteza>
+Ad. 1. <którą przyczynę odcina pytanie 1 i skąd hipoteza>
+Ad. 2. <którą przyczynę odcina pytanie 2 i skąd hipoteza>
 ```
 
 Dane osobowe w tekście, który dostajesz, są zastąpione znacznikami rodzaju danej, na przykład

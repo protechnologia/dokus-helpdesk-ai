@@ -60,7 +60,7 @@ GIVEN_OUTPUTS: dict[str, BaseModel] = {
     "suggest_handoff":   Proposal(text="Przekazujemy sprawę do dalszych prac.", internal_notes=""),
     "suggest_questions": Proposal(
         text           = "1. Od kiedy nie przychodzą przesyłki?",
-        internal_notes = "1: odcina zacięcie kolejki",
+        internal_notes = "Ad. 1. odcina zacięcie kolejki",
     ),
     "suggest_solution":  Proposal(
         text           = "Kroki do wykonania: 1. Prosimy o restart usługi.",

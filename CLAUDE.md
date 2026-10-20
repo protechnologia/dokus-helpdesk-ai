@@ -2639,7 +2639,9 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   i analizę z kodu, a nawias w treści model gubi: linia `[UWAGA: …]` nie padła w żadnym
   z czterech pomiarów. Ostrzeżenie o kroku nieodwracalnym zostaje w treści dla klienta:
   w `solution` w „Uwagach dla klienta", w `questions` jako linia w nawiasie pod pytaniami.
-  Notatki przy pytaniach idą do uwag, z numerem pytania. Zasada 9 obowiązuje oba pola.
+  Notatki przy pytaniach idą do uwag, każda w osobnej linii od „Ad. N." — numeru pytania, którego
+  dotyczy (2026-10-20, wcześniej „N:", które w uwagach czytało się jak osobna lista). Zasada 9
+  obowiązuje oba pola.
 - **`questions` działa dwutorowo:** bez trafień pyta na podstawie samego zgłoszenia,
   z trafieniami dokłada `questions_summary` z podobnych spraw. Ryzykiem nie jest puste pole, tylko
   sentinel w przebraniu („Brak pytań ze strony prowadzącego sprawę.") — 28 na 200 rekordów.

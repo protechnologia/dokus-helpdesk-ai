@@ -23,7 +23,7 @@ class QuestionsAnswer(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     text:           str | None = Field(examples=["1. Od kiedy nie przychodzą przesyłki? …"])
-    internal_notes: str        = Field(examples=["1: odcina zacięcie kolejki (zgł. 41002)"])
+    internal_notes: str        = Field(examples=["Ad. 1. odcina zacięcie kolejki (zgł. 41002)"])
 
     @field_validator("text")
     @classmethod

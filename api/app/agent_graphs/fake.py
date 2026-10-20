@@ -43,7 +43,7 @@ def fake_search_nodes(
 
     Example args:
         respond_tool_name="respond_suggest_questions"
-        output=Proposal(text="1. Od kiedy…", internal_notes="1: …")
+        output=Proposal(text="1. Od kiedy…", internal_notes="Ad. 1. …")
         limits={"find_tickets_vector": 3, "read_tickets_card": 3}
 
     Example result:
