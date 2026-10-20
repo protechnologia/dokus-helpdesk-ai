@@ -127,7 +127,9 @@ class StepItem(BaseModel):
     Kroki przychodzą w trakcie przebiegu, więc wołający widzi, co dzieje się teraz; odpowiedź
     trasy przychodzi na końcu, w zdarzeniu `result`. `message` to wpis logu przebiegu — tekst dla
     człowieka, bez treści zgłoszenia, nie do parsowania; co trwa po turze modelu, mówi
-    `requested_tools`.
+    `requested_tools`. Krok `anonymize` niesie tekst zgłoszenia po anonimizacji
+    (`anonymized_text`): ten sam, który czyta model, więc wdrożeniowiec widzi, co model dostał,
+    także gdy przebieg zawiedzie przed odpowiedzią.
     """
 
     node:            str                = Field(examples=["agent"])
@@ -137,6 +139,8 @@ class StepItem(BaseModel):
     usage:           UsageItem | None   = None
     requested_tools: list[str]          = Field(default_factory=list, examples=[["read_docs"]])
     tool_calls:      list[ToolCallItem] = Field(default_factory=list)
+    # Tylko w kroku `anonymize`: tekst zgłoszenia po anonimizacji, ten sam, który dostaje model.
+    anonymized_text: str | None         = Field(default=None, examples=["{IMIĘ} zgłasza brak…"])
 
 
 class ErrorResponse(BaseModel):

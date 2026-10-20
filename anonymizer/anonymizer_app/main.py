@@ -30,7 +30,7 @@ from fastapi import FastAPI, Request, Response
 from anonymizer_app.config import get_settings
 from anonymizer_app.core_engine import Engine, get_engine
 from anonymizer_app.core_errors.handlers import REQUEST_ID_HEADER, register_exception_handlers
-from anonymizer_app.entry_routers import anonymize, health
+from anonymizer_app.entry_routers import anonymize, health, info
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +155,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.include_router(health.router)
     app.include_router(anonymize.router)
+    app.include_router(info.router)
 
     # Ogłaszane przy starcie, bo silnik decyduje, czy `api` w ogóle przyjmie wynik.
     logger.info("anonymizer ready engine=%s", engine.name)

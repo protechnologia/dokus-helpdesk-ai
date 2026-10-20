@@ -13,9 +13,10 @@ from tests._helpers.synthetic_code import synthetic_code_description
 
 
 def test_instance_reports_the_model_and_the_state_of_every_index() -> None:
-    """Sprawdza, czy `GET /instance` odpowiada statusem 200 z atrapą modelu bez nazwy, z pięcioma
-    indeksami w stałej kolejności, każdym ze stanem i liczbą z serwisu (karty zbudowane, wątki
-    puste, dokumentacji nie ma, kod zbudowany), i z gałęzią oraz dniem budowy paczki syntetycznej.
+    """Sprawdza, czy `GET /instance` odpowiada statusem 200 z atrapą modelu bez nazwy, z opisem
+    anonimizatora (w teście atrapa: silnik `fake` bez modelu), z pięcioma indeksami w stałej
+    kolejności, każdym ze stanem i liczbą z serwisu (karty zbudowane, wątki puste, dokumentacji
+    nie ma, kod zbudowany), i z gałęzią oraz dniem budowy paczki syntetycznej.
 
     Wyłapuje trasę, która nie jest podpięta, gubi pole odpowiedzi albo wystawia stan inaczej niż
     jako `missing`, `empty` i `built` — z tej odpowiedzi belka frontu rysuje, na czym stoi
@@ -27,15 +28,16 @@ def test_instance_reports_the_model_and_the_state_of_every_index() -> None:
 
     assert response.status_code == 200
     assert response.json() == {
-        "model":        {"provider": "fake", "name": None},
-        "indexes":      [
+        "model":         {"provider": "fake", "name": None},
+        "anonymization": {"state": "available", "engine": "fake", "model": None},
+        "indexes":       [
             {"material": "tickets", "index": "cards",     "state": "built",   "count": 171},
             {"material": "tickets", "index": "threads",   "state": "empty",   "count": 0},
             {"material": "docs",    "index": "sections",  "state": "missing", "count": None},
             {"material": "docs",    "index": "fragments", "state": "missing", "count": None},
             {"material": "code",    "index": "package",   "state": "built",   "count": 30},
         ],
-        "code_package": {"branch": package.branch, "built_on": package.built_on.isoformat()},
+        "code_package":  {"branch": package.branch, "built_on": package.built_on.isoformat()},
     }
 
 

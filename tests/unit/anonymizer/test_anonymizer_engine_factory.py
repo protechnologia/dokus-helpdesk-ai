@@ -57,7 +57,8 @@ async def test_the_agent_engine_is_built_from_the_model_settings() -> None:
     engine = build_engine(Settings(**{**AGENT_SETTINGS, "anonymization_engine": " Agent "}))
 
     assert isinstance(engine, AgentEngine)
-    assert engine.name == "agent"
+    assert engine.name  == "agent"
+    assert engine.model == "test-model"
 
     await engine.aclose()
 

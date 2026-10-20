@@ -20,11 +20,12 @@ INDEXES = [
 
 def test_instance_answers_from_the_running_container(api_client: httpx2.Client) -> None:
     """Sprawdza, czy uruchomiony kontener `api` odpowiada na `GET /instance` statusem 200 z pięcioma
-    indeksami w stałej kolejności, każdym w jednym ze stanów `missing`, `empty` albo `built`.
+    indeksami w stałej kolejności, każdym w jednym ze stanów `missing`, `empty` albo `built`,
+    i z anonimizatorem dostępnym, z nazwą silnika.
 
     Wyłapuje wdrożenie, w którym kontener nie dosięga Qdranta albo Postgresa (status 503), nie
-    ma konfiguracji bazy (500) albo nie wystawia trasy — test w procesie stoi na atrapach
-    klientów i tego nie widzi."""
+    ma konfiguracji bazy (500), nie dosięga usługi `anonymizer` albo nie wystawia trasy — test
+    w procesie stoi na atrapach klientów i tego nie widzi."""
     response = api_client.get("/instance")
 
     assert response.status_code == 200
@@ -33,3 +34,5 @@ def test_instance_answers_from_the_running_container(api_client: httpx2.Client) 
 
     assert [(item["material"], item["index"]) for item in indexes] == INDEXES
     assert {item["state"] for item in indexes} <= {"missing", "empty", "built"}
+    assert response.json()["anonymization"]["state"] == "available"
+    assert response.json()["anonymization"]["engine"]

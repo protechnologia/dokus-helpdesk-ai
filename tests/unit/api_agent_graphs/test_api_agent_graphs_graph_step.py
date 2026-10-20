@@ -1,4 +1,5 @@
 from app.agent_graphs import ToolCallRun, graph_step
+from app.engine_anonymization import AnonymizedText
 from tests._helpers.graphs.samples import (
     READ_RESULT,
     READ_TIMING,
@@ -83,3 +84,19 @@ def test_a_step_carries_its_node_times_and_log() -> None:
     assert step.duration_ms == 85.0
     assert step.log         == update["log"]
     assert step.usage       is None
+
+
+def test_only_the_anonymize_step_carries_the_anonymized_text() -> None:
+    """Sprawdza, czy krok `anonymize` niesie tekst ze zmiany stanu węzła — tekst po anonimizacji —
+    a krok tury modelu i krok narzędzi tekstu nie niosą.
+
+    Wyłapuje krok bez tekstu po anonimizacji albo tekst doklejany do każdego kroku: front nie
+    pokazałby, co dostał model, albo strumień niósłby zgłoszenie przy każdym kroku."""
+    update = {"anonymized": AnonymizedText(text="{IMIĘ} zgłasza brak przesyłek")}
+
+    anonymize = graph_step("anonymize", update, [], STEP_STARTED_AT, 812.0)
+    agent     = graph_step("agent", agent_update(), two_turns()[:4], STEP_STARTED_AT, 2140.6)
+    tools     = graph_step("run_tools", run_tools_update(), two_turns(), STEP_STARTED_AT, 85.0)
+
+    assert anonymize.anonymized_text == "{IMIĘ} zgłasza brak przesyłek"
+    assert (agent.anonymized_text, tools.anonymized_text) == (None, None)

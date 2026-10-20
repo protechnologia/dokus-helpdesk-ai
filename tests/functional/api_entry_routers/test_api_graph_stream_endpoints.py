@@ -9,7 +9,14 @@ from app.engine_anonymization import AnonymizationConfigError
 from app.entry_routers.streaming import STREAM_MEDIA_TYPE
 from app.errors import REQUEST_ID_HEADER
 from app.main import create_app
-from tests._helpers.anonymization import FAKE_ENGINE, anonymizer_client_on, service_answer
+from tests._helpers.anonymization import (
+    ANONYMIZED_TEXT,
+    FAKE_ENGINE,
+    RAW_TEXT,
+    SENSITIVE,
+    anonymizer_client_on,
+    service_answer,
+)
 from tests._helpers.routers import (
     app_on_fake_graphs,
     app_with_model_failing_after_tools,
@@ -142,18 +149,26 @@ def test_an_unknown_variant_is_refused_before_the_stream() -> None:
     assert response.headers["content-type"].startswith("application/json")
 
 
-def test_the_steps_carry_no_ticket_text() -> None:
-    """Sprawdza, czy żadne zdarzenie `step` strumienia `/search` nie zawiera opisu zgłoszenia
-    z żądania.
+def test_the_steps_carry_the_ticket_only_after_anonymization() -> None:
+    """Sprawdza, czy krok `anonymize` strumienia `/search` niesie tekst zgłoszenia po
+    anonimizacji — ten, który oddała usługa `anonymizer` — a żaden krok nie zawiera surowego
+    opisu z żądania ani żadnego jego fragmentu z danymi osobowymi.
 
-    Wyłapuje krok, który niesie wejście grafu albo turę użytkownika: strumień trafia do
-    przeglądarki, a ma nieść to samo co log przebiegu, czyli bez treści zgłoszenia."""
-    events = sse_events(TestClient(create_app()).post("/search", json=TICKET, headers=STREAM).text)
+    Wyłapuje krok, który niesie wejście grafu albo turę użytkownika przed anonimizacją, oraz krok
+    bez tekstu po anonimizacji: strumień trafia do przeglądarki, więc może nieść tylko to, co
+    widzi model, a wdrożeniowiec ma zobaczyć, co model dostał."""
+    anonymizer = anonymizer_client_on(always(payload=service_answer()), fake_engine_allowed=True)
+    client     = TestClient(app_on_fake_graphs(anonymizer))
 
-    steps = [json.dumps(data, ensure_ascii=False) for name, data in events if name == "step"]
+    response = client.post("/search", json={**TICKET, "body": RAW_TEXT}, headers=STREAM)
+    steps    = [data for name, data in sse_events(response.text) if name == "step"]
+    texts    = [json.dumps(step, ensure_ascii=False) for step in steps]
 
-    assert steps
-    assert all(TICKET["body"] not in step for step in steps)
+    assert [step["anonymized_text"] for step in steps if step["node"] == "anonymize"] == [
+        ANONYMIZED_TEXT,
+    ]
+    assert all(step["anonymized_text"] is None for step in steps if step["node"] != "anonymize")
+    assert not [part for part in (RAW_TEXT, *SENSITIVE) for text in texts if part in text]
 
 
 def test_every_graph_route_has_the_stream_in_openapi() -> None:

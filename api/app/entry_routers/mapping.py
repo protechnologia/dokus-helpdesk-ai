@@ -177,6 +177,7 @@ def to_step_item(
         usage           = to_usage_item(step.usage) if step.usage is not None else None,
         requested_tools = list(step.requested_tools),
         tool_calls      = tool_calls,
+        anonymized_text = step.anonymized_text,
     )
 
     return item

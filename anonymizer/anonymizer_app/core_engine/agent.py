@@ -81,6 +81,20 @@ class AgentEngine(Engine):
         return AGENT_ENGINE_NAME
 
     @property
+    def model(self) -> str | None:
+        """
+        Description:
+        Nazwa modelu anonimizującego, z którym rozmawia klient silnika.
+
+        Example args:
+            (brak)
+
+        Example result:
+            "speakleash/Bielik-11B-v3.0-Instruct-FP8-Dynamic"
+        """
+        return self._llm.model
+
+    @property
     def graph(self) -> CompiledStateGraph:
         """
         Description:

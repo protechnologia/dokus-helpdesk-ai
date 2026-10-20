@@ -37,6 +37,21 @@ class Engine(ABC):
             "fake"
         """
 
+    @property
+    @abstractmethod
+    def model(self) -> str | None:
+        """
+        Description:
+        Nazwa modelu, którego silnik używa; `None`, gdy silnik modelu nie ma (atrapa). Oddaje ją
+        trasa `GET /info`, z niej `api` pokazuje, co anonimizuje zgłoszenia.
+
+        Example args:
+            (brak)
+
+        Example result:
+            "speakleash/Bielik-11B-v3.0-Instruct-FP8-Dynamic"
+        """
+
     @abstractmethod
     async def anonymize(
         self,

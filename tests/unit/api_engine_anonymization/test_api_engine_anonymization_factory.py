@@ -66,3 +66,14 @@ async def test_the_fake_passes_text_through_unchanged() -> None:
 
     assert result.text      == "Jan Kowalski zgłasza błąd"
     assert anonymizer.texts == ["Jan Kowalski zgłasza błąd"]
+
+
+async def test_the_fake_describes_itself_like_the_fake_engine_of_the_service() -> None:
+    """Sprawdza, czy atrapa anonimizatora opisuje się tak, jak usługa opisuje swoją atrapę
+    silnika: dostępna, silnik `fake`, bez modelu.
+
+    Wyłapuje atrapę, która udaje prawdziwy model: testy trasy `GET /instance` pokazywałyby
+    anonimizację modelem, której w teście nie ma."""
+    info = await FakeAnonymizer().describe()
+
+    assert info.model_dump() == {"available": True, "engine": "fake", "model": None}

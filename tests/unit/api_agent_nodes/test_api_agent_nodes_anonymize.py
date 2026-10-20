@@ -1,32 +1,12 @@
+import httpx
 import pytest
 
 from app.agent_graphs import GraphState
 from app.agent_nodes import LogEntry
 from app.agent_nodes.anonymize.node import AnonymizeNode
-from app.engine_anonymization import AnonymizationError, AnonymizedText, Anonymizer, FakeAnonymizer
-
-
-class FailingAnonymizer(Anonymizer):
-    """Anonimizator, który zawsze się wywraca — `FakeAnonymizer` nie umie odtworzyć porażki."""
-
-    async def anonymize(
-        self,
-        text: str,  # np. "Jan Kowalski…"
-    ) -> AnonymizedText:
-        """
-        Description:
-        Zgłasza błąd anonimizacji przy każdym wywołaniu.
-
-        Example args:
-            text="Jan Kowalski zgłasza…"
-
-        Example result:
-            (zawsze AnonymizationError)
-
-        Raises:
-            AnonymizationError: zawsze
-        """
-        raise AnonymizationError("nie udało się zanonimizować")
+from app.engine_anonymization import AnonymizationError, AnonymizedText, FakeAnonymizer
+from tests._helpers.anonymization import anonymizer_client_on
+from tests._helpers.transport import raising
 
 
 async def test_the_node_sets_the_anonymized_text() -> None:
@@ -54,5 +34,8 @@ async def test_a_failed_anonymization_stops_the_graph() -> None:
 
     Wyłapuje węzeł, który po nieudanej anonimizacji puściłby przebieg dalej: surowe zgłoszenie
     z danymi klienta trafiłoby wtedy do modelu."""
+    # Klient usługi, której nie da się dosięgnąć: zawodzi przy każdym wywołaniu.
+    failing = anonymizer_client_on(raising(httpx.ConnectError("connection refused")))
+
     with pytest.raises(AnonymizationError):
-        await AnonymizeNode(FailingAnonymizer()).run(GraphState(input_text="Jan Kowalski zgłasza…"))
+        await AnonymizeNode(failing).run(GraphState(input_text="Jan Kowalski zgłasza…"))

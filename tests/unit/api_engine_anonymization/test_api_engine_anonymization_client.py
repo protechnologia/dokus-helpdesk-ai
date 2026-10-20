@@ -27,6 +27,17 @@ BROKEN_ANSWERS = [
     pytest.param(raising(httpx.ReadTimeout("timed out")), id="przekroczony czas"),
 ]
 
+# Odpowiedzi `GET /info`, po których usługa jest opisana jako niedostępna, z opisem w `id`.
+BROKEN_INFO = [
+    pytest.param(always(status=503), id="status 503"),
+    pytest.param(always(text="<html>proxy error</html>"), id="treść spoza JSON-a"),
+    pytest.param(always(payload=["agent"]), id="lista zamiast obiektu"),
+    pytest.param(always(payload={"model": "bielik"}), id="bez nazwy silnika"),
+    pytest.param(always(payload={"engine": "agent", "model": 7}), id="model nie jest napisem"),
+    pytest.param(raising(httpx.ConnectError("connection refused")), id="brak połączenia"),
+    pytest.param(raising(httpx.ReadTimeout("timed out")), id="przekroczony czas"),
+]
+
 
 @pytest.mark.parametrize("fake_engine_allowed", [False, True], ids=["bez zgody", "ze zgodą"])
 async def test_the_text_goes_to_the_service_and_comes_back_anonymized(
@@ -163,3 +174,35 @@ async def test_aclose_closes_the_connections_and_may_be_repeated() -> None:
     await client.aclose()
 
     assert client._client.is_closed
+
+
+@pytest.mark.parametrize("model", ["speakleash/Bielik-11B-v3.0", None], ids=["agent", "atrapa"])
+async def test_describe_asks_the_service_for_its_engine_and_model(model: str | None) -> None:
+    """Sprawdza, czy opis anonimizatora to jedno żądanie `GET /info`, a z odpowiedzi usługi
+    przechodzą nazwa silnika i model — także `null`, który oddaje atrapa silnika.
+
+    Wyłapuje opis, który pyta inną ścieżkę, wysyła tekst albo gubi model: belka frontu mówiłaby
+    co innego niż usługa, która naprawdę anonimizuje zgłoszenia."""
+    seen: list = []
+    engine     = REAL_ENGINE if model else FAKE_ENGINE
+    answer     = httpx.Response(200, json={"engine": engine, "model": model})
+    client     = anonymizer_client_on(capturing(seen, {("GET", "/info"): answer}))
+
+    info = await client.describe()
+
+    assert info.model_dump() == {"available": True, "engine": engine, "model": model}
+    assert [(call["method"], call["path"]) for call in seen] == [("GET", "/info")]
+
+
+@pytest.mark.parametrize("handler", BROKEN_INFO)
+async def test_describe_reports_an_unreachable_service_as_unavailable(
+    handler: httpx.MockTransport,
+) -> None:
+    """Sprawdza, czy brak połączenia, przekroczony czas, status spoza 2xx i odpowiedź spoza
+    kontraktu dają opis „niedostępna" bez silnika i modelu, a nie wyjątek.
+
+    Wyłapuje opis, który wypuszcza błąd: `GET /instance` oddawałby wtedy 503 i belka frontu
+    nie pokazałaby ani modelu generującego, ani indeksów, choć brakuje tylko anonimizatora."""
+    info = await anonymizer_client_on(handler).describe()
+
+    assert info.model_dump() == {"available": False, "engine": None, "model": None}

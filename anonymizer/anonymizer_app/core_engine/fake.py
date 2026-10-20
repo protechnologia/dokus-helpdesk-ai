@@ -33,6 +33,20 @@ class FakeEngine(Engine):
         """
         return FAKE_ENGINE_NAME
 
+    @property
+    def model(self) -> str | None:
+        """
+        Description:
+        Atrapa nie używa modelu.
+
+        Example args:
+            (brak)
+
+        Example result:
+            None
+        """
+        return None
+
     async def anonymize(
         self,
         text: str,  # np. "Jan Nowak zgłasza, że przesyłki nie przychodzą."

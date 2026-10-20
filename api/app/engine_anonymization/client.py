@@ -4,13 +4,19 @@ import httpx
 
 from app.engine_anonymization.base import Anonymizer
 from app.engine_anonymization.errors import AnonymizationConfigError, AnonymizationError
-from app.engine_anonymization.models import AnonymizedText
+from app.engine_anonymization.models import AnonymizedText, AnonymizerInfo
 
 logger = logging.getLogger(__name__)
 
 # Ścieżka anonimizacji w usłudze `anonymizer`. Stała, a nie ustawienie: to część kontraktu między
 # dwiema usługami, które wdrażamy razem; gdzie usługa stoi, mówi już `ANONYMIZATION_BASE_URL`.
 ANONYMIZE_PATH = "/anonymize"
+
+# Ścieżka opisu usługi: silnik i model, bez adresu serwera modelu i bez klucza.
+INFO_PATH = "/info"
+
+# Opis usługi, która nie odpowiedziała albo odpowiedziała spoza kontraktu.
+UNAVAILABLE = AnonymizerInfo(available=False, engine=None, model=None)
 
 # Nazwa atrapy silnika w odpowiedzi usługi — ta sama, którą usługa zapisuje w `FAKE_ENGINE_NAME`.
 # Atrapa oddaje tekst bez zmian, więc jej wynik ten klient oddaje tylko wtedy, gdy mu na to
@@ -33,7 +39,9 @@ class AnonymizerClient(Anonymizer):
         3. Wynik atrapy silnika bez zgody to `AnonymizationConfigError`, nie tekst: atrapa oddaje
            tekst bez zmian, a ten nie może trafić do modelu zewnętrznego. Każda inna porażka to
            `AnonymizationError` (fail-closed: graf staje).
-        4. `aclose()` zamyka połączenia przy wyłączaniu aplikacji.
+        4. `describe()` pyta `/info`, którym silnikiem i z jakim modelem usługa działa; usługa,
+           która nie odpowiada, jest opisana jako niedostępna, bez błędu.
+        5. `aclose()` zamyka połączenia przy wyłączaniu aplikacji.
 
     Odmowa atrapy stoi tutaj, a nie w fabryce, bo fabryka z niczym się nie łączy, a który silnik
     działa, wie dopiero usługa. Zabezpieczenie jest więc przy pierwszym wywołaniu, a nie przy
@@ -121,6 +129,47 @@ class AnonymizerClient(Anonymizer):
         )
 
         return anonymized
+
+    async def describe(self) -> AnonymizerInfo:
+        """
+        Description:
+        Pyta usługę, którym silnikiem i z jakim modelem anonimizuje. Usługa nie łączy się przy
+        tym z modelem, więc odpowiada także przy wyłączonym serwerze modelu. Brak odpowiedzi,
+        status spoza 2xx i treść spoza kontraktu dają opis „niedostępna", a nie błąd: czyta to
+        opis instancji, który ma pokazać brak anonimizatora, zamiast samemu zawieść.
+
+        Example args:
+            (brak)
+
+        Example result:
+            AnonymizerInfo(available=True, engine="agent",
+                           model="speakleash/Bielik-11B-v3.0-Instruct-FP8-Dynamic")
+        """
+        # --- wywołanie ---
+        try:
+            response = await self._client.get(INFO_PATH)
+            response.raise_for_status()
+            payload = response.json()
+        except (
+            httpx.HTTPError,  # brak połączenia, przekroczony czas albo status spoza 2xx
+            ValueError,       # treść spoza JSON-a, zwykle strona błędu pośrednika
+        ) as exc:
+            logger.warning("anonymizer info unavailable error=%s", type(exc).__name__)
+
+            return UNAVAILABLE
+
+        # --- kontrakt: nazwa silnika jest zawsze, model bywa `null` ---
+        engine = payload.get("engine") if isinstance(payload, dict) else None
+        model  = payload.get("model") if isinstance(payload, dict) else None
+
+        if not isinstance(engine, str) or not engine or not isinstance(model, str | None):
+            logger.warning("anonymizer info unavailable error=contract")
+
+            return UNAVAILABLE
+
+        info = AnonymizerInfo(available=True, engine=engine, model=model)
+
+        return info
 
     async def aclose(self) -> None:
         """

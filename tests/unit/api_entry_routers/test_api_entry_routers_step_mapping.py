@@ -68,3 +68,15 @@ def test_a_model_turn_goes_out_with_the_tools_it_asked_for() -> None:
 
     assert agent.requested_tools == ["read_tickets_card"]
     assert tools.requested_tools == []
+
+
+def test_the_anonymized_text_goes_out_unchanged() -> None:
+    """Sprawdza, czy tekst po anonimizacji z kroku `anonymize` wychodzi w zdarzeniu znak w znak,
+    a krok bez niego wychodzi z `None`.
+
+    Wyłapuje mapowanie, które gubi tekst: zakładka „Po anonimizacji" we froncie zostałaby pusta,
+    także przy przebiegu, który zawiódł przed odpowiedzią."""
+    step = TOOL_STEP.model_copy(update={"node": "anonymize", "anonymized_text": "{IMIĘ} zgłasza…"})
+
+    assert to_step_item(step).anonymized_text      == "{IMIĘ} zgłasza…"
+    assert to_step_item(TOOL_STEP).anonymized_text is None

@@ -20,7 +20,7 @@ from app.engine_anonymization.client import AnonymizerClient
 from app.engine_anonymization.errors import AnonymizationConfigError, AnonymizationError
 from app.engine_anonymization.factory import build_anonymizer
 from app.engine_anonymization.fake import FakeAnonymizer
-from app.engine_anonymization.models import AnonymizedText
+from app.engine_anonymization.models import AnonymizedText, AnonymizerInfo
 
 __all__ = [
     "AnonymizationConfigError",
@@ -28,6 +28,7 @@ __all__ = [
     "AnonymizedText",
     "Anonymizer",
     "AnonymizerClient",
+    "AnonymizerInfo",
     "FakeAnonymizer",
     "build_anonymizer",
 ]

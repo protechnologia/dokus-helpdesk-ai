@@ -82,6 +82,20 @@ class LLMClient:
             timeout  = timeout,
         )
 
+    @property
+    def model(self) -> str:
+        """
+        Description:
+        Nazwa modelu, z którym rozmawia klient — ta sama, którą wysyła w każdym żądaniu.
+
+        Example args:
+            (brak)
+
+        Example result:
+            "speakleash/Bielik-11B-v3.0-Instruct-FP8-Dynamic"
+        """
+        return self._model
+
     async def complete_json(
         self,
         system:      str,                    # np. "Jesteś narzędziem do anonimizacji…"

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from app.engine_anonymization.models import AnonymizedText
+from app.engine_anonymization.models import AnonymizedText, AnonymizerInfo
 
 
 class Anonymizer(ABC):
@@ -13,7 +13,9 @@ class Anonymizer(ABC):
         1. Fabryka (`build_anonymizer`) buduje klienta usługi z konfiguracji; testy podają atrapę.
         2. Węzeł `anonymize` woła `anonymize()` na `input_text` grafu.
         3. Wynik trafia do stanu; dalej model zewnętrzny widzi wyłącznie jego.
-        4. `aclose()` zwalnia to, co implementacja trzyma (połączenia klienta usługi).
+        4. `describe()` mówi, czy anonimizator odpowiada i którym silnikiem działa — dla opisu
+           instancji (`GET /instance`), nie dla przebiegu grafu.
+        5. `aclose()` zwalnia to, co implementacja trzyma (połączenia klienta usługi).
 
     Fail-closed: implementacja, która nie umie zanonimizować tekstu, zgłasza błąd — nigdy nie
     oddaje tekstu bez zmian.
@@ -36,6 +38,22 @@ class Anonymizer(ABC):
 
         Raises:
             AnonymizationError: tekstu nie da się bezpiecznie zanonimizować
+        """
+
+    @abstractmethod
+    async def describe(self) -> AnonymizerInfo:
+        """
+        Description:
+        Mówi, czy anonimizator odpowiada, którym silnikiem działa i z jakim modelem — bez
+        anonimizowania czegokolwiek. Niedostępność to odpowiedź (`available=False`), nie błąd:
+        czyta to opis instancji, a nie przebieg grafu, więc fail-closed tu nie obowiązuje.
+
+        Example args:
+            (brak)
+
+        Example result:
+            AnonymizerInfo(available=True, engine="agent",
+                           model="speakleash/Bielik-11B-v3.0-Instruct-FP8-Dynamic")
         """
 
     async def aclose(self) -> None:

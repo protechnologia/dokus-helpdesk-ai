@@ -1,5 +1,6 @@
 from app.engine_anonymization.base import Anonymizer
-from app.engine_anonymization.models import AnonymizedText
+from app.engine_anonymization.client import FAKE_ENGINE
+from app.engine_anonymization.models import AnonymizedText, AnonymizerInfo
 
 
 class FakeAnonymizer(Anonymizer):
@@ -12,6 +13,7 @@ class FakeAnonymizer(Anonymizer):
 
     Flow:
         1. Każde `anonymize()` zapisuje tekst w `texts` i zwraca go bez zmian.
+        2. `describe()` przedstawia się jak atrapa silnika usługi: silnik „fake", bez modelu.
     """
 
     def __init__(self):
@@ -45,3 +47,19 @@ class FakeAnonymizer(Anonymizer):
         self.texts.append(text)
 
         return AnonymizedText(text=text)
+
+    async def describe(self) -> AnonymizerInfo:
+        """
+        Description:
+        Przedstawia atrapę tak, jak usługa przedstawia swoją atrapę silnika: dostępna, silnik
+        „fake", bez modelu.
+
+        Example args:
+            (brak)
+
+        Example result:
+            AnonymizerInfo(available=True, engine="fake", model=None)
+        """
+        info = AnonymizerInfo(available=True, engine=FAKE_ENGINE, model=None)
+
+        return info

@@ -295,8 +295,9 @@ def graph_step(
 ) -> GraphStep:
     """
     Description:
-    Składa krok przebiegu ze zmiany stanu, którą oddał węzeł. Z tury modelu bierze zużycie
-    i nazwy narzędzi, o które model poprosił, a z kroku `run_tools` wywołania narzędzi: każdy
+    Składa krok przebiegu ze zmiany stanu, którą oddał węzeł. Z kroku `anonymize` bierze tekst
+    po anonimizacji, z tury modelu zużycie i nazwy narzędzi, o które model poprosił, a z kroku
+    `run_tools` wywołania narzędzi: każdy
     pomiar czasu z `tool_timings` łączy po `call_id` z wywołaniem z ostatniej tury modelu
     i z wiadomością `tool` z wynikiem. Wywołania szuka tylko w ostatniej turze, bo
     identyfikatory bywają powtarzane między turami.
@@ -331,6 +332,9 @@ def graph_step(
         for call in message.tool_calls
     ]
 
+    # Tekst po anonimizacji: ten sam, który dostaje model, więc może wyjść poza graf.
+    anonymized = update.get("anonymized")
+
     tool_calls = [
         ToolCallRun(
             call_id     = timing.call_id,
@@ -351,6 +355,7 @@ def graph_step(
         usage           = update.get("usage"),
         requested_tools = requested,
         tool_calls      = tool_calls,
+        anonymized_text = anonymized.text if anonymized is not None else None,
     )
 
     return step

@@ -9,6 +9,7 @@ eksportuje.
 | `anonymize_request.py`  | `AnonymizeRequest`  | wejście `POST /anonymize`                 |
 | `anonymize_response.py` | `AnonymizeResponse` | wyjście `POST /anonymize` z nazwą silnika |
 | `health_response.py`    | `HealthResponse`    | wyjście `GET /health`                     |
+| `info_response.py`      | `InfoResponse`      | wyjście `GET /info`: silnik i model       |
 | `error_response.py`     | `ErrorResponse`     | jeden kształt każdego obsłużonego błędu   |
 | `found.py`              | `Found`             | miejsce danej znalezione przez węzeł      |
 | `chat_message.py`       | `ChatMessage`       | wiadomość rozmowy z modelem               |

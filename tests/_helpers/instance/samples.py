@@ -1,13 +1,14 @@
 """
 Description:
 Próbki do testów mapowania trasy `GET /instance`: raport stanu indeksów ze wszystkimi trzema
-stanami i konfiguracja modelu generującego. Dzięki nim plik testu to same testy.
+stanami, opis anonimizatora i konfiguracja modelu generującego. Dzięki nim plik testu to same testy.
 
 | co                      | do czego                                                      |
 |-------------------------|---------------------------------------------------------------|
 | `sample_package_info()` | gałąź i dzień budowy paczki kodu                              |
 | `sample_index_report()` | raport: indeks zbudowany, pusty i brakujący oraz paczka kodu  |
 | `sample_llm_settings()` | konfiguracja modelu generującego z podanym dostawcą i modelem |
+| `sample_anonymizer()`   | opis anonimizatora: silnik `agent` z modelem albo niedostępny |
 
 Każda próbka ma przedrostek `sample_`, więc w teście widać od razu, które wywołanie to dane
 testu, a które kod aplikacji.
@@ -24,6 +25,7 @@ from app.config import LLMSettings
 from app.core_model.code.code_package_info import CodePackageInfo
 from app.core_model.instance.index_report import IndexReport
 from app.core_model.instance.index_status import IndexStatus
+from app.engine_anonymization import AnonymizerInfo
 
 
 def sample_package_info() -> CodePackageInfo:
@@ -98,3 +100,23 @@ def sample_llm_settings(
     )
 
     return settings
+
+
+def sample_anonymizer(
+    available: bool,  # np. True; False — usługa `anonymizer` nie odpowiedziała
+) -> AnonymizerInfo:
+    """
+    Description:
+    Opis anonimizatora: silnik `agent` z modelem, a przy niedostępnej usłudze bez silnika
+    i modelu — tak jak opisuje ją klient usługi.
+
+    Example args:
+        available=True
+
+    Example result:
+        AnonymizerInfo(available=True, engine="agent", model="speakleash/Bielik-11B-v3.0")
+    """
+    if not available:
+        return AnonymizerInfo(available=False, engine=None, model=None)
+
+    return AnonymizerInfo(available=True, engine="agent", model="speakleash/Bielik-11B-v3.0")

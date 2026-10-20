@@ -42,10 +42,11 @@ class GraphStep(BaseModel):
     a nie dopiero `log` po fakcie. Krok zaczyna się tam, gdzie skończył się poprzedni, bo węzły
     grafu idą po kolei; pierwszy — przy starcie przebiegu.
 
-    Treści zgłoszenia ani odpowiedzi modelu tu nie ma, jak w `log`: tura modelu niesie tylko
-    zużycie i nazwy zleconych narzędzi, bez argumentów, a odpowiedź grafu przychodzi osobno, ze
-    stanem końcowym. Nazwy pozwalają wołającemu powiedzieć, co trwa po turze — narzędzia albo
-    odpowiedź — bez czytania wpisu logu, który jest tekstem dla człowieka.
+    Surowej treści zgłoszenia ani odpowiedzi modelu tu nie ma, jak w `log`: krok `anonymize`
+    niesie tekst po anonimizacji (`anonymized_text`) — ten sam, który czyta model — tura modelu
+    tylko zużycie i nazwy zleconych narzędzi, bez argumentów, a odpowiedź grafu przychodzi
+    osobno, ze stanem końcowym. Nazwy pozwalają wołającemu powiedzieć, co trwa po turze —
+    narzędzia albo odpowiedź — bez czytania wpisu logu, który jest tekstem dla człowieka.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -57,3 +58,5 @@ class GraphStep(BaseModel):
     usage:           LLMUsage | None   = None
     requested_tools: list[str]         = Field(default_factory=list, examples=[["read_docs"]])
     tool_calls:      list[ToolCallRun] = Field(default_factory=list)
+    # Tylko w kroku `anonymize`: tekst zgłoszenia po anonimizacji, ten sam, który dostaje model.
+    anonymized_text: str | None        = Field(default=None, examples=["{IMIĘ} zgłasza brak…"])

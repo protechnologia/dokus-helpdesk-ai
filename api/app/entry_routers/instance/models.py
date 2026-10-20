@@ -1,4 +1,5 @@
 from datetime import date as Date
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -14,6 +15,19 @@ class GenerationModelInfo(BaseModel):
 
     provider: str        = Field(examples=["openai"])
     name:     str | None = Field(examples=["gpt-6.1-sol"])
+
+
+class AnonymizationInfo(BaseModel):
+    """
+    Description:
+    Anonimizator instancji: czy usługa `anonymizer` odpowiada (`available` albo `unavailable`),
+    którym silnikiem działa (`agent` albo `fake`) i z jakim modelem. Przy atrapie silnika i przy
+    usłudze, która nie odpowiada, modelu nie ma; przy niedostępnej nie ma też silnika.
+    """
+
+    state:  Literal["available", "unavailable"] = Field(examples=["available"])
+    engine: str | None                          = Field(examples=["agent"])
+    model:  str | None                          = Field(examples=["speakleash/Bielik-11B-v3.0"])
 
 
 class IndexItem(BaseModel):
@@ -44,11 +58,12 @@ class CodePackageItem(BaseModel):
 class InstanceResponse(BaseModel):
     """
     Description:
-    Odpowiedź `GET /instance`: model generujący, stan pięciu indeksów (karty i wątki zgłoszeń,
-    sekcje i fragmenty dokumentacji, paczka kodu) i gałąź paczki kodu — `null`, gdy paczki nie
-    ma. Bez adresów usług i kluczy.
+    Odpowiedź `GET /instance`: model generujący, anonimizator, stan pięciu indeksów (karty
+    i wątki zgłoszeń, sekcje i fragmenty dokumentacji, paczka kodu) i gałąź paczki kodu — `null`,
+    gdy paczki nie ma. Bez adresów usług i kluczy.
     """
 
-    model:        GenerationModelInfo
-    indexes:      list[IndexItem]
-    code_package: CodePackageItem | None
+    model:         GenerationModelInfo
+    anonymization: AnonymizationInfo
+    indexes:       list[IndexItem]
+    code_package:  CodePackageItem | None

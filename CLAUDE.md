@@ -335,7 +335,7 @@ dokus-helpdesk-ai/
 │       ├── core_service/         # znaczniki, odmiany osób (Morfeusz2), wybór i zamiana miejsc danych
 │       ├── core_util/            # uniwersalne: składanie liter, części tekstu, zakresy, odczyt dokumentu
 │       ├── engine_llm/           # klient modelu anonimizującego (Chat Completions, httpx) i odczyt odpowiedzi
-│       └── entry_routers/        # /health, /anonymize
+│       └── entry_routers/        # /health, /anonymize, /info
 ├── postgres/                     # kolejna usługa: Postgres z polskim słownikiem
 │   ├── Dockerfile                # pobiera słownik sjp.pl (commit + suma kontrolna)
 │   ├── dictionary/               # build.sh z poprawkami słownika, custom_words.txt z nazwami własnymi
@@ -1551,8 +1551,12 @@ Wspólne:
   Liczy przy każdym żądaniu (`IndexInspector` z `core_service/inspector_indexes.py`), więc nowy
   indeks widać bez restartu. Brak tabeli albo kolekcji to stan, a awaria bazy to 503: „nie wiem"
   nie może wyglądać jak „nie ma". Serwis ma własnych klientów baz, budowanych raz na proces, bo
-  przy atrapie modelu narzędzia nie powstają wcale. W przeciwieństwie do `/health` zdradza
-  dostawcę i model, ale nie adresy ani klucze; trasy chroni dopiero p. 36.
+  przy atrapie modelu narzędzia nie powstają wcale. Obok stoi anonimizator (`anonymization`,
+  2026-10-20): silnik i model z `GET /info` usługi `anonymizer`, pytanej przez
+  `Anonymizer.describe()`. Usługa, która nie odpowiada, to stan `unavailable` bez silnika
+  i modelu, a nie 503: „niedostępny" nie udaje „nie ma", a belka nie traci modelu i indeksów.
+  W przeciwieństwie do `/health` zdradza dostawców i modele, ale nie adresy ani klucze; trasy
+  chroni dopiero p. 36.
 - **Bramki i „Popraw" nie mają dostępu do retrievalu** — ich grafy nie mają narzędzi wiedzy na
   liście dozwolonych. To nie jest oszczędność, tylko gwarancja: te endpointy mają działać przy
   pustym indeksie i przy padniętym embedderze.
@@ -1603,8 +1607,11 @@ Wspólne:
   z dokładnie tą treścią, którą trasa oddaje JSON-em. Status to zawsze 200, bo nagłówki wychodzą
   przed pierwszym krokiem: awarię zależności niesie zdarzenie `error` (`ErrorResponse`) zamiast
   `result`, a błąd konfiguracji zrywa strumień. 422 (walidacja, nieznany wariant) pada przed
-  startem strumienia, więc zostaje zwykłą odpowiedzią. Treści zgłoszenia w krokach nie ma, jak
-  w `log`; argumenty narzędzi pisze model z tekstu po anonimizacji, a wynik pochodzi z indeksów.
+  startem strumienia, więc zostaje zwykłą odpowiedzią. Surowej treści zgłoszenia w krokach nie
+  ma, jak w `log`: krok `anonymize` niesie tekst po anonimizacji (`anonymized_text`,
+  2026-10-20), ten sam, który dostaje model, więc front pokazuje, co model dostał, także przy
+  przebiegu, który zawiódł przed odpowiedzią; argumenty narzędzi pisze model z tekstu po
+  anonimizacji, a wynik pochodzi z indeksów.
   OpenAPI pokazuje obie postacie przy odpowiedzi 200 (`STREAM_RESPONSES`). Czy kiedyś rozdzielić
   strumień na osobne trasy, rozstrzygnie budowa frontu (p. 77).
   - **Middleware żądań loguje czas do wysłania nagłówków, nie do końca strumienia.**
@@ -1773,6 +1780,11 @@ wskazane fragmenty w całym tekście i zamienia je na znaczniki. Model tekstu ni
   ma) i bez limitu odpowiedzi (należy do promptu węzła). Brak adresu albo modelu to błąd przy
   starcie, a odpowiedź 401, 403 albo 404 — błąd konfiguracji przy pierwszym wywołaniu, nie 503;
   z modelem przy starcie usługa się nie łączy, bo pod z GPU bywa wyłączony.
+- **`GET /info` mówi, którym silnikiem i z jakim modelem usługa anonimizuje (2026-10-20):**
+  `{engine, model}`, przy atrapie silnika model `null`. Czyta to `api` dla `GET /instance`.
+  Usługa nie łączy się przy tym z modelem, więc odpowiada także przy wyłączonym podzie, i nie
+  podaje adresu serwera modelu ani klucza; `/health` zostaje samym „ok", bo sondę osiąga każdy,
+  kto dosięgnie portu.
 - **Długi tekst dzieli się na części po 6000 znaków (`CHUNK_CHARS`, 2026-10-19).** Wątki korpusu
   w tokenach Bielika: mediana 337, p99 2827, najdłuższy około 40 tys., czyli więcej niż okno
   16 384; dzieli się 18 wątków z 1825. Model w części tylko wskazuje, a kod szuka w całym
@@ -3908,6 +3920,9 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   wywołań z poprawnymi argumentami, a świeży stack bez indeksów kończyłby się błędem brakującego
   indeksu. Atrapa grafu woła tylko usługę `anonymizer`, bo anonimizacja to stały węzeł,
   a narzędzia wybiera model.
+- **Niedostępny anonimizator jako 503 w `GET /instance`** (2026-10-20) — belka straciłaby model
+  i stan indeksów, choć brakuje tylko anonimizatora; usługa, która nie odpowiada, to stan
+  `unavailable`.
 - **Atrapa anonimizatora w `api` w czasie działania** (2026-10-16) — nie byłoby widać, czy
   usługa `anonymizer` w ogóle odpowiada, a atrapę i tak ma usługa (`ANONYMIZATION_ENGINE=fake`).
   `FakeAnonymizer` zostaje dla testów.
