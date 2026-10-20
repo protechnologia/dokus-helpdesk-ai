@@ -29,3 +29,10 @@ services:
   anonymizer:
     volumes: !reset []
     command: ["uvicorn", "anonymizer_app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  frontend:
+    # Na prod front to pliki zbudowane w obrazie i nginx, bez serwera Vite i bez źródeł z hosta.
+    build:
+      context: ./frontend
+      target:  prod
+    volumes: !reset []

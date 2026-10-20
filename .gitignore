@@ -28,5 +28,6 @@ __pycache__/
 .idea/
 .vscode/
 
-# --- frontend (dojdzie w etapie 8) ---
+# --- frontend (p. 77): zależności i pliki zbudowane powstają z package-lock.json i src/ ---
 node_modules/
+frontend/dist/

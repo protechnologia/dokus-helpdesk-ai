@@ -1,0 +1,579 @@
+/*
+ * Układ i wygląd strony frontu pokazowego, według szkicu z p. 77: belka z pigułkami, karty
+ * liczników, niebieski pas guzików, trzy kolumny (środkowa najszersza) i ciemna konsola. Wygląd
+ * komponentów antd (kolory, czcionki, zaokrąglenia) dają tokeny w `theme.ts` — tu stoi to, czego
+ * tokeny nie opisują.
+ *
+ * Kto czyta: `main.tsx` wczytuje plik raz dla całej strony; klasy stoją w `pages/App.tsx`
+ * i w panelach w `pages/panels/`.
+ *
+ * O czym pamiętać przy zmianach:
+ *
+ * - Na szerokim ekranie strona ma wysokość okna, a każda kolumna przewija się sama; na wąskim
+ *   kolumny stają jedna pod drugą i przewija się cała strona.
+ * - Klasy nazywa się od części strony (`top-bar`, `run-band`, `console-row`), nie od wyglądu.
+ */
+
+body {
+    margin: 0;
+    background: #f2f3f5;
+    color: #1d2129;
+}
+
+/* --- strona: belka, liczniki, guziki i kolumny pod nimi --- */
+
+.page {
+    box-sizing: border-box;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 24px 24px;
+}
+
+.muted {
+    color: #5c6370;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.mono {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12.5px;
+}
+
+/* --- belka: nazwa po lewej, pigułki modelu i materiałów po prawej --- */
+
+.top-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.top-bar h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+/* Dopisek przy nazwie: mniejszy i szary, żeby nazwa produktu została na pierwszym planie. */
+.top-bar-by {
+    margin-left: 4px;
+    font-size: 13px;
+    font-weight: 400;
+    color: #5c6370;
+}
+
+.pills {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.pills-label {
+    margin-left: 8px;
+}
+
+.pill {
+    background: #ffffff;
+    border: 1px solid #e3e5e8;
+    border-radius: 10px;
+    padding: 2px 9px;
+}
+
+.pill[data-state="built"] {
+    background: #e6f4ea;
+    border-color: #e6f4ea;
+    color: #1e6b35;
+}
+
+.pill[data-state="empty"] {
+    background: #fff4e0;
+    border-color: #fff4e0;
+    color: #8a5300;
+}
+
+.pill[data-state="missing"] {
+    background: #fdecea;
+    border-color: #fdecea;
+    color: #a8261b;
+}
+
+/* --- liczniki sesji: sześć małych kart, etykieta po lewej, liczba po prawej --- */
+
+.stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.stat {
+    flex: 1 1 150px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    background: #ffffff;
+    border: 1px solid #e3e5e8;
+    border-radius: 8px;
+    padding: 6px 12px;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: #5c6370;
+    white-space: nowrap;
+}
+
+.stat-value {
+    font-size: 16px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Krótki niebieski puls karty po zmianie wartości; dwie nazwy animacji, żeby ruszała od nowa
+   przy każdej zmianie (`TopBar.tsx`, `data-flash` 1 i 2). */
+.stat[data-flash="1"] { animation: stat-pulse-a 0.9s ease-out; }
+.stat[data-flash="2"] { animation: stat-pulse-b 0.9s ease-out; }
+
+@keyframes stat-pulse-a {
+    from { background: #dbe8fd; border-color: #8fb3f0; }
+    to   { background: #ffffff; border-color: #e3e5e8; }
+}
+
+@keyframes stat-pulse-b {
+    from { background: #dbe8fd; border-color: #8fb3f0; }
+    to   { background: #ffffff; border-color: #e3e5e8; }
+}
+
+/* Karta „Czas" w trakcie przebiegu: wolny puls bez przerwy, w tym samym kolorze. */
+.stat[data-live="true"] {
+    animation: stat-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes stat-breathe {
+    0%, 100% { background: #ffffff; border-color: #e3e5e8; }
+    50%      { background: #e4eefd; border-color: #a9c3f2; }
+}
+
+/* --- pas guzików grafów: niebieskie tło, podpis po lewej, guziki po prawej --- */
+
+.run-band {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    background: #eaf1fd;
+    border: 1px solid #c9dafc;
+    border-radius: 8px;
+    padding: 6px 8px 6px 12px;
+}
+
+.run-band-label {
+    flex: 1 1 260px;
+    min-width: 0;
+    margin: 0;
+    color: #0f2a52;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.run-band-label span {
+    font-size: 12px;
+    color: #1f3d75;
+}
+
+.run-band-label strong {
+    font-weight: 600;
+}
+
+.run-band-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.run-band-separator {
+    width: 1px;
+    height: 28px;
+    margin: 0 4px;
+    background: #a9c3f2;
+}
+
+/* --- kolumny: zgłoszenie, odpowiedź (najszersza) i konsola --- */
+
+.columns {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    gap: 16px;
+}
+
+.column {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    box-sizing: border-box;
+    background: #ffffff;
+    border: 1px solid #e3e5e8;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.column-ticket  { flex: 1 1 300px; }
+.column-answer  { flex: 3 1 480px; }
+.column-console { flex: 1.4 1 400px; }
+
+.column-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.column-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* --- wąski ekran: kolumny jedna pod drugą, przewija się strona --- */
+
+@media (max-width: 1100px) {
+    .page {
+        height: auto;
+        min-height: 100vh;
+    }
+
+    .columns {
+        flex-wrap: wrap;
+    }
+
+    .column {
+        overflow: visible;
+    }
+}
+
+/* --- konsola przebiegu: ciemna, czcionka stałej szerokości, kolor na rodzaj kroku --- */
+
+.console {
+    background: #16181d;
+    border-color: #16181d;
+    color: #d7dae0;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.console .column-header {
+    margin-bottom: 0;
+}
+
+.console .column-header h2 {
+    color: #f1f2f4;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+.console-tools {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.console-live {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    color: #aeb4be;
+}
+
+/* Małe guziki na ciemnym tle konsoli: „Wyczyść" i „pokaż". */
+.console .console-button.ant-btn {
+    color: #aeb4be;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 12px;
+}
+
+.console .console-button.ant-btn:not(:disabled):hover {
+    color: #f1f2f4;
+    background: #2a2f3a;
+}
+
+.console .console-button.ant-btn:disabled {
+    color: #555b66;
+}
+
+.console-empty {
+    margin: 24px 0;
+    text-align: center;
+    color: #8b919c;
+    font-size: 12.5px;
+}
+
+/* Karta przebiegu; przebieg w toku ma niebieską obwódkę. */
+.run-block {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    background: #1f2229;
+    border: 1px solid #2c3039;
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+
+.run-block[data-running="true"] {
+    border-color: #3a5f95;
+}
+
+/* Przebieg wczytany do środkowego panelu. */
+.run-block[data-shown="true"] {
+    border-color: #5b8def;
+    box-shadow: inset 3px 0 0 #5b8def;
+}
+
+/* Nagłówek karty: guzik zwijania (strzałka, tytuł, liczniki) i obok „pokaż" albo „w panelu". */
+.run-block-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.run-block-toggle {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #d7dae0;
+    font: inherit;
+    font-size: 12.5px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.run-block-shown {
+    flex: none;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: #24365a;
+    color: #9cc1ff;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 11.5px;
+    white-space: nowrap;
+}
+
+.run-block-title {
+    color: #f1f2f4;
+}
+
+.run-block-summary {
+    margin-left: auto;
+    color: #8b919c;
+}
+
+.run-block[data-running="true"] .run-block-summary {
+    color: #6cb6ff;
+}
+
+.run-block-error {
+    margin: 4px 4px 0;
+    color: #ff8a80;
+    font-size: 12px;
+}
+
+/* Siatka wierszy: start | krok | koszt | czas. */
+.console-grid {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) 78px 52px;
+    column-gap: 6px;
+    align-items: baseline;
+}
+
+.console-head {
+    padding: 0 4px;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 11px;
+    color: #8b919c;
+}
+
+.console-row {
+    width: 100%;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    padding: 3px 4px;
+    color: #d7dae0;
+    font: inherit;
+    font-size: 12.5px;
+    line-height: 1.45;
+    text-align: left;
+    cursor: pointer;
+}
+
+.console-row:hover,
+.console-row:focus-visible {
+    background: #242833;
+}
+
+/* Wiersz, którego dialog jest otwarty. */
+.console-row[aria-pressed="true"] {
+    background: #2a3446;
+    outline: 1px solid #3a5f95;
+}
+
+.console-row[data-kind="pending"] {
+    cursor: default;
+}
+
+.console-row .start,
+.console-row .cost {
+    color: #8b919c;
+}
+
+.console-row .step {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.console-row .summary {
+    color: #8b919c;
+    font-size: 11.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.console-row .right {
+    text-align: right;
+}
+
+/* Kolor rodzaju kroku; wywołania narzędzi stoją wcięte pod turą, która je zleciła. */
+.console-row[data-kind="anonymize"] .label { color: #c5a3ff; }
+.console-row[data-kind="turn"] .label      { color: #6cb6ff; }
+.console-row[data-kind="tool"] .label      { color: #f0b35a; padding-left: 14px; }
+.console-row[data-kind="respond"] .label   { color: #7fd18b; }
+.console-row[data-kind="pending"] .label   { color: #6cb6ff; }
+
+/* Kropka „na żywo" przy konsoli i kroku w toku. */
+.live-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #6cb6ff;
+    margin-right: 6px;
+    animation: live-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+    50% { opacity: 0.25; }
+}
+
+/* --- dialog kroku: przesuwany za nagłówek (`StepDialog.tsx`) --- */
+
+.step-dialog .ant-modal-header {
+    cursor: move;
+    user-select: none;
+}
+
+/* --- treść w czcionce stałej szerokości: dialog kroku --- */
+
+.code-block {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: #f6f7f9;
+    border: 1px solid #e3e5e8;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+/* Przeglądarka JSON-a w dialogu (`StepDialog.tsx`): ramka i czcionka bloku kodu, bez pogrubień,
+   klucze w kolorze, interpunkcja szara, każdy poziom wcięty. */
+.json-view .json-child {
+    margin: 0;
+    padding-left: 16px;
+}
+
+.json-view .json-children {
+    margin: 0;
+    padding: 0;
+}
+
+.json-view > .json-child {
+    padding-left: 0;
+}
+
+.json-key        { color: #0b4ea2; margin-right: 4px; }
+.json-clickable  { cursor: pointer; }
+.json-string     { color: #1e6b35; }
+.json-literal    { color: #a8261b; }
+.json-null       { color: #8b919c; }
+.json-other      { color: #1d2129; }
+.json-punctuation { color: #8b919c; }
+
+.json-icon {
+    display: inline-block;
+    width: 12px;
+    color: #8b919c;
+    cursor: pointer;
+    user-select: none;
+}
+
+.json-expand::after   { content: "▸"; }
+.json-collapse::after { content: "▾"; }
+
+.json-collapsed {
+    color: #8b919c;
+    cursor: pointer;
+    margin: 0 4px;
+}
+
+.json-collapsed::after {
+    content: "…";
+}
+
+/* Uwagi dla wdrożeniowca w Markdownie. Każdą zwykłą linię `NotesTab.tsx` zamienia w osobny
+   akapit (notatki „Ad. 1. …" w kolejnych liniach), a akapity mają lekki odstęp; w punkcie listy
+   podział linii zostaje. */
+.notes p {
+    margin: 0 0 8px;
+}
+
+.notes li {
+    white-space: pre-line;
+}
+
+/* Nagłówki `##` bliżej treści niż domyślnie. */
+.notes h2 {
+    font-size: 14px;
+    margin: 16px 0 4px;
+}
+
+.notes h2:first-child {
+    margin-top: 0;
+}
+
+.notes ul {
+    margin: 0;
+    padding-left: 20px;
+}

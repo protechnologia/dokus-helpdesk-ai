@@ -3,7 +3,7 @@ from collections.abc import Iterator
 import httpx2
 import pytest
 
-from tests.conftest import anonymizer_url, api_url, embedder_url
+from tests.conftest import anonymizer_url, api_url, embedder_url, frontend_url
 
 # The addresses themselves live in `tests/conftest.py`, shared with `tests/integration/` — reaching
 # a service over its published port is the same problem for both kinds of test.
@@ -60,4 +60,22 @@ def anonymizer_service() -> Iterator[httpx2.Client]:
         httpx2.Client(base_url="http://localhost:8002")
     """
     with httpx2.Client(base_url=anonymizer_url(), timeout=10.0) as client:
+        yield client
+
+
+@pytest.fixture
+def frontend_client() -> Iterator[httpx2.Client]:
+    """
+    Description:
+    Klient HTTP działającej usługi `frontend` — ten sam adres, który człowiek otwiera
+    w przeglądarce. Bez sprawdzania osiągalności, jak przy pozostałych usługach (CLAUDE.md ->
+    „Testy").
+
+    Example args:
+        (brak)
+
+    Example result:
+        httpx2.Client(base_url="http://localhost:8020")
+    """
+    with httpx2.Client(base_url=frontend_url(), timeout=10.0) as client:
         yield client

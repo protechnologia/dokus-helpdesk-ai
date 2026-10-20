@@ -1,0 +1,32 @@
+# Serwer frontu na prod: pliki strony z `dist/` i przekazywanie `/api/…` do usługi `api`.
+#
+# Plik jest szablonem: obraz nginx przy starcie podstawia w nim zmienne środowiskowe zapisane
+# w nawiasach klamrowych (`FRONTEND_API_URL`) i zapisuje wynik do /etc/nginx/conf.d/. Zmienne
+# nginx bez nawiasów (np. $uri) zostają nietknięte.
+#
+# O czym pamiętać przy zmianach:
+#
+# - Ukośnik na końcu `proxy_pass` zdejmuje przedrostek `/api/`: trasy `api` są bez niego, tak jak
+#   w proxy Vite w dev (`vite.config.ts`).
+# - Strumień przebiegu (SSE) nie może czekać w buforze nginx: `api` wysyła przy nim nagłówek
+#   `X-Accel-Buffering: no`, który buforowanie wyłącza dla tej jednej odpowiedzi.
+# - Przebieg grafu na prawdziwym modelu trwa do kilku minut, a między krokami strumień milczy,
+#   stąd długi limit odczytu.
+
+server {
+    listen 8000;
+
+    root /usr/share/nginx/html;
+
+    location /api/ {
+        proxy_pass         ${FRONTEND_API_URL}/;
+        proxy_http_version 1.1;
+        proxy_set_header   Connection "";
+        proxy_read_timeout 600s;
+    }
+
+    # Strona to jedna aplikacja: każda inna ścieżka dostaje index.html.
+    location / {
+        try_files $uri /index.html;
+    }
+}

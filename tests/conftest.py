@@ -14,6 +14,7 @@ Rodzaj testu to jego folder, a marker mówi, czego test potrzebuje do uruchomien
 | `stack_embedder`   | usługi `embedder`            | `embedder_url()`          |
 | `stack_anonymizer` | usługi `anonymizer`          | `anonymizer_url()`        |
 | `stack_postgres`   | Postgresa ze słownikiem      | `build_postgres_client()` |
+| `stack_frontend`   | usługi `frontend`            | `frontend_url()`          |
 | `llm_live`         | prawdziwego, płatnego modelu | — (z konfiguracji)        |
 
 Marker nosi tylko test, który potrzebuje działającej usługi albo płatnego modelu. Jednostkowe nie
@@ -90,6 +91,10 @@ QDRANT_URL_DEFAULT   = "http://localhost:6333"
 # baza publikuje 8010.
 API_URL_ENV     = "API_TEST_URL"
 API_URL_DEFAULT = "http://localhost:8010"
+
+# Zgodne z DOCKER_FRONTEND_PORT w `.env.example`.
+FRONTEND_URL_ENV     = "FRONTEND_TEST_URL"
+FRONTEND_URL_DEFAULT = "http://localhost:8020"
 
 
 # Zgodne z wartościami domyślnymi z compose: baza, użytkownik i hasło `helpdesk`, port hosta
@@ -468,6 +473,21 @@ def api_url() -> str:
         "http://localhost:8010"
     """
     return os.environ.get(API_URL_ENV, API_URL_DEFAULT)
+
+
+def frontend_url() -> str:
+    """
+    Description:
+    Adres, pod którym usługa `frontend` odpowiada z hosta — ten sam, który człowiek otwiera
+    w przeglądarce.
+
+    Example args:
+        (brak)
+
+    Example result:
+        "http://localhost:8020"
+    """
+    return os.environ.get(FRONTEND_URL_ENV, FRONTEND_URL_DEFAULT)
 
 
 def postgres_dsn() -> str:

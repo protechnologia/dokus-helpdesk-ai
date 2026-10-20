@@ -1,0 +1,4 @@
+# Zależności instaluje obraz (`npm ci`), a pliki strony buduje etap `build` — kopie z hosta
+# zasłoniłyby jedne i drugie.
+node_modules
+dist

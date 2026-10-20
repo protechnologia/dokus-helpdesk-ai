@@ -57,6 +57,7 @@ markers = [
     "stack_embedder: requires a reachable embedder service",
     "stack_anonymizer: requires a reachable anonymizer service",
     "stack_postgres: requires a reachable Postgres with the Polish dictionary",
+    "stack_frontend: requires a reachable frontend service (and the api behind its proxy)",
     "llm_live: hits a real, billable LLM — outside the stack umbrella on purpose",
 ]
 

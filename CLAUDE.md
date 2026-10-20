@@ -195,8 +195,9 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
 - Deploy: Docker Compose
 
 Usługi w compose: `api` (FastAPI + CLI), `embedder` (model PL za REST-em), `anonymizer` (dane
-osobowe na znaczniki: wzorce i model anonimizujący, p. 19), `qdrant`, `postgres`. LLM jest
-**zewnętrznym endpointem**, nie usługą w bazowym compose.
+osobowe na znaczniki: wzorce i model anonimizujący, p. 19), `qdrant`, `postgres` i `frontend`
+(front pokazowy w React, p. 77). LLM jest **zewnętrznym endpointem**, nie usługą w bazowym
+compose.
 
 ## Zasady ogólne
 
@@ -340,10 +341,15 @@ dokus-helpdesk-ai/
 │   ├── Dockerfile                # pobiera słownik sjp.pl (commit + suma kontrolna)
 │   ├── dictionary/               # build.sh z poprawkami słownika, custom_words.txt z nazwami własnymi
 │   └── initdb/                   # konfiguracja wyszukiwania `pl_search` (tylko pusty wolumen)
+├── frontend/                     # kolejna usługa: front pokazowy (p. 77), React + antd
+│   ├── Dockerfile                # etapy dev (Vite), build, prod (nginx); compose wybiera `target`
+│   ├── nginx.conf.template       # prod: pliki strony i `/api/…` do usługi `api`
+│   ├── package.json, package-lock.json, tsconfig.json, vite.config.ts, index.html
+│   └── src/                      # main.tsx, pages/ (App + panels/), api/, models/, runs/, utils/…
 ├── tests/
 │   ├── conftest.py               # adresy usług, markery, fixture'y raportów
 │   ├── _helpers/                 # folder na helper: helper.py, models/ (plik na model), constants.py, report.py, measure.py, samples.py, __init__.py; scenariusze p. 59 w scenarios/
-│   ├── unit/                     # podfoldery <usługa>_<pakiet>: api_agent_tools/, api_core_service/, embedder/…
+│   ├── unit/                     # podfoldery <usługa>_<pakiet>: api_agent_tools/, api_core_service/, embedder/…; frontend/ (Vitest)
 │   ├── integration/              # jednostka + prawdziwa zależność: pliki, FastAPI, LangGraph, Qdrant
 │   ├── functional/               # cała aplikacja przez HTTP albo komendę
 │   └── evaluation/               # golden sety
@@ -1612,8 +1618,8 @@ Wspólne:
   2026-10-20), ten sam, który dostaje model, więc front pokazuje, co model dostał, także przy
   przebiegu, który zawiódł przed odpowiedzią; argumenty narzędzi pisze model z tekstu po
   anonimizacji, a wynik pochodzi z indeksów.
-  OpenAPI pokazuje obie postacie przy odpowiedzi 200 (`STREAM_RESPONSES`). Czy kiedyś rozdzielić
-  strumień na osobne trasy, rozstrzygnie budowa frontu (p. 77).
+  OpenAPI pokazuje obie postacie przy odpowiedzi 200 (`STREAM_RESPONSES`). Front pokazowy
+  (p. 77) woła tę samą trasę z nagłówkiem, więc osobnych tras strumienia nie potrzebował.
   - **Middleware żądań loguje czas do wysłania nagłówków, nie do końca strumienia.**
   - **Błąd konfiguracji w strumieniu wychodzi w logu jako `RuntimeError: Caught handled
     exception, but response already started`** — rodzina błędu ma handler, a odpowiedź już
@@ -2968,21 +2974,98 @@ i katalogu z jej kartami.
 
 ### Frontend
 
-Front pokazowy powstaje w p. 75–77. Obowiązują go zasady spisane wcześniej, żeby decyzja nie
-zapadła przypadkiem:
+Front pokazowy (p. 77): jedna strona w React do pokazów — belka z modelem, materiałami
+i licznikami, pas guzików grafów, a pod nimi zgłoszenie, odpowiedź i konsola przebiegu. Woła
+te same trasy co helpdesk, a przebieg czyta ich strumieniem (p. 75).
 
-- Front to **statyka wpiekana w `api`**, nie osobna usługa compose — dlatego nie
-  występuje w warstwach compose (wyjątek od zasady 3: to nie komponent gadający REST-em). Źródło
-  leży w `api/frontend/`, zbudowane pliki w `api/app/static/` (poza commitem), a obraz `api`
-  buduje je w osobnym etapie z Node.
-- Pełny React (SPA) + Ant Design v6 (React ≥18; `antd` i `@ant-design/icons` w tej samej generacji
-  major). Bez komponentów za paywallem.
-- Pliki statyczne z React serwowane przez FastAPI — z tego samego origin, pod `/ui`. Trasy API
-  zostają bez przedrostka, a w dev Vite przekazuje do `api` wszystko spoza `/ui`.
-- Wygląd przez tokeny antd w `ConfigProvider`. Bez Tailwinda.
-- Nie rozbijaj małych komponentów na kilkanaście plików (np. nawigacja jako dane w configu, nie
-  JSX).
-- Wykresy: `@ant-design/charts`.
+- **Osobna usługa compose `frontend` (decyzja 2026-10-20; wcześniej: statyka wpiekana w `api`
+  pod `/ui`).** Folder = usługa: Node i `node_modules` nie trafiają do `api/`, przebudowa frontu
+  nie przebudowuje `api`, a dev ma serwer Vite z podglądem na żywo w kontenerze, bez Node na
+  hoście. Przeglądarka rozmawia tylko z frontem: `/api/…` przekazuje on do `api` z obciętym
+  przedrostkiem (proxy Vite w dev, nginx na prod), więc `api` nie potrzebuje CORS ani serwowania
+  plików, a trasy `api` zostają bez przedrostka. Cena: kontener więcej i szablon nginx, a dev
+  i prod podają front czym innym.
+- **Obraz ma trzy etapy (`dev`, `build`, `prod`), a compose wybiera `target`.** Dev montuje
+  `src/`, `index.html` i `vite.config.ts`; `node_modules` zostaje w obrazie, więc po zmianie
+  zależności `up -d --build frontend`. Prod to nginx z plikami z etapu `build`
+  i `volumes: !reset []`. Kontener słucha na 8000 w obu etapach, więc warstwa prod nie zamienia
+  listy portów; na hoście `DOCKER_FRONTEND_PORT` (8020).
+- **Adres `api` przychodzi z ENV: `FRONTEND_API_URL`.** Czytają go `vite.config.ts`
+  (`process.env`; serwer Vite bez niego nie rusza) i `nginx.conf.template` (`${…}`, obraz nginx
+  podstawia przy starcie). Front nie ma klasy `Settings`, więc test plumbingu czyta odwołania
+  z tych dwóch plików jak jego pola.
+- **Strumień przechodzi przez proxy bez buforowania:** `api` wysyła przy SSE
+  `X-Accel-Buffering: no`, a nginx ma limit odczytu 600 s, bo przebieg na prawdziwym modelu
+  trwa minuty. `EventSource` nie umie wysłać POST, więc strumień czyta `fetch` (`api/sse.ts`).
+- **TypeScript, React 19, antd 6, Vite 8, Vitest 5 (2026-10-20).** Wersje przypięte dokładnie
+  w `package.json` i `package-lock.json`, wybrane spośród wydań starszych niż dwa tygodnie;
+  obrazy bazowe digestem. Ponad te: `react-markdown` do uwag, `react-json-view-lite` do JSON-a
+  ze zwijanymi kluczami w dialogu i `dayjs` do wyboru daty. Wykresów nie ma —
+  belka to liczby. Wygląd przez tokeny antd (`styles/theme.ts`), układ strony w `styles/app.css`;
+  bez Tailwinda i bez komponentów za paywallem. Paczka ma ~1 MB, prawie całą to antd, i nie jest
+  dzielona: front chodzi lokalnie, a pomiaru, że to boli, nie ma.
+- **Podział `src/`, folder na rolę:**
+
+  | folder         | co w nim                                                                 |
+  |----------------|--------------------------------------------------------------------------|
+  | `main.tsx`     | punkt wejścia: motyw i montaż strony                                     |
+  | `pages/`       | `App.tsx` (strona i jej stan) i `panels/`: plik na panel, zakładkę z     |
+  |                | własną logiką i dialog                                                   |
+  | `api/`         | jedyne miejsce, które zna trasy `api`: klient i rozbiór strumienia       |
+  | `models/api/`  | kształty z `api`, plik na zasób, jak `entry_routers/<zasób>/models.py`   |
+  | `models/runs/` | modele frontu: przebieg, graf i jego wynik, wiersze konsoli, liczniki    |
+  | `runs/`        | hook przebiegów i czysta logika: wiersze konsoli, liczniki               |
+  | `utils/`       | bez wiedzy o dziedzinie, plik na temat: czas, waluta, liczności, JSON    |
+  | `errors/`      | `ApiError` — jeden błąd na wszystkie drogi rozmowy z `api`               |
+  | `data/`        | zmyślone zgłoszenia do wczytania                                         |
+  | `styles/`      | tokeny antd i układ strony                                               |
+
+  Typ transportu (`SseEvent`) zostaje przy parserze, jak modele transportu w pakietach `engine_`,
+  a props przy komponentach. Drobiazgi (wiersz komentarza, lista źródeł) to funkcje w pliku
+  panelu, nie osobne pliki; guziki to lista danych, nie JSX.
+- **Stan strony trzyma `pages/App.tsx` w osobnych `useState`, bez biblioteki stanu:**
+  zgłoszenie, szkic dla klienta, stan instancji, warianty i przebiegi (`useRuns()`). Panele
+  dostają dane w props i zgłaszają kliknięcia funkcjami. Przebiegi żyją w pamięci strony:
+  odświeżenie je czyści, a liczniki belki liczą się „od otwarcia strony". Naraz trwa jeden
+  przebieg, bo guziki są wtedy wyłączone.
+- **Środkowy panel pokazuje jeden przebieg: ostatni albo wczytany z konsoli guzikiem „pokaż"
+  (2026-10-20), a szkic dla klienta to tekst tego przebiegu** (`runs/answer.ts`): propozycja,
+  wynik „Popraw" albo szkic sprawdzony bramką wysyłki. Przebieg bez tekstu dla klienta
+  (rozpoznanie, karta, bramka zamknięcia) daje pusty szkic, bo stary tekst udawałby jego
+  wynik. Cena: szkic poprawiony z ręki ginie przy następnym przebiegu albo wczytaniu innego.
+  Stan bez wyniku — przed pierwszym przebiegiem, w toku, po błędzie — stoi w ramce zamiast
+  zakładek, a w toku i po błędzie pod ramką stoi tekst po anonimizacji, jeśli krok `anonymize`
+  doszedł. „Wyczyść" w konsoli tylko chowa zakończone przebiegi: liczniki belki liczą dalej.
+- **Belka ma pigułki „generacja:" i „anonimizacja:"** (modele z `GET /instance`; niedostępny
+  anonimizator na czerwono), a karta licznika krótko pulsuje przy zmianie wartości. „Czas"
+  w trakcie przebiegu tyka co 200 ms, więc zamiast tego pulsuje powoli przez cały przebieg.
+- **Dialog szczegółów przesuwa się za nagłówek i zmienia rozmiar za róg** — przeciąganie na
+  zdarzeniach wskaźnika, rozmiar z CSS `resize`, bez biblioteki.
+- **Kolejność wariantów w pasie ustala front** (`VARIANT_ORDER`: pytania, odpowiedź,
+  przekazanie): `GET /variants` oddaje je alfabetycznie, a kolejność to wygląd, nie kontrakt.
+- **Każdą niewygodę kontraktu waży się osobno: obejście we froncie czy mała korekta w `api`.**
+  Korekta wygrywa, gdy front musiałby zgadywać albo czytać tekst dla człowieka — stąd
+  `requested_tools` w kroku tury (2026-10-20): konsola wie z niego, co trwa po turze. Korekty
+  w `api` idą osobnymi commitami.
+- **Kształty z `api` są w `models/api/` przepisane ręcznie;** zmiana modelu w `api` to zmiana
+  tam, a kompilator wskazuje miejsca frontu do poprawy. Wynik przebiegu nosi nazwę grafu
+  (`GraphOutcome`), więc panel rozpoznaje jego kształt bez rzutowania.
+- **Komentarze w formacie z Pythona:** opis pliku mówi, po co plik jest i kto go czyta;
+  docstring `Description` / `Example args` / `Example result` stoi na każdej funkcji
+  i komponencie, przykład przy każdym polu props i argumencie, a jednolinijkowy komentarz nad
+  każdym stanem komponentu.
+- **Testy:** Vitest dla czystej logiki (rozbiór strumienia, wiersze konsoli, liczniki, to, co
+  środkowy panel bierze z przebiegu, `utils/`)
+  w `tests/unit/frontend/`, w korzeniu jak wszystkie testy — typy `vitest` widzi stamtąd linia
+  `paths` w `tsconfig.json`; bez testów komponentów. Kontener sprawdza test z markerem
+  `stack_frontend`: strona, strona pod nieznaną ścieżką i `/api/…` w `api`. Strumienia przez
+  proxy żaden test nie sprawdza, bo wymagałby przebiegu grafu.
+- **Pułapki:** `react-json-view-lite` zwija klucze od nowa przy każdej nowej funkcji
+  `shouldExpandNode`, a strona w trakcie przebiegu przerysowuje się co 200 ms — funkcja stoi
+  w module, a rozbiór JSON-a w `useMemo`. Kontener dev montuje `src/`, `index.html`
+  i `vite.config.ts` z hosta: skasowanie i odtworzenie tych plików (np. `git stash -u`) zostawia
+  w kontenerze stare montowanie, a Vite podaje uszkodzoną treść — pomaga
+  `docker compose up -d --force-recreate frontend`.
 
 ## Uruchamianie i utrzymanie
 
@@ -2993,6 +3076,9 @@ zapadła przypadkiem:
 - Prod (bez montowania): `docker compose -f docker-compose.prod.yml up -d`
 - Po zmianie zależności lub `Dockerfile` (albo kodu na prodzie): `docker compose up -d --build
   <usługa>`
+- Front pokazowy: `http://localhost:8020` (`DOCKER_FRONTEND_PORT`); w dev zmiany w
+  `frontend/src/` widać od razu, po zmianie `package.json` — `docker compose up -d --build
+  frontend`
 - Weryfikacja realnej konfiguracji: `docker compose config` (nie zawartość `.env`)
 
 **Przygotowanie danych (skrypty repo)**
@@ -3059,6 +3145,9 @@ localhost:8010/search`.
 
 **Testy i jakość**
 - Lint: `ruff check .`
+- Front: `cd frontend && npm ci` raz, potem `npm test` (Vitest, testy z `tests/unit/frontend/`)
+  i `npm run build` (sprawdzenie typów i budowa); Node na hoście tylko do tego, kontener ma
+  własny
 - Wszystko, co nie potrzebuje stacku ani płatnego modelu (każdy rodzaj testu): `pytest`
   (wymaga zbudowanej paczki z aplikacji syntetycznej — polecenie w „Przygotowanie danych" —
   programu ripgrep na hoście: `apt install ripgrep`, i zależności z `requirements-dev.txt`,
@@ -3117,11 +3206,12 @@ localhost:8010/search`.
 - Cała konfiguracja przez ENV (pydantic-settings) — żadnych sekretów/endpointów na sztywno.
 - **Jeden `.env` w korzeniu** (nie per usługa; wartości rozdzielamy prefiksami
   `LLM_GENERATION_*`, `LLM_ANONYMIZATION_*`, `ANONYMIZATION_*`, `EMBEDDING_*`, `QDRANT_*`,
-  `POSTGRES_*`, `RAG_*`, `CODE_*`, `AGENT_*`). `.env` w `.gitignore`, **`.env.example` w repo =
+  `POSTGRES_*`, `RAG_*`, `CODE_*`, `AGENT_*`, `FRONTEND_*`). `.env` w `.gitignore`, **`.env.example` w repo =
   kontrakt** — każda zmienna z compose i `Settings` musi tam być. Bez `.env.prod`/`.env.dev` —
   różnice środowisk przez warstwy compose i ENV na maszynie docelowej. `LLM_ANONYMIZATION_*`
   i `ANONYMIZATION_ENGINE` czyta usługa `anonymizer`, a `ANONYMIZATION_BASE_URL`
-  i `ANONYMIZATION_TIMEOUT_SECONDS` — `api`.
+  i `ANONYMIZATION_TIMEOUT_SECONDS` — `api`. `FRONTEND_API_URL` czyta front: konfiguracja Vite
+  w dev i szablon nginx na prod; test plumbingu bierze te odwołania z obu plików.
 - **Progi i parametry retrievalu (`RAG_TOP_K`, `RAG_SCORE_MIN`…) idą do ENV** — to strojenie,
   nie logika.
 - **ENV do kontenerów jawnie przez `environment:`**, nie `env_file:` — wtedy `docker compose
@@ -3274,15 +3364,16 @@ localhost:8010/search`.
 
 | rodzaj       | folder               | co sprawdza                                                    | testów (na stacku) | czas |
 |--------------|----------------------|----------------------------------------------------------------|--------------------|------|
-| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2383 (0)           | 25 s |
-| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 1006 (87)          | 96 s |
-| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 155 (12)           | 10 s |
+| jednostkowe  | `tests/unit/`        | jedną jednostkę kodu; wszystko wokół to atrapy albo dane       | 2403 (0)           | 25 s |
+| integracyjne | `tests/integration/` | jednostkę razem z prawdziwą zależnością — poziom wyżej         | 1007 (87)          | 96 s |
+| funkcjonalne | `tests/functional/`  | całą aplikację przez prawdziwe wejście: HTTP albo komendę      | 161 (16)           | 10 s |
 | ewaluacyjne  | `tests/evaluation/`  | skuteczność na golden setach: ile wyników jest właściwych      | 108 (38)           | 38 s |
 
 Liczby z 2026-10-20, czasy z 2026-10-10: każdy folder osobno, w komplecie
 (`pytest tests/<folder>/ -m "not llm_live"`) na działającym stacku; bez testów na stacku
 integracyjne trwają 18 s, a ewaluacyjne poniżej sekundy. Komplet (`pytest -m "not llm_live"`):
-3555 testów, około 190 s; domyślny `pytest`, bez stacku: 3418 testów, około 50 s. Testy
+3582 testy, około 190 s; domyślny `pytest`, bez stacku: 3441 testów, około 55 s. Front ma
+osobno 38 testów Vitest (`npm test`). Testy
 `llm_live` — 36 integracyjnych i 61 ewaluacyjnych — liczą się do folderu, ale nie chodzą
 w żadnym z tych przebiegów. 2026-10-19 komplet trwał 8–11 min, a 2026-10-20 już 193 s, bez
 zmian w testach, które by to tłumaczyły; przyczyny nie ustalono. Od p. 19.5 testy na stacku
@@ -3361,8 +3452,8 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
   w procesie (`TestClient(create_app())`, `CliRunner`) z atrapami; z markerem — to samo wejście
   na działającym kontenerze albo prawdziwa usługa. Handlery na nagiej aplikacji są integracyjne.
 - **Markery nazywają wymagania:** `stack_api`, `stack_qdrant`, `stack_embedder`,
-  `stack_anonymizer`, `stack_postgres` i od p. 29 `stack_rules` pod parasolem `stack`,
-  a `llm_live` (płatny model) obok parasola, żeby `-m stack` go nie łapał. Rejestruje je `pyproject.toml`, tabelka stoi na
+  `stack_anonymizer`, `stack_postgres`, `stack_frontend` i od p. 29 `stack_rules` pod parasolem
+  `stack`, a `llm_live` (płatny model) obok parasola, żeby `-m stack` go nie łapał. Rejestruje je `pyproject.toml`, tabelka stoi na
   górze `tests/conftest.py`. Domyślny przebieg wyklucza je jawnie w `addopts`
   (`-m 'not stack and not llm_live'`), więc **nowy marker spoza parasola trzeba tam dopisać** —
   sama rejestracja niczego nie odsiewa. `-m` z linii poleceń nadpisuje tę wartość, dlatego
@@ -3822,9 +3913,29 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   brakuje. Dotyczy tak samo wariantu `handoff`.
 - **Osobne trasy strumienia** (`/search/stream`…) — zostajemy przy jednej trasie na graf
   z nagłówkiem `Accept` (decyzja 2026-10-19): różnica dotyczy sposobu oddania wyniku, nie
-  funkcji, a osobne trasy powieliłyby budowę stanu sześć razy. Wraca, gdy budowa frontu albo
-  wpięcie w helpdesk (p. 38) pokażą konkretny powód, na przykład klienta HTTP, który nie ustawi
-  nagłówka.
+  funkcji, a osobne trasy powieliłyby budowę stanu sześć razy. Front pokazowy (p. 77) ich nie
+  potrzebował. Wraca, gdy wpięcie w helpdesk (p. 38) pokaże konkretny powód, na przykład klienta
+  HTTP, który nie ustawi nagłówka.
+- **Statyka frontu wpiekana w `api` pod `/ui`** (plan do 2026-10-20) — obraz `api` dostawałby
+  etap z Node, a `api/` drzewo z `package.json` obok Pythona, a dev i tak potrzebował serwera
+  Vite. Front jest osobną usługą z proxy `/api` (CLAUDE.md → „Frontend").
+- **Jeden model stanu strony frontu (`useReducer`) albo biblioteka stanu (Redux, Zustand)** —
+  stan to kilka niezależnych kawałków, a reduktor z akcjami to więcej kodu niż zysk. Wraca, gdy
+  kawałki zaczną zmieniać się razem.
+- **Dzielenie paczki frontu na części** — paczka ma ~1 MB, prawie cała to antd, a front chodzi
+  lokalnie; bez pomiaru, że to boli.
+- **Biblioteka do przesuwania dialogów (`react-draggable`)** — przesuwanie za nagłówek to
+  kilkanaście linii na zdarzeniach wskaźnika, a rozmiar daje CSS `resize`.
+- **Kolejność wariantów w odpowiedzi `GET /variants`** — to wygląd guzików, nie kontrakt;
+  helpdesk ustawi swoje guziki po swojemu, a front pokazowy ma `VARIANT_ORDER`.
+- **Testy frontu w `frontend/tests/`** — reguła „testy w korzeniu" obejmuje też front, a typy
+  `vitest` widzi z `tests/unit/frontend/` jedna linia `paths` w `tsconfig.json`.
+- **Testy komponentów React** — logika siedzi w czystych funkcjach (`runs/`, `api/sse.ts`,
+  `utils/`), a komponenty tylko rysują; test komponentu sprawdzałby głównie antd.
+- **Plik na każdy model frontu** — około 30 plików po kilka linii; modele z `api` mają plik na
+  zasób, jak `entry_routers/<zasób>/models.py`.
+- **Etykieta kroku w toku zgadywana z wpisu logu** — wpis to tekst dla człowieka, nie do
+  parsowania; krok tury modelu niesie `requested_tools`.
 - **Czas wywołania narzędzia w wiadomości `tool`** — prostsze łączenie z wynikiem, ale model
   rozmowy idzie do dostawców, a metryki nie mają tam czego szukać; pomiar stoi w osobnym polu
   stanu (`tool_timings`).
@@ -4539,7 +4650,10 @@ chwili: na atrapie grafu albo na prawdziwym modelu z indeksami, które są zbudo
   „Warstwa bazy wektorowej (Qdrant)", „Warstwa wyszukiwania tekstowego (Postgres)", „Warstwy
   kodu", „Commands", „Świadomie pominięte".
 - [ ] **77. Aplikacja w React z czterema panelami** — jeden widok, zasady budowy w sekcji
-  „Frontend"; test w procesie: `/ui` oddaje stronę, a trasy API odpowiadają jak dotąd.
+  „Frontend": osobna usługa `frontend` z proxy `/api`, Vitest dla czystej logiki i test
+  kontenera (`stack_frontend`). Kod, testy i kompozycja są gotowe, a po pierwszym obejrzeniu
+  strony w przeglądarce doszły poprawki (2026-10-20): pokazany przebieg wczytywany z konsoli,
+  ramka „w toku" zamiast zakładek, tekst po anonimizacji, przesuwany dialog, czyszczenie konsoli.
 
   | panel     | co pokazuje                                                                         |
   |-----------|-------------------------------------------------------------------------------------|

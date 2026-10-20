@@ -35,6 +35,11 @@ names from (2) and (4); without them the prefix would be a blind spot rather tha
 WHAT THIS FILE DOES NOT CHECK. It compares NAMES, never values or behaviour: a wrong type, a wrong
 unit or a nonsensical default flows straight through. Everything here is read as DATA — no Docker,
 no `docker compose config`, no network — which is what keeps it a unit test.
+
+Usługa `frontend` (p. 77) nie ma klasy `Settings`: zmienne czytają u niej `vite.config.ts`
+(`process.env.NAZWA`, serwer Vite w dev) i `nginx.conf.template` (`${NAZWA}`, nginx na prod).
+Test czyta nazwy z tych dwóch plików jak dane i traktuje je jak pola `Settings` frontu, więc
+wszystkie krawędzie obejmują też front, bez listy wyjątków.
 """
 
 import re
@@ -73,6 +78,15 @@ SETTINGS_BY_SERVICE: dict[str, type[BaseSettings]] = {
     "embedder":   EmbedderSettings,
     "anonymizer": AnonymizerSettings,
 }
+
+# Pliki, z których usługa `frontend` czyta zmienne, i wzorzec odczytu w każdym: konfiguracja Vite
+# czyta `process.env.NAZWA`, a szablon nginx — `${NAZWA}`, który obraz podstawia przy starcie.
+FRONTEND_SERVICE = "frontend"
+FRONTEND_DIR     = REPO_ROOT / "frontend"
+FRONTEND_READERS = (
+    (FRONTEND_DIR / "vite.config.ts",      re.compile(r"process\.env\.([A-Z_][A-Z0-9_]*)")),
+    (FRONTEND_DIR / "nginx.conf.template", re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")),
+)
 
 # Variables consumed by `docker compose` itself rather than by any application: they are
 # interpolated into the compose file and never enter a container, so no Settings class declares
@@ -156,6 +170,47 @@ def _env_names_from_settings(settings_class: type[BaseSettings]) -> set[str]:
     return {field_name.upper() for field_name in settings_class.model_fields}
 
 
+def _env_names_from_frontend() -> set[str]:
+    """
+    Description:
+    Zwraca nazwy zmiennych, które czyta usługa `frontend`: z odwołań `process.env.NAZWA`
+    w konfiguracji Vite i `${NAZWA}` w szablonie nginx. Front nie ma klasy `Settings`, więc
+    jego „pola" to te odwołania.
+
+    Example args:
+        (brak)
+
+    Example result:
+        {"FRONTEND_API_URL"}
+    """
+    names: set[str] = set()
+
+    for path, pattern in FRONTEND_READERS:
+        names.update(pattern.findall(path.read_text(encoding="utf-8")))
+
+    return names
+
+
+def _env_names_by_service() -> dict[str, set[str]]:
+    """
+    Description:
+    Zwraca dla każdej naszej usługi w compose nazwy zmiennych, które umie przeczytać: z pól
+    `Settings` usług w Pythonie i z plików konfiguracji frontu.
+
+    Example args:
+        (brak)
+
+    Example result:
+        {"api": {"LOG_LEVEL", …}, "embedder": {…}, "anonymizer": {…},
+         "frontend": {"FRONTEND_API_URL"}}
+    """
+    readers = {name: _env_names_from_settings(cls) for name, cls in SETTINGS_BY_SERVICE.items()}
+
+    readers[FRONTEND_SERVICE] = _env_names_from_frontend()
+
+    return readers
+
+
 def _env_names_from_all_services() -> set[str]:
     """
     Description:
@@ -168,7 +223,7 @@ def _env_names_from_all_services() -> set[str]:
     Example result:
         {"LOG_LEVEL", "LLM_GENERATION_PROVIDER", "QDRANT_URL", "EMBEDDING_BACKEND"}
     """
-    return set().union(*(_env_names_from_settings(cls) for cls in SERVICE_SETTINGS))
+    return set().union(*_env_names_by_service().values())
 
 
 class _ComposeLoader(yaml.SafeLoader):
@@ -261,7 +316,8 @@ def _variables_interpolated_in_compose() -> set[str]:
 
 def test_every_settings_field_is_declared_in_env_example() -> None:
     """Sprawdza, czy każde pole konfiguracji (`Settings`) usług `api`, `embedder` i `anonymizer`
-    ma wpis o tej samej nazwie w `.env.example` (numer 1 na mapie u góry pliku).
+    oraz każda zmienna czytana przez `frontend` ma wpis o tej samej nazwie w `.env.example`
+    (numer 1 na mapie u góry pliku).
 
     Wyłapuje ustawienie dodane w kodzie, ale nieopisane w `.env.example`: osoba wdrażająca nie
     wie wtedy, że taka zmienna istnieje."""
@@ -345,17 +401,17 @@ def test_no_settings_field_claims_the_compose_only_prefix() -> None:
 
 
 def test_every_env_key_in_compose_is_readable_by_the_service_it_targets() -> None:
-    """Sprawdza, czy każda zmienna, którą `docker-compose.yml` podaje usłudze `api`, `embedder`
-    albo `anonymizer`, ma odpowiadające jej pole w konfiguracji (`Settings`) tej właśnie usługi
-    (numer 7 na mapie u góry pliku).
+    """Sprawdza, czy każda zmienna, którą `docker-compose.yml` podaje usłudze `api`, `embedder`,
+    `anonymizer` albo `frontend`, ma odpowiadające jej pole w konfiguracji (`Settings`) tej właśnie
+    usługi, a we froncie — odwołanie w `vite.config.ts` albo `nginx.conf.template` (numer 7 na
+    mapie u góry pliku).
 
     Wyłapuje literówkę w nazwie zmiennej albo zmienną podaną nie tej usłudze: usługa po cichu
     pomija nazwę, której nie zna, więc ustawiona wartość nigdy nie zaczyna działać."""
     compose = _load_compose(COMPOSE_BASE)
 
-    for service_name, settings_class in SETTINGS_BY_SERVICE.items():
+    for service_name, readable in _env_names_by_service().items():
         passed   = set(compose["services"][service_name].get("environment", {}))
-        readable = _env_names_from_settings(settings_class)
         unknown  = passed - readable
 
         assert not unknown, f"Service '{service_name}' gets unreadable keys: {sorted(unknown)}"
@@ -363,8 +419,8 @@ def test_every_env_key_in_compose_is_readable_by_the_service_it_targets() -> Non
 
 def test_every_settings_field_is_supplied_to_its_service() -> None:
     """Sprawdza, czy każde pole konfiguracji (`Settings`) usług `api`, `embedder` i `anonymizer`
-    jest w `docker-compose.yml` podawane tej właśnie usłudze, bez żadnych wyjątków (numer 8 na
-    mapie u góry pliku).
+    i każda zmienna czytana przez `frontend` jest w `docker-compose.yml` podawana tej właśnie
+    usłudze, bez żadnych wyjątków (numer 8 na mapie u góry pliku).
 
     Wyłapuje pole, którego usługa nigdy nie dostaje. Taka usterka niczym się nie objawia: każde
     pole ma wartość domyślną, więc usługa startuje, zgłasza się jako zdrowa i po cichu działa na
@@ -373,9 +429,8 @@ def test_every_settings_field_is_supplied_to_its_service() -> None:
 
     # No exemption list on purpose: leaving a field on its coded default must be a deliberate
     # act, and the way to declare it is to add the key to compose — not to quietly omit it here.
-    for service_name, settings_class in SETTINGS_BY_SERVICE.items():
+    for service_name, declared in _env_names_by_service().items():
         passed   = set(compose["services"][service_name].get("environment", {}))
-        declared = _env_names_from_settings(settings_class)
         missing  = declared - passed
 
         assert not missing, f"Service '{service_name}' never receives: {sorted(missing)}"
