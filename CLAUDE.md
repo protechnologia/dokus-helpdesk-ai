@@ -3093,6 +3093,8 @@ nogi produktu na jednej sprawie.
 - **Belka ma pigułki „generacja:" i „anonimizacja:"** (modele z `GET /instance`; niedostępny
   anonimizator na czerwono), a karta licznika krótko pulsuje przy zmianie wartości. „Czas"
   w trakcie przebiegu tyka co 200 ms, więc zamiast tego pulsuje powoli przez cały przebieg.
+  Wokół dopisku „by Tensoft” krąży kometa (2026-10-21): sam CSS na jednym pustym elemencie,
+  okrąg spłaszczony i przechylony jako orbita, za tekstem; przy „ogranicz ruch” znika.
 - **Dialog szczegółów przesuwa się za nagłówek i zmienia rozmiar za róg** — przeciąganie na
   zdarzeniach wskaźnika, rozmiar z CSS `resize`, bez biblioteki.
 - **Szerokość trzech kolumn reguluje się suwakami** (`pages/Columns.tsx`, `Splitter` z antd,

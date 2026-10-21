@@ -83,7 +83,13 @@ export function TopBar({ instance, totals, running }: TopBarProps) {
     return (
         <>
             <header className="top-bar">
-                <h1>Helpdesk AI <span className="top-bar-by">by Tensoft</span></h1>
+                <h1>
+                    Helpdesk AI{" "}
+                    <span className="top-bar-by">
+                        by Tensoft
+                        <span className="comet-orbit" aria-hidden="true" />
+                    </span>
+                </h1>
                 <div className="pills">
                     <span className="muted pills-label">Modele:</span>
                     <ModelPill instance={instance} />
