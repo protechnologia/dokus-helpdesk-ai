@@ -2219,7 +2219,7 @@ a do tego czasu jej nie ma, więc oba narzędzia kończą się błędem `DbPostg
   wyniku zapisany wprost, z polami pod nazwami ze schematu. Identyfikatory wracają w kształcie,
   w jakim model poda je następnemu narzędziu, a treść pisana przez klienta siedzi w polu
   tekstowym i nie może udawać końca wyniku. Czy długi tekst w JSON-ie czyta się modelowi gorzej
-  niż goły, pokażą pomiary grafów (p. 23–26).
+  niż goły, pokaże pomiar narzędzi w p. 23.
 - **Brak karty nie jest błędem, brak wątku albo sekcji jest.** Wątek ma każde zgłoszenie, kartę
   tylko to, które przeszło parsowanie i filtr jakości, więc `read_tickets_card` oddaje numery bez
   karty w `without_card`. Nieznany numer w `read_tickets_thread` i nieznany identyfikator
@@ -4368,16 +4368,19 @@ odłożonych — numeracja jest wspólna.**
 kryterium; po zakończeniu oznaczamy `[x]` i zwijamy do jednej linii — ale najpierw przenosimy trwałe
 ustalenia do właściwej sekcji (reguła → sekcja tematyczna, odrzucona opcja → „Świadomie pominięte",
 pułapka → „Gotchas" warstwy). **Gdy natrafisz na lukę „ostatniej mili" albo tworzysz świadomy
-skrót — dopisz punkt** (zwykle do bloku J), zamiast zostawiać go w milczeniu.
+skrót — dopisz punkt** (zwykle do bloku K), zamiast zostawiać go w milczeniu.
 
 **Kolejność bloków:** blok 0 jest zrobiony — cały produkt działa od wejścia do odpowiedzi na
 atrapach, bez modelu i Qdranta. Dalej po jednym punkcie na narzędzie (A) i na węzeł (B), razem
 z prawdziwym modelem (p. 18 i 17, dawny blok D), a po anonimizacji (E) i froncie pokazowym (F)
-— po jednym na graf (G), bo treść promptów stroi się na modelu docelowym, a ten na danych
-klientów nie ruszy bez anonimizatora. Front stoi przed grafami, bo przy ich strojeniu pozwala
-oglądać przebieg sprawy krok po kroku. Litery bloków F–J przesunęły się o jedną 2026-10-19,
-gdy doszedł front. Blok C (decyzje) jest pusty od 2026-10-16: jego punkty okazały się sprawami
-spoza programu albo trafiły do punktów, które od nich zależą.
+— po jednym na graf, bo treść promptów stroi się na modelu docelowym, a ten na danych klientów
+nie ruszy bez anonimizatora. Front stoi przed grafami, bo przy ich strojeniu pozwala oglądać
+przebieg sprawy krok po kroku. Grafy dzielą się wokół korpusu (2026-10-21): bez narzędzi wiedzy
+(G) idą przed nim, bo nie potrzebują indeksów, a `parse_ticket` buduje korpus; z narzędziami (J)
+po nim, razem z opisami narzędzi, bo narzędzia zgłoszeń mierzy się na zanonimizowanych kartach
+i wątkach z importu. Litery bloków F–J przesunęły się o jedną 2026-10-19, gdy doszedł front,
+a „Przed produkcją" z J na K 2026-10-21. Blok C (decyzje) jest pusty od 2026-10-16: jego punkty
+okazały się sprawami spoza programu albo trafiły do punktów, które od nich zależą.
 
 #### Zrobione
 
@@ -4675,12 +4678,13 @@ chwili: na atrapie grafu albo na prawdziwym modelu z indeksami, które są zbudo
   `anonymize`; 38 testów Vitest i test kontenera; reguły — „Frontend", „Warstwa API", „Usługa
   `anonymizer`", „Konfiguracja i deploy", „Testy", „Świadomie pominięte".
 
-#### G. Grafy — po jednym punkcie na graf: treść promptu i pomiar
+#### G. Grafy bez narzędzi wiedzy — po jednym punkcie na graf: treść promptu i pomiar
 
 Na prawdziwym modelu i anonimizatorze (p. 17–18 i blok E). Każdy pomiar ≥2 przebiegi, z czytaniem
 surowych odpowiedzi i raportem z datą i wersją promptu; przy generacji do
 wyboru golden set odpowiedzi albo przegląd ręczny — warianty mają różne kryteria sukcesu, więc
-każdy mierzy się osobno.
+każdy mierzy się osobno. Grafy z narzędziami wiedzy (p. 23, 25, 26) idą po korpusie, razem
+z opisami narzędzi.
 
 - [ ] **21. `gate_close`** — reguły zamknięcia jako dane, ewaluacja na realnych zamknięciach
   z korpusu per reguła z naciskiem na fałszywe alarmy, budżet opóźnienia (anonimizacja + model
@@ -4693,76 +4697,15 @@ każdy mierzy się osobno.
   „Ups! Coś poszło nie tak.” jako potoczny, a czy z nim nie przepuszcza prośby o hasło schowanej
   w cytacie, nikt nie mierzył. *Dlaczego:* fałszywy
   alarm uczy obchodzić bramkę odruchowo, a „bramka ma 90%" nie mówi, która reguła się sypie.
-- [ ] **23. `search`** — prompt pętli (jak pytać każde narzędzie, kiedy materiał wystarcza
-  i ile kosztuje kod aplikacji sprawdzany w każdej sprawie o działaniu aplikacji — reguła
-  z p. 70; na kodzie Dokusa do policzenia, jak często szukanie nazw z ekranu trafia we właściwe
-  miejsce i ile szukań zużywa, czy opis projektu (p. 65) to szukanie skraca, czy odczyt
-  symbolu (p. 73) pomaga w sprawach, w których model dziś nie dochodzi do miejsca, oraz czy
-  uwagi dla wdrożeniowca mówią prawdę o przeczytanych sprawach i ile mają mieć znaków);
-  pomiar pętli wobec wszystkich narzędzi naraz (tryb bez pętli zostaje jako odniesienie i tryb
-  awaryjny), w zestawie klastry wieloprzyczynowe; osobna oś — trafność zapytań pisanych przez
-  agenta wobec zapytań z parsera korpusu (golden set, `recall@1` i MRR; punkt odniesienia to pola
-  `query_problem` + `query_symptoms` golden setu — 152 ze 162 na pierwszym miejscu); wkład
-  narzędzi `_text` liczony osobno — czy znajdują coś, czego wektor nie znajduje, jest dziś
-  niezmierzone; do tego czy model czyta karty WSZYSTKICH znalezionych numerów, czy tylko
-  pierwszego, i ile kosztuje dodatkowa tura odczytu; na prawdziwych wątkach także: ile wątków
-  na sprawę (dziś 3), ile tur na sprawę (limit dziś 20, do ustawienia z rozkładu tur
-  w przebiegach), limit długości wątku i czy wątek ma nieść etykiety z `as_thread()`
-  („KOMENTARZ", rola, data); w sprawie organizacyjnej z 59.9 model czytał karty wszystkich pięciu
-  zgłoszeń z wyszukiwań, choć żadna sprawy nie dotyczyła, więc lista źródeł niosła materiał bez
-  związku (trzy przebiegi). *Dlaczego:*
-  najgroźniejszy błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach
-  (e-Doręczenia: 6 zgłoszeń, 6 przyczyn), a zapytanie agenta nie powstaje już promptem korpusu.
-- [ ] **71. Ustalenia z `search` jako wejście `/suggest`** (dopisany 2026-10-10, numer spoza
-  kolejności) — wariant z pętlą (`questions`, `solution`) przyjmuje opcjonalnie wynik
-  wyszukiwania: identyfikatory źródeł, które operator zostawił, i uwagi z p. 70; graf odczytuje
-  te źródła narzędziami, więc lista źródeł nadal powstaje z odczytu (zasada 9), i może szukać
-  dalej; bez wyniku wyszukiwania wariant działa jak dziś; do rozstrzygnięcia: czy operator
-  odznacza źródła przed generacją (etykieta do feedbacku, p. 42), co dostaje `handoff`, który
-  nie ma pętli (p. 27), i czy uwagi z wyszukiwania wchodzą do promptu jako dane; pomiar: koszt
-  i jakość wariantu z ustaleniami wobec wariantu, który szuka sam. *Dlaczego:* dziś każdy guzik
-  szuka od nowa, więc ta sama praca jest opłacana dwa razy, a propozycja może stanąć na innych
-  sprawach niż te, które operator widział w wyszukiwaniu; punkt wraca do decyzji z 2026-10-02
-  („każda funkcja ma własną pętlę"). Stoi po p. 23, bo potrzebuje zmierzonego wyszukiwania,
-  a przed p. 25–26, żeby warianty były mierzone już w docelowym kształcie.
 - [ ] **24. `parse_ticket`** — karta zgłoszenia promptem parsującym na modelu docelowym, porównana z
   próbkami z `porownanie-modeli-parsowania.md` (zbierane jeszcze JSON-em w tekście — od 2026-10-02
   karta wychodzi narzędziem `respond_parse_ticket`). *Dlaczego:* ten sam prompt buduje korpus przy
   masowym imporcie (p. 31) i przy powrocie zamkniętych zgłoszeń (p. 30), więc jego jakość na modelu
   docelowym rozstrzyga o jakości indeksu.
-- [ ] **25. `suggest_questions`** — prompt z 6.3 przemierzony na modelu docelowym z placeholderami,
-  z regułą zgodności przyczyny z objawem i z szerszą regułą sięgania po kod, tą samą co w p. 23; do sprawdzenia, czy długi tekst w JSON-ie (wątek, sekcja
-  instrukcji) czyta się modelowi gorzej niż goły;
-  ewaluacja wariantu, w tym jak często model oddaje „pytań już nie trzeba" (p. 72) i czy
-  słusznie — fałszywe wyjście przy zgodnym objawie i różnych przyczynach jest tu najgroźniejsze;
-  sentinele `questions_summary` rozpoznaje `no_questions()` dopisane
-  do `normalizer_ticket_sentinel.py`; w scenariuszu z p. 59.6 („wątek tylko zawęża") model
-  w 1 z 3 przebiegów zapytał klienta, czy na serwerze pozostał plik blokady, czyli o diagnozę,
-  której klient nie zna. W scenariuszu cytowania kodu z 59.7 (sprawa z komunikatem tylko
-  w kodzie) pierwsze pytanie do klienta niosło ścieżkę z repozytorium
-  (`src/lib/Urzad/Szablony/pisma`) w 3 z 3 przebiegów, choć prompt każe trzymać ścieżki w uwagach
-  dla wdrożeniowca; test tego nie sprawdza. *Dlaczego:* prompt z 6.3 powstał pod słabszy model, a znana
-  dziura (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
-- [ ] **26. `suggest_solution`** — prompt z 6.4 przemierzony na modelu docelowym, z regułą
-  zgodności trafienia z objawem, osobną regułą ostrzeżenia o kroku nieodwracalnym i szerszą
-  regułą sięgania po kod, tą samą co w p. 23; do
-  rozstrzygnięcia pomiarem: kiedy model ma czytać wątki (w sondzie `gpt-6.1-sol` brał wszystkie,
-  także po zaostrzeniu zdania w prompcie), czy „instrukcje zawsze" nie dokłada do źródeł sekcji,
-  z których odpowiedź nie korzysta, i jak ważyć instrukcję wobec zgłoszeń (od 2026-10-04 prompt
-  bierze fakty z obu na równi; w sondzie krok z instrukcji stanął pierwszy, choć żadne
-  zgłoszenie go nie potwierdzało); reguła dla odpowiedzi opartej wyłącznie na kodzie: przy jakim
-  warunku pada komunikat i co sprawdzić, wprost, że nie potwierdza tego żadna sprawa, a nazwy
-  klas i ścieżki w uwagach dla wdrożeniowca (p. 68); reguła o wątku bieżącej sprawy: nie
-  proponować kroku, który wątek pokazuje jako już wykonany (dziś prompt o wątku milczy, a mimo to
-  w scenariuszu z 59.8 model w trzech przebiegach napisał, że kroku nie powtarza); zastrzeżenie
-  o naszej czynności („sprawdzimy po aktualizacji”) model kładzie raz w treści dla klienta, raz
-  w uwagach (59.8); czy treść rozwiązania może pytać klienta — licznik pytań w scenariuszu
-  rozwiązania w pierwszym pomiarze pokazał 0 z 4 spraw z pytaniem; ewaluacja wariantu. *Dlaczego:* ostrzeżenie nie padło w żadnym z czterech pomiarów, a bez reguły zgodności
-  model kazał wygasić duplikat kontrahenta przy zgłoszeniu o przenoszeniu zasobów.
 - [ ] **27. `suggest_handoff`** — prompt niosący, co sprawdzono i czego brakuje; do
   rozstrzygnięcia, czy wariant dostaje narzędzia kodu (namiar na plik i warunek w przekazaniu),
-  bo dziś nie ma pętli narzędzi; ewaluacja
-  wariantu. *Dlaczego:* grzeczna formułka bez treści to udokumentowana patologia korpusu (ten sam
+  bo dziś nie ma pętli narzędzi — jeśli dostanie, punkt idzie za p. 26, na opisach narzędzi
+  zamrożonych w p. 23; ewaluacja wariantu. *Dlaczego:* grzeczna formułka bez treści to udokumentowana patologia korpusu (ten sam
   tekst ≥12× w jednej turze).
 - [ ] **28. `polish`** — zasady stylu jako dane, pomiar braku nowych faktów (porównanie wejścia
   z wyjściem pod kątem dodanych liczb, nazw i kroków); do potwierdzenia, czy „Popraw" zostaje
@@ -4811,12 +4754,91 @@ każdy mierzy się osobno.
   źródła i że sekcje pokrywają całość, przegląd opisów przez człowieka, próg ostrzeżenia
   o długiej sekcji (dziś tymczasowo 18 tys. znaków) oraz przeliczenie `RAG_DOCS_FRAGMENT_CHARS`
   i `RAG_DOCS_SCORE_MIN`, zmierzonych dotąd tylko na paczce syntetycznej, a gdy spis właściwej
-  dokumentacji okaże się za długi, zawężenie `list_docs` do jednego dokumentu. *Dlaczego:*
+  dokumentacji okaże się za długi, zawężenie `list_docs` do jednego dokumentu; na końcu pomiar
+  opisów czterech narzędzi dokumentacji na grafie `search`, tymi samymi liczbami co w p. 23
+  (paczka syntetyczna sprawdza okablowanie, nie skuteczność). *Dlaczego:*
   dokumentacja wraca do promptu jako cytowane źródło, więc parafraza modelu stałaby się „tak mówi
   instrukcja"; model dzieli i opisuje, treści nie przepisuje.
 
-#### J. Przed produkcją
+#### J. Narzędzia i grafy z narzędziami — opisy narzędzi, treść promptu i pomiar
 
+Po masowym imporcie (p. 31), na zanonimizowanych kartach i wątkach; pomiar jak w grafach bez
+narzędzi wiedzy: ≥2 przebiegi, surowe odpowiedzi, raport z datą i wersją promptu. Opis narzędzia
+(`description.md`) jest wspólny dla grafów, więc opisy stroi p. 23 na grafie `search`, który ma
+wszystkie narzędzia, a p. 25–26 mierzą na opisach zamrożonych; zmiana opisu po p. 23 to ponowny
+pomiar p. 23, 25 i 26. Opisy narzędzi dokumentacji mierzy p. 55, na właściwej dokumentacji.
+
+- [ ] **23. `search` i opisy narzędzi** — prompt pętli i opisy narzędzi, które pętla woła;
+  w każdym materiale te same liczby na narzędzie, brane z rozmowy, nie z deklaracji modelu:
+  błędne argumenty i odmowy, wywołania ponad limit, reakcja na flagi wyniku (`cut_by_limit`,
+  `has_more_depth`), przepisywanie przykładów z tabelki argumentów i koszt opisów w stałym
+  początku żądania (osiem narzędzi to było 3,6 tys. tokenów, dziś jest czternaście); do tego,
+  czy długi tekst w wyniku JSON (wątek, sekcja instrukcji) czyta się modelowi gorzej niż goły.
+  *Dlaczego:* najgroźniejszy błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach
+  (e-Doręczenia: 6 zgłoszeń, 6 przyczyn), a zapytanie agenta nie powstaje już promptem korpusu.
+  - [ ] **23.1 Narzędzia kodu** — ile kosztuje kod aplikacji sprawdzany w każdej sprawie
+    o działaniu aplikacji (reguła z p. 70); na kodzie Dokusa: jak często szukanie nazw z ekranu
+    trafia we właściwe miejsce i ile szukań zużywa, czy opis projektu (p. 65) to szukanie skraca
+    i czy odczyt symbolu (p. 73) pomaga w sprawach, w których model dziś nie dochodzi do miejsca.
+    Materiał już jest: paczka Dokusa i 9 przypadków w `code.json`.
+  - [ ] **23.2 Narzędzia zgłoszeń** — trafność zapytań pisanych przez agenta wobec zapytań
+    z parsera korpusu (golden set, `recall@1` i MRR; punkt odniesienia to pola `query_problem`
+    i `query_symptoms` golden setu — 152 ze 162 na pierwszym miejscu); wkład narzędzi `_text`
+    liczony osobno — czy znajdują coś, czego wektor nie znajduje, jest dziś niezmierzone; czy
+    model czyta karty WSZYSTKICH znalezionych numerów, czy tylko pierwszego, i ile kosztuje
+    dodatkowa tura odczytu; na prawdziwych wątkach: ile wątków na sprawę (dziś 3), limit
+    długości wątku i czy wątek ma nieść etykiety z `as_thread()` („KOMENTARZ", rola, data).
+  - [ ] **23.3 Prompt `search`** — kiedy materiał wystarcza: pomiar pętli wobec wszystkich
+    narzędzi naraz (tryb bez pętli zostaje jako odniesienie i tryb awaryjny), w zestawie klastry
+    wieloprzyczynowe; czy uwagi dla wdrożeniowca mówią prawdę o przeczytanych sprawach i ile
+    mają mieć znaków; ile tur na sprawę (limit dziś 20, do ustawienia z rozkładu tur
+    w przebiegach); w sprawie organizacyjnej z 59.9 model czytał karty wszystkich pięciu
+    zgłoszeń z wyszukiwań, choć żadna sprawy nie dotyczyła, więc lista źródeł niosła materiał
+    bez związku (trzy przebiegi).
+- [ ] **25. `suggest_questions`** — prompt z 6.3 przemierzony na modelu docelowym z placeholderami,
+  z regułą zgodności przyczyny z objawem i z szerszą regułą sięgania po kod, tą samą co w p. 23;
+  ewaluacja wariantu, w tym jak często model oddaje „pytań już nie trzeba" (p. 72) i czy
+  słusznie — fałszywe wyjście przy zgodnym objawie i różnych przyczynach jest tu najgroźniejsze;
+  sentinele `questions_summary` rozpoznaje `no_questions()` dopisane
+  do `normalizer_ticket_sentinel.py`; w scenariuszu z p. 59.6 („wątek tylko zawęża") model
+  w 1 z 3 przebiegów zapytał klienta, czy na serwerze pozostał plik blokady, czyli o diagnozę,
+  której klient nie zna. W scenariuszu cytowania kodu z 59.7 (sprawa z komunikatem tylko
+  w kodzie) pierwsze pytanie do klienta niosło ścieżkę z repozytorium
+  (`src/lib/Urzad/Szablony/pisma`) w 3 z 3 przebiegów, choć prompt każe trzymać ścieżki w uwagach
+  dla wdrożeniowca; test tego nie sprawdza. *Dlaczego:* prompt z 6.3 powstał pod słabszy model, a znana
+  dziura (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
+- [ ] **26. `suggest_solution`** — prompt z 6.4 przemierzony na modelu docelowym, z regułą
+  zgodności trafienia z objawem, osobną regułą ostrzeżenia o kroku nieodwracalnym i szerszą
+  regułą sięgania po kod, tą samą co w p. 23; do
+  rozstrzygnięcia pomiarem: kiedy model ma czytać wątki (w sondzie `gpt-6.1-sol` brał wszystkie,
+  także po zaostrzeniu zdania w prompcie), czy „instrukcje zawsze" nie dokłada do źródeł sekcji,
+  z których odpowiedź nie korzysta, i jak ważyć instrukcję wobec zgłoszeń (od 2026-10-04 prompt
+  bierze fakty z obu na równi; w sondzie krok z instrukcji stanął pierwszy, choć żadne
+  zgłoszenie go nie potwierdzało); reguła dla odpowiedzi opartej wyłącznie na kodzie: przy jakim
+  warunku pada komunikat i co sprawdzić, wprost, że nie potwierdza tego żadna sprawa, a nazwy
+  klas i ścieżki w uwagach dla wdrożeniowca (p. 68); reguła o wątku bieżącej sprawy: nie
+  proponować kroku, który wątek pokazuje jako już wykonany (dziś prompt o wątku milczy, a mimo to
+  w scenariuszu z 59.8 model w trzech przebiegach napisał, że kroku nie powtarza); zastrzeżenie
+  o naszej czynności („sprawdzimy po aktualizacji”) model kładzie raz w treści dla klienta, raz
+  w uwagach (59.8); czy treść rozwiązania może pytać klienta — licznik pytań w scenariuszu
+  rozwiązania w pierwszym pomiarze pokazał 0 z 4 spraw z pytaniem; ewaluacja wariantu. *Dlaczego:* ostrzeżenie nie padło w żadnym z czterech pomiarów, a bez reguły zgodności
+  model kazał wygasić duplikat kontrahenta przy zgłoszeniu o przenoszeniu zasobów.
+
+#### K. Przed produkcją
+
+- [ ] **71. Ustalenia z `search` jako wejście `/suggest`** (dopisany 2026-10-10, numer spoza
+  kolejności; od 2026-10-21 w tym bloku, wcześniej między p. 23 a p. 24) — wariant z pętlą
+  (`questions`, `solution`) przyjmuje opcjonalnie wynik wyszukiwania: identyfikatory źródeł,
+  które operator zostawił, i uwagi z p. 70; graf odczytuje te źródła narzędziami, więc lista
+  źródeł nadal powstaje z odczytu (zasada 9), i może szukać dalej; bez wyniku wyszukiwania
+  wariant działa jak dziś; do rozstrzygnięcia: czy operator odznacza źródła przed generacją
+  (etykieta do feedbacku, p. 42), co dostaje `handoff`, który nie ma pętli (p. 27), i czy uwagi
+  z wyszukiwania wchodzą do promptu jako dane; pomiar: koszt i jakość wariantu z ustaleniami
+  wobec wariantu, który szuka sam. *Dlaczego:* dziś każdy guzik szuka od nowa, więc ta sama
+  praca jest opłacana dwa razy, a propozycja może stanąć na innych sprawach niż te, które
+  operator widział w wyszukiwaniu; punkt wraca do decyzji z 2026-10-02 („każda funkcja ma
+  własną pętlę"). Potrzebuje zmierzonego wyszukiwania (p. 23); warianty z p. 25–26 są mierzone
+  bez ustaleń, więc po ich wpięciu trzeba je przemierzyć.
 - [ ] **74. Pamięć anonimizacji tego samego wątku** (dopisany 2026-10-18, numer spoza
   kolejności) — gdy wdrożeniowiec klika kolejny guzik (wyszukiwanie, pytania, rozwiązanie,
   bramka), a treść wątku się nie zmieniła, usługa `anonymizer` oddaje zapamiętany wynik zamiast
