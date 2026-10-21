@@ -2,6 +2,7 @@ import dataclasses
 from collections.abc import Mapping
 from typing import Any
 
+from tests._helpers.markers import malformed_markers
 from tests._helpers.scenarios.gates.models.gate_case import GateCase
 
 
@@ -55,6 +56,23 @@ class GateOutcome:
             False
         """
         return self.answer == "pass" and self.case.expected == "block"
+
+    @property
+    def malformed(self) -> list[str]:
+        """
+        Description:
+        Napisy w klamrach z uzasadnienia i wskazówki werdyktu, które nie są ani znacznikiem
+        anonimizacji, ani placeholderem z promptu: znacznik odmieniony albo przekręcony.
+
+        Example args:
+            (brak)
+
+        Example result:
+            ["{NAZWISKA}"]
+        """
+        text = "\n".join([*self.fields.get("reasons", []), self.fields.get("hint", "")])
+
+        return malformed_markers(text)
 
     @property
     def assessment(self) -> str:

@@ -6,12 +6,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class Verdict(BaseModel):
     """
     Description:
-    Werdykt bramki jakości: przepuszcza czy blokuje, dlaczego, czego brakuje i co dopisać.
+    Werdykt bramki jakości: przepuszcza czy blokuje, dlaczego i co dopisać.
 
     Do czego:
     Jeden kształt dla bramki zamknięcia i bramki wysyłki — wołający pisze jedną obsługę odpowiedzi,
     a bramki różni zestaw reguł, nie kontrakt (CLAUDE.md -> „Warstwa API"). Dane, nie proza:
-    helpdesk pokazuje `missing` jako listę we własnym UI. Wynik grafów `gate_close` i `gate_reply`.
+    helpdesk pokazuje `reasons` jako listę we własnym UI. Wynik grafów `gate_close` i `gate_reply`.
 
     Blokada zawsze niesie uzasadnienie i wskazówkę (zasada 10) — inaczej to samo „nie", którego
     wdrożeniowcy nauczą się obchodzić na ślepo. Pilnuje tego walidacja, więc odpowiedź modelu bez
@@ -23,7 +23,6 @@ class Verdict(BaseModel):
 
     verdict: Literal["pass", "block"] = Field(examples=["block"])
     reasons: list[str]                = Field(default_factory=list, examples=[["Nie widać zmian."]])
-    missing: list[str]                = Field(default_factory=list, examples=[["co zrobiono"]])
     hint:    str                      = Field(default="", examples=["Dopisz, co zmieniono."])
 
     @model_validator(mode="after")

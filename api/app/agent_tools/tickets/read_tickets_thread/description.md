@@ -23,9 +23,9 @@ ma karty.
 
 # Jak wywoływać
 
-| argument  | typ   | co podać         | przykład | opis |
-|-----------|-------|------------------|----------|------|
-| ticket_id | tekst | numer zgłoszenia | "90011"  | Jeden numer, dokładnie w brzmieniu z pola `ticket_id`. Nieznany numer kończy się błędem. |
+| argument  | typ    | przykłady | opis |
+|-----------|--------|-----------|------|
+| ticket_id | string | "90011"   | Jeden numer, dokładnie w brzmieniu z pola `ticket_id`. Nieznany numer kończy się błędem. |
 
 # Co zwraca
 

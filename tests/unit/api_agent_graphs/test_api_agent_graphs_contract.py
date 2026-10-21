@@ -24,9 +24,13 @@ from app.core_model.graphs.proposal import Proposal
 from app.engine_anonymization import FakeAnonymizer
 from app.engine_llm import LLMError
 from tests._helpers.graphs import (
+    ANONYMIZATION_HEADING,
     ANONYMIZED,
+    DATA_HEADING,
     TOOL_NAME_IN_PROMPT,
+    WITHOUT_DESCRIPTION_LAYOUT,
     WITHOUT_MARKERS_PARAGRAPH,
+    WITHOUT_PROMPT_SECTIONS,
     allowed_tools,
     anonymized_state,
     built_from,
@@ -38,14 +42,34 @@ from tests._helpers.graphs import (
     graph_modules,
     graph_name,
     output_types,
+    prompt_rules,
+    prompt_section,
 )
 from tests._helpers.graphs.samples import GIVEN_OUTPUTS
+from tests._helpers.tool_descriptions import DESCRIPTION_SECTIONS, argument_types, schema_types
 
 # Pakiety wszystkich grafów, te z nich, które odpowiadają narzędziem `respond_<graf>`, i te,
 # których prompt systemowy mówi modelowi o znacznikach anonimizacji.
 GRAPHS         = graph_modules()
 RESPOND_GRAPHS = [graph for graph in GRAPHS if hasattr(graph, "RESPOND_TOOL_NAME")]
 MARKER_GRAPHS  = [graph for graph in GRAPHS if graph_name(graph) not in WITHOUT_MARKERS_PARAGRAPH]
+
+# Grafy z narzędziem odpowiedzi do testu układu jego opisu. Graf, którego opis jeszcze go nie ma,
+# jest oczekiwaną porażką w trybie ścisłym: po przerobieniu opisu test każe zdjąć wyjątek.
+RESPOND_DESCRIPTIONS = [
+    pytest.param(graph, marks=pytest.mark.xfail(strict=True, reason="układ opisu w p. 24"))
+    if graph_name(graph) in WITHOUT_DESCRIPTION_LAYOUT else graph
+    for graph in RESPOND_GRAPHS
+]
+
+# Grafy, których prompt systemowy jest podzielony na sekcje, i ten sam zbiór do testu pierwszej
+# zasady: graf bez sekcji jest tam oczekiwaną porażką w trybie ścisłym, jak opisy odpowiedzi.
+SECTION_GRAPHS = [graph for graph in GRAPHS if graph_name(graph) not in WITHOUT_PROMPT_SECTIONS]
+RULES_GRAPHS   = [
+    pytest.param(graph, marks=pytest.mark.xfail(strict=True, reason="sekcje promptu w p. 24"))
+    if graph_name(graph) in WITHOUT_PROMPT_SECTIONS else graph
+    for graph in GRAPHS
+]
 
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=graph_name)
@@ -252,6 +276,37 @@ def test_the_respond_tool_follows_the_convention(graph: ModuleType) -> None:
     assert "<!--"        not in tool.description
 
 
+@pytest.mark.parametrize("graph", RESPOND_DESCRIPTIONS, ids=graph_name)
+def test_the_respond_tool_description_has_the_tool_sections(graph: ModuleType) -> None:
+    """Sprawdza, czy opis narzędzia odpowiedzi każdego grafu ma te same cztery nagłówki co opisy
+    narzędzi agenta, w tej samej kolejności: „Do czego służy", „Jak wywoływać", „Co zwraca"
+    i „Zasady".
+
+    Wyłapuje opis odpowiedzi ułożony inaczej niż opisy narzędzi: model dostaje je wszystkie
+    w jednej liście i ma w każdym znaleźć argumenty i zasady w tym samym miejscu. Opis karty
+    zgłoszenia przechodzi na ten układ w p. 24; do tego czasu test oczekuje dla niego porażki,
+    a gdy opis zostanie przerobiony, sam każe zdjąć ten wyjątek."""
+    description = graph.respond_tool().description
+    headings    = [line for line in description.splitlines() if line.startswith("#")]
+
+    assert headings == DESCRIPTION_SECTIONS
+
+
+@pytest.mark.parametrize("graph", RESPOND_DESCRIPTIONS, ids=graph_name)
+def test_the_respond_tool_description_lists_the_fields_with_their_schema_types(
+    graph: ModuleType,
+) -> None:
+    """Sprawdza, czy tabelka argumentów w opisie narzędzia odpowiedzi każdego grafu wymienia
+    dokładnie pola ze schematu odpowiedzi, każde z typem ze schematu zapisanym nazwą z JSON-a.
+
+    Wyłapuje opis rozjechany z modelem wyniku: pole dodane albo usunięte w modelu bez zmiany
+    tabelki (jak `missing` w werdykcie bramki) albo typ zmieniony tylko w jednym miejscu. Opis karty
+    zgłoszenia nie ma jeszcze tabelki argumentów (p. 24), więc test oczekuje dla niego porażki."""
+    tool = graph.respond_tool()
+
+    assert argument_types(tool.description) == schema_types(tool.parameters)
+
+
 @pytest.mark.parametrize("graph", RESPOND_GRAPHS, ids=graph_name)
 def test_both_prompt_turns_name_the_respond_tool(graph: ModuleType) -> None:
     """Sprawdza, czy prompt systemowy i tura użytkownika każdego grafu wymieniają narzędzie
@@ -328,13 +383,56 @@ def test_every_system_prompt_explains_anonymization_markers(graph: ModuleType) -
     # Prompt jest zawijany na szerokość, więc zdanie bywa złamane między liniami.
     system = " ".join(graph.system_prompt().split())
 
-    assert "Dane osobowe w tekście, który dostajesz, są zastąpione znacznikami" in system
+    assert "Dane osobowe w tekście, który dostajesz, zostały zanonimizowane" in system
+    assert "przez zastąpienie znacznikami" in system
     assert "Ten sam znacznik w dwóch miejscach nie musi znaczyć tej samej osoby" in system
     assert "Nie zgadujesz, co stoi pod znacznikiem, i nie odmieniasz go" in system
     assert "wpisujesz znacznik tak, jak stoi" in system
 
     if graph.TOOL_NAMES:
         assert "Znaczników nie wpisujesz do zapytań narzędzi" in system
+
+
+def test_every_anonymization_section_reads_the_same() -> None:
+    """Sprawdza, czy sekcja „Anonimizacja" promptu systemowego jest taka sama, znak w znak,
+    w każdym grafie, który mówi modelowi o znacznikach (wszystkie poza `parse_ticket`).
+
+    Wyłapuje poprawkę sekcji wprowadzoną w jednym prompcie bez pozostałych: grafy traktowałyby
+    znaczniki różnie, a w diffie jednego pliku nie byłoby widać, że reszta została po staremu.
+    Zdania o znacznikach właściwe jednemu grafowi stoją w jego „Zasadach"."""
+    sections = {graph_name(graph): prompt_section(graph.system_prompt(), ANONYMIZATION_HEADING)
+                for graph in MARKER_GRAPHS}
+
+    assert all(sections.values()), sections
+    assert len(set(sections.values())) == 1, sections
+
+
+def test_every_data_section_reads_the_same() -> None:
+    """Sprawdza, czy sekcja o danych w sekcjach `===` i wynikach narzędzi jest taka sama, znak
+    w znak, w prompcie systemowym każdego grafu podzielonego na sekcje (wszystkie poza
+    `parse_ticket`, który przechodzi na ten układ w p. 24).
+
+    Wyłapuje zabezpieczenie przed poleceniem wklejonym w dane poprawione w jednym prompcie bez
+    pozostałych: część grafów broniłaby się słabszym brzmieniem i nikt by tego nie zauważył."""
+    sections = {graph_name(graph): prompt_section(graph.system_prompt(), DATA_HEADING)
+                for graph in SECTION_GRAPHS}
+
+    assert all(sections.values()), sections
+    assert len(set(sections.values())) == 1, sections
+
+
+@pytest.mark.parametrize("graph", RULES_GRAPHS, ids=graph_name)
+def test_the_first_rule_forbids_making_things_up(graph: ModuleType) -> None:
+    """Sprawdza, czy pierwszą zasadą w sekcji „Zasady" promptu systemowego każdego grafu jest
+    osobne „NIE ZMYŚLASZ.".
+
+    Wyłapuje prompt, w którym zakaz zmyślania przesunięto niżej, dopisano do innej zasady albo
+    usunięto przy edycji: to najważniejsza zasada produktu (zasada 9) i ma stać w każdym grafie
+    w tym samym miejscu. Prompt parsujący nie ma jeszcze sekcji (p. 24), więc test oczekuje dla
+    niego porażki."""
+    rules = prompt_rules(graph.system_prompt())
+
+    assert rules[0] == "NIE ZMYŚLASZ."
 
 
 @pytest.mark.parametrize("graph", GRAPHS, ids=graph_name)

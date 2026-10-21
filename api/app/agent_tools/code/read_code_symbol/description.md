@@ -29,10 +29,10 @@ gdy znasz nazwę: z pola `symbol` w wyniku szukania
 
 # Jak wywoływać
 
-| argument | typ   | co podać          | przykład                  | opis |
-|----------|-------|-------------------|---------------------------|------|
-| name     | tekst | nazwa definicji   | "nastepnyNumer"           | Nazwa funkcji, metody albo klasy, z zachowaniem wielkości liter. Możesz podać ją razem z klasą albo obiektem, w którym leży: `GeneratorNumeru::nastepnyNumer`, `APP.pisma.wyslijHandler`. Przestrzeń nazw przed nazwą klasy jest pomijana. |
-| path     | tekst | plik albo katalog | "src/lib/Urzad/Numeracja" | Opcjonalne zawężenie: szuka definicji tylko w tym pliku albo w tym katalogu z podkatalogami. Bez niego szuka w całym kodzie. Ścieżka względem katalogu głównego kodu; ścieżka spoza kodu albo taka, której nie ma, kończy się błędem. |
+| argument | typ    | przykłady                 | opis |
+|----------|--------|---------------------------|------|
+| name     | string | "nastepnyNumer"           | Nazwa funkcji, metody albo klasy, z zachowaniem wielkości liter. Możesz podać ją razem z klasą albo obiektem, w którym leży: `GeneratorNumeru::nastepnyNumer`, `APP.pisma.wyslijHandler`. Przestrzeń nazw przed nazwą klasy jest pomijana. |
+| path     | string | "src/lib/Urzad/Numeracja" | Opcjonalne zawężenie: szuka definicji tylko w tym pliku albo w tym katalogu z podkatalogami. Bez niego szuka w całym kodzie. Ścieżka względem katalogu głównego kodu; ścieżka spoza kodu albo taka, której nie ma, kończy się błędem. |
 
 # Co zwraca
 

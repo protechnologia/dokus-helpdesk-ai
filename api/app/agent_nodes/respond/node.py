@@ -29,7 +29,7 @@ narzędzia, a graf wraca do węzła `agent`:
 Po poprawionej odpowiedzi ten sam węzeł zwraca już wynik:
 
     {
-        "output": Verdict(verdict="block", reasons=["Nie widać, co zrobiono."], missing=[],
+        "output": Verdict(verdict="block", reasons=["Nie widać, co zrobiono."],
                           hint="Dopisz, co zmieniono."),
         "log":    [LogEntry(node="respond", message="output: Verdict")],
     }
@@ -394,7 +394,7 @@ class RespondNode(RespondNodeBase):
             turn=tool_call_turn("respond_gate_close", {"verdict": "pass"})
 
         Example result:
-            Verdict(verdict="pass", reasons=[], missing=[], hint="")
+            Verdict(verdict="pass", reasons=[], hint="")
 
         Raises:
             InvalidAnswerError: sam tekst, brak wywołania odpowiedzi, odpowiedź razem z innym

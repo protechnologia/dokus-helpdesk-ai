@@ -22,10 +22,10 @@ problemu i symptomów każdego historycznego zgłoszenia.
 
 # Jak wywoływać
 
-| argument | typ   | co podać                            | przykład                                       | opis |
-|----------|-------|-------------------------------------|------------------------------------------------|------|
-| problem  | tekst | czego dotyczy kłopot                | "Wysyłka przez ePUAP kończy się błędem"        | Jednym-dwoma zdaniami. |
-| symptoms | tekst | symptomy widziane przez użytkownika | "Po kliknięciu Wyślij komunikat o braku sieci" | Z komunikatem błędu, jeśli jest. |
+| argument | typ    | przykłady                                      | opis |
+|----------|--------|------------------------------------------------|------|
+| problem  | string | "Wysyłka przez ePUAP kończy się błędem"        | Czego dotyczy kłopot, jednym-dwoma zdaniami. |
+| symptoms | string | "Po kliknięciu Wyślij komunikat o braku sieci" | Symptomy widziane przez użytkownika, z komunikatem błędu, jeśli jest. |
 
 Streść zgłoszenie do tych dwóch pól, nie przepisuj go wprost — bez
 powitań, podpisów i historii wątku.

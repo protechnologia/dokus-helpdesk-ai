@@ -26,6 +26,8 @@ grafów na żywym modelu.
 | `built_from()`          | graf złożony z podanych węzłów                                      |
 | `streamed_fake()`       | kroki i stan końcowy atrapy grafu przepuszczonej krok po kroku      |
 | `ran_fake()`            | stan końcowy atrapy grafu przepuszczonej w całości                  |
+| `prompt_section()`      | sekcja promptu systemowego pod nagłówkiem `#`, z nagłówkiem         |
+| `prompt_rules()`        | zasady z sekcji „Zasady" promptu systemowego, punkt po punkcie      |
 
 Przykład:
 
@@ -45,6 +47,7 @@ O czym pamiętać przy zmianach:
 
 import importlib
 import pkgutil
+import re
 from types import ModuleType
 from typing import get_args
 
@@ -414,3 +417,47 @@ async def ran_fake(
         GateCloseState(…, output=Verdict(verdict="pass"), log=[LogEntry(…), …])
     """
     return await run_graph(graph.build_fake_graph(FakeAnonymizer()), graph.example_state())
+
+
+def prompt_section(
+    prompt:  str,  # np. "# Zadanie\n\nPomagasz…\n\n# Zasady\n\n- NIE ZMYŚLASZ.\n…"
+    heading: str,  # np. "# Anonimizacja"
+) -> str:
+    """
+    Description:
+    Sekcja promptu systemowego pod podanym nagłówkiem `#`, razem z nim, do następnego nagłówka
+    `#` albo do końca promptu. Nagłówki `##` (wzory odpowiedzi) sekcji nie kończą. Prompt bez
+    takiej sekcji daje pusty napis.
+
+    Example args:
+        prompt="# Zadanie\n\nPomagasz…\n\n# Zasady\n\n- NIE ZMYŚLASZ.\n- …"
+        heading="# Zasady"
+
+    Example result:
+        "# Zasady\n\n- NIE ZMYŚLASZ.\n- …"
+    """
+    parts   = [part.strip() for part in re.split(r"\n(?=# )", prompt)]
+    section = next((part for part in parts if part.split("\n", 1)[0] == heading), "")
+
+    return section
+
+
+def prompt_rules(
+    prompt: str,  # np. "# Zasady\n\n- NIE ZMYŚLASZ.\n- Werdykt wydajesz…\n  tekstem.\n\n# …"
+) -> list[str]:
+    """
+    Description:
+    Zasady z sekcji „Zasady" promptu systemowego, punkt po punkcie, każda w jednej linii, bez
+    myślnika. Prompt bez tej sekcji daje pustą listę.
+
+    Example args:
+        prompt="# Zasady\n\n- NIE ZMYŚLASZ.\n- Werdykt wydajesz wyłącznie wywołaniem\n  narzędzia…"
+
+    Example result:
+        ["NIE ZMYŚLASZ.", "Werdykt wydajesz wyłącznie wywołaniem narzędzia…"]
+    """
+    section = prompt_section(prompt, "# Zasady")
+    items   = re.split(r"\n(?=- )", section.split("\n\n", 1)[1]) if section else []
+    rules   = [" ".join(item.split())[2:] for item in items]
+
+    return rules

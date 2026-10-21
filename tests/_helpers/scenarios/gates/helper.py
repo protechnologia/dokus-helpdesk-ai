@@ -120,7 +120,7 @@ def judge_gate_case(
 
     Example result:
         GateOutcome(case=GateCase(case_id="g03", …), answer="block", retries=0,
-                    fields={"verdict": "block", "reasons": […], "missing": [], "hint": "…"})
+                    fields={"verdict": "block", "reasons": […], "hint": "…"})
     """
     # --- brak wyniku: węzeł `respond` nie przyjął odpowiedzi mimo poprawki ---
     if output is None:

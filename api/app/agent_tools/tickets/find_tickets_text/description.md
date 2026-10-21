@@ -22,10 +22,10 @@ zgłoszenie niesie coś, co da się znaleźć słowo w słowo.
 
 # Jak wywoływać
 
-| argument | typ   | co podać                    | przykład          | opis |
-|----------|-------|-----------------------------|-------------------|------|
-| exact    | tekst | fraza wyszukiwana dosłownie | "SQLSTATE[23000]" | Bez odmiany, w podanej kolejności, bez względu na wielkość liter. Nadaje się do kodu błędu, sygnatury, fragmentu komunikatu z ekranu. Przepisz ją bez zmian; co najmniej trzy znaki. |
-| words    | tekst | słowa kluczowe              | "załącznik limit" | Wyszukiwane w dowolnej odmianie i kolejności („załącznik" znajdzie „załączników"); zgłoszenie musi zawierać wszystkie. |
+| argument | typ    | przykłady         | opis |
+|----------|--------|-------------------|------|
+| exact    | string | "SQLSTATE[23000]" | Fraza wyszukiwana dosłownie: bez odmiany, w podanej kolejności, bez względu na wielkość liter. Nadaje się do kodu błędu, sygnatury, fragmentu komunikatu z ekranu. Przepisz ją bez zmian; co najmniej trzy znaki. |
+| words    | string | "załącznik limit" | Słowa kluczowe, wyszukiwane w dowolnej odmianie i kolejności („załącznik" znajdzie „załączników"); zgłoszenie musi zawierać wszystkie. |
 
 Podaj co najmniej jedno pole. Każde szuka osobno, a wyniki się
 sumują: zgłoszenie wraca, gdy zawiera frazę z `exact` albo wszystkie

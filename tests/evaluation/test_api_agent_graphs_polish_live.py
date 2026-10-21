@@ -136,3 +136,19 @@ def test_no_numbers_or_names_are_added(graph: str, outcomes: PolishOutcomesOf) -
         f"{graph}: dopisane fakty — "
         + "; ".join(f"{outcome.case.label}: {outcome.assessment}" for outcome in added)
     )
+
+
+@pytest.mark.parametrize("graph", sorted(SECTIONS))
+def test_every_marker_stays_as_it_is(graph: str, outcomes: PolishOutcomesOf) -> None:
+    """Sprawdza, czy każdy znacznik anonimizacji z notatek stoi w poprawionym tekście tyle samo
+    razy, a każdy napis w klamrach jest znacznikiem albo placeholderem z promptu, bez odmiany.
+
+    Wyłapuje „Popraw”, które gubi znacznik, odmienia go („{IMIENIA}”) albo wstawia w jego miejsce
+    wymyśloną daną: tekst idzie do klienta, a wdrożeniowiec nie wie, którą daną uzupełnić."""
+    broken = [outcome for outcome in outcomes(graph) if outcome.lost_markers or outcome.malformed]
+
+    assert not broken, (
+        f"{graph}: znaczniki — "
+        + ", ".join(f"{outcome.case.case_id}: {outcome.assessment}" for outcome in broken)
+    )
+

@@ -66,7 +66,6 @@ LOG = [
 BLOCK = Verdict(
     verdict = "block",
     reasons = ["Nie widać, co zrobiono."],
-    missing = ["co zrobiono"],
     hint    = "Dopisz, co zmieniono w konfiguracji.",
 )
 

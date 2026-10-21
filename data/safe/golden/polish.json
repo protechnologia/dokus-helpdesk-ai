@@ -8,7 +8,8 @@
       "rules_version: wersja zestawu domyślnego zasad stylu (api/app/core_text/dict_rules_polish.json), pod którą napisano sprawy. Test bierze zasady z tego zestawu, tak jak trasa, i odmawia przy innej wersji.",
       "input: notatki pisane w pośpiechu, bez polskich znaków. Liczby zapisuje się cyframi: liczba słowem w notatkach i cyfrą w tekście wyszłaby jako nowa.",
       "colloquial: rdzenie słów potocznych z notatek, które mają zniknąć. kept: fakty z notatek w postaci bez odmiany (liczby, skróty, nazwy produktów), które mają zostać. tempting: dopiski, których w notatkach nie ma, a które kuszą model (ścieżka menu, termin, dodatkowy krok); żaden nie może trafić do tekstu. Każda sprawa ma słowo potoczne i fakt, a pułapki ma przynajmniej jedna.",
-      "Porównanie nie patrzy na wielkość liter, polskie znaki ani odstępy. Nowa liczba to ciąg cyfr, którego nie ma w notatkach; numer listy na początku linii się nie liczy, bo zasady stylu każą pisać kroki listą numerowaną."
+      "Porównanie nie patrzy na wielkość liter, polskie znaki ani odstępy. Nowa liczba to ciąg cyfr, którego nie ma w notatkach; numer listy na początku linii się nie liczy, bo zasady stylu każą pisać kroki listą numerowaną.",
+      "Sprawa ze znacznikami anonimizacji (s05; 2026-10-21): notatki ze zmyślonymi danymi osobowymi przepuszczone przez usługę anonymizer (silnik agent). Każdy znacznik z notatek ma stać w tekście tyle samo razy, bez odmiany i bez zmiany liter; napis w klamrach, który nie jest znacznikiem ani placeholderem z promptu, to błąd."
     ]
   },
   "polish": {
@@ -45,6 +46,14 @@
         "colloquial": ["wywala", "cacy"],
         "kept": ["5 MB", "12 MB", "ePUAP"],
         "tempting": ["rozdzielczo", "skan", "acrobat"]
+      },
+      {
+        "id": "s05",
+        "phenomenon": "znaczniki anonimizacji w notatkach",
+        "input": "dzwonila p. {IMIĘ} {NAZWISKO} z urzedu (tel {TELEFON}), pisma do {IMIĘ} {NAZWISKO} juz ida, adres do doreczen mu poprawilismy w kartotece, jakby znowu cos to niech pisze na {EMAIL}",
+        "colloquial": ["jakby"],
+        "kept": ["kartote"],
+        "tempting": ["kontrahen"]
       }
     ]
   }

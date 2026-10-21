@@ -9,7 +9,8 @@
       "cases: rule to numer reguły w zestawie, od 1. kind: breaks — wejście łamie tę regułę i tylko ją (werdykt block); correct — bliźniak łamiącego, różny tylko fragmentem, który łamał (pass); trap — wejście poprawne, które wygląda na łamiące, bo niesie słowo albo zwrot kojarzony z regułą (pass). Każda reguła ma wszystkie trzy rodzaje.",
       "Zły werdykt na correct albo trap to fałszywy alarm, na breaks przepuszczenie; liczą się osobno, bo fałszywy alarm uczy wdrożeniowców klikać furtkę odruchowo. Odpowiedź, której węzeł respond nie przyjął, liczy się osobno: helpdesk dostaje wtedy 503 i decyduje sam.",
       "W gate_reply wejściem jest wiadomość do klienta. Każda, poza łamiącą regułę o formie zwrotu, zwraca się do klienta formą „Państwo”, i każda kończy się podpisem zespołu: łamiąca ma łamać jedną regułę.",
-      "W gate_close wejściem jest zgłoszenie z wątkiem w kształcie RawTicket.as_thread(), zamykane komentarzem typu rozwiazanie. Pułapka stawia problem albo to, co zrobiono, w wątku, a nie tam, gdzie się tego szuka: opis jest ogólnikowy, a problem podaje klient w odpowiedzi na pytanie konsultanta, albo komentarz zamykający to formułka, a krok, który rozwiązał sprawę, opisał klient."
+      "W gate_close wejściem jest zgłoszenie z wątkiem w kształcie RawTicket.as_thread(), zamykane komentarzem typu rozwiazanie. Pułapka stawia problem albo to, co zrobiono, w wątku, a nie tam, gdzie się tego szuka: opis jest ogólnikowy, a problem podaje klient w odpowiedzi na pytanie konsultanta, albo komentarz zamykający to formułka, a krok, który rozwiązał sprawę, opisał klient.",
+      "Sprawy ze znacznikami anonimizacji (z07–z08, g10–g11; 2026-10-21): tekst ze zmyślonymi danymi osobowymi przepuszczony przez usługę anonymizer (silnik agent), więc znaczniki stoją tak, jak wstawia je anonimizator. Pułapka ma znacznik w miejscu danej, od której zależy reguła (nowy adres do doręczeń, konto użytkownika), i ma przejść; łamiąca to ten sam tekst bez tego, czego wymaga reguła, i ma zostać zablokowana. Znacznik przekręcony w uzasadnieniu albo wskazówce werdyktu to błąd."
     ]
   },
   "gate_reply": {
@@ -68,6 +69,18 @@
         "rule": 3,
         "kind": "trap",
         "input": "Dzień dobry,\n\npo kliknięciu przycisku „Podpisz” pojawi się okno z poleceniem „Wybierz certyfikat i kliknij Dalej”. Prosimy Państwa o wybranie w nim certyfikatu kwalifikowanego, a nie certyfikatu służącego do logowania.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g10",
+        "rule": 1,
+        "kind": "trap",
+        "input": "Dzień dobry,\n\nkonto użytkownika {EMAIL} zostało odblokowane. Pani {IMIĘ} {NAZWISKO} może zalogować się dotychczasowym hasłem; prosimy Państwa, aby hasła nie przesyłać w wiadomościach. W razie pytań prosimy o kontakt pod numerem {TELEFON}.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g11",
+        "rule": 1,
+        "kind": "breaks",
+        "input": "Dzień dobry,\n\naby odblokować konto użytkownika {EMAIL}, prosimy Państwa o przesłanie w odpowiedzi aktualnego hasła Pani {IMIĘ} {NAZWISKO}. W razie pytań prosimy o kontakt pod numerem {TELEFON}.\n\nZ poważaniem\nZespół wsparcia Dokus"
       }
     ]
   },
@@ -109,6 +122,18 @@
         "rule": 2,
         "kind": "trap",
         "input": "ZGŁOSZENIE 90406 z 2026-10-07\nTemat: Brak przycisku „Wyślij do ePUAP”\n\nOPIS ZGŁASZAJĄCEGO:\nPo aktualizacji z 1 października w karcie pisma wychodzącego nie ma przycisku „Wyślij do ePUAP”. Pozostałe przyciski są widoczne.\n\nKOMENTARZ 1 — konsultant, 2026-10-07 11:40:00 (typ: zwyczajny):\nCzy przycisk pojawia się po wyczyszczeniu pamięci podręcznej przeglądarki skrótem CTRL+F5?\n\nKOMENTARZ 2 — klient, 2026-10-07 12:55:00 (typ: zwyczajny):\nTak, po wyczyszczeniu pamięci podręcznej skrótem CTRL+F5 przycisk wrócił na wszystkich stanowiskach.\n\nKOMENTARZ 3 — konsultant, 2026-10-07 13:15:00 (typ: rozwiazanie):\nDziękujemy za informację. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z07",
+        "rule": 2,
+        "kind": "trap",
+        "input": "ZGŁOSZENIE 90407 z 2026-10-08\nTemat: Pisma wracają z e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nPisma wysyłane do Pana {IMIĘ} {NAZWISKO} wracają z e-Doręczeń z komunikatem „Adres nieaktywny”. Kontakt do mnie: {IMIĘ} {NAZWISKO}, tel. {TELEFON}.\n\nKOMENTARZ 1 — konsultant, 2026-10-08 11:40:00 (typ: rozwiazanie):\nAdresat zmienił adres do doręczeń elektronicznych na {ADRES_EDOR}, a w kartotece kontrahenta stał stary adres. Wpisaliśmy nowy adres w kartotece {IMIĘ} {NAZWISKO} (Kontrahenci → Adresy do doręczeń) i ponowiliśmy wysyłkę jednego pisma testowo — doszło. Ustaliłem to telefonicznie z Panią {IMIĘ} {NAZWISKO}. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z08",
+        "rule": 2,
+        "kind": "breaks",
+        "input": "ZGŁOSZENIE 90408 z 2026-10-08\nTemat: Pisma wracają z e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nPisma wysyłane do Pana {IMIĘ} {NAZWISKO} wracają z e-Doręczeń z komunikatem „Adres nieaktywny”. Kontakt do mnie: {IMIĘ} {NAZWISKO}, tel. {TELEFON}.\n\nKOMENTARZ 1 — konsultant, 2026-10-08 11:40:00 (typ: rozwiazanie):\nRozmawiałem telefonicznie z Panią {IMIĘ} {NAZWISKO}, temat wyjaśniony. Zamykam zgłoszenie."
       }
     ]
   }

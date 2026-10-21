@@ -20,10 +20,10 @@ dosłownym brzmieniu i po słowach kluczowych, nie po znaczeniu.
 
 # Jak wywoływać
 
-| argument | typ   | co podać                    | przykład          | opis |
-|----------|-------|-----------------------------|-------------------|------|
-| exact    | tekst | fraza wyszukiwana dosłownie | "Przekaż bufor"   | Bez odmiany, w podanej kolejności, bez względu na wielkość liter. Nadaje się do nazwy opcji lub przycisku, komunikatu, kodu. Przepisz ją bez zmian; co najmniej trzy znaki. |
-| words    | tekst | słowa kluczowe              | "limit załącznik" | Wyszukiwane w dowolnej odmianie i kolejności; sekcja musi zawierać wszystkie. Nadaje się do zagadnienia nazwanego kilkoma słowami. |
+| argument | typ    | przykłady         | opis |
+|----------|--------|-------------------|------|
+| exact    | string | "Przekaż bufor"   | Fraza wyszukiwana dosłownie: bez odmiany, w podanej kolejności, bez względu na wielkość liter. Nadaje się do nazwy opcji lub przycisku, komunikatu, kodu. Przepisz ją bez zmian; co najmniej trzy znaki. |
+| words    | string | "limit załącznik" | Słowa kluczowe, wyszukiwane w dowolnej odmianie i kolejności; sekcja musi zawierać wszystkie. Nadaje się do zagadnienia nazwanego kilkoma słowami. |
 
 Podaj co najmniej jedno pole. Każde szuka osobno, a wyniki się
 sumują: sekcja wraca, gdy zawiera frazę z `exact` albo wszystkie

@@ -9,7 +9,7 @@ class VerdictResponse(BaseModel):
     """
     Description:
     Odpowiedź obu bramek (`/gate/close`, `/gate/reply`) — jeden kształt, więc wołający pisze jedną
-    obsługę. Werdykt jest danymi, nie prozą: `missing` helpdesk pokazuje jako listę we własnym UI.
+    obsługę. Werdykt jest danymi, nie prozą: `reasons` helpdesk pokazuje jako listę we własnym UI.
 
     `overridable` jest zawsze `true`: furtka dla człowieka jest częścią kontraktu, nie obejściem
     (zasada 10), a blokadę egzekwuje helpdesk, nie my (zasada 11). `rules_version` mówi, którą
@@ -18,7 +18,6 @@ class VerdictResponse(BaseModel):
 
     verdict:       Literal["pass", "block"] = Field(examples=["block"])
     reasons:       list[str]                = Field(default_factory=list, examples=[["Brak."]])
-    missing:       list[str]                = Field(default_factory=list, examples=[["przyczyna"]])
     hint:          str                      = Field(default="", examples=["Dopisz, co zmieniono."])
     overridable:   bool                     = Field(default=True, examples=[True])
     rules_version: int                      = Field(examples=[1])

@@ -6,7 +6,7 @@
  * | graf                       | zakładka pokazuje                                        |
  * |----------------------------|----------------------------------------------------------|
  * | `search`, `suggest`        | uwagi dla wdrożeniowca (Markdown: `##` i listy)          |
- * | `gate_close`, `gate_reply` | werdykt z zestawem reguł, powody, braki, co dopisać      |
+ * | `gate_close`, `gate_reply` | werdykt z zestawem reguł, powody, co dopisać             |
  * | `parse_ticket`             | kartę zgłoszenia pole po polu                            |
  * | `polish`                   | informację, że poprawiony tekst stoi w „Dla klienta"     |
  *
@@ -19,7 +19,7 @@
  * - Zakładka dostaje sam wynik: przebieg w toku, zakończony błędem i stan przed pierwszym
  *   przebiegiem pokazuje `AnswerPanel.tsx` zamiast zakładek.
  * - Werdykt bramki ma u góry jedną ramkę: czy blokuje, czy przepuszcza, i który zestaw reguł
- *   go wydał. Powody, braki i to, co dopisać, stoją pod nią jako zwykłe sekcje, jednakowe.
+ *   go wydał. Powody i to, co dopisać, stoją pod nią jako zwykłe sekcje, jednakowe.
  */
 
 import { Alert, Descriptions, Empty, List, Space, Tag, Typography } from "antd";
@@ -115,16 +115,15 @@ function NotesView({ notes }: { notes: string }) {
 /**
  * Description:
  * Werdykt bramki: u góry ramka z rozstrzygnięciem i zestawem reguł, który je wydał, pod nią
- * powody, braki i to, co dopisać — jednakowymi sekcjami — oraz informacja, że werdykt można
- * świadomie obejść (zasada 10 w CLAUDE.md).
+ * powody i to, co dopisać — jednakowymi sekcjami. Tego, że werdykt da się obejść, zakładka nie
+ * powtarza: to kontrakt z helpdeskiem (`overridable`), a nie informacja dla oglądającego pokaz.
  *
  * Example args:
- *     verdict={ verdict: "block", reasons: ["Nie widać, co zrobiono."], missing: ["co zrobiono"],
+ *     verdict={ verdict: "block", reasons: ["Nie widać, co zrobiono."],
  *               hint: "Dopisz, co zrobiono.", rules_version: 1, … }
  *
  * Example result:
- *     <Space> z ramką „Blokuje — zestaw reguł nr 1" i sekcjami „Dlaczego", „Czego brakuje",
- *     „Co dopisać"
+ *     <Space> z ramką „Blokuje — zestaw reguł nr 1" i sekcjami „Dlaczego" i „Co dopisać"
  */
 function VerdictView({ verdict }: { verdict: VerdictResponse }) {
     const blocks = verdict.verdict === "block";
@@ -137,27 +136,21 @@ function VerdictView({ verdict }: { verdict: VerdictResponse }) {
                 title={`${blocks ? "Blokuje" : "Przepuszcza"} — zestaw reguł nr ${verdict.rules_version}`}
             />
             {verdict.reasons.length > 0 && <Bullets title="Dlaczego" items={verdict.reasons} />}
-            {verdict.missing.length > 0 && <Bullets title="Czego brakuje" items={verdict.missing} />}
             {verdict.hint !== "" && <Bullets title="Co dopisać" items={[verdict.hint]} />}
-            {verdict.overridable && (
-                <Typography.Text type="secondary">
-                    Werdykt to opinia, nie blokada: helpdesk pozwala go świadomie obejść.
-                </Typography.Text>
-            )}
         </Space>
     );
 }
 
 /**
  * Description:
- * Sekcja werdyktu: nagłówek i punkty — powody, braki i to, co dopisać.
+ * Sekcja werdyktu: nagłówek i punkty — powody albo to, co dopisać.
  *
  * Example args:
- *     title="Czego brakuje"
- *     items=["co zrobiono"]
+ *     title="Dlaczego"
+ *     items=["Nie widać, co zrobiono."]
  *
  * Example result:
- *     <List> z nagłówkiem „Czego brakuje" i jednym punktem
+ *     <List> z nagłówkiem „Dlaczego" i jednym punktem
  */
 function Bullets({ title, items }: { title: string; items: string[] }) {
     return (

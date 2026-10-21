@@ -19,9 +19,9 @@ treści albo z wyszukiwania.
 
 # Jak wywoływać
 
-| argument    | typ           | co podać              | przykład                                  | opis |
-|-------------|---------------|-----------------------|-------------------------------------------|------|
-| section_ids | lista tekstów | identyfikatory sekcji | ["usr-odswiezanie", "adm-role-i-profile"] | Od jednego do pięciu identyfikatorów, dokładnie w brzmieniu z pola `section_id`. Nieznany identyfikator kończy się błędem, bez wyniku częściowego. |
+| argument    | typ      | przykłady                                 | opis |
+|-------------|----------|-------------------------------------------|------|
+| section_ids | string[] | ["usr-odswiezanie", "adm-role-i-profile"] | Od jednego do pięciu identyfikatorów, dokładnie w brzmieniu z pola `section_id`. Nieznany identyfikator kończy się błędem, bez wyniku częściowego. |
 
 # Co zwraca
 

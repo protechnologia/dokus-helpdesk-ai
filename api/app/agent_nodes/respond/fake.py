@@ -22,7 +22,7 @@ class FakeRespondNode(RespondNodeBase):
 
     def __init__(
         self,
-        output: BaseModel,  # np. Verdict(verdict="pass", reasons=[], missing=[], hint="")
+        output: BaseModel,  # np. Verdict(verdict="pass", reasons=[], hint="")
     ):
         """
         Description:

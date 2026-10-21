@@ -18,15 +18,14 @@ def test_the_verdict_goes_out_field_by_field(
     graph: ModuleType,  # wstrzykiwane przez pytest z listy GATES wyżej
 ) -> None:
     """Sprawdza, czy odpowiedź bramki złożona ze stanu końcowego jej grafu niesie werdykt pole po
-    polu — rozstrzygnięcie, uzasadnienie, braki i wskazówkę — dla obu bramek tak samo.
+    polu — rozstrzygnięcie, uzasadnienie i wskazówkę — dla obu bramek tak samo.
 
-    Wyłapuje mapowanie, które gubi albo przestawia pole werdyktu: helpdesk pokazuje braki
+    Wyłapuje mapowanie, które gubi albo przestawia pole werdyktu: helpdesk pokazuje uzasadnienie
     i wskazówkę we własnym UI, a blokada bez nich to samo „nie" (zasada 10)."""
     response = to_verdict_response(final_state(graph, output=BLOCK), rules_version=1)
 
     assert response.verdict == BLOCK.verdict
     assert response.reasons == BLOCK.reasons
-    assert response.missing == BLOCK.missing
     assert response.hint    == BLOCK.hint
 
 

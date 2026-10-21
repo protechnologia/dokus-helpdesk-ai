@@ -41,11 +41,10 @@ from app.core_model.graphs.proposal import Proposal
 from app.core_model.graphs.verdict import Verdict
 from app.engine_llm import ChatMessage, LLMUsage
 
-# Werdykt bramki inny niż domyślny: blokada z uzasadnieniem, brakiem i wskazówką.
+# Werdykt bramki inny niż domyślny: blokada z uzasadnieniem i wskazówką.
 BLOCK = Verdict(
     verdict = "block",
     reasons = ["Nie widać, co było przyczyną."],
-    missing = ["przyczyna"],
     hint    = "Dopisz, dlaczego usługa stanęła.",
 )
 

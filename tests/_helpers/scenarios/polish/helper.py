@@ -51,6 +51,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from tests._helpers.markers import lost_markers, malformed_markers
 from tests._helpers.scenarios.polish.constants import (
     EXTRA_LETTERS,
     LIST_NUMBER,
@@ -194,14 +195,16 @@ def judge_polish_case(
     text   = plain(fields["text"])
 
     outcome = PolishOutcome(
-        case        = case,
-        rejected    = False,
-        colloquial  = tuple(word for word in case.colloquial if plain(word) in text),
-        lost        = tuple(fact for fact in case.kept if plain(fact) not in text),
-        new_numbers = tuple(sorted(numbers(fields["text"]) - numbers(case.text), key=int)),
-        added       = tuple(word for word in case.tempting if plain(word) in text),
-        retries     = retries,
-        fields      = fields,
+        case         = case,
+        rejected     = False,
+        colloquial   = tuple(word for word in case.colloquial if plain(word) in text),
+        lost         = tuple(fact for fact in case.kept if plain(fact) not in text),
+        new_numbers  = tuple(sorted(numbers(fields["text"]) - numbers(case.text), key=int)),
+        added        = tuple(word for word in case.tempting if plain(word) in text),
+        retries      = retries,
+        fields       = fields,
+        lost_markers = tuple(lost_markers(case.text, fields["text"])),
+        malformed    = tuple(malformed_markers(fields["text"])),
     )
 
     return outcome

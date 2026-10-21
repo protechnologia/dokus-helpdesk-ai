@@ -9,14 +9,16 @@ from tests._helpers.scenarios.polish.models.polish_case import PolishCase
 class PolishOutcome:
     """Ocena jednej sprawy „Popraw”."""
 
-    case:        PolishCase         # sprawa, której dotyczy ocena
-    rejected:    bool               # węzeł `respond` nie przyjął odpowiedzi mimo poprawki
-    colloquial:  tuple[str, ...]    # słowa potoczne, które zostały w tekście
-    lost:        tuple[str, ...]    # fakty z notatek, których w tekście nie ma
-    new_numbers: tuple[str, ...]    # liczby z tekstu, których nie ma w notatkach
-    added:       tuple[str, ...]    # pułapki, które trafiły do tekstu
-    retries:     int                # poprawki odpowiedzi od węzła `respond`
-    fields:      Mapping[str, Any]  # pola wyniku do raportu; puste, gdy wyniku nie ma
+    case:         PolishCase              # sprawa, której dotyczy ocena
+    rejected:     bool                    # węzeł `respond` nie przyjął odpowiedzi mimo poprawki
+    colloquial:   tuple[str, ...]         # słowa potoczne, które zostały w tekście
+    lost:         tuple[str, ...]         # fakty z notatek, których w tekście nie ma
+    new_numbers:  tuple[str, ...]         # liczby z tekstu, których nie ma w notatkach
+    added:        tuple[str, ...]         # pułapki, które trafiły do tekstu
+    retries:      int                     # poprawki odpowiedzi od węzła `respond`
+    fields:       Mapping[str, Any]       # pola wyniku do raportu; puste, gdy wyniku nie ma
+    lost_markers: tuple[str, ...] = ()    # znaczniki z notatek, których w tekście jest mniej
+    malformed:    tuple[str, ...] = ()    # napisy w klamrach spoza znaczników i placeholderów
 
     @property
     def assessment(self) -> str:
@@ -37,10 +39,12 @@ class PolishOutcome:
         problems = [
             f"{name}: {', '.join(found)}"
             for name, found in (
-                ("potoczne",    self.colloquial),
-                ("zgubione",    self.lost),
-                ("nowe liczby", self.new_numbers),
-                ("dopisane",    self.added),
+                ("potoczne",              self.colloquial),
+                ("zgubione",              self.lost),
+                ("nowe liczby",           self.new_numbers),
+                ("dopisane",              self.added),
+                ("zgubione znaczniki",    self.lost_markers),
+                ("przekręcone znaczniki", self.malformed),
             )
             if found
         ]

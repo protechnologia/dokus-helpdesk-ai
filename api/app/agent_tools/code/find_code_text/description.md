@@ -30,11 +30,11 @@ błędu: wynik mówi, w których plikach i liniach kodu ten tekst stoi.
 
 # Jak wywoływać
 
-| argument | typ   | co podać                    | przykład                   | opis |
-|----------|-------|-----------------------------|----------------------------|------|
-| exact    | tekst | fraza wyszukiwana dosłownie | "Brak sekwencji numeracji" | W podanej kolejności, bez względu na wielkość liter. Cała fraza musi stać w jednej linii kodu. Przepisz ją bez zmian; co najmniej trzy znaki. |
-| words    | tekst | słowa oddzielone spacją     | "sekwencji numeracji"      | Linia kodu musi zawierać wszystkie, w dowolnej kolejności, bez względu na wielkość liter. Bez odmiany: słowo jest szukane jako ciąg znaków („limit" znajdzie „limitu", ale nie odwrotnie). Co najmniej jedno słowo ma mieć trzy znaki. |
-| path     | tekst | katalog albo plik           | "src/web/js"               | Opcjonalne zawężenie: szuka tylko w tym katalogu z podkatalogami albo w tym pliku. Ścieżka względem katalogu głównego kodu; ścieżka spoza kodu albo taka, której nie ma, kończy się błędem. |
+| argument | typ    | przykłady                  | opis |
+|----------|--------|----------------------------|------|
+| exact    | string | "Brak sekwencji numeracji" | Fraza wyszukiwana dosłownie, w podanej kolejności, bez względu na wielkość liter. Cała fraza musi stać w jednej linii kodu. Przepisz ją bez zmian; co najmniej trzy znaki. |
+| words    | string | "sekwencji numeracji"      | Słowa oddzielone spacją. Linia kodu musi zawierać wszystkie, w dowolnej kolejności, bez względu na wielkość liter. Bez odmiany: słowo jest szukane jako ciąg znaków („limit" znajdzie „limitu", ale nie odwrotnie). Co najmniej jedno słowo ma mieć trzy znaki. |
+| path     | string | "src/web/js"               | Opcjonalne zawężenie: szuka tylko w tym katalogu z podkatalogami albo w tym pliku. Ścieżka względem katalogu głównego kodu; ścieżka spoza kodu albo taka, której nie ma, kończy się błędem. |
 
 Podaj `exact`, `words` albo oba. Każde szuka osobno, a wyniki się
 sumują: linia wraca, gdy zawiera frazę z `exact` albo wszystkie

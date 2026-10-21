@@ -30,12 +30,12 @@ jest.
 
 # Jak wywoływać
 
-| argument  | typ    | co podać                 | przykład                                      | opis |
-|-----------|--------|--------------------------|-----------------------------------------------|------|
-| path      | tekst  | ścieżka pliku            | "src/lib/Urzad/Numeracja/GeneratorNumeru.php" | Ścieżka pliku w kodzie aplikacji, względem jego katalogu głównego. Ścieżka spoza kodu, katalog albo plik, którego nie ma, kończy się błędem. |
-| from_line | liczba | pierwsza linia fragmentu | 17                                            | Numer linii w pliku, liczony od 1. |
-| to_line   | liczba | ostatnia linia fragmentu | 19                                            | Nie mniejszy niż `from_line`. Fragment ma najwyżej 40 linii; linia spoza pliku kończy się błędem. |
-| role      | tekst  | rola cytowania           | "cause"                                       | `cause`: ten fragment powoduje zachowanie opisane w zgłoszeniu. `excluded`: fragment sprawdzony i wykluczony jako przyczyna. |
+| argument  | typ     | przykłady                                     | opis |
+|-----------|---------|-----------------------------------------------|------|
+| path      | string  | "src/lib/Urzad/Numeracja/GeneratorNumeru.php" | Ścieżka pliku w kodzie aplikacji, względem jego katalogu głównego. Ścieżka spoza kodu, katalog albo plik, którego nie ma, kończy się błędem. |
+| from_line | integer | 17                                            | Pierwsza linia fragmentu: numer linii w pliku, liczony od 1. |
+| to_line   | integer | 19                                            | Ostatnia linia fragmentu, nie mniejsza niż `from_line`. Fragment ma najwyżej 40 linii; linia spoza pliku kończy się błędem. |
+| role      | string  | "cause", "excluded"                           | `cause`: ten fragment powoduje zachowanie opisane w zgłoszeniu. `excluded`: fragment sprawdzony i wykluczony jako przyczyna. |
 
 # Co zwraca
 

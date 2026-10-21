@@ -140,7 +140,6 @@ def test_the_verdict_goes_out_with_the_override_and_the_rules_version(
     assert answer == {
         "verdict":       "block",
         "reasons":       ["Nie widać, co zrobiono."],
-        "missing":       [],
         "hint":          "Dopisz, co zmieniono.",
         "overridable":   True,
         "rules_version": get_rule_set(graph_name).version,

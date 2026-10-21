@@ -92,12 +92,10 @@ def test_the_report_counts_per_gate_and_per_rule_and_prints_whole_verdicts() -> 
         "    1-breaks reguła 1, łamie: zgodny; poprawek 0",
         "        verdict: block",
         '        reasons: ["Prośba o hasło."]',
-        "        missing: []",
         "        hint: Usuń prośbę o hasło.",
         "    1-trap reguła 1, pułapka: FAŁSZYWY ALARM; poprawek 0",
         "        verdict: block",
         '        reasons: ["Prośba o hasło."]',
-        "        missing: []",
         "        hint: Usuń prośbę o hasło.",
         "    2-breaks reguła 2, łamie: ODPOWIEDŹ NIE DO PRZYJĘCIA; poprawek 1",
     ]
@@ -123,5 +121,5 @@ def test_an_outcome_keeps_itsgate_case() -> None:
         case    = case,
         answer  = "pass",
         retries = 1,
-        fields  = {"verdict": "pass", "reasons": [], "missing": [], "hint": ""},
+        fields  = {"verdict": "pass", "reasons": [], "hint": ""},
     )

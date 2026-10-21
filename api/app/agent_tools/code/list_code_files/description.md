@@ -27,10 +27,10 @@ zobaczyć, co leży obok znalezionego pliku.
 
 # Jak wywoływać
 
-| argument | typ    | co podać             | przykład                | opis |
-|----------|--------|----------------------|-------------------------|------|
-| path     | tekst  | ścieżka katalogu     | "src/lib/Urzad/Wysylka" | Opcjonalna. Ścieżka katalogu w kodzie aplikacji, względem jego katalogu głównego; bez niej dostajesz spis katalogu głównego. Ścieżka spoza kodu, plik albo katalog, którego nie ma, kończy się błędem. |
-| depth    | liczba | ile poziomów pokazać | 2                       | Opcjonalna, domyślnie 2. Przy 1 dostajesz sam katalog, przy 2 także zawartość jego podkatalogów, i tak dalej. |
+| argument | typ     | przykłady               | opis |
+|----------|---------|-------------------------|------|
+| path     | string  | "src/lib/Urzad/Wysylka" | Opcjonalna. Ścieżka katalogu w kodzie aplikacji, względem jego katalogu głównego; bez niej dostajesz spis katalogu głównego. Ścieżka spoza kodu, plik albo katalog, którego nie ma, kończy się błędem. |
+| depth    | integer | 2                       | Opcjonalna: ile poziomów pokazać, domyślnie 2. Przy 1 dostajesz sam katalog, przy 2 także zawartość jego podkatalogów, i tak dalej. |
 
 Bez argumentów prosisz o dwa poziomy od katalogu głównego kodu.
 

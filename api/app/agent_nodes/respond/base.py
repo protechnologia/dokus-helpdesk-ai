@@ -18,7 +18,7 @@ class RespondNodeBase(Node):
 
     def output_update(
         self,
-        output: BaseModel,  # np. Verdict(verdict="pass", reasons=[], missing=[], hint="")
+        output: BaseModel,  # np. Verdict(verdict="pass", reasons=[], hint="")
     ) -> dict[str, Any]:
         """
         Description:

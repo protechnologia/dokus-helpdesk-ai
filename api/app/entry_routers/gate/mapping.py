@@ -30,7 +30,6 @@ def to_verdict_response(
     response = VerdictResponse(
         verdict       = verdict.verdict,
         reasons       = verdict.reasons,
-        missing       = verdict.missing,
         hint          = verdict.hint,
         rules_version = rules_version,
         usage         = to_usage_item(final.usage),

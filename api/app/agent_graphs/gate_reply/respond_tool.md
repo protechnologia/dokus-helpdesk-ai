@@ -5,14 +5,33 @@
      reguły wysyłki, nie braki w opisie. Dlatego każdy graf ma własny opis. Szkielet z p. 5;
      treść stroi się z promptem w p. 22.
 
+     Układ jak w opisach narzędzi agenta: cztery sekcje, argumenty w tabelce, linie do 70 znaków;
+     dłuższe bywają tylko wiersze tabelki. „Co zwraca" jest bez tabelki, bo narzędzie nic modelowi
+     nie oddaje. Sekcji pilnuje test kontraktu grafów. Przykład w tabelce model może przepisać —
+     czy to robi, liczy pomiar w p. 22.
+
      Komentarze redakcyjne jak ten są wycinane przed wysłaniem. -->
-Wydaje werdykt bramki wysyłki. Wywołaj je raz, po ocenie wiadomości, jako jedyne wywołanie
-w turze.
+# Do czego służy
 
-- `verdict` — `"pass"`, gdy wiadomość nie łamie żadnej reguły wysyłki; inaczej `"block"`.
-- `reasons` — po jednym zdaniu na każdą złamaną regułę, z fragmentem wiadomości, który ją łamie.
-- `missing` — krótkie nazwy tego, czego wiadomości brakuje, jeśli reguła czegoś wymaga.
-- `hint` — jedno-dwa zdania dla wdrożeniowca: co zmienić, żeby wiadomość mogła wyjść.
+Oddaje werdykt bramki wysyłki: czy wiadomość może wyjść do klienta,
+a jeśli nie, to którą regułę łamie i co zmienić. Werdykt widzi
+wdrożeniowiec, który wysyła wiadomość.
 
-Przy `"block"` pola `reasons` i `hint` są obowiązkowe. Przy `"pass"` zostaw `missing` i `hint`
-puste.
+# Jak wywoływać
+
+| argument | typ      | przykłady                                               | opis |
+|----------|----------|---------------------------------------------------------|------|
+| verdict  | string   | "pass", "block"                                         | `"pass"`, gdy wiadomość nie łamie żadnej reguły wysyłki; inaczej `"block"`. |
+| reasons  | string[] | ["Prośba „proszę podać hasło” łamie regułę o hasłach."] | Po jednym zdaniu na każdą złamaną regułę, z fragmentem wiadomości, który ją łamie. |
+| hint     | string   | "Usuń prośbę o hasło."                                  | Jedno–dwa zdania dla wdrożeniowca: co zmienić, żeby wiadomość mogła wyjść. |
+
+# Co zwraca
+
+Nic: wywołanie kończy ocenę. Werdykt, który łamie zasady niżej,
+wraca jako błąd do poprawki.
+
+# Zasady
+
+- Wywołaj raz, po ocenie wiadomości, jako jedyne wywołanie w turze.
+- Przy `"block"` pola `reasons` i `hint` są obowiązkowe.
+- Przy `"pass"` zostaw `hint` pusty.

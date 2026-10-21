@@ -4,8 +4,8 @@
  * żądanie bramki wysyłki — przepisane z `api/app/entry_routers/gate/models.py`.
  *
  * Kto czyta:
- * - `VerdictResponse` — `pages/panels/NotesTab.tsx` (zakładka „Dla wdrożeniowca"): werdykt, braki,
- *   wskazówka i informacja, że werdykt można obejść.
+ * - `VerdictResponse` — `pages/panels/NotesTab.tsx` (zakładka „Dla wdrożeniowca"): werdykt, powody
+ *   i wskazówka.
  * - `GateReplyRequest` — `pages/App.tsx` wysyła w nim treść z zakładki „Dla klienta" po kliknięciu
  *   „Sprawdź przed wysyłką".
  */
@@ -22,7 +22,6 @@ export interface GateReplyRequest {
 export interface VerdictResponse {
     verdict:       "pass" | "block";
     reasons:       string[];  // np. ["Nie widać, co zrobiono."]
-    missing:       string[];  // np. ["co zrobiono"]
     hint:          string;    // np. "Dopisz, co zmieniono."
     overridable:   boolean;   // zawsze true
     rules_version: number;    // np. 1

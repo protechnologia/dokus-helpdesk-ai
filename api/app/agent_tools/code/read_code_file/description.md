@@ -25,11 +25,11 @@ funkcji ona leży i przy jakim warunku kod do niej dochodzi.
 
 # Jak wywoływać
 
-| argument  | typ    | co podać               | przykład                                      | opis |
-|-----------|--------|------------------------|-----------------------------------------------|------|
-| path      | tekst  | ścieżka pliku          | "src/lib/Urzad/Numeracja/GeneratorNumeru.php" | Ścieżka pliku w kodzie aplikacji, względem jego katalogu głównego, w brzmieniu z wyniku szukania. Ścieżka spoza kodu, katalog albo plik, którego nie ma, kończy się błędem. |
-| from_line | liczba | pierwsza linia zakresu | 10                                            | Opcjonalna. Numer linii w pliku, liczony od 1; bez niej odczyt zaczyna się od pierwszej linii. Linia za końcem pliku kończy się błędem. |
-| to_line   | liczba | ostatnia linia zakresu | 60                                            | Opcjonalna. Nie mniejsza niż `from_line`; bez niej odczyt idzie do końca pliku. Linia za końcem pliku nie jest błędem: dostajesz linie do końca pliku. |
+| argument  | typ     | przykłady                                     | opis |
+|-----------|---------|-----------------------------------------------|------|
+| path      | string  | "src/lib/Urzad/Numeracja/GeneratorNumeru.php" | Ścieżka pliku w kodzie aplikacji, względem jego katalogu głównego, w brzmieniu z wyniku szukania. Ścieżka spoza kodu, katalog albo plik, którego nie ma, kończy się błędem. |
+| from_line | integer | 10                                            | Opcjonalna. Pierwsza linia zakresu: numer linii w pliku, liczony od 1; bez niej odczyt zaczyna się od pierwszej linii. Linia za końcem pliku kończy się błędem. |
+| to_line   | integer | 60                                            | Opcjonalna. Ostatnia linia zakresu, nie mniejsza niż `from_line`; bez niej odczyt idzie do końca pliku. Linia za końcem pliku nie jest błędem: dostajesz linie do końca pliku. |
 
 Bez `from_line` i `to_line` prosisz o cały plik.
 

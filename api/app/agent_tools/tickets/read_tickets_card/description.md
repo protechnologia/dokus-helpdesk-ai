@@ -24,9 +24,9 @@ streszczenie sprawy.
 
 # Jak wywoływać
 
-| argument   | typ           | co podać        | przykład           | opis |
-|------------|---------------|-----------------|--------------------|------|
-| ticket_ids | lista tekstów | numery zgłoszeń | ["90001", "90003"] | Od jednego do dwudziestu numerów, dokładnie w brzmieniu z pola `ticket_id`. |
+| argument   | typ      | przykłady          | opis |
+|------------|----------|--------------------|------|
+| ticket_ids | string[] | ["90001", "90003"] | Od jednego do dwudziestu numerów, dokładnie w brzmieniu z pola `ticket_id`. |
 
 # Co zwraca
 

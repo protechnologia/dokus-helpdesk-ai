@@ -8,10 +8,14 @@ testy importują wszystko z pakietu, a próbki z ich modułu.
 """
 
 from tests._helpers.graphs.constants import (
+    ANONYMIZATION_HEADING,
     ANONYMIZED,
+    DATA_HEADING,
     GRAPHS_PACKAGE,
     TOOL_NAME_IN_PROMPT,
+    WITHOUT_DESCRIPTION_LAYOUT,
     WITHOUT_MARKERS_PARAGRAPH,
+    WITHOUT_PROMPT_SECTIONS,
 )
 from tests._helpers.graphs.helper import (
     allowed_tools,
@@ -30,15 +34,19 @@ from tests._helpers.graphs.helper import (
     has_sources,
     output_fields,
     output_types,
+    prompt_rules,
+    prompt_section,
     ran_fake,
     streamed_fake,
 )
 
 __all__ = [
     "allowed_tools",
+    "ANONYMIZATION_HEADING",
     "ANONYMIZED",
     "anonymized_state",
     "built_from",
+    "DATA_HEADING",
     "default_tool_limits",
     "edges_of",
     "expected_edges",
@@ -53,8 +61,12 @@ __all__ = [
     "has_sources",
     "output_fields",
     "output_types",
+    "prompt_rules",
+    "prompt_section",
     "ran_fake",
     "streamed_fake",
     "TOOL_NAME_IN_PROMPT",
+    "WITHOUT_DESCRIPTION_LAYOUT",
     "WITHOUT_MARKERS_PARAGRAPH",
+    "WITHOUT_PROMPT_SECTIONS",
 ]

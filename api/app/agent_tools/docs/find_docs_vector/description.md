@@ -21,9 +21,9 @@ zamieniane na embedding i porównywane z fragmentami sekcji.
 
 # Jak wywoływać
 
-| argument | typ   | co podać               | przykład                               | opis |
-|----------|-------|------------------------|----------------------------------------|------|
-| text     | tekst | temat własnymi słowami | "kto nadaje uprawnienie do kancelarii" | Temat szukanej sekcji, zdaniem albo kilkoma słowami. Znajduje sekcję także wtedy, gdy używa ona innych sformułowań. |
+| argument | typ    | przykłady                              | opis |
+|----------|--------|----------------------------------------|------|
+| text     | string | "kto nadaje uprawnienie do kancelarii" | Temat szukanej sekcji, własnymi słowami: zdaniem albo kilkoma wyrazami. Znajduje sekcję także wtedy, gdy używa ona innych sformułowań. |
 
 # Co zwraca
 

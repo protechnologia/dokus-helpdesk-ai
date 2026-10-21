@@ -12,12 +12,14 @@ from app.agent_tools.tickets.fake_tickets import default_cards, default_threads
 from app.agent_tools.tickets.read_tickets_card.models import ReadTicketsCardQuery
 from app.agent_tools.tickets.read_tickets_thread.models import ReadTicketsThreadQuery
 from app.config import Settings
+from app.core_util.json_schema import json_schema_without_docs
 from tests._helpers.fake_tools import (
     fake_agent_tools,
     fake_agent_tools_with_code_only,
     fake_agent_tools_with_tickets,
     fake_agent_tools_without_material,
 )
+from tests._helpers.tool_descriptions import DESCRIPTION_SECTIONS, argument_types, schema_types
 
 
 def tool_packages() -> list[str]:
@@ -123,9 +125,6 @@ SOURCES   = all_tools_of(KnowledgeSource)
 AUXILIARY = all_tools_of(AuxiliaryTool)
 TOOLS     = [*SOURCES, *AUXILIARY]
 
-# Układ opisu narzędzia (`description.md`), wspólny dla wszystkich narzędzi.
-DESCRIPTION_SECTIONS = ["# Do czego służy", "# Jak wywoływać", "# Co zwraca", "# Zasady"]
-
 ERRORS = tool_errors()
 
 
@@ -198,6 +197,20 @@ def test_every_description_has_the_same_four_sections(tool: type) -> None:
     headings = [line for line in tool.description.splitlines() if line.startswith("#")]
 
     assert headings == DESCRIPTION_SECTIONS
+
+
+@pytest.mark.parametrize("tool", TOOLS, ids=lambda cls: cls.__name__)
+def test_every_description_lists_the_arguments_with_their_schema_types(tool: type) -> None:
+    """Sprawdza, czy tabelka argumentów w opisie każdego narzędzia wymienia dokładnie te argumenty,
+    które ma schemat dla modelu, każdy z typem ze schematu zapisanym nazwą z JSON-a (`string`,
+    `integer`, `string[]`).
+
+    Wyłapuje opis rozjechany ze schematem: argument dopisany do klasy zapytania bez wiersza
+    w tabelce, wiersz po usuniętym argumencie albo typ zmieniony tylko w jednym miejscu. Model
+    dostaje opis i schemat razem i przy rozjeździe nie wie, któremu wierzyć."""
+    schema = json_schema_without_docs(arguments_model(tool))
+
+    assert argument_types(tool.description) == schema_types(schema)
 
 
 @pytest.mark.parametrize("tool", TOOLS, ids=lambda cls: cls.__name__)

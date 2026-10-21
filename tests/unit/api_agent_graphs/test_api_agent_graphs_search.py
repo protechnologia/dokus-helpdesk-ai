@@ -52,7 +52,8 @@ def test_the_prompt_and_the_respond_tool_name_the_same_note_sections() -> None:
 
     Wyłapuje zmianę nagłówka w jednym z dwóch plików bez poprawienia drugiego: model dostałby
     dwa różne wzory uwag, a w diffie jednego pliku nie byłoby tego widać."""
-    headings = [line for line in search.system_prompt().splitlines() if line.startswith("#")]
+    # Sekcje promptu mają nagłówki `#`, a wzór uwag nagłówki `##`.
+    headings = [line for line in search.system_prompt().splitlines() if line.startswith("## ")]
     tool     = " ".join(search.respond_tool().description.split())
 
     assert headings == [f"## {heading}" for heading in NOTE_HEADINGS]

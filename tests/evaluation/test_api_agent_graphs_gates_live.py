@@ -5,13 +5,14 @@ regułę klienta, i przepuszcza poprawne — także takie, które na łamiące t
 w `data/safe/golden/gates.json`, z sekcją na bramkę; na każdą regułę zestawu domyślnego ma trzy
 wejścia: łamiące, poprawnego bliźniaka i pułapkę. Bramka bez sekcji nie ma tu testów.
 
-Każda bramka z sekcją w zestawie przechodzi przez trzy testy:
+Każda bramka z sekcją w zestawie przechodzi przez cztery testy:
 
 | test                                    | co sprawdza                                     |
 |-----------------------------------------|-------------------------------------------------|
 | `test_every_case_gets_an_accepted_verdict` | każda sprawa kończy się werdyktem            |
 | `test_no_correct_input_is_blocked`      | żadne poprawne wejście ani pułapka nie są blokowane |
 | `test_no_breaking_input_passes`         | żadne łamiące wejście nie przechodzi            |
+| `test_no_marker_is_malformed`           | znaczniki w werdykcie stoją bez odmiany         |
 
 Pomiary:
 
@@ -19,6 +20,11 @@ Pomiary:
 |--------------|-----------------|----------------|------------------------------------------------|
 | `gate_reply` | 0 z 6           | 0 z 3          | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach |
 | `gate_close` | 0 z 4           | 0 z 2          | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach |
+| `gate_reply` | 0 z 7           | 0 z 4          | 2026-10-21, `gpt-6.1-sol`, w dwóch przebiegach |
+| `gate_close` | 0 z 5           | 0 z 3          | 2026-10-21, `gpt-6.1-sol`, w dwóch przebiegach |
+
+Pomiar z 2026-10-21 stoi na promptach podzielonych na sekcje, z rolą „pomagasz wdrożeniowcowi”
+i z parą spraw ze znacznikami anonimizacji na bramkę (znaczników przekręconych 0).
 
 Pierwszy pomiar `gate_reply` dał w obu przebiegach fałszywy alarm na pułapce g06: bramka uznała
 cytat komunikatu z ekranu („Ups! Coś poszło nie tak.”) za potoczne słownictwo wiadomości. Po
@@ -36,8 +42,8 @@ O czym pamiętać przy zmianach:
 - Liczy się sam werdykt. Czy bramka zablokowała z właściwego powodu, mówi uzasadnienie
   w raporcie, który pytest wypisuje po przebiegu; czyta się je przy pierwszym pomiarze i przy
   każdej zmianie wyniku.
-- KOSZTUJE: sprawa to jedna tura modelu. `gate_reply` ma dziewięć spraw: na `gpt-6.1-sol`
-  0,02 USD i kilka sekund; `gate_close` sześć: 0,01 USD.
+- KOSZTUJE: sprawa to jedna tura modelu. `gate_reply` ma jedenaście spraw, `gate_close` osiem;
+  obie razem na `gpt-6.1-sol` to około 0,05 USD i kilkanaście sekund.
 """
 
 
@@ -126,3 +132,19 @@ def test_no_breaking_input_passes(graph: str, outcomes: GateOutcomesOf) -> None:
         f"{graph}: przepuszczeń {len(misses)} — "
         + ", ".join(outcome.case.label for outcome in misses)
     )
+
+
+@pytest.mark.parametrize("graph", sorted(SECTIONS))
+def test_no_marker_is_malformed(graph: str, outcomes: GateOutcomesOf) -> None:
+    """Sprawdza, czy w uzasadnieniu i wskazówce werdyktu każdy napis w klamrach jest znacznikiem
+    anonimizacji albo placeholderem z promptu, bez odmiany i bez zmiany liter.
+
+    Wyłapuje werdykt, w którym model odmienił znacznik („{NAZWISKA}”) albo wymyślił własny:
+    wdrożeniowiec nie wie wtedy, którą daną uzupełnić, a anonimizacja przestaje być widoczna."""
+    malformed = [outcome for outcome in outcomes(graph) if outcome.malformed]
+
+    assert not malformed, (
+        f"{graph}: przekręcone znaczniki — "
+        + ", ".join(f"{outcome.case.label}: {outcome.malformed}" for outcome in malformed)
+    )
+

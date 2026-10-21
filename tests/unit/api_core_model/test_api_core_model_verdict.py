@@ -34,14 +34,14 @@ def test_a_block_without_reasons_or_hint_is_rejected(fields: dict[str, object]) 
 
 
 def test_a_block_with_reasons_and_hint_is_accepted() -> None:
-    """Sprawdza, czy werdykt blokujący z uzasadnieniem i wskazówką jest poprawny także wtedy, gdy
-    lista braków (`missing`) nie została podana — jest wtedy pusta.
+    """Sprawdza, czy werdykt blokujący z uzasadnieniem i wskazówką jest poprawny i niesie oba pola
+    bez zmian.
 
-    Wyłapuje walidację, która wymaga też listy braków: poprawnie uzasadniona blokada byłaby
-    odrzucana jak błąd formatu odpowiedzi modelu."""
+    Wyłapuje walidację, która wymaga czegoś więcej niż uzasadnienia i wskazówki: poprawnie
+    uzasadniona blokada byłaby odrzucana jak błąd formatu odpowiedzi modelu."""
     verdict = Verdict(verdict="block", reasons=["Nie widać zmian."], hint="Dopisz, co zmieniono.")
 
-    assert verdict.missing == []
+    assert (verdict.reasons, verdict.hint) == (["Nie widać zmian."], "Dopisz, co zmieniono.")
 
 
 def test_an_unknown_key_is_an_error() -> None:
