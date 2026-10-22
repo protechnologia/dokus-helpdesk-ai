@@ -22,6 +22,8 @@ O czym pamiętać przy zmianach:
 
 - Ucięcie zawsze odcina koniec listy, więc pełne elementy sprzed niego są tym, co model
   naprawdę wskazał. Czego nie zdążył wskazać, wołający nie odzyska; liczy to log węzła.
+- Uciętą odpowiedź czyta tu tylko węzeł adresów; węzłowi osób `ask_model()` odmawia jej
+  wcześniej błędem (`accept_truncated`).
 """
 
 import json

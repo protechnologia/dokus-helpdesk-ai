@@ -1,8 +1,8 @@
 """
 Description:
-Węzeł `replace_found`, ostatni w grafie anonimizacji: z miejsc osób i adresów, które wskazały
-węzły z modelem, wybiera te, które na siebie nie zachodzą, i zamienia je na znaczniki w tekście
-po wzorcach.
+Węzeł `replace_found`, ostatni w grafie anonimizacji: miejsca osób i adresów, które wskazały
+węzły z modelem, zamienia na znaczniki w tekście po wzorcach, a miejsca zachodzące na siebie
+łączy w jedno.
 
 Przykład (zmyślony; adres niesie ulicę nazwaną od osoby, którą węzeł osób wziął za nazwisko):
 
@@ -12,8 +12,10 @@ Przykład (zmyślony; adres niesie ulicę nazwaną od osoby, którą węzeł os�
 
 O czym pamiętać przy zmianach:
 
-- Dłuższe miejsce wygrywa, a przy równej długości adres (`ADDRESS_PRIORITY`): słowo z ulicy
-  nazwanej od osoby węzeł osób bierze za nazwisko, a cały adres i tak ma zniknąć.
+- Rodzaj połączonego miejsca daje dłuższe, a przy równej długości adres (`ADDRESS_PRIORITY`):
+  słowo z ulicy nazwanej od osoby węzeł osób bierze za nazwisko, a cały adres i tak ma zniknąć.
+- Dwa fragmenty adresu, które się krzyżują („Lipowa 12/4” i „12/4, Lubartów”), dają jeden
+  `{ADRES}` od początku pierwszego do końca drugiego, bez jawnej końcówki krótszego.
 """
 
 from typing import Any

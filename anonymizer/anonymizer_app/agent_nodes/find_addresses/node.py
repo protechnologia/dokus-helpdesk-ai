@@ -67,7 +67,9 @@ SCHEMA      = {
 # Limit odpowiedzi na część tekstu. Na dwóch wątkach próbki korpusu model zapętlał odpowiedź
 # (jeden fragment ze znacznikiem 285 razy, około 40 s); 300 tokenów skróciło najdłuższe wywołanie
 # do 10 s bez straty adresu (sonda z 2026-10-18). Pełne elementy uciętej odpowiedzi czyta
-# `answer_items()`.
+# `answer_items()`: na całym korpusie limit uciął 27 z 1859 wywołań, każde na zapętleniu, więc
+# odrzucenie zatrzymywałoby zgłoszenia bez straty adresu. Adresy z kotwicą zamieniają wcześniej
+# wzorce, a model wskazuje tylko te bez niej.
 MAX_ANSWER_TOKENS = 300
 
 # Sam kod pocztowy: odpada, bo sam nie wskazuje osoby.
@@ -99,7 +101,7 @@ class FindAddressesNode(Node):
     """
     Description:
     Węzeł grafu, który pyta model o adresy i zamienia jego odpowiedź na miejsca w całym tekście;
-    przebieg opisuje docstring modułu. Miejsca mogą na siebie zachodzić — wybiera z nich węzeł
+    przebieg opisuje docstring modułu. Miejsca mogą na siebie zachodzić — łączy je węzeł
     `replace_found`.
     """
 
@@ -143,7 +145,7 @@ class FindAddressesNode(Node):
             LLMError: model nie odpowiedział albo odpowiedział spoza schematu
         """
         items = await ask_model(self._llm, PROMPT_DIR, state.chunks, SCHEMA_NAME, SCHEMA, ITEMS_KEY,
-                                MAX_ANSWER_TOKENS)
+                                MAX_ANSWER_TOKENS, accept_truncated=True)
         found = place_addresses(state.after_patterns, items)
 
         update = {

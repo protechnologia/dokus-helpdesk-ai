@@ -65,20 +65,22 @@ def chat_answer(
 
 
 def scripted_llm(
-    persons:   Sequence[dict[str, str]] = (),  # np. [{"tekst": "Nowak", "rodzaj": "NAZWISKO"}]
-    addresses: Sequence[str]            = (),  # np. ["Wierzbowa 6"]
-    seen:      list | None              = None,  # wypełniana w miejscu: treść każdego żądania
+    persons:       Sequence[dict[str, str]] = (),      # np. [{"tekst": "Nowak", …}]
+    addresses:     Sequence[str]            = (),      # np. ["Wierzbowa 6"]
+    seen:          list | None              = None,    # wypełniana w miejscu: każde żądanie
+    finish_reason: str                      = "stop",  # np. "length" — ucięta limitem
 ) -> LLMClient:
     """
     Description:
     Klient modelu, którego atrapa transportu odpowiada na każde wywołanie węzła osób listą
-    `persons`, a węzła adresów — listą `addresses`. Każde żądanie, z treścią jako słownikiem,
-    trafia do `seen`, gdy ją podano.
+    `persons`, a węzła adresów — listą `addresses`, każde z podanym powodem zakończenia. Każde
+    żądanie, z treścią jako słownikiem, trafia do `seen`, gdy ją podano.
 
     Example args:
         persons=[{"tekst": "Jan", "rodzaj": "IMIĘ"}, {"tekst": "Nowak", "rodzaj": "NAZWISKO"}]
         addresses=[]
         seen=[]
+        finish_reason="stop"
 
     Example result:
         LLMClient, który na pytanie o osoby oddaje '{"dane": [{"tekst": "Jan", …}, …]}'
@@ -96,7 +98,7 @@ def scripted_llm(
 
         schema = body["response_format"]["json_schema"]["name"]
 
-        return httpx.Response(200, json=chat_answer(contents[schema]))
+        return httpx.Response(200, json=chat_answer(contents[schema], finish_reason=finish_reason))
 
     return model_client_on(httpx.MockTransport(handler))
 

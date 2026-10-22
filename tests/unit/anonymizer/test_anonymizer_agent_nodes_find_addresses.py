@@ -119,3 +119,18 @@ async def test_the_node_asks_every_chunk_and_logs_counts() -> None:
         ("ADRES", "Wierzbowa 6, Kutno"),
     ]
     assert update["log"][0].message == "2 fragmentów → 1 miejsc"
+
+
+async def test_an_answer_cut_by_the_token_limit_is_still_read() -> None:
+    """Sprawdza, czy węzeł adresów przyjmuje odpowiedź uciętą limitem tokenów i zamienia adresy,
+    które w niej stoją.
+
+    Wyłapuje odrzucanie uciętych odpowiedzi także tutaj: model zapętla listę adresów, więc
+    zgłoszenia bez żadnej straty kończyłyby się błędem."""
+    text  = "Proszę wysłać na Wierzbowa 6, Kutno."
+    llm   = scripted_llm(addresses=["Wierzbowa 6, Kutno"], finish_reason="length")
+    state = AnonymizeState(input_text=text, after_patterns=text, chunks=["a"])
+
+    update = await FindAddressesNode(llm).run(state)
+
+    assert [text[place.start:place.end] for place in update["addresses"]] == ["Wierzbowa 6, Kutno"]

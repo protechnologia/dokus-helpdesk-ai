@@ -1,8 +1,8 @@
 """
 Description:
 Węzeł `replace_patterns`, pierwszy w grafie anonimizacji: zamiana danych o stałym kształcie na
-znaczniki. Przepuszcza tekst przez wszystkie warianty wszystkich wzorców, wybiera miejsca, które
-na siebie nie zachodzą, i zamienia każde na znacznik jego rodzaju (`{PESEL}`, `{ADRES}`…). Osoby
+znaczniki. Przepuszcza tekst przez wszystkie warianty wszystkich wzorców, miejsca zachodzące na
+siebie łączy w jedno i zamienia każde na znacznik jego rodzaju (`{PESEL}`, `{ADRES}`…). Osoby
 i adresy bez kotwicy wskazuje dopiero model, w kolejnych węzłach (p. 19.5).
 
 Przykład:
@@ -13,15 +13,15 @@ Przykład:
 Kroki:
 
 1. Każdy wariant z `VARIANTS` zwraca swoje miejsca.
-2. Miejsca układają się od najdłuższego; przy równej długości wygrywa wariant wcześniejszy
-   w `PATTERNS`, a potem miejsce wcześniejsze w tekście.
-3. Po kolei bierze się każde miejsce, które nie zachodzi na wzięte wcześniej.
-4. Wzięte miejsca zamienia się od końca tekstu, żeby zamiana nie przesuwała pozostałych.
+2. Miejsca zachodzące na siebie łączą się w jedno, z rodzajem najdłuższego; przy równej
+   długości wygrywa wariant wcześniejszy w `PATTERNS` (`choose_found()`).
+3. Miejsca zamienia się od końca tekstu, żeby zamiana nie przesuwała pozostałych.
 
 O czym pamiętać przy zmianach:
 
-- Najdłuższe wygrywa, bo dłuższe znalezisko niesie krótsze w sobie: adres z kodem pocztowym
-  zawiera ulicę z numerem, a e-mail — imię i nazwisko.
+- Najdłuższe nadaje rodzaj, bo dłuższe znalezisko niesie krótsze w sobie: adres z kodem
+  pocztowym zawiera ulicę z numerem, a e-mail — imię i nazwisko. Miejsc, które się krzyżują,
+  wzorce na 1825 zgłoszeniach korpusu nie dają ani razu (2026-10-22).
 - Wzorce z sumą kontrolną stoją w `PATTERNS` przed telefonem: dziewięć cyfr z poprawną sumą
   REGON-u to REGON, choć mają też kształt telefonu.
 - Nowy plik wzorca w `core_patterns/` trzeba dopisać do `PATTERNS`; test zamiany pilnuje, że
@@ -72,8 +72,8 @@ def find_patterns(
 ) -> list[Found]:
     """
     Description:
-    Miejsca danych o stałym kształcie, które na siebie nie zachodzą, w kolejności tekstu.
-    Kolejne kroki opisuje docstring modułu.
+    Miejsca danych o stałym kształcie, które na siebie nie zachodzą, w kolejności tekstu;
+    zachodzące łączą się w jedno. Kolejne kroki opisuje docstring modułu.
 
     Example args:
         text="PESEL 85030512840, tel. 600 100 200"

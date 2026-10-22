@@ -139,3 +139,17 @@ async def test_the_node_asks_every_chunk_and_logs_counts() -> None:
     assert sorted(places) == ["Cieślak", "Cieślakiem"]
     assert update["log"][0].message == "2 fragmentów → 2 miejsc"
     assert set(PERSON_KINDS) >= {place.kind for place in update["persons"]}
+
+
+async def test_an_answer_cut_by_the_token_limit_is_an_error() -> None:
+    """Sprawdza, czy odpowiedź uciętą limitem tokenów węzeł osób odrzuca błędem `LLMError`,
+    także gdy jej treść jest poprawnym JSON-em.
+
+    Wyłapuje przyjęcie uciętej listy: nazwiska, których model nie zdążył wypisać przed limitem,
+    przeszłyby niezamienione do modelu zewnętrznego."""
+    llm   = scripted_llm(persons=[{"tekst": "Cieślak", "rodzaj": "NAZWISKO"}],
+                         finish_reason="length")
+    state = AnonymizeState(input_text=THREAD, after_patterns=THREAD, chunks=["część 1"])
+
+    with pytest.raises(LLMError):
+        await FindPersonsNode(llm).run(state)

@@ -12,7 +12,7 @@ każdy w osobnym węźle z `agent_nodes/`.
 | `split_chunks`     | tekst po wzorcach na części, które mieszczą się w oknie modelu  |
 | `find_persons`     | model wskazuje imiona i nazwiska, kod szuka ich odmian w tekście |
 | `find_addresses`   | model wskazuje adresy bez kotwicy, kod je dopasowuje i odsiewa  |
-| `replace_found`    | miejsca osób i adresów na znaczniki, dłuższe wygrywa            |
+| `replace_found`    | miejsca osób i adresów na znaczniki, zachodzące łączy w jedno   |
 
 O czym pamiętać przy zmianach:
 

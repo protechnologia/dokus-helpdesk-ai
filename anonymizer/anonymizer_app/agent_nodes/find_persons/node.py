@@ -84,6 +84,9 @@ SCHEMA      = {
 
 # Limit odpowiedzi na część tekstu. Element to około 15 tokenów, więc limit mieści ponad 90 form
 # w jednej części; zapętlonej odpowiedzi nie pozwala ciągnąć się dłużej niż kilkanaście sekund.
+# Odpowiedź uciętą limitem węzeł odrzuca (`LLMError`), inaczej niż węzeł adresów: na całym
+# korpusie limit nie uciął ani jednej (największa miała 439 tokenów), a nazwiska, których model
+# nie zdążył wypisać, przeszłyby do modelu zewnętrznego.
 MAX_ANSWER_TOKENS = 1500
 
 # Zwroty i role, złożone przez `fold_word()`: ich węzeł nie zamienia, nawet gdy model je wskazał
@@ -121,7 +124,7 @@ class FindPersonsNode(Node):
     """
     Description:
     Węzeł grafu, który pyta model o imiona i nazwiska i zamienia jego odpowiedź na miejsca w całym
-    tekście; przebieg opisuje docstring modułu. Miejsca mogą na siebie zachodzić — wybiera z nich
+    tekście; przebieg opisuje docstring modułu. Miejsca mogą na siebie zachodzić — łączy je
     węzeł `replace_found`.
     """
 
@@ -162,11 +165,13 @@ class FindPersonsNode(Node):
 
         Raises:
             EngineConfigError: serwer modelu odrzucił klucz albo nie zna modelu
-            LLMError: model nie odpowiedział albo odpowiedział spoza schematu
+            LLMError: model nie odpowiedział, odpowiedział spoza schematu albo limit tokenów
+                uciął jego odpowiedź
         """
         exceptions = read_exceptions()
         items      = await ask_model(self._llm, PROMPT_DIR, state.chunks, SCHEMA_NAME, SCHEMA,
-                                     ITEMS_KEY, MAX_ANSWER_TOKENS, prompt_values(exceptions))
+                                     ITEMS_KEY, MAX_ANSWER_TOKENS, accept_truncated=False,
+                                     values=prompt_values(exceptions))
         found      = place_persons(state.after_patterns, items, exceptions)
 
         update = {

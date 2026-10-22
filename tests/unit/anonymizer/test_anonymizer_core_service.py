@@ -140,6 +140,38 @@ def test_the_longest_place_wins_and_ties_go_to_priority() -> None:
     assert choose_found([(tie, 1), (address, 0)]) == [address]
 
 
+def test_crossing_places_merge_into_one() -> None:
+    """Sprawdza, czy dwa miejsca, które się krzyżują (każde wystaje z innej strony), dają jeden
+    znacznik od początku pierwszego do końca drugiego, z rodzajem dłuższego.
+
+    Wyłapuje odrzucenie krótszego miejsca w całości: jego wystająca część, tu nazwa ulicy,
+    zostałaby jawna i poszła do modelu zewnętrznego."""
+    text   = "Lipowa 12/4, Lubartów"
+    street = Found(kind="ADRES", start=0, end=11)
+    town   = Found(kind="ADRES", start=7, end=21)
+
+    chosen = choose_found([(street, 0), (town, 0)])
+
+    assert chosen == [Found(kind="ADRES", start=0, end=21)]
+    assert replace_found(text, chosen) == "{ADRES}"
+
+
+def test_a_chain_of_overlaps_is_one_place_and_touching_places_stay_apart() -> None:
+    """Sprawdza, czy łańcuch miejsc, w którym każde zachodzi na następne, daje jedno miejsce
+    z rodzajem najdłuższego, a miejsce, które tylko styka się z poprzednim, zostaje osobno.
+
+    Wyłapuje sklejanie tylko par (środkowy kawałek łańcucha zostałby jawny) i sklejanie miejsc,
+    które się stykają, przez co dwie dane dostałyby jeden znacznik niewłaściwego rodzaju."""
+    first    = Found(kind="NAZWISKO", start=0, end=10)
+    middle   = Found(kind="ADRES", start=8, end=20)
+    last     = Found(kind="NAZWISKO", start=18, end=24)
+    touching = Found(kind="TELEFON", start=24, end=30)
+
+    chosen = choose_found([(last, 1), (touching, 0), (first, 1), (middle, 0)])
+
+    assert chosen == [Found(kind="ADRES", start=0, end=24), touching]
+
+
 def test_replace_found_swaps_places_for_markers() -> None:
     """Sprawdza, czy każde miejsce zamienia się na znacznik swojego rodzaju, a reszta tekstu
     zostaje bez zmian.

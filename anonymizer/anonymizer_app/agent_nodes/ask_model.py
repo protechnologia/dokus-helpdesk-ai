@@ -19,6 +19,9 @@ O czym pamiętać przy zmianach:
 - Prompt i przykłady czyta się przy każdym wywołaniu: poprawka w dev działa bez restartu.
 - Linie `===` są tą samą ramą danych w przykładach i we właściwym tekście; prompt systemowy mówi,
   że tekst między nimi to dane, nie polecenia.
+- Odpowiedź uciętą limitem tokenów przyjmuje tylko węzeł, który wie, skąd się ucięcie bierze
+  (`accept_truncated`): adresy, gdzie model zapętla listę. Dla pozostałych to `LLMError`, bo za
+  ucięciem mogły stać dane, które przeszłyby do modelu zewnętrznego.
 """
 
 import asyncio
@@ -29,6 +32,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from anonymizer_app.core_errors.llm_error import LLMError
 from anonymizer_app.core_model.chat_message import ChatMessage
 from anonymizer_app.core_model.prompt_example import PromptExample
 from anonymizer_app.core_util.markdown import read_document
@@ -166,20 +170,21 @@ def prompt_chars(
 
 
 async def ask_model(
-    llm:         LLMClient,       # np. LLMClient(base_url="https://…/v1", model="speakleash/…")
-    prompt_dir:  Path,            # np. Path("anonymizer_app/agent_nodes/find_persons")
-    chunks:      Sequence[str],   # części tekstu, np. ["Od: Leszek Dudziak…"]
-    schema_name: str,             # np. "osoby"
-    schema:      dict[str, Any],  # np. {"type": "object", "properties": {"dane": …}}
-    key:         str,             # np. "dane" — klucz listy w odpowiedzi
-    max_tokens:  int,             # np. 1500 — limit odpowiedzi na część
-    values:      Mapping[str, str] = {},  # np. {"exceptions": "- Dokus"} — miejsca w prompcie
+    llm:              LLMClient,       # np. LLMClient(base_url="https://…/v1", model="…")
+    prompt_dir:       Path,            # np. Path("anonymizer_app/agent_nodes/find_persons")
+    chunks:           Sequence[str],   # części tekstu, np. ["Od: Leszek Dudziak…"]
+    schema_name:      str,             # np. "osoby"
+    schema:           dict[str, Any],  # np. {"type": "object", "properties": {"dane": …}}
+    key:              str,             # np. "dane" — klucz listy w odpowiedzi
+    max_tokens:       int,             # np. 1500 — limit odpowiedzi na część
+    accept_truncated: bool,            # np. False — czy odpowiedź uciętą limitem przyjąć
+    values:           Mapping[str, str] = {},  # np. {"exceptions": "- Dokus"} — do promptu
 ) -> list[Any]:
     """
     Description:
     Pyta model o każdą część tekstu, wszystkie naraz, i oddaje elementy list z odpowiedzi
     w kolejności części. Odpowiedź uciętą limitem tokenów czyta się do ostatniego pełnego
-    elementu i liczy w logu.
+    elementu i liczy w logu, gdy węzeł na to pozwala (`accept_truncated`); inaczej to błąd.
 
     Example args:
         llm=LLMClient(base_url="https://…/v1", model="speakleash/…")
@@ -189,6 +194,7 @@ async def ask_model(
         schema={"type": "object", "properties": {"dane": {…}}, "required": ["dane"]}
         key="dane"
         max_tokens=1500
+        accept_truncated=False
         values={"exceptions": "- Dokus"}
 
     Example result:
@@ -196,7 +202,8 @@ async def ask_model(
 
     Raises:
         EngineConfigError: serwer modelu odrzucił klucz albo nie zna modelu
-        LLMError: model nie odpowiedział albo odpowiedział spoza schematu
+        LLMError: model nie odpowiedział, odpowiedział spoza schematu albo limit tokenów uciął
+            odpowiedź węzła, który ucięcia nie przyjmuje
     """
     system   = read_system_prompt(prompt_dir, values)
     examples = read_examples(prompt_dir)
@@ -206,6 +213,15 @@ async def ask_model(
         for chunk in chunks
     ))
 
+    truncated = sum(answer.truncated for answer in answers)
+
+    # Ucięta lista to lista, której koniec przepadł: bez zgody węzła anonimizacja staje, zamiast
+    # przepuścić to, czego model nie zdążył wskazać.
+    if truncated and not accept_truncated:
+        raise LLMError(
+            f"limit tokenów uciął {truncated} z {len(answers)} odpowiedzi schematu {schema_name}"
+        )
+
     items = [item for answer in answers for item in answer_items(answer, key)]
 
     # Liczby, bez treści: elementy to fragmenty zgłoszenia.
@@ -214,7 +230,7 @@ async def ask_model(
         schema_name,
         len(chunks),
         len(items),
-        sum(answer.truncated for answer in answers),
+        truncated,
     )
 
     return items

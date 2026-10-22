@@ -1813,17 +1813,29 @@ wskazane fragmenty w całym tekście i zamienia je na znaczniki. Model tekstu ni
   tekście, więc podział niczego nie gubi. Fabryka przy starcie sprawdza, czy prompt z przykładami,
   największa część (liczona 1,3 znaku na token; najmniej w korpusie 1,37) i limit odpowiedzi
   mieszczą się w `LLM_ANONYMIZATION_NUM_CTX`; 8192 nie wystarcza węzłowi osób.
-- **Odpowiedź uciętą limitem czyta się do ostatniego pełnego elementu (`answer_items()`).**
-  Limit to 1500 tokenów w węźle osób i 300 w węźle adresów, bo model zapętla listę adresów: na
-  całym korpusie limit uciął 27 z 1859 wywołań adresów i żadnego wywołania osób (największa
-  odpowiedź 439 tokenów). Odpowiedź spoza schematu bez ucięcia to `LLMError` (503), nigdy pusta
-  lista, bo pusta lista znaczy „w tekście nie ma danych”.
+- **Odpowiedź uciętą limitem węzeł adresów czyta do ostatniego pełnego elementu
+  (`answer_items()`), a węzeł osób odrzuca błędem (`accept_truncated` w `ask_model()`,
+  2026-10-22).** Limit to 1500 tokenów w węźle osób i 300 w węźle adresów, bo model zapętla listę
+  adresów: na całym korpusie limit uciął 27 z 1859 wywołań adresów, każde na fragmencie już
+  zamienionym, i żadnego wywołania osób (największa odpowiedź 439 tokenów). Za ucięciem listy
+  osób mogłyby stać nazwiska, które przeszłyby do modelu zewnętrznego, więc taka sprawa to
+  `LLMError` (503). Adresy z kotwicą zamieniają wcześniej wzorce, więc ucięcie listy adresów
+  kosztuje najwyżej adres bez kotwicy. Odpowiedź spoza schematu bez ucięcia to `LLMError`,
+  nigdy pusta lista, bo pusta lista znaczy „w tekście nie ma danych”.
 - **Węzeł osób rozprowadza każde wskazane słowo na odmiany w całym wątku (`find_word_forms()`),
   poza liniami etykiet `RawTicket.as_thread()` i zwrotami („Pani”, „klient”).** Węzeł adresów
   dopasowuje fragment dosłownie, bez względu na wielkość liter, częściami i po początku słów,
   a odsiewa fragment ze znacznikiem, sam kod pocztowy i miejsce bez cyfry, które nie styka się
   z ulicą z numerem ani nie stoi w linii obok niej — filtr działa na miejscu, nie na fragmencie.
-  Oba węzły oddają każde miejsce raz; z zachodzących wygrywa dłuższe, przy remisie adres.
+  Oba węzły oddają każde miejsce raz; zachodzące łączą się w jedno z rodzajem dłuższego, przy
+  remisie adresu.
+- **Miejsca zachodzące na siebie łączą się w jeden znacznik, a nie wygrywa dłuższe (2026-10-22,
+  `choose_found()`), we wzorcach i w miejscach od modelu.** Zakres to suma miejsc z grupy,
+  a rodzaj daje najdłuższe. Gdy jedno miejsce zawiera drugie, wynik jest jak dawniej. Gdy się
+  krzyżują (każde wystaje z innej strony), odrzucenie krótszego zostawiało jego wystającą część
+  jawną: z „Lipowa 12/4” i „12/4, Lubartów” wychodziło „Lipowa {ADRES}”. Wzorce na 1825
+  zgłoszeniach nie dają ani jednego krzyżowania, więc chodzi o fragmenty adresów od modelu.
+  Styk (koniec jednego to początek drugiego) zostaje dwoma miejscami.
 - **Przykłady w promptach nie dzielą żadnego słowa z golden setem** (zestaw zmyślony i próbka
   korpusu); pilnuje tego test promptów. W sondzie z 2026-10-17 część imion się nakładała.
 - **Odmiany osób rozstrzyga słownik Morfeusz2 razem ze wspólnym początkiem (decyzja 2026-10-19,
@@ -1858,9 +1870,9 @@ wskazane fragmenty w całym tekście i zamienia je na znaczniki. Model tekstu ni
   zarazem nazwa znacznika) i `VARIANTS`; wariant przyjmuje tekst i zwraca miejsca (`Found`: rodzaj
   i zakres znaków). Docstring wzorca ma tabelę przykładów „przed → po” dla każdego wariantu,
   a wynik „po” pochodzi z uruchomionej funkcji. Zamiana (węzeł `replace_patterns`) zbiera
-  miejsca wszystkich wariantów, z zachodzących na siebie bierze najdłuższe (adres z kodem zamiast
-  samej ulicy), przy równej długości wcześniejszy wzorzec w `PATTERNS` (wzorce z sumą kontrolną
-  stoją przed telefonem), i zamienia od końca tekstu. Nazwa pliku to rodzaj danej po angielsku,
+  miejsca wszystkich wariantów, zachodzące na siebie łączy w jedno z rodzajem najdłuższego (adres
+  z kodem zamiast samej ulicy), przy równej długości wcześniejszego wzorca w `PATTERNS` (wzorce
+  z sumą kontrolną stoją przed telefonem), i zamienia od końca tekstu. Nazwa pliku to rodzaj danej po angielsku,
   bez przedrostków grupujących.
 
   | plik              | znacznik     | warianty                                               | sprawdzenie     |
@@ -4092,8 +4104,18 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Schemat z `maxItems` i zakazem klamr zamiast limitu odpowiedzi adresów** (sonda
   z 2026-10-18) — kończył zapętlenia, ale w próbce korpusu podwoił wskazania nadmiarowe, a inne
   wywołanie trwało 37 s; jest limit 300 tokenów i odczyt pełnych elementów uciętej odpowiedzi.
-- **Odrzucanie całej odpowiedzi uciętej limitem** — wątek straciłby wszystkie wskazane adresy,
-  a ucięcie w korpusie to zapętlenie na fragmencie, który filtr i tak odrzuca.
+- **Odrzucanie całej odpowiedzi węzła adresów uciętej limitem** — wątek straciłby wszystkie
+  wskazane adresy, a ucięcie w korpusie to zapętlenie na fragmencie, który filtr i tak odrzuca.
+  Rozróżnianie zapętlenia (powtórzony element) od długiej listy odrzucone 2026-10-22 jako
+  komplikacja bez zmierzonego przypadku. W węźle osób ucięcie jest błędem.
+- **Licznik fragmentów osób, których kod nie znalazł w tekście** (2026-10-22) — inną wielkość
+  liter, brak polskich znaków i odmianę kod już łapie, więc nieznaleziony fragment to zwykle
+  osoba zmyślona przez model; licznik podpowiadałby przyczynę, a przeciek pokaże pomiar
+  z p. 78.
+- **Test, że każdy obiekt w schemacie odpowiedzi grafu i zapytania narzędzia ma
+  `additionalProperties: false`** (2026-10-22) — wszystkie te modele są płaskie, a test
+  kontraktu sprawdza `extra="forbid"` na modelu głównym. Zagnieżdżony model domyślnie po cichu
+  gubi nadmiarowe pole, więc test dochodzi razem z pierwszym takim modelem.
 - **Sam Morfeusz2 albo sama reguła rdzenia przy odmianach osób** (2026-10-19) — sam lemat gubi
   zdrobnienie („Iza” obok „Izabela”, przeciek w próbce korpusu), sam początek niszczy zwykłe słowa
   („Alarm”, „Lista”); reguła bierze z obu to, co pewne. Słownika sjp.pl z obrazu Postgresa nie
@@ -4986,3 +5008,10 @@ Rzeczy odłożone świadomie, bez miejsca w kolejności planu. Każdy punkt: cel
   *Dlaczego:* kandydat bez decyzji; narzędzie jest katalogiem z kontraktem, więc dojdzie bez zmian
   w grafach i węzłach, ale byłoby pierwszym narzędziem, które coś wykonuje, a nie tylko czyta —
   wymaga osobnej decyzji o granicach.
+- [ ] **78. Pomiar anonimizatora na wątkach spoza strojenia** (dopisany 2026-10-22) — około 30
+  wątków korpusu spoza próbki golden setu, dobranych warstwami jak próbka, zaznaczonych przez
+  model i przejrzanych przez człowieka, w osobnym pliku w `data/unsafe/golden/`; jeden przebieg
+  testu `llm_live` silnika `agent`, bez strojenia na tym zestawie. *Dlaczego:* prompty, przykłady
+  i filtry silnika stroiliśmy na tym samym golden secie, na którym mierzymy, więc „bez
+  przecieku” to wynik optymistyczny. Wraca przed masowym importem (p. 31) albo przy podejrzeniu
+  przecieku.
