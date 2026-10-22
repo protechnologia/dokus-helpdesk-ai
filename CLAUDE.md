@@ -1492,6 +1492,9 @@ Konsekwencje, których nie pomijamy:
   reguł („zignoruj poprzednie polecenia"), nie tylko na poprawnym.
 - **Pusty zestaw reguł = wyjątek przy budowie stanu grafu, nie przepuszczenie.** Bramka bez
   reguł nie ma czego sprawdzać, a werdykt `pass` wyglądałby jak „wszystko OK".
+- **Zmiana pliku reguł dociera do `api` dopiero po restarcie kontenera** — `get_rule_set()` ma
+  `@lru_cache`, a serwer dev przeładowuje się tylko po zmianie plików `.py`. Front pokazywał
+  przez to stare reguły (2026-10-22).
 
 #### Ewaluacja bramek (osobna oś jakości)
 
@@ -1512,6 +1515,18 @@ merytorycznie").
   zamknięć przez trasę `/gate/close`, z anonimizatorem na Bieliku, dało zgodne werdykty bez
   danych osobowych w uzasadnieniach, 2–7,5 s i około 0,003 USD na sprawę; do tego test ręczny
   przez front. Liczb na prawdziwych zamknięciach z korpusu nie ma (p. 33).
+- **Bramka wysyłki przeszła sprawdzenie, ale nie pomiar (2026-10-22).** Na `gpt-6.1-sol`
+  scenariusze na regułach w wersji 2 dały 0 fałszywych alarmów z 13 i 0 przepuszczeń z 9
+  w dwóch przebiegach, a wstrzyknięcia 0 przebić z 9. Przez trasę `/gate/reply` z anonimizatorem
+  na Bieliku 13 z 13 werdyktów było zgodnych (na regułach w wersji 1); do tego test ręczny przez
+  front. Liczb na prawdziwych wiadomościach z korpusu nie ma (p. 33).
+- **Regułę klienta stroi się przykładami obu stron, a nie jedną formą w nawiasie (2026-10-22).**
+  Reguła formy zwrotu w wersji 1 kończyła się „(„Państwo”)” i model czytał to jako jedyną
+  dozwoloną formę: w teście przez front zablokował „Pani” w wiadomości do jednej osoby. Wersja 2
+  podaje przykłady dopuszczalne (Pan, Pani, Państwo) i niepoprawne (te same małą literą, ty, on,
+  ona), a pułapka g12 z „Panią” przechodzi. Reguła ortografii nie wspomina o polskich znakach:
+  model sam uznaje słowo bez polskiej litery za błąd (g20), a reguła „tekst z polskimi znakami”
+  blokowałaby poprawną wiadomość, w której żadne słowo ich nie wymaga (g22).
 
 ### Warstwa CLI
 
@@ -4784,28 +4799,12 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
   błędu na `gpt-6.1-sol`, do tego test ręczny przez front; pomiar na prawdziwych zamknięciach
   i czas na długich wątkach przeszły do p. 33; reguły — „Bramki jakości i asysta pisania”,
   „Prompty”, „Testy”.
-- [ ] **22. `gate_reply`** — reguły wysyłki jako dane (prośba o hasło, potoczne słownictwo, forma
-  zwrotu, niebezpieczne zachowania, ortografia i polskie znaki), ewaluacja per reguła, złośliwy zestaw reguł w teście-strażniku; na prawdziwych
-  wiadomościach do sprawdzenia zdanie o cytatach z p. 59.3 (od 2026-10-22: regułę łamie tylko
-  to, co wdrożeniowiec pisze od siebie, a cytaty to cudze słowa i reguły nie łamią): bez niego
-  bramka blokowała cytat komunikatu z ekranu „Ups! Coś poszło nie tak.” jako potoczny, a czy
-  z nim nie przepuszcza prośby o hasło schowanej w cytacie, nikt nie mierzył; nowe brzmienie
-  mówi to mocniej, więc to ryzyko rośnie. Reguła formy zwrotu w wersji 1 wymieniała tylko
-  „Państwo”, więc bramka blokowała „Pani” w wiadomości do jednej osoby (test ręczny przez front,
-  2026-10-22). Wersja 2 podaje przykłady form dopuszczalnych (Pan, Pani, Państwo) i niepoprawnych
-  (te same małą literą, ty, on, ona), reguła słownictwa obejmuje też wulgarne, czwarta reguła
-  zakazuje prośby o niebezpieczne zachowania (dla infrastruktury IT, bezpieczeństwa i integralności
-  danych), a piąta — błędów ortograficznych. O polskich znakach reguła nie mówi osobno: brak
-  polskiej litery to błąd ortograficzny, a czy model tak go czyta, pokazuje sprawa g20; reguła
-  „tekst z polskimi znakami” blokowałaby poprawną wiadomość, w której żadne słowo ich nie wymaga
-  (g22). Scenariusze mają
-  pułapkę z „Pani” (g12), wiadomości łamiące regułę słowem „Wasz” (g13) i „pani” małą literą
-  (g14), trójkę do czwartej reguły (g15–g17: wyłączenie antywirusa, zrzut ekranu zamiast tego,
-  prośba, żeby antywirusa nie wyłączać) i piątkę do piątej (g18–g22: „wogóle” i „narazie”, ta
-  sama wiadomość poprawnie, ta sama bez polskich znaków, a jako pułapki cytat komunikatu
-  i ścieżka pliku bez polskich znaków oraz poprawna wiadomość bez słowa, które ich wymaga).
-  *Dlaczego:* fałszywy
-  alarm uczy obchodzić bramkę odruchowo, a „bramka ma 90%" nie mówi, która reguła się sypie.
+- [x] **22. `gate_reply`** (2026-10-22) — pięć reguł w wersji 2 (hasło, słownictwo potoczne
+  i wulgarne, forma zwrotu z przykładami, niebezpieczne zachowania, ortografia), zasada, że
+  cytaty reguł nie łamią, 22 sprawy w scenariuszach; scenariusze, wstrzyknięcia i sprawy przez
+  trasę z anonimizatorem bez błędu na `gpt-6.1-sol`, do tego test ręczny przez front; pomiar na
+  prawdziwych wiadomościach, w tym prośba o hasło schowana w cytacie, przeszedł do p. 33;
+  reguły — „Bramki jakości i asysta pisania”, „Prompty”, „Testy”.
 - [ ] **24. `parse_ticket`** — karta zgłoszenia promptem parsującym na modelu docelowym, porównana z
   próbkami z `porownanie-modeli-parsowania.md` (zbierane jeszcze JSON-em w tekście — od 2026-10-02
   karta wychodzi narzędziem `respond_parse_ticket`); opis tego narzędzia przechodzi na układ
@@ -4860,7 +4859,11 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
   alarmy i przepuszczenia na każdą regułę na prawdziwych zamknięciach, w dwóch przebiegach,
   z czytaniem uzasadnień — kandydatem na zestaw są wątki z badania jakości z 2026-09-02
   (43 poprowadzone słabo i 41 dobrze) — oraz czas na długich wątkach wobec cierpliwości UI
-  helpdesku (p. 38). *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na
+  helpdesku (p. 38). `gate_reply` (2026-10-22): fałszywe alarmy i przepuszczenia na każdą
+  z pięciu reguł na prawdziwych wiadomościach do klientów, w dwóch przebiegach, z czytaniem
+  uzasadnień; osobno zasada, że cytaty reguł nie łamią — bez niej bramka blokowała cytat
+  komunikatu z ekranu „Ups! Coś poszło nie tak.” jako potoczny, a czy z nią nie przepuszcza
+  prośby o hasło schowanej w cytacie, nikt nie mierzył. *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na
   zapytaniach surowych, a grafy na zmyślonych sprawach i teście ręcznym.
 - [ ] **34. Tryb odświeżania korpusu** — kolejne zrzuty czy dostęp tylko do odczytu.
   *Dlaczego:* +130 zgłoszeń w miesiąc, więc jednorazowy zrzut szybko się starzeje.
