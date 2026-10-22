@@ -22,7 +22,7 @@ wdrożeniowiec, który wysyła wiadomość.
 | argument | typ      | przykłady                                               | opis |
 |----------|----------|---------------------------------------------------------|------|
 | verdict  | string   | "pass", "block"                                         | `"pass"`, gdy wiadomość nie łamie żadnej reguły wysyłki; inaczej `"block"`. |
-| reasons  | string[] | ["Prośba „proszę podać hasło” łamie regułę o hasłach."] | Po jednym zdaniu na każdą złamaną regułę, z fragmentem wiadomości, który ją łamie. |
+| reasons  | string[] | ["Prośba „proszę podać hasło” łamie regułę o hasłach."] | Uzasadnienia, po jednym zdaniu na każdą złamaną regułę, z fragmentem wiadomości, który ją łamie. |
 | hint     | string   | "Usuń prośbę o hasło."                                  | Jedno–dwa zdania dla wdrożeniowca: co zmienić, żeby wiadomość mogła wyjść. |
 
 # Co zwraca

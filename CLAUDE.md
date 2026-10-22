@@ -1438,7 +1438,8 @@ przycisk. Stąd trzy wymagania na kontrakt:
   tym, że werdykt da się obejść: model mógłby uznać blokadę za darmową i blokować częściej.
   Kryteriów oceny prompt nie powtarza („co było problemem, co zrobiono" wypadło z zadania
   `gate_close`): stoją w regułach klienta, a po ich zmianie model dostałby dwa sprzeczne
-  zestawy. Czy zmiana roli przesuwa fałszywe alarmy albo przepuszczenia, mierzą p. 21–22.
+  zestawy. Czy zmiana roli przesuwa fałszywe alarmy albo przepuszczenia na prawdziwych
+  zamknięciach i wiadomościach, pokaże pomiar na korpusie (p. 33).
 
 #### Trzy funkcje
 
@@ -1503,6 +1504,12 @@ merytorycznie").
   wykrywaniu prośby o hasło, czy na potocznym słownictwie.
 - **Dla „Popraw" osobne kryterium: brak nowych faktów.** Porównanie wejścia z wyjściem pod kątem
   dodanych liczb/nazw/kroków — to jedyna oś, na której ta funkcja może zaszkodzić klientowi.
+- **Bramka zamknięcia przeszła sprawdzenie, ale nie pomiar (2026-10-21).** Na `gpt-6.1-sol`
+  scenariusze bramek dały 0 fałszywych alarmów z 5 i 0 przepuszczeń z 3 w dwóch przebiegach,
+  także w parze ze znacznikami anonimizacji, a wstrzyknięcia 0 przebić z 9. Dziesięć zmyślonych
+  zamknięć przez trasę `/gate/close`, z anonimizatorem na Bieliku, dało zgodne werdykty bez
+  danych osobowych w uzasadnieniach, 2–7,5 s i około 0,003 USD na sprawę; do tego test ręczny
+  przez front. Liczb na prawdziwych zamknięciach z korpusu nie ma (p. 33).
 
 ### Warstwa CLI
 
@@ -2868,15 +2875,18 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
     każdego grafu mówi, że dane osobowe zastąpiono znacznikami rodzaju danej (`{IMIĘ}`,
     `{TELEFON}`…), że ten sam znacznik nie musi znaczyć tej samej osoby i że znacznik przepisuje
     się tak, jak stoi, bez zgadywania i bez odmiany. Od 2026-10-21 to sekcja „Anonimizacja",
-    w jednym brzmieniu w każdym grafie; zdania właściwe jednemu grafowi stoją w jego „Zasadach":
-    grafy z narzędziami wiedzy — że znaczników nie wpisuje się do zapytań, bramki i „Popraw" —
-    zdanie o swoim przypadku. Brak tej sekcji nie objawia się na zmyślonych zgłoszeniach, bo nie
+    w jednym brzmieniu w każdym grafie, a od 2026-10-22 mówi też, że znacznik nie jest błędem ani
+    brakiem, bo dana w tekście jest, tylko ukryta (wcześniej bramki miały to zdanie każda po
+    swojemu). Zdania właściwe jednemu grafowi stoją w jego „Zasadach": grafy z narzędziami
+    wiedzy — że znaczników nie wpisuje się do zapytań, „Popraw" — że każdy znacznik z notatek
+    zostaje w tekście. Brak tej sekcji nie objawia się na zmyślonych zgłoszeniach, bo nie
     ma w nich znaczników. Prompt parsujący dostaje ją w p. 31: jest kontraktem artefaktu, więc
     zmienia się z przebiegiem po korpusie.
 - **Prompt systemowy ma sekcje z nagłówkiem `#` (2026-10-21):** „Zadanie" na początku, sekcje
   własne grafu („Szukanie", „Jak myśleć", „Jak zapisać"…), „Zasady" w punktach, a na końcu
   „Anonimizacja" i „Dane wejściowe". Pierwszą zasadą jest zawsze osobne „NIE ZMYŚLASZ." (zasada
-  9), a zdanie o odpowiedzi narzędziem `respond_<graf>` też jest zasadą, nie zadaniem. Kryteriów
+  9), a zdanie o odpowiedzi narzędziem `respond_<graf>` też jest zasadą, nie zadaniem, i stoi na
+  końcu „Zasad" (od 2026-10-22; bez testu, który by tego pilnował). Kryteriów
   oceny z reguł klienta zadanie nie powtarza. Dwie ostatnie sekcje są w każdym grafie znak
   w znak takie same, więc poprawia się je wszędzie naraz. Pilnują tego trzy testy kontraktu
   grafów: obie sekcje wspólne i pierwsza zasada. Nagłówki `##` stoją tylko we wzorach odpowiedzi
@@ -4740,25 +4750,23 @@ Na prawdziwym modelu i anonimizatorze (p. 17–18 i blok E). Każdy pomiar ≥2 
 surowych odpowiedzi i raportem z datą i wersją promptu; przy generacji do
 wyboru golden set odpowiedzi albo przegląd ręczny — warianty mają różne kryteria sukcesu, więc
 każdy mierzy się osobno. Grafy z narzędziami wiedzy (p. 23, 25, 26) idą po korpusie, razem
-z opisami narzędzi.
+z opisami narzędzi. Punkt grafu zamyka się po pracy nad promptem, scenariuszach z p. 59 na żywym
+modelu i zgrubnym teście ręcznym przez front (decyzja 2026-10-22); to, co w punkcie jest
+pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
 
-- [ ] **21. `gate_close`** — reguły zamknięcia jako dane, ewaluacja na realnych zamknięciach
-  z korpusu per reguła z naciskiem na fałszywe alarmy, budżet opóźnienia (anonimizacja + model
-  zewnętrzny szeregowo); od 2026-10-21 prompt systemowy ma sekcje, jak w każdym grafie, rolę
-  „pomagasz wdrożeniowcowi” zamiast „jesteś bramką jakości” i zadanie bez kryteriów z reguł.
-  Na zmyślonych sprawach nowy prompt trzyma wynik starego (2026-10-21, `gpt-6.1-sol`):
-  scenariusze bramek 0 błędów w dwóch przebiegach, także w parze ze znacznikami, wstrzyknięcia
-  0 przebić z 9, a 10 spraw przez trasę `/gate/close` z anonimizatorem na Bieliku dało zgodne
-  werdykty bez danych osobowych w uzasadnieniach, 2–7,5 s i 0,003 USD na sprawę; czy rola
-  przesuwa fałszywe alarmy na prawdziwych zamknięciach, pokaże pomiar na korpusie.
-  *Dlaczego:* 43 słabo poprowadzone wątki niosły zero wiedzy przenośnej, a zły zapis przechodzi
-  filtr etapu 4.
+- [x] **21. `gate_close`** (2026-10-21) — prompt w sekcjach, rola „pomagasz wdrożeniowcowi”,
+  zadanie bez kryteriów z reguł, blokada tylko za brak informacji wymaganej regułą; scenariusze
+  bramek ze znacznikami anonimizacji, wstrzyknięcia i sprawy przez trasę z anonimizatorem bez
+  błędu na `gpt-6.1-sol`, do tego test ręczny przez front; pomiar na prawdziwych zamknięciach
+  i czas na długich wątkach przeszły do p. 33; reguły — „Bramki jakości i asysta pisania”,
+  „Prompty”, „Testy”.
 - [ ] **22. `gate_reply`** — reguły wysyłki jako dane (prośba o hasło, potoczne słownictwo, forma
   zwrotu), ewaluacja per reguła, złośliwy zestaw reguł w teście-strażniku; na prawdziwych
-  wiadomościach do sprawdzenia zdanie o cytatach z p. 59.3 (słowa przytoczone dosłownie to
-  cudze słowa, nie słownictwo wiadomości): bez niego bramka blokowała cytat komunikatu z ekranu
-  „Ups! Coś poszło nie tak.” jako potoczny, a czy z nim nie przepuszcza prośby o hasło schowanej
-  w cytacie, nikt nie mierzył. *Dlaczego:* fałszywy
+  wiadomościach do sprawdzenia zdanie o cytatach z p. 59.3 (od 2026-10-22: regułę łamie tylko
+  to, co wdrożeniowiec pisze od siebie, a cytaty to cudze słowa i reguły nie łamią): bez niego
+  bramka blokowała cytat komunikatu z ekranu „Ups! Coś poszło nie tak.” jako potoczny, a czy
+  z nim nie przepuszcza prośby o hasło schowanej w cytacie, nikt nie mierzył; nowe brzmienie
+  mówi to mocniej, więc to ryzyko rośnie. *Dlaczego:* fałszywy
   alarm uczy obchodzić bramkę odruchowo, a „bramka ma 90%" nie mówi, która reguła się sypie.
 - [ ] **24. `parse_ticket`** — karta zgłoszenia promptem parsującym na modelu docelowym, porównana z
   próbkami z `porownanie-modeli-parsowania.md` (zbierane jeszcze JSON-em w tekście — od 2026-10-02
@@ -4809,8 +4817,13 @@ z opisami narzędzi.
   „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy. *Dlaczego:* 77 ze 123 zgłoszeń
   w lipcu, a żadna heurystyka nie odróżni broadcastu od sprawy.
 - [ ] **33. Przeliczenia na pełnym korpusie** — `RAG_SCORE_MIN` na zapytaniach sparsowanych,
-  porównanie embedderów, liczba wątków-projektów, `questions_summary`, rozkład `component`.
-  *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na zapytaniach surowych.
+  porównanie embedderów, liczba wątków-projektów, `questions_summary`, rozkład `component`;
+  do tego pomiary grafów zamkniętych po teście ręcznym. `gate_close` (2026-10-22): fałszywe
+  alarmy i przepuszczenia na każdą regułę na prawdziwych zamknięciach, w dwóch przebiegach,
+  z czytaniem uzasadnień — kandydatem na zestaw są wątki z badania jakości z 2026-09-02
+  (43 poprowadzone słabo i 41 dobrze) — oraz czas na długich wątkach wobec cierpliwości UI
+  helpdesku (p. 38). *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na
+  zapytaniach surowych, a grafy na zmyślonych sprawach i teście ręcznym.
 - [ ] **34. Tryb odświeżania korpusu** — kolejne zrzuty czy dostęp tylko do odczytu.
   *Dlaczego:* +130 zgłoszeń w miesiąc, więc jednorazowy zrzut szybko się starzeje.
 - [ ] **35. Backup `data/unsafe/parsed/`.** *Dlaczego:* jedyny artefakt, którego odtworzenie
@@ -4833,6 +4846,9 @@ narzędzi wiedzy: ≥2 przebiegi, surowe odpowiedzi, raport z datą i wersją pr
 (`description.md`) jest wspólny dla grafów, więc opisy stroi p. 23 na grafie `search`, który ma
 wszystkie narzędzia, a p. 25–26 mierzą na opisach zamrożonych; zmiana opisu po p. 23 to ponowny
 pomiar p. 23, 25 i 26. Opisy narzędzi dokumentacji mierzy p. 55, na właściwej dokumentacji.
+Punkt grafu zamyka się po pracy nad promptem, scenariuszach z p. 59 na żywym modelu i zgrubnym
+teście ręcznym przez front (decyzja 2026-10-22); to, co w punkcie jest pomiarem na prawdziwym
+korpusie, przechodzi przy zamknięciu do p. 33.
 
 - [ ] **23. `search` i opisy narzędzi** — prompt pętli i opisy narzędzi, które pętla woła;
   w każdym materiale te same liczby na narzędzie, brane z rozmowy, nie z deklaracji modelu:

@@ -144,9 +144,9 @@ w której części kodu szukać dalej, przeczytaj opis projektu narzędziem `des
   wykluczyłeś.
 - Gdy zgłoszenia i instrukcje dają różne rozwiązania, nie wybieraj jednego. Połącz je w jedną
   odpowiedź i wypisz po kolei: najpierw jedno, a po nim „jeśli to nie pomoże" i następne.
+- Znaczników nie wpisujesz do zapytań narzędzi — nie niosą nic, po czym da się szukać.
 - Rozwiązanie oddajesz wyłącznie wywołaniem narzędzia `respond_suggest_solution` — nie odpowiadasz
   zwykłym tekstem.
-- Znaczników nie wpisujesz do zapytań narzędzi — nie niosą nic, po czym da się szukać.
 
 # Jak pisać
 
@@ -212,6 +212,7 @@ określającymi rodzaj danej. Przykłady znaczników: `{IMIĘ}`, `{NAZWISKO}`, `
 - Ten sam znacznik w dwóch miejscach nie musi znaczyć tej samej osoby ani tej samej danej.
 - Nie zgadujesz, co stoi pod znacznikiem, i nie odmieniasz go.
 - Gdy dana jest potrzebna w odpowiedzi, wpisujesz znacznik tak, jak stoi.
+- Znacznik w miejscu danej nie jest błędem ani brakiem: dana w tekście jest, tylko ukryta.
 
 # Dane wejściowe
 

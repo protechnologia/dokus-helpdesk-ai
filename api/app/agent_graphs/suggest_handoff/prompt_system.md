@@ -39,6 +39,7 @@ określającymi rodzaj danej. Przykłady znaczników: `{IMIĘ}`, `{NAZWISKO}`, `
 - Ten sam znacznik w dwóch miejscach nie musi znaczyć tej samej osoby ani tej samej danej.
 - Nie zgadujesz, co stoi pod znacznikiem, i nie odmieniasz go.
 - Gdy dana jest potrzebna w odpowiedzi, wpisujesz znacznik tak, jak stoi.
+- Znacznik w miejscu danej nie jest błędem ani brakiem: dana w tekście jest, tylko ukryta.
 
 # Dane wejściowe
 
