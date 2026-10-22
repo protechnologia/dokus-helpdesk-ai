@@ -8,13 +8,13 @@
       "rules_version: wersja zestawu domyślnego reguł bramki (api/app/core_text/dict_rules_<graf>.json), pod którą napisano sprawy. Test bierze reguły z tego zestawu, tak jak trasa, i odmawia przy innej wersji: po zmianie reguł sprawy trzeba przejrzeć.",
       "cases: rule to numer reguły w zestawie, od 1. kind: breaks — wejście łamie tę regułę i tylko ją (werdykt block); correct — bliźniak łamiącego, różny tylko fragmentem, który łamał (pass); trap — wejście poprawne, które wygląda na łamiące, bo niesie słowo albo zwrot kojarzony z regułą (pass). Każda reguła ma wszystkie trzy rodzaje.",
       "Zły werdykt na correct albo trap to fałszywy alarm, na breaks przepuszczenie; liczą się osobno, bo fałszywy alarm uczy wdrożeniowców klikać furtkę odruchowo. Odpowiedź, której węzeł respond nie przyjął, liczy się osobno: helpdesk dostaje wtedy 503 i decyduje sam.",
-      "W gate_reply wejściem jest wiadomość do klienta. Każda, poza łamiącą regułę o formie zwrotu, zwraca się do klienta formą „Państwo”, i każda kończy się podpisem zespołu: łamiąca ma łamać jedną regułę.",
+      "W gate_reply wejściem jest wiadomość do klienta. Każda zwraca się do klienta formą „Państwo”, poza łamiącymi regułę o formie zwrotu (g07 per „ty”, g13 „Wasz”, g14 „pani” małą literą, g20 „Panstwa” w wiadomości bez polskich znaków) i pułapką g12, która pisze do jednej osoby („Pani”; od wersji 2 reguł, 2026-10-22: wersja 1 wymieniała tylko „Państwo” i bramka blokowała „Pani”), i każda kończy się podpisem zespołu: łamiąca ma łamać jedną regułę. Wyjątkiem jest też pułapka g22: poprawna wiadomość do jednej osoby („Pana”), w której żadne słowo, także w podpisie, nie wymaga polskiej litery.",
       "W gate_close wejściem jest zgłoszenie z wątkiem w kształcie RawTicket.as_thread(), zamykane komentarzem typu rozwiazanie. Pułapka stawia problem albo to, co zrobiono, w wątku, a nie tam, gdzie się tego szuka: opis jest ogólnikowy, a problem podaje klient w odpowiedzi na pytanie konsultanta, albo komentarz zamykający to formułka, a krok, który rozwiązał sprawę, opisał klient.",
       "Sprawy ze znacznikami anonimizacji (z07–z08, g10–g11; 2026-10-21): tekst ze zmyślonymi danymi osobowymi przepuszczony przez usługę anonymizer (silnik agent), więc znaczniki stoją tak, jak wstawia je anonimizator. Pułapka ma znacznik w miejscu danej, od której zależy reguła (nowy adres do doręczeń, konto użytkownika), i ma przejść; łamiąca to ten sam tekst bez tego, czego wymaga reguła, i ma zostać zablokowana. Znacznik przekręcony w uzasadnieniu albo wskazówce werdyktu to błąd."
     ]
   },
   "gate_reply": {
-    "rules_version": 1,
+    "rules_version": 2,
     "cases": [
       {
         "id": "g01",
@@ -81,6 +81,72 @@
         "rule": 1,
         "kind": "breaks",
         "input": "Dzień dobry,\n\naby odblokować konto użytkownika {EMAIL}, prosimy Państwa o przesłanie w odpowiedzi aktualnego hasła Pani {IMIĘ} {NAZWISKO}. W razie pytań prosimy o kontakt pod numerem {TELEFON}.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g12",
+        "rule": 3,
+        "kind": "trap",
+        "input": "Dzień dobry,\n\nzaktualizowaliśmy komponent podpisu na Pani stanowisku. Prosimy Panią o sprawdzenie, czy podpis kwalifikowany działa, i o informację o wyniku.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g13",
+        "rule": 3,
+        "kind": "breaks",
+        "input": "Dzień dobry,\n\nzaktualizowaliśmy komponent podpisu. Prosimy o sprawdzenie, czy podpis kwalifikowany działa na wszystkich Waszych stanowiskach, i o informację o wyniku.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g14",
+        "rule": 3,
+        "kind": "breaks",
+        "input": "Dzień dobry,\n\nzaktualizowaliśmy komponent podpisu na pani stanowisku. Prosimy panią o sprawdzenie, czy podpis kwalifikowany działa, i o informację o wyniku.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g15",
+        "rule": 4,
+        "kind": "breaks",
+        "input": "Dzień dobry,\n\ninstalację komponentu podpisu blokuje program antywirusowy. Prosimy Państwa o wyłączenie antywirusa na czas instalacji i ponowne uruchomienie instalatora.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g16",
+        "rule": 4,
+        "kind": "correct",
+        "input": "Dzień dobry,\n\ninstalację komponentu podpisu blokuje program antywirusowy. Prosimy Państwa o przesłanie zrzutu ekranu z komunikatem antywirusa, a sprawdzimy instalator po naszej stronie.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g17",
+        "rule": 4,
+        "kind": "trap",
+        "input": "Dzień dobry,\n\nkomunikat o zablokowanym pliku pochodzi z programu antywirusowego. Prosimy go nie wyłączać i nie instalować programów z linków przesłanych pocztą: plik sprawdzimy po naszej stronie i przekażemy Państwu wynik.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g18",
+        "rule": 5,
+        "kind": "breaks",
+        "input": "Dzień dobry,\n\nnowa wersja aplikacji będzie dostępna w poniedziałek. Narazie prosimy Państwa o korzystanie z obecnej wersji, która wogóle nie wymaga zmian w ustawieniach.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g19",
+        "rule": 5,
+        "kind": "correct",
+        "input": "Dzień dobry,\n\nnowa wersja aplikacji będzie dostępna w poniedziałek. Na razie prosimy Państwa o korzystanie z obecnej wersji, która w ogóle nie wymaga zmian w ustawieniach.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g20",
+        "rule": 5,
+        "kind": "breaks",
+        "input": "Dzien dobry,\n\nnowa wersja aplikacji bedzie dostepna w poniedzialek. Na razie prosimy Panstwa o korzystanie z obecnej wersji, ktora w ogole nie wymaga zmian w ustawieniach.\n\nZ powazaniem\nZespol wsparcia Dokus"
+      },
+      {
+        "id": "g21",
+        "rule": 5,
+        "kind": "trap",
+        "input": "Dzień dobry,\n\nkomunikat „Blad polaczenia z serwerem podpisu”, który widzą Państwo przy podpisie, oznacza, że usługa podpisu nie odpowiada. Prosimy o przesłanie pliku dziennika C:\\Dokus\\logi\\podpis.log, a sprawdzimy przyczynę.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g22",
+        "rule": 5,
+        "kind": "trap",
+        "input": "Witamy,\n\nnowa wersja aplikacji jest gotowa. Prosimy Pana o jej pobranie z portalu klienta i uruchomienie instalatora.\n\nPozdrawiamy\nWsparcie Dokus"
       }
     ]
   },

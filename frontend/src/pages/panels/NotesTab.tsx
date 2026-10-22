@@ -115,7 +115,7 @@ function NotesView({ notes }: { notes: string }) {
 /**
  * Description:
  * Werdykt bramki: u góry ramka z rozstrzygnięciem i zestawem reguł, który je wydał, pod nią
- * powody i to, co dopisać — jednakowymi sekcjami. Tego, że werdykt da się obejść, zakładka nie
+ * powody i wskazówki, co poprawić — jednakowymi sekcjami. Tego, że werdykt da się obejść, zakładka nie
  * powtarza: to kontrakt z helpdeskiem (`overridable`), a nie informacja dla oglądającego pokaz.
  *
  * Example args:
@@ -123,7 +123,7 @@ function NotesView({ notes }: { notes: string }) {
  *               hint: "Dopisz, co zrobiono.", rules_version: 1, … }
  *
  * Example result:
- *     <Space> z ramką „Blokuje — zestaw reguł nr 1" i sekcjami „Dlaczego" i „Co dopisać"
+ *     <Space> z ramką „Blokuje — zestaw reguł nr 1" i sekcjami „Dlaczego" i „Wskazówki"
  */
 function VerdictView({ verdict }: { verdict: VerdictResponse }) {
     const blocks = verdict.verdict === "block";
@@ -136,7 +136,7 @@ function VerdictView({ verdict }: { verdict: VerdictResponse }) {
                 title={`${blocks ? "Blokuje" : "Przepuszcza"} — zestaw reguł nr ${verdict.rules_version}`}
             />
             {verdict.reasons.length > 0 && <Bullets title="Dlaczego" items={verdict.reasons} />}
-            {verdict.hint !== "" && <Bullets title="Co dopisać" items={[verdict.hint]} />}
+            {verdict.hint !== "" && <Bullets title="Wskazówki" items={[verdict.hint]} />}
         </Space>
     );
 }

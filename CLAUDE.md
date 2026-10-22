@@ -1458,8 +1458,10 @@ choć nie były to sprawy błahe. Do tego **zły zapis przechodzi filtr etapu 4*
 „problem został rozwiązany" daje niepuste `solution`, więc jakości zapisu nie da się nadrobić
 filtrem po fakcie.
 
-**Bramka wysyłki** sprawdza treść wobec reguł: brak prośby o hasło, brak potocznego słownictwa,
-forma zwrotu do klienta. Reguły są **danymi** (niżej), nie kodem.
+**Bramka wysyłki** sprawdza treść wobec reguł: brak prośby o hasło, brak potocznego
+i wulgarnego słownictwa, forma zwrotu do klienta, brak prośby o niebezpieczne zachowania
+(wyłączenie antywirusa, ręczna zmiana danych w bazie…), ortografia i polskie znaki. Reguły są
+**danymi** (niżej), nie kodem.
 
 **„Popraw"** to jedyna funkcja, która **zwraca tekst do wysłania**, nie werdykt. Dlatego ma
 najostrzejsze ograniczenie: **przepisuje formę, nie treść.** Nie wolno jej dodać kroku
@@ -4783,12 +4785,26 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
   i czas na długich wątkach przeszły do p. 33; reguły — „Bramki jakości i asysta pisania”,
   „Prompty”, „Testy”.
 - [ ] **22. `gate_reply`** — reguły wysyłki jako dane (prośba o hasło, potoczne słownictwo, forma
-  zwrotu), ewaluacja per reguła, złośliwy zestaw reguł w teście-strażniku; na prawdziwych
+  zwrotu, niebezpieczne zachowania, ortografia i polskie znaki), ewaluacja per reguła, złośliwy zestaw reguł w teście-strażniku; na prawdziwych
   wiadomościach do sprawdzenia zdanie o cytatach z p. 59.3 (od 2026-10-22: regułę łamie tylko
   to, co wdrożeniowiec pisze od siebie, a cytaty to cudze słowa i reguły nie łamią): bez niego
   bramka blokowała cytat komunikatu z ekranu „Ups! Coś poszło nie tak.” jako potoczny, a czy
   z nim nie przepuszcza prośby o hasło schowanej w cytacie, nikt nie mierzył; nowe brzmienie
-  mówi to mocniej, więc to ryzyko rośnie. *Dlaczego:* fałszywy
+  mówi to mocniej, więc to ryzyko rośnie. Reguła formy zwrotu w wersji 1 wymieniała tylko
+  „Państwo”, więc bramka blokowała „Pani” w wiadomości do jednej osoby (test ręczny przez front,
+  2026-10-22). Wersja 2 podaje przykłady form dopuszczalnych (Pan, Pani, Państwo) i niepoprawnych
+  (te same małą literą, ty, on, ona), reguła słownictwa obejmuje też wulgarne, czwarta reguła
+  zakazuje prośby o niebezpieczne zachowania (dla infrastruktury IT, bezpieczeństwa i integralności
+  danych), a piąta — błędów ortograficznych. O polskich znakach reguła nie mówi osobno: brak
+  polskiej litery to błąd ortograficzny, a czy model tak go czyta, pokazuje sprawa g20; reguła
+  „tekst z polskimi znakami” blokowałaby poprawną wiadomość, w której żadne słowo ich nie wymaga
+  (g22). Scenariusze mają
+  pułapkę z „Pani” (g12), wiadomości łamiące regułę słowem „Wasz” (g13) i „pani” małą literą
+  (g14), trójkę do czwartej reguły (g15–g17: wyłączenie antywirusa, zrzut ekranu zamiast tego,
+  prośba, żeby antywirusa nie wyłączać) i piątkę do piątej (g18–g22: „wogóle” i „narazie”, ta
+  sama wiadomość poprawnie, ta sama bez polskich znaków, a jako pułapki cytat komunikatu
+  i ścieżka pliku bez polskich znaków oraz poprawna wiadomość bez słowa, które ich wymaga).
+  *Dlaczego:* fałszywy
   alarm uczy obchodzić bramkę odruchowo, a „bramka ma 90%" nie mówi, która reguła się sypie.
 - [ ] **24. `parse_ticket`** — karta zgłoszenia promptem parsującym na modelu docelowym, porównana z
   próbkami z `porownanie-modeli-parsowania.md` (zbierane jeszcze JSON-em w tekście — od 2026-10-02

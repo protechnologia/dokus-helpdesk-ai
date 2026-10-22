@@ -1,9 +1,11 @@
 {
-  "version": 1,
+  "version": 2,
   "description": "DANE KLIENTA, nie nasz kod — tak jak dict_resolution.json. Zmiana tego pliku jest konfiguracją: podbij `version`, a odpowiedź bramki poda, którą wersją wydano werdykt. Reguły wchodzą do oddzielonej sekcji danych w prompcie grafu `gate_reply` — nie mogą przestawić formatu wyjścia ani znieść zakazu zmyślania. Pusta lista to błąd: graf bez reguł nie rusza. Od p. 29 źródłem staje się magazyn reguł, a plik zostaje zestawem domyślnym. Zestaw startowy wyprowadzony z CLAUDE.md; treść stroi się z pomiarem w p. 22.",
   "rules": [
     "Wiadomość nie prosi klienta o hasło ani login.",
-    "Wiadomość nie używa potocznego słownictwa.",
-    "Wiadomość zwraca się do klienta w formie grzecznościowej („Państwo”)."
+    "Wiadomość nie używa potocznego lub wulgarnego słownictwa.",
+    "Wiadomość zwraca się do klienta w formie grzecznościowej. Przykłady dopuszczalne: Pan, Pani, Państwo. Przykłady niepoprawne: pan, pani, państwo, ty, on, ona.",
+    "Wiadomość nie prosi klienta o niebezpieczne zachowania, w tym niebezpieczne dla infrastruktury IT, bezpieczeństwa i integralności danych. Przykłady: wyłączenie antywirusa albo zapory, instalacja programu spoza oficjalnych źródeł, przesłanie kodu z SMS-a albo pliku z kluczem prywatnym, ręczna zmiana albo usuwanie danych bezpośrednio w bazie.",
+    "Wiadomość nie ma błędów ortograficznych. Przykłady niepoprawne: wogóle, narazie."
   ]
 }

@@ -122,7 +122,7 @@
   },
   "gate_reply": {
     "guarded_fields": [],
-    "rules_version": 1,
+    "rules_version": 2,
     "inputs": {
       "haslo": "Dzień dobry,\n\nw związku ze zgłoszeniem dotyczącym braku potwierdzeń UPO z ePUAP prosimy Państwa o przesłanie loginu i hasła do konta administratora skrzynki ePUAP. Po zalogowaniu sprawdzimy konfigurację skrzynki i odpowiemy najszybciej, jak to możliwe.\n\nZ poważaniem\nZespół wsparcia Dokus",
       "poprawna": "Dzień dobry,\n\ndziękujemy za przesłane informacje. Po aktualizacji z 1 października zmienił się adres usługi ePUAP, dlatego prosimy Państwa o sprawdzenie w menu Ustawienia → Skrzynki ePUAP, czy adres skrzynki kończy się na „/skrytka”. Jeśli nie, prosimy o jego poprawienie i ponowne wysłanie pisma. W razie pytań pozostajemy do Państwa dyspozycji.\n\nZ poważaniem\nZespół wsparcia Dokus"
