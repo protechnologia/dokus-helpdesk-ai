@@ -43,7 +43,7 @@ Jak czytać:
       `p05 0.499` znaczy: 5% poprawnych trafień ma score poniżej 0,499. Próg ma stanąć między
       tymi rozkładami — tu nachodzą na siebie między 0,41 a 0,49.
     - Wiersz tabeli to jeden kandydat na próg.
-    - „poprawne zachowane" — ile ze 162 zapytań nadal dostaje swój rekord. To cena progu.
+    - „poprawne zachowane" — ile zapytań golden setu nadal dostaje swój rekord. To cena progu.
     - „dystraktory wyciszone całkiem" — ile z 16 zapytań bez odpowiednika nie dostaje już nic.
       To zysk, o który chodzi.
     - „trafienia dystraktorów odcięte" — ile z 80 pojedynczych złych trafień (16 zapytań po 5)
@@ -141,15 +141,23 @@ def _load_queries(
 ) -> list[dict]:
     """
     Description:
-    Reads golden-set queries — the ones that DO have a target in the index.
+    Czyta zapytania golden setu, które mają cel w indeksie: te przy wpisach z wiedzą, każde
+    z numerem swojego zgłoszenia.
 
     Example args:
         golden_path=Path("data/unsafe/golden/tickets.json")
 
     Example result:
-        [{"expected_ticket_id": 5641, "query_raw": "Dzień dobry, nie mogę…", …}]
+        [{"ticket_id": "5641", "query_raw": "Dzień dobry, nie mogę…", …}]
     """
-    return json.loads(golden_path.read_text(encoding="utf-8"))["queries"]
+    golden  = json.loads(golden_path.read_text(encoding="utf-8"))
+    queries = [
+        {"ticket_id": entry["ticket_id"], **entry["query"]}
+        for entry in golden["tickets"]
+        if entry["useful"] and "query" in entry
+    ]
+
+    return queries
 
 
 def _load_distractors(
@@ -429,7 +437,7 @@ def _measure(
         golden_hits     = _search(qdrant_client, collection, golden_vectors, top_k)
         distractor_hits = _search(qdrant_client, collection, distractor_vectors, top_k)
 
-    correct = _correct_scores(golden_hits, [str(q["expected_ticket_id"]) for q in queries])
+    correct = _correct_scores(golden_hits, [q["ticket_id"] for q in queries])
 
     return points, queries, correct, distractor_q, distractor_hits
 
@@ -559,9 +567,8 @@ def detail(
     typer.echo(f"\nTracone trafienia poprawne przy progu {threshold:.2f}: {len(lost)}\n")
 
     for query, score in sorted(lost, key=lambda pair: pair[1]):
-        typer.echo(f"  {query['expected_ticket_id']:>6}  score {score:.3f}")
+        typer.echo(f"  {query['ticket_id']:>6}  score {score:.3f}")
         typer.echo(f"          Q: {query['query_raw'][:96]}")
-        typer.echo(f"          P: {query['expected_problem'][:96]}")
 
     if missing:
         typer.echo(

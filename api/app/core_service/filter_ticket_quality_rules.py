@@ -34,8 +34,8 @@ def not_useful(
     raportu jest uzasadnienie modelu (`useful_reason`), żeby każde odrzucenie dało się sprawdzić;
     karta przydatna przechodzi.
 
-    Na 200 kartach odniesienia (golden200, `gpt-6.1-sol`, 2026-10-23) reguła odrzuca 59 z 74
-    oznaczonych odrzuceń i żadnego ze 126 dobrych rekordów.
+    Na 200 kartach odniesienia (golden200, `gpt-6.1-sol`, 2026-10-23) reguła odrzuca 59 z 65
+    rekordów oznaczonych jako bez wiedzy i żadnego ze 135 dobrych.
 
     Example args:
         ticket=ParsedTicket(ticket_id="34071", useful=False,

@@ -6,9 +6,14 @@ wyszukiwania po znaczeniu i filtra jakości.
 
 from pathlib import Path
 
-# Zapytania golden setu, każde ze wskazanym rekordem-celem, i etykiety przeglądu korpusu
-# (`rejected`: rekordy bez wiedzy). Dane klienta, poza repo.
+# Golden set: wpis na każde zgłoszenie korpusu odniesienia z etykietą przeglądu (`useful`)
+# i opcjonalnym zapytaniem, którego jest celem. Dane klienta, poza repo.
 GOLDEN_FILE = Path("data/unsafe/golden/tickets.json")
+
+# Warstwy zapytań, po których `scripts/eval_embeddings.py` liczy wyniki osobno: rodzaj sprawy
+# i trudność zapytania. Wartość spoza listy dałaby w tabeli pomiaru osobny wiersz.
+QUERY_KINDS        = ("eksploatacyjne", "wdrożeniowo-migracyjne")
+QUERY_DIFFICULTIES = ("typowe", "trudne")
 
 # Dystraktory: zapytania bez odpowiednika w indeksie, na które poprawną odpowiedzią jest pusty
 # wynik.
@@ -32,10 +37,10 @@ MIN_TARGET_RETURNED = 123
 # Trafienie na zapytanie bez odpowiednika wygląda na odpowiedź, a nią nie jest.
 MAX_DISTRACTORS_WITH_HITS = 8
 
-# Próg: rekordy oznaczone w przeglądzie jako bez wiedzy, które filtr odrzuca. Zmierzone 59 z 74
+# Próg: rekordy oznaczone w przeglądzie jako bez wiedzy, które filtr odrzuca. Zmierzone 59 z 65
 # (2026-10-23, karty `gpt-6.1-sol`); próg niżej, żeby wyłapać filtr, który zamilkł, a nie dryf.
 MIN_LABELLED_DROPS = 55
 
-# Próg: rekordy uznane w przeglądzie za dobre, które filtr odrzuca. Zmierzone 0 ze 126. Fałszywy
+# Próg: rekordy uznane w przeglądzie za dobre, które filtr odrzuca. Zmierzone 0 ze 135. Fałszywy
 # alarm jest droższą pomyłką: dobry rekord znika z indeksu niezauważony.
 MAX_FALSE_POSITIVES = 2

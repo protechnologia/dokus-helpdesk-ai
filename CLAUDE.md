@@ -129,8 +129,10 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
    i jednorazowy. Re-index **nigdy** nie wymaga ponownego wołania LLM.
    - **Zasada zaczyna obowiązywać dla artefaktu z masowego importu (p. 31)** — jednego przebiegu
      całego korpusu zamrożoną wersją promptu. Dziś w `data/unsafe/parsed/` leży
-     `bielik-11b-golden200/` (200 artefaktów, podstawa golden setu — ma przetrwać import) i próbki
-     porównawcze parserów, które import nadpisze albo skasuje.
+     `gpt-6.1-sol-golden200-v2/` (200 artefaktów, korpus golden setu od 2026-10-23),
+     `bielik-11b-golden200/` (te same zgłoszenia starszym promptem, na nich pisano zapytania) —
+     oba mają przetrwać import — i próbki porównawcze parserów, które import nadpisze albo
+     skasuje.
    - Pomiary „na 661 rekordach" pochodzą z wcześniejszej próbki, skasowanej 2026-07-31. Zniknęły
      pliki, nie wiedza — liczby pozostają wiążące.
 8. **Qdrant jest indeksem, nie źródłem prawdy.** Musi dać się skasować i odbudować z katalogu
@@ -1275,7 +1277,8 @@ Serce projektu. **Ten schemat jest kontraktem** — trzyma go model Pydantic w
 `api/app/core_model/tickets/parsed_ticket.py` i to on rozstrzyga, co jest poprawnym artefaktem.
 
 **Rdzeń: 10 pól** (ustalone 2026-07-31, po przeglądzie pod kątem uniwersalności produktu —
-schemat pierwotny miał 17 i był projektowany pod ten jeden korpus, nie pod produkt):
+schemat pierwotny miał 17 i był projektowany pod ten jeden korpus, nie pod produkt), **a od
+2026-10-23 trzynaście** — trzy ostatnie wiersze tabeli doszły w p. 24:
 
 | pole | rola | embedowane |
 |---|---|---|
@@ -1289,6 +1292,16 @@ schemat pierwotny miał 17 i był projektowany pod ten jeden korpus, nie pod pro
 | `solution`    | co rozwiązało sprawę, **wraz z zastrzeżeniami** | **nie** |
 | `resolution`  | klasa rozstrzygnięcia — **słownik konfigurowalny** | nie |
 | `questions_summary` | synteza: czego konsultant nie wiedział i o co dopytywał | nie |
+| `excluded_causes` | przyczyny sprawdzone i wykluczone w wątku (lista, pusta przy braku) | nie |
+| `useful`      | czy karta przyda się przy innej sprawie — na nim stoi filtr jakości | nie |
+| `useful_reason` | jednym zdaniem, co w wątku przesądziło o `useful` | nie |
+
+- **Wykluczenie jest prawdą tylko w swojej sprawie.** `excluded_causes` dostaje agent w karcie
+  (`read_tickets_card`) jako materiał na pytania rozróżniające, z zasadą, że w innej sprawie ta
+  sama przyczyna może być prawdziwa. Osobne pole, a nie zdanie w `cause`, bo „brak” z dopiskiem
+  o wykluczeniu byłby sentinelem w przebraniu.
+- **`useful` i `useful_reason` są dla filtra, nie dla agenta** — `read_tickets_card` ich nie
+  pokazuje: karta w indeksie przeszła filtr, więc `useful` byłoby zawsze prawdą.
 
 **Założenie fundujące: jedna instancja produktu obsługuje jeden helpdeskowany produkt.**
 Stąd nie ma pola `system` — nazwa własnej aplikacji jest stała dla instancji, więc byłaby
@@ -1344,8 +1357,8 @@ Zasady schematu:
   (`useful` = false), a nie po `resolution` ani po słowie „brak” w `solution` (decyzja
   2026-10-23).** Model widzi cały wątek, a filtr tylko kartę: sygnały braku wiedzy
   („omówione telefonicznie”, „instrukcja w załączeniu”, echo prośby „usunięto sprawę”) przy
-  parsowaniu giną. Na golden200 sparsowanym `gpt-6.1-sol` reguła `not_useful` odrzuca 59 z 74
-  rekordów bez wiedzy i żadnego ze 126 dobrych; dawna reguła po „brak” w `solution` odrzucała
+  parsowaniu giną. Na golden200 sparsowanym `gpt-6.1-sol` reguła `not_useful` odrzuca 59 z 65
+  rekordów bez wiedzy i żadnego ze 135 dobrych; dawna reguła po „brak” w `solution` odrzucała
   karty z ustaloną przyczyną w `cause` i wpuszczała echo prośby. Raport podaje przy każdym
   odrzuceniu `useful_reason`. Cena: filtr stoi na jednej ocenie modelu, która dla tego samego
   wątku potrafi wyjść różnie w dwóch przebiegach, a reguła pola `useful` w prompcie parsującym
@@ -1370,7 +1383,10 @@ Wejście do promptu z etapu 1. Czytaj **cały wątek**, nie komentarz wybrany po
 mówi, **czego NIE robić** · zapisuj **oba kody błędu** — ten z ekranu
 (po nim użytkownik szuka) i ten z logów (on identyfikuje problem) — i **normalizuj** je,
 obcinając ścieżki instalacji i wartości kluczy · nie przenoś liczb specyficznych dla instalacji,
-**ale liczby narzucone przez operatorów zachowuj zawsze**.
+**ale liczby narzucone przez operatorów zachowuj zawsze**. Od 2026-10-23 prompt mówi to ogólniej:
+pomija wartości właściwe tylko tej instalacji, a zachowuje te, które obowiązują w każdej.
+Kryterium to zasięg wartości, a nie jej rodzaj ani źródło, bo limit bywa ustawieniem jednej
+instalacji, a wymóg samej aplikacji obowiązuje wszystkich, choć nie narzuca go żaden operator.
 
 **Zastrzeżenia mają CZTERY wymiary** i są obowiązkowe, nie opcjonalne: skutek uboczny · **zasięg
 zmiany** („ustawienie globalne, dotyczy wszystkich" — przy RODO bywa rozstrzygające) · **zakres
@@ -3033,14 +3049,25 @@ dobre rozwiązanie: pierwsze mają trafiać w niewiadome, drugie w sprawdzony kr
 Zestaw to **syntetyczne zapytania**, nie pary historycznych zgłoszeń: produkt bierze nowe
 zgłoszenie i szuka podobnych, więc para `ticket ↔ ticket` mierzyłaby coś, czego produkt nie robi.
 Uboczny zysk: znika problem singletonów (47% rekordów nie ma bliskiego sąsiada), bo **zapytanie
-dostaje każdy rekord**. Pliki: `data/unsafe/golden/tickets.json` (126 zapytań i 74 odrzucenia
-z powodem; do 2026-10-10 `golden200.json`, potem do 2026-10-15 `tickets-dokus.json`), korpus
+dostaje każdy rekord**. Pliki: `data/unsafe/golden/tickets.json` (200 wpisów: 135 z wiedzą, 65 bez i 126
+zapytań; do 2026-10-10 `golden200.json`, potem do 2026-10-15 `tickets-dokus.json`), korpus
 `data/unsafe/parsed/gpt-6.1-sol-golden200-v2/` (200 kart, od 2026-10-23; wcześniej
 `bielik-11b-golden200/`) i dystraktory
 `data/unsafe/golden/tickets-distractors.json` (wcześniej `distractors.json`, potem
 `tickets-dokus-distractors.json`) — materiał wielokrotnego użytku przy każdej zmianie modelu. „Golden200" zostaje nazwą próbki 200 zgłoszeń
 i katalogu z jej kartami.
 
+- **Plik to jedna lista wpisów, po jednym na każde zgłoszenie korpusu odniesienia (2026-10-23,
+  wcześniej listy `queries` i `rejected` o dwóch kształtach).** Wpis ma `ticket_id`, etykietę
+  `useful` z `useful_reason` — nazwy jak w karcie, więc pomiar filtra to porównanie pole w pole —
+  i opcjonalne `query` z warstwami `kind` i `difficulty`. Najpierw wpisy z wiedzą, potem bez,
+  w obu po numerze, a liczniki obu grup i zapytań stoją w metryczce. `useful_reason` to
+  uzasadnienie modelu tam, gdzie etykieta się z nim zgadza (194 z 200), a przy niezgodnych powód
+  z przeglądu, więc rozbieżność widać w samym pliku. Zapytanie przy wpisie bez wiedzy zostaje na
+  wypadek powrotu etykiety; pomiar wyszukiwania go nie bierze, bo celu nie ma w indeksie. Wyniku
+  filtra plik nie trzyma, a kopie `expected_problem` i `expected_cause` z kart Bielika wypadły.
+  Spójność z korpusem (liczniki, wpis na zgłoszenie, kolejność, uzasadnienia, warstwy) pilnuje
+  `test_api_agent_tools_golden_tickets_data.py`, bez stacku.
 - **Każde zapytanie ma dwa kształty: `query_raw` i `query_problem` + `query_symptoms`** (dopisane
   2026-10-03, także w dystraktorach). Drugi to kształt narzędzia `find_tickets_vector`, napisany
   **wyłącznie z `query_raw`, bez wglądu w rekord-cel**, według opisu narzędzia dla agenta. Zastępuje
@@ -3060,8 +3087,9 @@ i katalogu z jej kartami.
 - **Liczba odrzuceń jest wynikiem, nie odpadem** — wyszło 19% (38 z 200) wobec 25–26% z pomiaru
   na 661 rekordach; różnica jest wyjaśnialna (tamto kryterium było szersze: „przydatne do
   zaproponowania komuś"). Odrzucone zostają w pliku **z powodem** — to gotowe wejście do filtru
-  etapu 4. Po przeglądzie wątków z 2026-10-23 odrzuceń jest 74, bo etykiety szły za kartami
-  Bielika, które dopisywały przyczynę albo rozwiązanie, których w wątku nie ma.
+  etapu 4. Po przeglądzie wątków z 2026-10-23 rekordów bez wiedzy jest 65: 36 przeszło do nich,
+  bo etykiety szły za kartami Bielika, które dopisywały przyczynę albo rozwiązanie, których
+  w wątku nie ma, a 9 wróciło do wiedzy po ocenie `useful` na nowych kartach.
   - **Pierwotnie było 35; trzy dołożono 2026-08-13 przy budowie filtru** (6773, 7468, 10718 —
     puste `cause` i `solution`, czyli kryterium, po którym odrzucono 17 innych). **Wniosek na
     przyszłe przeglądy: ręczna klasyfikacja 200 rekordów po kolei jest niekonsekwentna i wychodzi
@@ -3894,7 +3922,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/numbered_lines/`       | linie z numerami z wyniku `read_code_file` i `read_code_symbol` rozebrane z powrotem na pary „numer, treść" (`numbered_pairs()`), same numery (`line_numbers()`) albo samą treść (`line_texts()`) |
 | `tests/_helpers/synthetic_code/`       | aplikacja syntetyczna: zbudowana paczka, jej źródło i reguły, opis projektu, mapa symboli, zapytania z zestawu syntetycznego i prawdziwe narzędzia kodu na niej (`synthetic_code_tools()`) |
 | `tests/_helpers/synthetic_docs/`       | dokumentacja syntetyczna: indeks wobec paczki (`table_differences()`, `collection_differences()`) i pomiary obu wyszukiwań w dokumentacji |
-| `tests/_helpers/golden_tickets/`       | golden set zgłoszeń: zapytania, dystraktory, korpus odniesienia, pomiar `find_tickets_vector` i filtra jakości |
+| `tests/_helpers/golden_tickets/`       | golden set zgłoszeń: wpisy z etykietami i zapytaniami (`golden_set()`), dystraktory, korpus odniesienia, pomiar `find_tickets_vector` i filtra jakości |
 | `tests/_helpers/golden_anonymization/` | golden set anonimizatora: oba zestawy, ocena przecieków i zniszczonej wiedzy, pomiar z licznikami na rodzaj (`measure_anonymization()`), kontrola zaznaczeń (`annotation_problems()`) i wzorcowa zamiana (`ideal_anonymizer()`) |
 | `tests/_helpers/anonymizer_llm/`      | model anonimizujący usługi `anonymizer`: odpowiedź Chat Completions (`chat_answer()`), klient modelu na atrapie transportu (`model_client_on()`) i odpowiadający węzłom osób i adresów (`scripted_llm()`), konfiguracja z `.env` dla `llm_live` (`live_agent_settings()`), pomiar silnika `agent` na golden secie (`measure_agent()`), przecieki ponad próg i progi |
 | `tests/_helpers/patterns/`            | wzorce usługi `anonymizer`: tekst po zamianie miejscami z jednego wariantu (`replaced_by()`), zamiana wszystkimi wzorcami jako funkcja do pomiaru golden setu (`anonymize_with_patterns()`), rodzaje od wzorców, progi przecieków na zestaw i odczyt pomiaru (`kinds_over_threshold()`, `leaked_fragments()`, `destroyed_fragments()`, `removed_kinds()`) |
@@ -4003,6 +4031,10 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Filtr odrzucający dopiero przy „brak” w `solution` i `useful` = false** — nie gubił dobrych
   kart, ale zostawiał w indeksie 36 z 71 pustych, a trafienie bez treści jest gorsze niż brak
   trafienia. Wraca, gdyby ocena `useful` okazała się niestabilna na pełnym korpusie (p. 33).
+- **Golden set zgłoszeń w dwóch plikach, z wiedzą i bez** (2026-10-23) — etykieta to pole,
+  a nie miejsce wpisu, więc jej zmiana to zmiana pola, a nie przenoszenie wpisu między plikami.
+- **Wynik filtra jakości w golden secie** — liczy go pomiar przy każdym przebiegu, a zapisany
+  w pliku zestarzałby się przy pierwszej zmianie kart albo reguły.
 - **Dopisek do reguły pola `useful` o czynności jednorazowej** (2026-10-23, „Sam fakt, że coś
   zrobiono, to za mało”, „Zlecenie, w którym klient wie, co zrobić, to nie wiedza” i osiem
   innych) — dopisek miał być kilkusłowny i ogólny, a żaden z dziesięciu wariantów w dwóch
@@ -4853,56 +4885,14 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
   trasę z anonimizatorem bez błędu na `gpt-6.1-sol`, do tego test ręczny przez front; pomiar na
   prawdziwych wiadomościach, w tym prośba o hasło schowana w cytacie, przeszedł do p. 33;
   reguły — „Bramki jakości i asysta pisania”, „Prompty”, „Testy”.
-- [ ] **24. `parse_ticket`** — karta zgłoszenia promptem parsującym na modelu docelowym, porównana z
-  próbkami z `porownanie-modeli-parsowania.md` (zbierane jeszcze JSON-em w tekście — od 2026-10-02
-  karta wychodzi narzędziem `respond_parse_ticket`). Układ zrobiony 2026-10-23: prompt
-  systemowy w sekcjach, z „Anonimizacją" i „Danymi wejściowymi" jak w pozostałych grafach, opis
-  narzędzia w układzie opisu narzędzia; frazy zamrożone zostały, bez wersalików w obu plikach
-  („komplet zastrzeżeń”, „Zachowaj konkrety”) i w trybie orzekającym w prompcie
-  systemowym („Czytasz cały wątek”, „Rozwiązanie może pochodzić od klienta”, „Zapisujesz
-  rozstrzygnięcie końcowe”, „Nie przepisujesz danych…”); reguły pól nie powtarzają tabelki,
-  tylko mówią, jak pole wypełnić; reguła o liczbach mówi
-  ogólniej („Pomijasz wartości właściwe tylko tej instalacji…, a zachowujesz te, które
-  obowiązują w każdej instalacji…”; kryterium to zasięg wartości, nie jej rodzaj ani źródło,
-  bo limit bywa ustawieniem jednej instalacji, a wymóg samej aplikacji obowiązuje wszystkich),
-  a za „nigdy zmyśloną” strażnik pilnuje „NIE ZMYŚLASZ.”. Kolejność dalej (decyzja 2026-10-23):
-  1. **Pole „nadaje się do bazy wiedzy" razem z ponownym parsowaniem golden200** — tak/nie
-     z jednozdaniowym uzasadnieniem w osobnym polu, wymagane w `ParsedTicket`, w odpowiedzi
-     `/parse-ticket` i we froncie; filtr jakości odrzuca kartę z `useful` = false (zrobione
-     2026-10-23, po przeglądzie 67 wątków rozbieżnych z etykietami: 36 etykiet poprawionych,
-     golden ma 126 rekordów z wiedzą i 74 bez; 9 kolejnych zmieni się z „bez wiedzy” na
-     „wiedza” przy nowym kształcie pliku, bo nie mają zapytań; potem ocena `useful` różni się
-     od etykiet w 6 kartach z 200, wszystkich przepuszczonych: 4 to czynność jednorazowa albo
-     wątek bez rozstrzygnięcia, 2 są sporne). Model widzi cały wątek, a filtr tylko
-     kartę, więc sygnały braku wiedzy („omówione telefonicznie", „instrukcja w załączeniu",
-     broadcast) giną przy parsowaniu. Pole wymagane unieważnia karty bez niego, więc golden200
-     parsuje się od nowa do nowego katalogu obok `bielik-11b-golden200/` (tego nie
-     nadpisujemy), a indeks i testy na golden200 przechodzą na nowy katalog. W tym samym
-     kroku pole `excluded_causes` (lista, pusta przy braku): przyczyny, które wątek sprawdził
-     i wykluczył. Dziś zasada „odrzucony trop wspominasz jednym zdaniem” nie mówi, w którym
-     polu; w `cause` wykluczenie przy nieustalonej przyczynie dawałoby „brak” z dopiskiem,
-     czyli sentinel w przebraniu. Pole idzie też do karty dla agenta (`read_tickets_card`),
-     bo wykluczenia to materiał na pytania rozróżniające; zasada o tropie przenosi się wtedy
-     z promptu systemowego do reguły pola.
-  2. **Luki z porównania** — zgłoszenie informacyjne bez treści (6 wariantów z 9), pytania
-     proceduralne w `questions_summary` mimo zakazu (4 modele) i sentinele w przebraniu w tym
-     polu (28 kart z 200). Niepotwierdzoną hipotezę w `cause` (4 modele z 8) reguła pola
-     wyklucza od 2026-10-23 („tylko przyczynę potwierdzoną w wątku, bez domysłów”), a opis
-     `problem` obejmuje pytanie o działanie systemu; czy to wystarcza, pokaże pomiar.
-  3. **Scenariusze z p. 59 i pomiar** na 10 zgłoszeniach z porównania, po anonimizatorze.
-  4. **Nowy kształt `data/unsafe/golden/tickets.json`** (decyzja 2026-10-23): jedna lista, wpis
-     na każde z 200 zgłoszeń — `ticket_id`, etykieta `useful` z `useful_reason` (nazwy jak
-     w karcie, więc pomiar to porównanie pole w pole) i opcjonalne `query` z `kind`
-     i `difficulty` (warstwy w `eval_embeddings.py`). Zastępuje listy `queries` i `rejected`
-     o dwóch kształtach; kopie `expected_problem` i `expected_cause` z kart Bielika wypadają.
-     Jeden plik, nie dwa: etykieta to pole, a nie miejsce wpisu, więc jej zmiana to zmiana
-     pola. Dla czytelności najpierw wpisy `useful: true`, potem `false`, w obu po numerze,
-     `useful` zaraz po `ticket_id`, a w metryczce liczniki obu grup, sprawdzane testem
-     spójności. Wyniku filtra plik nie trzyma: liczy go pomiar, a przebieg trafia do raportu.
-
-  *Dlaczego:* ten sam prompt buduje korpus przy masowym imporcie (p. 31) i przy powrocie
-  zamkniętych zgłoszeń (p. 30), więc jego jakość na modelu docelowym rozstrzyga o jakości
-  indeksu.
+- [x] **24. `parse_ticket`** (2026-10-23) — prompt systemowy w sekcjach z „Anonimizacją”
+  i „Danymi wejściowymi”, opis `respond_parse_ticket` w układzie opisu narzędzia, z regułą na pole
+  w „Zasadach”; trzy nowe pola karty (`excluded_causes`, `useful`, `useful_reason`) i filtr
+  jakości na `useful`; golden200 sparsowany od nowa na `gpt-6.1-sol` (około 1 USD) i przegląd
+  etykiet: 135 z wiedzą, 65 bez, ocena modelu zgodna w 194 z 200; `tickets.json` jako jedna lista
+  wpisów z testem spójności; luki z porównania, scenariusze z p. 59, test ręczny przez front
+  i pomiar na 10 zgłoszeniach przeszły do p. 31; reguły — „Domena”, „Prompty”, „Warstwa grafów”,
+  „Golden set retrievalu”, „Świadomie pominięte”.
 - [ ] **27. `suggest_handoff`** — prompt niosący, co sprawdzono i czego brakuje; do
   rozstrzygnięcia, czy wariant dostaje narzędzia kodu (namiar na plik i warunek w przekazaniu),
   bo dziś nie ma pętli narzędzi — jeśli dostanie, punkt idzie za p. 26, na opisach narzędzi
@@ -4930,7 +4920,7 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
       w kontenerze, na tej samej fabryce grafów co trasy, z kosztem przebiegu w raporcie (zapis
       artefaktu po KAŻDYM zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed
       parsowaniem, model parsujący wybrany na podstawie `porownanie-modeli-parsowania.md`
-      i pomiaru z p. 24, czytnik SQL, wznawianie, raport, porządek
+      i pomiaru promptu parsującego, czytnik SQL, wznawianie, raport, porządek
       w `data/unsafe/parsed/` (golden200 zostaje); zanonimizowany wątek idzie do tabeli
       wyszukiwania, którą ten przebieg zakłada — do ustalenia, czy każdego
       zgłoszenia, czy tylko tych z kartą przyjętą przez filtr jakości (wątek musi mieć każdy
@@ -4938,7 +4928,13 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
       zapytań tekstowych do zgłoszeń (komunikaty i kody błędów z wątków, w polach `exact`
       i `words`) i test ewaluacyjny `find_tickets_text` z progiem — dziś narzędzie ma tylko
       test integracyjny na pięciu zmyślonych wątkach, a golden set zgłoszeń ma zapytania
-      wyłącznie w kształcie wyszukiwania po znaczeniu. *Dlaczego:* to jedyny
+      wyłącznie w kształcie wyszukiwania po znaczeniu. Przed przebiegiem prompt parsujący,
+      zamknięty w p. 24 bez pomiaru: luki z porównania — zgłoszenie informacyjne bez treści
+      (6 wariantów z 9), pytania proceduralne w `questions_summary` mimo zakazu (4 modele)
+      i sentinele w przebraniu w tym polu (28 kart z 200); czy reguła `cause` „tylko przyczyna
+      potwierdzona w wątku” wystarcza na niepotwierdzone hipotezy (4 modele z 8); scenariusze
+      z p. 59 na nowym prompcie (wstrzyknięcia w karcie), test ręczny przez front i pomiar na
+      10 zgłoszeniach z porównania, po anonimizatorze. *Dlaczego:* to jedyny
       drogi przebieg (zasada 7), więc anonimizator i prompt muszą być gotowe przed nim.
 - [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
   „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy. *Dlaczego:* 77 ze 123 zgłoszeń

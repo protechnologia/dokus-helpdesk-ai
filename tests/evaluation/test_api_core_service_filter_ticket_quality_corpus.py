@@ -5,8 +5,8 @@ porównuje z etykietami z ręcznego przeglądu tych samych rekordów.
 
 | co mierzy                                     | próg           | zmierzone dziś |
 |-----------------------------------------------|----------------|----------------|
-| odrzucone spośród 74 oznaczonych „bez wiedzy" | co najmniej 55 | 59             |
-| odrzucone spośród 126 uznanych za dobre       | najwyżej 2     | 0              |
+| odrzucone spośród 65 oznaczonych „bez wiedzy" | co najmniej 55 | 59             |
+| odrzucone spośród 135 uznanych za dobre       | najwyżej 2     | 0              |
 
 Po co: reguła filtra czyta ocenę wydaną przez model (`useful`), więc psuje się przez zamilknięcie.
 Zmiana reguły tego pola w prompcie parsującym albo podmiana modelu i nagle każda karta jest
@@ -17,7 +17,7 @@ nie zauważy. Filtr jest dziś 1:1 z oceną modelu, więc test mierzy w praktyce
 Co się dzieje po drodze (`measure_filter()` z `tests/_helpers/golden_tickets/`):
 
 1. Czyta 200 artefaktów z `data/unsafe/parsed/gpt-6.1-sol-golden200-v2/`.
-2. Czyta id rekordów oznaczonych w przeglądzie jako niosące zero wiedzy (`rejected`
+2. Czyta id rekordów oznaczonych w przeglądzie jako niosące zero wiedzy (`useful` = false
    w `data/unsafe/golden/tickets.json`).
 3. Uruchamia `filter_tickets()` i liczy, ile odrzuceń trafia w oznaczone, a ile poza nie.
 
@@ -28,8 +28,8 @@ O czym pamiętać przy zmianach:
 - Progi stoją obok zmierzonych wartości z zapasem: zwykły dryf nie ma wywalać testu, zamilknięcie
   filtra ma.
 - Etykiety powstały w sierpniu z kart Bielika i zostały poprawione 2026-10-23 po przeczytaniu
-  wątków rozbieżnych z nowymi kartami (33 zmiany, powody w `tickets.json`). Test mierzy zgodność
-  z tym przeglądem, nie poprawność filtra.
+  wątków rozbieżnych z nowymi kartami (36 rekordów do „bez wiedzy”, 9 z powrotem do „wiedza”,
+  powody w `useful_reason`). Test mierzy zgodność z tym przeglądem, nie poprawność filtra.
 """
 
 
@@ -65,7 +65,7 @@ def measurement() -> FilterMeasurement:
 
 
 def test_filter_still_recognises_hollow_records(measurement: FilterMeasurement) -> None:
-    """Sprawdza, czy filtr jakości nadal odrzuca zgłoszenia bez wiedzy: z 74 rekordów, które przy
+    """Sprawdza, czy filtr jakości nadal odrzuca zgłoszenia bez wiedzy: z 65 rekordów, które przy
     przeglądzie uznano za bezwartościowe, ma odrzucić co najmniej 55.
 
     Wyłapuje sytuację, w której po zmianie promptu parsującego albo modelu filtr przestaje
@@ -77,7 +77,7 @@ def test_filter_still_recognises_hollow_records(measurement: FilterMeasurement) 
 
 
 def test_filter_does_not_reject_good_records(measurement: FilterMeasurement) -> None:
-    """Sprawdza, czy filtr jakości nie wyrzuca dobrych zgłoszeń: ze 126 rekordów, które przy
+    """Sprawdza, czy filtr jakości nie wyrzuca dobrych zgłoszeń: ze 135 rekordów, które przy
     przeglądzie uznano za dobre, wolno mu odrzucić najwyżej 2.
 
     Wyłapuje regułę filtra, która stała się za szeroka i po cichu usuwa z indeksu przydatne

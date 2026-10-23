@@ -17,10 +17,9 @@ a testy jednostkowe i integracyjne na trzech zmyślonych zgłoszeniach tego nie 
 
 Co się dzieje po drodze:
 
-1. `measure_tickets_vector()` z `tests/_helpers/golden_tickets/` czyta zapytania
-   z `data/unsafe/golden/tickets.json` (126, każde ze wskazanym
-   rekordem-celem) i z `data/unsafe/golden/tickets-distractors.json` (16, bez odpowiednika
-   w indeksie).
+1. `measure_tickets_vector()` z `tests/_helpers/golden_tickets/` czyta zapytania przy wpisach
+   z wiedzą z `data/unsafe/golden/tickets.json` (126, każde ze wskazanym rekordem-celem)
+   i z `data/unsafe/golden/tickets-distractors.json` (16, bez odpowiednika w indeksie).
 2. Każde wysyła do `FindTicketsVectorTool` polami `query_problem` i `query_symptoms`, na
    skonfigurowanej kolekcji, z `RAG_TOP_K` i `RAG_SCORE_MIN` z konfiguracji.
 3. Liczy, ile razy rekord-cel wrócił jako pierwszy, ile razy wrócił w ogóle i ile dystraktorów

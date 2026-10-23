@@ -6,17 +6,21 @@ po znaczeniu na stacku i filtra jakości na plikach.
 
 | co                         | do czego                                                     |
 |----------------------------|--------------------------------------------------------------|
-| `golden_queries()`         | zapytania golden setu w parze z id rekordu-celu              |
+| `golden_set()`             | cały plik golden setu: liczniki z metryczki i wpisy          |
+| `golden_queries()`         | zapytania przy wpisach z wiedzą, w parze z id rekordu-celu   |
 | `distractor_queries()`     | zapytania bez odpowiednika w indeksie                        |
 | `measure_tickets_vector()` | pomiar `find_tickets_vector` na skonfigurowanej kolekcji     |
 | `corpus()`                 | artefakty korpusu odniesienia                                |
-| `rejected_ids()`           | id rekordów oznaczonych w przeglądzie jako bez wiedzy        |
+| `not_useful_ids()`         | id rekordów oznaczonych w przeglądzie jako bez wiedzy        |
 | `measure_filter()`         | odrzucenia filtra jakości wobec etykiet przeglądu            |
 
 O czym pamiętać przy zmianach:
 
 - `data/` nie ma w repo (PII), więc fixture pomiaru sprawdza obecność plików i bez nich pomija
   testy; funkcje stąd zakładają, że pliki są.
+- Zapytanie stoi też przy kilku wpisach bez wiedzy, na wypadek powrotu etykiety. Pomiar
+  wyszukiwania bierze zapytania tylko przy wpisach z wiedzą, bo cel bez wiedzy filtr wyrzuca
+  z indeksu i nie miałby jak wrócić.
 - `query_problem` i `query_symptoms` napisano z samego `query_raw`, bez wglądu w rekord-cel. Nie
   wolno ich poprawiać pod wynik: zastępują zapytanie agenta do czasu pomiaru na prawdziwym modelu
   (p. 23).
@@ -42,15 +46,47 @@ from tests._helpers.golden_tickets.constants import (
     GOLDEN_FILE,
 )
 from tests._helpers.golden_tickets.models.filter_measurement import FilterMeasurement
+from tests._helpers.golden_tickets.models.golden_query import GoldenQuery
+from tests._helpers.golden_tickets.models.golden_set import GoldenSet
+from tests._helpers.golden_tickets.models.golden_ticket import GoldenTicket
 from tests._helpers.golden_tickets.models.tickets_vector_measurement import (
     TicketsVectorMeasurement,
 )
 
 
+def golden_set() -> GoldenSet:
+    """
+    Description:
+    Czyta golden set zgłoszeń: liczniki z metryczki i wpisy w kolejności z pliku, każdy
+    z etykietą przeglądu i zapytaniem, jeśli je ma.
+
+    Example args:
+        (brak)
+
+    Example result:
+        GoldenSet(counts={"useful": 135, "not_useful": 65, "queries": 126},
+                  tickets=[GoldenTicket(ticket_id="5641", useful=True, …), …])
+    """
+    data    = json.loads(GOLDEN_FILE.read_text(encoding="utf-8"))
+    tickets = [
+        GoldenTicket(
+            ticket_id     = entry["ticket_id"],
+            useful        = entry["useful"],
+            useful_reason = entry["useful_reason"],
+            query         = GoldenQuery(**entry["query"]) if "query" in entry else None,
+        )
+        for entry in data["tickets"]
+    ]
+    golden = GoldenSet(counts=data["meta"]["counts"], tickets=tickets)
+
+    return golden
+
+
 def golden_queries() -> list[tuple[str, FindTicketsVectorQuery]]:
     """
     Description:
-    Czyta zapytania golden setu w kształcie narzędzia, każde w parze z id rekordu-celu.
+    Czyta zapytania przy wpisach z wiedzą, w kształcie narzędzia, każde w parze z id
+    rekordu-celu.
 
     Example args:
         (brak)
@@ -58,16 +94,16 @@ def golden_queries() -> list[tuple[str, FindTicketsVectorQuery]]:
     Example result:
         [("90001", FindTicketsVectorQuery(problem="Nie przychodzą przesyłki…", symptoms="…")), …]
     """
-    golden  = json.loads(GOLDEN_FILE.read_text(encoding="utf-8"))
     queries = [
         (
-            str(entry["expected_ticket_id"]),
+            ticket.ticket_id,
             FindTicketsVectorQuery(
-                problem  = entry["query_problem"],
-                symptoms = entry["query_symptoms"],
+                problem  = ticket.query.query_problem,
+                symptoms = ticket.query.query_symptoms,
             ),
         )
-        for entry in golden["queries"]
+        for ticket in golden_set().tickets
+        if ticket.useful and ticket.query is not None
     ]
 
     return queries
@@ -190,20 +226,18 @@ def corpus() -> list[ParsedTicket]:
     return tickets
 
 
-def rejected_ids() -> set[str]:
+def not_useful_ids() -> set[str]:
     """
     Description:
-    Czyta id zgłoszeń, które przegląd oznaczył jako niosące zero wiedzy.
+    Czyta id zgłoszeń, które przegląd oznaczył jako niosące zero wiedzy (`useful` = false).
 
     Example args:
         (brak)
 
     Example result:
-        {"19596", "27348", …}
+        {"8765", "27348", …}
     """
-    labels = json.loads(GOLDEN_FILE.read_text(encoding="utf-8"))
-
-    return {str(entry["ticket_id"]) for entry in labels["rejected"]}
+    return {ticket.ticket_id for ticket in golden_set().tickets if not ticket.useful}
 
 
 def measure_filter() -> FilterMeasurement:
@@ -218,13 +252,13 @@ def measure_filter() -> FilterMeasurement:
     Example result:
         FilterMeasurement(labelled_drops=59, false_positives=0)
     """
-    rejected = rejected_ids()
-    report   = filter_tickets(corpus())
-    dropped  = {verdict.ticket_id for verdict in report.dropped}
+    not_useful = not_useful_ids()
+    report     = filter_tickets(corpus())
+    dropped    = {verdict.ticket_id for verdict in report.dropped}
 
     measurement = FilterMeasurement(
-        labelled_drops  = len(dropped & rejected),
-        false_positives = len(dropped - rejected),
+        labelled_drops  = len(dropped & not_useful),
+        false_positives = len(dropped - not_useful),
     )
 
     return measurement

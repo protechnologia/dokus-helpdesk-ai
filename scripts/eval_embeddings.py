@@ -12,8 +12,9 @@ Do czego:
     Stacku nie potrzebuje: ładuje wagi modelu wprost i liczy podobieństwa w pamięci.
 
 Co liczy:
-    1. Czyta golden set (`data/unsafe/golden/<zestaw>.json`): zapytania, każde ze wskazanym
-       zgłoszeniem, które powinno wrócić, i korpus zgłoszeń, w którym się szuka.
+    1. Czyta golden set (`data/unsafe/golden/<zestaw>.json`): zapytania przy wpisach z wiedzą,
+       każde ze wskazanym zgłoszeniem, które powinno wrócić, i korpus zgłoszeń, w którym się
+       szuka.
     2. Zamienia na wektory cały korpus i wszystkie zapytania — osobno w każdym trybie.
     3. Dla każdego zapytania układa zgłoszenia od najbardziej podobnego i zapisuje, na którym
        miejscu stoi to oczekiwane.
@@ -366,8 +367,11 @@ def recall(
 
         raise typer.Exit(code=1)
 
+    # Zapytania tylko przy wpisach z wiedzą, jak w teście ewaluacyjnym `find_tickets_vector`:
+    # przy wpisie bez wiedzy zapytanie zostaje w pliku na wypadek powrotu etykiety.
     data       = json.loads(golden.read_text(encoding="utf-8"))
-    queries    = data["queries"]
+    entries    = [entry for entry in data["tickets"] if entry["useful"] and "query" in entry]
+    queries    = [entry["query"] for entry in entries]
     corpus_dir = REPO_ROOT / data["meta"]["corpus_dir"]
 
     if not corpus_dir.exists():
@@ -377,7 +381,7 @@ def recall(
 
     corpus_ids, corpus_texts = _load_corpus(corpus_dir)
     query_texts  = [q["query_raw"] for q in queries]
-    expected_ids = [q["expected_ticket_id"] for q in queries]
+    expected_ids = [int(entry["ticket_id"]) for entry in entries]
 
     lengths = [len(t) for t in query_texts]
 
