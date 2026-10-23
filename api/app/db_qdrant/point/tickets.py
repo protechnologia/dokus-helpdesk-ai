@@ -120,9 +120,12 @@ class TicketPoint(BaseModel):
             # Nie jest embedowane, ale jedzie: po `cause` odróżnia się trafienia o tym samym
             # objawie i różnych przyczynach (CLAUDE.md -> „Powtarza się objaw").
             "cause":             ticket.cause,
+            "excluded_causes":   ticket.excluded_causes,
             "solution":          ticket.solution,
             "resolution":        ticket.resolution,
             "questions_summary": ticket.questions_summary,
+            "useful":            ticket.useful,
+            "useful_reason":     ticket.useful_reason,
             # Wersja słownika, którą powstało `resolution` — żeby edycja słownika dała się
             # prześledzić bez czytania artefaktu z dysku (zasada 7).
             "resolution_vocabulary_version": ticket.resolution_vocabulary_version,

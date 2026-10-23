@@ -35,14 +35,17 @@ type CardField = Exclude<keyof TicketCard, "ticket_id" | "date" | "usage" | "log
 
 // Pola karty w kolejności z kontraktu sparsowanego zgłoszenia: nazwa dla człowieka i pole.
 const CARD_FIELDS: { label: string; field: CardField }[] = [
-    { label: "Komponent",           field: "component" },
-    { label: "Problem",             field: "problem" },
-    { label: "Objawy",              field: "symptoms" },
-    { label: "Kody błędów",         field: "error_codes" },
-    { label: "Przyczyna",           field: "cause" },
-    { label: "Rozwiązanie",         field: "solution" },
-    { label: "Rozstrzygnięcie",     field: "resolution" },
-    { label: "Pytania konsultanta", field: "questions_summary" },
+    { label: "Komponent",            field: "component" },
+    { label: "Problem",              field: "problem" },
+    { label: "Objawy",               field: "symptoms" },
+    { label: "Kody błędów",          field: "error_codes" },
+    { label: "Przyczyna",            field: "cause" },
+    { label: "Wykluczone przyczyny", field: "excluded_causes" },
+    { label: "Rozwiązanie",          field: "solution" },
+    { label: "Rozstrzygnięcie",      field: "resolution" },
+    { label: "Pytania konsultanta",  field: "questions_summary" },
+    { label: "Przydatna",            field: "useful" },
+    { label: "Dlaczego",             field: "useful_reason" },
 ];
 
 /**
@@ -166,13 +169,13 @@ function Bullets({ title, items }: { title: string; items: string[] }) {
 /**
  * Description:
  * Karta zgłoszenia pole po polu, z nazwą pola z kontraktu pod nazwą dla człowieka — tak, jak
- * zgłoszenie wyglądałoby w bazie wiedzy.
+ * zgłoszenie wyglądałoby w bazie wiedzy. Listy stoją jako znaczniki, ocena jako „tak” albo „nie”.
  *
  * Example args:
- *     card={ component: "e-Doręczenia", problem: "…", error_codes: ["…"], … }
+ *     card={ component: "e-Doręczenia", problem: "…", error_codes: ["…"], useful: true, … }
  *
  * Example result:
- *     <Descriptions> z ośmioma wierszami
+ *     <Descriptions> z jedenastoma wierszami
  */
 function CardView({ card }: { card: TicketCard }) {
     const items = CARD_FIELDS.map(({ label, field }) => {
@@ -181,11 +184,39 @@ function CardView({ card }: { card: TicketCard }) {
         return {
             key:      field,
             label:    <Space orientation="vertical" size={0}>{label}<span className="mono muted">{field}</span></Space>,
-            children: Array.isArray(value)
-                ? <Space wrap size={4}>{value.map((code) => <Tag key={code} className="mono">{code}</Tag>)}</Space>
-                : <span style={{ whiteSpace: "pre-wrap" }}>{String(value)}</span>,
+            children: <CardValue value={value} />,
         };
     });
 
     return <Descriptions column={1} bordered size="small" items={items} />;
+}
+
+/**
+ * Description:
+ * Wartość jednego pola karty: lista jako znaczniki (pusta jako „—”), ocena jako „tak” albo „nie”,
+ * tekst z zachowanymi nowymi liniami.
+ *
+ * Example args:
+ *     value=["ERR-4210"]
+ *
+ * Example result:
+ *     <Tag>ERR-4210</Tag>
+ */
+function CardValue({ value }: { value: TicketCard[CardField] }) {
+    // --- lista: kody błędów, wykluczone przyczyny ---
+    if (Array.isArray(value)) {
+        if (value.length === 0) {
+            return <span className="muted">—</span>;
+        }
+
+        return <Space wrap size={4}>{value.map((item) => <Tag key={item} className="mono">{item}</Tag>)}</Space>;
+    }
+
+    // --- ocena karty ---
+    if (typeof value === "boolean") {
+        return <Tag color={value ? "green" : "red"}>{value ? "tak" : "nie"}</Tag>;
+    }
+
+    // --- tekst ---
+    return <span style={{ whiteSpace: "pre-wrap" }}>{value}</span>;
 }

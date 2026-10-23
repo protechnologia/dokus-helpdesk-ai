@@ -10,10 +10,12 @@ tylko ta struktura: z dwóch pól powstaje wektor, wszystkie jadą w payloadzie 
 | `component`                     | model, z treści wątku           | nie        |
 | `problem`, `symptoms`           | model                           | tak        |
 | `error_codes`, `cause`          | model                           | nie        |
+| `excluded_causes`               | model                           | nie        |
 | `solution`                      | model, razem z zastrzeżeniami   | nie        |
 | `resolution`                    | model, wartością ze słownika    | nie        |
 | `resolution_vocabulary_version` | graf `parse_ticket`             | nie        |
 | `questions_summary`             | model                           | nie        |
+| `useful`, `useful_reason`       | model, ocena całego wątku       | nie        |
 
 Przykład — artefakt `data/unsafe/parsed/33644.json`:
 
@@ -25,9 +27,12 @@ Przykład — artefakt `data/unsafe/parsed/33644.json`:
       "symptoms":          "Po kliknięciu Wyślij pojawia się komunikat o braku sieci",
       "error_codes":       ["ERR-4210"],
       "cause":             "Certyfikat bez uprawnienia AddDocumentToSign",
+      "excluded_causes":   ["Brak połączenia z siecią"],
       "solution":          "Wygenerowano certyfikat z właściwym uprawnieniem.",
       "resolution":        "naprawione",
       "questions_summary": "brak",
+      "useful":            true,
+      "useful_reason":     "Wątek podaje przyczynę i rozwiązanie przydatne w innej instalacji.",
       "resolution_vocabulary_version": 1
     }
 
@@ -95,6 +100,10 @@ class ParsedTicket(BaseModel):
     # --- strona payloadu: z tego powstaje odpowiedź ---
     error_codes: list[str] = Field(default_factory=list, examples=[["ERR-4210", "SQLSTATE 23000"]])
     cause:       str       = Field(examples=["Certyfikat bez uprawnienia AddDocumentToSign"])
+    # Przyczyny, które wątek sprawdził i wykluczył. Osobno od `cause`, bo przy nieustalonej
+    # przyczynie wykluczenie w `cause` dawałoby „brak” z dopiskiem. Że w innej sprawie ta sama
+    # przyczyna może być prawdziwa, mówi czytającemu opis `read_tickets_card`, nie parserowi.
+    excluded_causes: list[str] = Field(examples=[["Brak połączenia z siecią"]])
     # Zastrzeżenia są częścią tego tekstu, nie osobnym polem; zgubione odwracają sens odpowiedzi.
     solution:    str       = Field(examples=["Wygenerowano certyfikat z właściwym uprawnieniem."])
 
@@ -105,7 +114,17 @@ class ParsedTicket(BaseModel):
     # Czego konsultant nie wiedział i o co dopytywał; `brak`, gdy nikt nie dopytywał.
     questions_summary: str = Field(default=NO_VALUE, examples=["pytano o wersję przeglądarki"])
 
-    @field_validator("component", "problem", "symptoms", "cause", "solution", "questions_summary")
+    # --- ocena karty: czy przyda się przy innej sprawie ---
+    # Ocenia model, który widzi cały wątek: sygnały braku wiedzy („omówione telefonicznie”,
+    # „instrukcja w załączeniu”, powiadomienie zamiast zgłoszenia) przy parsowaniu giną, więc
+    # filtr jakości, który widzi tylko kartę, sam ich nie odtworzy.
+    useful:        bool = Field(examples=[True])
+    useful_reason: str  = Field(examples=["Wątek podaje przyczynę i rozwiązanie."])
+
+    @field_validator(
+        "component", "problem", "symptoms", "cause", "solution", "questions_summary",
+        "useful_reason",
+    )
     @classmethod
     def _reject_blank(cls, value: str) -> str:          # np. "  "
         """

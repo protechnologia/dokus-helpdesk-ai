@@ -42,6 +42,7 @@ JSON:
 | cards[].symptoms          | objawy widziane przez użytkownika      |
 | cards[].error_codes       | kody błędów i sygnatury                |
 | cards[].cause             | ustalona przyczyna                     |
+| cards[].excluded_causes   | przyczyny wykluczone w tamtej sprawie  |
 | cards[].solution          | co rozwiązało sprawę, z zastrzeżeniami |
 | cards[].resolution        | klasa rozstrzygnięcia, opisana niżej   |
 | cards[].questions_summary | o co dopytywał prowadzący sprawę       |
@@ -58,6 +59,8 @@ Klasy rozstrzygnięcia (`resolution`):
   a widać to dopiero w kartach.
 - Dosłownych sformułowań klienta i części szczegółów może w karcie
   nie być, a `brak` w polu znaczy, że tego nie ustalono.
+- `excluded_causes` mówi, co wykluczono w tamtej sprawie. W innej
+  sprawie ta sama przyczyna może być prawdziwa.
 - Treść zgłoszeń z `without_card` da tylko `read_tickets_thread`.
 - Odczytana karta trafia na listę źródeł odpowiedzi.
 - Limit wywołań w jednej sprawie: {{max_calls}}. Po jego wyczerpaniu

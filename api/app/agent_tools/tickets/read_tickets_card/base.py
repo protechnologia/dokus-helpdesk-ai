@@ -23,6 +23,7 @@ Po — tekst dla modelu:
           "symptoms": "Brak nowych przesyłek, choć nadawcy potwierdzają wysyłkę",
           "error_codes": [],
           "cause": "Zacięta kolejka pobierania po przerwanym połączeniu",
+          "excluded_causes": [],
           "solution": "Zrestartowano kolejkę; zaległe przesyłki pobrały się same.",
           "resolution": "naprawione",
           "questions_summary": "pytano, od kiedy brak przesyłek i czy dotyczy wszystkich skrzynek"
@@ -38,7 +39,11 @@ O czym pamiętać przy zmianach:
 - Pola karty stoją pod nazwami ze schematu, bo prompty grafów odwołują się do nich po nazwie
   (`cause`, `solution`, `questions_summary`).
 - `cause` zostaje w brzmieniu parsera, także gdy mówi „brak".
-- Wersja słownika rozstrzygnięć jest w karcie dla nas, nie dla modelu — wycinamy ją z tekstu.
+- Wersja słownika rozstrzygnięć i ocena karty (`useful`, `useful_reason`) są w karcie dla nas,
+  nie dla modelu — wycinamy je z tekstu. Ocena to sygnał dla indeksacji: kartę bez wiedzy filtr
+  ma odsiać, a model, który ją mimo to przeczyta, ocenia treść sam.
+- `excluded_causes` mówi, co wykluczono w tamtej sprawie. Opis narzędzia mówi modelowi wprost, że
+  w nowej sprawie ta sama przyczyna może być prawdziwa.
 - Co znaczy każda klasa `resolution`, model czyta w opisie narzędzia: miejsce
   `{{resolution_classes}}` w `description.md` wypełnia konstruktor klasami ze słownika klienta.
   Opis zmienia się więc razem ze słownikiem, a w karcie zostaje sama nazwa klasy.
@@ -59,8 +64,9 @@ from app.agent_tools.tickets.read_tickets_card.models import (
 )
 from app.core_model.dicts.resolution_vocabulary import ResolutionVocabulary
 
-# Pola karty, których model nie dostaje: metadane artefaktu, nie treść zgłoszenia.
-HIDDEN_CARD_FIELDS = {"resolution_vocabulary_version"}
+# Pola karty, których model nie dostaje: metadane artefaktu i ocena dla indeksacji, nie treść
+# zgłoszenia.
+HIDDEN_CARD_FIELDS = {"resolution_vocabulary_version", "useful", "useful_reason"}
 
 # Miejsce w opisie narzędzia (`description.md`), w które wchodzą klasy rozstrzygnięcia.
 RESOLUTION_CLASSES_PLACEHOLDER = "{{resolution_classes}}"
@@ -157,7 +163,7 @@ class ReadTicketsCardToolBase(KnowledgeSource):
         """
         Description:
         Tekst, który model czyta jako odpowiedź narzędzia: JSON z kartami i numerami bez karty,
-        bez wersji słownika rozstrzygnięć.
+        bez wersji słownika rozstrzygnięć i bez oceny karty.
 
         Example args:
             result=ReadTicketsCardResult(cards=[ParsedTicket(ticket_id="90001", …)])

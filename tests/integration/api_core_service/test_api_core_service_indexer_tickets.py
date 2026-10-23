@@ -28,6 +28,9 @@ VALID_TICKET = {
     "resolution":                    "naprawione",
     "resolution_vocabulary_version": 1,
     "questions_summary":             "pytano o wersję przeglądarki",
+    "excluded_causes":               [],
+    "useful":                        True,
+    "useful_reason":                 "Wątek podaje przyczynę i rozwiązanie.",
 }
 
 
@@ -254,22 +257,22 @@ async def test_good_tickets_are_indexed(tmp_path: Path) -> None:
 
 
 async def test_hollow_tickets_are_dropped_with_a_reason(tmp_path: Path) -> None:
-    """Sprawdza, czy zgłoszenie bez wiedzy (w rozwiązaniu i w przyczynie stoi samo „brak") nie
-    trafia do indeksu, a raport podaje powód: z dwóch wczytanych zgłoszeń jedno jest
-    zaindeksowane, a jedno odrzucone regułą `no_resolution`.
+    """Sprawdza, czy zgłoszenie bez wiedzy (model ocenił kartę jako nieprzydatną) nie trafia do
+    indeksu, a raport podaje powód: z dwóch wczytanych zgłoszeń jedno jest zaindeksowane, a jedno
+    odrzucone regułą `not_useful`.
 
     Wyłapuje dwie usterki: puste zgłoszenie w indeksie, które przy wyszukiwaniu wygląda na
     odpowiedź, oraz odrzucenie bez podanego powodu, którego nie da się odróżnić od błędu
     w czytaniu plików."""
     _write(tmp_path, "1")
-    _write(tmp_path, "2", solution="brak", cause="brak")
+    _write(tmp_path, "2", useful=False, useful_reason="Wątek nie niesie wiedzy.")
 
     report = await _indexer(FakeEmbedder(), FakeTickets()).build(tmp_path)
 
     assert report.read    == 2
     assert report.indexed == 1
     assert report.dropped == 1
-    assert report.filtered.by_reason() == {"no_resolution": 1}
+    assert report.filtered.by_reason() == {"not_useful": 1}
 
 
 async def test_both_named_vectors_are_built(tmp_path: Path) -> None:

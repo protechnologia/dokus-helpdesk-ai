@@ -108,7 +108,7 @@ async def measure_tickets_vector(
         settings=Settings(embedding_base_url="http://localhost:8001", …)
 
     Example result:
-        TicketsVectorMeasurement(target_first=152, target_returned=160, distractors_with_hits=3)
+        TicketsVectorMeasurement(target_first=119, target_returned=126, distractors_with_hits=7)
 
     Raises:
         AssertionError: skonfigurowana kolekcja jest pusta
@@ -216,7 +216,7 @@ def measure_filter() -> FilterMeasurement:
         (brak)
 
     Example result:
-        FilterMeasurement(labelled_drops=29, false_positives=0)
+        FilterMeasurement(labelled_drops=59, false_positives=0)
     """
     rejected = rejected_ids()
     report   = filter_tickets(corpus())

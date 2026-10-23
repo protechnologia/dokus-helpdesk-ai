@@ -7,12 +7,12 @@ class RuleHit(BaseModel):
     Jedno zadziałanie reguły na jednym rekordzie: która reguła i fragment, który ją uruchomił.
 
     Fragment jest tu najważniejszy. Strojenie progu albo wzorca na 200 rekordach to zgadywanie,
-    dopóki raport nie mówi, CO reguła przeczytała — „solution jest puste" to twierdzenie,
-    „solution zaczyna się od »Brak rozstrzygnięcia w wątku«" to dowód.
+    dopóki raport nie mówi, CO reguła przeczytała — „karta jest pusta" to twierdzenie,
+    „model: »wątek potwierdza jedynie usunięcie sprawy«" to dowód.
     """
 
-    rule:     str = Field(examples=["no_resolution"])
-    evidence: str = Field(examples=["Brak rozstrzygnięcia w wątku."])
+    rule:     str = Field(examples=["not_useful"])
+    evidence: str = Field(examples=["Wątek potwierdza jedynie usunięcie sprawy."])
 
 
 class QualityVerdict(BaseModel):
@@ -54,6 +54,6 @@ class QualityVerdict(BaseModel):
             (brak)
 
         Example result:
-            ["no_resolution"]
+            ["not_useful"]
         """
         return [hit.rule for hit in self.hits]

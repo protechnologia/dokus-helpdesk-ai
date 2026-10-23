@@ -35,6 +35,9 @@ VALID_TICKET = {
     "resolution":                    "naprawione",
     "resolution_vocabulary_version": 1,
     "questions_summary":             "pytano o wersję przeglądarki",
+    "excluded_causes":               ["Brak miejsca na dysku"],
+    "useful":                        True,
+    "useful_reason":                 "Wątek podaje przyczynę i rozwiązanie.",
 }
 
 SECTION = default_sections()[0]
@@ -110,7 +113,7 @@ def test_different_sources_get_different_ids() -> None:
 # --- punkt zgłoszenia ---------------------------------------------------------------------
 
 def test_ticket_payload_carries_every_card_field() -> None:
-    """Sprawdza, czy punkt zbudowany z karty zgłoszenia niesie w danych (payload) dziesięć pól
+    """Sprawdza, czy punkt zbudowany z karty zgłoszenia niesie w danych (payload) trzynaście pól
     karty, od numeru zgłoszenia po wersję słownika rozstrzygnięć, każde z wartością z karty.
 
     Wyłapuje pole zgubione albo przekręcone przy budowie punktu: z tych pól korzysta prompt
@@ -125,9 +128,12 @@ def test_ticket_payload_carries_every_card_field() -> None:
     assert payload["symptoms"]          == VALID_TICKET["symptoms"]
     assert payload["error_codes"]       == ["ERR-4210"]
     assert payload["cause"]             == VALID_TICKET["cause"]
+    assert payload["excluded_causes"]   == VALID_TICKET["excluded_causes"]
     assert payload["solution"]          == VALID_TICKET["solution"]
     assert payload["resolution"]        == "naprawione"
     assert payload["questions_summary"] == VALID_TICKET["questions_summary"]
+    assert payload["useful"]            is True
+    assert payload["useful_reason"]     == VALID_TICKET["useful_reason"]
     assert payload["resolution_vocabulary_version"] == 1
 
 

@@ -29,9 +29,12 @@ def test_the_record_side_builds_the_same_text() -> None:
         problem                       = PROBLEM,
         symptoms                      = SYMPTOMS,
         cause                         = "Certyfikat bez uprawnienia AddDocumentToSign",
+        excluded_causes               = [],
         solution                      = "Wygenerowano certyfikat z właściwym uprawnieniem.",
         resolution                    = "naprawione",
         resolution_vocabulary_version = 1,
+        useful                        = True,
+        useful_reason                 = "Wątek podaje przyczynę i rozwiązanie.",
     )
 
     assert ticket.embedding_text() == build_embedding_text(problem=PROBLEM, symptoms=SYMPTOMS)

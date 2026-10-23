@@ -190,10 +190,13 @@ def _card(
         symptoms                      = symptoms,
         error_codes                   = ["ERR-4210"],
         cause                         = "brak",
+        excluded_causes               = [],
         solution                      = solution,
         resolution                    = "naprawione",
         resolution_vocabulary_version = 1,
         questions_summary             = "pytano, od kiedy występuje problem",
+        useful                        = True,
+        useful_reason                 = "Wątek podaje rozwiązanie.",
     )
 
     return card

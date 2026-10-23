@@ -3,10 +3,11 @@ from app.core_model.tickets.quality_report import QualityReport
 from app.core_model.tickets.quality_verdict import QualityVerdict, RuleHit
 from app.core_service.filter_ticket_quality_rules import RULES
 
-# Udział korpusu, który filtr powinien odrzucić. Zmierzony dwa razy na różnych próbkach: 19%
-# zestawu odniesienia z 200 rekordów, 25–26% na 661 rekordach przejrzanych wcześniej. Wynik daleko
-# poniżej znaczy, że reguły rozminęły się z tym, co pisze parser, a nie, że korpus się poprawił.
-EXPECTED_DROP_RATE = 0.19
+# Udział korpusu, który filtr powinien odrzucić. Zmierzony na 200 kartach odniesienia
+# (golden200, `gpt-6.1-sol`, 2026-10-23): 59 z 200 kart z oceną „nieprzydatna”; wcześniej 25–26%
+# na 661 rekordach przejrzanych ręcznie. Wynik daleko poniżej znaczy, że model przestał oceniać
+# karty jak przy pomiarze, a nie, że korpus się poprawił.
+EXPECTED_DROP_RATE = 0.30
 
 # O ile odsetek odrzuceń może spaść, zanim przebieg to zgłosi. Szeroko celowo — chodzi o złapanie
 # filtra, który ZAMILKŁ (zmieniony prompt, podmieniony model), a nie o pilnowanie zwykłych wahań.
@@ -39,15 +40,15 @@ def evaluate_ticket(
     pre-filtr przed tą bramką, nigdy jej zamiennik.
 
     Example args:
-        ticket=ParsedTicket(ticket_id="19596", solution="Brak rozstrzygnięcia w wątku.", …)
+        ticket=ParsedTicket(ticket_id="19596", useful=False, useful_reason="Wątek…", …)
 
     Example result:
-        QualityVerdict(ticket_id="19596", hits=[RuleHit(rule="no_resolution", evidence="Brak…")])
+        QualityVerdict(ticket_id="19596", hits=[RuleHit(rule="not_useful", evidence="Wątek…")])
     """
     hits = []
 
     for rule in RULES:
-        evidence = rule(ticket.solution)
+        evidence = rule(ticket)
 
         if evidence is not None:
             hits.append(RuleHit(rule=rule.__name__, evidence=evidence))
@@ -83,9 +84,10 @@ def drop_rate_warning(
     Zwraca ostrzeżenie, gdy filtr odrzucił znacznie mniej korpusu, niż każą oczekiwać wszystkie
     pomiary, albo None, gdy odsetek jest wiarygodny lub paczka jest za mała, by go ocenić.
 
-    Po co to jest: reguły czytają tekst napisany przez model językowy, więc psują się przez
-    ZAMILKNIĘCIE — zmieniony prompt parsujący albo podmieniony model i nagle nic nie pasuje, każdy
-    rekord przechodzi, a indeks zapełnia się pustymi wpisami, choć nic nie świeci na czerwono.
+    Po co to jest: reguły czytają to, co napisał model językowy, więc psują się przez
+    ZAMILKNIĘCIE — zmieniony prompt parsujący albo podmieniony model ocenia każdą kartę jako
+    przydatną, każdy rekord przechodzi, a indeks zapełnia się pustymi wpisami, choć nic nie świeci
+    na czerwono.
     Liczba odrzuconych to jedyny sygnał, który nie może zawieść tak jak reguły, bo nie zależy od
     żadnego sformułowania.
 

@@ -48,6 +48,9 @@ def _payload(
         "solution":                      "Zrestartowano kolejkę; zaległe przesyłki pobrały się.",
         "resolution":                    "naprawione",
         "questions_summary":             "pytano, od kiedy brak przesyłek",
+        "excluded_causes":               [],
+        "useful":                        True,
+        "useful_reason":                 "Wątek podaje przyczynę i rozwiązanie.",
         "resolution_vocabulary_version": 1,
     }
 

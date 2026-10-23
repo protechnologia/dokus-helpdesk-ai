@@ -46,7 +46,7 @@ class QualityReport(BaseModel):
             (brak)
 
         Example result:
-            [QualityVerdict(ticket_id="19596", hits=[RuleHit(rule="no_resolution", …)])]
+            [QualityVerdict(ticket_id="19596", hits=[RuleHit(rule="not_useful", …)])]
         """
         return [verdict for verdict in self.verdicts if not verdict.keep]
 
@@ -61,7 +61,7 @@ class QualityReport(BaseModel):
             (brak)
 
         Example result:
-            {"no_resolution": 29}
+            {"not_useful": 59}
         """
         counter = Counter(rule for verdict in self.dropped for rule in verdict.reasons)
 
@@ -69,7 +69,7 @@ class QualityReport(BaseModel):
 
     def ticket_ids_for(
         self,
-        rule: str,  # np. "no_resolution"
+        rule: str,  # np. "not_useful"
     ) -> list[str]:
         """
         Description:
@@ -77,7 +77,7 @@ class QualityReport(BaseModel):
         żeby odsetek odrzuceń dało się sprawdzić na konkretnych zgłoszeniach.
 
         Example args:
-            rule="no_resolution"
+            rule="not_useful"
 
         Example result:
             ["19596", "30423"]

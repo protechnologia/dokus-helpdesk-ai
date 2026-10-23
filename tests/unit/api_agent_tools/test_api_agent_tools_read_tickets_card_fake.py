@@ -43,9 +43,9 @@ async def test_every_query_is_recorded() -> None:
 
 
 async def test_the_model_sees_every_card_field_under_its_schema_name() -> None:
-    """Sprawdza, czy tekst dla modelu to JSON, w którym karta ma wszystkie dziesięć pól pod nazwami
-    ze schematu (między innymi `cause`, `solution`, `questions_summary`), z datą zapisaną jako
-    `2026-04-22`, a numer bez karty stoi w `without_card`.
+    """Sprawdza, czy tekst dla modelu to JSON, w którym karta ma jedenaście pól treści pod nazwami
+    ze schematu (między innymi `cause`, `excluded_causes`, `solution`, `questions_summary`), z datą
+    zapisaną jako `2026-04-22`, a numer bez karty stoi w `without_card`.
 
     Wyłapuje pole zgubione albo nazwane inaczej po drodze do modelu: prompty grafów odwołują się do
     pól karty po nazwie, więc model nie znalazłby tego, o czym prompt mówi."""
@@ -62,6 +62,7 @@ async def test_the_model_sees_every_card_field_under_its_schema_name() -> None:
         "symptoms",
         "error_codes",
         "cause",
+        "excluded_causes",
         "solution",
         "resolution",
         "questions_summary",
@@ -74,14 +75,16 @@ async def test_the_model_sees_every_card_field_under_its_schema_name() -> None:
 
 async def test_the_model_does_not_see_artifact_metadata() -> None:
     """Sprawdza, czy w tekście dla modelu nie ma wersji słownika rozstrzygnięć
-    (`resolution_vocabulary_version`).
+    (`resolution_vocabulary_version`) ani oceny karty (`useful`, `useful_reason`).
 
-    Wyłapuje przeciek metadanych artefaktu do modelu: to informacja dla nas, nie treść zgłoszenia,
-    a model potraktowałby ją jak fakt o sprawie."""
+    Wyłapuje przeciek metadanych artefaktu do modelu: to informacja dla nas i dla indeksacji, nie
+    treść zgłoszenia, a model potraktowałby ją jak fakt o sprawie."""
     tool = FakeReadTicketsCardTool()
     text = tool.render_for_model(await tool.search(QUERY))
 
     assert "resolution_vocabulary_version" not in text
+    assert '"useful"'                      not in text
+    assert "useful_reason"                 not in text
 
 
 async def test_the_three_default_cards_share_a_symptom_and_differ_in_cause() -> None:

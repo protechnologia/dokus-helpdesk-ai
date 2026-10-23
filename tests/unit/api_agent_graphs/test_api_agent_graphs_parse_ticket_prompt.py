@@ -126,13 +126,14 @@ def test_vocabulary_entry_cannot_restate_the_output_format() -> None:
         "tylko przyczynę potwierdzoną w wątku",  # połowa modeli wpisywała domysł jako przyczynę
         "komplet zastrzeżeń",                    # zgubione zastrzeżenie odwraca odpowiedź
         "Odmowa też jest rozwiązaniem",          # odmowa to rozstrzygnięcie, często najcenniejsze
+        "wyjaśnienie, jak działa system",        # model gubił je, szukając samej naprawy
     ],
 )
 def test_corpus_derived_rule_survives(prompt: str, requirement: str) -> None:
-    """Sprawdza, czy w prompcie nadal stoją kluczowe frazy sześciu reguł, wyprowadzonych
+    """Sprawdza, czy w prompcie nadal stoją kluczowe frazy siedmiu reguł, wyprowadzonych
     z błędów na prawdziwych zgłoszeniach: czytaj cały wątek, rozwiązanie bywa od klienta, liczy
-    się rozstrzygnięcie końcowe, przyczyna tylko potwierdzona, zachowaj zastrzeżenia, odmowa też
-    jest rozstrzygnięciem.
+    się rozstrzygnięcie końcowe, przyczyna tylko potwierdzona, zachowaj zastrzeżenia, odmowa
+    i wyjaśnienie działania systemu też są rozstrzygnięciem.
 
     Wyłapuje regułę zgubioną przy redakcji promptu: karty zgłoszeń po cichu straciłyby na jakości,
     a naprawa oznacza ponowne parsowanie korpusu modelem."""
@@ -224,6 +225,26 @@ def test_an_undecided_card_is_called_normal(prompt: str) -> None:
 
     assert "nie pozwalają ustalić przyczyny ani rozwiązania. To normalne" in text
     assert 'nie wypełniaj wtedy pól na siłę, wpisz „brak"' in text
+
+
+def test_usefulness_names_the_hollow_thread_signals(prompt: str) -> None:
+    """Sprawdza, czy reguła pola `useful` wymienia sygnały wątku bez wiedzy, które przy
+    parsowaniu giną: „omówione telefonicznie", „instrukcja w załączeniu", odesłanie do innego
+    zgłoszenia, zapowiedź poprawki i powiadomienie zamiast zgłoszenia.
+
+    Wyłapuje zgubienie tych przykładów przy redakcji: dla nich pole istnieje, bo filtr jakości,
+    który widzi tylko kartę, sam ich nie rozpozna, a karta z niepustym `solution` wygląda wtedy
+    na wiedzę."""
+    text = " ".join(field_rules().split())
+
+    for signal in (
+        "„omówione telefonicznie\"",
+        "„instrukcja w załączeniu\"",
+        "odesłanie do innego zgłoszenia",
+        "zapowiedź poprawki",
+        "powiadomienie o aktualizacji",
+    ):
+        assert signal in text, signal
 
 
 def test_field_block_excludes_the_argument_table() -> None:

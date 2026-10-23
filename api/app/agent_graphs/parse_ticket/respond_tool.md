@@ -12,13 +12,12 @@
      wartości każdego pola tabelka, a to, że pól nie wypełnia się na siłę, gdy wątek niewiele
      ustalił, mówi jedna z zasad.
 
-     UWAGA: FRAZY UCIECZKOWE („brak", „nie dotyczy") SĄ KONTRAKTEM FILTRU JAKOŚCI.
-     Filtr indeksacji (frazy w core_service/normalizer_ticket_sentinel.py) rozpoznaje rekord bez wiedzy po tym,
-     że `solution` niesie frazę ucieczkową i niewiele poza nią — nie po stylu wypowiedzi modelu. To
-     jedyny powód, dla którego filtr przeżywa podmianę modelu. Zmiana tych fraz albo instrukcji,
-     KIEDY je stosować, jest więc zmianą filtru, choćby nie tknęła jego kodu. Po takiej edycji
-     uruchom test na korpusie referencyjnym
-     (tests/evaluation/test_api_core_service_filter_ticket_quality_corpus.py).
+     UWAGA: POLE `useful` JEST KONTRAKTEM FILTRU JAKOŚCI (od 2026-10-23). Filtr indeksacji
+     (reguła `not_useful` w core_service/filter_ticket_quality_rules.py) odrzuca kartę, którą model
+     ocenił jako nieprzydatną. Zmiana reguły tego pola albo przykładów, co jest wiedzą, jest więc
+     zmianą filtru, choćby nie tknęła jego kodu. Po takiej edycji przelicz test na korpusie
+     odniesienia (tests/evaluation/test_api_core_service_filter_ticket_quality_corpus.py), a karty
+     odniesienia sparsuj od nowa (scripts/parse_golden_tickets.py).
 
      Komentarze redakcyjne jak ten są wycinane przed wysłaniem. -->
 # Do czego służy
@@ -36,9 +35,12 @@ do nowego zgłoszenia.
 | symptoms          | string   | "Plik PDF ma pustą ramkę w miejscu kodu.", "brak", "nie dotyczy" | Objawy problemu: komunikaty, moment wystąpienia, czynność przed błędem. |
 | error_codes       | string[] | ["LBL-503"], []                                                  | Kody i sygnatury błędów z wątku. |
 | cause             | string   | "Wyłączona usługa generowania grafik…", "brak", "nie dotyczy"    | Ustalona przyczyna. |
+| excluded_causes   | string[] | ["Brak miejsca na dysku"], []                                    | Przyczyny, które wątek sprawdził i wykluczył. |
 | solution          | string   | "Włączono usługę generowania grafik…", "brak"                    | Co rozstrzygnęło sprawę, razem z ograniczeniami i skutkami ubocznymi. |
 | resolution        | string   | "naprawione", "brak"                                             | Jedna nazwa ze słownika rozstrzygnięć podanego w danych. |
 | questions_summary | string   | "Pytano o wersję sterownika drukarki…", "brak"                   | Czego prowadzący sprawę nie wiedział i o co dopytywał. |
+| useful            | boolean  | true, false                                                      | Czy karta przyda się przy innej sprawie. |
+| useful_reason     | string   | "Wątek kończy się zapowiedzią poprawki, bez rozwiązania."        | Dlaczego karta przyda się albo nie. |
 
 # Co zwraca
 
@@ -66,13 +68,16 @@ z rozstrzygnięciem spoza słownika wraca jako błąd do poprawki.
 - Wypełniając pole `error_codes`, zapisz wszystkie kody z wątku,
   z ekranu i z logów.
 - Wypełniając pole `cause`, wpisz tylko przyczynę potwierdzoną
-  w wątku, bez domysłów (np. „prawdopodobnie…") i bez wykluczonych
-  przyczyn.
+  w wątku, bez domysłów (np. „prawdopodobnie…").
+- Wypełniając pole `excluded_causes`, wpisz tylko przyczyny, które
+  wątek sprawdził i wykluczył, nie domysły.
 - Wypełniając pole `solution`, przenieś z wątku komplet zastrzeżeń
   (np. skutki uboczne, kogo dotyczy zmiana, od kiedy działa, czy
   obejmuje dawne przypadki) i to, kto wykonał krok: użytkownik czy
-  dostawca. Odmowa też jest rozwiązaniem, a obietnica (np. „zajmiemy
-  się", „przekażemy do działu technicznego") nie.
+  dostawca. Rozwiązaniem jest też wyjaśnienie, jak działa system,
+  i naprawa po stronie dostawcy, także bez potwierdzenia klienta.
+  Odmowa też jest rozwiązaniem, a obietnica (np. „zajmiemy się",
+  „przekażemy do działu technicznego") nie.
 - Wypełniając pole `resolution`, użyj wartości oznaczającej brak
   rozstrzygnięcia, jeśli wątek nie pozwala rozstrzygnąć.
 - Wypełniając pole `questions_summary`, bierz wyłącznie pytania
@@ -80,3 +85,13 @@ z rozstrzygnięciem spoza słownika wraca jako błąd do poprawki.
   i bez proceduralnych (np. „czy problem nadal występuje?"). Zachowaj
   konkrety: „Pytano o rozdzielczość ekranu i profil skanowania
   w NAPS2", a nie „Pytano o konfigurację stanowiska".
+- Wypełniając pole `useful`, oceń, czy karta przyda się przy innej
+  sprawie: niesie przyczynę albo rozwiązanie, które przeniesie się na
+  inną instalację. Przyda się też, gdy wątek wyjaśnia, jak działa
+  system, kiedy występuje błąd albo że operacja mimo komunikatu się
+  powiodła. Nie przyda się, gdy wątek tego nie niesie (np.
+  formułka zamykająca, „omówione telefonicznie", „instrukcja
+  w załączeniu", odesłanie do innego zgłoszenia, zapowiedź poprawki)
+  albo nie jest zgłoszeniem (np. powiadomienie o aktualizacji).
+- Wypełniając pole `useful_reason`, podaj jednym zdaniem, co w wątku
+  przesądziło o ocenie.

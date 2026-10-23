@@ -1,5 +1,3 @@
-import pytest
-
 from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_service.filter_ticket_quality import (
     MIN_RECORDS_FOR_DROP_RATE,
@@ -23,6 +21,9 @@ VALID_TICKET = {
     "resolution":                    "naprawione",
     "resolution_vocabulary_version": 1,
     "questions_summary":             "pytano o wersję przeglądarki",
+    "excluded_causes":               [],
+    "useful":                        True,
+    "useful_reason":                 "Wątek podaje przyczynę i rozwiązanie.",
 }
 
 
@@ -42,58 +43,39 @@ def _ticket(**overrides: object) -> ParsedTicket:
 
 # --- what the rule drops ------------------------------------------------------------------
 
-@pytest.mark.parametrize(
-    "solution",
-    [
-        "brak",                                                     # the schema's own escape value
-        "nie dotyczy",                                              # the other escape value
-        "Brak rozstrzygnięcia w wątku.",                            # escape phrase plus filler
-        "Brak rozstrzygnięcia - problem pozostaje nierozwiązany.",   # still nothing done
-        "Rozwiązane do zamknięcia (brak szczegółów co do sposobu)",  # admission mid-sentence
-    ],
-)
-def test_hollow_solution_is_dropped(solution: str) -> None:
-    """Sprawdza, czy zgłoszenie, którego rozwiązanie tylko przyznaje, że rozwiązania nie ma, jest
-    odrzucane regułą `no_resolution`, a werdykt niesie fragment tego tekstu jako dowód. Pięć
-    przypadków: samo „brak", „nie dotyczy" i trzy zdania, które poza takim przyznaniem prawie nic
-    nie dodają.
+def test_card_judged_not_useful_is_dropped() -> None:
+    """Sprawdza, czy karta, którą model ocenił jako nieprzydatną (`useful` = false), jest
+    odrzucana regułą `not_useful`, a dowodem w werdykcie jest uzasadnienie modelu, słowo w słowo.
 
-    Wyłapuje dwie usterki: puste zgłoszenie przepuszczone do indeksu, gdzie przy wyszukiwaniu
-    wygląda na odpowiedź, oraz odrzucenie bez dowodu, po którym nie da się sprawdzić, czy reguła
-    miała rację."""
-    verdict = evaluate_ticket(_ticket(solution=solution))
+    Wyłapuje dwie usterki: kartę bez wiedzy przepuszczoną do indeksu, gdzie przy wyszukiwaniu
+    wygląda na odpowiedź, oraz odrzucenie bez uzasadnienia, po którym nie da się sprawdzić, czy
+    model miał rację."""
+    reason  = "Wątek potwierdza jedynie usunięcie sprawy na prośbę."
+    ticket  = _ticket(solution="Usunięto sprawę.", useful=False, useful_reason=reason)
+    verdict = evaluate_ticket(ticket)
 
     assert not verdict.keep
-    assert verdict.reasons == ["no_resolution"]
-    assert verdict.hits[0].evidence
+    assert verdict.reasons == ["not_useful"]
+    assert verdict.hits[0].evidence == reason
 
 
 # --- what the rule must NOT drop ----------------------------------------------------------
 
-@pytest.mark.parametrize(
-    "solution",
-    [
-        # A refusal is the most valuable class in this corpus — it says what NOT to attempt. It
-        # opens with the same word as an empty record, so only the amount of text tells them apart.
-        "Brak możliwości wygenerowania ZPO w tej sytuacji. Klient musi zaakceptować brak"
-        " potwierdzenia, ponieważ operator nie wystawia go dla przesyłek nierejestrowanych.",
-        # "No change in the system" plus an explanation: the client learns how it actually works.
-        "Brak zmian w systemie. Klient otrzymał wyjaśnienie, jak działa mechanizm eksportu danych"
-        " i dlaczego kolumny pojawiają się w tej kolejności.",
-        # `brak` as a PREFIX of an ordinary adjective, in a record describing work that was done.
-        # This one cost a false positive until the pattern moved to whole-word matching.
-        "Dodano brakujące ustawienie systemowe. Wykonuje dostawca.",
-        "Konsultant utworzył brakujące katalogi do końca roku i potwierdził, że błąd znika.",
-    ],
-)
-def test_solution_with_content_is_kept(solution: str) -> None:
-    """Sprawdza, czy zgłoszenie zostaje, gdy słowo „brak" otwiera prawdziwą treść albo jest tylko
-    częścią innego słowa. Cztery przypadki: odmowa z uzasadnieniem, „brak zmian w systemie"
-    z wyjaśnieniem dla klienta i dwa rozwiązania ze słowem „brakujące".
+def test_useful_card_without_solution_is_kept() -> None:
+    """Sprawdza, czy karta z „brak” w rozwiązaniu, ale z ustaloną przyczyną i oceną „przydatna”,
+    zostaje w indeksie.
 
-    Wyłapuje regułę, która odrzuca po samym słowie „brak": z indeksu wypadłyby odmowy, czyli
-    najcenniejsze zgłoszenia, bo mówią, czego nie próbować, oraz opisy wykonanej pracy."""
-    assert evaluate_ticket(_ticket(solution=solution)).keep
+    Wyłapuje powrót do filtrowania po słowie „brak” w `solution`: wypadłyby wtedy karty, w których
+    wątek ustalił przyczynę, a naprawy nie opisał — przyczyna to wiedza, której agent potrzebuje
+    przy tym samym objawie."""
+    ticket = _ticket(
+        solution      = "brak",
+        cause         = "Stanowisko miało minioną datę ważności.",
+        useful        = True,
+        useful_reason = "Przyczyna przeniesie się na inne instalacje.",
+    )
+
+    assert evaluate_ticket(ticket).keep
 
 
 def test_ordinary_solution_is_kept() -> None:
@@ -112,7 +94,7 @@ def test_ordinary_solution_is_kept() -> None:
 
 def test_report_splits_kept_from_dropped() -> None:
     """Sprawdza, czy raport dzieli zgłoszenia na zachowane i odrzucone: z trzech zgłoszeń, z których
-    drugie ma w rozwiązaniu samo „brak", zachowane są pierwsze i trzecie, a odrzucone drugie.
+    drugie model ocenił jako nieprzydatne, zachowane są pierwsze i trzecie, a odrzucone drugie.
 
     Wyłapuje zgłoszenie po złej stronie podziału albo zgubione w raporcie: indeksacja bierze
     z raportu listę zachowanych, więc puste zgłoszenie weszłoby do indeksu albo dobre by z niego
@@ -120,7 +102,7 @@ def test_report_splits_kept_from_dropped() -> None:
     report = filter_tickets(
         [
             _ticket(ticket_id="1"),
-            _ticket(ticket_id="2", solution="brak"),
+            _ticket(ticket_id="2", useful=False),
             _ticket(ticket_id="3"),
         ]
     )
@@ -131,25 +113,25 @@ def test_report_splits_kept_from_dropped() -> None:
 
 def test_report_counts_drops_per_reason() -> None:
     """Sprawdza, czy raport liczy odrzucenia osobno dla każdej reguły: przy dwóch zgłoszeniach,
-    z których jedno ma w rozwiązaniu samo „brak", wynik to jedno odrzucenie regułą `no_resolution`.
+    z których jedno model ocenił jako nieprzydatne, wynik to jedno odrzucenie regułą `not_useful`.
 
     Wyłapuje raport, który podaje tylko łączną liczbę odrzuconych albo liczy je źle: w jednej sumie
     nie widać reguły, która odrzuca nie te zgłoszenia, co trzeba."""
-    report = filter_tickets([_ticket(ticket_id="1", solution="brak"), _ticket(ticket_id="2")])
+    report = filter_tickets([_ticket(ticket_id="1", useful=False), _ticket(ticket_id="2")])
 
-    assert report.by_reason() == {"no_resolution": 1}
+    assert report.by_reason() == {"not_useful": 1}
 
 
 def test_report_lists_ticket_ids_per_rule() -> None:
     """Sprawdza, czy raport podaje numery zgłoszeń odrzuconych przez daną regułę: przy dwóch
-    zgłoszeniach, z których odrzucone jest 19596, lista dla reguły `no_resolution` zawiera tylko ten
+    zgłoszeniach, z których odrzucone jest 19596, lista dla reguły `not_useful` zawiera tylko ten
     numer.
 
     Wyłapuje raport, który zna samą liczbę odrzuceń: bez numerów nie da się zajrzeć do odrzuconych
     zgłoszeń i sprawdzić, czy reguła miała rację."""
-    report = filter_tickets([_ticket(ticket_id="19596", solution="brak"), _ticket(ticket_id="2")])
+    report = filter_tickets([_ticket(ticket_id="19596", useful=False), _ticket(ticket_id="2")])
 
-    assert report.ticket_ids_for("no_resolution") == ["19596"]
+    assert report.ticket_ids_for("not_useful") == ["19596"]
 
 
 def test_empty_corpus_is_an_empty_report() -> None:
@@ -170,8 +152,8 @@ def test_silent_filter_is_reported() -> None:
     """Sprawdza, czy filtr ostrzega, gdy z dużej paczki zgłoszeń nie odrzucił żadnego: paczka ma
     tyle zgłoszeń, ile wynosi próg `MIN_RECORDS_FOR_DROP_RATE`, a ostrzeżenie każe sprawdzić reguły.
 
-    Wyłapuje zniknięcie tego ostrzeżenia. Reguły czytają tekst pisany przez model, więc po zmianie
-    promptu albo modelu mogą przestać pasować do czegokolwiek i same tego nie zauważą: każde
+    Wyłapuje zniknięcie tego ostrzeżenia. Reguła czyta ocenę wydaną przez model, więc po zmianie
+    promptu albo modelu może przestać odrzucać cokolwiek i sama tego nie zauważy: każde
     zgłoszenie przechodzi, a żaden błąd się nie pojawia."""
     report = filter_tickets([_ticket(ticket_id=str(i)) for i in range(MIN_RECORDS_FOR_DROP_RATE)])
 
@@ -180,15 +162,15 @@ def test_silent_filter_is_reported() -> None:
 
 def test_plausible_drop_rate_is_silent() -> None:
     """Sprawdza, czy filtr nie ostrzega, gdy odrzuca mniej więcej tyle, ile przewidują pomiary:
-    w paczce o wielkości progu `MIN_RECORDS_FOR_DROP_RATE` jedna piąta zgłoszeń ma w rozwiązaniu
-    samo „brak".
+    w paczce o wielkości progu `MIN_RECORDS_FOR_DROP_RATE` model ocenił jako nieprzydatną co
+    trzecią kartę.
 
     Wyłapuje ostrzeżenie przy zdrowym przebiegu: alarm, który odzywa się zawsze, przestaje być
     czytany i nie pomoże wtedy, gdy reguły naprawdę zamilkną."""
     tickets = [_ticket(ticket_id=str(i)) for i in range(MIN_RECORDS_FOR_DROP_RATE)]
-    # Roughly the measured 19%, comfortably inside the tolerance.
-    for i in range(MIN_RECORDS_FOR_DROP_RATE // 5):
-        tickets[i] = _ticket(ticket_id=str(i), solution="brak")
+    # Mniej więcej zmierzone 30%, z zapasem w granicach tolerancji.
+    for i in range(MIN_RECORDS_FOR_DROP_RATE // 3):
+        tickets[i] = _ticket(ticket_id=str(i), useful=False)
 
     assert drop_rate_warning(filter_tickets(tickets)) is None
 

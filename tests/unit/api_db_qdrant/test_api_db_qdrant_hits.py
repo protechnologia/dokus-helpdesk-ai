@@ -23,6 +23,9 @@ TICKET_PAYLOAD = {
     "solution":          "Wygenerowano podglądy ręcznie.",
     "resolution":        "naprawione",
     "questions_summary": "brak",
+    "excluded_causes":   [],
+    "useful":            True,
+    "useful_reason":     "Wątek podaje przyczynę i rozwiązanie.",
     "resolution_vocabulary_version": "1",
 }
 

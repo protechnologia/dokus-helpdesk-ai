@@ -24,8 +24,11 @@ class TicketCard(BaseModel):
     symptoms:          str       = Field(examples=["Komunikat o braku sieci"])
     error_codes:       list[str] = Field(default_factory=list, examples=[["ERR-4210"]])
     cause:             str       = Field(examples=["brak"])
+    excluded_causes:   list[str] = Field(examples=[["Brak miejsca na dysku"]])
     solution:          str       = Field(examples=["brak"])
     resolution:        str       = Field(examples=["naprawione"])
     questions_summary: str       = Field(examples=["brak"])
+    useful:            bool      = Field(examples=[True])
+    useful_reason:     str       = Field(examples=["Wątek podaje przyczynę i rozwiązanie."])
     usage:             UsageItem
     log:               list[LogItem] = Field(default_factory=list)

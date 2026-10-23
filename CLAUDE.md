@@ -865,7 +865,11 @@ Rzeczy, które przechodzą każdy sprawdzian formalny, a psują odpowiedź. Kole
 - **„Naprawiono skutki, nie przyczynę" — 18% rekordów z rozwiązaniem.** Dostawca ręcznie
   wygenerował podglądy, przywrócił statusy — a przyczyna została nierozpoznana. Rekord wygląda na
   pełnowartościowy, a realna odpowiedź brzmi „poproś dostawcę, żeby zrobił to ręcznie".
-  **Etykieta, nie odrzucenie** — wdrożeniowiec musi wiedzieć, że sam tego nie zrobi.
+  **Wdrożeniowiec jest po stronie dostawcy (2026-10-23), więc sama ręczna naprawa skutków nie
+  jest dla niego wiedzą** — „zrobi to dostawca” to on albo jego zespół. Wiedzą jest dopiero to,
+  czego nie wie: przyczyna („wzór był chwilowo niedostępny w repozytorium”) albo sposób
+  naprawy. Wcześniej stało tu „etykieta, nie odrzucenie”, pisane tak, jakby wdrożeniowiec stał
+  po stronie klienta.
 - **`solution` odpowiada na inne pytanie niż `problem` — 5–10%.** Uwaga metodologiczna:
   **leksykalnie tego nie wykryjesz** (mediana podobieństwa `problem` ↔ `solution` to 0,19, bo
   oba pola naturalnie używają innego słownictwa). Potrzebny model semantyczny.
@@ -1336,12 +1340,19 @@ Zasady schematu:
   („naprawiono skutki, nie przyczynę"), więc **prompt parsujący musi je wymuszać** — po odrzuceniu
   pola `audience` i klasy `naprawione_przez_dostawcę` nie ma innego nośnika. **Cena przyjęta
   świadomie: nie da się po tym filtrować ani tego policzyć** — jest treścią, nie metadanymi.
-- **Filtr jakości przy indeksacji patrzy na TREŚĆ (`solution`, `cause`), nie na `resolution`.**
-  Zmierzone na 661 rekordach: wśród „nierozwiązanych" tylko **8 na 161 ma puste `solution`** —
-  czyli 95% z nich niesie treść, a klasa rozstrzygnięcia niczego nie przewiduje. Filtr oparty
-  o `resolution` odtwarzałby dokładnie ten binarny odsiew, przed którym ostrzegają „Ryzyka
-  jakości treści" („im poważniejsza operacyjnie sprawa, tym większa szansa, że wątek urwie się
-  bez odpowiedzi"). Filtr ma być **wielosygnałowy, niebinarny i raportujący, co odrzuca**.
+- **Filtr jakości przy indeksacji odrzuca kartę, którą model parsujący ocenił jako nieprzydatną
+  (`useful` = false), a nie po `resolution` ani po słowie „brak” w `solution` (decyzja
+  2026-10-23).** Model widzi cały wątek, a filtr tylko kartę: sygnały braku wiedzy
+  („omówione telefonicznie”, „instrukcja w załączeniu”, echo prośby „usunięto sprawę”) przy
+  parsowaniu giną. Na golden200 sparsowanym `gpt-6.1-sol` reguła `not_useful` odrzuca 59 z 74
+  rekordów bez wiedzy i żadnego ze 126 dobrych; dawna reguła po „brak” w `solution` odrzucała
+  karty z ustaloną przyczyną w `cause` i wpuszczała echo prośby. Raport podaje przy każdym
+  odrzuceniu `useful_reason`. Cena: filtr stoi na jednej ocenie modelu, która dla tego samego
+  wątku potrafi wyjść różnie w dwóch przebiegach, a reguła pola `useful` w prompcie parsującym
+  jest od teraz kontraktem filtra. Filtr oparty o `resolution` odtwarzałby binarny odsiew,
+  przed którym ostrzegają „Ryzyka jakości treści” („im poważniejsza operacyjnie sprawa, tym
+  większa szansa, że wątek urwie się bez odpowiedzi”): wśród „nierozwiązanych” na 661 rekordach
+  tylko **8 na 161 ma puste `solution`**.
   - Konsekwencja: **`resolution` nie jest polem krytycznym dla działania systemu.** Gdy klient
     nie skonfiguruje słownika, produkt nadal działa — traci wzbogacenie odpowiedzi, nie indeks.
   - **Puste `cause` też NIE jest sygnałem braku wiedzy** — **73% takich rekordów przechodzi filtr**
@@ -3022,9 +3033,10 @@ dobre rozwiązanie: pierwsze mają trafiać w niewiadome, drugie w sprawdzony kr
 Zestaw to **syntetyczne zapytania**, nie pary historycznych zgłoszeń: produkt bierze nowe
 zgłoszenie i szuka podobnych, więc para `ticket ↔ ticket` mierzyłaby coś, czego produkt nie robi.
 Uboczny zysk: znika problem singletonów (47% rekordów nie ma bliskiego sąsiada), bo **zapytanie
-dostaje każdy rekord**. Pliki: `data/unsafe/golden/tickets.json` (162 zapytania i 38 odrzuceń
+dostaje każdy rekord**. Pliki: `data/unsafe/golden/tickets.json` (126 zapytań i 74 odrzucenia
 z powodem; do 2026-10-10 `golden200.json`, potem do 2026-10-15 `tickets-dokus.json`), korpus
-`data/unsafe/parsed/bielik-11b-golden200/` (200 artefaktów) i dystraktory
+`data/unsafe/parsed/gpt-6.1-sol-golden200-v2/` (200 kart, od 2026-10-23; wcześniej
+`bielik-11b-golden200/`) i dystraktory
 `data/unsafe/golden/tickets-distractors.json` (wcześniej `distractors.json`, potem
 `tickets-dokus-distractors.json`) — materiał wielokrotnego użytku przy każdej zmianie modelu. „Golden200" zostaje nazwą próbki 200 zgłoszeń
 i katalogu z jej kartami.
@@ -3033,8 +3045,9 @@ i katalogu z jej kartami.
   2026-10-03, także w dystraktorach). Drugi to kształt narzędzia `find_tickets_vector`, napisany
   **wyłącznie z `query_raw`, bez wglądu w rekord-cel**, według opisu narzędzia dla agenta. Zastępuje
   zapytanie agenta do czasu pomiaru z p. 23, więc **nie wolno go poprawiać pod wynik**. Przez
-  narzędzie daje rekord-cel na pierwszym miejscu w 152 ze 162 zapytań (93,8%, wobec 98,1% dla
-  surowych), w pierwszej piątce w 161, a próg 0.48 przechodzi 160; trafienie dostają 3 z 16
+  narzędzie daje rekord-cel na pierwszym miejscu w 119 ze 126 zapytań, a zwraca go w każdym;
+  trafienie dostaje 7 z 16 dystraktorów (2026-10-23, karty `gpt-6.1-sol`). Na kartach Bielika
+  było 152 ze 162 (93,8%, wobec 98,1% dla zapytań surowych), 160 zwróconych i 3 z 16
   dystraktorów. Pilnuje tego
   `tests/evaluation/test_api_agent_tools_find_tickets_vector_golden_stack.py`.
 
@@ -3047,7 +3060,8 @@ i katalogu z jej kartami.
 - **Liczba odrzuceń jest wynikiem, nie odpadem** — wyszło 19% (38 z 200) wobec 25–26% z pomiaru
   na 661 rekordach; różnica jest wyjaśnialna (tamto kryterium było szersze: „przydatne do
   zaproponowania komuś"). Odrzucone zostają w pliku **z powodem** — to gotowe wejście do filtru
-  etapu 4.
+  etapu 4. Po przeglądzie wątków z 2026-10-23 odrzuceń jest 74, bo etykiety szły za kartami
+  Bielika, które dopisywały przyczynę albo rozwiązanie, których w wątku nie ma.
   - **Pierwotnie było 35; trzy dołożono 2026-08-13 przy budowie filtru** (6773, 7468, 10718 —
     puste `cause` i `solution`, czyli kryterium, po którym odrzucono 17 innych). **Wniosek na
     przyszłe przeglądy: ręczna klasyfikacja 200 rekordów po kolei jest niekonsekwentna i wychodzi
@@ -3209,6 +3223,11 @@ nogi produktu na jednej sprawie.
 - Sprawdzenie opisu projektu wobec paczki, po każdej poprawce opisu:
   `python scripts/build_code_package.py check-description data/unsafe/code` (kod 1, gdy opisu
   nie ma albo któraś ścieżka nie zgadza się z paczką; budowa paczki robi to samo na końcu)
+- Ponowne parsowanie golden setu grafem `parse_ticket` do nowego katalogu kart, z wznawianiem
+  i postępem co 10 zgłoszeń: `python scripts/parse_golden_tickets.py parse <karty wzorcowe>
+  <nowy katalog>` — **płatne, pytaj przed**; wymaga usługi `anonymizer` z modelem
+  anonimizującym i modelu generującego z `.env` (golden200 na `gpt-6.1-sol` kosztował 2026-10-23
+  około 1 USD)
 - Mapa symboli do paczki, która już stoi, bez kopiowania kodu od nowa:
   `python scripts/build_code_symbols.py build data/unsafe/code` (zastępuje `symbols.json`;
   budowa paczki robi to samo na końcu)
@@ -3976,8 +3995,20 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   potrafi zgubić zdanie o zastrzeżeniu, dlatego są jawnym wymogiem promptu parsującego i promptu
   generacji.
 - **Klasa `useful`/`not_useful` wyprowadzana z `resolution`** — wśród 161 rekordów
-  „nierozwiązanych" tylko 8 ma puste `solution`, więc klasa niczego nie przewiduje. Filtr
-  indeksacji patrzy na treść.
+  „nierozwiązanych" tylko 8 ma puste `solution`, więc klasa niczego nie przewiduje. Od
+  2026-10-23 `useful` jest polem karty, które ocenia model z całego wątku.
+- **Reguła filtra po słowie „brak” w `solution` (`no_resolution`, do 2026-10-23)** — wyrzucała
+  karty z ustaloną przyczyną w `cause` i bez opisu naprawy, a karty bez wiedzy z niepustym
+  rozwiązaniem („Usunięto sprawę”) wpuszczała. Odeszła razem z `no_solution()`.
+- **Filtr odrzucający dopiero przy „brak” w `solution` i `useful` = false** — nie gubił dobrych
+  kart, ale zostawiał w indeksie 36 z 71 pustych, a trafienie bez treści jest gorsze niż brak
+  trafienia. Wraca, gdyby ocena `useful` okazała się niestabilna na pełnym korpusie (p. 33).
+- **Dopisek do reguły pola `useful` o czynności jednorazowej** (2026-10-23, „Sam fakt, że coś
+  zrobiono, to za mało”, „Zlecenie, w którym klient wie, co zrobić, to nie wiedza” i osiem
+  innych) — dopisek miał być kilkusłowny i ogólny, a żaden z dziesięciu wariantów w dwóch
+  przebiegach na 25 wątkach nie odwrócił ocen kart przepuszczanych (najlepszy 11 z 16, cel 13),
+  nie psując ocen dobrych (najlepszy wynik 25–26 z 28, cel 27). Reguła została bez zmian,
+  a 6 kart przepuszczanych przez filtr na golden200 to znany koszt.
 - **Lista dosłownych pytań konsultanta zamiast syntezy** (`asked_questions`) — przy medianie
   jednego pytania na zgłoszenie lista to niemal to samo co synteza, a forma pytająca ciągnie
   model do przepisania cudzych pytań wprost. Warunek: synteza zachowuje konkrety.
@@ -4837,8 +4868,12 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
   a za „nigdy zmyśloną” strażnik pilnuje „NIE ZMYŚLASZ.”. Kolejność dalej (decyzja 2026-10-23):
   1. **Pole „nadaje się do bazy wiedzy" razem z ponownym parsowaniem golden200** — tak/nie
      z jednozdaniowym uzasadnieniem w osobnym polu, wymagane w `ParsedTicket`, w odpowiedzi
-     `/parse-ticket` i we froncie; filtr jakości bierze je jako sygnał dopiero po pomiarze
-     zgodności z 38 ręcznymi odrzuceniami golden setu. Model widzi cały wątek, a filtr tylko
+     `/parse-ticket` i we froncie; filtr jakości odrzuca kartę z `useful` = false (zrobione
+     2026-10-23, po przeglądzie 67 wątków rozbieżnych z etykietami: 36 etykiet poprawionych,
+     golden ma 126 rekordów z wiedzą i 74 bez; 9 kolejnych zmieni się z „bez wiedzy” na
+     „wiedza” przy nowym kształcie pliku, bo nie mają zapytań; potem ocena `useful` różni się
+     od etykiet w 6 kartach z 200, wszystkich przepuszczonych: 4 to czynność jednorazowa albo
+     wątek bez rozstrzygnięcia, 2 są sporne). Model widzi cały wątek, a filtr tylko
      kartę, więc sygnały braku wiedzy („omówione telefonicznie", „instrukcja w załączeniu",
      broadcast) giną przy parsowaniu. Pole wymagane unieważnia karty bez niego, więc golden200
      parsuje się od nowa do nowego katalogu obok `bielik-11b-golden200/` (tego nie
@@ -4855,6 +4890,15 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
      wyklucza od 2026-10-23 („tylko przyczynę potwierdzoną w wątku, bez domysłów”), a opis
      `problem` obejmuje pytanie o działanie systemu; czy to wystarcza, pokaże pomiar.
   3. **Scenariusze z p. 59 i pomiar** na 10 zgłoszeniach z porównania, po anonimizatorze.
+  4. **Nowy kształt `data/unsafe/golden/tickets.json`** (decyzja 2026-10-23): jedna lista, wpis
+     na każde z 200 zgłoszeń — `ticket_id`, etykieta `useful` z `useful_reason` (nazwy jak
+     w karcie, więc pomiar to porównanie pole w pole) i opcjonalne `query` z `kind`
+     i `difficulty` (warstwy w `eval_embeddings.py`). Zastępuje listy `queries` i `rejected`
+     o dwóch kształtach; kopie `expected_problem` i `expected_cause` z kart Bielika wypadają.
+     Jeden plik, nie dwa: etykieta to pole, a nie miejsce wpisu, więc jej zmiana to zmiana
+     pola. Dla czytelności najpierw wpisy `useful: true`, potem `false`, w obu po numerze,
+     `useful` zaraz po `ticket_id`, a w metryczce liczniki obu grup, sprawdzane testem
+     spójności. Wyniku filtra plik nie trzyma: liczy go pomiar, a przebieg trafia do raportu.
 
   *Dlaczego:* ten sam prompt buduje korpus przy masowym imporcie (p. 31) i przy powrocie
   zamkniętych zgłoszeń (p. 30), więc jego jakość na modelu docelowym rozstrzyga o jakości
@@ -4899,8 +4943,9 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
 - [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
   „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy. *Dlaczego:* 77 ze 123 zgłoszeń
   w lipcu, a żadna heurystyka nie odróżni broadcastu od sprawy.
-- [ ] **33. Przeliczenia na pełnym korpusie** — `RAG_SCORE_MIN` na zapytaniach sparsowanych,
-  porównanie embedderów, liczba wątków-projektów, `questions_summary`, rozkład `component`;
+- [ ] **33. Przeliczenia na pełnym korpusie** — `RAG_SCORE_MIN` na zapytaniach sparsowanych
+  (na kartach `gpt-6.1-sol` trafienie dostaje 7 z 16 dystraktorów, na kartach Bielika 3 z 16,
+  przy tym samym progu 0.48), porównanie embedderów, liczba wątków-projektów, `questions_summary`, rozkład `component`;
   do tego pomiary grafów zamkniętych po teście ręcznym. `gate_close` (2026-10-22): fałszywe
   alarmy i przepuszczenia na każdą regułę na prawdziwych zamknięciach, w dwóch przebiegach,
   z czytaniem uzasadnień — kandydatem na zestaw są wątki z badania jakości z 2026-09-02
@@ -4956,7 +5001,7 @@ korpusie, przechodzi przy zamknięciu do p. 33.
     Materiał już jest: paczka Dokusa i 9 przypadków w `code.json`.
   - [ ] **23.2 Narzędzia zgłoszeń** — trafność zapytań pisanych przez agenta wobec zapytań
     z parsera korpusu (golden set, `recall@1` i MRR; punkt odniesienia to pola `query_problem`
-    i `query_symptoms` golden setu — 152 ze 162 na pierwszym miejscu); wkład narzędzi `_text`
+    i `query_symptoms` golden setu — 119 ze 126 na pierwszym miejscu); wkład narzędzi `_text`
     liczony osobno — czy znajdują coś, czego wektor nie znajduje, jest dziś niezmierzone; czy
     model czyta karty WSZYSTKICH znalezionych numerów, czy tylko pierwszego, i ile kosztuje
     dodatkowa tura odczytu; na prawdziwych wątkach: ile wątków na sprawę (dziś 3), limit
@@ -4973,8 +5018,8 @@ korpusie, przechodzi przy zamknięciu do p. 33.
   sprawa ze znacznikami anonimizacji w `questions.json` z oceną helpera `markers`, jak w p. 23;
   ewaluacja wariantu, w tym jak często model oddaje „pytań już nie trzeba" (p. 72) i czy
   słusznie — fałszywe wyjście przy zgodnym objawie i różnych przyczynach jest tu najgroźniejsze;
-  sentinele `questions_summary` rozpoznaje `no_questions()` dopisane
-  do `normalizer_ticket_sentinel.py`; w scenariuszu z p. 59.6 („wątek tylko zawęża") model
+  sentinele `questions_summary` trzeba rozpoznać nową funkcją w `core_service/` (moduł fraz
+  ucieczkowych `solution` usunięto 2026-10-23 razem z regułą `no_resolution`); w scenariuszu z p. 59.6 („wątek tylko zawęża") model
   w 1 z 3 przebiegów zapytał klienta, czy na serwerze pozostał plik blokady, czyli o diagnozę,
   której klient nie zna. W scenariuszu cytowania kodu z 59.7 (sprawa z komunikatem tylko
   w kodzie) pierwsze pytanie do klienta niosło ścieżkę z repozytorium

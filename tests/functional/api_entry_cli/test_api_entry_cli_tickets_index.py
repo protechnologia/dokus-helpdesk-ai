@@ -24,6 +24,9 @@ VALID_TICKET = {
     "resolution":                    "naprawione",
     "resolution_vocabulary_version": 1,
     "questions_summary":             "brak",
+    "excluded_causes":               [],
+    "useful":                        True,
+    "useful_reason":                 "Wątek podaje przyczynę i rozwiązanie.",
 }
 
 
@@ -60,7 +63,7 @@ def _report(indexed: int = 1, dropped_ids: tuple[str, ...] = ()) -> TicketsIndex
     verdicts = [
         QualityVerdict(
             ticket_id = ticket_id,
-            hits      = [RuleHit(rule="no_resolution", evidence="Brak rozstrzygnięcia w wątku.")],
+            hits      = [RuleHit(rule="not_useful", evidence="Wątek nie niesie wiedzy.")],
         )
         for ticket_id in dropped_ids
     ]
@@ -167,7 +170,7 @@ def test_build_does_not_drop_the_collection(tmp_path: Path, stub_run: StubRun) -
 
 def test_build_lists_reasons_for_drops(tmp_path: Path, stub_run: StubRun) -> None:
     """Sprawdza, czy przy odrzuconym zgłoszeniu `helpdesk tickets index` wypisuje nazwę reguły,
-    która je odrzuciła (`no_resolution`), i numer tego zgłoszenia (19596).
+    która je odrzuciła (`not_useful`), i numer tego zgłoszenia (19596).
 
     Wyłapuje raport, który przemilcza odrzucenia: filtr, który po cichu wyrzuca połowę zgłoszeń,
     wygląda dokładnie jak działający, a różnicę widać tylko w tym wypisie."""
@@ -175,7 +178,7 @@ def test_build_lists_reasons_for_drops(tmp_path: Path, stub_run: StubRun) -> Non
 
     result = runner.invoke(cli, ["tickets", "index", str(_corpus(tmp_path))])
 
-    assert "no_resolution" in result.stdout
+    assert "not_useful" in result.stdout
     assert "19596" in result.stdout
 
 

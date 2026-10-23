@@ -32,9 +32,12 @@ def to_ticket_card(
         symptoms          = card.symptoms,
         error_codes       = card.error_codes,
         cause             = card.cause,
+        excluded_causes   = card.excluded_causes,
         solution          = card.solution,
         resolution        = card.resolution,
         questions_summary = card.questions_summary,
+        useful            = card.useful,
+        useful_reason     = card.useful_reason,
         usage             = to_usage_item(final.usage),
         log               = to_log_items(final.log),
     )

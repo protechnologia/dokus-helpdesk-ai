@@ -19,6 +19,9 @@ VALID_TICKET = {
     "resolution":                    "naprawione",
     "resolution_vocabulary_version": 1,
     "questions_summary":             "brak",
+    "excluded_causes":               [],
+    "useful":                        True,
+    "useful_reason":                 "Wątek podaje przyczynę i rozwiązanie.",
 }
 
 

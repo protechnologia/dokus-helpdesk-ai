@@ -37,6 +37,18 @@ def _in_one_line(
     return " ".join(text.split())
 
 
+def test_excluded_causes_are_said_to_concern_only_that_case() -> None:
+    """Sprawdza, czy opis narzędzia mówi modelowi, że `excluded_causes` to przyczyny wykluczone
+    w tamtej sprawie, a w innej sprawie ta sama przyczyna może być prawdziwa.
+
+    Wyłapuje zgubienie tego zastrzeżenia: model wykluczałby przyczynę w nowej sprawie tylko
+    dlatego, że wykluczono ją w starej, choć przy tym samym objawie przyczyny bywają różne."""
+    text = _in_one_line(FakeReadTicketsCardTool().description)
+
+    assert "`excluded_causes` mówi, co wykluczono w tamtej sprawie" in text
+    assert "W innej sprawie ta sama przyczyna może być prawdziwa" in text
+
+
 def test_the_description_explains_every_class_of_the_dictionary() -> None:
     """Sprawdza, czy opis narzędzia zbudowanego na domyślnym słowniku rozstrzygnięć wymienia każdą
     klasę tego słownika razem z jej znaczeniem.

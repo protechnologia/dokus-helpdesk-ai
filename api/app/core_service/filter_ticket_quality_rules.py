@@ -3,61 +3,63 @@ Description:
 Lista reguł filtra jakości, który przy indeksacji (`helpdesk tickets index`) decyduje, czy
 sparsowane zgłoszenie niesie jakąkolwiek wiedzę i warto je wpuścić do Qdranta.
 
-| reguła          | odpala, gdy                                                    |
-|-----------------|----------------------------------------------------------------|
-| `no_resolution` | `solution` niesie frazę ucieczkową i najwyżej 10 słów poza nią |
+| reguła       | odpala, gdy                                                         |
+|--------------|---------------------------------------------------------------------|
+| `not_useful` | model parsujący ocenił kartę jako nieprzydatną (`useful` = false)   |
 
 Sam plik niczego nie odrzuca. Robi to orkiestrator `filter_ticket_quality.py`, który iteruje po
-krotce `RULES` z końca pliku i składa werdykt oraz raport dla `indexer_tickets`. Dołożenie reguły to
-dopisanie funkcji, wpisu w `RULES` i wiersza w tabelce; testy parametryzują się po tej krotce.
+krotce `RULES` z końca pliku i składa werdykt oraz raport dla `indexer_tickets`. Reguła dostaje
+całą kartę i oddaje dowód do raportu albo None. Dołożenie reguły to dopisanie funkcji, wpisu
+w `RULES` i wiersza w tabelce; testy parametryzują się po tej krotce.
 
-Dwie rzeczy, o których warto pamiętać przy zmianach:
+O czym pamiętać przy zmianach:
 
-- Rozpoznanie pustego pola należy do `normalizer_ticket_sentinel.py` — tam leżą frazy, próg i uwaga
-  o sprzężeniu z promptem parsującym. Reguła tutaj robi z tej odpowiedzi dowód do raportu.
-- Reguły patrzą tylko na `solution`, nigdy na `cause`. Puste `cause` ma większość dobrych
-  rekordów (105 ze 114 na próbce 200), więc filtr po tym polu wyciąłby dużą część korpusu.
+- Ocenę wydaje model, który widział cały wątek, a filtr widzi tylko kartę. Sygnały braku wiedzy
+  („omówione telefonicznie”, „instrukcja w załączeniu”, echo prośby „usunięto”) przy parsowaniu
+  giną, więc reguła po tekście karty ich nie odtworzy.
+- Reguła stoi na regule pola `useful` w opisie narzędzia `respond_parse_ticket`: zmiana tamtej
+  reguły jest zmianą filtru, choćby nie tknęła tego pliku. Po niej przelicza się test filtra na
+  korpusie odniesienia.
 """
 
-from app.core_service.normalizer_ticket_sentinel import no_solution
-
-# Ile znaków `solution` trafia do raportu jako dowód.
-EVIDENCE_LENGTH = 80
+from app.core_model.tickets.parsed_ticket import ParsedTicket
 
 
-def no_resolution(
-    solution: str,  # np. "Brak rozstrzygnięcia w wątku."
+def not_useful(
+    ticket: ParsedTicket,  # np. ParsedTicket(ticket_id="34071", useful=False, …)
 ) -> str | None:
     """
     Description:
-    Odpala, gdy `solution` przyznaje, że rozstrzygnięcia nie ma, i niewiele poza tym dodaje
-    (`no_solution()`). Zwraca wtedy pierwsze 80 znaków pola (`EVIDENCE_LENGTH`) jako dowód do
-    raportu; w przeciwnym razie None i rekord przechodzi.
+    Odpala, gdy model parsujący ocenił kartę jako nieprzydatną przy innej sprawie. Dowodem do
+    raportu jest uzasadnienie modelu (`useful_reason`), żeby każde odrzucenie dało się sprawdzić;
+    karta przydatna przechodzi.
 
-    Na 200 rekordach odniesienia reguła łapie 29 z 38 oznaczonych odrzuceń, bez fałszywych
-    alarmów.
-
-    Example args:
-        solution="Brak rozstrzygnięcia w wątku."
-
-    Example result:
-        "Brak rozstrzygnięcia w wątku."
+    Na 200 kartach odniesienia (golden200, `gpt-6.1-sol`, 2026-10-23) reguła odrzuca 59 z 74
+    oznaczonych odrzuceń i żadnego ze 126 dobrych rekordów.
 
     Example args:
-        solution="Brak możliwości wygenerowania ZPO w tej sytuacji. Klient musi zaakceptować…"
+        ticket=ParsedTicket(ticket_id="34071", useful=False,
+                            useful_reason="Wątek potwierdza jedynie usunięcie sprawy.", …)
 
     Example result:
-        None — odmowa to treść, nie pustka
+        "Wątek potwierdza jedynie usunięcie sprawy."
+
+    Example args:
+        ticket=ParsedTicket(ticket_id="24661", solution="brak", cause="Miniona data ważności…",
+                            useful=True, …)
+
+    Example result:
+        None — przyczyna w `cause` to wiedza, choć rozwiązania nie opisano
     """
-    if not no_solution(solution):
+    if ticket.useful:
         return None
 
-    return solution.strip()[:EVIDENCE_LENGTH]
+    return ticket.useful_reason
 
 
 # Reguły w kolejności raportu; po tej krotce iterują orkiestrator i testy.
-# Jedna celowo: wzorce na pozostałe odrzucenia (obietnica w czasie przyszłym, odesłanie do innego
-# zgłoszenia, kilka spraw w jednym) łapały po 1–2 rekordy i zależały od sformułowań jednego modelu.
+# Jedna celowo: dawna reguła po frazie „brak” w `solution` (`no_resolution`) odrzucała też karty
+# z przyczyną w `cause`, a karty bez wiedzy z niepustym rozwiązaniem przepuszczała.
 RULES = (
-    no_resolution,
+    not_useful,
 )

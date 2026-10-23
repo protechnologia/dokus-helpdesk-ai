@@ -119,6 +119,9 @@ def default_cards() -> list[ParsedTicket]:
         "problem":                       "Nie przychodzą przesyłki z e-Doręczeń",
         "symptoms":                      "Brak nowych przesyłek, choć nadawcy potwierdzają wysyłkę",
         "error_codes":                   [],
+        "excluded_causes":               [],
+        "useful":                        True,
+        "useful_reason":                 "Wątek podaje przyczynę i rozwiązanie.",
         "resolution_vocabulary_version": 1,
     }
 
@@ -161,6 +164,9 @@ def default_cards() -> list[ParsedTicket]:
             solution          = "Założono sekwencję numeracji na 2026 rok; zapis działa.",
             resolution        = "naprawione",
             questions_summary = "pytano, czy błąd dotyczy każdego rejestru, czy tylko kancelarii",
+            excluded_causes   = [],
+            useful            = True,
+            useful_reason     = "Wątek podaje przyczynę i rozwiązanie.",
             resolution_vocabulary_version = 1,
         ),
     ]

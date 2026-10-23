@@ -16,6 +16,9 @@ VALID_TICKET = {
     "resolution":                    "naprawione",
     "resolution_vocabulary_version": 1,
     "questions_summary":             "pytano o wersję przeglądarki",
+    "excluded_causes":               [],
+    "useful":                        True,
+    "useful_reason":                 "Wątek podaje przyczynę i rozwiązanie.",
 }
 
 
@@ -64,10 +67,12 @@ def test_questions_summary_defaults_to_the_explicit_exit() -> None:
     assert ParsedTicket(**payload).questions_summary == NO_VALUE
 
 
-@pytest.mark.parametrize("field", ["component", "problem", "symptoms", "cause", "solution"])
+@pytest.mark.parametrize(
+    "field", ["component", "problem", "symptoms", "cause", "solution", "useful_reason"],
+)
 def test_blank_text_is_rejected(field: str) -> None:
     """Sprawdza, czy tekst z samych spacji w każdym z pól `component`, `problem`, `symptoms`,
-    `cause` i `solution` daje błąd walidacji.
+    `cause`, `solution` i `useful_reason` daje błąd walidacji.
 
     Wyłapuje przyjęcie pustego pola: brak wartości zapisuje się jawnie słowem `brak`, a puste
     pole to pole pominięte przez model, które w korpusie wyglądałoby jak wypełnione."""
@@ -84,6 +89,20 @@ def test_surrounding_whitespace_is_stripped() -> None:
     ticket = ParsedTicket(**{**VALID_TICKET, "problem": "  Drukarka nie drukuje  "})
 
     assert ticket.problem == "Drukarka nie drukuje"
+
+
+@pytest.mark.parametrize("field", ["excluded_causes", "useful", "useful_reason"])
+def test_card_without_new_fields_is_rejected(field: str) -> None:
+    """Sprawdza, czy karta bez któregoś z pól `excluded_causes`, `useful` albo `useful_reason`
+    daje błąd walidacji.
+
+    Wyłapuje wartość domyślną dopisaną któremuś z tych pól: karta sparsowana starszym promptem
+    przechodziłaby wtedy jak nowa, z oceną albo listą wykluczeń, których model nigdy nie podał,
+    a filtr jakości i agent czytaliby je jak prawdziwe."""
+    payload = {key: value for key, value in VALID_TICKET.items() if key != field}
+
+    with pytest.raises(ValidationError):
+        ParsedTicket(**payload)
 
 
 def test_unknown_field_is_rejected() -> None:

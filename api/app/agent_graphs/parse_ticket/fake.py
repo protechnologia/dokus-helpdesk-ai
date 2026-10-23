@@ -32,10 +32,13 @@ def default_ticket() -> ParsedTicket:
         symptoms                      = "Brak nowych przesyłek w skrzynce od wczoraj",
         error_codes                   = [],
         cause                         = "Zacięta kolejka pobierania po przerwanym połączeniu",
+        excluded_causes               = [],
         solution                      = "Zrestartowano kolejkę; zaległe przesyłki doszły same.",
         resolution                    = "naprawione",
         resolution_vocabulary_version = get_resolution_classes().version,
         questions_summary             = "pytano, od kiedy brak przesyłek",
+        useful                        = True,
+        useful_reason                 = "Wątek podaje przyczynę i rozwiązanie.",
     )
 
     return ticket
