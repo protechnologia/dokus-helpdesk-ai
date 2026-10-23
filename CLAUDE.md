@@ -4555,313 +4555,86 @@ ustalenia do właściwej sekcji (reguła → sekcja tematyczna, odrzucona opcja 
 pułapka → „Gotchas" warstwy). **Gdy natrafisz na lukę „ostatniej mili" albo tworzysz świadomy
 skrót — dopisz punkt** (zwykle do bloku K), zamiast zostawiać go w milczeniu.
 
-**Kolejność bloków:** blok 0 jest zrobiony — cały produkt działa od wejścia do odpowiedzi na
-atrapach, bez modelu i Qdranta. Dalej po jednym punkcie na narzędzie (A) i na węzeł (B), razem
-z prawdziwym modelem (p. 18 i 17, dawny blok D), a po anonimizacji (E) i froncie pokazowym (F)
-— po jednym na graf, bo treść promptów stroi się na modelu docelowym, a ten na danych klientów
-nie ruszy bez anonimizatora. Front stoi przed grafami, bo przy ich strojeniu pozwala oglądać
-przebieg sprawy krok po kroku. Grafy dzielą się wokół korpusu (2026-10-21): bez narzędzi wiedzy
-(G) idą przed nim, bo nie potrzebują indeksów, a `parse_ticket` buduje korpus; z narzędziami (J)
-po nim, razem z opisami narzędzi, bo narzędzia zgłoszeń mierzy się na zanonimizowanych kartach
-i wątkach z importu. Litery bloków F–J przesunęły się o jedną 2026-10-19, gdy doszedł front,
-a „Przed produkcją" z J na K 2026-10-21. Blok C (decyzje) jest pusty od 2026-10-16: jego punkty
-okazały się sprawami spoza programu albo trafiły do punktów, które od nich zależą.
+**Kolejność bloków:** bloki 0, A, B, E i F są zrobione. Grafy dzielą się wokół korpusu: bez
+narzędzi wiedzy (G) idą przed nim, bo nie potrzebują indeksów, a `parse_ticket` buduje korpus;
+z narzędziami (J) po nim, razem z opisami narzędzi, bo narzędzia zgłoszeń mierzy się na
+zanonimizowanych kartach i wątkach z importu. Bloków C i D nie ma: ich punkty trafiły do innych
+bloków albo wypadły z planu.
+
+Zrobiony punkt to jedna linia: numer, nazwa, data i sekcja, w której stoją jego ustalenia (→).
 
 #### Zrobione
 
 Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („filtr etapu 4",
-„pomiar z etapu 3").
+„pomiar z etapu 3", „prompt z 6.3").
 
-- [x] **Etap 0. Fundament repo** — pakiet, `Settings` + `.env.example` + test plumbingu, usługa
-  `api` (`/health`, Request-ID, handlery wyjątków), CLI `helpdesk`, warstwa LLM za `LLMClient`,
-  usługa `embedder`, compose dev + prod.
-- [x] **Etap 1. Kontrakt zgłoszenia** — `ParsedTicket`, słownik rozstrzygnięć w `core_text/`, prompt
-  parsujący pod testem-strażnikiem, `helpdesk tickets validate`.
-- [x] **Etap 2. Embedder jako usługa** — PolDense za `Encoder`em, prefiksy trybów, kontrola wymiaru
-  w fabryce, `EmbeddingClient` z `embed_query/passage/sts`.
-- [x] **Etap 3. Ewaluacja embeddera** — golden set i `scripts/eval_embeddings.py`; decyzja:
-  PolDense-150M, tryb `query→passage`.
-- [x] **Etap 4. Indeksacja** — filtr jakości, named vectors, payload,
-  `helpdesk tickets index/reindex`.
-  Na 200 artefaktach 171 zaindeksowanych, 29 odrzuconych; `recall@1` 98,1% przez stack to
-  sprawdzian okablowania, nie skuteczności (golden set i korpus to te same rekordy).
-- [x] **Etap 5. Wyszukiwanie** — `POST /search` z parserem zapytania przed wyszukaniem;
-  zastąpione grafem `search` 2026-10-02.
-- [x] **6.1–6.4. Opis wariantów i prompty generacji** — `variants.json` + `loader_variants.py`
-  (skasowane 2026-10-02 — warianty to grafy), prompty `questions` i `solution` strojone pomiarem
-  (dziś w `agent_graphs/suggest_*`).
+- [x] **Etap 0. Fundament repo** — `Settings`, `api`, CLI `helpdesk`, warstwa LLM, `embedder`.
+- [x] **Etap 1. Kontrakt zgłoszenia** → „Domena: kontrakt sparsowanego zgłoszenia”.
+- [x] **Etap 2. Embedder jako usługa** → „Warstwa embeddera”.
+- [x] **Etap 3. Ewaluacja embeddera** — PolDense-150M, tryb `query→passage` → „Warstwa embeddera”.
+- [x] **Etap 4. Indeksacja** — filtr jakości, `helpdesk tickets index/reindex` → „Domena”.
+- [x] **Etap 5. Wyszukiwanie** — zastąpione grafem `search` 2026-10-02.
+- [x] **6.1–6.4. Prompty generacji** — `questions` i `solution`, dziś w `agent_graphs/suggest_*`.
 
-#### 0. Na atrapach — kończy się pełną implementacją na atrapach
+#### 0. Na atrapach
 
-**Każda jednostka — narzędzie, węzeł, graf — to katalog z wersją właściwą i jej atrapą (`fake.py`)
-oraz `__init__.py`; narzędzie ma do tego własne `models.py`.** Osobny graf na każdy wariant
-generacji.
-
-- [x] **1. Struktura `api/app/agent_tools/` z listą narzędzi** — kontrakty (`base.py`), wspólny
-  `SourceRef` (`models.py`), katalogi `find_tickets_vector/` i `find_docs_vector/` z własnymi
-  `models.py` (dziś w folderach materiałów), tabela narzędzi w `agent_tools/__init__.py`; reguły —
-  „Warstwa narzędzi agenta".
-- [x] **2. Atrapy wszystkich narzędzi** — `FakeFindTicketsVectorTool` i `FakeFindDocsVectorTool`
-  (`fake.py` w katalogu narzędzia) oraz test kontraktu, który sam znajduje narzędzia w
-  `app/agent_tools/`; reguły — „Warstwa narzędzi agenta".
-- [x] **3. Struktura `api/app/agent_nodes/` z listą węzłów** — kontrakt `Node` (`base.py`), katalogi
-  `anonymize/`, `agent/`, `run_tools/`, `respond/`; reduktor `merge_sources` w
-  `agent_graphs/base.py` (stan ma każdy graf własny, w `state.py`); do tego `ChatMessage`/`ToolCall`
-  (`engine_llm/models/messages.py`) i `AnonymizedText` (`engine_anonymization/`); reguły — „Warstwa
-  węzłów".
-- [x] **4. Atrapy wszystkich węzłów** — `FakeAgentNode`, `FakeRunToolsNode`, `FakeRespondNode`;
-  `anonymize` od razu właściwy (`AnonymizeNode`) na `FakeAnonymizer` z fabryką odmawiającą przy
-  prawdziwym LLM; test kontraktu węzłów; reguły — „Warstwa węzłów".
-- [x] **5. Wszystkie grafy na atrapach** — `gate_close`, `gate_reply`, `search`, `parse_ticket`,
-  `suggest_questions`, `suggest_solution`, `suggest_handoff`, `polish` (ten ostatni do
-  potwierdzenia w p. 28); LangGraph jako zależność, LangSmith zablokowany, `GraphState` z logiem,
-  odpowiedź narzędziem `respond_<graf>`; reguły — „Warstwa grafów".
-- [x] **6. Trasy na atrapach grafów** — `/gate/close`, `/gate/reply`, `/search` (przełączony
-  z `RagSearchera`), `/parse-ticket`, `/suggest` + `GET /variants` z rejestru, `/polish`; reguły
-  z `core_text/dict_rules_*`; reguły — „Warstwa API". CLI dla grafów nie powstaje (2026-10-16).
+- [x] **1. Struktura `agent_tools/`** → „Warstwa narzędzi agenta”.
+- [x] **2. Atrapy wszystkich narzędzi** → „Warstwa narzędzi agenta”.
+- [x] **3. Struktura `agent_nodes/`** → „Warstwa węzłów”.
+- [x] **4. Atrapy wszystkich węzłów** → „Warstwa węzłów”.
+- [x] **5. Wszystkie grafy na atrapach** → „Warstwa grafów”.
+- [x] **6. Trasy na atrapach grafów** → „Warstwa API”.
 
 #### A. Narzędzia — po jednym punkcie na narzędzie
 
-Właściwe `tool.py` obok atrapy. `cite()` i `render_for_model()` są wspólne dla atrapy
-i prawdziwego narzędzia (`base.py` w katalogu narzędzia, wzór: `find_tickets_vector`) — różni je
-wyłącznie `search()`.
-
-**Rozszerzony 2026-10-03:** każdy materiał ma wyszukiwanie wektorowe (`_vector`, Qdrant)
-i tekstowe (`_text`, Postgres), a dokumentacja dodatkowo listing i odczyt po identyfikatorze.
-Nowe punkty mają numery spoza kolejności (47–56), żeby nie rozjechać odwołań „p. N". Modele,
-atrapy i opisy `.md` wszystkich ośmiu narzędzi już są, wpięte w trzy grafy z narzędziami;
-punkty niżej to narzędzia właściwe.
-
-- [x] **7. `find_tickets`** — `FindTickets` na embedderze i Qdrancie, bez parsera; tekst do
-  embeddingu z `build_embedding_text()`; reguły — „Warstwa
-  narzędzi agenta". Do grafów wchodzi z właściwymi węzłami (p. 9–10). Od p. 47 nazywa się
-  `find_tickets_vector`, a od p. 57 oddaje numery zgłoszeń zamiast kart.
-- [x] **47. Nazwy i źródła** — `find_tickets_vector` i `find_docs_vector` (katalogi, klasy, opisy
-  w grafach); `SourceRef.source` nazywa materiał („tickets", „docs"); reguły — „Warstwa narzędzi
-  agenta".
-- [x] **48. Postgres ze słownikiem w compose** — usługa `postgres` z własnym obrazem (słownik
-  sjp.pl z trzema poprawkami, konfiguracja `pl_search`), zmienne `POSTGRES_*`, marker
-  `stack_postgres` i test na stacku; reguły — „Warstwa wyszukiwania tekstowego (Postgres)".
-- [x] **54. Syntetyczna dokumentacja i golden set** (2026-10-04) — dwa dokumenty, 27 sekcji
-  w `data/safe/instruction/syntetyczna-instrukcja-*` i 61 zapytań do obu wyszukiwań
-  w `data/safe/golden/docs-tools.json`; mierzy okablowanie, nie skuteczność.
-- [x] **49. Indeksacja dokumentacji** (2026-10-05) — `helpdesk docs validate|index`: czytnik
-  paczki, cięcie sekcji na fragmenty, indekser zastępujący tabelę i kolekcję, osobny indeks
-  syntetyczny;
-  reguły — „Instrukcje", „Warstwa bazy wektorowej (Qdrant)", „Warstwa CLI".
-- [x] **8. `find_docs_vector`** (2026-10-05) — `FindDocsVectorTool` na embedderze i kolekcji
-  dokumentacji: sekcje grupowane w Qdrancie, próg `RAG_DOCS_SCORE_MIN`, fragmenty po 1000 znaków
-  z pomiaru; reguły — „Instrukcje", „Warstwa bazy wektorowej (Qdrant)".
-- [x] **50. `find_docs_text`** (2026-10-05) — `FindDocsTextTool` na tabeli dokumentacji; spacje
-  zamiast białych znaków w `search_text` obu tabel i w zapytaniu, szukanie tabel oddaje
-  identyfikatory; `exact` jako jedna fraza; wspólny układ opisów wszystkich narzędzi; reguły —
-  „Warstwa wyszukiwania tekstowego (Postgres)", „Warstwa narzędzi agenta".
-- [x] **51. `list_docs`** (2026-10-05) — `ListDocsTool` na tabeli dokumentacji: spis w kolejności
-  dokumentów, bez treści; spis idzie narzędziem, nie w prompcie systemowym (2026-10-16).
-- [x] **52. `read_docs`** (2026-10-05) — `ReadDocsTool` na tabeli dokumentacji: treść znak w znak,
-  nieznany identyfikator to błąd bez wyniku częściowego; reguły — „Warstwa narzędzi agenta".
-- [x] **53. `find_tickets_text`** (2026-10-05) — `FindTicketsTextTool` na tabeli zgłoszeń,
-  sprawdzone na zmyślonych wątkach; co trafia do tabeli, rozstrzyga p. 31; reguły — „Warstwa
-  narzędzi agenta", „Warstwa wyszukiwania tekstowego (Postgres)".
-- [x] **57. Zgłoszenia dwustopniowo i wyniki w JSON-ie** (2026-10-04) — oba wyszukiwania oddają
-  numery, `read_tickets_card` (właściwe i atrapa) i `read_tickets_thread` (atrapa) treść; tylko
-  odczyty cytują, `score` wyszedł z `SourceRef`; reguły — „Warstwa narzędzi agenta".
-- [x] **56. `read_tickets_thread`** (2026-10-05) — `ReadTicketsThreadTool` na tabeli zgłoszeń,
-  jeden wątek na wywołanie, sprawdzone na zmyślonych wątkach; długość i kształt wątku rozstrzyga
-  pomiar na prawdziwych (p. 23); reguły — „Warstwa narzędzi agenta".
+- [x] **7. `find_tickets_vector`** → „Warstwa narzędzi agenta”.
+- [x] **47. Nazwy narzędzi i źródeł** → „Warstwa narzędzi agenta”.
+- [x] **48. Postgres ze słownikiem** → „Warstwa wyszukiwania tekstowego (Postgres)”.
+- [x] **54. Syntetyczna dokumentacja i golden set** (2026-10-04) → „Instrukcje”.
+- [x] **49. Indeksacja dokumentacji** (2026-10-05) → „Instrukcje”, „Warstwa CLI”.
+- [x] **8. `find_docs_vector`** (2026-10-05) → „Warstwa bazy wektorowej (Qdrant)”.
+- [x] **50. `find_docs_text`** (2026-10-05) → „Warstwa wyszukiwania tekstowego (Postgres)”.
+- [x] **51. `list_docs`** (2026-10-05) → „Warstwa narzędzi agenta”.
+- [x] **52. `read_docs`** (2026-10-05) → „Warstwa narzędzi agenta”.
+- [x] **53. `find_tickets_text`** (2026-10-05) → „Warstwa wyszukiwania tekstowego (Postgres)”.
+- [x] **57. Zgłoszenia dwustopniowo, wyniki w JSON-ie** (2026-10-04) → „Warstwa narzędzi agenta”.
+- [x] **56. `read_tickets_thread`** (2026-10-05) → „Warstwa narzędzi agenta”.
 
 #### B. Węzły i prawdziwy model — po jednym punkcie na węzeł
 
-Właściwe węzły na atrapach zależności. Grafy już działają na atrapach węzłów, więc właściwe
-wchodzą po jednym, a przebieg grafu się przy tym nie zmienia. Prawdziwy model (p. 18 i 17) stoi
-tu od 2026-10-05, zaraz po `run_tools`, a przed `respond`: pierwszy przebieg pętli na prawdziwym
-modelu ma być jak najwcześniej, bo jego wynik przestawi limity, opisy narzędzi i prompty taniej
-niż zgadywanie. Narzędzia kodu aplikacji (p. 60–67 i 73) stoją tu od 2026-10-06, przed scenariuszami
-z p. 59, żeby te objęły też sprawę, w której komunikat jest tylko w kodzie; każde wchodzi
-z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_solution`.
+- [x] **9. `agent`** (2026-10-05) → „Warstwa węzłów”.
+- [x] **10. `run_tools`** (2026-10-05) → „Warstwa węzłów”.
+- [x] **18. Dwie konfiguracje LLM** (2026-10-05) → „Warstwa LLM”.
+- [x] **17. Tura z narzędziami u dostawców** (2026-10-05) → „Warstwa LLM”.
+- [x] **11. `respond`** (2026-10-05) → „Warstwa węzłów”, „Warstwa grafów”.
+- [x] **12. Test po wszystkich grafach** (2026-10-05) → „Warstwa grafów”.
+- [x] **60. Paczka z kodu Dokusa** (2026-10-06) → „Kod aplikacji”.
+- [x] **61. Zestaw przypadków do kodu Dokusa** (2026-10-07) → „Kod aplikacji”.
+- [x] **67. `quote_code`** (2026-10-07) → „Warstwa narzędzi agenta”.
+- [x] **68. Uwagi dla wdrożeniowca osobno** (2026-10-08) → „Warianty generacji”.
+- [x] **69. Testy skryptu paczki kodu** (2026-10-08) → „Kod aplikacji”, „Testy”.
+- [x] **62. `find_code_text`** (2026-10-09) → „Kod aplikacji”, „Warstwa narzędzi agenta”.
+- [x] **63. `read_code_file`** (2026-10-09) → „Warstwa narzędzi agenta”.
+- [x] **64. `list_code_files`** (2026-10-10) → „Warstwa narzędzi agenta”.
+- [x] **70. `search` jako rozpoznanie dla wdrożeniowca** (2026-10-11) → „Warstwa grafów”.
+- [x] **72. `suggest_questions`: „pytań już nie trzeba”** (2026-10-11) → „Warianty generacji”.
+- [x] **65. `describe_code`** (2026-10-12) → „Kod aplikacji”, „Warstwa narzędzi agenta”.
+- [x] **66. Mapa symboli** (2026-10-13) → „Kod aplikacji”.
+- [x] **73. `read_code_symbol` i pole `symbol` w szukaniu** (2026-10-13) → „Warstwa narzędzi
+  agenta”.
+- [x] **59. Scenariusze ewaluacyjne grafów na zmyślonych danych** (2026-10-14 – 2026-10-15)
+  → „Testy”.
 
-- [x] **9. `agent`** (2026-10-05) — `AgentNode` na `LLMClient.complete_turn()`, `FakeLLMClient`
-  ze scenariuszem tur, `provider_items` w wiadomości, limit tur `AGENT_MAX_ITERATIONS`
-  w rozgałęzieniu grafów; trasy zostają na atrapach grafów do p. 11; reguły — „Warstwa węzłów",
-  „Warstwa grafów", „Warstwa LLM".
-- [x] **10. `run_tools`** (2026-10-05) — `RunToolsNode` na kontraktach narzędzi: błąd wywołania
-  (`ToolCallError`) wraca do modelu, awaria embeddera, Qdranta albo Postgresa to 503,
-  `dropped_below_threshold` przy zapytaniu w odpowiedzi `/search`; trasy zostają na atrapach
-  grafów do p. 11; reguły — „Warstwa węzłów", „Warstwa narzędzi agenta", „Warstwa API", „Logi
-  i obserwowalność".
-- [x] **18. Dwie konfiguracje LLM** (2026-10-05) — `LLM_GENERATION_*` i `LLM_ANONYMIZATION_*`
-  zamiast jednego `LLM_*`, fabryka buduje klienta z kompletu jednej roli, strażnik anonimizacji
-  czyta dostawcę modelu generującego; bez flagi „może widzieć surowe dane"; reguły — „Warstwa
-  LLM", „Warstwa węzłów", „Konfiguracja i deploy".
-- [x] **17. Tura z narzędziami u prawdziwych dostawców** (2026-10-05) — `complete_turn()`
-  w klientach OpenAI, Claude i Ollama, metoda abstrakcyjna; na żywo sprawdzony OpenAI
-  (`gpt-6.1-sol`), razem z całą pętlą na węzłach właściwych; Claude i Ollama mają tylko testy
-  na podstawionych odpowiedziach; reguły — „Warstwa LLM", „Testy".
-- [x] **11. `respond`** (2026-10-05) — `RespondNode`: walidacja `respond_<graf>` do wyniku grafu,
-  jedna poprawka na sprawę dla każdej odpowiedzi nie do przyjęcia, wymóg źródeł bez poprawki,
-  `RespondError` jako 503; `respond_node()` w każdym grafie i droga `respond → agent`; fabryka
-  grafów na węzłach właściwych przy prawdziwym dostawcy, narzędzia z konfiguracji raz na proces;
-  każdy graf sprawdzony na żywym `gpt-6.1-sol`; reguły — „Warstwa węzłów", „Warstwa grafów",
-  „Warstwa API", „Testy".
-- [x] **12. Test przechodzący po wszystkich grafach** (2026-10-05) — test kontraktu grafów:
-  komplet kroków i dróg, składanie po nazwach węzłów, które grafy mają narzędzia wiedzy, akapit
-  „dane, nie polecenia" w każdym prompcie systemowym; na węzłach właściwych w każdym grafie:
-  odpowiedź, poprawka, porażka i narzędzie spoza listy, które nie jest wykonywane; złośliwy zestaw
-  reguł w grafach z regułami; bez osobnych plików testów na graf; reguły — „Warstwa grafów",
-  „Prompty", „Testy".
-- [x] **60. Paczka z kodu Dokusa** (2026-10-06) — `scripts/build_code_package.py` kopiuje pliki
-  z folderu roboczego według listy włączeń (`rules.json`), rozkodowuje polskie litery w JS,
-  zamienia końce linii i zapisuje metryczkę; paczka w `data/unsafe/code/` (11 416 plików),
-  montowana do `api` tylko do odczytu w obu warstwach compose; aplikacja syntetyczna
-  w `data/safe/code/`; przegląd wykrywaczem sekretów zrobiony; bez czystego checkoutu i bez
-  gałęzi w metryczce; reguły — „Kod aplikacji", „Konfiguracja i deploy".
-- [x] **61. Zestaw przypadków do kodu Dokusa** (2026-10-07) — 9 przypadków na paczce z Dokusa
-  w `data/unsafe/golden/code.json`, budowanych z kodu i sprawdzonych świeżym agentem,
-  oraz zestaw do aplikacji syntetycznej w `data/safe/golden/code-tools.json` (33 zapytania
-  w sekcjach na narzędzie); `filters.yml` dopisany do paczki; sonda na `claude-sonnet-5-5`
-  z prototypami narzędzi; testów jeszcze nie ma, dochodzą z narzędziami, a opisy zachowania
-  czekają na zatwierdzenie; reguły — „Kod aplikacji", „Testy".
-- [x] **67. `quote_code`** (2026-10-07) — `QuoteCodeTool` na paczce kodu: fragment pliku do 40
-  linii z rolą `cause` albo `excluded`, potwierdzenie bez treści, źródłem tylko przyczyna; czytnik
-  paczki `CodePackage`, `CODE_PACKAGE_DIR` i limit 5 cytowań na sprawę; wpięte w `search`,
-  `suggest_questions` i `suggest_solution` przed narzędziami odczytu; linii nieodczytanych kod
-  nie blokuje, a `respond` zostaje bez zmian; reguły — „Kod aplikacji", „Warstwa narzędzi
-  agenta", „Warstwa węzłów", „Testy".
-- [x] **68. Uwagi dla wdrożeniowca osobno** (2026-10-08) — `internal_notes` w `Proposal`
-  i w `/suggest`, pusty napis bez uwag; bez źródeł `suggest_solution` oddaje same uwagi
-  (`ProposalNotes`, funkcja `without_sources` w węźle `respond`); notatki przy pytaniach i nazwy
-  z kodu w uwagach, ostrzeżenie zostaje w treści; prompty trzech wariantów i opisy narzędzi
-  odpowiedzi; reguły — „Warstwa API", „Warstwa węzłów", „Warianty generacji", „Twarde reguły
-  promptu generacji".
-- [x] **69. Testy skryptu paczki kodu** (2026-10-08) — jednostkowe doboru plików według reguł
-  i poprawek treści, integracyjne na aplikacji syntetycznej (źródło to paczka plus
-  `absent_paths`, która zostaje w zestawie) i na małych drzewach plików; dwie poprawki skryptu:
-  wyłączenia bez rozróżniania wielkości liter i błąd zamiast pustej paczki; reguły — „Kod
-  aplikacji", „Testy".
-- [x] **62. `find_code_text`** (2026-10-09) — `FindCodeTextTool` na paczce kodu i kliencie
-  ripgrepa: fraza i słowa w jednej linii, opcjonalne zawężenie do katalogu albo pliku, wynik
-  z treścią linii, do 20 linii i licznik pominiętych; pakiet `engine_process/` na programy
-  uruchamiane procesem, ripgrep z apt w obrazie `api`, `CODE_SEARCH_TIMEOUT_SECONDS` i limit 10
-  wywołań na sprawę; wpięte w `search`, `suggest_questions` i `suggest_solution`; skrypt paczki
-  zapisuje w metryczce gałąź z pliku kopii roboczej; którą gałąź indeksuje instancja, przechodzi
-  do p. 65; reguły — „Kod aplikacji", „Warstwy kodu", „Warstwa narzędzi agenta", „Warstwa
-  węzłów", „Logi i obserwowalność", „Testy".
-- [x] **63. `read_code_file`** (2026-10-09) — `ReadCodeFileTool` na paczce kodu: plik albo
-  zakres linii z numerami, do 300 linii na wywołanie, zakres żądany obok oddanego i flagi
-  `cut_by_limit` i `end_of_file`; narzędzie pomocnicze, bez źródeł, limit 10 odczytów na sprawę;
-  opisy `quote_code` i `find_code_text` z nazwą odczytu, pełna reguła „znajdź, przeczytaj,
-  zacytuj" w promptach `search`, `suggest_questions` i `suggest_solution`; sekcja
-  `read_code_file` zestawu syntetycznego dopasowana; na żywym `gpt-6.1-sol` droga szukanie →
-  odczyt → cytowanie przeszła w testach grafów i w sondzie na aplikacji syntetycznej, bez
-  osiągnięcia limitu linii; raport zużycia w testach wypisuje wywołania narzędzi
-  z argumentami; reguły — „Kod aplikacji", „Warstwa narzędzi agenta", „Warstwa węzłów",
-  „Testy", „Świadomie pominięte".
-- [x] **64. `list_code_files`** (2026-10-10) — `ListCodeFilesTool` na paczce kodu: spis
-  katalogu do wskazanej głębokości (domyślnie 2), płaska lista pozycji z pełną ścieżką
-  i rodzajem, do 200 pozycji; głębokość żądana obok oddanej, `dir_info.total_depth` i trzy
-  sygnały (`depth_cut_by_limit`, `has_more_depth`, `omitted_over_limit`); narzędzie pomocnicze,
-  bez źródeł, limit 5 spisów na sprawę; czytnik paczki wylicza pliki katalogu; jedno zdanie
-  o spisie w promptach `search`, `suggest_questions` i `suggest_solution`; sekcja
-  `list_code_files` zestawu syntetycznego dopasowana, a aplikacja syntetyczna ma sprawę
-  z nadmiarowym plikiem w katalogu szablonów; na żywym `gpt-6.1-sol` model sięgnął po spis
-  w obu sprawach, które tego wymagały, i w żadnej, która nie wymagała; szukanie bez
-  komunikatu, po opisie projektu, przechodzi do p. 65; reguły — „Kod aplikacji", „Warstwa
-  narzędzi agenta", „Warstwa węzłów", „Testy", „Świadomie pominięte".
-- [x] **70. `search` jako rozpoznanie dla wdrożeniowca** (2026-10-11) — prompt wymienia
-  zgłoszenia, instrukcje i kod aplikacji na równi i mówi, po co jest wynik; kod w każdej sprawie
-  o działaniu aplikacji, bez komunikatu wejściem są nazwy z ekranu; zdanie o wątku bieżącej
-  sprawy; `respond_search` oddaje uwagi (`SearchNotes`, cztery sekcje Markdown, niepuste), a trasa
-  `/search` niesie je w `internal_notes`; sonda na siedmiu zmyślonych sprawach na żywym
-  `gpt-6.1-sol`, bez pary na starym prompcie; pomiar na prawdziwych sprawach i na kodzie Dokusa
-  zostaje w p. 23; reguły — „Warstwa grafów", „Warstwa API", „Kod aplikacji", „Testy",
-  „Świadomie pominięte".
-- [x] **72. `suggest_questions`: „pytań już nie trzeba"** (2026-10-11) — gdy fakty ze
-  zgłoszenia, z opisu albo z wątku, rozstrzygają sprawę, wariant oddaje `text: null` i uwagi
-  zamiast pytań na siłę; model odpowiada w kształcie `QuestionsAnswer`, a węzeł `respond`
-  zamienia go na wynik funkcją grafu `to_output`; reguła z hamulcem w prompcie; sonda na czterech
-  zmyślonych sprawach na żywym `gpt-6.1-sol`; jak często i czy słusznie model sięga po to
-  wyjście na prawdziwych sprawach, zostaje w p. 25; reguły — „Warianty generacji", „Warstwa
-  API", „Warstwa węzłów", „Świadomie pominięte".
-- [x] **65. `describe_code`** (2026-10-12) — `DescribeCodeTool` na czytniku `CodeDescription`:
-  opis projektu w całości, z gałęzią i dniem budowy paczki, raz na sprawę; plik `project.md`
-  obok metryczki i sprawdzanie jego ścieżek w skrypcie paczki; gałąź w tytule źródła z kodu
-  i w potwierdzeniu cytowania; reguła „bez komunikatu zacznij od opisu" w `search`
-  i zdanie-przyzwolenie w trzech grafach; opis aplikacji syntetycznej i szkic opisu Dokusa,
-  który czeka na poprawki programisty; instancja ma jedną paczkę z jednej gałęzi;
-  `read_document()` bez pamiętania plików; sonda na ośmiu przebiegach na żywym `gpt-6.1-sol`;
-  czy opis skraca szukanie na kodzie Dokusa, liczy p. 23; reguły — „Kod aplikacji", „Warstwa
-  narzędzi agenta", „Warstwa węzłów", „Warstwa API", „Testy", „Świadomie pominięte".
-- [x] **66. Mapa symboli** (2026-10-13) — skrypt `scripts/build_code_symbols.py` buduje
-  tree-sitterem plik `symbols.json` obok metryczki: definicje funkcji, metod i klas z plików
-  PHP i JS, z pierwszą i ostatnią linią, same definicje, bez użyć; budowa paczki woła go na
-  końcu, a osobna komenda dobudowuje mapę do paczki, która już stoi; czytnik `CodeSymbols`
-  i modele `CodeSymbol` i `CodeSymbolMap`; mapy obu paczek zbudowane; ctags odrzucony, bo nie
-  podaje linii końca; narzędzie, pole w szukaniu i wyszukiwanie po mapie przeszły do p. 73;
-  reguły — „Kod aplikacji", „Warstwy kodu", „Testy", „Świadomie pominięte".
-- [x] **73. `read_code_symbol` i pole `symbol` w szukaniu** (2026-10-13, wydzielony z p. 66)
-  — `ReadCodeSymbolTool` na paczce kodu i jej mapie symboli: `name` wymagane, `path`
-  opcjonalne (plik albo katalog), jedna definicja z treścią do 300 linii, kilka jako lista
-  kandydatów bez treści, brak definicji jako błąd z podpowiedzią; nazwa sama, z klasą albo
-  obiektem, z przestrzenią nazw; pole `symbol` w wyniku `find_code_text`; narzędzie
-  pomocnicze, bez źródeł, limit 10 odczytów na sprawę; wpięte w `search`, `suggest_questions`
-  i `suggest_solution`, jedno zdanie-przyzwolenie w trzech promptach; `is_path_under()`
-  w `core_util/`; sekcja `read_code_symbol` zestawu syntetycznego i akcja w klasie bazowej
-  w aplikacji syntetycznej; na żywym `gpt-6.1-sol` model sięgał po narzędzie w każdej
-  z czterech spraw Dokusa, ale wynik i liczba tur wyszły jak bez niego; czy narzędzie pomaga
-  tam, gdzie model dziś nie dochodzi do miejsca, liczy p. 23; reguły — „Kod aplikacji",
-  „Warstwa narzędzi agenta", „Warstwa węzłów", „Testy", „Świadomie pominięte".
-- [x] **59. Scenariusze ewaluacyjne grafów na zmyślonych danych** (2026-10-14 – 2026-10-15,
-  dziewięć podpunktów) — testy `llm_live` w `tests/evaluation/`: wstrzyknięcie we wszystkich
-  grafach (0 przebić, także atakiem w regułach i w materiale narzędzi), bramki na parach reguł,
-  „Popraw”, „pytań już nie trzeba”, cytowanie kodu, rozwiązanie i czytanie znalezionego
-  materiału, każdy zestaw na `gpt-6.1-sol` w co najmniej dwóch przebiegach; jedyna poprawka
-  promptu to zdanie o cytatach w bramce wysyłki, a wnioski dla promptów czekają w p. 22–26;
-  reguły — „Testy", „Twarde reguły promptu generacji", „Świadomie pominięte".
+#### E. Anonimizacja
 
-#### E. Anonimizacja — zastępuje atrapę anonimizatora z p. 4
+- [x] **19. Usługa `anonymizer`** (2026-10-16 – 2026-10-19) → „Usługa `anonymizer`”. Szkic
+  Blueprintu na SOFA o atrapach w kompozycji czeka na przegląd w panelu.
 
-- [x] **19. Usługa `anonymizer` w compose** (2026-10-16 – 2026-10-19, sześć podpunktów) — silnik
-  `agent`: dziesięć wzorców zamienia dane o stałym kształcie, osoby i adresy bez kotwicy wskazuje
-  model anonimizujący (Bielik 11B v3 na vLLM), a zamienia je kod; całość fail-closed. Każda dana
-  staje się znacznikiem swojego rodzaju, bez numerów, i nigdzie nie wraca do postaci sprzed
-  anonimizacji. O atrapie decyduje konfiguracja usługi, a `api` woła ją zawsze przez klienta,
-  który przy prawdziwym modelu generującym odmawia wyniku atrapy; to samo dla embeddera, z nazwą
-  modelu w każdym punkcie Qdranta. Golden set anonimizatora (54 zmyślone przypadki i 32 wątki
-  korpusu) przechodzi bez przecieku i bez zniszczonej wiedzy. Prompty siedmiu grafów mówią
-  o znacznikach (19.7), parsujący od 2026-10-23 (p. 24). Szkic Blueprintu na SOFA o atrapach
-  w kompozycji czeka na przegląd w panelu. Reguły — „Usługa `anonymizer`", „Warstwy kodu",
-  „Warstwa API", „Warstwa węzłów", „Warstwa embeddera", „Warstwa bazy wektorowej (Qdrant)",
-  „Warstwa LLM", „Prompty", „Konfiguracja i deploy", „Testy", „Świadomie pominięte".
+#### F. Frontend pokazowy
 
-#### F. Frontend pokazowy — przebieg grafu widoczny na żywo
-
-Prosta aplikacja w React, na razie do pokazów: zbiorcze liczby u góry, pod nimi pas guzików
-grafów, a niżej zgłoszenie po lewej, odpowiedź pośrodku i konsola przebiegu po prawej. Szkic układu z 2026-10-19:
-https://claude.ai/artifact/W4dAs5PUin6A47vfA5Gnty. Pokaz chodzi na tym, co instancja ma w danej
-chwili: na atrapie grafu albo na prawdziwym modelu z indeksami, które są zbudowane.
-
-- [x] **75. Strumień przebiegu z tras grafów** (2026-10-19) — sześć tras grafów odpowiada
-  strumieniem SSE przy `Accept: text/event-stream`: `step` po każdym kroku, na końcu `result`
-  równy odpowiedzi JSON albo `error`; `stream_graph()` na `astream` LangGrapha, czasy wywołań
-  narzędzi z `run_tools` (`tool_timings`), wspólna obsługa `GraphResponder` z funkcją `finish`
-  trasy, opis awarii z `dependency_failure()`; reguły — „Warstwa API", „Warstwy kodu", „Warstwa
-  węzłów", „Warstwa grafów", „Logi i obserwowalność", „Świadomie pominięte".
-- [x] **76. Puste indeksy i stan instancji** (2026-10-20) — na stacku dev brakujące tabele
-  wątków i dokumentacji oraz kolekcja dokumentacji założone ręcznie, puste; trasa
-  `GET /instance` z modelem generującym i stanem pięciu indeksów (`IndexInspector`, `count()`
-  tabel, liczba plików z metryczki paczki kodu); narzędzia tylko zbudowanych materiałów
-  odrzucone. Pokaz ma dziś karty golden200 (niezanonimizowane, więc zostaje w zespole), pustą
-  tabelę wątków (p. 31), pustą dokumentację (p. 55) i kod Dokusa; reguły — „Warstwa API",
-  „Warstwa bazy wektorowej (Qdrant)", „Warstwa wyszukiwania tekstowego (Postgres)", „Warstwy
-  kodu", „Commands", „Świadomie pominięte".
-- [x] **77. Aplikacja w React z czterema panelami** (2026-10-20) — osobna usługa `frontend`
-  (React 19, antd 6, TypeScript, Vite; nginx na prod, proxy `/api` do `api`): belka z modelami,
-  materiałami i licznikami sesji, pas guzików grafów, trzy kolumny z suwakami — zgłoszenie
-  z wątkiem, odpowiedź pokazanego przebiegu w czterech zakładkach i konsola przebiegu na żywo ze
-  strumienia, z dialogiem kroku; pod front w `api`: `requested_tools` w kroku tury, model
-  anonimizujący w `/instance` (`GET /info` usługi `anonymizer`) i tekst po anonimizacji w kroku
-  `anonymize`; 38 testów Vitest i test kontenera; reguły — „Frontend", „Warstwa API", „Usługa
-  `anonymizer`", „Konfiguracja i deploy", „Testy", „Świadomie pominięte".
+- [x] **75. Strumień przebiegu z tras grafów** (2026-10-19) → „Warstwa API”.
+- [x] **76. Puste indeksy i stan instancji** (2026-10-20) → „Warstwa API”, „Commands”.
+- [x] **77. Aplikacja w React z czterema panelami** (2026-10-20) → „Frontend”.
 
 #### G. Grafy bez narzędzi wiedzy — po jednym punkcie na graf: treść promptu i pomiar
 
@@ -4873,26 +4646,9 @@ z opisami narzędzi. Punkt grafu zamyka się po pracy nad promptem, scenariuszac
 modelu i zgrubnym teście ręcznym przez front (decyzja 2026-10-22); to, co w punkcie jest
 pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
 
-- [x] **21. `gate_close`** (2026-10-21) — prompt w sekcjach, rola „pomagasz wdrożeniowcowi”,
-  zadanie bez kryteriów z reguł, blokada tylko za brak informacji wymaganej regułą; scenariusze
-  bramek ze znacznikami anonimizacji, wstrzyknięcia i sprawy przez trasę z anonimizatorem bez
-  błędu na `gpt-6.1-sol`, do tego test ręczny przez front; pomiar na prawdziwych zamknięciach
-  i czas na długich wątkach przeszły do p. 33; reguły — „Bramki jakości i asysta pisania”,
-  „Prompty”, „Testy”.
-- [x] **22. `gate_reply`** (2026-10-22) — pięć reguł w wersji 2 (hasło, słownictwo potoczne
-  i wulgarne, forma zwrotu z przykładami, niebezpieczne zachowania, ortografia), zasada, że
-  cytaty reguł nie łamią, 22 sprawy w scenariuszach; scenariusze, wstrzyknięcia i sprawy przez
-  trasę z anonimizatorem bez błędu na `gpt-6.1-sol`, do tego test ręczny przez front; pomiar na
-  prawdziwych wiadomościach, w tym prośba o hasło schowana w cytacie, przeszedł do p. 33;
-  reguły — „Bramki jakości i asysta pisania”, „Prompty”, „Testy”.
-- [x] **24. `parse_ticket`** (2026-10-23) — prompt systemowy w sekcjach z „Anonimizacją”
-  i „Danymi wejściowymi”, opis `respond_parse_ticket` w układzie opisu narzędzia, z regułą na pole
-  w „Zasadach”; trzy nowe pola karty (`excluded_causes`, `useful`, `useful_reason`) i filtr
-  jakości na `useful`; golden200 sparsowany od nowa na `gpt-6.1-sol` (około 1 USD) i przegląd
-  etykiet: 135 z wiedzą, 65 bez, ocena modelu zgodna w 194 z 200; `tickets.json` jako jedna lista
-  wpisów z testem spójności; luki z porównania, scenariusze z p. 59, test ręczny przez front
-  i pomiar na 10 zgłoszeniach przeszły do p. 31; reguły — „Domena”, „Prompty”, „Warstwa grafów”,
-  „Golden set retrievalu”, „Świadomie pominięte”.
+- [x] **21. `gate_close`** (2026-10-21) → „Bramki jakości i asysta pisania”; pomiar w p. 33.
+- [x] **22. `gate_reply`** (2026-10-22) → „Bramki jakości i asysta pisania”; pomiar w p. 33.
+- [x] **24. `parse_ticket`** (2026-10-23) → „Domena”, „Golden set retrievalu”; pomiar w p. 31.
 - [ ] **27. `suggest_handoff`** — prompt niosący, co sprawdzono i czego brakuje; do
   rozstrzygnięcia, czy wariant dostaje narzędzia kodu (namiar na plik i warunek w przekazaniu),
   bo dziś nie ma pętli narzędzi — jeśli dostanie, punkt idzie za p. 26, na opisach narzędzi
