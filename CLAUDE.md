@@ -4462,8 +4462,7 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 
 #### E. Anonimizacja
 
-- [x] **19. Usługa `anonymizer`** (2026-10-16 – 2026-10-19) → „Usługa `anonymizer`”. Szkic
-  Blueprintu na SOFA o atrapach w kompozycji czeka na przegląd w panelu.
+- [x] **19. Usługa `anonymizer`** (2026-10-16 – 2026-10-19) → „Usługa `anonymizer`”.
 
 #### F. Frontend pokazowy
 
