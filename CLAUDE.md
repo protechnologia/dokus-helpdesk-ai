@@ -978,11 +978,10 @@ zgłoszenie niesie komunikat albo kod błędu. Z narzędzi są opis projektu (`d
 p. 65), szukanie (`find_code_text`, p. 62), spis katalogu (`list_code_files`, p. 64), odczyt
 pliku (`read_code_file`, p. 63), odczyt symbolu (`read_code_symbol`, p. 73) i cytowanie
 fragmentu (`quote_code`, p. 67). Są też paczka kodu (p. 60), jej mapa symboli (p. 66) i zestaw
-przypadków (p. 61). Niżej decyzje i liczby z 2026-10-06, z prób z 2026-10-07, z budowy szukania
-i odczytu z 2026-10-09, spisu z 2026-10-10, opisu projektu z 2026-10-12 i mapy symboli
-z 2026-10-13.
-Liczby bez dopisku „w paczce" pochodzą z rozpoznania na kopii roboczej gałęzi jednego klienta,
-a paczka powstała z innej gałęzi.
+przypadków (p. 61). Wyniki sond na żywym modelu to pojedyncze przebiegi, nie pomiar; tu stoi
+wniosek i liczba, która go niesie, a przebieg w raporcie. Liczby bez dopisku „w paczce"
+pochodzą z rozpoznania na kopii roboczej gałęzi jednego klienta, a paczka powstała z innej
+gałęzi.
 
 - **Kod może wyjść do modelu zewnętrznego (decyzja 2026-10-06).** Nie przechodzi przez
   anonimizację: wynik narzędzia idzie do modelu wprost.
@@ -1076,92 +1075,44 @@ a paczka powstała z innej gałęzi.
   nie zmienia wyniku, tylko czas: najdłuższe było najrzadsze w 3 parach z 5, a przy „function
   execute" kosztowało 0,42 s zamiast 0,11 s. Słowa nie mają odmiany: to ciągi znaków, więc
   „limit" znajdzie „limitu", ale nie odwrotnie.
-- **Model nie sięga po narzędzia kodu, dopóki prompt o nich nie mówi (2026-10-09).** W testach
-  `llm_live` na `gpt-6.1-sol` w czterech sprawach z pętlą nie padło ani jedno wywołanie
-  `find_code_text` ani `quote_code`. Nie pomogło też zgłoszenie z komunikatem, który stoi tylko
-  w kodzie: model poszukał go w zgłoszeniach i instrukcjach i oddał same uwagi. Po dopisaniu
-  wstępnej reguły do promptów `suggest_solution` i `suggest_questions` w tej samej sprawie
-  zawołał `find_code_text`, a w sprawach bez komunikatu nadal nie. Model szukał stałego
-  fragmentu komunikatu, bez roku, a w uwagach dla wdrożeniowca podał plik, numer linii i treść
-  linii z dopiskiem, że sama linia nie mówi, kiedy błąd występuje. To pojedyncze przebiegi na
-  atrapach narzędzi, nie pomiar. Od p. 63 reguła jest pełna i stoi w promptach trzech grafów:
-  znajdź (`find_code_text`), przeczytaj otoczenie (`read_code_file`), zacytuj fragment, który
-  pokazuje warunek (`quote_code`). Warunek sięgnięcia po kod został wąski: komunikat, wpis
-  z logu albo kod błędu, których zgłoszenia i instrukcje nie tłumaczą. W `suggest_solution`
-  fakty wolno brać także z przeczytanego kodu; kształt odpowiedzi opartej wyłącznie na kodzie
-  stroi p. 26. Od p. 64 akapit o kodzie kończy zdanie o spisie katalogu (`list_code_files`):
-  model może obejrzeć katalog, gdy szukanie daje za dużo trafień albo chce zobaczyć, co leży
-  obok znalezionego pliku. To przyzwolenie, nie nakaz, i nie jest osobnym wejściem w kod.
-  Od p. 70 (2026-10-11) wąski warunek stoi już tylko w `suggest_questions`
-  i `suggest_solution`: `search` sprawdza kod w każdej sprawie o działaniu aplikacji, a gdy
-  zgłoszenie nie niesie komunikatu, szuka nazw z ekranu. Od p. 65 (2026-10-12) taka sprawa
-  zaczyna się w `search` od opisu projektu (`describe_code`): model bierze z niego katalog,
-  ogląda go spisem i dopiero w nim szuka nazw z ekranu. Wszystkie trzy grafy mają też
-  zdanie-przyzwolenie: gdy model nie wie, w której części kodu szukać dalej, może przeczytać
-  opis. Od p. 73 (2026-10-13) po zdaniu o odczycie otoczenia stoi w trzech grafach drugie
-  przyzwolenie: gdy model zna nazwę funkcji — z pola `symbol` przy znalezionej linii albo
-  z wywołania w przeczytanym kodzie — może przeczytać ją w całości (`read_code_symbol`).
-- **Na żywym `gpt-6.1-sol` model sięga po opis projektu, gdy zgłoszenie nie niesie komunikatu,
-  i pomija go, gdy niesie (2026-10-12, osiem pojedynczych przebiegów `search`, 0,83 USD, nie
-  pomiar; raport `data/unsafe/docs/przebieg-describe-code-gpt-6.1-sol-2026-10-12.md`).** Dwie
-  sprawy na aplikacji syntetycznej i trzy z zestawu Dokusa (K6, K7, K1), te trzy z opisem
-  i bez; narzędzia zgłoszeń i dokumentacji bez materiału. W trzech sprawach bez komunikatu
-  model wywołał `describe_code` w pierwszej turze, a potem zawężał szukanie do katalogu
-  z opisu; w dwóch z komunikatem nie wywołał go wcale. W K7 („Resetuj ustawienia", napis
-  w 178 plikach) z opisem zacytował oba wymagane miejsca w 11 turach, a bez opisu poszedł
-  martwą ścieżką, wyczerpał limit 20 tur i nie zacytował żadnego. W K6 opis wyniku nie
-  zmienił: w obu ramionach model przeczytał właściwy plik i nie wskazał przyczyny, bo
-  wyzwalacza bazy w paczce nie ma. W K1 (komunikat) oba ramiona poszły tą samą drogą.
-  Zdanie-przyzwolenie nie zadziałało ani razu. Opis podnosi koszt sprawy, w której niczego
-  nie skraca (K6: 0,116 wobec 0,090 USD), i obniża tam, gdzie skraca (K7: 0,145 wobec
-  0,204 USD); sprawa na kodzie Dokusa to 8–20 tur i 0,09–0,20 USD. Wszystkie cztery błędy
-  narzędzi to zgadywane nazwy katalogów modułów (dwa razy `obidokumentywychodzace` zamiast
-  `obidokout`): opis nie wymienia nazw głównych modułów.
-- **Na żywym `gpt-6.1-sol` model sam sięga po odczyt symbolu, ale w czterech sprawach nie dał
-  on ani lepszego wyniku, ani mniej tur (2026-10-13, osiem pojedynczych przebiegów `search`,
-  0,75 USD, nie pomiar; raport
-  `data/unsafe/docs/przebieg-read-code-symbol-gpt-6.1-sol-2026-10-13.md`).** Sprawy K1, K2, K7
-  i K9 z zestawu Dokusa, każda na kodzie z narzędziem i polem `symbol` oraz bez nich;
-  narzędzia zgłoszeń i dokumentacji bez materiału. Z narzędziem model wywołał je w każdej
-  sprawie, razem 14 razy (1–6 na sprawę): 13 wywołań oddało definicję od razu, a jedno błąd,
-  bo nazwa klasy miała przestrzeń nazw, której mapa nie trzyma; po sondzie narzędzie
-  przestrzeń nazw pomija. W 12 wywołaniach podał
-  `path`, z tego 4 razy katalog, i listy kandydatów nie dostał ani razu. Odczytów pliku było
-  9 zamiast 18, a wyników narzędzi w rozmowie o 14% mniej znaków. Wymagane miejsca zostały
-  zacytowane we wszystkich czterech sprawach w obu wariantach, więc poprawy skuteczności
-  sonda nie mogła pokazać. Tur było razem 34 wobec 29 (w K7 16 wobec 11, w pozostałych po
-  tyle samo), a koszt 0,368 wobec 0,381 USD. W K2 model wziął nazwę z pola `symbol` i od razu
-  przeczytał funkcję: wyniki narzędzi to 5,6 tys. znaków wobec 14 tys. Dwa odczyty urwał
-  limit 300 linii (klasa i funkcja na 465 linii), każdy to około 25 tys. znaków. Mapa była
-  czytana 2–14 razy na sprawę, czyli 0,4–2,5 s przy sprawie trwającej 35–166 s.
-- **Na żywym `gpt-6.1-sol` model idzie drogą szukanie → odczyt → cytowanie (2026-10-09,
-  pojedyncze przebiegi, nie pomiar; raport
-  `data/unsafe/docs/przebieg-read-code-file-gpt-6.1-sol-2026-10-09.md`).** Siedem spraw
-  z komunikatem: jedna w testach `llm_live` na atrapach i sześć w sondzie na aplikacji
-  syntetycznej, z prawdziwymi narzędziami kodu. W każdej model zaczynał od zgłoszeń
-  i instrukcji, a w kodzie szukał od drugiej tury. W sześciu sprawach, w których szukanie
-  trafiło, było 11 odczytów bez błędu, każdy pliku z wyniku szukania, i 10 cytowań, wszystkie
-  linii wcześniej odczytanych; w sprawie bez trafień model nie czytał i nie cytował.
-  W kontrolerze na 441 linii prosił o zakres wokół trafienia (od około 50 linii przed nim),
-  nie o cały plik. W 6 z 9 odczytów sondy koniec zakresu wypadał za końcem pliku, bo model
-  nie zna długości pliku. Limitu 300 linii nie osiągnął ani razu (najdłuższy odczyt miał 150
-  linii), więc `cut_by_limit` i doczytywanie od `to_line` + 1 sprawdzają tylko testy bez
-  modelu. Sprawa w sondzie to 4–8 tur i 0,01–0,04 USD.
+- **Model nie sięga po narzędzia kodu, dopóki prompt o nich nie mówi (2026-10-09).** Bez
+  reguły w prompcie `gpt-6.1-sol` nie zawołał ich ani razu, także przy komunikacie, który stoi
+  tylko w kodzie. Dziś prompty `search`, `suggest_questions` i `suggest_solution` mówią:
+  znajdź, przeczytaj otoczenie, zacytuj fragment, który pokazuje warunek; spis katalogu, opis
+  projektu i odczyt symbolu to przyzwolenia, nie nakazy. `search` sprawdza kod w każdej sprawie
+  o działaniu aplikacji, a bez komunikatu zaczyna od opisu projektu; pozostałe dwa grafy sięgają
+  po kod tylko przy komunikacie, wpisie z logu albo kodzie błędu, których zgłoszenia i instrukcje
+  nie tłumaczą (do p. 25–26).
+- **Bez komunikatu model sam sięga po opis projektu, z komunikatem go pomija** (sonda `search`
+  na `gpt-6.1-sol`, 2026-10-12, 8 przebiegów; raport
+  `data/unsafe/docs/przebieg-describe-code-gpt-6.1-sol-2026-10-12.md`). Opis skraca szukanie
+  napisu, który stoi w wielu plikach (K7: oba miejsca w 11 turach, bez opisu limit 20 tur i zero
+  cytatów), a tam, gdzie niczego nie skraca, podnosi koszt (K6: 0,116 wobec 0,090 USD). Sprawa
+  na kodzie Dokusa to 8–20 tur i 0,09–0,20 USD. Zdanie-przyzwolenie nie zadziałało ani razu.
+  Opis nie wymienia nazw głównych modułów, więc model je zgaduje (`obidokumentywychodzace`
+  zamiast `obidokout`).
+- **Model sam sięga po odczyt symbolu, ale wyniku to nie poprawia** (sonda `search` na
+  `gpt-6.1-sol`, 2026-10-13, 4 sprawy Dokusa z narzędziem i bez; raport
+  `data/unsafe/docs/przebieg-read-code-symbol-gpt-6.1-sol-2026-10-13.md`). Z 14 wywołań 13
+  oddało definicję od razu, a odczytów pliku było 9 zamiast 18. Wymagane miejsca zacytował
+  w obu wariantach, przy 34 turach wobec 29. Dwa odczyty urwał limit 300 linii, każdy to
+  około 25 tys. znaków.
+- **Model idzie drogą szukanie → odczyt → cytowanie** (sondy na `gpt-6.1-sol`, 2026-10-09,
+  7 spraw z komunikatem; raport
+  `data/unsafe/docs/przebieg-read-code-file-gpt-6.1-sol-2026-10-09.md`).
+  Cytował tylko linie wcześniej odczytane, a długi plik czytał zakresem wokół trafienia.
+  Limitu 300 linii nie osiągnął, więc `cut_by_limit` sprawdzają tylko testy bez modelu.
 - **Katalogi paczki są małe, a kilka jest bardzo dużych (2026-10-10).** Paczka ma 2375
   katalogów: połowa ma do 2 pozycji, 90% do 9, 99% do 53, a największy 1264; katalog główny
   ma jedną. Stąd spis pokazuje kilka poziomów naraz (domyślnie 2) i najwyżej 200 pozycji. Sam
   katalog nie mieści się w 200 w siedmiu przypadkach, wszystkie z setkami plików; przy 100
   odpadałyby jeszcze cztery, w tym trzy listy podkatalogów (114–155), czyli spisy modułów.
   Dwa poziomy nie mieszczą się w 18 katalogach. Spis od katalogu głównego trwa 0,08 s.
-- **Na żywym `gpt-6.1-sol` model sięga po spis katalogu, gdy sprawa tego wymaga, i nie sięga,
-  gdy nie wymaga (2026-10-10, trzy pojedyncze przebiegi, nie pomiar; raport
-  `data/unsafe/docs/przebieg-list-code-files-gpt-6.1-sol-2026-10-10.md`).** W dwóch sprawach
-  z nadmiarowym plikiem w katalogu szablonów (`suggest_solution` i `search`) model znalazł
-  komunikat, przeczytał klasę, spisał jej katalog z głębokością 2 podaną wprost i przeczytał
-  plik, którego nazwę znał tylko ze spisu. W sprawie kontrolnej spisu nie wywołał. Nazwany
-  plik opisał jako stan sprawdzonego kodu i dopisał, że jego obecność u klienta wymaga
-  sprawdzenia. Sprawa to 5–7 tur i 0,02–0,05 USD. W sondach z 2026-10-07 na kodzie Dokusa
-  prototyp spisu, pokazujący jeden poziom, model wołał w 7 z 15 przebiegów.
+- **Model sięga po spis katalogu, gdy sprawa tego wymaga, i nie sięga, gdy nie wymaga** (sonda
+  na `gpt-6.1-sol`, 2026-10-10, 3 przebiegi; raport
+  `data/unsafe/docs/przebieg-list-code-files-gpt-6.1-sol-2026-10-10.md`). W obu sprawach
+  z nadmiarowym plikiem przeczytał plik, którego nazwę znał tylko ze spisu, a w kontrolnej
+  spisu nie wywołał.
 - **Jeden komunikat ma w kodzie kilka brzmień** — „Nie udało się skomunikować z serwerem" trzy,
   w tym jedno z innym szykiem słów — a komunikat składany z części nie istnieje w kodzie
   w całości. Stąd szukanie po słowach obok frazy i szukanie stałego fragmentu, bez numerów
@@ -1263,11 +1214,8 @@ a paczka powstała z innej gałęzi.
   bliźniaczą klasę filtra, której nic nie wpina, akcję bez przycisku. Zestaw zapisuje je jako
   pułapki.
 - **Zacytowany komunikat daje wejście jednym szukaniem; trudność leży w przejściu na drugi
-  koniec łańcucha PHP → JS.** W sondzie na `claude-sonnet-5-5` z prototypami narzędzi
-  (2026-10-07, pojedyncze przebiegi, raport `data/unsafe/docs/proby-zestawu-kodu-2026-10-07.md`)
-  sprawa zajmowała 6–20 tur i średnio 0,13 USD, a łańcuch 8–15 tur. Limit 10 szukań wyczerpał
-  się w 5 sprawach z 9, a jedna przeszła dopiero przy 20. Model odczytywał 2–9 plików na
-  sprawę, a cytował 2–5 fragmentów.
+  koniec łańcucha PHP → JS** (sonda na `claude-sonnet-5-5` z prototypami narzędzi, 2026-10-07;
+  raport `data/unsafe/docs/proby-zestawu-kodu-2026-10-07.md`). Sam łańcuch to 8–15 tur.
 
 ## Architektura
 
