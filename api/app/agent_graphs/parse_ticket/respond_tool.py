@@ -14,8 +14,8 @@ DESCRIPTION_FILE  = Path(__file__).parent / "respond_tool.md"
 # który go wstawił do promptu. Model, który by je wymyślił, nie ma jak ich podać.
 FILLED_BY_GRAPH = ("ticket_id", "date", "resolution_vocabulary_version")
 
-# Nagłówek sekcji z opisami pól w respond_tool.md — granica dla `field_rules()`.
-FIELDS_HEADING = "## Pola karty"
+# Nagłówek sekcji z regułami pól w respond_tool.md — granica dla `field_rules()`.
+RULES_HEADING = "# Zasady"
 
 
 def respond_tool() -> ToolDefinition:
@@ -44,20 +44,21 @@ def respond_tool() -> ToolDefinition:
 def field_rules() -> str:
     """
     Description:
-    Zwraca sam blok opisów pól z opisu narzędzia. Wystawiony dla testu-strażnika: nazwa pola pada
-    też w przykładach, więc szukanie w całym opisie przeszłoby po skasowaniu opisu pola.
+    Zwraca sekcję „Zasady" z opisu narzędzia, w której stoją reguły pól („Wypełniając pole
+    `pole`, …"). Wystawiony dla testu-strażnika: nazwa pola pada też w tabelce argumentów, więc
+    szukanie w całym opisie przeszłoby po skasowaniu reguły pola.
 
     Example args:
         (brak)
 
     Example result:
-        "\\n\\n`component` — czego sprawa dotyczy. Jedna wartość…"
+        "\\n\\n- Wywołaj raz, po przeczytaniu całego wątku…\\n- Wypełniając pole `component`, …"
     """
-    # Cięcie na NASTĘPNYM nagłówku drugiego poziomu, jakimkolwiek: sekcja wstawiona za polami nie
-    # może po cichu poszerzyć bloku o przykłady JSON, w których pada nazwa każdego pola.
-    body = respond_tool().description.split(FIELDS_HEADING, 1)[1]
+    # Cięcie na NASTĘPNYM nagłówku sekcji, jakimkolwiek: sekcja dopisana za „Zasadami” nie może
+    # po cichu poszerzyć bloku o tekst, w którym pada nazwa każdego pola.
+    body = respond_tool().description.split(f"\n{RULES_HEADING}\n", 1)[1]
 
-    return body.split("\n## ", 1)[0]
+    return body.split("\n# ", 1)[0]
 
 
 def _without_fields(

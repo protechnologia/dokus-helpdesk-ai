@@ -1,8 +1,16 @@
 <!-- Opis narzędzia odpowiedzi grafu `parse_ticket` — czyta go MODEL razem ze schematem argumentów
      (ParsedTicket bez docstringów i bez pól, które wypełnia graf: ticket_id, date,
      resolution_vocabulary_version — patrz respond_tool.py). Część KONTRAKTU ARTEFAKTU, jak
-     prompt_system.md (zasada 7). Sekcję „Pola karty" test-strażnik czyta osobno (`field_rules()`),
-     żeby skasowany opis pola nie przechodził dzięki nazwie w przykładach.
+     prompt_system.md (zasada 7).
+
+     Układ jak w opisach narzędzi agenta (od 2026-10-23, p. 24): cztery sekcje, argumenty
+     w tabelce, linie do 70 znaków; dłuższe bywają tylko wiersze tabelki.
+     Reguły pól są za długie na komórkę tabelki, więc tabelka mówi o polu jedno zdanie, a pełne
+     reguły stoją w „Zasadach", po punkcie na pole, w postaci „Wypełniając pole `pole`, …". Test-strażnik czyta
+     je stamtąd (`field_rules()`), żeby skasowana reguła pola nie przechodziła dzięki nazwie
+     w tabelce. Przykładów całej karty w JSON-ie nie ma (od 2026-10-23): kształt daje schemat,
+     wartości każdego pola tabelka, a to, że pól nie wypełnia się na siłę, gdy wątek niewiele
+     ustalił, mówi jedna z zasad.
 
      UWAGA: FRAZY UCIECZKOWE („brak", „nie dotyczy") SĄ KONTRAKTEM FILTRU JAKOŚCI.
      Filtr indeksacji (frazy w core_service/normalizer_ticket_sentinel.py) rozpoznaje rekord bez wiedzy po tym,
@@ -13,81 +21,62 @@
      (tests/evaluation/test_api_core_service_filter_ticket_quality_corpus.py).
 
      Komentarze redakcyjne jak ten są wycinane przed wysłaniem. -->
-Oddaje kartę zgłoszenia. Wywołaj je raz, po przeczytaniu całego wątku, jako jedyne wywołanie
-w turze.
+# Do czego służy
 
-## Pola karty
+Oddaje kartę zgłoszenia: treść wątku zapisaną w stałych polach.
+Z kart powstaje baza wiedzy, w której szuka się spraw podobnych
+do nowego zgłoszenia.
 
-`component` — czego sprawa dotyczy. Jedna wartość. Nie zgaduj po nazwie modułu — zgłoszenie
-potrafi dotyczyć usługi zewnętrznej albo cudzego oprogramowania. Dla naszego systemu wpisz
-„główna aplikacja".
+# Jak wywoływać
 
-`problem` — 1–2 zdania o tym, CO nie działa. Tak, żeby dało się dopasować inne zgłoszenie
-o tym samym kłopocie.
+| argument          | typ      | przykłady                                                        | opis |
+|-------------------|----------|------------------------------------------------------------------|------|
+| component         | string   | "główna aplikacja", "ePUAP", "e-Doręczenia"                      | Czego sprawa dotyczy, jedna wartość. |
+| problem           | string   | "Import listy kontrahentów przerywa się w połowie pliku."        | 1–2 zdania o tym, co nie działa albo o co pyta zgłaszający. |
+| symptoms          | string   | "Plik PDF ma pustą ramkę w miejscu kodu.", "brak", "nie dotyczy" | Objawy problemu: komunikaty, moment wystąpienia, czynność przed błędem. |
+| error_codes       | string[] | ["LBL-503"], []                                                  | Kody i sygnatury błędów z wątku. |
+| cause             | string   | "Wyłączona usługa generowania grafik…", "brak", "nie dotyczy"    | Ustalona przyczyna. |
+| solution          | string   | "Włączono usługę generowania grafik…", "brak"                    | Co rozstrzygnęło sprawę, razem z ograniczeniami i skutkami ubocznymi. |
+| resolution        | string   | "naprawione", "brak"                                             | Jedna nazwa ze słownika rozstrzygnięć podanego w danych. |
+| questions_summary | string   | "Pytano o wersję sterownika drukarki…", "brak"                   | Czego prowadzący sprawę nie wiedział i o co dopytywał. |
 
-`symptoms` — co widzi użytkownik: komunikaty, moment wystąpienia, czynność przed błędem.
-Gdy zgłoszenie nie opisuje awarii, tylko pyta o działanie systemu — „nie dotyczy".
+# Co zwraca
 
-`error_codes` — lista kodów i sygnatur. Zapisz OBA, jeśli oba są w wątku: kod z ekranu ORAZ kod
-z logów. Normalizuj — obetnij ścieżki instalacji, nazwy serwerów i wartości kluczy. Brak kodów
-to pusta lista.
+Nic: wywołanie kończy sprawę. Karta z pustym polem albo
+z rozstrzygnięciem spoza słownika wraca jako błąd do poprawki.
 
-`cause` — ustalona przyczyna. Nie wpisuj hipotezy, którą później obalono. Brak ustalenia — „brak".
+# Zasady
 
-`solution` — co rozstrzygnęło sprawę. Obowiązkowo:
-
-- KOMPLET ZASTRZEŻEŃ: skutek uboczny; zasięg zmiany („ustawienie globalne"); zakres czasowy
-  („dla zaległych nie ma drogi"); kompletność naprawy wstecznej. Pominięcie zastrzeżenia
-  zamienia odpowiedź w jej przeciwieństwo.
-- KTO wykonuje krok — użytkownik u siebie czy dostawca.
-- ODMOWA też jest rozwiązaniem („nie zostanie zrealizowane, ponieważ…") i bywa najcenniejsza,
-  bo mówi, czego NIE robić.
-
-Bez rozstrzygnięcia — „brak". Obietnice („zajmiemy się", „przekażemy") to nie rozwiązanie.
-
-`resolution` — dokładnie jedna nazwa ze słownika rozstrzygnięć podanego w danych. Jeśli wątek
-nie pozwala rozstrzygnąć, użyj wartości oznaczającej brak rozstrzygnięcia.
-
-`questions_summary` — czego prowadzący sprawę NIE wiedział i o co dopytywał. Liczą się WYŁĄCZNIE
-pytania osoby obsługującej; pytania zgłaszającego POMIŃ, nawet techniczne. POMIŃ też pytania
-proceduralne („czy problem nadal występuje?", „czy możemy zamknąć?"). MUSI zachować konkrety:
-
-- „Pytano o konfigurację stanowiska" jest bezwartościowe.
-- „Pytano o rozdzielczość ekranu i profil skanowania w NAPS2" niesie wiedzę.
-
-Gdy nikt o nic nie dopytywał — „brak". To normalny, częsty stan.
-
-## Przykłady
-
-Dwa przykłady pokazują sam KSZTAŁT argumentów. Nie kopiuj z nich treści ani stylu — zapisuj to,
-co jest w konkretnym wątku.
-
-Wątek zakończony rozstrzygnięciem:
-
-```json
-{
-  "component": "usługa kurierska",
-  "problem": "Etykiety nadania generują się bez kodu kreskowego.",
-  "symptoms": "Po zatwierdzeniu przesyłki plik PDF ma pustą ramkę w miejscu kodu.",
-  "error_codes": ["LBL-503"],
-  "cause": "Wyłączona usługa generowania grafik po stronie serwera wydruków.",
-  "solution": "Włączono usługę generowania grafik i przegenerowano etykiety. Wykonuje dostawca. Zastrzeżenie: przegenerowane zostały wyłącznie przesyłki z ostatnich 7 dni, starsze etykiety pozostają bez kodu.",
-  "resolution": "naprawione",
-  "questions_summary": "Pytano o wersję sterownika drukarki i o to, czy problem dotyczy wydruku seryjnego, czy pojedynczej etykiety."
-}
-```
-
-Wątek bez rozstrzygnięcia — to normalny, częsty przypadek, nie błąd:
-
-```json
-{
-  "component": "główna aplikacja",
-  "problem": "Import listy kontrahentów przerywa się w połowie pliku.",
-  "symptoms": "Proces zatrzymuje się po kilkuset wierszach, bez komunikatu błędu.",
-  "error_codes": [],
-  "cause": "brak",
-  "solution": "brak",
-  "resolution": "brak",
-  "questions_summary": "brak"
-}
-```
+- Wywołaj raz, po przeczytaniu całego wątku, jako jedyne wywołanie
+  w turze.
+- Wartości „brak" i „nie dotyczy" to dwa różne wyjścia: „brak", gdy
+  pole dotyczy sprawy, ale wątek tego nie ustalił; „nie dotyczy", gdy
+  pole nie pasuje do tego rodzaju zgłoszenia.
+- Wątki często niosą mało informacji albo informacje nieprzydatne
+  i nie pozwalają ustalić przyczyny ani rozwiązania. To normalne:
+  nie wypełniaj wtedy pól na siłę, wpisz „brak".
+- Wypełniając pole `component`, oceniaj po treści, nie po nazwie
+  modułu. Gdy sprawa dotyczy aplikacji, którą obsługuje ten
+  helpdesk, wpisz „główna aplikacja"; gdy usługi zewnętrznej albo
+  cudzego oprogramowania, wpisz jego nazwę.
+- Wypełniając pole `problem`, pisz tak, żeby dało się po nim znaleźć
+  inne zgłoszenia z tym samym problemem.
+- Wypełniając pole `symptoms`, wpisz „nie dotyczy", gdy zgłoszenie
+  nie opisuje awarii, tylko pyta o działanie systemu.
+- Wypełniając pole `error_codes`, zapisz wszystkie kody z wątku,
+  z ekranu i z logów.
+- Wypełniając pole `cause`, wpisz tylko przyczynę potwierdzoną
+  w wątku, bez domysłów (np. „prawdopodobnie…") i bez wykluczonych
+  przyczyn.
+- Wypełniając pole `solution`, przenieś z wątku komplet zastrzeżeń
+  (np. skutki uboczne, kogo dotyczy zmiana, od kiedy działa, czy
+  obejmuje dawne przypadki) i to, kto wykonał krok: użytkownik czy
+  dostawca. Odmowa też jest rozwiązaniem, a obietnica (np. „zajmiemy
+  się", „przekażemy do działu technicznego") nie.
+- Wypełniając pole `resolution`, użyj wartości oznaczającej brak
+  rozstrzygnięcia, jeśli wątek nie pozwala rozstrzygnąć.
+- Wypełniając pole `questions_summary`, bierz wyłącznie pytania
+  osoby obsługującej, bez pytań zgłaszającego (nawet technicznych)
+  i bez proceduralnych (np. „czy problem nadal występuje?"). Zachowaj
+  konkrety: „Pytano o rozdzielczość ekranu i profil skanowania
+  w NAPS2", a nie „Pytano o konfigurację stanowiska".

@@ -2599,8 +2599,16 @@ nowe zgłoszenie (surowy tekst)
   czy model je przepisuje, liczą pomiary grafów (p. 21–28). Przy `verdict` bramek stoją oba
   werdykty, `"pass"` pierwszy, bo fałszywy alarm boli bardziej niż przepuszczenie, a przy `text`
   w `suggest_questions` także `null`. Sekcji i zgodności tabelki ze schematem odpowiedzi pilnuje
-  test kontraktu grafów; opis karty zgłoszenia ma stary układ do p. 24 i test oczekuje dla niego
-  porażki.
+  test kontraktu grafów. Opis karty zgłoszenia ma ten układ od 2026-10-23 (p. 24): reguły pól są
+  za długie na komórkę tabelki, więc tabelka mówi o polu jedno zdanie, a reguły stoją
+  w „Zasadach", po punkcie na pole („Wypełniając pole `pole`, …"), skąd czyta je test-strażnik. Dwie zasady
+  przed nimi, za „Wywołaj raz…”, mówią, czym różni się „brak" od „nie dotyczy", i że wątki
+  często nie pozwalają ustalić przyczyny ani rozwiązania, więc pól nie wypełnia się na siłę.
+  Mówią o wątku, a nie o „karcie
+  bez rozstrzygnięcia”, bo to drugie czyta się jak pole bez wartości albo samo pole
+  `resolution`. Dwa przykłady całej karty w JSON-ie wypadły: zostały z czasu, gdy karta
+  wychodziła JSON-em w tekście, a dziś kształt daje schemat, a wartości każdego pola tabelka
+  (bez pomiaru; sprawdzi go pomiar w p. 24).
 - **Atrapa grafu (`build_fake_graph()`) jest jednorazowa** — `FakeAgentNode` ma zaplanowane tury,
   więc trasa buduje ją na każde wywołanie. `ainvoke` zwraca słownik, nie model stanu.
 - **`stream_graph()` obok `run_graph()` oddaje przebieg krok po kroku (2026-10-19):** po każdym
@@ -2909,8 +2917,9 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
     swojemu). Zdania właściwe jednemu grafowi stoją w jego „Zasadach": grafy z narzędziami
     wiedzy — że znaczników nie wpisuje się do zapytań, „Popraw" — że każdy znacznik z notatek
     zostaje w tekście. Brak tej sekcji nie objawia się na zmyślonych zgłoszeniach, bo nie
-    ma w nich znaczników. Prompt parsujący dostaje ją w p. 31: jest kontraktem artefaktu, więc
-    zmienia się z przebiegiem po korpusie.
+    ma w nich znaczników. Prompt parsujący ma ją od 2026-10-23 (p. 24, wcześniej planowana na
+    p. 31): pomiar karty idzie do modelu zewnętrznego, więc na wątkach po anonimizatorze, a prompt
+    i tak zamraża się dopiero przy masowym imporcie.
 - **Prompt systemowy ma sekcje z nagłówkiem `#` (2026-10-21):** „Zadanie" na początku, sekcje
   własne grafu („Szukanie", „Jak myśleć", „Jak zapisać"…), „Zasady" w punktach, a na końcu
   „Anonimizacja" i „Dane wejściowe". Pierwszą zasadą jest zawsze osobne „NIE ZMYŚLASZ." (zasada
@@ -2919,10 +2928,18 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   oceny z reguł klienta zadanie nie powtarza. Dwie ostatnie sekcje są w każdym grafie znak
   w znak takie same, więc poprawia się je wszędzie naraz. Pilnują tego trzy testy kontraktu
   grafów: obie sekcje wspólne i pierwsza zasada. Nagłówki `##` stoją tylko we wzorach odpowiedzi
-  w blokach kodu (uwagi `search`). Prompt parsujący przechodzi na ten układ w p. 24, a do tego
-  czasu testy oczekują dla niego porażki albo go pomijają. Przy przejściu na sekcje treść
-  przeszła słowo w słowo, poza sekcjami wspólnymi i rolą bramek; na żywym modelu nowego układu
-  nie mierzono (p. 21–28).
+  w blokach kodu (uwagi `search`). Przy przejściu na sekcje treść przeszła słowo w słowo, poza
+  sekcjami wspólnymi i rolą bramek; na żywym modelu nowego układu nie mierzono (p. 21–28).
+  **Graf bez narzędzi ma przed sekcjami wspólnymi tylko „Zadanie" i „Zasady"** (bramki,
+  „Popraw", `suggest_handoff`, a od 2026-10-23 karta zgłoszenia); własne sekcje mają grafy
+  z narzędziami. Prompt parsujący przeszedł na ten układ 2026-10-23 (p. 24): reguły czytania
+  wątku, wcześniej osobna sekcja „Jak czytać wątek", stoją w „Zasadach" w trybie orzekającym,
+  jak w bramkach („Czytasz cały wątek…”), i bez wersalików poza „NIE ZMYŚLASZ.” — przy
+  wyróżnieniu w co drugiej zasadzie żadne nic nie wyróżnia. Druga zasada ma brzmienie bramek
+  („Opierasz się wyłącznie na treści wątku…”), a „Zadanie" nie nazywa narzędzia odpowiedzi.
+  Zdania o wiernym zapisie i o jawnym wyjściu wypadły, bo powtarzały „NIE ZMYŚLASZ." i drugą
+  zasadę; kiedy wpisać „brak" albo „nie dotyczy", mówi reguła każdego pola. Opis narzędzia
+  odpowiedzi zostaje w trybie rozkazującym, jak opisy wszystkich narzędzi („Wywołaj raz…”).
 - **Zmiana promptu = pokaż przed/po + oczekiwany wpływ.** Nie przepisujemy promptów po cichu
   przy okazji innej zmiany.
   
@@ -4748,7 +4765,7 @@ z atrapą i limitem wywołań do `search`, `suggest_questions` i `suggest_soluti
   który przy prawdziwym modelu generującym odmawia wyniku atrapy; to samo dla embeddera, z nazwą
   modelu w każdym punkcie Qdranta. Golden set anonimizatora (54 zmyślone przypadki i 32 wątki
   korpusu) przechodzi bez przecieku i bez zniszczonej wiedzy. Prompty siedmiu grafów mówią
-  o znacznikach (19.7), parsujący dostaje to w p. 31. Szkic Blueprintu na SOFA o atrapach
+  o znacznikach (19.7), parsujący od 2026-10-23 (p. 24). Szkic Blueprintu na SOFA o atrapach
   w kompozycji czeka na przegląd w panelu. Reguły — „Usługa `anonymizer`", „Warstwy kodu",
   „Warstwa API", „Warstwa węzłów", „Warstwa embeddera", „Warstwa bazy wektorowej (Qdrant)",
   „Warstwa LLM", „Prompty", „Konfiguracja i deploy", „Testy", „Świadomie pominięte".
@@ -4807,12 +4824,41 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
   reguły — „Bramki jakości i asysta pisania”, „Prompty”, „Testy”.
 - [ ] **24. `parse_ticket`** — karta zgłoszenia promptem parsującym na modelu docelowym, porównana z
   próbkami z `porownanie-modeli-parsowania.md` (zbierane jeszcze JSON-em w tekście — od 2026-10-02
-  karta wychodzi narzędziem `respond_parse_ticket`); opis tego narzędzia przechodzi na układ
-  opisu narzędzia, a prompt systemowy na sekcje, jak w pozostałych grafach, z zachowaniem fraz
-  zamrożonych testem-strażnikiem; testy kontraktu grafów przestają wtedy oczekiwać dla niego
-  porażki i obejmują go testem sekcji wspólnych. *Dlaczego:* ten sam prompt
-  buduje korpus przy masowym imporcie (p. 31) i przy powrocie zamkniętych zgłoszeń (p. 30), więc
-  jego jakość na modelu docelowym rozstrzyga o jakości indeksu.
+  karta wychodzi narzędziem `respond_parse_ticket`). Układ zrobiony 2026-10-23: prompt
+  systemowy w sekcjach, z „Anonimizacją" i „Danymi wejściowymi" jak w pozostałych grafach, opis
+  narzędzia w układzie opisu narzędzia; frazy zamrożone zostały, bez wersalików w obu plikach
+  („komplet zastrzeżeń”, „Zachowaj konkrety”) i w trybie orzekającym w prompcie
+  systemowym („Czytasz cały wątek”, „Rozwiązanie może pochodzić od klienta”, „Zapisujesz
+  rozstrzygnięcie końcowe”, „Nie przepisujesz danych…”); reguły pól nie powtarzają tabelki,
+  tylko mówią, jak pole wypełnić; reguła o liczbach mówi
+  ogólniej („Pomijasz wartości właściwe tylko tej instalacji…, a zachowujesz te, które
+  obowiązują w każdej instalacji…”; kryterium to zasięg wartości, nie jej rodzaj ani źródło,
+  bo limit bywa ustawieniem jednej instalacji, a wymóg samej aplikacji obowiązuje wszystkich),
+  a za „nigdy zmyśloną” strażnik pilnuje „NIE ZMYŚLASZ.”. Kolejność dalej (decyzja 2026-10-23):
+  1. **Pole „nadaje się do bazy wiedzy" razem z ponownym parsowaniem golden200** — tak/nie
+     z jednozdaniowym uzasadnieniem w osobnym polu, wymagane w `ParsedTicket`, w odpowiedzi
+     `/parse-ticket` i we froncie; filtr jakości bierze je jako sygnał dopiero po pomiarze
+     zgodności z 38 ręcznymi odrzuceniami golden setu. Model widzi cały wątek, a filtr tylko
+     kartę, więc sygnały braku wiedzy („omówione telefonicznie", „instrukcja w załączeniu",
+     broadcast) giną przy parsowaniu. Pole wymagane unieważnia karty bez niego, więc golden200
+     parsuje się od nowa do nowego katalogu obok `bielik-11b-golden200/` (tego nie
+     nadpisujemy), a indeks i testy na golden200 przechodzą na nowy katalog. W tym samym
+     kroku pole `excluded_causes` (lista, pusta przy braku): przyczyny, które wątek sprawdził
+     i wykluczył. Dziś zasada „odrzucony trop wspominasz jednym zdaniem” nie mówi, w którym
+     polu; w `cause` wykluczenie przy nieustalonej przyczynie dawałoby „brak” z dopiskiem,
+     czyli sentinel w przebraniu. Pole idzie też do karty dla agenta (`read_tickets_card`),
+     bo wykluczenia to materiał na pytania rozróżniające; zasada o tropie przenosi się wtedy
+     z promptu systemowego do reguły pola.
+  2. **Luki z porównania** — zgłoszenie informacyjne bez treści (6 wariantów z 9), pytania
+     proceduralne w `questions_summary` mimo zakazu (4 modele) i sentinele w przebraniu w tym
+     polu (28 kart z 200). Niepotwierdzoną hipotezę w `cause` (4 modele z 8) reguła pola
+     wyklucza od 2026-10-23 („tylko przyczynę potwierdzoną w wątku, bez domysłów”), a opis
+     `problem` obejmuje pytanie o działanie systemu; czy to wystarcza, pokaże pomiar.
+  3. **Scenariusze z p. 59 i pomiar** na 10 zgłoszeniach z porównania, po anonimizatorze.
+
+  *Dlaczego:* ten sam prompt buduje korpus przy masowym imporcie (p. 31) i przy powrocie
+  zamkniętych zgłoszeń (p. 30), więc jego jakość na modelu docelowym rozstrzyga o jakości
+  indeksu.
 - [ ] **27. `suggest_handoff`** — prompt niosący, co sprawdzono i czego brakuje; do
   rozstrzygnięcia, czy wariant dostaje narzędzia kodu (namiar na plik i warunek w przekazaniu),
   bo dziś nie ma pętli narzędzi — jeśli dostanie, punkt idzie za p. 26, na opisach narzędzi
@@ -4839,8 +4885,8 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
 - [ ] **31. Masowy import z nowszego zrzutu** — przez graf `parse_ticket`, komendą `helpdesk`
       w kontenerze, na tej samej fabryce grafów co trasy, z kosztem przebiegu w raporcie (zapis
       artefaktu po KAŻDYM zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed
-      parsowaniem, model parsujący wybrany na podstawie `porownanie-modeli-parsowania.md`, prompt
-      dostosowany do placeholderów, czytnik SQL, wznawianie, raport, porządek
+      parsowaniem, model parsujący wybrany na podstawie `porownanie-modeli-parsowania.md`
+      i pomiaru z p. 24, czytnik SQL, wznawianie, raport, porządek
       w `data/unsafe/parsed/` (golden200 zostaje); zanonimizowany wątek idzie do tabeli
       wyszukiwania, którą ten przebieg zakłada — do ustalenia, czy każdego
       zgłoszenia, czy tylko tych z kartą przyjętą przez filtr jakości (wątek musi mieć każdy
