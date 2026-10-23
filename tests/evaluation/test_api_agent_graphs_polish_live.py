@@ -5,7 +5,7 @@ notatek wdrożeniowca, a nie ich treść — słowa potoczne znikają, fakty zos
 liczb ani nazw. Zestaw leży w `data/safe/golden/polish.json`; każda sprawa to notatki z listą
 słów potocznych, faktów i pułapek, czyli dopisków, które kuszą model.
 
-Każdy graf z sekcją w zestawie przechodzi przez cztery testy:
+Każdy graf z sekcją w zestawie przechodzi przez pięć testów:
 
 | test                                     | co sprawdza                                        |
 |------------------------------------------|----------------------------------------------------|
@@ -13,6 +13,7 @@ Każdy graf z sekcją w zestawie przechodzi przez cztery testy:
 | `test_colloquial_words_disappear`        | żadne słowo potoczne z notatek nie zostaje         |
 | `test_facts_from_the_notes_stay`         | żaden fakt z notatek nie ginie                     |
 | `test_no_numbers_or_names_are_added`     | nie przybywa liczb ani dopisków z pułapek          |
+| `test_every_marker_stays_as_it_is`       | znaczniki z notatek stoją w tekście bez zmian      |
 
 Pomiary:
 

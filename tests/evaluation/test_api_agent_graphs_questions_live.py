@@ -24,6 +24,8 @@ O czym pamiętać przy zmianach:
 
 - Progu nie ma: każdy błędny wybór to poprawka promptu. Sprawę poprawia się tylko wtedy, gdy
   błędna jest ona sama, nigdy pod wynik.
+- Sprawa rozstrzygnięta niesie fakt, który wskazuje jedną przyczynę wprost, a nie tylko
+  zawęża; inaczej brak pytań nie byłby jedyną dobrą odpowiedzią.
 - Liczy się, czy pytania są. Czy uwagi nazywają fakty, które wykluczyły przyczyny, i czy pytania
   nie powtarzają tych, na które klient odpowiedział, czyta się w raporcie.
 - KOSZTUJE: sprawa to pętla agenta z narzędziami, kilka tur modelu; cztery sprawy na

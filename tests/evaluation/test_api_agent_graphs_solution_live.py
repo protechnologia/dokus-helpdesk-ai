@@ -29,6 +29,8 @@ O czym pamiętać przy zmianach:
 
 - Progu nie ma: każdy brak to poprawka promptu. Sprawę poprawia się tylko wtedy, gdy błędna
   jest ona sama — na przykład wariant faktu nie obejmuje poprawnego brzmienia — nigdy pod wynik.
+- Fakt z karty musi stać w treści dla klienta (`text`); uwagi dla wdrożeniowca go nie
+  zastępują, bo do klienta nie trafiają.
 - Krok, który klient już wykonał, i nieodwracalność dopisana bez materiału to liczniki
   w raporcie, bez asercji; czy propozycja mimo to nie każe powtarzać kroku, czyta się w treści.
 - Pytania do klienta (znaki zapytania w treści poza cytatem „…” i adresem) też są licznikiem:

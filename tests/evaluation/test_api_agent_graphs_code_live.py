@@ -3,11 +3,12 @@ Description:
 Scenariusze ewaluacyjne cytowania kodu na żywym modelu (p. 59): czy graf z narzędziami kodu
 cytuje jako przyczynę plik, w którym stoi komunikat ze zgłoszenia, czy nie cytuje przyczyny, gdy
 komunikatu nie ma w kodzie nigdzie, choć podobny kusi, i czy cytuje tylko linie, które wcześniej
-przeczytał. Zestaw leży w `data/safe/golden/code.json`, z sekcją na graf (`search`,
-`suggest_questions`, `suggest_solution`); narzędzia kodu są prawdziwe, na paczce aplikacji
-syntetycznej, a zgłoszenia i instrukcje to atrapy.
+przeczytał. Zestaw leży w `data/safe/golden/code.json`: jedna lista spraw, a każda wymienia
+w `graphs` grafy, na których idzie (`search`, `suggest_questions`, `suggest_solution`);
+narzędzia kodu są prawdziwe, na paczce aplikacji syntetycznej, a zgłoszenia i instrukcje to
+atrapy.
 
-Każdy graf z sekcją w zestawie przechodzi przez cztery testy:
+Każdy graf, który sprawy wymieniają w `graphs`, przechodzi przez cztery testy:
 
 | test                                                  | co sprawdza                           |
 |-------------------------------------------------------|---------------------------------------|
@@ -33,6 +34,12 @@ O czym pamiętać przy zmianach:
   ona sama, nigdy pod wynik.
 - Spis katalogu, nazwę pliku widocznego tylko w spisie i przyczynę wykluczoną przez wątek liczy
   raport, bez asercji; czy uwagi odróżniają stan kodu od instalacji klienta, czyta się w nich.
+- Cytowania i odczyty ocena bierze z wyników narzędzi w rozmowie, nie z deklaracji modelu.
+  Odczytana jest linia z wyniku `read_code_file` albo `read_code_symbol` we wcześniejszej turze;
+  linia widziana tylko w wyniku szukania odczytana nie jest.
+- Para spraw z wątkiem, w którym klient wyklucza jedną przyczynę, idzie tylko na `search`:
+  pozostałe dwa grafy sięgają po kod wyłącznie przy komunikacie, wpisie z logu albo kodzie
+  błędu. Nowy graf z narzędziami kodu to wpis w `graphs` spraw, które mają na nim iść.
 - Wymaga zbudowanej paczki syntetycznej i ripgrepa na hoście, jak testy narzędzi kodu.
 - KOSZTUJE: sprawa to pętla agenta z narzędziami, 3–6 tur modelu; osiem spraw (cztery
   w `search`, po dwie w `suggest_questions` i `suggest_solution`) na `gpt-6.1-sol` to szacunkowo
