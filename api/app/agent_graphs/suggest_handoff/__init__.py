@@ -8,8 +8,8 @@ Przebieg: anonymize → agent → respond. Bez narzędzi wiedzy — przekazanie 
 wraca z pustą listą źródeł i działa przy pustym indeksie (`REQUIRES_HITS = False`). Jedyne
 narzędzie modelu to `respond_suggest_handoff` (`respond_tool.py`).
 
-Status: węzły właściwe z fabryki grafów, atrapa w `fake.py`; scenariusze i pomiar w p. 33 (CLAUDE.md ->
-„Plan").
+Status: węzły właściwe z fabryki grafów, atrapa w `fake.py`; scenariusze i pomiar w p. 33
+(CLAUDE.md -> „Plan").
 """
 
 from app.agent_graphs.suggest_handoff.fake import build_fake_graph, example_state
