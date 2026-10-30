@@ -5,7 +5,7 @@
      Układ jak w opisach narzędzi agenta: cztery sekcje, argumenty w tabelce, linie do 70 znaków;
      dłuższe bywają tylko wiersze tabelki. „Co zwraca" jest bez tabelki, bo narzędzie nic modelowi
      nie oddaje. Sekcji pilnuje test kontraktu grafów. Przykład w tabelce pokazuje układ wiadomości,
-     a model może go przepisać — czy to robi, liczy pomiar w p. 33.
+     a model może go przepisać — czy to robi, liczą scenariusze z `handoff.json`.
 
      Komentarze redakcyjne jak ten są wycinane przed wysłaniem. -->
 # Do czego służy

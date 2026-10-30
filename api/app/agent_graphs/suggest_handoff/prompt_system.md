@@ -1,7 +1,7 @@
 <!-- Prompt grafu `suggest_handoff` — strona systemowa.
 
-     Treść z p. 27, scenariusze i pomiar w p. 33 (CLAUDE.md -> „Plan"). Dawnego promptu tego
-     wariantu nie było — dawny variants.json wskazywał pliki, które nigdy nie powstały.
+     Treść z p. 27, scenariusze w `handoff.json`, pomiar w p. 33 (CLAUDE.md -> „Plan"). Dawnego
+     promptu tego wariantu nie było — dawny variants.json wskazywał pliki, które nigdy nie powstały.
 
      TU JEST CAŁA INSTRUKCJA, w turze użytkownika tylko dane (CLAUDE.md -> „Prompty").
 
@@ -31,7 +31,6 @@ Piszesz klientowi krótką wiadomość: podsumowanie problemu i informację o pr
 # Zasady szczegółowe
 
 - Podsumowanie mówi, czego dotyczy problem i co dotąd ustalono, jeśli wątek coś ustalił.
-- Gdy wątek mówi, czego klient ma nie robić, powtarzasz to w tekście.
 - Nie obiecujesz terminów ani konkretnych akcji, które zostaną wykonane.
 
 # Anonimizacja

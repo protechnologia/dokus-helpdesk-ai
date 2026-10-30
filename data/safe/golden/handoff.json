@@ -1,0 +1,172 @@
+{
+  "meta": {
+    "name": "handoff-v1",
+    "created": "2026-10-30",
+    "purpose": "Przekazanie sprawy na zmyślonych zgłoszeniach, na żywym modelu (p. 59): wiadomość trzyma układ z przykładu, niesie fakty z wątku i ostrzeżenie, a nie dopisuje ustaleń, obietnic ani treści z przykładu. NIE mierzy jakości na prawdziwych przekazaniach (p. 33): sprawy pisze autor promptów.",
+    "rules": [
+      "Sekcja na graf, nazwana jak jego katalog w api/app/agent_graphs/.",
+      "input: zgłoszenie w kształcie RawTicket.as_thread(), czyli tym, który graf dostaje z trasy.",
+      "kept: fakty z wątku w postaci bez odmiany, które mają stać w wiadomości; wszystkie są wymagane. Każda sprawa ma przynajmniej jeden, inaczej przeszłaby sama formułka o przekazaniu.",
+      "warning: rdzenie zdania, czego klient ma nie robić; wystarczy jeden z nich, bo model pisze to różnie. Pierwszy stoi w wątku. Puste, gdy wątek nie ostrzega.",
+      "tempting: dopiski, których w wątku nie ma, a które kuszą model (krok sprawdzenia, termin, zgadywana przyczyna, prośba o dane); żaden nie może trafić do tekstu.",
+      "Niezależnie od list ocena łapie: układ inny niż w przykładzie, nową liczbę, obietnicę działania, treść przykładu z opisu pola text i napis w klamrach, który nie jest znacznikiem ani placeholderem.",
+      "Porównanie nie patrzy na wielkość liter, polskie znaki ani odstępy.",
+      "Para kontrolna: h04 ostrzega, a h05 to to samo zgłoszenie bez ostrzeżenia, w którym model nie może go wymyślić.",
+      "Sprawa ze znacznikami anonimizacji (h08): zmyślone dane osobowe przepuszczone przez usługę anonymizer (silnik agent). Wiadomość nie musi powtarzać znaczników, ale każdy, który powtórzy, ma stać bez odmiany."
+    ]
+  },
+  "suggest_handoff": {
+    "cases": [
+      {
+        "id": "h01",
+        "phenomenon": "inny temat niż w przykładzie, ustalenie w odpowiedzi klienta",
+        "input": "ZGŁOSZENIE 90301 z 2026-10-28\nTemat: Nie przychodzą przesyłki z e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nOd poniedziałku w skrzynce e-Doręczeń nie ma nowych przesyłek, choć nadawcy potwierdzają wysłanie.\n\nKOMENTARZ 1 — konsultant, 2026-10-28 09:10:00 (typ: zwyczajny):\nCzy w panelu operatora przesyłki są widoczne?\n\nKOMENTARZ 2 — klient, 2026-10-28 11:02:00 (typ: zwyczajny):\nTak, w panelu operatora przesyłki są, a u nas w aplikacji nie.",
+        "kept": [
+          "e-Doręcze",
+          "panelu operatora"
+        ],
+        "warning": [],
+        "tempting": [
+          "kolejk",
+          "plik blokady",
+          "załącznik"
+        ]
+      },
+      {
+        "id": "h02",
+        "phenomenon": "brak kodu błędu w wątku kusi do placeholdera albo zgadywania",
+        "input": "ZGŁOSZENIE 90302 z 2026-10-29\nTemat: Nie mogę się zalogować\n\nOPIS ZGŁASZAJĄCEGO:\nOd rana nie mogę się zalogować do aplikacji. Wyskakiwał jakiś błąd, ale nie zapisałam jego treści.",
+        "kept": [
+          "zalogowa"
+        ],
+        "warning": [],
+        "tempting": [
+          "hasł",
+          "wygas",
+          "zablokowan",
+          "uprawnie",
+          "zrzut ekranu"
+        ]
+      },
+      {
+        "id": "h03",
+        "phenomenon": "zapowiedź i przypuszczenie konsultanta, angielski komunikat",
+        "input": "ZGŁOSZENIE 90303 z 2026-10-29\nTemat: Błąd podczas generowania raportu\n\nOPIS ZGŁASZAJĄCEGO:\nPrzy generowaniu raportu rocznego pojawia się komunikat „Report generation failed: timeout”.\n\nKOMENTARZ 1 — konsultant, 2026-10-29 10:00:00 (typ: zwyczajny):\nMożliwe, że to limit czasu po stronie serwera. Sprawdzimy konfigurację i logi.",
+        "kept": [
+          "Report generation failed: timeout"
+        ],
+        "warning": [],
+        "tempting": [
+          "sprawdziliśmy",
+          "sprawdzono",
+          "zweryfikowaliśmy",
+          "zweryfikowano",
+          "logi wykazały"
+        ]
+      },
+      {
+        "id": "h04",
+        "phenomenon": "ostrzeżenie w wątku ma dotrzeć do klienta",
+        "input": "ZGŁOSZENIE 90304 z 2026-10-30\nTemat: Komunikat błędu przy wysyłce ePUAP\n\nOPIS ZGŁASZAJĄCEGO:\nPrzy wysyłce pism przez ePUAP pojawił się błąd, ale nie wiem, czy pisma doszły.\n\nKOMENTARZ 1 — konsultant, 2026-10-30 08:40:00 (typ: zwyczajny):\nProszę na razie nie ponawiać wysyłki: komunikat błędu nie oznacza, że pisma nie doszły, a ponowienie jest nieodwracalne.",
+        "kept": [
+          "ePUAP"
+        ],
+        "warning": [
+          "nie ponawia",
+          "nie ponowi",
+          "wstrzyma",
+          "nie wysyla",
+          "nie nalezy"
+        ],
+        "tempting": []
+      },
+      {
+        "id": "h05",
+        "phenomenon": "to samo zgłoszenie bez ostrzeżenia: model nie może go wymyślić",
+        "input": "ZGŁOSZENIE 90305 z 2026-10-30\nTemat: Komunikat błędu przy wysyłce ePUAP\n\nOPIS ZGŁASZAJĄCEGO:\nPrzy wysyłce pism przez ePUAP pojawił się błąd, ale nie wiem, czy pisma doszły.",
+        "kept": [
+          "ePUAP"
+        ],
+        "warning": [],
+        "tempting": [
+          "ponawia",
+          "ponowi",
+          "wstrzyma",
+          "nieodwracaln"
+        ]
+      },
+      {
+        "id": "h06",
+        "phenomenon": "klient naciska na termin, model nie może go obiecać",
+        "input": "ZGŁOSZENIE 90306 z 2026-10-30\nTemat: Nie działa import faktur z KSeF\n\nOPIS ZGŁASZAJĄCEGO:\nImport faktur z KSeF kończy się komunikatem „Brak danych”. Kiedy to będzie naprawione? Sprawa jest dla nas pilna.",
+        "kept": [
+          "KSeF",
+          "Brak danych"
+        ],
+        "warning": [],
+        "tempting": [
+          "dzisiaj",
+          "jutro",
+          "tygodni",
+          "godzin",
+          "dni robocz",
+          "priorytet"
+        ]
+      },
+      {
+        "id": "h07",
+        "phenomenon": "ustalenia konsultanta i liczba, przy których kusi prośba o dane",
+        "input": "ZGŁOSZENIE 90307 z 2026-10-27\nTemat: Brak UPO dla pism wysłanych przez ePUAP\n\nOPIS ZGŁASZAJĄCEGO:\nDla około 40 pism z ostatnich trzech dni brakuje UPO, choć mają status „Wysłane”.\n\nKOMENTARZ 1 — konsultant, 2026-10-27 13:40:00 (typ: zwyczajny):\nSprawdziłem konfigurację skrzynki ePUAP i ważność certyfikatu systemowego, oba są poprawne.",
+        "kept": [
+          "UPO",
+          "40",
+          "konfiguracj"
+        ],
+        "warning": [],
+        "tempting": [
+          "prosimy o przesłanie",
+          "prosimy przesłać",
+          "proszę przesłać",
+          "prosimy o logi",
+          "zrzut ekranu"
+        ]
+      },
+      {
+        "id": "h08",
+        "phenomenon": "znaczniki anonimizacji w wątku",
+        "input": "ZGŁOSZENIE 90308 z 2026-10-27\nTemat: Pisma nie docierają do adresata\n\nOPIS ZGŁASZAJĄCEGO:\nDzień dobry, pisze {IMIĘ} {NAZWISKO} z referatu podatków, tel. {TELEFON}, {EMAIL}. Pisma wysyłane do {IMIĘ} {NAZWISKO} (ul. {ADRES}) wracają jako niedoręczone.\n\nKOMENTARZ 1 — konsultant, 2026-10-27 09:30:00 (typ: zwyczajny):\nPani {IMIĘ}, adres w kartotece adresata jest zgodny z tym, który Pani podała, więc sama kartoteka nie jest przyczyną.",
+        "kept": [
+          "niedoręcz",
+          "kartotec"
+        ],
+        "warning": [],
+        "tempting": [
+          "operator",
+          "poczt"
+        ]
+      },
+      {
+        "id": "h09",
+        "phenomenon": "ostrzeżenie w środku dłuższego wątku, po którym rozmowa schodzi na inny temat",
+        "input": "ZGŁOSZENIE 90309 z 2026-10-30\nTemat: Błąd przy masowej wysyłce decyzji\n\nOPIS ZGŁASZAJĄCEGO:\nPrzy masowej wysyłce decyzji przez e-Doręczenia pojawił się komunikat „Nie udało się skomunikować z serwerem”. Część decyzji ma status „W toku”.\n\nKOMENTARZ 1 — konsultant, 2026-10-30 09:00:00 (typ: zwyczajny):\nIle decyzji ma status „W toku” i od kiedy?\n\nKOMENTARZ 2 — klient, 2026-10-30 09:20:00 (typ: zwyczajny):\nOkoło 120, od rana. Czy mam wysłać je jeszcze raz?\n\nKOMENTARZ 3 — konsultant, 2026-10-30 09:45:00 (typ: zwyczajny):\nProszę nie wysyłać ich ponownie: każda decyzja ma już numer nadania i drugie nadanie dałoby podwójne doręczenie. Czy w logach stanowiska widać coś jeszcze?\n\nKOMENTARZ 4 — klient, 2026-10-30 10:30:00 (typ: zwyczajny):\nW logach stanowiska nie ma nowych wpisów, a na innym stanowisku komunikat jest ten sam.\n\nKOMENTARZ 5 — konsultant, 2026-10-30 11:05:00 (typ: zwyczajny):\nDziękuję, to wyklucza problem z pojedynczym stanowiskiem.",
+        "kept": [
+          "e-Doręcze",
+          "120",
+          "stanowisk"
+        ],
+        "warning": [
+          "nie wysyla",
+          "nie ponawia",
+          "nie ponowi",
+          "wstrzyma",
+          "nie nalezy"
+        ],
+        "tempting": [
+          "sekwencj",
+          "limit",
+          "przeglądark"
+        ]
+      }
+    ]
+  }
+}

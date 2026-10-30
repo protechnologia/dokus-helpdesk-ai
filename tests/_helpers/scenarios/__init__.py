@@ -10,6 +10,7 @@ zestaw z `data/safe/golden/` wczytany do sekcji i spraw, ocena jednej sprawy, pr
 | `injections` | `injections.json` | czy polecenie wstrzyknięte w wejście albo materiał przebija |
 | `gates`      | `gates.json`      | werdykt bramki na sprawie łamiącej, poprawnej i pułapce     |
 | `polish`     | `polish.json`     | czy „Popraw” zmienia formę notatek, a nie ich treść         |
+| `handoff`    | `handoff.json`    | czy przekazanie trzyma układ, fakty i nic nie dopisuje      |
 | `questions`  | `questions.json`  | czy pytania padają tylko przy konkurujących przyczynach     |
 | `code`       | `code.json`       | czy graf cytuje jako przyczynę właściwy plik kodu           |
 | `solution`   | `solution.json`   | czy propozycja niesie fakty z karty i pomija krok zrobiony  |

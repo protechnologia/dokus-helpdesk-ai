@@ -48,8 +48,8 @@ O czym pamiętać przy zmianach:
   przebiegu pytest wypisuje je z sumą kosztu (`pytest_terminal_summary()`). Sam raport leży
   w `tests/_helpers/live/`; tu zostają fixture i funkcja wypisująca, bo pytest szuka ich
   tylko w `conftest.py`. Tak samo raporty scenariuszy: fixture `<scenariusz>_report`
-  (`injection_report`, `gate_report`, `polish_report`, `questions_report`, `code_report`,
-  `solution_report`, `reading_report`), a klasa raportu
+  (`injection_report`, `gate_report`, `polish_report`, `handoff_report`, `questions_report`,
+  `code_report`, `solution_report`, `reading_report`), a klasa raportu
   w `tests/_helpers/scenarios/<scenariusz>/`; po przebiegu stoją przed zużyciem modelu.
 """
 
@@ -67,6 +67,7 @@ from app.engine_anonymization import FakeAnonymizer
 from tests._helpers.live import LLM_LIVE_MARKER, LiveUsageReport
 from tests._helpers.scenarios.code import CodeReport
 from tests._helpers.scenarios.gates import GateReport
+from tests._helpers.scenarios.handoff import HandoffReport
 from tests._helpers.scenarios.injections import InjectionReport
 from tests._helpers.scenarios.polish import PolishReport
 from tests._helpers.scenarios.questions import QuestionsReport
@@ -244,6 +245,31 @@ def gate_report(
     return pytestconfig.stash[GATE_REPORT_KEY]
 
 
+# Miejsce raportu przekazania w konfiguracji przebiegu, na tej samej zasadzie co raport zużycia.
+HANDOFF_REPORT_KEY = pytest.StashKey[HandoffReport]()
+
+
+@pytest.fixture(scope="session")
+def handoff_report(
+    pytestconfig: pytest.Config,  # wstrzykiwane przez pytest; trzyma raport na cały przebieg
+) -> HandoffReport:
+    """
+    Description:
+    Raport scenariuszy przekazania sprawy, jeden na cały przebieg pytesta. Test przekazania
+    zgłasza w nim ocenę każdej sprawy, a po przebiegu pytest wypisuje ją razem z wiadomością.
+
+    Example args:
+        (wstrzykiwane przez pytest)
+
+    Example result:
+        HandoffReport wspólny dla wszystkich testów przebiegu
+    """
+    if HANDOFF_REPORT_KEY not in pytestconfig.stash:
+        pytestconfig.stash[HANDOFF_REPORT_KEY] = HandoffReport()
+
+    return pytestconfig.stash[HANDOFF_REPORT_KEY]
+
+
 # Miejsce raportu „Popraw” w konfiguracji przebiegu, na tej samej zasadzie co raport zużycia.
 POLISH_REPORT_KEY = pytest.StashKey[PolishReport]()
 
@@ -393,12 +419,14 @@ def pytest_terminal_summary(
     Example result:
         None — na końcu wyjścia pytesta stoją sekcje „wstrzyknięcia poleceń", „scenariusze
         bramek", „scenariusze »Popraw«", „scenariusze pytań", „scenariusze cytowania kodu",
-        „scenariusze rozwiązania", „scenariusze czytania" i „zużycie żywego modelu"
+        „scenariusze rozwiązania", „scenariusze czytania", „scenariusze przekazania"
+        i „zużycie żywego modelu"
     """
     sections = [
         ("wstrzyknięcia poleceń",        config.stash.get(INJECTION_REPORT_KEY, None)),
         ("scenariusze bramek",           config.stash.get(GATE_REPORT_KEY, None)),
         ("scenariusze „Popraw”",         config.stash.get(POLISH_REPORT_KEY, None)),
+        ("scenariusze przekazania",      config.stash.get(HANDOFF_REPORT_KEY, None)),
         ("scenariusze pytań",            config.stash.get(QUESTIONS_REPORT_KEY, None)),
         ("scenariusze cytowania kodu",   config.stash.get(CODE_REPORT_KEY, None)),
         ("scenariusze rozwiązania",      config.stash.get(SOLUTION_REPORT_KEY, None)),

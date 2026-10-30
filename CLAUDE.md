@@ -2718,16 +2718,17 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   odpowiedź już jest w treści.
 - **`handoff` to krótka wiadomość bez narzędzi (2026-10-30, p. 27):** „Dzień dobry.”, podsumowanie
   problemu z tym, co dotąd ustalono, informacja o przekazaniu sprawy, „Pozdrawiam.”. Układ pokazuje
-  przykład w opisie pola `text`, a zasady szczegółowe mówią, co niesie podsumowanie, że ostrzeżenie,
-  czego klient ma nie robić, idzie do tekstu, i że model nie obiecuje terminów ani konkretnych
-  akcji. Samo „przekazaliśmy do analizy” nie mówi klientowi, o co chodzi i co już wiadomo; krótkie
+  przykład w opisie pola `text`, a zasady szczegółowe mówią tylko, co niesie podsumowanie, i że
+  model nie obiecuje terminów ani konkretnych akcji. Samo „przekazaliśmy do analizy” nie mówi klientowi, o co chodzi i co już wiadomo; krótkie
   komentarze z przekazaniem to w korpusie mediana 155 znaków (zgrubne liczenie po słowach, 104
   komentarze w 100 zgłoszeniach). Dosłownie powtarza się tam tylko jeden tekst (3×), więc problemem
   jest brak treści, a nie szablon: dawne „≥12×” dotyczyło formułki zamykającej. Przeszło
-  sprawdzenie, nie pomiar: na `gpt-6.1-sol` wstrzyknięcia 0 przebić z 6, a cztery zmyślone sprawy
-  przez `/suggest` z anonimizatorem na Bieliku dały oczekiwany układ, po około 0,003 USD. Cena: nic
-  już wprost nie mówi, że zapowiedź („sprawdzimy”) nie jest ustaleniem, a wiadomość nie mówi
-  klientowi, czy dostanie jeszcze odpowiedź.
+  sprawdzenie, nie pomiar: na `gpt-6.1-sol` scenariusze z `handoff.json` dały 0 błędów na 9 spraw
+  w dwóch przebiegach, wstrzyknięcia 0 przebić z 6, a cztery zmyślone sprawy przez `/suggest`
+  z anonimizatorem na Bieliku oczekiwany układ, po około 0,003 USD. Cena: nic już wprost nie mówi,
+  że zapowiedź („sprawdzimy”) nie jest ustaleniem, ani nie każe przekazać ostrzeżenia; pilnują tego
+  tylko scenariusze h03, h04 i h09. Wiadomość nie mówi też klientowi, czy dostanie jeszcze
+  odpowiedź.
 
 ### Warstwa LLM
 
@@ -3315,6 +3316,9 @@ localhost:8010/search`.
 - Scenariusze „Popraw" (słowa potoczne, zgubione fakty, dopiski, p. 59):
   `pytest tests/evaluation/test_api_agent_graphs_polish_live.py -m llm_live` — **kosztuje, pytaj
   przed**
+- Scenariusze przekazania sprawy (układ, fakty, ostrzeżenie, dopiski, obietnice, p. 59):
+  `pytest tests/evaluation/test_api_agent_graphs_handoff_live.py -m llm_live` — **kosztuje, pytaj
+  przed**
 - Scenariusze „pytań już nie trzeba" (`suggest_questions`, p. 59):
   `pytest tests/evaluation/test_api_agent_graphs_questions_live.py -m llm_live` — **kosztuje,
   pytaj przed**; sprawa to pętla agenta, kilka tur modelu
@@ -3613,7 +3617,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 - **Nazwa zestawu w `data/safe/golden/` mówi, czego dotyczy (2026-10-15).** Dopisek `-tools` ma
   zestaw zapytań do narzędzi z oczekiwanym wynikiem, sprawdzany bez modelu (`code-tools.json`,
   `docs-tools.json`, wcześniej z dopiskiem `-synthetic`). Nazwa bez dopisku to scenariusze
-  ewaluacji modelu z p. 59 (`injections`, `gates`, `polish`, `questions`, `code`, `solution`,
+  ewaluacji modelu z p. 59 (`injections`, `gates`, `polish`, `handoff`, `questions`, `code`, `solution`,
   `reading`). Zestawy
   w `data/unsafe/golden/` nie mają dopisku paczki (do 2026-10-15 `-dokus`): instancja obsługuje
   jeden produkt, więc dane klienta są zawsze z tej samej paczki (`tickets.json`,
@@ -3739,6 +3743,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
   | `injections_live.py`                   | `injections.json` | polecenie w wejściu, regule klienta albo materiale narzędzi nie zmienia wyniku; wszystkie grafy |
   | `gates_live.py`                        | `gates.json`      | bramka blokuje wejście łamiące regułę, przepuszcza poprawne i pułapkę |
   | `polish_live.py`                       | `polish.json`     | „Popraw” zmienia formę: bez słów potocznych, zgubionych faktów i dopisków |
+  | `handoff_live.py`                      | `handoff.json`    | przekazanie trzyma układ i fakty, niesie ostrzeżenie, nie dopisuje i nie obiecuje |
   | `questions_live.py`                    | `questions.json`  | `suggest_questions` pyta tylko wtedy, gdy przyczyny konkurują |
   | `code_live.py`                         | `code.json`       | przyczyną jest plik z komunikatem, cytowany po odczycie    |
   | `solution_live.py`                     | `solution.json`   | treść dla klienta niesie fakty z karty, w tym krok nieodwracalny |
@@ -3777,6 +3782,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/scenarios/injections/` | zestaw wstrzyknięć, sprawy sekcji z atakiem także w materiale atrap, kontrola dotarcia (`reached_model()`), ocena sprawy i raport (fixture `injection_report`) |
 | `tests/_helpers/scenarios/gates/`      | zestaw scenariuszy bramek, ocena werdyktu i raport (fixture `gate_report`) |
 | `tests/_helpers/scenarios/polish/`     | zestaw scenariuszy „Popraw", ocena tekstu i raport (fixture `polish_report`) |
+| `tests/_helpers/scenarios/handoff/`    | zestaw scenariuszy przekazania sprawy, ocena wiadomości i układu (`layout_problems()`) i raport (fixture `handoff_report`) |
 | `tests/_helpers/scenarios/questions/`  | zestaw scenariuszy „pytań już nie trzeba", ocena i raport (fixture `questions_report`) |
 | `tests/_helpers/scenarios/code/`       | zestaw scenariuszy cytowania kodu (sprawy z listą grafów), narzędzia sprawy (`case_tools()`), cytowania kodu z rozmowy, ocena i raport (fixture `code_report`) |
 | `tests/_helpers/scenarios/solution/`   | zestaw scenariuszy rozwiązania, karty sprawy ze zmianami (`case_cards()`), fakty w treści dla klienta (`mentions()`), ocena i raport (fixture `solution_report`) |
@@ -3818,8 +3824,8 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
   (`from tests._helpers.scenarios.gates.samples import BLOCK`).
 - **Scenariusze z p. 59 stoją razem w `tests/_helpers/scenarios/`, folder na scenariusz
   (2026-10-15).** Wszystkie mają ten sam układ: zestaw z `data/safe/golden/`, sprawy, ocena
-  i raport; 59.7 dołożył `code` (cytowanie kodu), 59.8 — `solution`, a 59.9 — `reading`
-  (czytanie znalezionego materiału). Na górze `_helpers/` zostają
+  i raport; 59.7 dołożył `code` (cytowanie kodu), 59.8 — `solution`, 59.9 — `reading`
+  (czytanie znalezionego materiału), a p. 27 — `handoff` (przekazanie sprawy). Na górze `_helpers/` zostają
   atrapy i podmiany zależności, infrastruktura żywego modelu (`live`), grafy (`graphs`) i dane
   pomiarów ewaluacyjnych (`synthetic_docs`, `golden_tickets`), z których korzystają też testy
   spoza scenariuszy. Nazwa od wzorca, nie od grafów: grafom służy prawie każdy helper,
@@ -4073,6 +4079,10 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   liter, brak polskich znaków i odmianę kod już łapie, więc nieznaleziony fragment to zwykle
   osoba zmyślona przez model; licznik podpowiadałby przyczynę, a przeciek pokaże pomiar
   z p. 78.
+- **Zasada w prompcie `suggest_handoff`, że ostrzeżenie z wątku idzie do tekstu** (2026-10-30) —
+  bez niej model przekazał je w 15 próbach z 15 (także w środku dłuższego wątku), a z nią w 15
+  z 15; pilnują tego scenariusze h04 i h09. Wraca, gdy zaczną padać. Tak samo osobna zasada, że
+  zapowiedź nie jest ustaleniem (scenariusz h03).
 - **Uwagi dla wdrożeniowca w `suggest_handoff`** (2026-10-30) — model ma tylko wątek, który
   wdrożeniowiec i tak widzi, więc notatka nie dodałaby nowej wiedzy. Wraca z p. 71, gdyby wariant
   dostawał ustalenia z `/search`, np. namiar na plik.
@@ -4523,7 +4533,7 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
 - [x] **21. `gate_close`** (2026-10-21) → „Bramki jakości i asysta pisania”; pomiar w p. 33.
 - [x] **22. `gate_reply`** (2026-10-22) → „Bramki jakości i asysta pisania”; pomiar w p. 33.
 - [x] **24. `parse_ticket`** (2026-10-23) → „Domena”, „Golden set retrievalu”; pomiar w p. 31.
-- [x] **27. `suggest_handoff`** (2026-10-30) → „Warianty generacji”; scenariusze i pomiar w p. 33.
+- [x] **27. `suggest_handoff`** (2026-10-30) → „Warianty generacji”; test ręczny i pomiar w p. 33.
 - [ ] **28. `polish`** — zasady stylu jako dane, pomiar braku nowych faktów (porównanie wejścia
   z wyjściem pod kątem dodanych liczb, nazw i kroków); do potwierdzenia, czy „Popraw" zostaje
   w zakresie. *Dlaczego:* jedyna funkcja zwracająca tekst do wysłania, więc dodany fakt trafia
@@ -4576,10 +4586,8 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
   z pięciu reguł na prawdziwych wiadomościach do klientów, w dwóch przebiegach, z czytaniem
   uzasadnień; osobno zasada, że cytaty reguł nie łamią — bez niej bramka blokowała cytat
   komunikatu z ekranu „Ups! Coś poszło nie tak.” jako potoczny, a czy z nią nie przepuszcza
-  prośby o hasło schowanej w cytacie, nikt nie mierzył. `suggest_handoff` (2026-10-30): scenariusze
-  z p. 59 na żywym modelu (sprawa bez kodu błędu w wątku, sprawa z zapowiedzią „sprawdzimy”,
-  ostrzeżenie w wątku z zasadą i bez niej, licznik przepisania przykładu z opisu `text`), test ręczny
-  przez front i ocena na prawdziwych przekazaniach. *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na
+  prośby o hasło schowanej w cytacie, nikt nie mierzył. `suggest_handoff` (2026-10-30): test ręczny
+  przez front (jeszcze nie zrobiony) i ocena na prawdziwych przekazaniach. *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na
   zapytaniach surowych, a grafy na zmyślonych sprawach i teście ręcznym.
 - [ ] **34. Tryb odświeżania korpusu** — kolejne zrzuty czy dostęp tylko do odczytu.
   *Dlaczego:* +130 zgłoszeń w miesiąc, więc jednorazowy zrzut szybko się starzeje.
