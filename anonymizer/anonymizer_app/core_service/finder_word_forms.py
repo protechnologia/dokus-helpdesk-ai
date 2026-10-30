@@ -12,8 +12,9 @@ Reguła — słowo w tekście jest odmianą wskazanego, gdy:
 
 Dopasowanie po wspólnym początku (na słowach złożonych przez `fold_word()`): wspólny początek ma
 długość słowa wskazanego bez dwóch ostatnich liter, a nie mniej niż 3 litery, a słowo w tekście
-ma po nim najwyżej 4 litery. Zawsze: słowo wskazane ma co najmniej 3 litery, słowo z wielkiej
-litery pasuje tylko do słowa z wielkiej litery, a słów w znacznikach reguła nie bierze.
+ma po nim najwyżej 4 litery. Zawsze: słowo wskazane ma co najmniej 3 litery, a słów w znacznikach
+reguła nie bierze. Słowo wskazane z wielkiej litery pasuje tylko do słów z wielkiej litery, chyba
+że żadna jego forma tak w tekście nie stoi: wtedy wielką literę dopisał model.
 
 | wskazane   | w tekście   | lemat        | po początku | wynik                             |
 |------------|-------------|--------------|-------------|-----------------------------------|
@@ -23,12 +24,17 @@ litery pasuje tylko do słowa z wielkiej litery, a słów w znacznikach reguła 
 | Ala        | Alarm       | różny        | tak         | nie — „alarm” to zwykły rzeczownik |
 | Lis        | Lista       | różny        | tak         | nie — „lista” to zwykły rzeczownik |
 | Sobczakową | Sobczakowej | spoza słow.  | tak         | odmiana                           |
+| Lis        | lis         | wspólny      | tak         | nie — obok stoi „Lis”             |
+| Anna       | anna        | wspólny      | tak         | odmiana — literę dopisał model    |
 
 O czym pamiętać przy zmianach:
 
 - Sam lemat gubi zdrobnienie („Iza” obok „Izabela”), a sam początek łapie zwykłe słowa („Alarm”
   obok „Ala”); reguła bierze z obu to, co pewne. Pomiar z 2026-10-19 na odpowiedziach modelu dla
   golden setu: zniszczona wiedza zestawu zmyślonego 2 → 0, bez nowego przecieku.
+- Model przy notatkach małymi literami podaje „Anna” zamiast „anna”, choć prompt każe przepisywać
+  dosłownie. Bez wyjątku na brak formy z wielkiej litery taka osoba przechodziła do modelu
+  zewnętrznego. Słownik tego nie rozstrzygnie: „nowak” i „dudek” zna z małej jako zwykłe słowa.
 - Nadal łapie słowo, które słownik zna też jako nazwisko: „Nowego” na początku zdania obok
   „Nowak” (słownik ma nazwisko „Nowy”). Pomyłka jest w stronę zamiany, nie przecieku.
 """
@@ -77,21 +83,21 @@ def find_word_forms(
 
     markers = marker_spans(text)
     lemmas  = analyse_word(word).lemmas
-    found   = []
+    forms   = []
 
     for match in LETTERS.finditer(text):
-        candidate = match.group()
-
         # --- słowo w znaczniku to dana już zamieniona ---
         if is_inside(match.span(), markers):
             continue
 
-        # --- wielka litera wskazanego słowa jest częścią nazwy: „Lis” to nie „lis” ---
-        if word[0].isupper() and not candidate[0].isupper():
-            continue
+        if _is_form(folded, lemmas, match.group()):
+            forms.append(match)
 
-        if _is_form(folded, lemmas, candidate):
-            found.append(match.span())
+    # --- wielka litera wskazanego słowa jest częścią nazwy: „Lis” to nie „lis”; gdy żadna forma ---
+    # --- nie stoi z wielkiej, literę dopisał model („anna” → „Anna”) i liczą się te, które są ---
+    capitals = [match for match in forms if match.group()[0].isupper()]
+    chosen   = capitals if word[0].isupper() and capitals else forms
+    found    = [match.span() for match in chosen]
 
     return found
 

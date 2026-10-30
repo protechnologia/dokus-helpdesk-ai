@@ -645,6 +645,105 @@
         "WERSJA": ["4.15"],
         "NUMER": ["90154"]
       }
+    },
+    {
+      "id": "s55",
+      "phenomenon": "notatka małymi literami bez polskich znaków: osoba powtórzona, telefon, kod błędu",
+      "text": "dzwonila marzena kubiak z ratusza, tel 512 334 776. marzena kubiak mowi ze pisma z eNadawcy nie doszly, blad 3107",
+      "remove": {
+        "IMIĘ": [
+          "marzena"
+        ],
+        "NAZWISKO": [
+          "kubiak"
+        ],
+        "TELEFON": [
+          "512 334 776"
+        ]
+      },
+      "keep": {
+        "USŁUGA": [
+          "eNadawcy"
+        ],
+        "KOD_BŁĘDU": [
+          "3107"
+        ]
+      }
+    },
+    {
+      "id": "s56",
+      "phenomenon": "notatka małymi literami: nazwiska, które są też zwykłymi słowami, w odmianie",
+      "text": "rozmawialem z renata wrona i z panem sobolem, oboje maja zly adres w ewidencji. wersja 5.2 tego nie poprawia",
+      "remove": {
+        "IMIĘ": [
+          "renata"
+        ],
+        "NAZWISKO": [
+          "wrona",
+          "sobolem"
+        ]
+      },
+      "keep": {
+        "WERSJA": [
+          "5.2"
+        ],
+        "SŁOWO": [
+          "ewidencji"
+        ]
+      }
+    },
+    {
+      "id": "s57",
+      "phenomenon": "podpis z wielkiej litery, a ta sama osoba małymi literami w komentarzu konsultanta",
+      "text": "ZGŁOSZENIE 90157 z 2026-10-20\nTemat: Brak przesyłek\n\nOPIS ZGŁASZAJĄCEGO:\nDzień dobry, od rana nie ma przesyłek z e-Doręczeń.\nPozdrawiam\nGrzegorz Malec\n\nKOMENTARZ 1 — konsultant, 2026-10-20 10:00:00 (typ: komentarz):\nrozmawialem z grzegorz malec, potwierdzil ze problem dalej jest",
+      "remove": {
+        "IMIĘ": [
+          "Grzegorz"
+        ],
+        "NAZWISKO": [
+          "Malec"
+        ]
+      },
+      "keep": {
+        "USŁUGA": [
+          "e-Doręczeń"
+        ],
+        "NUMER": [
+          "90157"
+        ]
+      }
+    },
+    {
+      "id": "s58",
+      "phenomenon": "notatka małymi literami: zdrobnienie imienia, a nazwa działu ma zostać",
+      "text": "pani jadzia z kancelarii zglosila ze nie dziala podpis w wersji 7.1",
+      "remove": {
+        "IMIĘ": [
+          "jadzia"
+        ]
+      },
+      "keep": {
+        "WERSJA": [
+          "7.1"
+        ],
+        "SŁOWO": [
+          "kancelarii"
+        ]
+      }
+    },
+    {
+      "id": "s59",
+      "phenomenon": "notatka małymi literami bez żadnej osoby: nic nie znika",
+      "text": "przesylki juz ida, kolejka odbioru stala, zrestartowalem usluge i zaleglosci sciagnely sie same. wersja 5.2",
+      "remove": {},
+      "keep": {
+        "WERSJA": [
+          "5.2"
+        ],
+        "SŁOWO": [
+          "kolejka"
+        ]
+      }
     }
   ]
 }

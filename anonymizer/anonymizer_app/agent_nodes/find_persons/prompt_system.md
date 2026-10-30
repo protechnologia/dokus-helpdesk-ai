@@ -6,6 +6,8 @@
      nie ma w żadnym zestawie golden setu — sonda miała tu nakładanie. Przykład nagłówka z kilkoma
      adresatami dopisany 2026-10-19: bez niego model w jednym wątku próbki albo pomijał całą linię
      „Do:” (2 z 15 przebiegów), albo brał nazwę skrzynki za nazwisko (13 z 15); z nim — 0 i 0.
+     Przykład notatki małymi literami dopisany 2026-10-30: bez niego model podawał „Anna” zamiast
+     „anna” i brał nazwę działu za nazwisko („Kancelarii”).
 
      `{{exceptions}}` wypełnia węzeł listą z `exceptions.json` (nazwy produktu, skrzynek
      i systemów tej instalacji). Tę samą listę kod odrzuca też sam, więc sekcja pomaga modelowi,

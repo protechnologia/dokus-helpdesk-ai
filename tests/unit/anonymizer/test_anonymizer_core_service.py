@@ -70,9 +70,13 @@ def test_analyse_word_gives_lemmas_and_whether_it_is_a_person(
         ("rozmawialem z panem fabisiakiem", "fabisiakiem", ["fabisiakiem"]),
         ("{NAZWISKO} Dudziak", "Dudziak", ["Dudziak"]),
         ("Al jest, Ala też.", "Al", []),
+        ("dzwonila anna nowak, anna mowi", "Anna", ["anna", "anna"]),
+        ("rozmawialem z dudkiem, dudek mowi", "Dudek", ["dudkiem", "dudek"]),
+        ("Fabisiak dzwonil, rozmawialem z fabisiakiem", "fabisiakiem", ["Fabisiak", "fabisiakiem"]),
     ],
     ids=["dopełniacz", "wołacz", "rodzaj", "wymiana-głoski", "zdrobnienie", "spoza-słownika",
-         "małe-litery", "znacznik", "za-krótkie"],
+         "małe-litery", "znacznik", "za-krótkie", "model-dopisał-wielką-imię",
+         "model-dopisał-wielką-zwykłe-słowo", "wskazane-z-małej-obok-wielkiej"],
 )
 def test_find_word_forms_finds_every_form_of_a_person(
     text:     str,
@@ -82,10 +86,13 @@ def test_find_word_forms_finds_every_form_of_a_person(
     """Sprawdza, czy reguła znajduje każdą formę wskazanego imienia albo nazwiska: po wspólnym
     lemacie („Ewie” przy „Ewa”), po wspólnym początku na imię znane słownikowi („Izabela” przy
     zdrobnieniu „Iza”) i na słowo spoza słownika („Sobczakowej”), bez słów w znacznikach i bez
-    słów krótszych niż trzy litery.
+    słów krótszych niż trzy litery. Znajduje też formy z małej litery, gdy żadna nie stoi
+    z wielkiej, a model podał słowo z wielkiej („anna” przy „Anna”), a słowo podane z małej znajduje
+    obie postaci („Fabisiak” przy „fabisiakiem”).
 
     Wyłapuje regułę, która zgubi odmianę: osoba podana przez model raz przeciekłaby wszędzie, gdzie
-    stoi w innej formie. Sama reguła rdzenia gubiła „Ewie”, sam lemat — „Izabela”."""
+    stoi w innej formie. Sama reguła rdzenia gubiła „Ewie”, sam lemat — „Izabela”, a warunek na
+    wielką literę bez wyjątku przepuszczał całe notatki pisane małymi literami."""
     assert [text[start:end] for start, end in find_word_forms(text, word)] == expected
 
 
@@ -95,8 +102,9 @@ def test_find_word_forms_finds_every_form_of_a_person(
         ("Pani Ala zgłasza: Alarm o dysku.", "Ala", ["Ala"]),
         ("Pan Lis. Lista jest pusta.", "Lis", ["Lis"]),
         ("Pan Lis, a lista jest pusta.", "Lis", ["Lis"]),
+        ("Pan Lis widział, że lis biegł.", "Lis", ["Lis"]),
     ],
-    ids=["alarm", "lista-z-wielkiej", "lista-z-małej"],
+    ids=["alarm", "lista-z-wielkiej", "lista-z-małej", "to-samo-słowo-z-małej"],
 )
 def test_find_word_forms_leaves_ordinary_words(
     text:     str,
@@ -104,7 +112,8 @@ def test_find_word_forms_leaves_ordinary_words(
     expected: list[str],
 ) -> None:
     """Sprawdza, czy zwykłe słowo, które zaczyna się jak krótkie imię albo nazwisko („Alarm” przy
-    „Ala”, „Lista” przy „Lis”, także na początku zdania), nie jest odmianą.
+    „Ala”, „Lista” przy „Lis”, także na początku zdania), nie jest odmianą, a to samo słowo z małej
+    litery zostaje, gdy obok stoi nazwisko z wielkiej („lis” przy „Pan Lis”).
 
     Wyłapuje powrót samej reguły rdzenia: niszczyła „Lista zwrotów” i „Alarm o braku miejsca na
     dysku” w golden secie (s33), czyli wiedzę, której potem nikt z wątku nie odczyta."""
