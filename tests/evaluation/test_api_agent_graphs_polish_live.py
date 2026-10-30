@@ -20,6 +20,7 @@ Pomiary:
 | graf     | potoczne | zgubione | dopisane | pomiar                                         |
 |----------|----------|----------|----------|------------------------------------------------|
 | `polish` | 0 z 4    | 0 z 4    | 0 z 4    | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach |
+| `polish` | 0 z 5    | 0 z 5    | 0 z 5    | 2026-10-30, `gpt-6.1-sol`, w dwóch przebiegach |
 
 O czym pamiętać przy zmianach:
 

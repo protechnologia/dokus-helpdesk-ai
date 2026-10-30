@@ -23,7 +23,7 @@ który zamyka zgłoszenie.
 |----------|----------|----------------------------------------|------|
 | verdict  | string   | "pass", "block"                        | `"pass"`, gdy zgłoszenie spełnia reguły zamknięcia; inaczej `"block"`. |
 | reasons  | string[] | ["Nie widać, co zostało zrobione."]    | Uzasadnienia, po jednym zdaniu na każdą niespełnioną regułę, z tym, czego w zgłoszeniu brakuje. |
-| hint     | string   | "Dopisz, co zmieniono w ustawieniach." | Jedno–dwa zdania dla wdrożeniowca: co dopisać, żeby zamknięcie przeszło. |
+| hint     | string   | "Dopisz, co zmieniono w ustawieniach." | Jedno–dwa zdania: co dopisać, żeby zamknięcie przeszło. |
 
 # Co zwraca
 

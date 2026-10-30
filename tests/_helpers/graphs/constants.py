@@ -15,6 +15,10 @@ ANONYMIZED = "ZANONIMIZOWANE-7f3a"
 # test kontraktu odróżnia nazwy narzędzi od nazw pól, które prompt też pisze w grawisach.
 TOOL_NAME_IN_PROMPT = r"`((?:find|read|list|quote|describe|respond)_[a-z_]+)`"
 
-# Nagłówki dwóch sekcji, które prompt systemowy każdego grafu ma w jednym brzmieniu.
+# Nagłówki trzech sekcji, które prompt systemowy każdego grafu ma w jednym brzmieniu.
+GENERAL_RULES_HEADING = "# Zasady ogólne"
 ANONYMIZATION_HEADING = "# Anonimizacja"
 DATA_HEADING          = "# Dane wejściowe"
+
+# Nagłówek sekcji z zasadami właściwymi jednemu grafowi: stoi zaraz po zasadach ogólnych.
+SPECIFIC_RULES_HEADING = "# Zasady szczegółowe"

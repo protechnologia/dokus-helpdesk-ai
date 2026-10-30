@@ -42,19 +42,20 @@ def test_variants_list_the_registry() -> None:
 def test_every_variant_answers_in_one_shape(variant: str) -> None:
     """Sprawdza, czy `POST /suggest` odpowiada w tym samym kształcie dla każdego wariantu
     z rejestru: status 200, nazwa wariantu, niepusty tekst propozycji, uwagi dla wdrożeniowca
-    z wyniku grafu i log przebiegu od anonimizacji do odpowiedzi. Wariant z narzędziami wiedzy
-    wraca ze źródłami, a wariant bez nich z pustą listą źródeł.
+    z wyniku grafu (przekazanie sprawy ma je puste) i log przebiegu od anonimizacji do odpowiedzi.
+    Wariant z narzędziami wiedzy wraca ze źródłami, a wariant bez nich z pustą listą źródeł.
 
     Wyłapuje wariant, którego trasa nie obsługuje albo który odpowiada inaczej niż pozostałe,
     oraz uwagi zgubione po drodze: helpdesk musiałby pisać osobną obsługę odpowiedzi dla każdego
     guzika, a wdrożeniowiec nie dostałby tego, czego nie wolno wysłać klientowi."""
     response = TestClient(create_app()).post("/suggest", json={**TICKET, "variant": variant})
     body     = response.json()
+    notes    = "" if variant == "handoff" else f"fake-suggest-{variant}-notes"
 
     assert response.status_code == 200
     assert body["variant"] == variant
     assert body["text"]
-    assert body["internal_notes"] == f"fake-suggest-{variant}-notes"
+    assert body["internal_notes"] == notes
     assert bool(body["sources"]) == bool(VARIANTS[variant].TOOL_NAMES)
     assert body["log"][0]["node"]  == "anonymize"
     assert body["log"][-1]["node"] == "respond"

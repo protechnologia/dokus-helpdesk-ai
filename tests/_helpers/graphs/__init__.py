@@ -11,7 +11,9 @@ from tests._helpers.graphs.constants import (
     ANONYMIZATION_HEADING,
     ANONYMIZED,
     DATA_HEADING,
+    GENERAL_RULES_HEADING,
     GRAPHS_PACKAGE,
+    SPECIFIC_RULES_HEADING,
     TOOL_NAME_IN_PROMPT,
 )
 from tests._helpers.graphs.helper import (
@@ -49,6 +51,7 @@ __all__ = [
     "expected_edges",
     "fake_nodes",
     "filled_by",
+    "GENERAL_RULES_HEADING",
     "graph_module",
     "graph_modules",
     "graph_name",
@@ -61,6 +64,7 @@ __all__ = [
     "prompt_rules",
     "prompt_section",
     "ran_fake",
+    "SPECIFIC_RULES_HEADING",
     "streamed_fake",
     "TOOL_NAME_IN_PROMPT",
 ]

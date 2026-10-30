@@ -42,7 +42,7 @@ def system_prompt() -> str:
         (brak)
 
     Example result:
-        "Jesteś asystentem wdrożeniowca helpdesku. Na podstawie zgłoszenia piszesz klientowi…"
+        "Jesteś asystentem wdrożeniowca helpdesku. Sprawa przechodzi do dalszych prac…"
     """
     return read_document(SYSTEM_FILE).rstrip()
 
@@ -95,11 +95,33 @@ def model_tools(
     return definitions
 
 
+def filled_by_graph(
+    state: SuggestHandoffState,  # np. SuggestHandoffState(input_text="ZGŁOSZENIE 90101…")
+) -> dict[str, str]:
+    """
+    Description:
+    Pola propozycji, które wypełnia graf, a nie model (`FILLED_BY_GRAPH`): uwagi są zawsze puste,
+    a odpowiedź `/suggest` ma ten sam kształt co w pozostałych wariantach.
+
+    Example args:
+        state=SuggestHandoffState(input_text="ZGŁOSZENIE 90101…")
+
+    Example result:
+        {"internal_notes": ""}
+    """
+    filled = {
+        "internal_notes": "",
+    }
+
+    return filled
+
+
 def respond_node() -> RespondNode:
     """
     Description:
-    Węzeł odpowiedzi tego grafu: waliduje argumenty `respond_suggest_handoff` do `Proposal`.
-    Wariant nie wymaga źródeł (`REQUIRES_HITS`), więc propozycja powstaje z samego wątku.
+    Węzeł odpowiedzi tego grafu: dokłada do argumentów `respond_suggest_handoff` pola od grafu
+    (`filled_by_graph()`) i waliduje całość do `Proposal`. Wariant nie wymaga źródeł
+    (`REQUIRES_HITS`), więc propozycja powstaje z samego wątku.
 
     Example args:
         (brak)
@@ -111,6 +133,7 @@ def respond_node() -> RespondNode:
         respond_tool_name = RESPOND_TOOL_NAME,
         output_model      = Proposal,
         requires_sources  = REQUIRES_HITS,
+        filled_by_graph   = filled_by_graph,
     )
 
     return node

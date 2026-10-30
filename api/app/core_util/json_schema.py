@@ -34,6 +34,32 @@ def json_schema_without_docs(
     return schema
 
 
+def json_schema_without_fields(
+    schema: dict[str, Any],   # np. {"type": "object", "properties": {"ticket_id": …}, …}
+    fields: tuple[str, ...],  # np. ("ticket_id", "date")
+) -> dict[str, Any]:
+    """
+    Description:
+    Usuwa ze schematu obiektu podane pola — z `properties` i z `required`.
+
+    Example args:
+        schema={"properties": {"ticket_id": {…}, "problem": {…}}, "required": ["ticket_id"]}
+        fields=("ticket_id",)
+
+    Example result:
+        {"properties": {"problem": {…}}, "required": []}
+    """
+    trimmed = {
+        **schema,
+        "properties": {
+            name: value for name, value in schema["properties"].items() if name not in fields
+        },
+        "required": [name for name in schema.get("required", []) if name not in fields],
+    }
+
+    return trimmed
+
+
 def _strip_docs(
     node: Any,  # np. {"title": "Verdict", "type": "object", "properties": {…}}
 ) -> Any:

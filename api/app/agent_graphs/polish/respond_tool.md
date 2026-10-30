@@ -18,7 +18,7 @@ klientowi.
 
 | argument | typ    | przykłady                              | opis |
 |----------|--------|----------------------------------------|------|
-| text     | string | "Dzień dobry, przesyłki z e-Doręczeń…" | Ten sam sens co w notatkach, w poprawnej formie; gotowy do wysłania po polsku. |
+| text     | string | "Dzień dobry, przesyłki z e-Doręczeń…" | Ten sam sens co w notatkach, w poprawnej formie; gotowy do wysłania. |
 
 # Co zwraca
 

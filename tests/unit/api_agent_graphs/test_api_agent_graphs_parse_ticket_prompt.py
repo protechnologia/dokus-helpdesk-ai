@@ -281,5 +281,7 @@ def test_system_prompt_forbids_invention(prompt: str) -> None:
 
     Wyłapuje zgubienie któregoś z tych dwóch zdań: model mógłby wtedy wypełniać pola zmyśloną
     treścią albo odpowiedzieć zwykłym tekstem zamiast karty."""
+    answer_rule = "wyłącznie wywołaniem narzędzia, którego nazwa zaczyna się od `respond_`"
+
     assert "NIE ZMYŚLASZ." in system_prompt()
-    assert f"wyłącznie wywołaniem narzędzia `{RESPOND_TOOL_NAME}`" in system_prompt()
+    assert answer_rule     in system_prompt()

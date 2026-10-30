@@ -16,7 +16,8 @@ class Proposal(BaseModel):
     Treść i uwagi są osobno, bo mają dwóch odbiorców: `text` ma dać się wysłać klientowi bez
     wycinania, a w `internal_notes` stoi to, co do klienta wyjść nie może — nazwy klas i ścieżki
     z kodu, notatki przy pytaniach, czego materiał nie rozstrzyga. Uwagi są wymagane, ale mogą być
-    puste: model musi o nich zdecydować, a pusty napis znaczy, że uwag nie ma.
+    puste: model musi o nich zdecydować, a pusty napis znaczy, że uwag nie ma. W `suggest_handoff`
+    wypełnia je graf, zawsze pustym napisem.
     """
 
     model_config = ConfigDict(extra="forbid")

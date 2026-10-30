@@ -2495,8 +2495,8 @@ a do tego czasu jej nie ma, więc oba narzędzia kończą się błędem `DbPostg
   `QuestionsAnswer`, w którym `text` może być `null`, a wynikiem jest `Proposal` albo
   `ProposalNotes`. Dzięki temu `Proposal` dalej wymaga treści w pozostałych wariantach.
 - **Węzeł odpowiedzi buduje `respond_node()` z pakietu grafu**: graf zna swoje narzędzie
-  odpowiedzi, model wyniku, wymóg źródeł i pola, które wypełnia sam. W `parse_ticket` pola od
-  grafu (`filled_by_graph()`) wygrywają z tym, co podał model.
+  odpowiedzi, model wyniku, wymóg źródeł i pola, które wypełnia sam. W `parse_ticket`
+  i `suggest_handoff` pola od grafu (`filled_by_graph()`) wygrywają z tym, co podał model.
 - **`AnonymizedText` mieszka w `engine_anonymization/`** — pakiecie na usługę anonimizatora, jak
   `engine_embedding/` (kontrakt `Anonymizer`, klient usługi `AnonymizerClient`, `FakeAnonymizer`,
   fabryka `build_anonymizer`). Osobny typ zamiast `str`, żeby granica była widoczna
@@ -2695,7 +2695,9 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   w `solution` w „Uwagach dla klienta", w `questions` jako linia w nawiasie pod pytaniami.
   Notatki przy pytaniach idą do uwag, każda w osobnej linii od „Ad. N." — numeru pytania, którego
   dotyczy (2026-10-20, wcześniej „N:", które w uwagach czytało się jak osobna lista). Zasada 9
-  obowiązuje oba pola.
+  obowiązuje oba pola. `suggest_handoff` uwag nie ma (2026-10-30): model ma tylko wątek, który
+  wdrożeniowiec i tak widzi, więc pole wypełnia graf pustym napisem, a odpowiedź `/suggest`
+  zachowuje kształt.
 - **`questions` działa dwutorowo:** bez trafień pyta na podstawie samego zgłoszenia,
   z trafieniami dokłada `questions_summary` z podobnych spraw. Ryzykiem nie jest puste pole, tylko
   sentinel w przebraniu („Brak pytań ze strony prowadzącego sprawę.") — 28 na 200 rekordów.
@@ -2889,31 +2891,44 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
     się tak, jak stoi, bez zgadywania i bez odmiany. Od 2026-10-21 to sekcja „Anonimizacja",
     w jednym brzmieniu w każdym grafie, a od 2026-10-22 mówi też, że znacznik nie jest błędem ani
     brakiem, bo dana w tekście jest, tylko ukryta (wcześniej bramki miały to zdanie każda po
-    swojemu). Zdania właściwe jednemu grafowi stoją w jego „Zasadach": grafy z narzędziami
-    wiedzy — że znaczników nie wpisuje się do zapytań, „Popraw" — że każdy znacznik z notatek
-    zostaje w tekście. Brak tej sekcji nie objawia się na zmyślonych zgłoszeniach, bo nie
+    swojemu). Zdania właściwe jednemu grafowi stoją w jego „Zasadach szczegółowych": grafy
+    z narzędziami wiedzy — że znaczników nie wpisuje się do zapytań, „Popraw" — że każdy znacznik
+    z notatek zostaje w tekście. Brak tej sekcji nie objawia się na zmyślonych zgłoszeniach, bo nie
     ma w nich znaczników. Prompt parsujący ma ją od 2026-10-23 (p. 24, wcześniej planowana na
     p. 31): pomiar karty idzie do modelu zewnętrznego, więc na wątkach po anonimizatorze, a prompt
     i tak zamraża się dopiero przy masowym imporcie.
 - **Prompt systemowy ma sekcje z nagłówkiem `#` (2026-10-21):** „Zadanie" na początku, sekcje
-  własne grafu („Szukanie", „Jak myśleć", „Jak zapisać"…), „Zasady" w punktach, a na końcu
-  „Anonimizacja" i „Dane wejściowe". Pierwszą zasadą jest zawsze osobne „NIE ZMYŚLASZ." (zasada
-  9), a zdanie o odpowiedzi narzędziem `respond_<graf>` też jest zasadą, nie zadaniem, i stoi na
-  końcu „Zasad" (od 2026-10-22; bez testu, który by tego pilnował). Kryteriów
-  oceny z reguł klienta zadanie nie powtarza. Dwie ostatnie sekcje są w każdym grafie znak
-  w znak takie same, więc poprawia się je wszędzie naraz. Pilnują tego trzy testy kontraktu
-  grafów: obie sekcje wspólne i pierwsza zasada. Nagłówki `##` stoją tylko we wzorach odpowiedzi
-  w blokach kodu (uwagi `search`). Przy przejściu na sekcje treść przeszła słowo w słowo, poza
-  sekcjami wspólnymi i rolą bramek; na żywym modelu nowego układu nie mierzono (p. 21–28).
-  **Graf bez narzędzi ma przed sekcjami wspólnymi tylko „Zadanie" i „Zasady"** (bramki,
+  własne grafu („Szukanie", „Jak myśleć", „Jak zapisać"…), „Zasady ogólne" i „Zasady szczegółowe"
+  w punktach (od 2026-10-30, wcześniej jedna sekcja „Zasady"), a na końcu „Anonimizacja" i „Dane
+  wejściowe". Zasady ogólne wiążą każdy graf: osobne „NIE ZMYŚLASZ." (zasada 9), „Opierasz się
+  wyłącznie na danych, które dostajesz…”, zdanie o odpowiedzi narzędziem i „Odpowiedź piszesz po
+  polsku…”. Ta ostatnia zostawia w oryginale komunikaty, kody błędów i nazwy, żeby dało się je
+  znaleźć dosłownym szukaniem, i nie obejmuje zapytań do narzędzi, bo kod szuka się po angielskich
+  nazwach. „Dane” znaczą to, co
+  w sekcji „Dane wejściowe": tekst w sekcjach `===` i wyniki narzędzi, więc jedno brzmienie pasuje
+  też do grafów, które czytają materiał narzędziami. Jedyny wyjątek to hipoteza za pytaniem
+  w `suggest_questions`, zapisana tam wprost. Narzędzia odpowiedzi różnią się nazwą między grafami,
+  więc zasada mówi o przedrostku `respond_`, a dokładną nazwę podaje ostatnie zdanie tury
+  użytkownika. Wskazywanie braków zamiast poprawiania jest szczegółowe, bo dotyczy bramek. Wersaliki
+  w zasadach ma tylko „NIE ZMYŚLASZ." (w każdym grafie od 2026-10-30): przy wyróżnieniu w co drugiej
+  zasadzie żadne nic nie wyróżnia. Kryteriów oceny z reguł klienta zadanie nie powtarza. Zasady ogólne i dwie ostatnie sekcje są w każdym
+  grafie znak w znak takie same, więc poprawia się je wszędzie naraz, a brak zasady wychodzi
+  w teście, nie dopiero przy czytaniu promptu. Pilnuje tego pięć testów kontraktu grafów: trzy
+  sekcje wspólne, pierwsza zasada i zasady szczegółowe zaraz po ogólnych. Nagłówki `##` stoją
+  tylko we wzorach odpowiedzi w blokach kodu (uwagi `search`). Przy przejściu na sekcje treść
+  przeszła słowo w słowo, poza sekcjami wspólnymi i rolą bramek; na żywym modelu nowego układu
+  nie mierzono (p. 21–28). Po podziale zasad wszystkie testy na żywym modelu przeszły w jednym
+  przebiegu na `gpt-6.1-sol` (2026-10-30, 96 z 96, 9 min 17 s, 1,90 USD; wstrzyknięcia 0 przebić
+  na 63 ataki), a scenariusze bramek i „Popraw” także w dwóch wcześniejszych, przed ostatnimi
+  poprawkami `suggest_handoff`. To sprawdzenie, nie pomiar jakości: ten model ma wywołanie
+  narzędzia wymuszone, więc nie pokazuje, czy zasada z przedrostkiem działa słabiej tam, gdzie
+  wymuszenia nie ma.
+  **Graf bez narzędzi ma poza sekcjami wspólnymi tylko „Zadanie" i „Zasady szczegółowe"** (bramki,
   „Popraw", `suggest_handoff`, a od 2026-10-23 karta zgłoszenia); własne sekcje mają grafy
   z narzędziami. Prompt parsujący przeszedł na ten układ 2026-10-23 (p. 24): reguły czytania
-  wątku, wcześniej osobna sekcja „Jak czytać wątek", stoją w „Zasadach" w trybie orzekającym,
-  jak w bramkach („Czytasz cały wątek…”), i bez wersalików poza „NIE ZMYŚLASZ.” — przy
-  wyróżnieniu w co drugiej zasadzie żadne nic nie wyróżnia. Druga zasada ma brzmienie bramek
-  („Opierasz się wyłącznie na treści wątku…”), a „Zadanie" nie nazywa narzędzia odpowiedzi.
-  Zdania o wiernym zapisie i o jawnym wyjściu wypadły, bo powtarzały „NIE ZMYŚLASZ." i drugą
-  zasadę; kiedy wpisać „brak" albo „nie dotyczy", mówi reguła każdego pola. Opis narzędzia
+  wątku, wcześniej osobna sekcja „Jak czytać wątek", stoją w „Zasadach szczegółowych" w trybie
+  orzekającym, jak w bramkach („Czytasz cały wątek…”). „Zadanie" nie nazywa narzędzia odpowiedzi. Zdania o wiernym zapisie i o jawnym wyjściu wypadły, bo powtarzały zasady ogólne;
+  kiedy wpisać „brak" albo „nie dotyczy", mówi reguła każdego pola. Opis narzędzia
   odpowiedzi zostaje w trybie rozkazującym, jak opisy wszystkich narzędzi („Wywołaj raz…”).
 - **Zmiana promptu = pokaż przed/po + oczekiwany wpływ.** Nie przepisujemy promptów po cichu
   przy okazji innej zmiany.
@@ -2940,6 +2955,8 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   w uwagach dla wdrożeniowca (`internal_notes`), nie w treści dla klienta (2026-10-08, wcześniej
   w nawiasach kwadratowych, `[dla serwisanta: sprawdź wersję firmware]`). Znacznik anonimizacji
   ma tę samą postać i ten sam sens: daną uzupełnia człowiek przed wysłaniem (2026-10-19).
+  `suggest_handoff` placeholderów nie ma (2026-10-30): numer i datę zgłoszenia ma w nagłówku wątku,
+  dane osobowe pod znacznikami, a reszty nie dopowiada.
 
 #### Wnioski ze strojenia promptów
 
@@ -3936,8 +3953,8 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   gdy dane z klikania dadzą podstawę do oceny (p. 42).
 - **Odesłanie zgłoszenia do innego działu wewnętrznego** — nie ma działu, do którego się odsyła,
   a grzeczna formułka bez treści to udokumentowana patologia korpusu. Nie dotyczy eskalacji do
-  operatora zewnętrznego (ePUAP, Poczta Polska): tam tekst ma nieść, co sprawdzono i czego
-  brakuje. Dotyczy tak samo wariantu `handoff`.
+  operatora zewnętrznego (ePUAP, Poczta Polska): tam tekst ma nieść, czego dotyczy problem i co
+  dotąd ustalono. Dotyczy tak samo wariantu `handoff`.
 - **Osobne trasy strumienia** (`/search/stream`…) — zostajemy przy jednej trasie na graf
   z nagłówkiem `Accept` (decyzja 2026-10-19): różnica dotyczy sposobu oddania wyniku, nie
   funkcji, a osobne trasy powieliłyby budowę stanu sześć razy. Front pokazowy (p. 77) ich nie
@@ -4044,6 +4061,17 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   liter, brak polskich znaków i odmianę kod już łapie, więc nieznaleziony fragment to zwykle
   osoba zmyślona przez model; licznik podpowiadałby przyczynę, a przeciek pokaże pomiar
   z p. 78.
+- **Uwagi dla wdrożeniowca w `suggest_handoff`** (2026-10-30) — model ma tylko wątek, który
+  wdrożeniowiec i tak widzi, więc notatka nie dodałaby nowej wiedzy. Wraca z p. 71, gdyby wariant
+  dostawał ustalenia z `/search`, np. namiar na plik.
+- **Narzędzia kodu w `suggest_handoff`** (decyzja 2026-10-30) — jedna tura kosztuje tyle co bramka,
+  a sprawa na kodzie Dokusa to 8–20 tur i 0,09–0,20 USD, żeby dodać namiar, którego klient nie
+  potrzebuje.
+- **Obowiązkowe „czego brakuje” w tekście przekazania** (2026-10-30) — kusi model do zmyślania
+  potrzeb serwisu; wiadomość mówi, czego dotyczy problem i co dotąd ustalono.
+- **Wspólna nazwa `respond` dla narzędzi odpowiedzi wszystkich grafów** (2026-10-30) — skróciłaby
+  jedną zasadę ogólną, a kosztowałaby około 190 wystąpień do zmiany i nazwę grafu w logach; każde
+  z tych narzędzi ma inne argumenty i opis, więc zasada mówi o przedrostku `respond_`.
 - **Test, że każdy obiekt w schemacie odpowiedzi grafu i zapytania narzędzia ma
   `additionalProperties: false`** (2026-10-22) — wszystkie te modele są płaskie, a test
   kontraktu sprawdza `extra="forbid"` na modelu głównym. Zagnieżdżony model domyślnie po cichu
@@ -4483,11 +4511,15 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
 - [x] **21. `gate_close`** (2026-10-21) → „Bramki jakości i asysta pisania”; pomiar w p. 33.
 - [x] **22. `gate_reply`** (2026-10-22) → „Bramki jakości i asysta pisania”; pomiar w p. 33.
 - [x] **24. `parse_ticket`** (2026-10-23) → „Domena”, „Golden set retrievalu”; pomiar w p. 31.
-- [ ] **27. `suggest_handoff`** — prompt niosący, co sprawdzono i czego brakuje; do
-  rozstrzygnięcia, czy wariant dostaje narzędzia kodu (namiar na plik i warunek w przekazaniu),
-  bo dziś nie ma pętli narzędzi — jeśli dostanie, punkt idzie za p. 26, na opisach narzędzi
-  zamrożonych w p. 23; ewaluacja wariantu. *Dlaczego:* grzeczna formułka bez treści to udokumentowana patologia korpusu (ten sam
-  tekst ≥12× w jednej turze).
+- [ ] **27. `suggest_handoff`** — krótka wiadomość dla klienta: czego dotyczy problem, co dotąd
+  ustalono i że sprawa przechodzi dalej; bez narzędzi i bez uwag dla wdrożeniowca (decyzje
+  2026-10-30). Prompt jest gotowy do sprawdzania: wstrzyknięcia 0 przebić z 6 i cztery zmyślone
+  sprawy przez trasę `/suggest` z anonimizatorem na Bieliku bez błędu (po około 0,003 USD).
+  Zostają: scenariusze z p. 59 na żywym modelu (sprawa bez kodu błędu w wątku, sprawa z zapowiedzią
+  „sprawdzimy”, ostrzeżenie w wątku z zasadą i bez niej, licznik przepisania przykładu z opisu
+  `text`) i test ręczny przez front. *Dlaczego:* samo „przekazaliśmy do analizy” nie mówi klientowi, o co
+  chodzi i co już wiadomo; krótkie komentarze z przekazaniem to w korpusie mediana 155 znaków
+  (zgrubne liczenie po słowach, 104 komentarze w 100 zgłoszeniach).
 - [ ] **28. `polish`** — zasady stylu jako dane, pomiar braku nowych faktów (porównanie wejścia
   z wyjściem pod kątem dodanych liczb, nazw i kroków); do potwierdzenia, czy „Popraw" zostaje
   w zakresie. *Dlaczego:* jedyna funkcja zwracająca tekst do wysłania, więc dodany fakt trafia
@@ -4577,7 +4609,7 @@ korpusie, przechodzi przy zamknięciu do p. 33.
   Zestawy scenariuszy tych grafów (`reading`, `code`, a w p. 25–26 `questions` i `solution`)
   dostają sprawę ze znacznikami anonimizacji z prawdziwego anonimizatora i ocenę z helpera
   `markers`, jak bramki i „Popraw”: znacznik przekręcony w wyniku i znacznik w argumentach
-  narzędzi wyszukiwania to błędy z wymogiem zera (zasada w „Zasadach” grafów z narzędziami).
+  narzędzi wyszukiwania to błędy z wymogiem zera (zasada w „Zasadach szczegółowych” grafów z narzędziami).
   *Dlaczego:* najgroźniejszy błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach
   (e-Doręczenia: 6 zgłoszeń, 6 przyczyn), a zapytanie agenta nie powstaje już promptem korpusu.
   - [ ] **23.1 Narzędzia kodu** — ile kosztuje kod aplikacji sprawdzany w każdej sprawie
@@ -4601,6 +4633,7 @@ korpusie, przechodzi przy zamknięciu do p. 33.
     bez związku (trzy przebiegi).
 - [ ] **25. `suggest_questions`** — prompt z 6.3 przemierzony na modelu docelowym z placeholderami,
   z regułą zgodności przyczyny z objawem i z szerszą regułą sięgania po kod, tą samą co w p. 23;
+  czy wyjątek dla hipotezy, zapisany 2026-10-30 obok zasad ogólnych, nie zmienia pytań;
   sprawa ze znacznikami anonimizacji w `questions.json` z oceną helpera `markers`, jak w p. 23;
   ewaluacja wariantu, w tym jak często model oddaje „pytań już nie trzeba" (p. 72) i czy
   słusznie — fałszywe wyjście przy zgodnym objawie i różnych przyczynach jest tu najgroźniejsze;

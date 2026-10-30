@@ -21,7 +21,7 @@ znalazłeś.
 
 | argument       | typ    | przykłady                        | opis |
 |----------------|--------|----------------------------------|------|
-| internal_notes | string | "## Zgłoszenia historyczne\n- …" | Uwagi dla wdrożeniowca w lekkim Markdownie, w czterech sekcjach ze wzoru z instrukcji (Zgłoszenia historyczne, Instrukcje i dokumentacja, Kod aplikacji, Nie znaleziono), po polsku; nigdy puste. |
+| internal_notes | string | "## Zgłoszenia historyczne\n- …" | Uwagi dla wdrożeniowca w lekkim Markdownie, w czterech sekcjach ze wzoru z instrukcji (Zgłoszenia historyczne, Instrukcje i dokumentacja, Kod aplikacji, Nie znaleziono); nigdy puste. |
 
 # Co zwraca
 

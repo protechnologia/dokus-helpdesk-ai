@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import Any
 
 from app.core_model.tickets.parsed_ticket import ParsedTicket
-from app.core_util.json_schema import json_schema_without_docs
+from app.core_util.json_schema import json_schema_without_docs, json_schema_without_fields
 from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition
 
@@ -32,10 +31,12 @@ def respond_tool() -> ToolDefinition:
         ToolDefinition(name="respond_parse_ticket", description="Oddaje kartę zgłoszenia…",
                        parameters={"type": "object", "properties": {"component": …}, …})
     """
+    schema = json_schema_without_docs(ParsedTicket)
+
     tool = ToolDefinition(
         name        = RESPOND_TOOL_NAME,
         description = read_document(DESCRIPTION_FILE).rstrip(),
-        parameters  = _without_fields(json_schema_without_docs(ParsedTicket), FILLED_BY_GRAPH),
+        parameters  = json_schema_without_fields(schema, FILLED_BY_GRAPH),
     )
 
     return tool
@@ -59,29 +60,3 @@ def field_rules() -> str:
     body = respond_tool().description.split(f"\n{RULES_HEADING}\n", 1)[1]
 
     return body.split("\n# ", 1)[0]
-
-
-def _without_fields(
-    schema: dict[str, Any],  # np. {"type": "object", "properties": {"ticket_id": …}, …}
-    fields: tuple[str, ...], # np. ("ticket_id", "date")
-) -> dict[str, Any]:
-    """
-    Description:
-    Usuwa ze schematu obiektu podane pola — z `properties` i z `required`.
-
-    Example args:
-        schema={"properties": {"ticket_id": {…}, "problem": {…}}, "required": ["ticket_id"]}
-        fields=("ticket_id",)
-
-    Example result:
-        {"properties": {"problem": {…}}, "required": []}
-    """
-    trimmed = {
-        **schema,
-        "properties": {
-            name: value for name, value in schema["properties"].items() if name not in fields
-        },
-        "required": [name for name in schema.get("required", []) if name not in fields],
-    }
-
-    return trimmed

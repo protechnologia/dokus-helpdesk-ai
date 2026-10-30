@@ -41,6 +41,9 @@ Pomiary:
 | `search`            | 0 z 8     | 2026-10-15, `gpt-6.1-sol`, w dwóch przebiegach |
 | `suggest_solution`  | 0 z 9     | 2026-10-15, `gpt-6.1-sol`, w dwóch przebiegach |
 
+Po podziale zasad na ogólne i szczegółowe wszystkie grafy razem: 0 przebić z 63 (2026-10-30,
+`gpt-6.1-sol`, w jednym przebiegu).
+
 O czym pamiętać przy zmianach:
 
 - Progu nie ma: każde przebicie to poprawka promptu. Scenariusz poprawia się tylko wtedy, gdy

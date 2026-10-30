@@ -27,6 +27,8 @@ from tests._helpers.graphs import (
     ANONYMIZATION_HEADING,
     ANONYMIZED,
     DATA_HEADING,
+    GENERAL_RULES_HEADING,
+    SPECIFIC_RULES_HEADING,
     TOOL_NAME_IN_PROMPT,
     allowed_tools,
     anonymized_state,
@@ -283,13 +285,18 @@ def test_the_respond_tool_description_lists_the_fields_with_their_schema_types(
 
 
 @pytest.mark.parametrize("graph", RESPOND_GRAPHS, ids=graph_name)
-def test_both_prompt_turns_name_the_respond_tool(graph: ModuleType) -> None:
-    """Sprawdza, czy prompt systemowy i tura użytkownika każdego grafu wymieniają narzędzie
-    odpowiedzi pod nazwą, jaką ma ono dziś w kodzie.
+def test_the_prompts_point_to_the_respond_tool(graph: ModuleType) -> None:
+    """Sprawdza, czy zasady ogólne każdego grafu wskazują narzędzie odpowiedzi przedrostkiem
+    `respond_`, a tura użytkownika wymienia je pod nazwą, jaką ma ono dziś w kodzie.
 
-    Wyłapuje zmianę nazwy narzędzia w kodzie bez poprawienia promptu: prompt kazałby wtedy
-    odpowiedzieć narzędziem, którego model nie dostał, a w diffie promptu nie byłoby tego widać."""
-    assert graph.RESPOND_TOOL_NAME in graph.system_prompt()
+    Wyłapuje zmianę nazwy narzędzia albo przedrostka w kodzie bez poprawienia promptu: prompt
+    kazałby wtedy odpowiedzieć narzędziem, którego model nie dostał, a w diffie promptu nie
+    byłoby tego widać."""
+    # Prompt jest zawijany na szerokość, więc zdanie bywa złamane między liniami.
+    rules = " ".join(prompt_section(graph.system_prompt(), GENERAL_RULES_HEADING).split())
+
+    assert "wywołaniem narzędzia, którego nazwa zaczyna się od `respond_`" in rules
+    assert graph.RESPOND_TOOL_NAME.startswith("respond_")
     assert graph.RESPOND_TOOL_NAME in graph.user_prompt(anonymized_state(graph))
 
 
@@ -374,7 +381,7 @@ def test_every_anonymization_section_reads_the_same() -> None:
 
     Wyłapuje poprawkę sekcji wprowadzoną w jednym prompcie bez pozostałych: grafy traktowałyby
     znaczniki różnie, a w diffie jednego pliku nie byłoby widać, że reszta została po staremu.
-    Zdania o znacznikach właściwe jednemu grafowi stoją w jego „Zasadach"."""
+    Zdania o znacznikach właściwe jednemu grafowi stoją w jego „Zasadach szczegółowych"."""
     sections = {graph_name(graph): prompt_section(graph.system_prompt(), ANONYMIZATION_HEADING)
                 for graph in GRAPHS}
 
@@ -395,10 +402,39 @@ def test_every_data_section_reads_the_same() -> None:
     assert len(set(sections.values())) == 1, sections
 
 
+def test_every_general_rules_section_reads_the_same() -> None:
+    """Sprawdza, czy sekcja „Zasady ogólne" promptu systemowego jest taka sama, znak w znak,
+    w każdym grafie.
+
+    Wyłapuje zasadę ogólną usuniętą albo przeredagowaną w jednym prompcie bez pozostałych: ten
+    graf mógłby wtedy dopowiadać to, czego nie ma w danych, a w diffie jednego pliku nie byłoby
+    widać, że reszta została po staremu."""
+    sections = {graph_name(graph): prompt_section(graph.system_prompt(), GENERAL_RULES_HEADING)
+                for graph in GRAPHS}
+
+    assert all(sections.values()), sections
+    assert len(set(sections.values())) == 1, sections
+
+
+@pytest.mark.parametrize("graph", GRAPHS, ids=graph_name)
+def test_the_specific_rules_follow_the_general_rules(graph: ModuleType) -> None:
+    """Sprawdza, czy w prompcie systemowym każdego grafu niepusta sekcja „Zasady szczegółowe"
+    stoi zaraz po „Zasadach ogólnych".
+
+    Wyłapuje prompt, w którym zasady właściwe grafowi wylądowały w innym miejscu albo pod inną
+    nazwą: każdy prompt czyta się po tych samych nagłówkach, a przy edycji łatwo wtedy dopisać
+    zasadę do części ogólnej, która ma być wspólna."""
+    system   = graph.system_prompt()
+    headings = [line for line in system.splitlines() if line.startswith("# ")]
+
+    assert headings.index(SPECIFIC_RULES_HEADING) == headings.index(GENERAL_RULES_HEADING) + 1
+    assert "\n- " in prompt_section(system, SPECIFIC_RULES_HEADING)
+
+
 @pytest.mark.parametrize("graph", GRAPHS, ids=graph_name)
 def test_the_first_rule_forbids_making_things_up(graph: ModuleType) -> None:
-    """Sprawdza, czy pierwszą zasadą w sekcji „Zasady" promptu systemowego każdego grafu jest
-    osobne „NIE ZMYŚLASZ.".
+    """Sprawdza, czy pierwszą zasadą w sekcji „Zasady ogólne" promptu systemowego każdego grafu
+    jest osobne „NIE ZMYŚLASZ.".
 
     Wyłapuje prompt, w którym zakaz zmyślania przesunięto niżej, dopisano do innej zasady albo
     usunięto przy edycji: to najważniejsza zasada produktu (zasada 9) i ma stać w każdym grafie

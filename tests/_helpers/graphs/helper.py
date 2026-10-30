@@ -27,7 +27,7 @@ grafów na żywym modelu.
 | `streamed_fake()`       | kroki i stan końcowy atrapy grafu przepuszczonej krok po kroku      |
 | `ran_fake()`            | stan końcowy atrapy grafu przepuszczonej w całości                  |
 | `prompt_section()`      | sekcja promptu systemowego pod nagłówkiem `#`, z nagłówkiem         |
-| `prompt_rules()`        | zasady z sekcji „Zasady" promptu systemowego, punkt po punkcie      |
+| `prompt_rules()`        | zasady ogólne z promptu systemowego, punkt po punkcie               |
 
 Przykład:
 
@@ -66,7 +66,7 @@ from app.agent_tools import AgentTool
 from app.config import Settings
 from app.engine_anonymization import AnonymizedText, Anonymizer, FakeAnonymizer
 from tests._helpers.fake_tools import fake_agent_tools
-from tests._helpers.graphs.constants import ANONYMIZED, GRAPHS_PACKAGE
+from tests._helpers.graphs.constants import ANONYMIZED, GENERAL_RULES_HEADING, GRAPHS_PACKAGE
 
 
 def graph_names() -> set[str]:
@@ -209,7 +209,8 @@ def filled_by(
 ) -> tuple[str, ...]:
     """
     Description:
-    Pola wyniku, których model nie podaje, bo wypełnia je graf — dziś tylko w `parse_ticket`.
+    Pola wyniku, których model nie podaje, bo wypełnia je graf — w `parse_ticket`
+    i `suggest_handoff`.
 
     Example args:
         graph=<module app.agent_graphs.parse_ticket>
@@ -420,7 +421,7 @@ async def ran_fake(
 
 
 def prompt_section(
-    prompt:  str,  # np. "# Zadanie\n\nPomagasz…\n\n# Zasady\n\n- NIE ZMYŚLASZ.\n…"
+    prompt:  str,  # np. "# Zadanie\n\nPomagasz…\n\n# Zasady ogólne\n\n- NIE ZMYŚLASZ.\n…"
     heading: str,  # np. "# Anonimizacja"
 ) -> str:
     """
@@ -430,11 +431,11 @@ def prompt_section(
     takiej sekcji daje pusty napis.
 
     Example args:
-        prompt="# Zadanie\n\nPomagasz…\n\n# Zasady\n\n- NIE ZMYŚLASZ.\n- …"
-        heading="# Zasady"
+        prompt="# Zadanie\n\nPomagasz…\n\n# Zasady ogólne\n\n- NIE ZMYŚLASZ.\n- …"
+        heading="# Zasady ogólne"
 
     Example result:
-        "# Zasady\n\n- NIE ZMYŚLASZ.\n- …"
+        "# Zasady ogólne\n\n- NIE ZMYŚLASZ.\n- …"
     """
     parts   = [part.strip() for part in re.split(r"\n(?=# )", prompt)]
     section = next((part for part in parts if part.split("\n", 1)[0] == heading), "")
@@ -443,20 +444,20 @@ def prompt_section(
 
 
 def prompt_rules(
-    prompt: str,  # np. "# Zasady\n\n- NIE ZMYŚLASZ.\n- Werdykt wydajesz…\n  tekstem.\n\n# …"
+    prompt: str,  # np. "# Zasady ogólne\n\n- NIE ZMYŚLASZ.\n- Opierasz się…\n  dopowiadasz.\n\n# …"
 ) -> list[str]:
     """
     Description:
-    Zasady z sekcji „Zasady" promptu systemowego, punkt po punkcie, każda w jednej linii, bez
-    myślnika. Prompt bez tej sekcji daje pustą listę.
+    Zasady z sekcji „Zasady ogólne" promptu systemowego, punkt po punkcie, każda w jednej linii,
+    bez myślnika. Prompt bez tej sekcji daje pustą listę.
 
     Example args:
-        prompt="# Zasady\n\n- NIE ZMYŚLASZ.\n- Werdykt wydajesz wyłącznie wywołaniem\n  narzędzia…"
+        prompt="# Zasady ogólne\n\n- NIE ZMYŚLASZ.\n- Opierasz się wyłącznie\n  na danych…"
 
     Example result:
-        ["NIE ZMYŚLASZ.", "Werdykt wydajesz wyłącznie wywołaniem narzędzia…"]
+        ["NIE ZMYŚLASZ.", "Opierasz się wyłącznie na danych…"]
     """
-    section = prompt_section(prompt, "# Zasady")
+    section = prompt_section(prompt, GENERAL_RULES_HEADING)
     items   = re.split(r"\n(?=- )", section.split("\n\n", 1)[1]) if section else []
     rules   = [" ".join(item.split())[2:] for item in items]
 

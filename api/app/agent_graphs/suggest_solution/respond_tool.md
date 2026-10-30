@@ -18,7 +18,7 @@ wdrożeniowca.
 
 | argument       | typ    | przykłady                                      | opis |
 |----------------|--------|------------------------------------------------|------|
-| text           | string | "Proszę w ustawieniach kancelarii włączyć…"    | Treść dla klienta w kształcie ze wzoru z instrukcji, po polsku, bez wstępu. |
+| text           | string | "Proszę w ustawieniach kancelarii włączyć…"    | Treść dla klienta w kształcie ze wzoru z instrukcji, bez wstępu. |
 | internal_notes | string | "Przyczyna jak w zgł. 41002: zacięta kolejka." | Uwagi dla wdrożeniowca, których klient nie dostaje; pusty napis, gdy uwag nie masz. |
 
 # Co zwraca

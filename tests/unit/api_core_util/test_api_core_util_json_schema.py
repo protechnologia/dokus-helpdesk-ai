@@ -2,7 +2,7 @@ import json
 
 from pydantic import BaseModel, Field
 
-from app.core_util.json_schema import json_schema_without_docs
+from app.core_util.json_schema import json_schema_without_docs, json_schema_without_fields
 
 
 class Inner(BaseModel):
@@ -56,3 +56,26 @@ def test_the_shape_stays() -> None:
     assert SCHEMA["required"]                     == ["title", "inner"]
     assert SCHEMA["properties"]["title"]["type"]  == "string"
     assert SCHEMA["$defs"]["Inner"]["properties"] == {"code": {"type": "string"}}
+
+
+def test_removed_fields_disappear_and_the_rest_stays() -> None:
+    """Sprawdza, czy podane pole znika ze schematu z `properties` i z `required`, a pozostałe pola
+    i ich wymagalność zostają.
+
+    Wyłapuje pole usunięte tylko z `properties`: schemat wymagałby pola, którego nie opisuje,
+    a model językowy nie mógłby zbudować poprawnej odpowiedzi."""
+    trimmed = json_schema_without_fields(SCHEMA, ("title",))
+
+    assert set(trimmed["properties"]) == {"description", "inner"}
+    assert trimmed["required"]        == ["inner"]
+
+
+def test_removing_fields_does_not_change_the_given_schema() -> None:
+    """Sprawdza, czy usuwanie pól oddaje nowy schemat, a podany zostaje bez zmian.
+
+    Wyłapuje funkcję, która zmienia schemat w miejscu: schemat wspólny dla kilku wywołań po cichu
+    traciłby pola także tam, gdzie mają zostać."""
+    json_schema_without_fields(SCHEMA, ("title",))
+
+    assert "title" in SCHEMA["properties"]
+    assert "title" in SCHEMA["required"]

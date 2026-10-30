@@ -20,7 +20,7 @@ notatki do tych pytań.
 
 | argument       | typ              | przykłady                                       | opis |
 |----------------|------------------|-------------------------------------------------|------|
-| text           | string albo null | "1. Od kiedy nie przychodzą przesyłki? …", null | Ponumerowana lista pytań w kształcie z instrukcji, po polsku, bez wstępu; `null`, gdy fakty ze zgłoszenia rozstrzygają sprawę i pytań nie trzeba. |
+| text           | string albo null | "1. Od kiedy nie przychodzą przesyłki? …", null | Ponumerowana lista pytań w kształcie z instrukcji, bez wstępu; `null`, gdy fakty ze zgłoszenia rozstrzygają sprawę i pytań nie trzeba. |
 | internal_notes | string           | "Ad. 1. odcina zacięcie kolejki (zgł. 41002)"   | Notatki dla wdrożeniowca do pytań, których klient nie dostaje; pusty napis, gdy notatek nie masz. Przy `text` równym `null` obowiązkowe: dlaczego pytań już nie trzeba. |
 
 # Co zwraca

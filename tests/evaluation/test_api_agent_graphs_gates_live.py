@@ -22,9 +22,12 @@ Pomiary:
 | `gate_close` | 0 z 4           | 0 z 2          | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach |
 | `gate_reply` | 0 z 7           | 0 z 4          | 2026-10-21, `gpt-6.1-sol`, w dwóch przebiegach |
 | `gate_close` | 0 z 5           | 0 z 3          | 2026-10-21, `gpt-6.1-sol`, w dwóch przebiegach |
+| `gate_reply` | 0 z 13          | 0 z 9          | 2026-10-30, `gpt-6.1-sol`, w dwóch przebiegach |
+| `gate_close` | 0 z 5           | 0 z 3          | 2026-10-30, `gpt-6.1-sol`, w dwóch przebiegach |
 
 Pomiar z 2026-10-21 stoi na promptach podzielonych na sekcje, z rolą „pomagasz wdrożeniowcowi”
-i z parą spraw ze znacznikami anonimizacji na bramkę (znaczników przekręconych 0).
+i z parą spraw ze znacznikami anonimizacji na bramkę (znaczników przekręconych 0). Pomiar
+z 2026-10-30 stoi na zasadach podzielonych na ogólne i szczegółowe.
 
 Pierwszy pomiar `gate_reply` dał w obu przebiegach fałszywy alarm na pułapce g06: bramka uznała
 cytat komunikatu z ekranu („Ups! Coś poszło nie tak.”) za potoczne słownictwo wiadomości. Po

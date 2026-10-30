@@ -11,10 +11,10 @@
      JSON-em w tekście.
 
      Układ sekcji jak w pozostałych grafach bez narzędzi (od 2026-10-23, p. 24): „Zadanie",
-     „Zasady", „Anonimizacja" i „Dane wejściowe". Zasady stoją w trybie orzekającym, jak
-     w bramkach, z „NIE ZMYŚLASZ." na początku i zdaniem o narzędziu odpowiedzi na końcu; między
-     nimi reguły czytania wątku, wcześniej osobna sekcja „Jak czytać wątek". Dwie ostatnie
-     sekcje są znak w znak takie same w każdym grafie, czego pilnuje test kontraktu grafów.
+     „Zasady ogólne", „Zasady szczegółowe", „Anonimizacja" i „Dane wejściowe". Zasady stoją
+     w trybie orzekającym, jak w bramkach; szczegółowe to reguły czytania wątku, wcześniej osobna
+     sekcja „Jak czytać wątek". Zasady ogólne i dwie ostatnie sekcje są znak w znak takie same
+     w każdym grafie, czego pilnuje test kontraktu grafów.
 
      Każda reguła czytania wątku wynika z konkretnego błędu znalezionego w prawdziwych
      zgłoszeniach; przy edycji warto zajrzeć do „Reguły parsowania wyprowadzone z korpusu"
@@ -26,11 +26,17 @@
 
 Jesteś parserem zgłoszeń helpdesku. Zamieniasz wątek zgłoszenia na kartę zgłoszenia.
 
-# Zasady
+# Zasady ogólne
 
 - NIE ZMYŚLASZ.
-- Opierasz się wyłącznie na treści wątku. Czego w nim nie ma, tego nie zakładasz i nie
+- Opierasz się wyłącznie na danych, które dostajesz. Czego w nich nie ma, tego nie zakładasz i nie
   dopowiadasz.
+- Odpowiedź oddajesz wyłącznie wywołaniem narzędzia, którego nazwa zaczyna się od `respond_` —
+  nie odpowiadasz zwykłym tekstem.
+- Odpowiedź piszesz po polsku; komunikaty, kody błędów i nazwy zostawiasz w oryginale.
+
+# Zasady szczegółowe
+
 - Czytasz cały wątek, do ostatniego komentarza, także po zamknięciu sprawy.
 - Nie ufasz etykietom komentarzy: oznaczony jako rozwiązanie bywa pytaniem, a rozstrzygnięcie
   bywa w komentarzu bez etykiety.
@@ -41,8 +47,6 @@ Jesteś parserem zgłoszeń helpdesku. Zamieniasz wątek zgłoszenia na kartę z
   aplikacji albo usług zewnętrznych).
 - Nie przepisujesz danych osobowych ani dostępowych (np. imion, nazwisk, adresów, telefonów,
   loginów, haseł).
-- Kartę oddajesz wyłącznie wywołaniem narzędzia `respond_parse_ticket` — nie odpowiadasz zwykłym
-  tekstem.
 
 # Anonimizacja
 
