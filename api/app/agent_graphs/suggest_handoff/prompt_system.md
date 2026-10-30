@@ -1,7 +1,7 @@
 <!-- Prompt grafu `suggest_handoff` — strona systemowa.
 
-     Treść i pomiar w p. 27 (CLAUDE.md -> „Plan"). Dawnego promptu tego wariantu nie było — dawny
-     variants.json wskazywał pliki, które nigdy nie powstały.
+     Treść z p. 27, scenariusze i pomiar w p. 33 (CLAUDE.md -> „Plan"). Dawnego promptu tego
+     wariantu nie było — dawny variants.json wskazywał pliki, które nigdy nie powstały.
 
      TU JEST CAŁA INSTRUKCJA, w turze użytkownika tylko dane (CLAUDE.md -> „Prompty").
 

@@ -2716,6 +2716,18 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 - **Prompt `questions` nie może przepisać cudzych pytań.** Materiał historyczny to wzorzec:
   odrzuć pytania niepasujące do sprawy, przeformułuj pod to zgłoszenie, pomiń te, na które
   odpowiedź już jest w treści.
+- **`handoff` to krótka wiadomość bez narzędzi (2026-10-30, p. 27):** „Dzień dobry.”, podsumowanie
+  problemu z tym, co dotąd ustalono, informacja o przekazaniu sprawy, „Pozdrawiam.”. Układ pokazuje
+  przykład w opisie pola `text`, a zasady szczegółowe mówią, co niesie podsumowanie, że ostrzeżenie,
+  czego klient ma nie robić, idzie do tekstu, i że model nie obiecuje terminów ani konkretnych
+  akcji. Samo „przekazaliśmy do analizy” nie mówi klientowi, o co chodzi i co już wiadomo; krótkie
+  komentarze z przekazaniem to w korpusie mediana 155 znaków (zgrubne liczenie po słowach, 104
+  komentarze w 100 zgłoszeniach). Dosłownie powtarza się tam tylko jeden tekst (3×), więc problemem
+  jest brak treści, a nie szablon: dawne „≥12×” dotyczyło formułki zamykającej. Przeszło
+  sprawdzenie, nie pomiar: na `gpt-6.1-sol` wstrzyknięcia 0 przebić z 6, a cztery zmyślone sprawy
+  przez `/suggest` z anonimizatorem na Bieliku dały oczekiwany układ, po około 0,003 USD. Cena: nic
+  już wprost nie mówi, że zapowiedź („sprawdzimy”) nie jest ustaleniem, a wiadomość nie mówi
+  klientowi, czy dostanie jeszcze odpowiedź.
 
 ### Warstwa LLM
 
@@ -4511,15 +4523,7 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
 - [x] **21. `gate_close`** (2026-10-21) → „Bramki jakości i asysta pisania”; pomiar w p. 33.
 - [x] **22. `gate_reply`** (2026-10-22) → „Bramki jakości i asysta pisania”; pomiar w p. 33.
 - [x] **24. `parse_ticket`** (2026-10-23) → „Domena”, „Golden set retrievalu”; pomiar w p. 31.
-- [ ] **27. `suggest_handoff`** — krótka wiadomość dla klienta: czego dotyczy problem, co dotąd
-  ustalono i że sprawa przechodzi dalej; bez narzędzi i bez uwag dla wdrożeniowca (decyzje
-  2026-10-30). Prompt jest gotowy do sprawdzania: wstrzyknięcia 0 przebić z 6 i cztery zmyślone
-  sprawy przez trasę `/suggest` z anonimizatorem na Bieliku bez błędu (po około 0,003 USD).
-  Zostają: scenariusze z p. 59 na żywym modelu (sprawa bez kodu błędu w wątku, sprawa z zapowiedzią
-  „sprawdzimy”, ostrzeżenie w wątku z zasadą i bez niej, licznik przepisania przykładu z opisu
-  `text`) i test ręczny przez front. *Dlaczego:* samo „przekazaliśmy do analizy” nie mówi klientowi, o co
-  chodzi i co już wiadomo; krótkie komentarze z przekazaniem to w korpusie mediana 155 znaków
-  (zgrubne liczenie po słowach, 104 komentarze w 100 zgłoszeniach).
+- [x] **27. `suggest_handoff`** (2026-10-30) → „Warianty generacji”; scenariusze i pomiar w p. 33.
 - [ ] **28. `polish`** — zasady stylu jako dane, pomiar braku nowych faktów (porównanie wejścia
   z wyjściem pod kątem dodanych liczb, nazw i kroków); do potwierdzenia, czy „Popraw" zostaje
   w zakresie. *Dlaczego:* jedyna funkcja zwracająca tekst do wysłania, więc dodany fakt trafia
@@ -4572,7 +4576,10 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
   z pięciu reguł na prawdziwych wiadomościach do klientów, w dwóch przebiegach, z czytaniem
   uzasadnień; osobno zasada, że cytaty reguł nie łamią — bez niej bramka blokowała cytat
   komunikatu z ekranu „Ups! Coś poszło nie tak.” jako potoczny, a czy z nią nie przepuszcza
-  prośby o hasło schowanej w cytacie, nikt nie mierzył. *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na
+  prośby o hasło schowanej w cytacie, nikt nie mierzył. `suggest_handoff` (2026-10-30): scenariusze
+  z p. 59 na żywym modelu (sprawa bez kodu błędu w wątku, sprawa z zapowiedzią „sprawdzimy”,
+  ostrzeżenie w wątku z zasadą i bez niej, licznik przepisania przykładu z opisu `text`), test ręczny
+  przez front i ocena na prawdziwych przekazaniach. *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na
   zapytaniach surowych, a grafy na zmyślonych sprawach i teście ręcznym.
 - [ ] **34. Tryb odświeżania korpusu** — kolejne zrzuty czy dostęp tylko do odczytu.
   *Dlaczego:* +130 zgłoszeń w miesiąc, więc jednorazowy zrzut szybko się starzeje.
