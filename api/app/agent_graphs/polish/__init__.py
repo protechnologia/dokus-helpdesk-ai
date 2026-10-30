@@ -2,14 +2,14 @@
 Description:
 Graf `polish` — „Popraw": notatki wdrożeniowca przepisane na poprawną formę, bez zmiany treści
 (zasada 9). Jedyny graf, który zwraca tekst do wysłania (`PolishedText`), zawsze do akceptacji
-człowieka. Do potwierdzenia, czy zostaje w zakresie (CLAUDE.md -> „Plan", p. 28).
+człowieka. Do potwierdzenia, czy zostaje w zakresie (CLAUDE.md -> „Plan", p. 33).
 
 Przebieg: anonymize → agent → respond. Bez narzędzi wiedzy i bez `run_tools`. Jedyne narzędzie
 modelu to `respond_polish` (`respond_tool.py`). Zasady stylu przychodzą w stanie (`rules`)
 i trafiają do oddzielonej sekcji danych w turze użytkownika.
 
-Status: węzły właściwe z fabryki grafów, atrapa w `fake.py`; prompt to szkielet, treść
-i pomiar w p. 28.
+Status: węzły właściwe z fabryki grafów, atrapa w `fake.py`; scenariusze w `polish.json`, pomiar
+w p. 33 (CLAUDE.md -> „Plan").
 """
 
 from app.agent_graphs.polish.fake import build_fake_graph, example_state

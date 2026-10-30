@@ -2,7 +2,7 @@
   "meta": {
     "name": "polish-v1",
     "created": "2026-10-14",
-    "purpose": "„Popraw” na zmyślonych notatkach wdrożeniowca, na żywym modelu (p. 59): potoczne słowa znikają, fakty zostają, nie przybywa liczb ani nazw. NIE mierzy jakości redakcji na prawdziwych notatkach (p. 28): notatki pisze autor promptów.",
+    "purpose": "„Popraw” na zmyślonych notatkach wdrożeniowca, na żywym modelu (p. 59): potoczne słowa znikają, fakty zostają, nie przybywa liczb ani nazw. NIE mierzy jakości redakcji na prawdziwych notatkach (p. 33): notatki pisze autor promptów.",
     "rules": [
       "Sekcja na graf, nazwana jak jego katalog w api/app/agent_graphs/.",
       "rules_version: wersja zestawu domyślnego zasad stylu (api/app/core_text/dict_rules_polish.json), pod którą napisano sprawy. Test bierze zasady z tego zestawu, tak jak trasa, i odmawia przy innej wersji.",
@@ -13,47 +13,133 @@
     ]
   },
   "polish": {
-    "rules_version": 1,
+    "rules_version": 2,
     "cases": [
       {
         "id": "s01",
         "phenomenon": "słowa potoczne i liczba w notatkach",
         "input": "przesylki z e-doreczen juz ida. kolejka odbioru sie zawiesila, zrestartowalem usluge i teraz wszystko smiga jak ta lala. zalegle przesylki (bylo ich 17) sciagnely sie same, nic nie musza robic",
-        "colloquial": ["smig", "jak ta lala"],
-        "kept": ["17"],
+        "colloquial": [
+          "smig",
+          "jak ta lala"
+        ],
+        "kept": [
+          "17"
+        ],
         "tempting": []
       },
       {
         "id": "s02",
         "phenomenon": "ścieżka menu kusi do dopisania",
         "input": "przycisk wyslij do epuap wrocil. trzeba bylo dac uprawnienie wysylka do epuap roli kancelaria, juz dalem. niech sie przeloguja i bedzie git",
-        "colloquial": ["git"],
-        "kept": ["ePUAP"],
-        "tempting": ["menu", "zakładk", "administracj"]
+        "colloquial": [
+          "git"
+        ],
+        "kept": [
+          "ePUAP"
+        ],
+        "tempting": [
+          "menu",
+          "zakładk",
+          "administracj"
+        ]
       },
       {
         "id": "s03",
         "phenomenon": "obietnica terminu kusi do dopisania",
         "input": "to blad w aplikacji, poprawka bedzie w nastepnej wersji. na razie obejscie: zapisac pismo jako szkic i dopiero potem podpisac. sorki za klopot",
-        "colloquial": ["sorki"],
-        "kept": ["szkic"],
-        "tempting": ["wkrótce", "tydzie", "tygodni", "miesi"]
+        "colloquial": [
+          "sorki"
+        ],
+        "kept": [
+          "szkic"
+        ],
+        "tempting": [
+          "wkrótce",
+          "tydzie",
+          "tygodni",
+          "miesi"
+        ]
       },
       {
         "id": "s04",
         "phenomenon": "dodatkowy krok kusi do dopisania",
         "input": "limit zalacznikow do epuap to 5 MB na plik, a ten pdf ma 12 MB i dlatego sie wywala. trzeba go zmniejszyc albo podzielic na mniejsze pliki i bedzie cacy",
-        "colloquial": ["wywala", "cacy"],
-        "kept": ["5 MB", "12 MB", "ePUAP"],
-        "tempting": ["rozdzielczo", "skan", "acrobat"]
+        "colloquial": [
+          "wywala",
+          "cacy"
+        ],
+        "kept": [
+          "5 MB",
+          "12 MB",
+          "ePUAP"
+        ],
+        "tempting": [
+          "rozdzielczo",
+          "skan",
+          "acrobat"
+        ]
       },
       {
         "id": "s05",
         "phenomenon": "znaczniki anonimizacji w notatkach",
         "input": "dzwonila p. {IMIĘ} {NAZWISKO} z urzedu (tel {TELEFON}), pisma do {IMIĘ} {NAZWISKO} juz ida, adres do doreczen mu poprawilismy w kartotece, jakby znowu cos to niech pisze na {EMAIL}",
-        "colloquial": ["jakby"],
-        "kept": ["kartote"],
-        "tempting": ["kontrahen"]
+        "colloquial": [
+          "jakby"
+        ],
+        "kept": [
+          "kartote"
+        ],
+        "tempting": [
+          "kontrahen"
+        ]
+      },
+      {
+        "id": "s06",
+        "phenomenon": "cytowany komunikat z ekranu w notatkach bez polskich znaków",
+        "input": "klientowi wyskakuje 'Nie udalo sie skomunikowac z serwerem' przy podpisie. to przez limit pamieci na serwerze, zwiekszylismy go i juz nie ma lipy",
+        "colloquial": [
+          "lip"
+        ],
+        "kept": [
+          "skomunikowac z serwerem",
+          "limit"
+        ],
+        "tempting": [
+          "aktualizacj",
+          "restart"
+        ]
+      },
+      {
+        "id": "s07",
+        "phenomenon": "angielski komunikat w notatkach ma zostać w oryginale",
+        "input": "przy raporcie rocznym lecial blad Report generation failed: timeout. wydluzylismy czas generowania i raport juz sie robi, git",
+        "colloquial": [
+          "git"
+        ],
+        "kept": [
+          "Report generation failed: timeout"
+        ],
+        "tempting": [
+          "minut",
+          "sekund"
+        ]
+      },
+      {
+        "id": "s08",
+        "phenomenon": "kroki do wykonania w notatkach mają wyjść listą",
+        "input": "pani ma stary skrot do aplikacji, trzeba go wywalic, wejsc na nowy adres z maila i zapisac go jako nowy skrot, wtedy bedzie cacy",
+        "colloquial": [
+          "wywal",
+          "cacy"
+        ],
+        "kept": [
+          "skrot"
+        ],
+        "tempting": [
+          "przeglądark",
+          "hasł"
+        ]
       }
     ]
   }

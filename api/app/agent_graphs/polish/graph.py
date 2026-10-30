@@ -37,7 +37,7 @@ def system_prompt() -> str:
         (brak)
 
     Example result:
-        "Jesteś redaktorem wiadomości helpdesku. Przepisujesz notatki wdrożeniowca…"
+        "Jesteś asystentem wdrożeniowca helpdesku. Przepisujesz jego notatki wdrożeniowca…"
     """
     return read_document(SYSTEM_FILE).rstrip()
 

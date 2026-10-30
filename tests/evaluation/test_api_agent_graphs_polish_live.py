@@ -20,7 +20,7 @@ Pomiary:
 | graf     | potoczne | zgubione | dopisane | pomiar                                         |
 |----------|----------|----------|----------|------------------------------------------------|
 | `polish` | 0 z 4    | 0 z 4    | 0 z 4    | 2026-10-14, `gpt-6.1-sol`, w dwóch przebiegach |
-| `polish` | 0 z 5    | 0 z 5    | 0 z 5    | 2026-10-30, `gpt-6.1-sol`, w dwóch przebiegach |
+| `polish` | 0 z 8    | 0 z 8    | 0 z 8    | 2026-10-30, `gpt-6.1-sol`, w dwóch przebiegach |
 
 O czym pamiętać przy zmianach:
 
@@ -31,8 +31,8 @@ O czym pamiętać przy zmianach:
   pomiarze i przy każdej zmianie wyniku.
 - Zasady stylu bierze się z zestawu domyślnego, tak jak trasa. Sekcja zapisuje wersję zestawu,
   pod którą ją napisano; przy innej wersji test kończy się błędem, zanim zawoła model.
-- KOSZTUJE: sprawa to jedna tura modelu, a `polish` ma cztery sprawy: na `gpt-6.1-sol`
-  0,01 USD i kilka sekund.
+- KOSZTUJE: sprawa to jedna tura modelu, a `polish` ma osiem spraw: na `gpt-6.1-sol`
+  około 0,03 USD i kilka sekund.
 """
 
 

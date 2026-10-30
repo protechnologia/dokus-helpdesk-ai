@@ -1495,6 +1495,12 @@ merytorycznie").
   w dwóch przebiegach, a wstrzyknięcia 0 przebić z 9. Przez trasę `/gate/reply` z anonimizatorem
   na Bieliku 13 z 13 werdyktów było zgodnych (na regułach w wersji 1); do tego test ręczny przez
   front. Liczb na prawdziwych wiadomościach z korpusu nie ma (p. 33).
+- **„Popraw” przeszło sprawdzenie, ale nie pomiar (2026-10-30).** Na `gpt-6.1-sol` scenariusze
+  na zasadach stylu w wersji 2 dały 0 błędów na 8 spraw w dwóch przebiegach, a wstrzyknięcia 0 przebić
+  z 8. Trasa `/polish` z anonimizatorem na Bieliku dała układ i formy zgodne z zasadami; do tego test
+  ręczny przez front. Komunikat z notatki bez polskich znaków zostaje bez nich („w oryginale”), co
+  przyjęliśmy świadomie. Forma zwrotu bywa niezręczna: „Aniu, czy możesz” daje „Dzień dobry, {IMIĘ}.
+  Czy mogą Państwo”. Liczb na prawdziwych notatkach nie ma (p. 33).
 - **Regułę klienta stroi się przykładami obu stron, a nie jedną formą w nawiasie (2026-10-22).**
   Reguła formy zwrotu w wersji 1 kończyła się „(„Państwo”)” i model czytał to jako jedyną
   dozwoloną formę: w teście przez front zablokował „Pani” w wiadomości do jednej osoby. Wersja 2
@@ -1839,6 +1845,16 @@ wskazane fragmenty w całym tekście i zamienia je na znaczniki. Model tekstu ni
   licencja BSD) ładuje fabryka silnika przy starcie (0,44 s); analiza słowa to 0,25 ms
   i jest pamiętana. Zostaje „Nowego” na początku zdania obok „Nowak”, bo słownik zna też
   nazwisko „Nowy” — pomyłka w stronę zamiany.
+- **Słowo wskazane z wielkiej litery pasuje do form z małej, gdy w tekście nie ma formy z wielkiej
+  (2026-10-30, `find_word_forms()`).** Model przy notatkach małymi literami podaje „Anna” zamiast
+  „anna”, choć prompt każe przepisywać dosłownie, a warunek „„Lis” to nie „lis”” pomijał wtedy małe
+  formy: „dzwonila anna nowak” szło do modelu zewnętrznego bez zmian, a przez `/polish` imię
+  trafiło do tekstu. Słownik tego nie rozstrzygnie, bo „nowak” i „dudek” zna z małej jako zwykłe
+  słowa, więc wielką literę uznaje się za dopisek modelu, gdy żadna forma tak nie stoi. „Lis” obok
+  „lis” działa jak dotąd. Cena: błędne wskazanie z wielkiej („Kancelarii” przy „kancelarii”) nie
+  jest już odrzucane, więc prompt ma przykład notatki małymi literami. Golden set (59 przypadków
+  zmyślonych i próbka korpusu) bez przecieku i bez zniszczonej wiedzy w dwóch przebiegach na
+  Bieliku.
 - **Nazwy aplikacji i systemów tej instalacji nie są osobami: `exceptions.json` obok promptu
   węzła osób (2026-10-19).** Lista trafia do promptu jako osobna sekcja (miejsce
   `{{exceptions}}`) i do filtra w kodzie: słowa z niej i ich odmiany (wspólny początek, także
@@ -2905,8 +2921,7 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
     w jednym brzmieniu w każdym grafie, a od 2026-10-22 mówi też, że znacznik nie jest błędem ani
     brakiem, bo dana w tekście jest, tylko ukryta (wcześniej bramki miały to zdanie każda po
     swojemu). Zdania właściwe jednemu grafowi stoją w jego „Zasadach szczegółowych": grafy
-    z narzędziami wiedzy — że znaczników nie wpisuje się do zapytań, „Popraw" — że każdy znacznik
-    z notatek zostaje w tekście. Brak tej sekcji nie objawia się na zmyślonych zgłoszeniach, bo nie
+    z narzędziami wiedzy — że znaczników nie wpisuje się do zapytań. Brak tej sekcji nie objawia się na zmyślonych zgłoszeniach, bo nie
     ma w nich znaczników. Prompt parsujący ma ją od 2026-10-23 (p. 24, wcześniej planowana na
     p. 31): pomiar karty idzie do modelu zewnętrznego, więc na wątkach po anonimizatorze, a prompt
     i tak zamraża się dopiero przy masowym imporcie.
@@ -2968,8 +2983,9 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   w uwagach dla wdrożeniowca (`internal_notes`), nie w treści dla klienta (2026-10-08, wcześniej
   w nawiasach kwadratowych, `[dla serwisanta: sprawdź wersję firmware]`). Znacznik anonimizacji
   ma tę samą postać i ten sam sens: daną uzupełnia człowiek przed wysłaniem (2026-10-19).
-  `suggest_handoff` placeholderów nie ma (2026-10-30): numer i datę zgłoszenia ma w nagłówku wątku,
-  dane osobowe pod znacznikami, a reszty nie dopowiada.
+  `suggest_handoff` i „Popraw” placeholderów nie mają (2026-10-30): dane osobowe stoją pod
+  znacznikami, a reszty model nie dopowiada; numer i datę zgłoszenia `suggest_handoff` ma w nagłówku
+  wątku, a „Popraw” ich nie dostaje, więc wdrożeniowiec dopisuje je sam.
 
 #### Wnioski ze strojenia promptów
 
@@ -3627,9 +3643,9 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
   w `safe` i próbka korpusu w `unsafe`.
 - **Golden set anonimizatora (2026-10-17, p. 19.3): przypadek to tekst z danymi, które mają
   zniknąć (`remove`), i wiedzą, która ma zostać (`keep`), obie zapisane po rodzaju.** Zestaw
-  zmyślony ma 54 przypadki: cytowaną historię maili z adresami w `<…>`, dane złamane między
+  zmyślony ma 59 przypadków: cytowaną historię maili z adresami w `<…>`, dane złamane między
   liniami, odmianę i wołacz, numery z poprawną sumą obok liczb tego samego kształtu bez niej
-  i pułapki, a od 2026-10-18 także przypadki z sond anonimizacji: adresy bez kodu, bez kotwicy
+  i pułapki, od 2026-10-30 notatki pisane małymi literami, a od 2026-10-18 także przypadki z sond anonimizacji: adresy bez kodu, bez kotwicy
   i w notatce małymi literami, samo nazwisko po zwrocie i na początku zdania, krótkie imiona
   i nazwiska w odmianie obok słów o tym samym początku, wątek bez osób i słowa ról z etykiet
   komentarzy w `keep`, a także zapisy, które wzorce przepuszczały w próbce korpusu (telefony
@@ -4083,6 +4099,10 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   bez niej model przekazał je w 15 próbach z 15 (także w środku dłuższego wątku), a z nią w 15
   z 15; pilnują tego scenariusze h04 i h09. Wraca, gdy zaczną padać. Tak samo osobna zasada, że
   zapowiedź nie jest ustaleniem (scenariusz h03).
+- **Osobne zasady w prompcie „Popraw”: „Nie dodajesz faktów, danych, kroków…” i „Każdy znacznik
+  z notatek zostaje w tekście”** (2026-10-30) — pierwsza powtarza zasadę ogólną i „Zmieniasz formę,
+  nie treść”, a druga zabrania pominąć powtórzony znacznik tej samej osoby. Bez nich scenariusze:
+  0 dopisków i 0 zgubionych znaczników na 8 spraw w dwóch przebiegach. Wracają, gdy zaczną padać.
 - **Uwagi dla wdrożeniowca w `suggest_handoff`** (2026-10-30) — model ma tylko wątek, który
   wdrożeniowiec i tak widzi, więc notatka nie dodałaby nowej wiedzy. Wraca z p. 71, gdyby wariant
   dostawał ustalenia z `/search`, np. namiar na plik.
@@ -4440,7 +4460,7 @@ ustalenia do właściwej sekcji (reguła → sekcja tematyczna, odrzucona opcja 
 pułapka → „Gotchas" warstwy). **Gdy natrafisz na lukę „ostatniej mili" albo tworzysz świadomy
 skrót — dopisz punkt** (zwykle do bloku K), zamiast zostawiać go w milczeniu.
 
-**Kolejność bloków:** bloki 0, A, B, E i F są zrobione. Grafy dzielą się wokół korpusu: bez
+**Kolejność bloków:** bloki 0, A, B, E, F i G są zrobione. Grafy dzielą się wokół korpusu: bez
 narzędzi wiedzy (G) idą przed nim, bo nie potrzebują indeksów, a `parse_ticket` buduje korpus;
 z narzędziami (J) po nim, razem z opisami narzędzi, bo narzędzia zgłoszeń mierzy się na
 zanonimizowanych kartach i wątkach z importu. Bloków C i D nie ma: ich punkty trafiły do innych
@@ -4522,28 +4542,14 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 
 #### G. Grafy bez narzędzi wiedzy — po jednym punkcie na graf: treść promptu i pomiar
 
-Na prawdziwym modelu i anonimizatorze (p. 17–18 i blok E). Każdy pomiar ≥2 przebiegi, z czytaniem
-surowych odpowiedzi i raportem z datą i wersją promptu; przy generacji do
-wyboru golden set odpowiedzi albo przegląd ręczny — warianty mają różne kryteria sukcesu, więc
-każdy mierzy się osobno. Grafy z narzędziami wiedzy (p. 23, 25, 26) idą po korpusie, razem
-z opisami narzędzi. Punkt grafu zamyka się po pracy nad promptem, scenariuszach z p. 59 na żywym
-modelu i zgrubnym teście ręcznym przez front (decyzja 2026-10-22); to, co w punkcie jest
-pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
-
 - [x] **21. `gate_close`** (2026-10-21) → „Bramki jakości i asysta pisania”; pomiar w p. 33.
 - [x] **22. `gate_reply`** (2026-10-22) → „Bramki jakości i asysta pisania”; pomiar w p. 33.
 - [x] **24. `parse_ticket`** (2026-10-23) → „Domena”, „Golden set retrievalu”; pomiar w p. 31.
-- [x] **27. `suggest_handoff`** (2026-10-30) → „Warianty generacji”; test ręczny i pomiar w p. 33.
-- [ ] **28. `polish`** — zasady stylu jako dane, pomiar braku nowych faktów (porównanie wejścia
-  z wyjściem pod kątem dodanych liczb, nazw i kroków); do potwierdzenia, czy „Popraw" zostaje
-  w zakresie. *Dlaczego:* jedyna funkcja zwracająca tekst do wysłania, więc dodany fakt trafia
-  prosto do klienta.
+- [x] **27. `suggest_handoff`** (2026-10-30) → „Warianty generacji”; pomiar w p. 33.
+- [x] **28. `polish`** (2026-10-30) → „Ewaluacja bramek”; pomiar w p. 33.
 
-#### H. Reguły i powrót do korpusu
+#### H. Powrót do korpusu
 
-- [ ] **29. Magazyn reguł w SQL** — osobny schemat i osobna rola w Postgresie z p. 48, nie nowa
-  usługa; wersje, audyt werdyktów, kontrola dostępu do edycji; później też magazyn notatek.
-  *Dlaczego:* klient stroi reguły bez deployu, a edycja to zmiana konfiguracji produkcyjnej.
 - [ ] **30. Zamknięte zgłoszenie wraca do korpusu** — tylko z pozytywnym werdyktem bramki, kartą
   z grafu `parse_ticket`; do rozstrzygnięcia: zapis automatyczny czy kolejka do akceptacji i kto
   uruchamia indeksację (zasada 8). *Dlaczego:* noga 2 karmi nogę 1, a to jedyna droga, którą
@@ -4586,8 +4592,10 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
   z pięciu reguł na prawdziwych wiadomościach do klientów, w dwóch przebiegach, z czytaniem
   uzasadnień; osobno zasada, że cytaty reguł nie łamią — bez niej bramka blokowała cytat
   komunikatu z ekranu „Ups! Coś poszło nie tak.” jako potoczny, a czy z nią nie przepuszcza
-  prośby o hasło schowanej w cytacie, nikt nie mierzył. `suggest_handoff` (2026-10-30): test ręczny
-  przez front (jeszcze nie zrobiony) i ocena na prawdziwych przekazaniach. *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na
+  prośby o hasło schowanej w cytacie, nikt nie mierzył. `suggest_handoff` (2026-10-30): ocena na
+  prawdziwych przekazaniach. `polish` (2026-10-30): brak nowych faktów na prawdziwych notatkach, bo
+  wypadły z promptu osobne zasady o dopiskach i znacznikach, oraz decyzja, czy „Popraw” zostaje
+  w zakresie. *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na
   zapytaniach surowych, a grafy na zmyślonych sprawach i teście ręcznym.
 - [ ] **34. Tryb odświeżania korpusu** — kolejne zrzuty czy dostęp tylko do odczytu.
   *Dlaczego:* +130 zgłoszeń w miesiąc, więc jednorazowy zrzut szybko się starzeje.
@@ -4606,8 +4614,10 @@ pomiarem na prawdziwym korpusie, przechodzi przy zamknięciu do p. 33.
 
 #### J. Narzędzia i grafy z narzędziami — opisy narzędzi, treść promptu i pomiar
 
-Po masowym imporcie (p. 31), na zanonimizowanych kartach i wątkach; pomiar jak w grafach bez
-narzędzi wiedzy: ≥2 przebiegi, surowe odpowiedzi, raport z datą i wersją promptu. Opis narzędzia
+Po masowym imporcie (p. 31), na zanonimizowanych kartach i wątkach, na prawdziwym modelu
+i anonimizatorze. Każdy pomiar ≥2 przebiegi, z czytaniem surowych odpowiedzi i raportem z datą
+i wersją promptu; przy generacji do wyboru golden set odpowiedzi albo przegląd ręczny, a każdy
+wariant mierzy się osobno, bo warianty mają różne kryteria sukcesu. Opis narzędzia
 (`description.md`) jest wspólny dla grafów, więc opisy stroi p. 23 na grafie `search`, który ma
 wszystkie narzędzia, a p. 25–26 mierzą na opisach zamrożonych; zmiana opisu po p. 23 to ponowny
 pomiar p. 23, 25 i 26. Opisy narzędzi dokumentacji mierzy p. 55, na właściwej dokumentacji.
@@ -4739,6 +4749,9 @@ Rzeczy odłożone świadomie, bez miejsca w kolejności planu. Każdy punkt: cel
   pomiar pokaże, że wersja lekka nie wystarcza. *Dlaczego odłożony:* hasło nie niesie wiedzy,
   a ryzyko leży po stronie umowy i polityki bezpieczeństwa klienta; alarm „zmień hasło" to jego
   procedura (p. 39).
+- [ ] **29. Magazyn reguł w SQL** (odłożony 2026-10-30) — osobny schemat i osobna rola w Postgresie z p. 48, nie nowa
+  usługa; wersje, audyt werdyktów, kontrola dostępu do edycji; później też magazyn notatek.
+  *Dlaczego:* klient stroi reguły bez deployu, a edycja to zmiana konfiguracji produkcyjnej.
 - [ ] **44. Notatki agenta i HITL w pętli** — notatki jako narzędzie pomocnicze w
   `agent_tools/notes/` (sterują szukaniem, nigdy generacją), przerwanie pętli na decyzję człowieka
   (odczyt zgłoszeń i sekcji po identyfikatorze jest już narzędziem agenta — p. 52, 56, 57).
