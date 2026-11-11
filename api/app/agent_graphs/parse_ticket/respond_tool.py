@@ -11,7 +11,7 @@ DESCRIPTION_FILE  = Path(__file__).parent / "respond_tool.md"
 
 # Pola karty, o które model nie jest pytany: tożsamość i datę daje źródło, wersję słownika — graf,
 # który go wstawił do promptu. Model, który by je wymyślił, nie ma jak ich podać.
-FILLED_BY_GRAPH = ("ticket_id", "date", "resolution_vocabulary_version")
+FILLED_BY_GRAPH = ("ticket_id", "date", "resolution_vocabulary_version", "parser_model")
 
 # Nagłówek sekcji z regułami pól w respond_tool.md — granica dla `field_rules()`.
 RULES_HEADING = "# Zasady"

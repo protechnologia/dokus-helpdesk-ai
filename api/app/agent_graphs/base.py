@@ -58,6 +58,7 @@ class GraphState(BaseModel):
     anonymized:      AnonymizedText | None                      = None                         # ustawia węzeł `anonymize`
     messages:        Annotated[list[ChatMessage], operator.add] = Field(default_factory=list)  # rozmowa z modelem; reduktor dokleja nowe wiadomości
     iterations:      int                                        = 0                            # liczba tur modelu; podbija węzeł `agent`
+    model:           str | None                                 = None                         # model, który odpowiedział w ostatniej turze; ustawia węzeł `agent`
     respond_retries: int                                        = 0                            # ile razy węzeł `respond` odesłał odpowiedź do poprawki
     usage:           Annotated[LLMUsage, add_usage]             = Field(default_factory=LLMUsage)  # tokeny i koszt wywołań modelu; reduktor sumuje tury
     log:             Annotated[list[LogEntry], operator.add]    = Field(default_factory=list)  # przebieg: po wpisie od każdego wywołania węzła

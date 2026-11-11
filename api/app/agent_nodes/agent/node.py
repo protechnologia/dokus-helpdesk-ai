@@ -145,6 +145,7 @@ class AgentNode(AgentNodeBase):
             state    = state,
             messages = [*opening, turn.message],
             usage    = turn.usage,
+            model    = turn.model,
         )
 
         return update

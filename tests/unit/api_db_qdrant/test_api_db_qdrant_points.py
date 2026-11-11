@@ -34,6 +34,7 @@ VALID_TICKET = {
     "solution":                      "Wygenerowano certyfikat z właściwym uprawnieniem.",
     "resolution":                    "naprawione",
     "resolution_vocabulary_version": 1,
+    "parser_model":                  "gpt-6.1-sol",
     "questions_summary":             "pytano o wersję przeglądarki",
     "excluded_causes":               ["Brak miejsca na dysku"],
     "useful":                        True,
@@ -113,8 +114,9 @@ def test_different_sources_get_different_ids() -> None:
 # --- punkt zgłoszenia ---------------------------------------------------------------------
 
 def test_ticket_payload_carries_every_card_field() -> None:
-    """Sprawdza, czy punkt zbudowany z karty zgłoszenia niesie w danych (payload) trzynaście pól
-    karty, od numeru zgłoszenia po wersję słownika rozstrzygnięć, każde z wartością z karty.
+    """Sprawdza, czy punkt zbudowany z karty zgłoszenia niesie w danych (payload) czternaście pól
+    karty, od numeru zgłoszenia po wersję słownika rozstrzygnięć i nazwę modelu, każde z wartością
+    z karty.
 
     Wyłapuje pole zgubione albo przekręcone przy budowie punktu: z tych pól korzysta prompt
     generacji, więc brakujące znikałoby z odpowiedzi po cichu."""
@@ -135,6 +137,7 @@ def test_ticket_payload_carries_every_card_field() -> None:
     assert payload["useful"]            is True
     assert payload["useful_reason"]     == VALID_TICKET["useful_reason"]
     assert payload["resolution_vocabulary_version"] == 1
+    assert payload["parser_model"]                  == "gpt-6.1-sol"
 
 
 def test_ticket_payload_date_is_an_iso_string() -> None:

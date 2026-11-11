@@ -15,7 +15,8 @@ class ParseTicketState(GraphState):
 
     Tożsamość, data i słownik przychodzą w stanie, nie od modelu: to pola `FILLED_BY_GRAPH`, o które
     model nie jest pytany, a karta zapisuje wersję słownika w `resolution_vocabulary_version`
-    (zasada 7). Węzeł `respond` dokłada je do argumentów `respond_parse_ticket`.
+    (zasada 7). Tak samo nazwę modelu (`parser_model`): bierze ją z pola `model` stanu, które
+    ustawia węzeł `agent`. Węzeł `respond` dokłada je do argumentów `respond_parse_ticket`.
     """
 
     ticket_id:  str                  = Field(min_length=1)  # id zgłoszenia ze źródła

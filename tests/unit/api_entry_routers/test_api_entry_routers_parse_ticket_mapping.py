@@ -5,16 +5,16 @@ from tests._helpers.routers.samples import CARD, LOG, USAGE, final_state
 
 def test_every_card_field_goes_out_unchanged() -> None:
     """Sprawdza, czy karta w odpowiedzi `/parse-ticket` ma każde pole karty z grafu, każde pod
-    swoją nazwą i z tą samą wartością, a wersji słownika rozstrzygnięć nie ma.
+    swoją nazwą i z tą samą wartością, a wersji słownika rozstrzygnięć i nazwy modelu nie ma.
 
     Wyłapuje pole zgubione albo przepisane z sąsiedniego (`cause` z `solution`) oraz wyciek
-    wersji słownika, która jest metadaną artefaktu: helpdesk dostałby kartę niezgodną z tym, co
-    trafiłoby do korpusu."""
+    wersji słownika albo nazwy modelu, które są metadanymi artefaktu: helpdesk dostałby kartę
+    niezgodną z tym, co trafiłoby do korpusu."""
     response = to_ticket_card(final_state(parse_ticket, output=CARD))
 
     card_fields = response.model_dump(exclude={"usage", "log"})
 
-    assert card_fields == CARD.model_dump(exclude={"resolution_vocabulary_version"})
+    assert card_fields == CARD.model_dump(exclude={"resolution_vocabulary_version", "parser_model"})
 
 
 def test_the_card_carries_usage_and_log_of_the_run() -> None:

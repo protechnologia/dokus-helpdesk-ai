@@ -109,4 +109,5 @@ class FakeAgentNode(AgentNodeBase):
         turn = self._turns[self._next]
         self._next += 1
 
-        return self.turn_update(state=state, messages=[turn], usage=self._usage)
+        # Atrapa nie pyta żadnego modelu, więc nazwy modelu nie ma — karta z atrapy jej nie niesie.
+        return self.turn_update(state=state, messages=[turn], usage=self._usage, model=None)

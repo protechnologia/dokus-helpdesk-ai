@@ -184,6 +184,18 @@ async def test_the_usage_of_the_turn_goes_to_the_state() -> None:
     assert update["usage"].cost_usd      == 0.0
 
 
+async def test_the_model_that_answered_goes_to_the_state() -> None:
+    """Sprawdza, czy węzeł zapisuje w stanie nazwę modelu, który odpowiedział w tej turze, tak jak
+    podał ją klient modelu (u atrapy klienta „fake”).
+
+    Wyłapuje węzeł, który tej nazwy nie przekazuje: karta zgłoszenia nie wiedziałaby, którym
+    modelem powstała, więc po zmianie modelu w `.env` nie dałoby się odróżnić starych kart od
+    nowych."""
+    update = await make_node(FakeLLMClient(turns=[SEARCH])).run(make_state())
+
+    assert update["model"] == "fake"
+
+
 @pytest.mark.parametrize(
     "turn, message",
     [

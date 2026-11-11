@@ -66,7 +66,7 @@ from app.core_model.dicts.resolution_vocabulary import ResolutionVocabulary
 
 # Pola karty, których model nie dostaje: metadane artefaktu i ocena dla indeksacji, nie treść
 # zgłoszenia.
-HIDDEN_CARD_FIELDS = {"resolution_vocabulary_version", "useful", "useful_reason"}
+HIDDEN_CARD_FIELDS = {"resolution_vocabulary_version", "parser_model", "useful", "useful_reason"}
 
 # Miejsce w opisie narzędzia (`description.md`), w które wchodzą klasy rozstrzygnięcia.
 RESOLUTION_CLASSES_PLACEHOLDER = "{{resolution_classes}}"

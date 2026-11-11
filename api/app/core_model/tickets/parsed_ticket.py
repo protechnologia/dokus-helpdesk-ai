@@ -112,6 +112,9 @@ class ParsedTicket(BaseModel):
     resolution: str = Field(examples=["naprawione"])
     # Wersja słownika, z której pochodzi `resolution`: słownik to dane klienta i może się zmienić.
     resolution_vocabulary_version: int = Field(examples=[1])
+    # Model, który zrobił kartę, tak jak nazwał go dostawca; wypełnia graf, nie model. Brak przy
+    # kartach sprzed tego pola (golden set z 2026-10-23) i przy atrapie węzła `agent`.
+    parser_model: str | None = Field(default=None, examples=["gpt-6.1-sol"])
     # Czego konsultant nie wiedział i o co dopytywał; `brak`, gdy nikt nie dopytywał.
     questions_summary: str = Field(default=NO_VALUE, examples=["pytano o wersję przeglądarki"])
 

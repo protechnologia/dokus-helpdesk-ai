@@ -75,7 +75,8 @@ async def test_the_model_sees_every_card_field_under_its_schema_name() -> None:
 
 async def test_the_model_does_not_see_artifact_metadata() -> None:
     """Sprawdza, czy w tekście dla modelu nie ma wersji słownika rozstrzygnięć
-    (`resolution_vocabulary_version`) ani oceny karty (`useful`, `useful_reason`).
+    (`resolution_vocabulary_version`), nazwy modelu, który zrobił kartę (`parser_model`), ani oceny
+    karty (`useful`, `useful_reason`).
 
     Wyłapuje przeciek metadanych artefaktu do modelu: to informacja dla nas i dla indeksacji, nie
     treść zgłoszenia, a model potraktowałby ją jak fakt o sprawie."""
@@ -83,6 +84,7 @@ async def test_the_model_does_not_see_artifact_metadata() -> None:
     text = tool.render_for_model(await tool.search(QUERY))
 
     assert "resolution_vocabulary_version" not in text
+    assert "parser_model"                  not in text
     assert '"useful"'                      not in text
     assert "useful_reason"                 not in text
 

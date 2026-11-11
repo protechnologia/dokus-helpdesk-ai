@@ -1262,6 +1262,12 @@ schemat pierwotny miał 17 i był projektowany pod ten jeden korpus, nie pod pro
   o wykluczeniu byłby sentinelem w przebraniu.
 - **`useful` i `useful_reason` są dla filtra, nie dla agenta** — `read_tickets_card` ich nie
   pokazuje: karta w indeksie przeszła filtr, więc `useful` byłoby zawsze prawdą.
+- **Model, który zrobił kartę, wpisuje graf do pola `parser_model` (2026-11-11)**, tak jak wersję
+  słownika: model nie jest o nie pytany, a nazwa pochodzi z odpowiedzi dostawcy (`LLMTurn.model`),
+  którą węzeł `agent` zapisuje w stanie grafu. Karty sprzed tego pola (golden set) i karty
+  z atrapy węzła `agent` mają `null`, więc pole nie jest obowiązkowe. Idzie do payloadu Qdranta,
+  ale nie do modelu (`read_tickets_card` je ukrywa) ani do odpowiedzi `/parse-ticket`. Dzięki
+  niemu korpus może zostać w jednym katalogu także po zmianie modelu w `.env`.
 
 **Założenie fundujące: jedna instancja produktu obsługuje jeden helpdeskowany produkt.**
 Stąd nie ma pola `system` — nazwa własnej aplikacji jest stała dla instancji, więc byłaby
@@ -2428,7 +2434,8 @@ a do tego czasu jej nie ma, więc oba narzędzia kończą się błędem `DbPostg
   właściwy mają ten sam kontrakt.
 - **Pola wspólne stanu w `GraphState` (`agent_graphs/base.py`), `state.py` grafu dziedziczy i
   dokłada swoje**: `input_text`,
-  `anonymized`, `messages`, `iterations`, `respond_retries`, `usage`, `log`, `tool_timings` są
+  `anonymized`, `messages`, `iterations`, `model`, `respond_retries`, `usage`, `log`,
+  `tool_timings` są
   w bazie; `output`
   w typie wyniku (`Verdict`,
   `ParsedTicket`…), `sources` (tylko grafy z narzędziami wiedzy) i dane wejściowe (`rules`) — w
@@ -2488,8 +2495,8 @@ a do tego czasu jej nie ma, więc oba narzędzia kończą się błędem `DbPostg
   z `user_prompt(state)` i zostawia ją w `messages`; atrapa węzła jej nie dokłada, bo nie zna
   promptu grafu. Dokąd idzie przebieg, rozstrzyga graf; czy narzędzie jest dozwolone —
   `run_tools`; czy odpowiedź ma poprawny kształt, także gdy model odpowiedział samym tekstem —
-  `respond`. Zapis tury w stanie (licznik, zużycie, wpis w logu) jest wspólny z atrapą
-  (`agent/base.py`).
+  `respond`. Zapis tury w stanie (licznik, zużycie, nazwa modelu, wpis w logu) jest wspólny
+  z atrapą (`agent/base.py`); atrapa nazwy modelu nie ma, bo żadnego nie pyta.
 - **Węzeł `run_tools` jest właściwy (`RunToolsNode`, 2026-10-05).** Wykonuje po kolei wywołania
   z ostatniej tury modelu i na każde odpowiada jedną wiadomością `tool`: wynikiem z narzędzia
   albo błędem `{"error": …}`. Do modelu wraca wyłącznie `ToolCallError` — nieznane narzędzie,
@@ -2602,8 +2609,8 @@ nowe zgłoszenie (surowy tekst)
   ma jedno źródło; błąd walidacji wraca tą samą drogą co błędne argumenty narzędzia. Schemat nie ma
   `sources` (zasada 9), odpowiedź musi być jedynym wywołaniem w turze. Długi tekst w argumencie
   (`suggest_*`, `polish`) — do zmierzenia w p. 25–28. Także `parse_ticket` (`respond_parse_ticket`,
-  2026-10-02) — bez pól `FILLED_BY_GRAPH` (`ticket_id`, `date`, wersja słownika), które dokłada graf
-  ze stanu.
+  2026-10-02) — bez pól `FILLED_BY_GRAPH` (`ticket_id`, `date`, wersja słownika, `parser_model`),
+  które dokłada graf ze stanu.
 - **Opis narzędzia odpowiedzi ma układ opisu narzędzia agenta (2026-10-21):** te same cztery
   sekcje, argumenty w tabelce z typem z JSON-a i przykładami, linie do 70 znaków. „Co zwraca"
   jest bez tabelki i mówi, że wywołanie kończy sprawę, a odpowiedź łamiąca zasady wraca do

@@ -67,6 +67,18 @@ def test_questions_summary_defaults_to_the_explicit_exit() -> None:
     assert ParsedTicket(**payload).questions_summary == NO_VALUE
 
 
+def test_card_without_the_parser_model_is_valid() -> None:
+    """Sprawdza, czy karta bez pola `parser_model` (model, który ją zrobił) jest poprawna i ma w nim
+    `None`.
+
+    Wyłapuje pole uczynione obowiązkowym: karty golden setu powstały przed nim i każda wypadłaby
+    wtedy z walidacji, a nadpisać ich nie wolno (zasada 7)."""
+    ticket = ParsedTicket(**VALID_TICKET)
+
+    assert "parser_model" not in VALID_TICKET
+    assert ticket.parser_model is None
+
+
 @pytest.mark.parametrize(
     "field", ["component", "problem", "symptoms", "cause", "solution", "useful_reason"],
 )

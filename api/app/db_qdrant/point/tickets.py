@@ -129,6 +129,8 @@ class TicketPoint(BaseModel):
             # Wersja słownika, którą powstało `resolution` — żeby edycja słownika dała się
             # prześledzić bez czytania artefaktu z dysku (zasada 7).
             "resolution_vocabulary_version": ticket.resolution_vocabulary_version,
+            # Model, który zrobił kartę — z tego samego powodu: bez czytania artefaktu z dysku.
+            "parser_model":                  ticket.parser_model,
         }
 
         point = cls(

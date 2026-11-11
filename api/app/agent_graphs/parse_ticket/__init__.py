@@ -5,8 +5,8 @@ Ten sam prompt zbuduje korpus przy masowym imporcie (p. 31), więc to KONTRAKT A
 `prompt_system.md`, `prompt_user.md` i `respond_tool.md` pod testem-strażnikiem.
 
 Przebieg: anonymize → agent → respond. Bez narzędzi wiedzy; kartę model oddaje narzędziem
-`respond_parse_ticket` (`respond_tool.py`) bez pól `FILLED_BY_GRAPH` — tożsamość, datę i wersję
-słownika dokłada graf ze stanu.
+`respond_parse_ticket` (`respond_tool.py`) bez pól `FILLED_BY_GRAPH` — tożsamość, datę, wersję
+słownika i nazwę modelu dokłada graf ze stanu.
 
 Status: węzły właściwe z fabryki grafów, atrapa w `fake.py`; prompt na modelu docelowym
 w p. 24 (CLAUDE.md -> „Plan").

@@ -16,14 +16,14 @@ TICKET = {"ticket_id": "41002", "body": "Od wczoraj nie przychodzą przesyłki z
 def test_the_card_goes_out_field_by_field() -> None:
     """Sprawdza, czy `POST /parse-ticket` oddaje kartę zgłoszenia z grafu pole po polu, razem ze
     zużyciem modelu (jedno wywołanie) i logiem przebiegu (anonimizacja, model, odpowiedź), a bez
-    wersji słownika rozstrzygnięć, która jest polem wewnętrznym.
+    wersji słownika rozstrzygnięć i nazwy modelu, które są polami wewnętrznymi.
 
     Wyłapuje trasę, która gubi albo przekręca pole karty, oraz taką, która wypuszcza na zewnątrz
     pole wewnętrzne: odpowiedź ma mieć dokładnie te pola, które usługa obiecuje wołającemu."""
     response = TestClient(create_app()).post("/parse-ticket", json=TICKET)
     expected = parse_ticket.default_ticket().model_dump(
         mode    = "json",
-        exclude = {"resolution_vocabulary_version"},
+        exclude = {"resolution_vocabulary_version", "parser_model"},
     )
     body = response.json()
 

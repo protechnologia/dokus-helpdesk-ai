@@ -165,21 +165,24 @@ def filled_by_graph(
     """
     Description:
     Pola karty, które wypełnia graf, a nie model (`FILLED_BY_GRAPH`): tożsamość i data zgłoszenia
-    ze źródła oraz wersja słownika, który graf wstawił do promptu. Węzeł `respond` dokłada je do
-    argumentów `respond_parse_ticket`, zanim zwaliduje całość do `ParsedTicket`.
+    ze źródła, wersja słownika, który graf wstawił do promptu, i model, który odpowiedział
+    w ostatniej turze. Węzeł `respond` dokłada je do argumentów `respond_parse_ticket`, zanim
+    zwaliduje całość do `ParsedTicket`.
 
     Example args:
         state=ParseTicketState(input_text="ZGŁOSZENIE 90101…", ticket_id="90101",
-                               date=date(2026, 9, 30),
+                               date=date(2026, 9, 30), model="gpt-6.1-sol",
                                vocabulary=ResolutionVocabulary(version=1, classes=[…]))
 
     Example result:
-        {"ticket_id": "90101", "date": date(2026, 9, 30), "resolution_vocabulary_version": 1}
+        {"ticket_id": "90101", "date": date(2026, 9, 30), "resolution_vocabulary_version": 1,
+         "parser_model": "gpt-6.1-sol"}
     """
     filled = {
         "ticket_id":                     state.ticket_id,
         "date":                          state.date,
         "resolution_vocabulary_version": state.vocabulary.version,
+        "parser_model":                  state.model,
     }
 
     return filled

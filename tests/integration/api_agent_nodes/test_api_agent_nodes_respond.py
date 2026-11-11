@@ -29,6 +29,7 @@ from app.core_model.graphs.proposal_notes import ProposalNotes
 from app.core_model.graphs.verdict import Verdict
 from app.engine_anonymization import FakeAnonymizer
 from app.engine_llm import ChatMessage, FakeLLMClient
+from app.engine_llm.client.fake import FAKE_MODEL_NAME
 from tests._helpers.fake_tools import fake_agent_tools
 
 # Prawdziwy węzeł `respond` wpięty w grafy i uruchomiony przez LangGraph, razem z prawdziwymi
@@ -119,9 +120,15 @@ async def expected_answer(
         (ChatMessage(role="assistant", tool_calls=[ToolCall(name="respond_gate_close", …)]),
          Verdict(verdict="pass", reasons=["fake-gate-close-verdict"], …))
     """
-    final = await run_graph(graph.build_fake_graph(FakeAnonymizer()), graph.example_state())
+    final  = await run_graph(graph.build_fake_graph(FakeAnonymizer()), graph.example_state())
+    output = final.output
 
-    return final.messages[-1], final.output
+    # Karta niesie nazwę modelu, który odpowiedział. Atrapa grafu nie pyta żadnego modelu, więc
+    # jej karta nazwy nie ma, a węzeł `agent` na atrapie klienta dostaje nazwę od niej.
+    if "parser_model" in type(output).model_fields:
+        output = output.model_copy(update={"parser_model": FAKE_MODEL_NAME})
+
+    return final.messages[-1], output
 
 
 def reading_turns(

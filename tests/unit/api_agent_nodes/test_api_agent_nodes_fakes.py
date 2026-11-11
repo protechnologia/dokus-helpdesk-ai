@@ -208,7 +208,7 @@ def test_the_log_entry_of_a_turn_carries_its_cost() -> None:
     z pola `usage`, po którym graf sumuje koszt sprawy."""
     usage = LLMUsage(calls=1, prompt_tokens=4820, cost_usd=0.03214)
 
-    update = FakeAgentNode([SEARCH]).turn_update(State(input_text="x"), [SEARCH], usage)
+    update = FakeAgentNode([SEARCH]).turn_update(State(input_text="x"), [SEARCH], usage, None)
 
     assert update["log"][0].message == "tura 1: narzędzia: find_tickets_vector; 0,0321 USD"
     assert update["usage"]          == usage
