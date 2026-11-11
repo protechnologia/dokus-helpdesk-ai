@@ -6,10 +6,12 @@ i Qdranta — więc indeks da się skasować i odbudować jedną komendą.
 
     data/unsafe/corpus/cards/*.json → filtr jakości → embedder (`problem` + `symptoms`) → Qdrant
 
-| metoda      | komenda                 | co robi                                          |
-|-------------|-------------------------|--------------------------------------------------|
-| `build()`   | `tickets index <katalog>`   | dokłada artefakty, nadpisując punkty tych samych |
-| `rebuild()` | `tickets reindex <katalog>` | kasuje kolekcję i buduje od zera                 |
+| metoda      | kto woła                     | co robi                                          |
+|-------------|------------------------------|--------------------------------------------------|
+| `build()`   | `tickets index <katalog>`    | dokłada artefakty, nadpisując punkty tych samych |
+| `rebuild()` | `tickets reindex <katalog>`  | kasuje kolekcję i buduje od zera                 |
+| `add()`     | zamknięte zgłoszenie (p. 30) | dokłada karty, które przeszły filtr              |
+| `remove()`  | zamknięte zgłoszenie (p. 30) | usuwa punkty o podanych numerach                 |
 
 Przed — artefakt `data/unsafe/corpus/cards/33644.json`:
 
@@ -52,6 +54,7 @@ Co się dzieje po drodze:
 """
 
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 
 from app.core_model.tickets.parsed_ticket import ParsedTicket
@@ -197,6 +200,55 @@ class TicketsIndexer:
         await self._tickets.drop()
 
         return await self.build(directory)
+
+    async def add(
+        self,
+        tickets: Sequence[ParsedTicket],  # np. [ParsedTicket(ticket_id="41002", …)] — po filtrze
+    ) -> int:
+        """
+        Description:
+        Dokłada do kolekcji karty, które już przeszły filtr jakości, i oddaje, ile zapisano:
+        zakłada kolekcję, gdy jej nie ma, liczy oba wektory i zapisuje punkty. Punkt tego samego
+        zgłoszenia jest nadpisywany. Tędy idzie pojedyncze zamknięte zgłoszenie (p. 30), bez
+        czytania katalogu.
+
+        Example args:
+            tickets=[ParsedTicket(ticket_id="41002", …)]
+
+        Example result:
+            1
+
+        Raises:
+            DbQdrantConfigError: kolekcja ma punkty innego modelu embeddera
+            DbQdrantError: Qdrant jest nieosiągalny albo odrzucił zapis
+            EmbeddingConfigError: embedder zmienił model w trakcie zapisu
+            EmbeddingError: embedder jest nieosiągalny albo odpowiedział błędem
+        """
+        await self._tickets.ensure()
+
+        return await self._upsert(list(tickets))
+
+    async def remove(
+        self,
+        ticket_ids: Sequence[str],  # np. ["41002"]
+    ) -> None:
+        """
+        Description:
+        Usuwa z kolekcji punkty zgłoszeń o podanych numerach; numer, którego nie ma, nie jest
+        błędem. Tędy wypada karta zgłoszenia zamkniętego ponownie, która tym razem odpadła
+        w filtrze.
+
+        Example args:
+            ticket_ids=["41002"]
+
+        Example result:
+            None
+
+        Raises:
+            DbQdrantError: Qdrant jest nieosiągalny albo odrzucił polecenie
+        """
+        await self._tickets.ensure()
+        await self._tickets.delete(ticket_ids)
 
     async def aclose(self) -> None:
         """

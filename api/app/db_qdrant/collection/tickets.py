@@ -40,6 +40,7 @@ class TicketsCollection(VectorCollection):
            `drop()`.
         2. Narzędzie: `search()` → trafienia `TicketHit`, od najbardziej podobnego.
         3. Odczyt: `read_by_id()` → punkty `TicketPoint` o podanych numerach zgłoszeń.
+        4. Usuwanie: `delete()` — karta zamkniętego zgłoszenia, która odpadła w filtrze (p. 30).
     """
 
     # Nazwane wektory kolekcji zgłoszeń — jej cały schemat poza wymiarem z konfiguracji.
@@ -129,3 +130,23 @@ class TicketsCollection(VectorCollection):
         points    = [TicketPoint.from_qdrant(entry) for entry in entries]
 
         return points
+
+    async def delete(
+        self,
+        ticket_ids: Sequence[str],  # np. ["33644"]
+    ) -> None:
+        """
+        Description:
+        Usuwa punkty zgłoszeń o podanych numerach. Numer, którego w kolekcji nie ma, nie jest
+        błędem: tak usuwa się kartę, która po ponownym zamknięciu zgłoszenia odpadła w filtrze.
+
+        Example args:
+            ticket_ids=["33644"]
+
+        Example result:
+            None
+
+        Raises:
+            DbQdrantError: Qdrant nie odpowiedział, nie ma kolekcji albo odrzucił polecenie
+        """
+        await self._delete([point_id_for(ticket_id) for ticket_id in ticket_ids])

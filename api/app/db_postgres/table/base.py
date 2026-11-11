@@ -382,6 +382,37 @@ class TextTable:
 
         return [self._data(record) for record in records]
 
+    async def _delete(
+        self,
+        key: str,            # kolumna klucza, np. "ticket_id"
+        ids: Sequence[str],  # np. ["90011"]
+    ) -> None:
+        """
+        Description:
+        Usuwa wiersze o podanych kluczach. Klucz, którego w tabeli nie ma, nie jest błędem —
+        usuwanie jest powtarzalne.
+
+        Example args:
+            key="ticket_id"
+            ids=["90011"]
+
+        Example result:
+            None
+
+        Raises:
+            DbPostgresError: baza nie odpowiedziała albo odrzuciła polecenie
+        """
+        # --- nic do usunięcia ---
+        if not ids:
+            return None
+
+        await self._client.execute(
+            f"DELETE FROM {self._sql_name} WHERE {key} = ANY($1::text[])",
+            list(ids),
+        )
+
+        return None
+
     async def _list(
         self,
         order: str,  # np. "document, version, ordinal"

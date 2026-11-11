@@ -56,6 +56,7 @@ class TicketsTable(TextTable):
         2. Szukanie: `words()`, `phrase()` i `substring()` → numery pasujących zgłoszeń, od
            najnowszych.
         3. Odczyt: `read_by_id()` → wiersze `TicketRow` o podanych numerach.
+        4. Usuwanie: `delete()` — wątek zgłoszenia, którego karta odpadła w filtrze (p. 30).
     """
 
     def __init__(
@@ -149,6 +150,27 @@ class TicketsTable(TextTable):
         rows    = [TicketRow(**record) for record in records]
 
         return rows
+
+    async def delete(
+        self,
+        ticket_ids: Sequence[str],  # np. ["90011"]
+    ) -> None:
+        """
+        Description:
+        Usuwa wątki zgłoszeń o podanych numerach. Numer, którego w tabeli nie ma, nie jest
+        błędem: tak usuwa się wątek zgłoszenia, którego karta po ponownym zamknięciu odpadła
+        w filtrze.
+
+        Example args:
+            ticket_ids=["90011"]
+
+        Example result:
+            None
+
+        Raises:
+            DbPostgresError: baza nie odpowiedziała albo odrzuciła polecenie
+        """
+        await self._delete(key=KEY, ids=ticket_ids)
 
     async def words(
         self,

@@ -457,6 +457,39 @@ class VectorCollection:
 
         return points
 
+    async def _delete(
+        self,
+        point_ids: Sequence[str],  # np. ["df3b51f3-…"]
+    ) -> None:
+        """
+        Description:
+        Usuwa punkty o podanych identyfikatorach i czeka, aż zmiana się zastosuje. Identyfikator,
+        którego w kolekcji nie ma, nie jest błędem — usuwanie jest powtarzalne.
+
+        Example args:
+            point_ids=["df3b51f3-9eac-56f3-9f28-6253f23dd731"]
+
+        Example result:
+            None
+
+        Raises:
+            DbQdrantError: Qdrant nie odpowiedział, nie ma kolekcji albo odrzucił polecenie
+        """
+        # --- nic do usunięcia ---
+        if not point_ids:
+            return None
+
+        await self._client.request(
+            "POST",
+            f"{self._path}/points/delete",
+            params = {"wait": "true"},
+            json   = {"points": list(point_ids)},
+        )
+
+        logger.info("delete collection=%s points=%d", self._name, len(point_ids))
+
+        return None
+
     async def _verify_write_model(
         self,
         models: set[str],  # np. {"OPI-PIB/PolDense-150M"} — modele punktów jednego zapisu

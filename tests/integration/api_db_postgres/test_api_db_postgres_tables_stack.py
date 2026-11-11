@@ -167,6 +167,21 @@ async def test_a_message_is_found_as_a_substring_of_the_thread(tickets: TicketsT
     assert found == [row.ticket_id for row in ROWS]
 
 
+async def test_a_deleted_ticket_is_no_longer_found(tickets: TicketsTable) -> None:
+    """Sprawdza, czy po usunięciu wątku jednego z dwóch zgłoszeń wyszukiwanie komunikatu oddaje
+    już tylko drugie, a usunięcie numeru, którego w tabeli nie ma, nie jest błędem.
+
+    Wyłapuje usuwanie, którego baza nie przyjmuje albo które kasuje nie ten wiersz: wątek
+    zgłoszenia, którego karta odpadła przy ponownym zamknięciu, dalej wracałby w szukaniu."""
+    first, second = (row.ticket_id for row in ROWS)
+
+    await tickets.delete([first, "99999"])
+
+    found = await tickets.substring("skomunikować z serwerem")
+
+    assert found == [second]
+
+
 async def test_writing_the_same_tickets_twice_duplicates_nothing(tickets: TicketsTable) -> None:
     """Sprawdza, czy drugi zapis tych samych dwóch zgłoszeń niczego nie dokłada: po nim
     wyszukiwanie komunikatu nadal oddaje dokładnie dwa numery.

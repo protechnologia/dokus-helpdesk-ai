@@ -947,6 +947,39 @@ async def test_read_with_an_unrecognised_body_fails_with_our_message() -> None:
         await collection.read_by_id(["33644"])
 
 
+# --- delete -------------------------------------------------------------------------------
+
+async def test_ticket_delete_asks_by_point_ids_and_waits() -> None:
+    """Sprawdza, czy usunięcie zgłoszenia „33644" wysyła `POST` na ścieżkę usuwania punktów,
+    z identyfikatorem punktu wyliczonym z tego numeru i z parametrem `wait=true`.
+
+    Wyłapuje usuwanie po samym numerze zgłoszenia (pod takim identyfikatorem punktu nie ma, więc
+    karta odrzucona przy ponownym zamknięciu zostałaby w indeksie) albo bez czekania na wykonanie:
+    trasa oddałaby wynik, zanim karta zniknęła."""
+    seen: list = []
+    collection = _collection(TicketsCollection, capturing(seen))
+
+    await collection.delete(["33644"])
+
+    call = seen[-1]
+
+    assert (call["method"], call["path"]) == ("POST", f"{PATH_POINTS}/delete")
+    assert call["params"]["wait"]         == "true"
+    assert call["body"]                   == {"points": [point_id_for("33644")]}
+
+
+async def test_delete_of_nothing_sends_nothing() -> None:
+    """Sprawdza, czy usunięcie pustej listy zgłoszeń nie wysyła do Qdranta żadnego żądania.
+
+    Wyłapuje żądanie z pustą listą punktów: Qdrant przyjmuje je różnie zależnie od wersji, a nie
+    ma po co go wysyłać."""
+    seen: list = []
+
+    await _collection(TicketsCollection, capturing(seen)).delete([])
+
+    assert seen == []
+
+
 # --- awarie i zamknięcie ------------------------------------------------------------------
 
 @pytest.mark.parametrize("kind, vectors", COLLECTIONS)

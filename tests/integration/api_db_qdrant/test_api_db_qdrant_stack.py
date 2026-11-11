@@ -227,6 +227,22 @@ async def test_tickets_read_back_in_the_order_asked_and_without_the_missing(
     assert [point.ticket_id for point in points] == ["10718", "33644"]
 
 
+async def test_a_deleted_ticket_is_gone_and_the_others_stay(tickets: TicketsCollection) -> None:
+    """Sprawdza, czy usunięcie zgłoszenia „33644" z kolekcji dwóch zgłoszeń zostawia jedno,
+    „10718", a usunięcie numeru, którego w kolekcji nie ma, nie jest błędem.
+
+    Wyłapuje usuwanie, którego prawdziwy Qdrant nie przyjmuje albo które kasuje nie ten punkt:
+    karta odrzucona przy ponownym zamknięciu zgłoszenia zostałaby w wynikach wyszukiwania."""
+    await tickets.ensure()
+    await tickets.upsert([_ticket_point("33644"), _ticket_point("10718")])
+
+    await tickets.delete(["33644", "99999"])
+
+    points = await tickets.read_by_id(["33644", "10718"])
+
+    assert [point.ticket_id for point in points] == ["10718"]
+
+
 async def test_reupserting_the_same_ticket_overwrites_it(tickets: TicketsCollection) -> None:
     """Sprawdza, czy to samo zgłoszenie zapisane dwa razy, za drugim razem z innymi wektorami,
     zostaje w kolekcji jako jeden punkt.

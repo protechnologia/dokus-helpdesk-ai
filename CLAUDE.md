@@ -163,7 +163,8 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
   to zanonimizowany wątek w indeksie tekstowym (p. 53), nigdy w wektorze
 - **Nie kasuj i nie nadpisuj plików w `data/unsafe/corpus/cards/`, `corpus/anonymized/`
   i `data/unsafe/golden/cards/`** — to niepowtarzalny wynik przebiegu LLM i anonimizatora; nowe
-  karty golden setu zastępują swoje dopiero po przyjęciu
+  karty golden setu zastępują swoje dopiero po przyjęciu. Jedyny wyjątek: ponowne zamknięcie
+  zgłoszenia nadpisuje jego pliki w korpusie (p. 30)
 - **Nie filtruj korpusu po `status = 'zamkniety'`** — Dokus kończy zgłoszenia na `rozwiazany`,
   `zamkniety` ma 5 sztuk na 1825
 - **Nie szukaj rozwiązań w tabeli `rozwiazanie`** — jest martwa; rozwiązanie to `komentarz`
@@ -654,6 +655,16 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   w `raw-*`; indeksy odbudowują się z `cards/` i `anonymized/`. Jeden katalog, a nie katalog na
   model, bo karty dopisują się miesiącami, a model w `.env` może się zmienić. Karty i wątki
   golden setu leżą osobno, w `data/unsafe/golden/`.
+- **Zamknięte zgłoszenie dokłada do korpusu `ClosedTicketIndexer`
+  (`core_service/indexer_closed_ticket.py`, p. 30).** Najpierw zapisuje trzy pliki: surowe
+  zgłoszenie do `raw-route/`, wątek po anonimizacji do `anonymized/` i kartę do `cards/`,
+  kartę na końcu. Potem filtr jakości: kartę przyjętą dokłada do Qdranta, a jej wątek do tabeli
+  wątków; odrzuconą usuwa z obu, bo zgłoszenie zamknięte ponownie mogło tam stać z poprzednią
+  kartą. Pliki odrzuconej karty zostają, bo zmieniony filtr może ją kiedyś przyjąć. Pliki idą
+  pierwsze, bo są źródłem prawdy: gdy Qdrant albo Postgres padnie, `helpdesk tickets reindex`
+  odbuduje indeks. Ponowne zamknięcie nadpisuje wszystkie trzy pliki (decyzja 2026-11-11):
+  nowszy wątek jest pełniejszy, a karta kosztuje grosze. Cena: poprzedniej karty nie da się
+  odzyskać.
 
 #### Zakres korpusu: wyłącznie moduł Dokus
 
@@ -1976,7 +1987,10 @@ Osoby i adresy idą osobnymi wywołaniami: wspólne kosztowało na próbce korpu
   (`TicketHit`, `DocHit`) nie ma wektorów, a ma podobieństwo, więc `score` jest w nim zawsze.
   Cena: z odczytem wracają wektory, których wołający zwykle nie potrzebuje. Kolekcja dokumentacji
   odczytu po identyfikatorze nie ma: z `section_id` nie da się policzyć, ile sekcja ma punktów,
-  a jej treść czyta się z Postgresa.
+  a jej treść czyta się z Postgresa. Kolekcja zgłoszeń usuwa też punkty po numerach
+  (`delete()`, 2026-11-11): tak wypada karta zgłoszenia zamkniętego ponownie, która odpadła
+  w filtrze. Numer, którego nie ma, nie jest błędem, a tabela wątków w Postgresie ma
+  `delete()` o tej samej umowie.
 - **Kolekcja dokumentacji: punkt to fragment sekcji, z jednym nazwanym wektorem `section`
   i opisem sekcji z metryczki w payloadzie, bez treści** — treść leży w Postgresie. Nazwa kolekcji
   to `QDRANT_DOCS_COLLECTION`. Sekcja ma tyle punktów, na ile fragmentów pocięto jej treść
@@ -3838,6 +3852,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/transport/`            | test klienta HTTP: `with_transport()`, `always()`, `routed()`, `capturing()`, `raising()` |
 | `tests/_helpers/anonymization/`        | anonimizacja: zmyślone zgłoszenie z danymi osobowymi i jego postać po anonimizacji, fragmenty, których nie wolno zobaczyć w logach (`SENSITIVE`), klient usługi `anonymizer` na atrapie transportu (`anonymizer_client_on()`), odpowiedź usługi (`service_answer()`) i sprawdzenie, czy anonimizator przyjmuje wynik atrapy silnika (`accepts_the_fake_engine()`) |
 | `tests/_helpers/postgres/`             | narzędzie na prawdziwej tabeli z podmienionym klientem (`ScriptedPostgres`), także liczenie wierszy albo jego błąd (`count_error`) |
+| `tests/_helpers/tickets_index/`        | indekser zgłoszeń i serwis zamkniętego zgłoszenia: atrapy embeddera, kolekcji zgłoszeń i tabeli wątków (`FakeEmbedder`, `FakeTickets`, `FakeThreads`), serwis na nich (`closed_ticket_indexer_on()`); próbki zamkniętego zgłoszenia w `samples.py` |
 | `tests/_helpers/instance/`             | stan instancji: serwis liczący indeksy na atrapach Qdranta i Postgresa (`scripted_inspector()`, `inspector_on()`, klienci `counting_*` i `failing_*`), aplikacja z podanym serwisem (`app_with_inspector()`); próbki `sample_*()` w `samples.py` — raport stanu, paczka kodu, konfiguracja modelu |
 | `tests/_helpers/embedding/`            | embedding: nazwy modeli testowych (`EMBEDDING_MODEL`, `OTHER_MODEL`), odpowiedź usługi `embedder` w kształcie kontraktu (`embedder_answer()`) i payload punktu Qdranta z nazwą modelu (`with_model()`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |

@@ -3,18 +3,17 @@ from pathlib import Path
 
 import pytest
 
+from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_service.indexer_tickets import EMBED_BATCH_SIZE, TicketsIndexer
 from app.db_qdrant import (
     VECTOR_PROBLEM,
     VECTOR_STS,
     QdrantClient,
-    TicketPoint,
     TicketsCollection,
 )
-from app.engine_embedding import EmbeddingConfigError, Embeddings
+from app.engine_embedding import EmbeddingConfigError
 from tests._helpers.embedding import EMBEDDING_MODEL, OTHER_MODEL
-
-VECTOR_SIZE = 4
+from tests._helpers.tickets_index import VECTOR_SIZE, FakeEmbedder, FakeTickets
 
 VALID_TICKET = {
     "ticket_id":                     "33644",
@@ -32,174 +31,6 @@ VALID_TICKET = {
     "useful":                        True,
     "useful_reason":                 "Wątek podaje przyczynę i rozwiązanie.",
 }
-
-
-class FakeEmbedder:
-    """
-    Description:
-    Zastępuje `EmbeddingClient`: oddaje wektor na tekst z nazwą modelu i zapisuje, w którym
-    TRYBIE poszła każda paczka.
-
-    Stub, a nie atrapa z produkcji: `FakeEncoder` stoi po drugiej stronie HTTP, w usłudze
-    `embedder`, więc klient nie ma własnej wersji offline. Liczy się tu, że indeksacja woła
-    passage i sts osobno — zamiany jednego z drugim nie widać po fakcie, bo oba wektory dalej
-    wyglądają poprawnie.
-    """
-
-    def __init__(
-        self,
-        sts_model: str = EMBEDDING_MODEL,  # np. "inny-model" — gdy test zmienia model w trybie sts
-    ) -> None:
-        """
-        Description:
-        Buduje stub z pustymi zapisami wywołań. Tryb passage oddaje zawsze `EMBEDDING_MODEL`,
-        a tryb sts model podany tutaj.
-
-        Example args:
-            sts_model="model-testowy"
-
-        Example result:
-            FakeEmbedder z pustymi `passage_batches` i `sts_batches`
-        """
-        self.passage_batches: list[list[str]] = []
-        self.sts_batches:     list[list[str]] = []
-        self.closed     = False
-        self._sts_model = sts_model
-
-    async def embed_passage(
-        self,
-        texts: list[str],  # np. ["Wysyłka przez ePUAP…"]
-    ) -> Embeddings:
-        """
-        Description:
-        Zapisuje paczkę i oddaje rozpoznawalny wektor na każdy tekst.
-
-        Example args:
-            texts=["Wysyłka przez ePUAP…"]
-
-        Example result:
-            Embeddings(model="model-testowy", vectors=[[1.0, 1.0, 1.0, 1.0]])
-        """
-        self.passage_batches.append(texts)
-
-        return Embeddings(model=EMBEDDING_MODEL, vectors=[[1.0] * VECTOR_SIZE for _ in texts])
-
-    async def embed_sts(
-        self,
-        texts: list[str],  # np. ["Wysyłka przez ePUAP…"]
-    ) -> Embeddings:
-        """
-        Description:
-        Zapisuje paczkę i oddaje wektor inny niż w trybie passage, żeby zamienioną parę było
-        widać w asercjach.
-
-        Example args:
-            texts=["Wysyłka przez ePUAP…"]
-
-        Example result:
-            Embeddings(model="model-testowy", vectors=[[2.0, 2.0, 2.0, 2.0]])
-        """
-        self.sts_batches.append(texts)
-
-        return Embeddings(model=self._sts_model, vectors=[[2.0] * VECTOR_SIZE for _ in texts])
-
-    async def aclose(self) -> None:
-        """
-        Description:
-        Zapisuje, że stub został zamknięty.
-
-        Example args:
-            (brak)
-
-        Example result:
-            None
-        """
-        self.closed = True
-
-
-class FakeTickets:
-    """
-    Description:
-    Zastępuje `TicketsCollection`: zapisuje wywołania cyklu życia i każdy zapisany punkt.
-
-    Z tego samego powodu co `FakeEmbedder`: prawdziwy klient przekracza granicę procesu, a ten
-    plik sprawdza KOLEJNOŚĆ i TREŚĆ tego, co robi indekser, a nie to, czy Qdrant to zapisze —
-    to sprawdza `stack_qdrant`.
-    """
-
-    def __init__(self) -> None:
-        """
-        Description:
-        Buduje stub z pustymi zapisami.
-
-        Example args:
-            (brak)
-
-        Example result:
-            FakeTickets zapisujący do `calls` i `points`
-        """
-        self.calls:  list[str]         = []
-        self.points: list[TicketPoint] = []
-        self.name = "tickets"
-
-    async def ensure(self) -> bool:
-        """
-        Description:
-        Zapisuje wywołanie.
-
-        Example args:
-            (brak)
-
-        Example result:
-            True
-        """
-        self.calls.append("ensure")
-
-        return True
-
-    async def upsert(self, points: list[TicketPoint]) -> int:
-        """
-        Description:
-        Zapisuje paczkę i zgłasza ją jako zapisaną.
-
-        Example args:
-            points=[TicketPoint(point_id="df3b…", …)]
-
-        Example result:
-            1
-        """
-        self.calls.append(f"upsert:{len(points)}")
-        self.points.extend(points)
-
-        return len(points)
-
-    async def drop(self) -> bool:
-        """
-        Description:
-        Zapisuje wywołanie.
-
-        Example args:
-            (brak)
-
-        Example result:
-            True
-        """
-        self.calls.append("drop")
-
-        return True
-
-    async def aclose(self) -> None:
-        """
-        Description:
-        Zapisuje wywołanie.
-
-        Example args:
-            (brak)
-
-        Example result:
-            None
-        """
-        self.calls.append("aclose")
 
 
 def _write(directory: Path, ticket_id: str, **overrides: object) -> None:
@@ -370,6 +201,35 @@ async def test_large_corpus_is_embedded_in_batches(tmp_path: Path) -> None:
     assert report.indexed == count
     assert len(embedder.passage_batches) > 1
     assert sum(len(batch) for batch in embedder.passage_batches) == count
+
+
+async def test_add_writes_the_given_cards_without_reading_a_directory() -> None:
+    """Sprawdza, czy `add()` z jedną kartą zakłada kolekcję, gdy jej nie ma, i zapisuje dokładnie
+    ten jeden punkt, bez czytania żadnego katalogu, a jako wynik oddaje 1.
+
+    Wyłapuje dokładanie, które pomija zakładanie kolekcji albo gubi kartę: pierwsze zamknięte
+    zgłoszenie na świeżej instancji kończyłoby się błędem brakującej kolekcji, a karta
+    nie trafiałaby do wyszukiwania."""
+    tickets = FakeTickets()
+
+    written = await _indexer(FakeEmbedder(), tickets).add([ParsedTicket(**VALID_TICKET)])
+
+    assert written == 1
+    assert tickets.calls == ["ensure", "upsert:1"]
+    assert [point.ticket_id for point in tickets.points] == ["33644"]
+
+
+async def test_remove_deletes_the_given_numbers() -> None:
+    """Sprawdza, czy `remove()` zakłada kolekcję, gdy jej nie ma, i usuwa punkty o podanych
+    numerach, niczego nie zapisując.
+
+    Wyłapuje usuwanie, które pomija podane numery albo zapisuje zamiast usuwać: karta odrzucona przy
+    ponownym zamknięciu zgłoszenia zostałaby w wynikach wyszukiwania."""
+    tickets = FakeTickets()
+
+    await _indexer(FakeEmbedder(), tickets).remove(["33644"])
+
+    assert tickets.calls == ["ensure", "delete:33644"]
 
 
 async def test_rebuild_drops_the_collection_first(tmp_path: Path) -> None:

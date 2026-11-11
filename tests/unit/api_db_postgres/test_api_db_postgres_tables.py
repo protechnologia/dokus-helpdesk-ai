@@ -360,6 +360,35 @@ async def test_tickets_are_read_by_their_numbers() -> None:
     assert "ticket_id = ANY($1::text[])" in sql and "array_position($1::text[], ticket_id)" in sql
 
 
+async def test_tickets_are_deleted_by_their_numbers_in_one_statement() -> None:
+    """Sprawdza, czy usunięcie wątków dwóch zgłoszeń wysyła do bazy jedno polecenie `DELETE`
+    z oboma numerami jako jedną listą, po kolumnie numeru zgłoszenia.
+
+    Wyłapuje usuwanie po złej kolumnie albo numerami wklejonymi w tekst polecenia: wątek
+    zgłoszenia, którego karta odpadła, zostałby w wyszukiwaniu tekstowym, a numer w treści SQL-a
+    otwiera drogę do wstrzyknięcia."""
+    client = StubClient()
+
+    await TicketsTable(client).delete(["90011", "90012"])
+
+    sql, ids = client.calls[0]
+
+    assert sql.startswith("DELETE FROM")
+    assert "ticket_id = ANY($1::text[])" in sql
+    assert ids == ["90011", "90012"]
+
+
+async def test_deleting_no_tickets_sends_nothing() -> None:
+    """Sprawdza, czy usunięcie pustej listy zgłoszeń nie wysyła do bazy żadnego polecenia.
+
+    Wyłapuje zbędne polecenie przy każdym wywołaniu bez numerów: każde to podróż do bazy."""
+    client = StubClient()
+
+    await TicketsTable(client).delete([])
+
+    assert client.calls == []
+
+
 async def test_sections_are_listed_in_the_order_of_the_documents() -> None:
     """Sprawdza, czy spis sekcji dokumentacji prosi bazę o kolejność: dokument, wydanie, miejsce
     sekcji w dokumencie, i oddaje wiersz z bazy bez zmian.
