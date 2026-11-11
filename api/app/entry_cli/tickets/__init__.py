@@ -1,7 +1,7 @@
 """
 Description:
-Obszar `helpdesk tickets` — sparsowane zgłoszenia: sprawdzenie artefaktów i zbudowanie z nich
-indeksu, w którym agent szuka podobnych spraw. Importuj stąd
+Obszar `helpdesk tickets` — korpus zgłoszeń: sprawdzenie kart i zbudowanie z korpusu obu
+indeksów, w których agent szuka podobnych spraw (kolekcja kart, tabela wątków). Importuj stąd
 (`from app.entry_cli.tickets import tickets`).
 
 Do czego:
@@ -10,11 +10,14 @@ indeksacji leży w `common.py`. Parsowanie zgłoszeń do korpusu dojdzie z masow
 (p. 31). Tutaj tylko obiekt Typer i rejestracja — moduły komend nie importują obiektu z pakietu,
 więc nie ma cyklu importów.
 
-| komenda                     | plik          | co robi                                          |
-|-----------------------------|---------------|--------------------------------------------------|
-| `tickets validate <kat.>`   | `validate.py` | artefakty wobec ParsedTicket; kod 1 = błędy      |
-| `tickets index <katalog>`   | `index.py`    | dokłada artefakty, nadpisując punkty tych samych |
-| `tickets reindex <katalog>` | `reindex.py`  | kasuje kolekcję i buduje od zera (pyta)          |
+Argumentem każdej komendy jest katalog korpusu (`cards/`, `anonymized/`); bez niego korpus
+z `TICKETS_CORPUS_DIR`.
+
+| komenda                       | plik          | co robi                                          |
+|-------------------------------|---------------|--------------------------------------------------|
+| `tickets validate [<korpus>]` | `validate.py` | karty wobec ParsedTicket; kod 1 = błędy          |
+| `tickets index [<korpus>]`    | `index.py`    | dokłada karty i wątki, nadpisując te same numery |
+| `tickets reindex [<korpus>]`  | `reindex.py`  | kasuje oba indeksy i buduje od zera (pyta)       |
 """
 
 import typer
@@ -22,7 +25,7 @@ import typer
 from app.entry_cli.tickets import index, reindex, validate
 
 tickets = typer.Typer(
-    help            = "Sparsowane zgłoszenia z data/unsafe/corpus/cards/: walidacja i indeks.",
+    help            = "Korpus zgłoszeń (data/unsafe/corpus/): walidacja kart i indeksy.",
     no_args_is_help = True,
 )
 

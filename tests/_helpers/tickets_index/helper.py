@@ -8,10 +8,11 @@ kolejność i treść tego, co serwis robi, bez usług.
 |----------------|---------------------|-----------------------------------------------------|
 | `FakeEmbedder` | `EmbeddingClient`   | paczki tekstów w trybie passage i sts               |
 | `FakeTickets`  | `TicketsCollection` | wywołania (`ensure`, `upsert`, `delete`…) i punkty  |
-| `FakeThreads`  | `TicketsTable`      | wywołania (`create`, `upsert`, `delete`…) i wiersze |
+| `FakeThreads`  | `TicketsTable`      | wywołania (`create`, `upsert`, `drop`…) i wiersze   |
 
-`closed_ticket_indexer_on()` składa na nich serwis zamkniętego zgłoszenia, z prawdziwym
-indekserem kart pomiędzy. Do testów trasy `POST /tickets/closed`: `ReplacingAnonymizer`, który
+`tickets_indexer_on()` składa na nich prawdziwy indekser zgłoszeń, `closed_ticket_indexer_on()`
+— serwis zamkniętego zgłoszenia na takim indekserze, a `write_card()` i `write_thread()` kładą
+kartę i wątek w korpusie testu. Do testów trasy `POST /tickets/closed`: `ReplacingAnonymizer`, który
 zamienia jeden fragment na znaczniki (po nim widać, który wątek trafił do korpusu),
 `card_graph()` — graf karty z atrapą modelu i prawdziwym węzłem `respond` — oraz
 `app_closing_tickets()`, aplikacja z atrapą bramki, tym grafem karty i podanym serwisem.
@@ -297,6 +298,19 @@ class FakeThreads:
         """
         self.calls.append(f"delete:{','.join(ticket_ids)}")
 
+    async def drop(self) -> None:
+        """
+        Description:
+        Zapisuje wywołanie.
+
+        Example args:
+            (brak)
+
+        Example result:
+            None
+        """
+        self.calls.append("drop")
+
     async def aclose(self) -> None:
         """
         Description:
@@ -311,6 +325,77 @@ class FakeThreads:
         self.calls.append("aclose")
 
 
+def tickets_indexer_on(
+    tickets:  FakeTickets,                # np. FakeTickets()
+    threads:  FakeThreads | None = None,  # np. FakeThreads() — gdy test patrzy na tabelę wątków
+    embedder: FakeEmbedder | None = None,  # np. FakeEmbedder() — gdy test patrzy na embedder
+) -> TicketsIndexer:
+    """
+    Description:
+    Buduje prawdziwy indekser zgłoszeń na atrapach embeddera, kolekcji i tabeli wątków. Atrapę,
+    której test nie podał, indekser dostaje świeżą.
+
+    Example args:
+        tickets=FakeTickets()
+        threads=None
+        embedder=None
+
+    Example result:
+        TicketsIndexer zapisujący do podanej atrapy kolekcji
+    """
+    indexer = TicketsIndexer(
+        embedder = embedder if embedder is not None else FakeEmbedder(),
+        tickets  = tickets,
+        threads  = threads if threads is not None else FakeThreads(),
+    )
+
+    return indexer
+
+
+def write_card(
+    root: Path,          # np. tmp_path — katalog korpusu testu
+    card: ParsedTicket,  # np. sample_card(ticket_id="1")
+) -> None:
+    """
+    Description:
+    Zapisuje kartę w `cards/` korpusu testu, pod jej numerem, tak jak robi to korpus.
+
+    Example args:
+        root=Path("/tmp/pytest-0/korpus")
+        card=sample_card(ticket_id="1")
+
+    Example result:
+        None — plik `cards/1.json` leży na dysku
+    """
+    path = TicketsCorpus(root=root).cards_dir / f"{card.ticket_id}.json"
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(card.model_dump_json(), encoding="utf-8")
+
+
+def write_thread(
+    root:      Path,            # np. tmp_path — katalog korpusu testu
+    ticket_id: str,             # np. "1"
+    thread:    AnonymizedText,  # np. sample_thread("1")
+) -> None:
+    """
+    Description:
+    Zapisuje wątek po anonimizacji w `anonymized/` korpusu testu, pod numerem zgłoszenia.
+
+    Example args:
+        root=Path("/tmp/pytest-0/korpus")
+        ticket_id="1"
+        thread=sample_thread("1")
+
+    Example result:
+        None — plik `anonymized/1.txt` leży na dysku
+    """
+    path = TicketsCorpus(root=root).anonymized_dir / f"{ticket_id}.txt"
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(thread.text, encoding="utf-8")
+
+
 def closed_ticket_indexer_on(
     root:    Path,         # np. tmp_path — katalog korpusu testu
     tickets: FakeTickets,  # np. FakeTickets()
@@ -318,8 +403,8 @@ def closed_ticket_indexer_on(
 ) -> ClosedTicketIndexer:
     """
     Description:
-    Buduje serwis zamkniętego zgłoszenia na katalogu korpusu testu, z prawdziwym indekserem kart
-    stojącym na atrapach embeddera i kolekcji oraz z atrapą tabeli wątków.
+    Buduje serwis zamkniętego zgłoszenia na katalogu korpusu testu, z prawdziwym indekserem
+    zgłoszeń stojącym na atrapach embeddera, kolekcji i tabeli wątków.
 
     Example args:
         root=Path("/tmp/pytest-0/korpus")
@@ -331,8 +416,7 @@ def closed_ticket_indexer_on(
     """
     indexer = ClosedTicketIndexer(
         corpus  = TicketsCorpus(root=root),
-        cards   = TicketsIndexer(embedder=FakeEmbedder(), tickets=tickets),
-        threads = threads,
+        indexer = tickets_indexer_on(tickets, threads),
     )
 
     return indexer

@@ -10,14 +10,14 @@ from app.entry_cli.tickets import tickets
 # Obszar to pakiet w `entry_cli/`, czynność to plik w nim:
 # `helpdesk tickets index` → `entry_cli/tickets/index.py`.
 #
-# | komenda                   | plik                  | co robi                          |
-# |---------------------------|-----------------------|----------------------------------|
-# | `version`                 | `cli.py`              | wersja pakietu; smoke test CLI   |
-# | `tickets validate <kat.>` | `tickets/validate.py` | artefakty wobec ParsedTicket     |
-# | `tickets index <kat.>`    | `tickets/index.py`    | artefakty do kolekcji Qdranta    |
-# | `tickets reindex <kat.>`  | `tickets/reindex.py`  | kolekcja zgłoszeń od zera        |
-# | `docs validate <kat.>`    | `docs/validate.py`    | paczka dokumentacji wobec plików |
-# | `docs index <kat.>`       | `docs/index.py`       | indeks dokumentacji od zera      |
+# | komenda                       | plik                  | co robi                          |
+# |-------------------------------|-----------------------|----------------------------------|
+# | `version`                     | `cli.py`              | wersja pakietu; smoke test CLI   |
+# | `tickets validate [<korpus>]` | `tickets/validate.py` | karty korpusu wobec ParsedTicket |
+# | `tickets index [<korpus>]`    | `tickets/index.py`    | karty i wątki do obu indeksów    |
+# | `tickets reindex [<korpus>]`  | `tickets/reindex.py`  | indeksy zgłoszeń od zera         |
+# | `docs validate <kat.>`        | `docs/validate.py`    | paczka dokumentacji wobec plików |
+# | `docs index <kat.>`           | `docs/index.py`       | indeks dokumentacji od zera      |
 #
 # Grafów (wyszukiwanie, propozycje, bramki, „Popraw") CLI nie uruchamia — robią to trasy API.
 #

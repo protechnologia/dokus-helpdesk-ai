@@ -29,22 +29,25 @@ VALID_TICKET = {
 def _write(directory: Path, name: str, payload: dict) -> None:
     """
     Description:
-    Writes one artifact file into the directory under test.
+    Zapisuje jeden plik karty w `cards/` badanego korpusu.
 
     Example args:
-        directory=Path("/tmp/x")
+        directory=Path("/tmp/x")  # korpus; plik trafia do /tmp/x/cards/
         name="ok.json"
         payload={"ticket_id": "33644", …}
 
     Example result:
-        None — the file exists on disk
+        None — plik leży na dysku
     """
-    (directory / name).write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    cards = directory / "cards"
+    cards.mkdir(exist_ok=True)
+
+    (cards / name).write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 
 def test_valid_directory_exits_zero(tmp_path: Path) -> None:
-    """Sprawdza, czy `helpdesk tickets validate` na katalogu z jednym poprawnym plikiem zgłoszenia
-    kończy się kodem 0 i wypisuje podsumowanie: sprawdzono 1, błędnych 0.
+    """Sprawdza, czy `helpdesk tickets validate` na korpusie z jednym poprawnym plikiem karty
+    w `cards/` kończy się kodem 0 i wypisuje podsumowanie: sprawdzono 1, błędnych 0.
 
     Wyłapuje komendę, która zgłasza błąd przy poprawnych plikach albo nie mówi, ile ich
     sprawdziła — przebieg, który niczego nie przeczytał, wyglądałby wtedy tak samo jak udany."""
@@ -65,8 +68,7 @@ def test_without_a_directory_the_corpus_cards_are_checked(
     Wyłapuje komendę, która bez argumentu patrzy gdzie indziej niż indeksacja, np. w dawne
     `data/unsafe/parsed`: walidacja przechodziłaby na pustym miejscu, a indeks budowałby się
     z kart, których nikt nie sprawdził."""
-    (tmp_path / "cards").mkdir()
-    _write(tmp_path / "cards", "ok.json", VALID_TICKET)
+    _write(tmp_path, "ok.json", VALID_TICKET)
     monkeypatch.setenv("TICKETS_CORPUS_DIR", str(tmp_path))
 
     result = runner.invoke(cli, ["tickets", "validate"])

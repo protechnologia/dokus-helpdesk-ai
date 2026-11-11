@@ -15,13 +15,13 @@ GENERUJĄCEGO — KAŻDE ZGŁOSZENIE TO PŁATNE WYWOŁANIE:
     python scripts/parse_golden_tickets.py parse <nowy katalog kart>
 
     # cały zestaw, 4 naraz:
-    python scripts/parse_golden_tickets.py parse data/unsafe/golden/cards-gpt-6.1-sol-v3
+    python scripts/parse_golden_tickets.py parse data/unsafe/golden-gpt-6.1-sol-v3/cards
 
     # próba na dwóch zgłoszeniach: to samo z `--limit 2`
 
 Przykład wyjścia (zmyślone liczby):
 
-    Zgłoszeń: 200, już sparsowanych: 0, do zrobienia: 200 → data/unsafe/golden/cards-gpt-6.1-sol-v3
+    Zgłoszeń: 200, już sparsowanych: 0, do zrobienia: 200 → data/unsafe/golden-gpt-6.1-sol-v3/cards
      10/200  błędów: 0  koszt: 0.0812 USD
      20/200  błędów: 1  koszt: 0.1655 USD
     …
@@ -48,6 +48,9 @@ O czym pamiętać:
   po jego zmianie.
 - Przyjęte karty zastępują `data/unsafe/golden/cards/` ręcznie, po porównaniu pomiarów na obu
   katalogach; skrypt katalogu odniesienia nie rusza.
+- Katalog wyjściowy to `cards/` w osobnym katalogu korpusu (np.
+  `data/unsafe/golden-gpt-6.1-sol-v3/cards`), bo komendy `helpdesk tickets` biorą katalog
+  korpusu: indeks do pomiaru buduje `helpdesk tickets reindex data/unsafe/golden-gpt-6.1-sol-v3`.
 - Adres usługi `anonymizer` w `.env` to nazwa z sieci compose; z hosta skrypt woła ją pod
   `--anonymizer-url`.
 - Błąd konfiguracji (model, klucz, anonimizator na atrapie silnika) zatrzymuje cały przebieg;
@@ -135,7 +138,7 @@ def golden_tickets(
 
 def wanted_ids(
     all_ids: list[str],     # np. ["10012", "10170"]
-    out_dir: pathlib.Path,  # np. Path("data/unsafe/golden/cards-gpt-6.1-sol-v3")
+    out_dir: pathlib.Path,  # np. Path("data/unsafe/golden-gpt-6.1-sol-v3/cards")
     limit:   int | None,    # np. 2 — próba na początku listy; None znaczy wszystkie
 ) -> tuple[list[str], int, int]:
     """
@@ -146,7 +149,7 @@ def wanted_ids(
 
     Example args:
         all_ids=["10012", "10170", …]
-        out_dir=Path("data/unsafe/golden/cards-gpt-6.1-sol-v3")
+        out_dir=Path("data/unsafe/golden-gpt-6.1-sol-v3/cards")
         limit=None
 
     Example result:
@@ -164,7 +167,7 @@ def wanted_ids(
 async def parse_all(
     ticket_ids:     list[str],     # np. ["10012", "10170"]
     raw_dir:        pathlib.Path,  # np. Path("data/unsafe/golden/raw")
-    out_dir:        pathlib.Path,  # np. Path("data/unsafe/golden/cards-gpt-6.1-sol-v3")
+    out_dir:        pathlib.Path,  # np. Path("data/unsafe/golden-gpt-6.1-sol-v3/cards")
     anonymizer_url: str,           # np. "http://localhost:8002"
     concurrency:    int,           # np. 4
 ) -> tuple[int, list[tuple[str, str]], float]:
@@ -176,7 +179,7 @@ async def parse_all(
     Example args:
         ticket_ids=["10012", "10170"]
         raw_dir=Path("data/unsafe/golden/raw")
-        out_dir=Path("data/unsafe/golden/cards-gpt-6.1-sol-v3")
+        out_dir=Path("data/unsafe/golden-gpt-6.1-sol-v3/cards")
         anonymizer_url="http://localhost:8002"
         concurrency=4
 
@@ -281,7 +284,7 @@ def parse(
     błędów na końcu. Kończy się kodem 1, gdy któreś zgłoszenie się nie udało.
 
     Example args:
-        out_dir=Path("data/unsafe/golden/cards-gpt-6.1-sol-v3")
+        out_dir=Path("data/unsafe/golden-gpt-6.1-sol-v3/cards")
         golden=Path("data/unsafe/golden/tickets.json")
         raw_dir=Path("data/unsafe/golden/raw")
         anonymizer_url="http://localhost:8002"

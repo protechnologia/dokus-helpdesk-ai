@@ -7,7 +7,7 @@ class TicketsIndexReport(BaseModel):
     """
     Description:
     Co zrobił jeden przebieg indeksacji zgłoszeń: ile artefaktów wczytał, ile odrzucił filtr
-    jakości i dlaczego, i ile punktów trafiło do Qdranta.
+    jakości i dlaczego, ile punktów trafiło do Qdranta i ile wątków do tabeli wątków.
 
     Do czego:
     Przebieg indeksacji to jedyna chwila, w której na korpus patrzy się jako na całość, więc musi
@@ -22,6 +22,9 @@ class TicketsIndexReport(BaseModel):
 
     read:     int           = Field(examples=[200])
     indexed:  int           = Field(examples=[171])
+    # Ile wątków kart przyjętych trafiło do tabeli wątków; `None`, gdy korpus nie ma katalogu
+    # `anonymized/` (golden set) i tabela została bez zmian.
+    threads:  int | None    = Field(default=None, examples=[171])
     filtered: QualityReport = Field(default_factory=QualityReport)
     # Uwagi, które przebieg chce pokazać operatorowi — dziś kontrola odsetka odrzuceń, czyli
     # sposób, w jaki zamilkły filtr daje o sobie znać (`filter_ticket_quality.drop_rate_warning`).

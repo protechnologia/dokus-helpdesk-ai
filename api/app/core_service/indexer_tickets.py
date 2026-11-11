@@ -1,17 +1,19 @@
 """
 Description:
-Indeksacja: z katalogu sparsowanych zgłoszeń (`data/unsafe/corpus/cards/`) buduje kolekcję
-Qdranta, po której w runtime szuka się podobnych zgłoszeń. Nie woła LLM-a — tylko embedder
-i Qdranta — więc indeks da się skasować i odbudować jedną komendą.
+Indeksacja zgłoszeń: z korpusu (`data/unsafe/corpus/`) buduje oba indeksy, w których agent szuka
+podobnych spraw — kolekcję kart w Qdrancie (szukanie po znaczeniu) i tabelę wątków w Postgresie
+(szukanie po słowach i odczyt wątku). Nie woła LLM-a, tylko embedder i obie bazy, więc indeksy da
+się skasować i odbudować jedną komendą.
 
-    data/unsafe/corpus/cards/*.json → filtr jakości → embedder (`problem` + `symptoms`) → Qdrant
+    cards/*.json ─→ filtr jakości ─┬─ embedder (`problem` + `symptoms`) ────────────→ Qdrant
+                                   └─ wątki kart przyjętych z anonymized/<numer>.txt → Postgres
 
-| metoda      | kto woła                     | co robi                                          |
-|-------------|------------------------------|--------------------------------------------------|
-| `build()`   | `tickets index <katalog>`    | dokłada artefakty, nadpisując punkty tych samych |
-| `rebuild()` | `tickets reindex <katalog>`  | kasuje kolekcję i buduje od zera                 |
-| `add()`     | zamknięte zgłoszenie (p. 30) | dokłada karty, które przeszły filtr              |
-| `remove()`  | zamknięte zgłoszenie (p. 30) | usuwa punkty o podanych numerach                 |
+| metoda      | kto woła                     | co robi                                            |
+|-------------|------------------------------|----------------------------------------------------|
+| `build()`   | `tickets index [<korpus>]`   | dokłada karty i wątki, nadpisując te same numery   |
+| `rebuild()` | `tickets reindex [<korpus>]` | kasuje kolekcję i tabelę wątków, buduje je od zera |
+| `add()`     | zamknięte zgłoszenie (p. 30) | dokłada jedną kartę i jej wątek                    |
+| `remove()`  | zamknięte zgłoszenie (p. 30) | usuwa punkty i wiersze o podanych numerach         |
 
 Przed — artefakt `data/unsafe/corpus/cards/33644.json`:
 
@@ -51,6 +53,15 @@ Co się dzieje po drodze:
 4. `id` punktu jest wyliczane z `ticket_id`, więc ponowna indeksacja nadpisuje punkt, zamiast
    go dublować.
 5. Cały artefakt jedzie w payloadzie — z niego powstaje później propozycja odpowiedzi.
+6. Wątek każdej karty przyjętej trafia do tabeli wątków jako wiersz: numer, data z karty, temat
+   z linii „Temat:” i cały wątek po anonimizacji. Wątki kart odrzuconych do tabeli nie idą.
+
+O czym pamiętać przy zmianach:
+
+- Korpus bez katalogu `anonymized/` (golden set, którego wątki są tylko surowe) buduje same
+  karty, a tabela wątków zostaje bez zmian — raport mówi to polem `threads` równym `None`.
+- Gdy `anonymized/` jest, każda karta musi mieć w nim swój wątek: brak to zepsuty korpus, więc
+  przebieg odmawia, zanim cokolwiek zapisze albo skasuje.
 """
 
 import logging
@@ -59,9 +70,12 @@ from pathlib import Path
 
 from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_model.tickets.quality_report import QualityReport
+from app.core_model.tickets.tickets_corpus import TicketsCorpus
 from app.core_model.tickets.tickets_index_report import TicketsIndexReport
 from app.core_service.filter_ticket_quality import drop_rate_warning, filter_tickets
+from app.db_postgres import TicketRow, TicketsTable
 from app.db_qdrant import TicketPoint, TicketsCollection
+from app.engine_anonymization import AnonymizedText
 from app.engine_embedding import EmbeddingClient, EmbeddingConfigError
 
 logger = logging.getLogger(__name__)
@@ -71,25 +85,33 @@ logger = logging.getLogger(__name__)
 # HTTP — model sam składa paczki wewnątrz i karmiony hurtem jest dużo szybszy.
 EMBED_BATCH_SIZE = 32
 
+# Ile numerów kart bez wątku wypisać w błędzie: dość, żeby znaleźć przyczynę, a nie całą listę.
+MAX_LISTED_MISSING = 10
+
 
 class TicketsIndexer:
     """
     Description:
-    Buduje indeks Qdranta ze sparsowanych artefaktów: odczyt, filtr, embedding, upsert.
+    Buduje oba indeksy zgłoszeń z korpusu: kolekcję kart w Qdrancie i tabelę wątków w Postgresie.
 
     Do czego:
-    Indeks jest pochodną, nigdy źródłem prawdy (zasada 8) — wszystko tutaj musi dać się odtworzyć
-    z `data/unsafe/corpus/cards/` jedną komendą i BEZ wołania LLM-a (zasada 7). Dlatego ten serwis
-    czyta artefakty z dysku i rozmawia wyłącznie z embedderem i Qdrantem.
+    Indeksy są pochodną, nigdy źródłem prawdy (zasada 8) — wszystko tutaj musi dać się odtworzyć
+    z `cards/` i `anonymized/` korpusu jedną komendą i BEZ wołania LLM-a (zasada 7). Dlatego ten
+    serwis czyta pliki z dysku i rozmawia wyłącznie z embedderem, Qdrantem i Postgresem. Oba
+    indeksy trzyma jeden serwis, jak `DocsIndexer` przy dokumentacji, bo wątek trafia do tabeli
+    tylko razem z kartą przyjętą przez filtr.
 
     Flow:
-        1. `build()` wczytuje każdy `*.json` z katalogu do `ParsedTicket`.
-        2. Filtr jakości dzieli je na zachowane i odrzucone, z powodem przy każdym odrzuceniu.
-        3. Zachowane zgłoszenia są embedowane paczkami — DWA RAZY, raz na named vector: `problem`
+        1. `build()` wczytuje każdy `*.json` z `cards/` do `ParsedTicket` i sprawdza, czy
+           `anonymized/` ma wątek każdej karty.
+        2. Filtr jakości dzieli karty na zachowane i odrzucone, z powodem przy każdym odrzuceniu.
+        3. Zachowane karty są embedowane paczkami — DWA RAZY, raz na named vector: `problem`
            w trybie passage (z nim porównywane jest zapytanie w runtime) i `sts` w trybie
-           symetrycznym.
-        4. Punkty idą upsertem; raport niesie liczby, powody i ewentualne ostrzeżenia.
-        5. `aclose()` zamyka połączenia, na których indekser stoi.
+           symetrycznym — i idą upsertem do kolekcji.
+        4. Wątki zachowanych kart idą do tabeli wątków; raport niesie liczby, powody
+           i ewentualne ostrzeżenia.
+        5. `add()` i `remove()` robią to samo dla jednego zgłoszenia, bez czytania katalogu.
+        6. `aclose()` zamyka połączenia, na których indekser stoi.
 
     Oba wektory budujemy celowo. Pomiar rozstrzygnął wyszukiwanie na korzyść `query→passage`,
     i na zapytaniach surowych (etap 3), i na sparsowanych (etap 4), więc wektora `sts` dziś nikt
@@ -101,60 +123,68 @@ class TicketsIndexer:
         self,
         embedder: EmbeddingClient,    # np. EmbeddingClient(base_url="http://embedder:8000")
         tickets:  TicketsCollection,  # np. TicketsCollection(QdrantClient(…), "tickets", 768)
+        threads:  TicketsTable,       # np. TicketsTable(PostgresClient(…))
     ):
         """
         Description:
-        Spina indekser z embedderem i kolekcją zgłoszeń. Oba są wstrzykiwane, a nie budowane
-        tutaj: domena nigdy nie sięga po własne SDK ani URL (zasada 4). Wymiar wektorów zna
-        kolekcja.
+        Spina indekser z embedderem, kolekcją zgłoszeń i tabelą wątków. Wszystkie są
+        wstrzykiwane, a nie budowane tutaj: domena nigdy nie sięga po własne SDK ani URL
+        (zasada 4). Wymiar wektorów zna kolekcja.
 
         Example args:
             embedder=EmbeddingClient(base_url="http://embedder:8000")
             tickets=TicketsCollection(QdrantClient(base_url="http://qdrant:6333"), "tickets", 768)
+            threads=TicketsTable(PostgresClient(…))
 
         Example result:
-            TicketsIndexer gotowy do zbudowania kolekcji `tickets`
+            TicketsIndexer gotowy do zbudowania kolekcji `tickets` i tabeli `tickets_text`
         """
         self._embedder = embedder
         self._tickets  = tickets
+        self._threads  = threads
 
     async def build(
         self,
-        directory: Path,  # np. Path("data/unsafe/corpus/cards")
+        corpus: TicketsCorpus,  # np. TicketsCorpus(root=Path("data/unsafe/corpus"))
     ) -> TicketsIndexReport:
         """
         Description:
-        Indeksuje katalog artefaktów do kolekcji i zwraca, co zrobił. Czyta się jak lista kroków;
-        szczegóły siedzą w prywatnych helperach niżej.
+        Indeksuje korpus: karty do kolekcji, a wątki kart przyjętych do tabeli wątków, i zwraca,
+        co zrobił. Czyta się jak lista kroków; szczegóły siedzą w prywatnych helperach niżej.
 
         Example args:
-            directory=Path("data/unsafe/corpus/cards")
+            corpus=TicketsCorpus(root=Path("data/unsafe/corpus"))
 
         Example result:
-            TicketsIndexReport(read=200, indexed=171, filtered=QualityReport(…), warnings=[])
+            TicketsIndexReport(read=200, indexed=171, threads=171, filtered=QualityReport(…))
 
         Raises:
-            NotADirectoryError: ścieżka nie istnieje albo nie jest katalogiem
+            NotADirectoryError: katalog kart nie istnieje albo nie jest katalogiem
+            FileNotFoundError: `anonymized/` jest, ale nie ma w nim wątku którejś karty
             DbQdrantConfigError: kolekcja ma punkty innego modelu embeddera
             DbQdrantError: Qdrant jest nieosiągalny albo odrzucił zapis
+            DbPostgresError: Postgres jest nieosiągalny albo odrzucił zapis
             EmbeddingConfigError: embedder zmienił model w trakcie przebiegu
             EmbeddingError: embedder jest nieosiągalny albo odpowiedział błędem
         """
-        tickets = self._read(directory)
-        report  = filter_tickets(tickets)
-        kept    = self._kept_tickets(tickets, report)
+        tickets      = self._read(corpus.cards_dir)
+        with_threads = self._has_threads(corpus, tickets)
+        report       = filter_tickets(tickets)
+        kept         = self._kept_tickets(tickets, report)
 
         await self._tickets.ensure()
         indexed = await self._upsert(kept)
+        threads = await self._upsert_threads(corpus, kept) if with_threads else None
 
-        # Same liczby: payloady niosą treść zgłoszeń, czyli dane klienta, którym miejsce najwyżej
-        # na DEBUG (CLAUDE.md -> „Logi i obserwowalność").
+        # Same liczby: payloady i wątki niosą treść zgłoszeń, czyli dane klienta, którym miejsce
+        # najwyżej na DEBUG (CLAUDE.md -> „Logi i obserwowalność").
         logger.info(
-            "index build collection=%s read=%d indexed=%d dropped=%d",
+            "index build collection=%s read=%d indexed=%d dropped=%d threads=%s",
             self._tickets.name,
             len(tickets),
             indexed,
             len(report.dropped),
+            threads,
         )
 
         warning = drop_rate_warning(report)
@@ -162,6 +192,7 @@ class TicketsIndexer:
         build_report = TicketsIndexReport(
             read     = len(tickets),
             indexed  = indexed,
+            threads  = threads,
             filtered = report,
             warnings = [warning] if warning else [],
         )
@@ -170,63 +201,80 @@ class TicketsIndexer:
 
     async def rebuild(
         self,
-        directory: Path,  # np. Path("data/unsafe/corpus/cards")
+        corpus: TicketsCorpus,  # np. TicketsCorpus(root=Path("data/unsafe/corpus"))
     ) -> TicketsIndexReport:
         """
         Description:
-        Kasuje kolekcję i buduje ją od zera. Bezpieczne z konstrukcji, a nie dzięki ostrożności:
-        indeks da się odbudować z `data/unsafe/corpus/cards/` tą samą komendą (zasada 8), więc
-        niszczona jest pochodna.
+        Kasuje kolekcję kart i, gdy korpus ma wątki, tabelę wątków, i buduje je od zera.
+        Bezpieczne z konstrukcji, a nie dzięki ostrożności: indeksy da się odbudować z plików
+        korpusu tą samą komendą (zasada 8), więc niszczona jest pochodna. Korpus bez
+        `anonymized/` tabeli wątków nie rusza.
 
         Osobna metoda zamiast flagi w `build()`, bo obie różnią się tym, czym RYZYKUJĄ, a nie tym,
         jak działają — a CLI jedną z nich musi osłonić potwierdzeniem.
 
         Example args:
-            directory=Path("data/unsafe/corpus/cards")
+            corpus=TicketsCorpus(root=Path("data/unsafe/corpus"))
 
         Example result:
-            TicketsIndexReport(read=200, indexed=171, …)
+            TicketsIndexReport(read=200, indexed=171, threads=171, …)
 
         Raises:
-            NotADirectoryError: ścieżka nie istnieje albo nie jest katalogiem
-            FileNotFoundError: w katalogu nie ma ani jednej karty
+            NotADirectoryError: katalog kart nie istnieje albo nie jest katalogiem
+            FileNotFoundError: w katalogu kart nie ma ani jednej karty albo `anonymized/` jest,
+                ale nie ma w nim wątku którejś karty
             DbQdrantError: Qdrant jest nieosiągalny albo odrzucił zapis
+            DbPostgresError: Postgres jest nieosiągalny albo odrzucił polecenie
         """
-        # Kasujemy dopiero wtedy, gdy jest z czego odbudować: zła ścieżka albo katalog bez kart
-        # zostawiłyby po skasowaniu pusty indeks, a kolekcja nie miałaby już czego oddać.
-        if not self._read(directory):
-            raise FileNotFoundError(f"brak kart w katalogu, kolekcja zostaje: {directory}")
+        tickets = self._read(corpus.cards_dir)
+
+        # Kasujemy dopiero wtedy, gdy jest z czego odbudować: zła ścieżka, katalog bez kart albo
+        # karta bez wątku zostawiłyby po skasowaniu pusty albo niepełny indeks.
+        if not tickets:
+            raise FileNotFoundError(f"brak kart w katalogu, indeksy zostają: {corpus.cards_dir}")
+
+        with_threads = self._has_threads(corpus, tickets)
 
         await self._tickets.drop()
 
-        return await self.build(directory)
+        if with_threads:
+            await self._threads.drop()
+
+        return await self.build(corpus)
 
     async def add(
         self,
-        tickets: Sequence[ParsedTicket],  # np. [ParsedTicket(ticket_id="41002", …)] — po filtrze
-    ) -> int:
+        ticket: ParsedTicket,    # np. ParsedTicket(ticket_id="41002", …) — przyjęta przez filtr
+        thread: AnonymizedText,  # np. AnonymizedText(text="ZGŁOSZENIE 41002 z 2026-11-11\n…")
+    ) -> None:
         """
         Description:
-        Dokłada do kolekcji karty, które już przeszły filtr jakości, i oddaje, ile zapisano:
-        zakłada kolekcję, gdy jej nie ma, liczy oba wektory i zapisuje punkty. Punkt tego samego
-        zgłoszenia jest nadpisywany. Tędy idzie pojedyncze zamknięte zgłoszenie (p. 30), bez
-        czytania katalogu.
+        Dokłada jedną kartę, która już przeszła filtr jakości, do kolekcji, a jej wątek do tabeli
+        wątków; kolekcję i tabelę zakłada, gdy ich nie ma. Punkt i wiersz tego samego zgłoszenia
+        są nadpisywane. Tędy idzie zamknięte zgłoszenie (p. 30), bez czytania katalogu.
 
         Example args:
-            tickets=[ParsedTicket(ticket_id="41002", …)]
+            ticket=ParsedTicket(ticket_id="41002", …)
+            thread=AnonymizedText(text="ZGŁOSZENIE 41002 z 2026-11-11\nTemat: …")
 
         Example result:
-            1
+            None
 
         Raises:
+            ValueError: w wątku nie ma linii z tematem
             DbQdrantConfigError: kolekcja ma punkty innego modelu embeddera
             DbQdrantError: Qdrant jest nieosiągalny albo odrzucił zapis
+            DbPostgresError: Postgres jest nieosiągalny albo odrzucił zapis
             EmbeddingConfigError: embedder zmienił model w trakcie zapisu
             EmbeddingError: embedder jest nieosiągalny albo odpowiedział błędem
         """
-        await self._tickets.ensure()
+        # Wiersz najpierw: wątek bez tematu ma odpaść, zanim cokolwiek trafi do któregoś indeksu.
+        row = TicketRow.from_thread(ticket.ticket_id, ticket.date, thread.text)
 
-        return await self._upsert(list(tickets))
+        await self._tickets.ensure()
+        await self._upsert([ticket])
+        await self._threads.create()
+        await self._threads.upsert([row])
 
     async def remove(
         self,
@@ -234,9 +282,9 @@ class TicketsIndexer:
     ) -> None:
         """
         Description:
-        Usuwa z kolekcji punkty zgłoszeń o podanych numerach; numer, którego nie ma, nie jest
-        błędem. Tędy wypada karta zgłoszenia zamkniętego ponownie, która tym razem odpadła
-        w filtrze.
+        Usuwa z kolekcji punkty, a z tabeli wątków wiersze zgłoszeń o podanych numerach; numer,
+        którego nie ma, nie jest błędem. Kolekcję i tabelę zakłada, gdy ich nie ma. Tędy wypada
+        zgłoszenie zamknięte ponownie, którego karta tym razem odpadła w filtrze.
 
         Example args:
             ticket_ids=["41002"]
@@ -246,15 +294,18 @@ class TicketsIndexer:
 
         Raises:
             DbQdrantError: Qdrant jest nieosiągalny albo odrzucił polecenie
+            DbPostgresError: Postgres jest nieosiągalny albo odrzucił polecenie
         """
         await self._tickets.ensure()
         await self._tickets.delete(ticket_ids)
+        await self._threads.create()
+        await self._threads.delete(ticket_ids)
 
     async def aclose(self) -> None:
         """
         Description:
-        Zamyka połączenia embeddera i Qdranta. Sprzątający woła tylko to i nie musi wiedzieć,
-        z czego indekser jest zbudowany.
+        Zamyka połączenia embeddera, Qdranta i Postgresa. Sprzątający woła tylko to i nie musi
+        wiedzieć, z czego indekser jest zbudowany.
 
         Example args:
             (brak)
@@ -264,6 +315,7 @@ class TicketsIndexer:
         """
         await self._embedder.aclose()
         await self._tickets.aclose()
+        await self._threads.aclose()
 
     def _read(
         self,
@@ -320,6 +372,100 @@ class TicketsIndexer:
         kept_ids = {verdict.ticket_id for verdict in report.kept}
 
         return [ticket for ticket in tickets if ticket.ticket_id in kept_ids]
+
+    def _has_threads(
+        self,
+        corpus:  TicketsCorpus,       # np. TicketsCorpus(root=Path("data/unsafe/corpus"))
+        tickets: list[ParsedTicket],  # np. [ParsedTicket(ticket_id="41002", …)] — wszystkie karty
+    ) -> bool:
+        """
+        Description:
+        Mówi, czy korpus ma wątki po anonimizacji, a gdy ma, sprawdza, czy każda karta ma w nim
+        swój wątek. Sprawdza wszystkie karty, nie tylko przyjęte: karta bez wątku znaczy zepsuty
+        korpus, niezależnie od tego, co powie o niej filtr.
+
+        Example args:
+            corpus=TicketsCorpus(root=Path("data/unsafe/corpus"))
+            tickets=[ParsedTicket(ticket_id="41002", …)]
+
+        Example result:
+            True
+
+        Raises:
+            FileNotFoundError: `anonymized/` jest, ale nie ma w nim wątku którejś karty
+        """
+        # --- korpus bez wątków (golden set): same karty, tabela bez zmian ---
+        if not corpus.anonymized_dir.is_dir():
+            return False
+
+        missing = [
+            ticket.ticket_id
+            for ticket in tickets
+            if not self._thread_path(corpus, ticket.ticket_id).is_file()
+        ]
+
+        if missing:
+            listed = ", ".join(missing[:MAX_LISTED_MISSING])
+
+            raise FileNotFoundError(
+                f"{len(missing)} kart bez wątku w {corpus.anonymized_dir} (np. {listed}); "
+                "indeksy zostają"
+            )
+
+        return True
+
+    def _thread_path(
+        self,
+        corpus:    TicketsCorpus,  # np. TicketsCorpus(root=Path("data/unsafe/corpus"))
+        ticket_id: str,            # np. "41002"
+    ) -> Path:
+        """
+        Description:
+        Ścieżka wątku zgłoszenia w korpusie: plik nazwany numerem zgłoszenia w `anonymized/`.
+
+        Example args:
+            corpus=TicketsCorpus(root=Path("data/unsafe/corpus"))
+            ticket_id="41002"
+
+        Example result:
+            Path("data/unsafe/corpus/anonymized/41002.txt")
+        """
+        return corpus.anonymized_dir / f"{ticket_id}.txt"
+
+    async def _upsert_threads(
+        self,
+        corpus:  TicketsCorpus,       # np. TicketsCorpus(root=Path("data/unsafe/corpus"))
+        tickets: list[ParsedTicket],  # np. [ParsedTicket(ticket_id="41002", …)] — przyjęte
+    ) -> int:
+        """
+        Description:
+        Zapisuje do tabeli wątków wątki podanych kart, zakładając tabelę, gdy jej nie ma, i oddaje,
+        ile wierszy zapisano. Datę wiersza bierze z karty, temat z linii „Temat:” wątku.
+
+        Example args:
+            corpus=TicketsCorpus(root=Path("data/unsafe/corpus"))
+            tickets=[ParsedTicket(ticket_id="41002", date=date(2026, 11, 11), …)]
+
+        Example result:
+            1
+
+        Raises:
+            ValueError: w wątku nie ma linii z tematem
+            DbPostgresError: Postgres jest nieosiągalny albo odrzucił zapis
+        """
+        rows = [
+            TicketRow.from_thread(
+                ticket.ticket_id,
+                ticket.date,
+                self._thread_path(corpus, ticket.ticket_id).read_text(encoding="utf-8"),
+            )
+            for ticket in tickets
+        ]
+
+        await self._threads.create()
+        await self._threads.upsert(rows)
+
+        return len(rows)
 
     async def _upsert(
         self,

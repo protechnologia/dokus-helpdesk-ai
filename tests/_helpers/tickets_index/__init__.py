@@ -17,6 +17,9 @@ from tests._helpers.tickets_index.helper import (
     app_closing_tickets,
     card_graph,
     closed_ticket_indexer_on,
+    tickets_indexer_on,
+    write_card,
+    write_thread,
 )
 
 __all__ = [
@@ -29,4 +32,7 @@ __all__ = [
     "app_closing_tickets",
     "card_graph",
     "closed_ticket_indexer_on",
+    "tickets_indexer_on",
+    "write_card",
+    "write_thread",
 ]

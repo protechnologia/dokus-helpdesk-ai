@@ -53,6 +53,7 @@ from app.core_model.docs.doc_manifest import DocManifest
 from app.core_model.docs.doc_manifest_section import DocManifestSection
 from app.core_model.docs.doc_package import DocPackage
 from app.core_model.tickets.parsed_ticket import ParsedTicket
+from app.core_model.tickets.tickets_corpus import TicketsCorpus
 from app.core_service.indexer_docs import DocsIndexer
 from app.core_service.indexer_tickets import TicketsIndexer
 from app.core_service.loader_dict_resolution import get_resolution_classes
@@ -285,7 +286,8 @@ async def tickets_cards(
     """
     Description:
     Oddaje wyszukiwanie po znaczeniu i odczyt kart na własnej kolekcji testu, zaindeksowanej
-    produkcyjną ścieżką (`TicketsIndexer`) z trzech zmyślonych kart zapisanych jako pliki JSON.
+    produkcyjną ścieżką (`TicketsIndexer`) z trzech zmyślonych kart zapisanych jako pliki JSON
+    w `cards/` korpusu testu.
 
     Example args:
         host_settings=Settings(embedding_base_url="http://localhost:8001", …)
@@ -311,12 +313,18 @@ async def tickets_cards(
 
     await collection.drop()
 
+    corpus = TicketsCorpus(root=tmp_path)
+    corpus.cards_dir.mkdir()
+
     for card in CARDS:
-        artifact = tmp_path / f"{card.ticket_id}.json"
+        artifact = corpus.cards_dir / f"{card.ticket_id}.json"
         artifact.write_text(card.model_dump_json(), encoding="utf-8")
 
-    indexer = TicketsIndexer(embedder=embedder, tickets=collection)
-    await indexer.build(tmp_path)
+    # Korpus bez `anonymized/`: indekser buduje same karty i tabeli wątków nie dotyka, więc
+    # podana tabela (testowa, tej samej co w `tickets_threads`) zostaje nietknięta.
+    threads = TicketsTable(build_postgres_client(), name=TICKETS_TABLE)
+    indexer = TicketsIndexer(embedder=embedder, tickets=collection, threads=threads)
+    await indexer.build(corpus)
 
     yield TicketsCards(
         find = FindTicketsVectorTool(

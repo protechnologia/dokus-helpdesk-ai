@@ -6,7 +6,10 @@ from typer.testing import CliRunner
 
 from app.core_model.tickets.quality_report import QualityReport
 from app.core_model.tickets.quality_verdict import QualityVerdict, RuleHit
+from app.core_model.tickets.tickets_corpus import TicketsCorpus
 from app.core_model.tickets.tickets_index_report import TicketsIndexReport
+from app.db_postgres import DbPostgresError
+from app.db_postgres.table.tickets.table import TICKETS_TABLE
 from app.db_qdrant import DbQdrantError
 from app.entry_cli.cli import cli
 
@@ -33,22 +36,29 @@ VALID_TICKET = {
 def _corpus(directory: Path) -> Path:
     """
     Description:
-    Writes one valid artifact so the command has something to read.
+    Zapisuje jedną poprawną kartę w `cards/` korpusu, żeby komenda miała co czytać.
 
     Example args:
         directory=Path("/tmp/x")
 
     Example result:
-        The same directory, now holding 33644.json
+        Ten sam katalog, z kartą w cards/33644.json
     """
-    (directory / "33644.json").write_text(
+    cards = directory / "cards"
+    cards.mkdir(exist_ok=True)
+
+    (cards / "33644.json").write_text(
         json.dumps(VALID_TICKET, ensure_ascii=False), encoding="utf-8"
     )
 
     return directory
 
 
-def _report(indexed: int = 1, dropped_ids: tuple[str, ...] = ()) -> TicketsIndexReport:
+def _report(
+    indexed:     int             = 1,      # np. 1
+    dropped_ids: tuple[str, ...] = (),     # np. ("19596",)
+    threads:     int | None      = None,   # np. 1; None — korpus bez anonymized/
+) -> TicketsIndexReport:
     """
     Description:
     Builds the report a stubbed run returns, with the given tickets marked as dropped.
@@ -56,9 +66,10 @@ def _report(indexed: int = 1, dropped_ids: tuple[str, ...] = ()) -> TicketsIndex
     Example args:
         indexed=1
         dropped_ids=("19596",)
+        threads=1
 
     Example result:
-        TicketsIndexReport(read=2, indexed=1, filtered=QualityReport(…))
+        TicketsIndexReport(read=2, indexed=1, threads=1, filtered=QualityReport(…))
     """
     verdicts = [
         QualityVerdict(
@@ -71,6 +82,7 @@ def _report(indexed: int = 1, dropped_ids: tuple[str, ...] = ()) -> TicketsIndex
     return TicketsIndexReport(
         read     = indexed + len(dropped_ids),
         indexed  = indexed,
+        threads  = threads,
         filtered = QualityReport(verdicts=verdicts),
     )
 
@@ -101,13 +113,13 @@ class StubRun:
         self.report: TicketsIndexReport       = _report()
         self.error:  Exception | None       = None
 
-    async def __call__(self, directory: Path, drop_first: bool) -> TicketsIndexReport:
+    async def __call__(self, corpus: TicketsCorpus, drop_first: bool) -> TicketsIndexReport:
         """
         Description:
         Records the call and either raises the configured error or returns the report.
 
         Example args:
-            directory=Path("/tmp/x")
+            corpus=TicketsCorpus(root=Path("/tmp/x"))
             drop_first=False
 
         Example result:
@@ -116,7 +128,7 @@ class StubRun:
         Raises:
             Exception: whatever the test assigned to `error`
         """
-        self.calls.append({"directory": directory, "drop_first": drop_first})
+        self.calls.append({"corpus": corpus, "drop_first": drop_first})
 
         if self.error is not None:
             raise self.error
@@ -288,21 +300,98 @@ def test_rebuild_names_the_directory_in_the_prompt(tmp_path: Path, stub_run: Stu
 
 
 @pytest.mark.parametrize("command", [["index"], ["reindex", "--yes"]])
-def test_without_a_directory_the_corpus_cards_are_indexed(
+def test_without_a_directory_the_configured_corpus_is_indexed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stub_run: StubRun, command: list[str]
 ) -> None:
     """Sprawdza, czy `helpdesk tickets index` i `helpdesk tickets reindex` bez katalogu indeksują
-    `cards/` korpusu wskazanego przez `TICKETS_CORPUS_DIR`.
+    korpus wskazany przez `TICKETS_CORPUS_DIR`.
 
-    Wyłapuje komendę, która bez argumentu sięga gdzie indziej niż zapis kart, np. w dawne
-    `data/unsafe/parsed`: przebudowa nie miałaby z czego zbudować indeksu albo zbudowałaby go
-    z innych kart niż te, które zapisuje trasa."""
+    Wyłapuje komendę, która bez argumentu sięga gdzie indziej niż zapis kart i wątków, np. w dawne
+    `data/unsafe/parsed`: przebudowa nie miałaby z czego zbudować indeksów albo zbudowałaby je
+    z innych plików niż te, które zapisuje trasa."""
     monkeypatch.setenv("TICKETS_CORPUS_DIR", str(tmp_path))
 
     result = runner.invoke(cli, ["tickets", *command])
 
     assert result.exit_code == 0
-    assert stub_run.calls[0]["directory"] == tmp_path / "cards"
+    assert stub_run.calls[0]["corpus"].root == tmp_path
+
+
+@pytest.mark.parametrize("command", [["index"], ["reindex", "--yes"]])
+def test_the_directory_argument_is_the_corpus(
+    tmp_path: Path, stub_run: StubRun, command: list[str]
+) -> None:
+    """Sprawdza, czy katalog podany komendom `index` i `reindex` jest katalogiem korpusu, z którego
+    indekser bierze `cards/` i `anonymized/`, a nie katalogiem samych kart.
+
+    Wyłapuje komendę, która traktuje argument jak katalog kart: `helpdesk tickets reindex
+    data/unsafe/golden` szukałby kart w `golden/` zamiast w `golden/cards/`."""
+    result = runner.invoke(cli, ["tickets", *command, str(_corpus(tmp_path))])
+
+    assert result.exit_code == 0
+    assert stub_run.calls[0]["corpus"] == TicketsCorpus(root=tmp_path)
+
+
+def test_unreachable_postgres_exits_two(tmp_path: Path, stub_run: StubRun) -> None:
+    """Sprawdza, czy `helpdesk tickets index` kończy się kodem 2 i wypisuje „BŁĄD”, gdy indeksacja
+    zgłasza, że Postgres nie odpowiada (`DbPostgresError`) przy zapisie wątków.
+
+    Wyłapuje awarię tabeli wątków wypuszczoną jako nieobsłużony wyjątek ze śladem stosu: operator
+    nie odróżniłby leżącej bazy, którą wystarczy podnieść, od błędu w kodzie."""
+    stub_run.error = DbPostgresError("Could not reach Postgres")
+
+    result = runner.invoke(cli, ["tickets", "index", str(_corpus(tmp_path))])
+
+    assert result.exit_code == 2
+    assert "BŁĄD" in result.output
+
+
+@pytest.mark.parametrize(
+    ("threads", "expected"),
+    [(3, "Wątków w tabeli: 3."), (None, "tabela wątków bez zmian")],
+)
+def test_the_report_says_what_happened_to_the_threads(
+    tmp_path: Path, stub_run: StubRun, threads: int | None, expected: str
+) -> None:
+    """Sprawdza, czy podsumowanie `helpdesk tickets index` mówi, ile wątków trafiło do tabeli,
+    a przy korpusie bez `anonymized/` — że tabela wątków została bez zmian.
+
+    Wyłapuje podsumowanie, które milczy o wątkach: po indeksacji golden setu operator nie
+    wiedziałby, że wyszukiwanie po słowach nadal stoi na starej tabeli albo pustej."""
+    stub_run.report = _report(threads=threads)
+
+    result = runner.invoke(cli, ["tickets", "index", str(_corpus(tmp_path))])
+
+    assert expected in result.stdout
+
+
+def test_rebuild_names_the_threads_table_when_the_corpus_has_threads(
+    tmp_path: Path, stub_run: StubRun
+) -> None:
+    """Sprawdza, czy przy korpusie z katalogiem `anonymized/` pytanie przed przebudową nazywa też
+    tabelę wątków, która zostanie skasowana.
+
+    Wyłapuje pytanie, które wymienia tylko kolekcję: operator nie wiedziałby, że potwierdza też
+    skasowanie wątków, w których agent szuka po słowach."""
+    (_corpus(tmp_path) / "anonymized").mkdir()
+
+    result = runner.invoke(cli, ["tickets", "reindex", str(tmp_path)], input="n\n")
+
+    assert f"tabelę '{TICKETS_TABLE}'" in result.stdout
+    assert "zostaje" not in result.stdout
+
+
+def test_rebuild_says_the_threads_table_stays_without_threads(
+    tmp_path: Path, stub_run: StubRun
+) -> None:
+    """Sprawdza, czy przy korpusie bez `anonymized/` (jak golden set) pytanie przed przebudową
+    mówi, że tabela wątków zostaje.
+
+    Wyłapuje pytanie, które straszy skasowaniem wątków, choć przebudowa ich nie ruszy, albo
+    milczy o tym, że tabela nie zostanie odbudowana."""
+    result = runner.invoke(cli, ["tickets", "reindex", str(_corpus(tmp_path))], input="n\n")
+
+    assert f"Tabela '{TICKETS_TABLE}' zostaje" in result.stdout
 
 
 def test_rebuild_without_cards_exits_two(tmp_path: Path, stub_run: StubRun) -> None:

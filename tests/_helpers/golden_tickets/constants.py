@@ -24,7 +24,7 @@ DISTRACTORS_FILE = Path("data/unsafe/golden/tickets-distractors.json")
 CORPUS_DIR = Path("data/unsafe/golden/cards")
 
 # Podpowiedź do błędu pomiaru, gdy kolekcja zgłoszeń jest pusta: polecenie, które ją buduje.
-BUILD_HINT = "zbuduj indeks: helpdesk tickets reindex data/unsafe/golden/cards"
+BUILD_HINT = "zbuduj indeks: helpdesk tickets reindex data/unsafe/golden"
 
 # Próg: zapytania, na które rekord-cel wraca jako pierwszy. Zmierzone 119 ze 126 (2026-10-23,
 # karty `gpt-6.1-sol`); próg niżej, żeby wyłapać zepsutą ścieżkę, a nie zwykły dryf.

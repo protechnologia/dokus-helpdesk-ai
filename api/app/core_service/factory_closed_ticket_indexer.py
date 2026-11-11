@@ -1,13 +1,18 @@
 """
 Description:
 Buduje z konfiguracji serwis, który dokłada zamknięte zgłoszenie do korpusu (p. 30): katalog
-korpusu z `TICKETS_CORPUS_DIR`, indekser kart z `factory_tickets_indexer.py` i tabelę wątków
-w Postgresie. Trzyma jeden taki serwis na proces i podaje go trasie `POST /tickets/closed` jako
-zależność (`get_closed_ticket_indexer()`).
+korpusu z `TICKETS_CORPUS_DIR` i indekser zgłoszeń z `factory_tickets_indexer.py`, który trzyma
+kolekcję kart i tabelę wątków. Trzyma jeden taki serwis na proces i podaje go trasie
+`POST /tickets/closed` jako zależność (`get_closed_ticket_indexer()`).
 
 Do czego:
 Trasa zamknięcia zgłoszenia bierze stąd gotowy serwis, tak jak komendy `helpdesk tickets` biorą
 indekser z fabryki obok — sama nie składa klientów.
+
+Klientów nie składa też ta fabryka: indekser zgłoszeń bierze gotowy z
+`factory_tickets_indexer.py`. Dokłada tylko to, czego potrzebuje trasa, a komendy nie: odmowę
+przy atrapie modelu i jeden serwis na cały proces API, podawany trasie jako zależność i zamykany
+przy wyłączaniu aplikacji. Komenda buduje swój indekser sama i zamyka go po przebiegu.
 
 O czym pamiętać przy zmianach:
 
@@ -27,7 +32,6 @@ import functools
 from app.config import Settings
 from app.core_service.factory_tickets_indexer import build_tickets_indexer
 from app.core_service.indexer_closed_ticket import ClosedTicketIndexer
-from app.db_postgres import PostgresClient, TicketsTable
 from app.engine_llm.factory import PROVIDER_FAKE
 
 
@@ -65,19 +69,9 @@ def build_closed_ticket_indexer(
             "korpus przyjmuje tylko karty prawdziwego modelu, a LLM_GENERATION_PROVIDER=fake"
         )
 
-    postgres = PostgresClient(
-        host     = settings.postgres_host,
-        port     = settings.postgres_port,
-        database = settings.postgres_db,
-        user     = settings.postgres_user,
-        password = settings.postgres_password,
-        timeout  = settings.postgres_timeout_seconds,
-    )
-
     indexer = ClosedTicketIndexer(
         corpus  = settings.tickets_corpus(),
-        cards   = build_tickets_indexer(settings),
-        threads = TicketsTable(postgres),
+        indexer = build_tickets_indexer(settings),
     )
 
     return indexer

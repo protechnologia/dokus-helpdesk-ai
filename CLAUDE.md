@@ -631,8 +631,17 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
                                      │
                                      ├─ filtr jakości (raportuje, co odrzuca)
                                      ├─ [embedder] problem+symptoms → wektory
-                                     └─ upsert do Qdranta (wektory + payload)
+                                     ├─ upsert do Qdranta (wektory + payload)
+                                     └─ wątki kart przyjętych z corpus/anonymized/ → Postgres
 ```
+
+- **Oba indeksy zgłoszeń buduje jeden serwis, `TicketsIndexer` (2026-11-11, p. 30), jak
+  `DocsIndexer` przy dokumentacji.** Z `cards/` korpusu robi kolekcję kart w Qdrancie, a wątki
+  kart przyjętych z `anonymized/` wstawia do tabeli wątków w Postgresie; tego samego serwisu
+  używa trasa zamknięcia zgłoszenia dla jednej karty. Korpus bez `anonymized/` (golden set,
+  którego wątki są tylko surowe) buduje same karty, a tabeli wątków nie rusza. Gdy
+  `anonymized/` jest, każda karta musi mieć w nim swój wątek: brak to zepsuty korpus, więc
+  indeksacja odmawia, zanim cokolwiek zapisze albo skasuje.
 
 - **Import to cienka warstwa adapterów** — jeden czytnik na format źródłowy
   (`core_service/parser_ticket_raw.py`, przy masowym imporcie obok wariantu SQL); reszta systemu
@@ -1585,9 +1594,10 @@ Wspólne:
   (`core_service/factory_docs_indexer.py`, `factory_tickets_indexer.py`), jak trasy biorą graf
   z `agent_graphs/factory.py`, i zamyka go jednym `aclose()`.
 - **Komendy niszczące (`tickets reindex`, `docs index`) pytają o potwierdzenie** albo wymagają
-  `--yes`; pytanie nazywa to, co zniknie, i skąd przyjdzie nowe. Kasują dopiero wtedy, gdy
-  mają z czego odbudować: `tickets reindex` odmawia, zanim skasuje kolekcję, gdy katalogu nie
-  ma albo nie ma w nim kart (kod 2).
+  `--yes`; pytanie nazywa to, co zniknie, i skąd przyjdzie nowe. Kasują dopiero wtedy, gdy mają z
+  czego odbudować: `tickets reindex` odmawia, zanim cokolwiek skasuje, gdy katalogu kart nie ma, nie
+  ma w nim kart albo karta nie ma wątku w `anonymized/` (kod 2). Tabelę wątków kasuje tylko przy
+  korpusie z `anonymized/` i wtedy wymienia ją w pytaniu.
 
 #### Gotchas
 
@@ -2093,8 +2103,10 @@ Usługa `postgres` to drugi indeks obok Qdranta: szuka po słowach w odmianie i 
 ciągach, czego wektor nie robi. Po stronie `api` stoi pakiet `app/db_postgres/` z tabelami zgłoszeń
 i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs index`, a czytają ją `list_docs`,
 `find_docs_text` i `read_docs`. Tabelę zgłoszeń czytają `find_tickets_text`
-i `read_tickets_thread`; założy ją i wypełni indeksacja wątków po anonimizacji (p. 19, p. 31),
-a do tego czasu jej nie ma, więc oba narzędzia kończą się błędem `DbPostgresMissingTableError`.
+i `read_tickets_thread`. Zakłada ją i wypełnia `helpdesk tickets index` z wątków po anonimizacji
+w `anonymized/` korpusu (od 2026-11-11), a pojedyncze zgłoszenie dokłada trasa zamknięcia
+(p. 30); korpus napełni masowy import (p. 31). Tam, gdzie tabeli nie ma, oba narzędzia kończą się
+błędem `DbPostgresMissingTableError`.
 
 - **Trzy drogi dopasowania, każda do czego innego:** słowa (`plainto_tsquery` — dowolna kolejność
   i odmiana), fraza (`phraseto_tsquery` — cały komunikat w tej samej kolejności) i podciąg
@@ -3109,12 +3121,12 @@ zapytań; do 2026-10-10 `golden200.json`, potem do 2026-10-15 `tickets-dokus.jso
 `tickets-dokus-distractors.json`) — materiał wielokrotnego użytku przy każdej zmianie modelu.
 „Golden200" zostaje nazwą próbki 200 zgłoszeń.
 
-- **Karty golden setu zastępuje się w całości, po przyjęciu (2026-11-11).** Jest jeden katalog
-  kart, bez nazwy modelu w ścieżce: model i datę zapisuje ten opis, bo karty nie mają pola
-  z modelem. Nowe parsowanie (`scripts/parse_golden_tickets.py`) idzie do katalogu roboczego,
-  a `golden/cards/` zastępuje dopiero po porównaniu pomiarów na obu; stare karty nie zostają
-  obok. Numery zgłoszeń skrypt bierze z `tickets.json`, a katalog kart z jego metryczki
-  (`meta.corpus_dir`).
+- **Karty golden setu zastępuje się w całości, po przyjęciu (2026-11-11).** Jest jeden katalog kart,
+  bez nazwy modelu w ścieżce: model i datę zapisuje ten opis, bo karty nie mają pola z modelem. Nowe
+  parsowanie (`scripts/parse_golden_tickets.py`) idzie do `cards/` w osobnym katalogu roboczym, bo
+  komendy `helpdesk tickets` biorą katalog korpusu, a `golden/cards/` zastępuje dopiero po
+  porównaniu pomiarów na obu; stare karty nie zostają obok. Numery zgłoszeń skrypt bierze z
+  `tickets.json`, a katalog kart z jego metryczki (`meta.corpus_dir`).
 - **Wątki golden setu leżą w `golden/raw/` (2026-11-11):** 200 plików z eksportu lipcowego
   zrzutu, z których powstały karty i na których przeglądano etykiety. Reszta lipcowego eksportu
   (1625 plików) jest skasowana: eksport da się powtórzyć z lipcowego zrzutu, a korpus powstaje
@@ -3316,8 +3328,9 @@ nogi produktu na jednej sprawie.
   `python scripts/build_code_package.py check-description data/unsafe/code` (kod 1, gdy opisu
   nie ma albo któraś ścieżka nie zgadza się z paczką; budowa paczki robi to samo na końcu)
 - Ponowne parsowanie golden setu grafem `parse_ticket` do katalogu roboczego, z wznawianiem
-  i postępem co 10 zgłoszeń: `python scripts/parse_golden_tickets.py parse <nowy katalog>`
-  (numery z `data/unsafe/golden/tickets.json`; do `golden/cards/` nie zapisuje) — **płatne,
+  i postępem co 10 zgłoszeń: `python scripts/parse_golden_tickets.py parse <nowy katalog>/cards`
+  (numery z `data/unsafe/golden/tickets.json`; do `golden/cards/` nie zapisuje; indeks do
+  pomiaru: `helpdesk tickets reindex <nowy katalog>`) — **płatne,
   pytaj przed**; wymaga usługi `anonymizer` z modelem anonimizującym i modelu generującego
   z `.env` (golden200 na `gpt-6.1-sol` kosztował 2026-10-23 około 1 USD)
 - Mapa symboli do paczki, która już stoi, bez kopiowania kodu od nowa:
@@ -3325,12 +3338,14 @@ nogi produktu na jednej sprawie.
   budowa paczki robi to samo na końcu)
 
 **Pipeline danych (CLI `helpdesk`)**
-- Walidacja kart: `helpdesk tickets validate [<katalog>]` (bez katalogu: `cards/` korpusu
-  z `TICKETS_CORPUS_DIR`; tak samo w dwóch komendach niżej)
-- Indeksacja do Qdranta: `helpdesk tickets index [<katalog>]`
-- Pełna odbudowa indeksu: `helpdesk tickets reindex [<katalog>]` (kasuje kolekcję i buduje ją
-  od zera; katalogu, którego nie ma albo w którym nie ma kart, nie przyjmie, zanim cokolwiek
-  skasuje)
+- Argumentem trzech komend niżej jest katalog korpusu z `cards/` i `anonymized/` (bez niego
+  `TICKETS_CORPUS_DIR`); golden set to `data/unsafe/golden`, który ma same karty
+- Walidacja kart: `helpdesk tickets validate [<korpus>]`
+- Indeksacja kart do Qdranta i wątków do tabeli wątków: `helpdesk tickets index [<korpus>]`
+  (korpus bez `anonymized/` buduje same karty)
+- Pełna odbudowa indeksów: `helpdesk tickets reindex [<korpus>]` (kasuje kolekcję, a przy
+  korpusie z `anonymized/` także tabelę wątków, i buduje je od zera; korpusu bez kart albo
+  z kartą bez wątku nie przyjmie, zanim cokolwiek skasuje)
 - Sprawdzenie paczki dokumentacji: `helpdesk docs validate <katalog>` (same pliki, bez stacku)
 - Indeksacja dokumentacji: `helpdesk docs index <katalog>` (zastępuje tabelę i kolekcję;
   **wymaga stacku**); paczka syntetyczna do osobnego indeksu:
@@ -3867,7 +3882,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/transport/`            | test klienta HTTP: `with_transport()`, `always()`, `routed()`, `capturing()`, `raising()` |
 | `tests/_helpers/anonymization/`        | anonimizacja: zmyślone zgłoszenie z danymi osobowymi i jego postać po anonimizacji, fragmenty, których nie wolno zobaczyć w logach (`SENSITIVE`), klient usługi `anonymizer` na atrapie transportu (`anonymizer_client_on()`), odpowiedź usługi (`service_answer()`) i sprawdzenie, czy anonimizator przyjmuje wynik atrapy silnika (`accepts_the_fake_engine()`) |
 | `tests/_helpers/postgres/`             | narzędzie na prawdziwej tabeli z podmienionym klientem (`ScriptedPostgres`), także liczenie wierszy albo jego błąd (`count_error`) |
-| `tests/_helpers/tickets_index/`        | indekser zgłoszeń, serwis zamkniętego zgłoszenia i trasa `POST /tickets/closed`: atrapy embeddera, kolekcji zgłoszeń i tabeli wątków (`FakeEmbedder`, `FakeTickets`, `FakeThreads`), serwis na nich (`closed_ticket_indexer_on()`), anonimizator zamieniający jeden fragment (`ReplacingAnonymizer`), graf karty z prawdziwym węzłem `respond` (`card_graph()`) i aplikacja trasy na tym wszystkim (`app_closing_tickets()`); próbki zamkniętego zgłoszenia, żądania i werdyktów w `samples.py` |
+| `tests/_helpers/tickets_index/`        | indekser zgłoszeń, serwis zamkniętego zgłoszenia i trasa `POST /tickets/closed`: atrapy embeddera, kolekcji zgłoszeń i tabeli wątków (`FakeEmbedder`, `FakeTickets`, `FakeThreads`), indekser zgłoszeń na nich (`tickets_indexer_on()`), karta i wątek w korpusie testu (`write_card()`, `write_thread()`), serwis zamkniętego zgłoszenia (`closed_ticket_indexer_on()`), anonimizator zamieniający jeden fragment (`ReplacingAnonymizer`), graf karty z prawdziwym węzłem `respond` (`card_graph()`) i aplikacja trasy na tym wszystkim (`app_closing_tickets()`); próbki zamkniętego zgłoszenia, żądania i werdyktów w `samples.py` |
 | `tests/_helpers/instance/`             | stan instancji: serwis liczący indeksy na atrapach Qdranta i Postgresa (`scripted_inspector()`, `inspector_on()`, klienci `counting_*` i `failing_*`), aplikacja z podanym serwisem (`app_with_inspector()`); próbki `sample_*()` w `samples.py` — raport stanu, paczka kodu, konfiguracja modelu |
 | `tests/_helpers/embedding/`            | embedding: nazwy modeli testowych (`EMBEDDING_MODEL`, `OTHER_MODEL`), odpowiedź usługi `embedder` w kształcie kontraktu (`embedder_answer()`) i payload punktu Qdranta z nazwą modelu (`with_model()`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |

@@ -1,10 +1,10 @@
-import json
 from pathlib import Path
 
 import pytest
 
-from app.core_model.tickets.parsed_ticket import ParsedTicket
+from app.core_model.tickets.tickets_corpus import TicketsCorpus
 from app.core_service.indexer_tickets import EMBED_BATCH_SIZE, TicketsIndexer
+from app.db_postgres import PostgresClient, TicketsTable
 from app.db_qdrant import (
     VECTOR_PROBLEM,
     VECTOR_STS,
@@ -13,74 +13,35 @@ from app.db_qdrant import (
 )
 from app.engine_embedding import EmbeddingConfigError
 from tests._helpers.embedding import EMBEDDING_MODEL, OTHER_MODEL
-from tests._helpers.tickets_index import VECTOR_SIZE, FakeEmbedder, FakeTickets
+from tests._helpers.tickets_index import (
+    VECTOR_SIZE,
+    FakeEmbedder,
+    FakeThreads,
+    FakeTickets,
+    tickets_indexer_on,
+    write_card,
+    write_thread,
+)
+from tests._helpers.tickets_index.samples import TICKET_ID, sample_card, sample_thread
 
-VALID_TICKET = {
-    "ticket_id":                     "33644",
-    "date":                          "2026-03-14",
-    "component":                     "ePUAP",
-    "problem":                       "Wysyłka przez ePUAP kończy się błędem komunikacji",
-    "symptoms":                      "Po kliknięciu Wyślij pojawia się komunikat o braku sieci",
-    "error_codes":                   ["ERR-4210"],
-    "cause":                         "Certyfikat bez uprawnienia AddDocumentToSign",
-    "solution":                      "Wygenerowano certyfikat z właściwym uprawnieniem.",
-    "resolution":                    "naprawione",
-    "resolution_vocabulary_version": 1,
-    "questions_summary":             "pytano o wersję przeglądarki",
-    "excluded_causes":               [],
-    "useful":                        True,
-    "useful_reason":                 "Wątek podaje przyczynę i rozwiązanie.",
-}
-
-
-def _write(directory: Path, ticket_id: str, **overrides: object) -> None:
-    """
-    Description:
-    Zapisuje jeden artefakt w badanym katalogu.
-
-    Example args:
-        directory=Path("/tmp/x")
-        ticket_id="33644"
-        solution="brak"
-
-    Example result:
-        None — plik leży na dysku
-    """
-    payload = {**VALID_TICKET, "ticket_id": ticket_id, **overrides}
-
-    (directory / f"{ticket_id}.json").write_text(
-        json.dumps(payload, ensure_ascii=False), encoding="utf-8"
-    )
-
-
-def _indexer(embedder: FakeEmbedder, tickets: FakeTickets) -> TicketsIndexer:
-    """
-    Description:
-    Buduje indekser na dwóch stubach.
-
-    Example args:
-        embedder=FakeEmbedder()
-        tickets=FakeTickets()
-
-    Example result:
-        TicketsIndexer spięty ze stubami
-    """
-    return TicketsIndexer(embedder=embedder, tickets=tickets)
+# Indekser zgłoszeń na korpusie w katalogu testu: karty i wątki naprawdę leżą na dysku, a embedder,
+# kolekcja zgłoszeń i tabela wątków to atrapy zapisujące, co dostały. Że Qdrant i Postgres
+# przyjmują zapis, sprawdzają testy kolekcji i tabeli na stacku.
 
 
 async def test_good_tickets_are_indexed(tmp_path: Path) -> None:
-    """Sprawdza, czy z katalogu z dwoma poprawnymi zgłoszeniami oba trafiają do indeksu (raport
+    """Sprawdza, czy z korpusu z dwoma poprawnymi zgłoszeniami oba trafiają do indeksu (raport
     mówi: wczytano 2, zaindeksowano 2) i czy pierwszą rzeczą, jaką indekser robi z kolekcją, jest
     upewnienie się, że ona istnieje.
 
     Wyłapuje indekser, który gubi poprawne zgłoszenia albo zaczyna zapisywać punkty do kolekcji,
     której jeszcze nie ma — taki przebieg kończyłby się błędem bazy zamiast zbudowanym
     indeksem."""
-    _write(tmp_path, "1")
-    _write(tmp_path, "2")
+    write_card(tmp_path, sample_card(ticket_id="1"))
+    write_card(tmp_path, sample_card(ticket_id="2"))
 
     tickets = FakeTickets()
-    report = await _indexer(FakeEmbedder(), tickets).build(tmp_path)
+    report  = await tickets_indexer_on(tickets).build(TicketsCorpus(root=tmp_path))
 
     assert report.read    == 2
     assert report.indexed == 2
@@ -95,10 +56,10 @@ async def test_hollow_tickets_are_dropped_with_a_reason(tmp_path: Path) -> None:
     Wyłapuje dwie usterki: puste zgłoszenie w indeksie, które przy wyszukiwaniu wygląda na
     odpowiedź, oraz odrzucenie bez podanego powodu, którego nie da się odróżnić od błędu
     w czytaniu plików."""
-    _write(tmp_path, "1")
-    _write(tmp_path, "2", useful=False, useful_reason="Wątek nie niesie wiedzy.")
+    write_card(tmp_path, sample_card(ticket_id="1"))
+    write_card(tmp_path, sample_card(ticket_id="2", useful=False, useful_reason="Nic."))
 
-    report = await _indexer(FakeEmbedder(), FakeTickets()).build(tmp_path)
+    report = await tickets_indexer_on(FakeTickets()).build(TicketsCorpus(root=tmp_path))
 
     assert report.read    == 2
     assert report.indexed == 1
@@ -116,12 +77,12 @@ async def test_both_named_vectors_are_built(tmp_path: Path) -> None:
     bo oba wektory dalej wyglądają poprawnie, a brakujący wektor oznaczałby później ponowną
     indeksację całego korpusu. Wyłapuje też punkt z modelem innym niż ten, który policzył
     wektory: kolekcja nie umiałaby wtedy odmówić mieszania modeli."""
-    _write(tmp_path, "1")
+    write_card(tmp_path, sample_card(ticket_id="1"))
 
     embedder = FakeEmbedder()
     tickets  = FakeTickets()
 
-    await _indexer(embedder, tickets).build(tmp_path)
+    await tickets_indexer_on(tickets, embedder=embedder).build(TicketsCorpus(root=tmp_path))
 
     point = tickets.points[0]
 
@@ -137,11 +98,12 @@ async def test_both_modes_receive_the_same_text(tmp_path: Path) -> None:
     Wyłapuje rozjazd tekstów między trybami: oba wektory opisują jedno zgłoszenie, więc gdyby
     powstały z różnych tekstów, zgłoszenie byłoby wyszukiwane jako jedno, a porównywane z innymi
     jako coś innego."""
-    _write(tmp_path, "1")
+    write_card(tmp_path, sample_card(ticket_id="1"))
 
     embedder = FakeEmbedder()
+    indexer  = tickets_indexer_on(FakeTickets(), embedder=embedder)
 
-    await _indexer(embedder, FakeTickets()).build(tmp_path)
+    await indexer.build(TicketsCorpus(root=tmp_path))
 
     assert embedder.passage_batches == embedder.sts_batches
 
@@ -153,12 +115,13 @@ async def test_two_models_in_one_batch_stop_the_build(tmp_path: Path) -> None:
 
     Wyłapuje indekser, który bierze model z jednego wywołania i nie patrzy na drugie: punkt
     zapisałby jeden model przy wektorze `sts` policzonym innym, a tego nie wykryje już nic."""
-    _write(tmp_path, "1")
+    write_card(tmp_path, sample_card(ticket_id="1"))
 
     tickets = FakeTickets()
+    indexer = tickets_indexer_on(tickets, embedder=FakeEmbedder(sts_model=OTHER_MODEL))
 
     with pytest.raises(EmbeddingConfigError, match=OTHER_MODEL):
-        await _indexer(FakeEmbedder(sts_model=OTHER_MODEL), tickets).build(tmp_path)
+        await indexer.build(TicketsCorpus(root=tmp_path))
 
     assert tickets.points == []
 
@@ -170,17 +133,18 @@ async def test_embedding_text_comes_from_the_model(tmp_path: Path) -> None:
     Wyłapuje rozwiązanie, które trafiło do wektora: szukamy zgłoszeń o podobnym problemie,
     a wektor z domieszką odpowiedzi mieszałby podobieństwo problemu z podobieństwem
     rozwiązania."""
-    _write(tmp_path, "1")
+    write_card(tmp_path, sample_card(ticket_id="1"))
 
     embedder = FakeEmbedder()
+    indexer  = tickets_indexer_on(FakeTickets(), embedder=embedder)
 
-    await _indexer(embedder, FakeTickets()).build(tmp_path)
+    await indexer.build(TicketsCorpus(root=tmp_path))
 
     sent = embedder.passage_batches[0][0]
 
-    assert VALID_TICKET["problem"]  in sent
-    assert VALID_TICKET["symptoms"] in sent
-    assert VALID_TICKET["solution"] not in sent
+    assert sample_card().problem  in sent
+    assert sample_card().symptoms in sent
+    assert sample_card().solution not in sent
 
 
 async def test_large_corpus_is_embedded_in_batches(tmp_path: Path) -> None:
@@ -193,123 +157,223 @@ async def test_large_corpus_is_embedded_in_batches(tmp_path: Path) -> None:
     count = EMBED_BATCH_SIZE + 5
 
     for number in range(count):
-        _write(tmp_path, f"{number:04d}")
+        write_card(tmp_path, sample_card(ticket_id=f"{number:04d}"))
 
     embedder = FakeEmbedder()
-    report   = await _indexer(embedder, FakeTickets()).build(tmp_path)
+    indexer  = tickets_indexer_on(FakeTickets(), embedder=embedder)
+    report   = await indexer.build(TicketsCorpus(root=tmp_path))
 
     assert report.indexed == count
     assert len(embedder.passage_batches) > 1
     assert sum(len(batch) for batch in embedder.passage_batches) == count
 
 
-async def test_add_writes_the_given_cards_without_reading_a_directory() -> None:
-    """Sprawdza, czy `add()` z jedną kartą zakłada kolekcję, gdy jej nie ma, i zapisuje dokładnie
-    ten jeden punkt, bez czytania żadnego katalogu, a jako wynik oddaje 1.
+async def test_threads_of_kept_cards_go_to_the_table(tmp_path: Path) -> None:
+    """Sprawdza, czy z korpusu z wątkami do tabeli wątków trafia (po jej założeniu) wątek karty
+    przyjętej, z datą karty i treścią pliku z `anonymized/`, a wątek karty odrzuconej nie trafia,
+    i czy raport mówi o jednym wątku.
 
-    Wyłapuje dokładanie, które pomija zakładanie kolekcji albo gubi kartę: pierwsze zamknięte
-    zgłoszenie na świeżej instancji kończyłoby się błędem brakującej kolekcji, a karta
-    nie trafiałaby do wyszukiwania."""
-    tickets = FakeTickets()
+    Wyłapuje budowę, która pomija tabelę wątków — wyszukiwanie po słowach i odczyt wątku nie
+    widziałyby korpusu — albo wpuszcza do niej wątki kart odrzuconych: agent znajdowałby po
+    słowach zgłoszenia, których karty nie ma w indeksie (decyzja 2026-11-11)."""
+    write_card(tmp_path, sample_card(ticket_id="1"))
+    write_card(tmp_path, sample_card(ticket_id="2", useful=False, useful_reason="Nic."))
+    write_thread(tmp_path, "1", sample_thread("1"))
+    write_thread(tmp_path, "2", sample_thread("2"))
 
-    written = await _indexer(FakeEmbedder(), tickets).add([ParsedTicket(**VALID_TICKET)])
+    threads = FakeThreads()
+    report  = await tickets_indexer_on(FakeTickets(), threads).build(TicketsCorpus(root=tmp_path))
 
-    assert written == 1
+    assert threads.calls == ["create", "upsert:1"]
+    assert [(row.ticket_id, row.ticket_date) for row in threads.rows] == [("1", sample_card().date)]
+    assert threads.rows[0].thread == sample_thread("1").text
+    assert report.threads == 1
+
+
+async def test_a_corpus_without_threads_leaves_the_table_alone(tmp_path: Path) -> None:
+    """Sprawdza, czy korpus bez katalogu `anonymized/` (jak golden set) buduje karty, nie dotyka
+    tabeli wątków i daje raport z `threads` równym `None`.
+
+    Wyłapuje budowę, która przy braku wątków zakłada albo czyści tabelę: indeksacja golden setu
+    zabrałaby wtedy wątki korpusu z wyszukiwania po słowach."""
+    write_card(tmp_path, sample_card(ticket_id="1"))
+
+    threads = FakeThreads()
+    report  = await tickets_indexer_on(FakeTickets(), threads).build(TicketsCorpus(root=tmp_path))
+
+    assert report.indexed == 1
+    assert threads.calls  == []
+    assert report.threads is None
+
+
+async def test_a_card_without_its_thread_stops_the_build_before_anything(tmp_path: Path) -> None:
+    """Sprawdza, czy korpus z `anonymized/`, w którym karta 2 nie ma wątku, kończy się błędem
+    `FileNotFoundError` z jej numerem, zanim cokolwiek trafi do kolekcji albo tabeli.
+
+    Wyłapuje budowę, która pomija kartę bez wątku po cichu albo zapisuje karty i pada dopiero
+    przy wątkach: zepsuty korpus dałby indeksy, w których karta i wątek się rozjeżdżają."""
+    write_card(tmp_path, sample_card(ticket_id="1"))
+    write_card(tmp_path, sample_card(ticket_id="2"))
+    write_thread(tmp_path, "1", sample_thread("1"))
+
+    tickets, threads = FakeTickets(), FakeThreads()
+
+    with pytest.raises(FileNotFoundError, match="2"):
+        await tickets_indexer_on(tickets, threads).build(TicketsCorpus(root=tmp_path))
+
+    assert (tickets.calls, threads.calls) == ([], [])
+
+
+async def test_add_writes_one_card_and_its_thread() -> None:
+    """Sprawdza, czy `add()` zakłada kolekcję i tabelę wątków, gdy ich nie ma, zapisuje jeden
+    punkt karty i jeden wiersz z jej wątkiem, bez czytania żadnego katalogu.
+
+    Wyłapuje dokładanie, które pomija zakładanie kolekcji albo tabeli albo gubi kartę lub wątek:
+    pierwsze zamknięte zgłoszenie na świeżej instancji kończyłoby się błędem brakującego
+    indeksu, a zgłoszenie nie trafiałoby do wyszukiwania."""
+    tickets, threads = FakeTickets(), FakeThreads()
+
+    await tickets_indexer_on(tickets, threads).add(sample_card(), sample_thread())
+
     assert tickets.calls == ["ensure", "upsert:1"]
-    assert [point.ticket_id for point in tickets.points] == ["33644"]
+    assert threads.calls == ["create", "upsert:1"]
+    assert [point.ticket_id for point in tickets.points] == [TICKET_ID]
+    assert threads.rows[0].thread == sample_thread().text
 
 
-async def test_remove_deletes_the_given_numbers() -> None:
-    """Sprawdza, czy `remove()` zakłada kolekcję, gdy jej nie ma, i usuwa punkty o podanych
-    numerach, niczego nie zapisując.
+async def test_remove_deletes_the_given_numbers_from_both_indexes() -> None:
+    """Sprawdza, czy `remove()` zakłada kolekcję i tabelę, gdy ich nie ma, i usuwa z obu punkty
+    i wiersze o podanych numerach, niczego nie zapisując.
 
-    Wyłapuje usuwanie, które pomija podane numery albo zapisuje zamiast usuwać: karta odrzucona przy
-    ponownym zamknięciu zgłoszenia zostałaby w wynikach wyszukiwania."""
-    tickets = FakeTickets()
+    Wyłapuje usuwanie, które pomija jeden z indeksów albo zapisuje zamiast usuwać: karta
+    odrzucona przy ponownym zamknięciu zgłoszenia zostałaby w wynikach wyszukiwania."""
+    tickets, threads = FakeTickets(), FakeThreads()
 
-    await _indexer(FakeEmbedder(), tickets).remove(["33644"])
+    await tickets_indexer_on(tickets, threads).remove([TICKET_ID])
 
-    assert tickets.calls == ["ensure", "delete:33644"]
+    assert tickets.calls == ["ensure", f"delete:{TICKET_ID}"]
+    assert threads.calls == ["create", f"delete:{TICKET_ID}"]
 
 
-async def test_rebuild_drops_the_collection_first(tmp_path: Path) -> None:
-    """Sprawdza, czy pełna odbudowa indeksu najpierw kasuje kolekcję, a dopiero potem zakłada ją
-    od nowa.
+async def test_rebuild_drops_both_indexes_first(tmp_path: Path) -> None:
+    """Sprawdza, czy pełna odbudowa korpusu z wątkami najpierw kasuje kolekcję i tabelę wątków,
+    a dopiero potem zakłada je od nowa.
 
-    Wyłapuje odbudowę, która nie kasuje starej kolekcji: punkty zgłoszeń, których w katalogu już
-    nie ma, zostałyby pod spodem i dalej wracały w wynikach wyszukiwania."""
-    _write(tmp_path, "1")
+    Wyłapuje odbudowę, która nie kasuje starego indeksu: punkty i wiersze zgłoszeń, których
+    w korpusie już nie ma, zostałyby pod spodem i dalej wracały w wynikach wyszukiwania."""
+    write_card(tmp_path, sample_card(ticket_id="1"))
+    write_thread(tmp_path, "1", sample_thread("1"))
 
-    tickets = FakeTickets()
+    tickets, threads = FakeTickets(), FakeThreads()
 
-    await _indexer(FakeEmbedder(), tickets).rebuild(tmp_path)
+    await tickets_indexer_on(tickets, threads).rebuild(TicketsCorpus(root=tmp_path))
+
+    assert tickets.calls[:2] == ["drop", "ensure"]
+    assert threads.calls     == ["drop", "create", "upsert:1"]
+
+
+async def test_rebuild_without_threads_keeps_the_table(tmp_path: Path) -> None:
+    """Sprawdza, czy przebudowa korpusu bez `anonymized/` kasuje i buduje kolekcję, a tabeli
+    wątków nie rusza.
+
+    Wyłapuje przebudowę golden setu, która kasuje tabelę wątków korpusu, choć nie ma czym jej
+    napełnić."""
+    write_card(tmp_path, sample_card(ticket_id="1"))
+
+    tickets, threads = FakeTickets(), FakeThreads()
+
+    await tickets_indexer_on(tickets, threads).rebuild(TicketsCorpus(root=tmp_path))
 
     assert tickets.calls[0] == "drop"
-    assert tickets.calls[1] == "ensure"
+    assert threads.calls    == []
 
 
 async def test_rebuild_is_idempotent(tmp_path: Path) -> None:
-    """Sprawdza, czy dwie odbudowy z tego samego katalogu dają punkty o tych samych
+    """Sprawdza, czy dwie odbudowy z tego samego korpusu dają punkty o tych samych
     identyfikatorach — identyfikator punktu wynika z numeru zgłoszenia.
 
     Wyłapuje identyfikatory nadawane losowo albo zależne od przebiegu: ponowna indeksacja
     dokładałaby wtedy drugi komplet punktów, zamiast nadpisać pierwszy."""
-    _write(tmp_path, "1")
-    _write(tmp_path, "2")
+    write_card(tmp_path, sample_card(ticket_id="1"))
+    write_card(tmp_path, sample_card(ticket_id="2"))
 
     first  = FakeTickets()
     second = FakeTickets()
 
-    await _indexer(FakeEmbedder(), first).rebuild(tmp_path)
-    await _indexer(FakeEmbedder(), second).rebuild(tmp_path)
+    await tickets_indexer_on(first).rebuild(TicketsCorpus(root=tmp_path))
+    await tickets_indexer_on(second).rebuild(TicketsCorpus(root=tmp_path))
 
     assert [p.point_id for p in first.points] == [p.point_id for p in second.points]
 
 
-async def test_rebuild_of_a_missing_directory_keeps_the_collection(tmp_path: Path) -> None:
-    """Sprawdza, czy przebudowa z katalogu, którego nie ma, kończy się `NotADirectoryError`
-    i nie kasuje kolekcji.
+async def test_rebuild_of_a_missing_directory_keeps_the_indexes(tmp_path: Path) -> None:
+    """Sprawdza, czy przebudowa korpusu, którego nie ma, kończy się `NotADirectoryError`
+    i nie kasuje kolekcji ani tabeli.
 
     Wyłapuje przebudowę, która najpierw kasuje, a dopiero potem szuka katalogu: literówka
     w ścieżce albo domyślny katalog, którego jeszcze nie ma, zostawiłyby pusty indeks."""
-    tickets = FakeTickets()
+    tickets, threads = FakeTickets(), FakeThreads()
 
     with pytest.raises(NotADirectoryError):
-        await _indexer(FakeEmbedder(), tickets).rebuild(tmp_path / "nie-ma")
+        await tickets_indexer_on(tickets, threads).rebuild(TicketsCorpus(root=tmp_path / "nie-ma"))
 
-    assert "drop" not in tickets.calls
+    assert "drop" not in tickets.calls + threads.calls
 
 
-async def test_rebuild_of_a_directory_without_cards_keeps_the_collection(tmp_path: Path) -> None:
-    """Sprawdza, czy przebudowa z katalogu bez kart kończy się `FileNotFoundError` i nie kasuje
-    kolekcji.
+async def test_rebuild_of_a_corpus_without_cards_keeps_the_indexes(tmp_path: Path) -> None:
+    """Sprawdza, czy przebudowa korpusu z pustym `cards/` kończy się `FileNotFoundError` i nie
+    kasuje kolekcji ani tabeli.
 
-    Wyłapuje przebudowę, która kasuje kolekcję, choć nie ma jej z czego odbudować: wyszukiwanie
-    zgłoszeń straciłoby cały indeks przez wskazanie pustego katalogu."""
-    tickets = FakeTickets()
+    Wyłapuje przebudowę, która kasuje indeksy, choć nie ma ich z czego odbudować: wyszukiwanie
+    zgłoszeń straciłoby cały indeks przez wskazanie pustego korpusu."""
+    corpus = TicketsCorpus(root=tmp_path)
+    corpus.cards_dir.mkdir()
+    corpus.anonymized_dir.mkdir()
+
+    tickets, threads = FakeTickets(), FakeThreads()
 
     with pytest.raises(FileNotFoundError):
-        await _indexer(FakeEmbedder(), tickets).rebuild(tmp_path)
+        await tickets_indexer_on(tickets, threads).rebuild(corpus)
 
-    assert "drop" not in tickets.calls
+    assert "drop" not in tickets.calls + threads.calls
+
+
+async def test_rebuild_with_a_card_without_its_thread_keeps_the_indexes(tmp_path: Path) -> None:
+    """Sprawdza, czy przebudowa korpusu z `anonymized/`, w którym karta nie ma wątku, kończy się
+    `FileNotFoundError` i nie kasuje kolekcji ani tabeli.
+
+    Wyłapuje przebudowę, która sprawdza wątki dopiero po skasowaniu: zepsuty korpus zostawiłby
+    puste indeksy, a do czasu naprawy korpusu agent nie miałby w czym szukać."""
+    write_card(tmp_path, sample_card(ticket_id="1"))
+    TicketsCorpus(root=tmp_path).anonymized_dir.mkdir()
+
+    tickets, threads = FakeTickets(), FakeThreads()
+
+    with pytest.raises(FileNotFoundError):
+        await tickets_indexer_on(tickets, threads).rebuild(TicketsCorpus(root=tmp_path))
+
+    assert "drop" not in tickets.calls + threads.calls
 
 
 async def test_missing_directory_is_an_error(tmp_path: Path) -> None:
-    """Sprawdza, czy wskazanie katalogu, którego nie ma, kończy się błędem `NotADirectoryError`.
+    """Sprawdza, czy wskazanie korpusu, którego nie ma, kończy się błędem `NotADirectoryError`.
 
     Wyłapuje indekser, który przy literówce w ścieżce kończy pracę bez błędu, z zerem zgłoszeń —
     pusty przebieg wyglądałby wtedy na udany."""
     with pytest.raises(NotADirectoryError):
-        await _indexer(FakeEmbedder(), FakeTickets()).build(tmp_path / "nie-ma")
+        await tickets_indexer_on(FakeTickets()).build(TicketsCorpus(root=tmp_path / "nie-ma"))
 
 
 async def test_empty_directory_indexes_nothing(tmp_path: Path) -> None:
-    """Sprawdza, czy pusty katalog daje pusty raport (wczytano 0, zaindeksowano 0), a nie
-    wyjątek.
+    """Sprawdza, czy korpus z pustym `cards/` daje pusty raport (wczytano 0, zaindeksowano 0),
+    a nie wyjątek.
 
     Wyłapuje indekser, który wywraca się, gdy nie ma czego indeksować. Co zrobić z pustym
     wynikiem, decyduje komenda, która indekser wywołała, więc musi dostać raport."""
-    report = await _indexer(FakeEmbedder(), FakeTickets()).build(tmp_path)
+    corpus = TicketsCorpus(root=tmp_path)
+    corpus.cards_dir.mkdir()
+
+    report = await tickets_indexer_on(FakeTickets()).build(corpus)
 
     assert report.read    == 0
     assert report.indexed == 0
@@ -324,30 +388,32 @@ async def test_silent_filter_is_reported(tmp_path: Path) -> None:
     zauważą: puste zgłoszenia wchodziłyby do indeksu, a jedynym sygnałem jest liczba
     odrzuconych."""
     for number in range(60):
-        _write(tmp_path, f"{number:04d}")
+        write_card(tmp_path, sample_card(ticket_id=f"{number:04d}"))
 
-    report = await _indexer(FakeEmbedder(), FakeTickets()).build(tmp_path)
+    report = await tickets_indexer_on(FakeTickets()).build(TicketsCorpus(root=tmp_path))
 
     assert report.warnings
 
 
-async def test_aclose_closes_the_embedder_and_the_collection() -> None:
-    """Sprawdza, czy zamknięcie indeksera zamyka i embedder, i kolekcję.
+async def test_aclose_closes_the_embedder_the_collection_and_the_table() -> None:
+    """Sprawdza, czy zamknięcie indeksera zamyka embedder, kolekcję i tabelę wątków.
 
     Wyłapuje połączenie zostawione otwarte: kto trzyma sam indekser, na przykład komenda,
     sprząta jednym wywołaniem i nie ma jak zamknąć reszty osobno."""
     embedder = FakeEmbedder()
     tickets  = FakeTickets()
+    threads  = FakeThreads()
 
-    await _indexer(embedder, tickets).aclose()
+    await tickets_indexer_on(tickets, threads, embedder=embedder).aclose()
 
     assert embedder.closed
     assert tickets.calls == ["aclose"]
+    assert threads.calls == ["aclose"]
 
 
 def test_indexer_takes_clients_it_does_not_build() -> None:
-    """Sprawdza, czy indekser da się zbudować z podanego embeddera i podanej kolekcji — tu
-    z prawdziwą klasą kolekcji i adresem, z którym test się nie łączy.
+    """Sprawdza, czy indekser da się zbudować z podanego embeddera, podanej kolekcji i podanej
+    tabeli — tu z prawdziwymi klasami kolekcji i tabeli i adresami, z którymi test się nie łączy.
 
     Wyłapuje konstruktor, który przestał przyjmować gotowych klientów albo przy budowie sam
     sięga po sieć: indekser zależałby wtedy od działającej usługi, a testy z tego pliku nie
@@ -357,6 +423,14 @@ def test_indexer_takes_clients_it_does_not_build() -> None:
         name        = "tickets",
         vector_size = VECTOR_SIZE,
     )
-    indexer = TicketsIndexer(embedder=FakeEmbedder(), tickets=tickets)
+    postgres = PostgresClient(
+        host     = "postgres",
+        port     = 5432,
+        database = "helpdesk",
+        user     = "helpdesk",
+        password = "haslo",
+    )
+    threads = TicketsTable(postgres)
+    indexer = TicketsIndexer(embedder=FakeEmbedder(), tickets=tickets, threads=threads)
 
     assert indexer is not None

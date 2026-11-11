@@ -56,9 +56,9 @@ async def test_the_service_writes_where_the_configuration_points() -> None:
     service = build_closed_ticket_indexer(settings)
 
     try:
-        assert service._corpus.root         == Path("/dane/korpus")
-        assert service._cards._tickets.name == "zgloszenia"
-        assert service._threads.name        == TICKETS_TABLE
+        assert service._corpus.root           == Path("/dane/korpus")
+        assert service._indexer._tickets.name == "zgloszenia"
+        assert service._indexer._threads.name == TICKETS_TABLE
     finally:
         await service.aclose()
 
@@ -74,8 +74,8 @@ async def test_the_built_service_closes_its_clients() -> None:
 
     await service.aclose()
 
-    assert service._cards._embedder._client.is_closed
-    assert service._cards._tickets._client._client.is_closed
+    assert service._indexer._embedder._client.is_closed
+    assert service._indexer._tickets._client._client.is_closed
 
 
 @pytest.mark.parametrize("provider", ["fake", " Fake "])

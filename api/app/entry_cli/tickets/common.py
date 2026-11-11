@@ -4,16 +4,18 @@ from pathlib import Path
 import typer
 
 from app.config import Settings
+from app.core_model.tickets.tickets_corpus import TicketsCorpus
 from app.core_model.tickets.tickets_index_report import TicketsIndexReport
 from app.core_service.factory_tickets_indexer import build_tickets_indexer
+from app.db_postgres import DbPostgresError
 from app.db_qdrant import DbQdrantError
 from app.engine_embedding import EmbeddingError
 
-# Wspólne dla `tickets index` i `tickets reindex` — różni je wyłącznie to, czy kolekcja jest
-# najpierw kasowana.
+# Wspólne dla `tickets index` i `tickets reindex` — różni je wyłącznie to, czy indeksy są
+# najpierw kasowane.
 
-# Pomoc argumentu z katalogiem kart, wspólna dla `validate`, `index` i `reindex`.
-CARDS_DIR_HELP = "Katalog z kartami; bez niego cards/ korpusu z TICKETS_CORPUS_DIR."
+# Pomoc argumentu z katalogiem korpusu, wspólna dla `validate`, `index` i `reindex`.
+CORPUS_DIR_HELP = "Katalog korpusu z cards/ i anonymized/; bez niego TICKETS_CORPUS_DIR."
 
 # Pomoc flagi `--verbose` w `index` i `reindex`.
 VERBOSE_DROPS_HELP = "Wypisz wszystkie odrzucone."
@@ -46,6 +48,12 @@ def _print_report(
         f"Wczytano {report.read}, zaindeksowano {report.indexed}, odrzucono {report.dropped}."
     )
 
+    # --- tabela wątków: zapisana albo świadomie pominięta ---
+    if report.threads is None:
+        typer.echo("Korpus bez katalogu anonymized/: tabela wątków bez zmian.")
+    else:
+        typer.echo(f"Wątków w tabeli: {report.threads}.")
+
     # --- dlaczego rekordy odpadły ---
     by_reason = report.filtered.by_reason()
 
@@ -68,30 +76,30 @@ def _print_report(
         typer.echo(f"\nUWAGA: {warning}")
 
 
-def cards_dir_or_default(
+def corpus_or_default(
     directory: Path | None,  # np. None — komenda bez katalogu
-) -> Path:
+) -> TicketsCorpus:
     """
     Description:
-    Zwraca katalog kart dla komendy: podany wprost albo, gdy go nie podano, `cards/` korpusu
-    z konfiguracji (`TICKETS_CORPUS_DIR`). Wspólne dla `validate`, `index` i `reindex`, żeby
-    wszystkie trzy bez argumentu patrzyły w to samo miejsce.
+    Zwraca korpus dla komendy: z podanego katalogu albo, gdy go nie podano, z konfiguracji
+    (`TICKETS_CORPUS_DIR`). Wspólne dla `validate`, `index` i `reindex`, żeby wszystkie trzy bez
+    argumentu patrzyły w to samo miejsce.
 
     Example args:
-        directory=None
+        directory=Path("data/unsafe/golden")
 
     Example result:
-        Path("/code/data/unsafe/corpus/cards")
+        TicketsCorpus(root=Path("data/unsafe/golden"))
     """
     if directory is not None:
-        return directory
+        return TicketsCorpus(root=directory)
 
-    return Settings().tickets_corpus().cards_dir
+    return Settings().tickets_corpus()
 
 
 async def _run(
-    directory:  Path,  # np. Path("data/unsafe/corpus/cards")
-    drop_first: bool,  # np. True — przebudowa zamiast budowy
+    corpus:     TicketsCorpus,  # np. TicketsCorpus(root=Path("data/unsafe/corpus"))
+    drop_first: bool,           # np. True — przebudowa zamiast budowy
 ) -> TicketsIndexReport:
     """
     Description:
@@ -99,33 +107,34 @@ async def _run(
     przebieg padnie w połowie.
 
     Example args:
-        directory=Path("data/unsafe/corpus/cards")
+        corpus=TicketsCorpus(root=Path("data/unsafe/corpus"))
         drop_first=False
 
     Example result:
-        TicketsIndexReport(read=200, indexed=171, …)
+        TicketsIndexReport(read=200, indexed=171, threads=171, …)
 
     Raises:
-        NotADirectoryError: katalog z artefaktami nie istnieje
-        FileNotFoundError: przebudowa na katalogu bez kart
+        NotADirectoryError: katalog kart nie istnieje
+        FileNotFoundError: przebudowa bez kart albo karta bez wątku w `anonymized/`
         EmbeddingError: embedder nieosiągalny albo odpowiedział błędem
         DbQdrantError: Qdrant nieosiągalny albo odrzucił zapis
+        DbPostgresError: Postgres nieosiągalny albo odrzucił zapis
     """
     indexer = build_tickets_indexer(Settings())
 
     try:
         if drop_first:
-            return await indexer.rebuild(directory)
+            return await indexer.rebuild(corpus)
 
-        return await indexer.build(directory)
+        return await indexer.build(corpus)
     finally:
         await indexer.aclose()
 
 
 def execute_index_build(
-    directory:  Path,  # np. Path("data/unsafe/corpus/cards")
-    drop_first: bool,  # np. False
-    verbose:    bool,  # np. False
+    corpus:     TicketsCorpus,  # np. TicketsCorpus(root=Path("data/unsafe/corpus"))
+    drop_first: bool,           # np. False
+    verbose:    bool,           # np. False
 ) -> None:
     """
     Description:
@@ -133,7 +142,7 @@ def execute_index_build(
     Wspólne dla `tickets index` i `tickets reindex`.
 
     Example args:
-        directory=Path("data/unsafe/corpus/cards")
+        corpus=TicketsCorpus(root=Path("data/unsafe/corpus"))
         drop_first=False
         verbose=False
 
@@ -141,22 +150,22 @@ def execute_index_build(
         None — wypisuje raport; kod wyjścia niezerowy przy porażce
 
     Raises:
-        typer.Exit: kod 2 przy braku katalogu, przebudowie bez kart albo nieosiągalnej usłudze,
-            kod 1, gdy nic nie zaindeksowano
+        typer.Exit: kod 2 przy braku katalogu kart, przebudowie bez kart, karcie bez wątku albo
+            nieosiągalnej usłudze, kod 1, gdy nic nie zaindeksowano
     """
     try:
-        report = asyncio.run(_run(directory, drop_first))
+        report = asyncio.run(_run(corpus, drop_first))
     except NotADirectoryError as exc:
         # Kod 2 oddziela „wskazałeś nic" od „przebieg nic nie dał" — potok musi odróżnić złą
         # konfigurację od rzeczywiście pustego wyniku.
         typer.echo(f"BŁĄD: {exc}", err=True)
         raise typer.Exit(code=2) from exc
     except FileNotFoundError as exc:
-        # Przebudowa na katalogu bez kart: indekser odmówił, zanim cokolwiek skasował, więc
-        # kolekcja stoi nietknięta — to też „wskazałeś nic”.
+        # Przebudowa bez kart albo karta bez wątku: indekser odmówił, zanim cokolwiek zapisał
+        # albo skasował, więc indeksy stoją nietknięte — korpus trzeba najpierw poprawić.
         typer.echo(f"BŁĄD: {exc}", err=True)
         raise typer.Exit(code=2) from exc
-    except (EmbeddingError, DbQdrantError) as exc:
+    except (EmbeddingError, DbQdrantError, DbPostgresError) as exc:
         # Leżąca zależność to też 2: ponowienie tej samej komendy może zadziałać, pusty korpus
         # sam się nie naprawi.
         typer.echo(f"BŁĄD: {exc}", err=True)

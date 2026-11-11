@@ -6,6 +6,19 @@ przyjętą dokłada do Qdranta, a jej wątek do tabeli wątków w Postgresie; ka
 z obu, bo zgłoszenie zamknięte ponownie mogło tam stać z poprzednią kartą. Woła go trasa
 zamknięcia zgłoszenia, po bramce i grafie karty.
 
+To nie jest drugi indekser. Same indeksy, czyli kolekcję kart i tabelę wątków, obsługuje
+zwykły indekser zgłoszeń (`TicketsIndexer`, ten sam, na którym stoją komendy
+`helpdesk tickets index` i `reindex`). Ten serwis dokłada do niego tylko to, czego potrzebuje
+pojedyncze zamknięte zgłoszenie:
+
+| co dokłada                       | po co                                                   |
+|----------------------------------|---------------------------------------------------------|
+| zapis trzech plików w korpusie   | pliki są źródłem prawdy, z którego odbudowuje się       |
+|                                  | indeksy                                                 |
+| ocenę jednej karty filtrem       | przyjęta idzie do indeksów, odrzucona z nich wypada     |
+| raport `ClosedTicketReport`      | trasa mówi wołającemu, czy karta zastąpiła wcześniejszą |
+|                                  | i czy jest w indeksach                                  |
+
 Przed — zgłoszenie 41002 po bramce i grafie karty:
 
     RawTicket(ticket_id="41002", body="Od wczoraj nie przychodzą przesyłki…", …)
@@ -24,8 +37,10 @@ Co się dzieje po drodze:
 1. Trzy pliki trafiają na dysk, karta ostatnia, więc karta nie leży nigdy bez swojego wątku.
    Zgłoszenie zamknięte ponownie nadpisuje wszystkie trzy.
 2. Filtr jakości ocenia kartę (`evaluate_ticket()`).
-3. Karta przyjęta: punkt w Qdrancie (`TicketsIndexer.add()`) i wiersz w tabeli wątków.
-4. Karta odrzucona: punkt i wiersz tego numeru są usuwane, jeśli były.
+3. Karta przyjęta: indekser zgłoszeń dokłada punkt w Qdrancie i wiersz w tabeli wątków
+   (`TicketsIndexer.add()`).
+4. Karta odrzucona: indekser usuwa punkt i wiersz tego numeru, jeśli były
+   (`TicketsIndexer.remove()`).
 
 O czym pamiętać przy zmianach:
 
@@ -45,7 +60,6 @@ from app.core_model.tickets.raw_ticket import RawTicket
 from app.core_model.tickets.tickets_corpus import TicketsCorpus
 from app.core_service.filter_ticket_quality import evaluate_ticket
 from app.core_service.indexer_tickets import TicketsIndexer
-from app.db_postgres import TicketRow, TicketsTable
 from app.engine_anonymization import AnonymizedText
 
 logger = logging.getLogger(__name__)
@@ -54,8 +68,8 @@ logger = logging.getLogger(__name__)
 class ClosedTicketIndexer:
     """
     Description:
-    Zapisuje zamknięte zgłoszenie do korpusu i uzgadnia z nim indeksy: Qdranta z kartami i tabelę
-    wątków w Postgresie.
+    Zapisuje zamknięte zgłoszenie do korpusu i uzgadnia z nim indeksy zgłoszeń: Qdranta z kartami
+    i tabelę wątków w Postgresie, obie przez indekser zgłoszeń.
 
     Do czego:
     Noga 2 karmi nogę 1: zgłoszenie zamknięte z pozytywnym werdyktem bramki staje się materiałem
@@ -66,32 +80,30 @@ class ClosedTicketIndexer:
         1. `add()` sprawdza, że trzy części dotyczą jednego zgłoszenia.
         2. `_write()` zapisuje pliki i mówi, czy karta tego numeru już była w korpusie.
         3. Filtr jakości ocenia kartę.
-        4. `_index()` dokłada kartę przyjętą do obu indeksów, `_remove()` usuwa odrzuconą.
+        4. Indekser zgłoszeń dokłada kartę przyjętą do obu indeksów albo usuwa z nich odrzuconą.
         5. `aclose()` zamyka połączenia, na których serwis stoi.
     """
 
     def __init__(
         self,
         corpus:  TicketsCorpus,   # np. Settings().tickets_corpus()
-        cards:   TicketsIndexer,  # np. build_tickets_indexer(Settings())
-        threads: TicketsTable,    # np. TicketsTable(PostgresClient(…))
+        indexer: TicketsIndexer,  # np. build_tickets_indexer(Settings())
     ):
         """
         Description:
-        Spina serwis z katalogiem korpusu, indekserem kart i tabelą wątków. Wszystkie trzy są
-        wstrzykiwane: serwis nie składa klientów sam (zasada 4).
+        Spina serwis z katalogiem korpusu i indekserem zgłoszeń. Oba są wstrzykiwane: serwis nie
+        składa klientów sam (zasada 4).
 
         Example args:
             corpus=TicketsCorpus(root=Path("/code/data/unsafe/corpus"))
-            cards=TicketsIndexer(embedder=EmbeddingClient(…), tickets=TicketsCollection(…))
-            threads=TicketsTable(PostgresClient(…))
+            indexer=TicketsIndexer(embedder=EmbeddingClient(…), tickets=TicketsCollection(…),
+                                   threads=TicketsTable(PostgresClient(…)))
 
         Example result:
             ClosedTicketIndexer piszący do `/code/data/unsafe/corpus` i obu indeksów
         """
         self._corpus  = corpus
-        self._cards   = cards
-        self._threads = threads
+        self._indexer = indexer
 
     async def add(
         self,
@@ -127,9 +139,9 @@ class ClosedTicketIndexer:
         verdict  = evaluate_ticket(card)
 
         if verdict.keep:
-            await self._index(card, thread)
+            await self._indexer.add(card, thread)
         else:
-            await self._remove(card.ticket_id)
+            await self._indexer.remove([card.ticket_id])
 
         logger.info(
             "closed ticket ticket_id=%s replaced=%s indexed=%s dropped_by=%s",
@@ -151,7 +163,7 @@ class ClosedTicketIndexer:
     async def aclose(self) -> None:
         """
         Description:
-        Zamyka połączenia indeksera kart i tabeli wątków. Sprzątający woła tylko to.
+        Zamyka połączenia indeksera zgłoszeń. Sprzątający woła tylko to.
 
         Example args:
             (brak)
@@ -159,8 +171,7 @@ class ClosedTicketIndexer:
         Example result:
             None
         """
-        await self._cards.aclose()
-        await self._threads.aclose()
+        await self._indexer.aclose()
 
     def _write(
         self,
@@ -199,49 +210,3 @@ class ClosedTicketIndexer:
             path.write_text(text, encoding="utf-8")
 
         return replaced
-
-    async def _index(
-        self,
-        card:   ParsedTicket,    # np. ParsedTicket(ticket_id="41002", …)
-        thread: AnonymizedText,  # np. AnonymizedText(text="ZGŁOSZENIE 41002…")
-    ) -> None:
-        """
-        Description:
-        Dokłada kartę przyjętą do Qdranta, a jej wątek do tabeli wątków; tabelę zakłada, gdy jej
-        nie ma. Punkt i wiersz tego samego numeru są nadpisywane.
-
-        Example args:
-            card=ParsedTicket(ticket_id="41002", …)
-            thread=AnonymizedText(text="ZGŁOSZENIE 41002 z 2026-11-11\\nTemat: …")
-
-        Example result:
-            None
-
-        Raises:
-            ValueError: w wątku nie ma linii z tematem
-        """
-        row = TicketRow.from_thread(card.ticket_id, card.date, thread.text)
-
-        await self._cards.add([card])
-        await self._threads.create()
-        await self._threads.upsert([row])
-
-    async def _remove(
-        self,
-        ticket_id: str,  # np. "41002"
-    ) -> None:
-        """
-        Description:
-        Usuwa z obu indeksów punkt i wiersz zgłoszenia, którego karta odpadła w filtrze; gdy ich
-        nie było, nic się nie dzieje. Pliki zostają w korpusie: filtr może się zmienić,
-        a przebudowa indeksu oceni kartę od nowa.
-
-        Example args:
-            ticket_id="41002"
-
-        Example result:
-            None
-        """
-        await self._cards.remove([ticket_id])
-        await self._threads.create()
-        await self._threads.delete([ticket_id])
