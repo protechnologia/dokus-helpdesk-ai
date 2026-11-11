@@ -1,12 +1,15 @@
 """
 Description:
-Zmyślone zamknięte zgłoszenie do testów serwisu `ClosedTicketIndexer`: zgłoszenie z trasy, jego
-wątek po anonimizacji i karta. Pakiet helpera tego pliku nie wystawia — test importuje próbki
-z tego modułu.
+Zmyślone zamknięte zgłoszenie do testów serwisu `ClosedTicketIndexer` i trasy
+`POST /tickets/closed`: zgłoszenie z trasy, jego wątek po anonimizacji i karta, żądanie do trasy
+z tym samym zgłoszeniem oraz werdykty bramki. Pakiet helpera tego pliku nie wystawia — test
+importuje próbki z tego modułu.
 """
 
 from datetime import date
+from typing import Any
 
+from app.core_model.graphs.verdict import Verdict
 from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_model.tickets.raw_comment import RawComment
 from app.core_model.tickets.raw_ticket import RawTicket
@@ -107,3 +110,68 @@ def sample_card(
     }
 
     return ParsedTicket(**fields)
+
+
+def sample_request(
+    ticket_id: str = TICKET_ID,  # np. "41003" — gdy test potrzebuje innego numeru
+) -> dict[str, Any]:
+    """
+    Description:
+    Zwraca treść żądania do trasy zamknięcia z tym samym zgłoszeniem co `sample_raw_ticket()`:
+    trasa robi z niego dokładnie to zgłoszenie.
+
+    Example args:
+        ticket_id="41002"
+
+    Example result:
+        {"ticket_id": "41002", "date": "2026-11-11", "subject": "Brak przesyłek…", …}
+    """
+    raw = sample_raw_ticket(ticket_id)
+
+    request = {
+        "ticket_id": raw.ticket_id,
+        "date":      raw.date.isoformat(),
+        "category":  raw.category,
+        "subject":   raw.subject,
+        "body":      raw.body,
+        "comments":  [
+            {"role": comment.role, "created_at": comment.created_at, "body": comment.body}
+            for comment in raw.comments
+        ],
+    }
+
+    return request
+
+
+def sample_pass() -> Verdict:
+    """
+    Description:
+    Zwraca werdykt bramki, który przepuszcza zamknięcie.
+
+    Example args:
+        (brak)
+
+    Example result:
+        Verdict(verdict="pass", reasons=[], hint="")
+    """
+    return Verdict(verdict="pass")
+
+
+def sample_block() -> Verdict:
+    """
+    Description:
+    Zwraca werdykt bramki, który blokuje zamknięcie, z uzasadnieniem i wskazówką.
+
+    Example args:
+        (brak)
+
+    Example result:
+        Verdict(verdict="block", reasons=["Nie widać, co zrobiono."], hint="Dopisz, …")
+    """
+    verdict = Verdict(
+        verdict = "block",
+        reasons = ["Nie widać, co zrobiono."],
+        hint    = "Dopisz, co zmieniono w kolejce odbioru.",
+    )
+
+    return verdict

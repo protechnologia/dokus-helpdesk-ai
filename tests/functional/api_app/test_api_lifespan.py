@@ -6,18 +6,24 @@ from app.main import create_app
 
 @pytest.mark.parametrize(
     "closer",
-    ["close_process_agent_tools", "close_process_anonymizer", "close_process_index_inspector"],
+    [
+        "close_process_agent_tools",
+        "close_process_anonymizer",
+        "close_process_index_inspector",
+        "close_process_closed_ticket_indexer",
+    ],
 )
 def test_shutting_the_app_down_closes_process_clients(
     monkeypatch: pytest.MonkeyPatch,
     closer:      str,
 ) -> None:
-    """Sprawdza, czy wyłączenie aplikacji woła zamknięcie narzędzi agenta, anonimizatora i serwisu
-    liczącego indeksy, każde dokładnie raz, dopiero po zakończeniu obsługi żądań.
+    """Sprawdza, czy wyłączenie aplikacji woła zamknięcie narzędzi agenta, anonimizatora, serwisu
+    liczącego indeksy i serwisu korpusu zgłoszeń, każde dokładnie raz, dopiero po zakończeniu
+    obsługi żądań.
 
     Wyłapuje aplikację, która przy wyłączaniu zostawia otwartą pulę połączeń z Postgresem,
     połączenia do embeddera i Qdranta, połączenia do usługi `anonymizer` albo połączenia
-    serwisu trasy `GET /instance`."""
+    serwisów tras `GET /instance` i `POST /tickets/closed`."""
     closed: list[str] = []
 
     async def close() -> None:

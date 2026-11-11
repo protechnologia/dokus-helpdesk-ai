@@ -18,4 +18,9 @@ na zgłoszenie, źródła, zużycie, log). Modele API są odrębne od domenowych
 | `parse_ticket/` | `POST /parse-ticket`                   | `parse_ticket`             |
 | `suggest/`      | `POST /suggest`, `GET /variants`       | `suggest_*` z rejestru     |
 | `polish/`       | `POST /polish`                         | `polish`                   |
+| `tickets/`      | `POST /tickets/closed`                 | `gate_close`, przy „pass”  |
+|                 |                                        | `parse_ticket`             |
+
+`POST /tickets/closed` jako jedyna uruchamia dwa grafy i po nich zapis w korpusie, więc nie ma
+strumienia przebiegu.
 """

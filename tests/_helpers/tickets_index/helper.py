@@ -11,17 +11,32 @@ kolejność i treść tego, co serwis robi, bez usług.
 | `FakeThreads`  | `TicketsTable`      | wywołania (`create`, `upsert`, `delete`…) i wiersze |
 
 `closed_ticket_indexer_on()` składa na nich serwis zamkniętego zgłoszenia, z prawdziwym
-indekserem kart pomiędzy.
+indekserem kart pomiędzy. Do testów trasy `POST /tickets/closed`: `ReplacingAnonymizer`, który
+zamienia jeden fragment na znaczniki (po nim widać, który wątek trafił do korpusu),
+`card_graph()` — graf karty z atrapą modelu i prawdziwym węzłem `respond` — oraz
+`app_closing_tickets()`, aplikacja z atrapą bramki, tym grafem karty i podanym serwisem.
 """
 
 from pathlib import Path
 
+from fastapi import FastAPI
+from langgraph.graph.state import CompiledStateGraph
+
+from app.agent_graphs import gate_close, parse_ticket
+from app.agent_graphs.factory import get_graph_builder
+from app.agent_nodes.agent import FakeAgentNode, tool_call_turn
+from app.agent_nodes.anonymize import AnonymizeNode
+from app.core_model.graphs.verdict import Verdict
+from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_model.tickets.tickets_corpus import TicketsCorpus
+from app.core_service.factory_closed_ticket_indexer import get_closed_ticket_indexer
 from app.core_service.indexer_closed_ticket import ClosedTicketIndexer
 from app.core_service.indexer_tickets import TicketsIndexer
 from app.db_postgres import TicketRow
 from app.db_qdrant import TicketPoint
+from app.engine_anonymization import AnonymizedText, Anonymizer, AnonymizerInfo, FakeAnonymizer
 from app.engine_embedding import Embeddings
+from app.main import create_app
 from tests._helpers.embedding import EMBEDDING_MODEL
 from tests._helpers.tickets_index.constants import VECTOR_SIZE
 
@@ -321,3 +336,133 @@ def closed_ticket_indexer_on(
     )
 
     return indexer
+
+
+class ReplacingAnonymizer(Anonymizer):
+    """
+    Description:
+    Anonimizator do testów, który zamienia jeden podany fragment na podane znaczniki i zapisuje
+    każdy tekst, który dostał.
+
+    Stub, bo `FakeAnonymizer` oddaje tekst bez zmian, więc wątek przed anonimizacją i po niej
+    wyglądałyby tak samo i test nie odróżniłby, który z nich trafił do korpusu.
+    """
+
+    def __init__(
+        self,
+        fragment: str,  # np. "Anna Nowak"
+        markers:  str,  # np. "{IMIĘ} {NAZWISKO}"
+    ) -> None:
+        """
+        Description:
+        Zapamiętuje, co zamieniać i na co, z pustym dziennikiem tekstów.
+
+        Example args:
+            fragment="Anna Nowak"
+            markers="{IMIĘ} {NAZWISKO}"
+
+        Example result:
+            ReplacingAnonymizer z pustym `texts`
+        """
+        self.texts: list[str] = []
+        self._fragment = fragment
+        self._markers  = markers
+
+    async def anonymize(
+        self,
+        text: str,  # np. "…potwierdziła Anna Nowak."
+    ) -> AnonymizedText:
+        """
+        Description:
+        Zapisuje tekst i oddaje go z fragmentem zamienionym na znaczniki.
+
+        Example args:
+            text="…potwierdziła Anna Nowak."
+
+        Example result:
+            AnonymizedText(text="…potwierdziła {IMIĘ} {NAZWISKO}.")
+        """
+        self.texts.append(text)
+
+        return AnonymizedText(text=text.replace(self._fragment, self._markers))
+
+    async def describe(self) -> AnonymizerInfo:
+        """
+        Description:
+        Przedstawia się jak atrapa anonimizatora.
+
+        Example args:
+            (brak)
+
+        Example result:
+            AnonymizerInfo(available=True, engine="fake", model=None)
+        """
+        return await FakeAnonymizer().describe()
+
+
+def card_graph(
+    anonymizer: Anonymizer,    # np. ReplacingAnonymizer("Anna Nowak", "{IMIĘ} {NAZWISKO}")
+    card:       ParsedTicket,  # np. sample_card() — pola, które poda atrapa modelu
+) -> CompiledStateGraph:
+    """
+    Description:
+    Graf karty z atrapą modelu, która odpowiada polami podanej karty bez pól wypełnianych przez
+    graf, i z prawdziwym węzłem `respond`, który dokłada numer, datę, wersję słownika i model ze
+    stanu. Atrapa grafu z pakietu oddaje kartę w całości, więc nie pokazałaby, czy trasa włożyła
+    do stanu numer i datę zgłoszenia. Graf jest jednorazowy.
+
+    Example args:
+        anonymizer=ReplacingAnonymizer("Anna Nowak", "{IMIĘ} {NAZWISKO}")
+        card=sample_card()
+
+    Example result:
+        CompiledStateGraph, który oddaje kartę z numerem i datą ze stanu
+    """
+    answer = tool_call_turn(
+        parse_ticket.RESPOND_TOOL_NAME,
+        card.model_dump(mode="json", exclude=set(parse_ticket.FILLED_BY_GRAPH)),
+    )
+
+    graph = parse_ticket.build_graph(
+        anonymize = AnonymizeNode(anonymizer),
+        agent     = FakeAgentNode([answer]),
+        respond   = parse_ticket.respond_node(),
+    )
+
+    return graph
+
+
+def app_closing_tickets(
+    corpus:          ClosedTicketIndexer,  # np. closed_ticket_indexer_on(tmp_path, …)
+    verdict:         Verdict,              # np. Verdict(verdict="pass") — werdykt atrapy bramki
+    card:            ParsedTicket,         # np. sample_card() — pola karty od atrapy modelu
+    card_anonymizer: Anonymizer,           # np. ReplacingAnonymizer("Anna Nowak", "{IMIĘ} …")
+) -> FastAPI:
+    """
+    Description:
+    Aplikacja, w której trasa `POST /tickets/closed` dostaje atrapę bramki z podanym werdyktem,
+    graf karty z `card_graph()` i podany serwis korpusu. Bramka anonimizuje atrapą, która oddaje
+    tekst bez zmian, a graf karty podanym anonimizatorem: wątki obu grafów się różnią, więc
+    widać, który trafił do korpusu, a po dzienniku podanego anonimizatora — czy graf karty
+    ruszył. Każde żądanie buduje oba grafy od nowa, jak fabryka grafów, więc to samo zgłoszenie
+    da się zamknąć dwa razy.
+
+    Example args:
+        corpus=closed_ticket_indexer_on(tmp_path, FakeTickets(), FakeThreads())
+        verdict=Verdict(verdict="pass")
+        card=sample_card()
+        card_anonymizer=ReplacingAnonymizer("Anna Nowak", "{IMIĘ} {NAZWISKO}")
+
+    Example result:
+        FastAPI, której `POST /tickets/closed` pisze do katalogu korpusu testu
+    """
+    graphs = {
+        gate_close:   lambda: gate_close.build_fake_graph(FakeAnonymizer(), verdict),
+        parse_ticket: lambda: card_graph(card_anonymizer, card),
+    }
+
+    app = create_app()
+    app.dependency_overrides[get_graph_builder]         = lambda: lambda module: graphs[module]()
+    app.dependency_overrides[get_closed_ticket_indexer] = lambda: corpus
+
+    return app

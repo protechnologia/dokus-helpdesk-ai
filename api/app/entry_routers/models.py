@@ -28,7 +28,7 @@ class TicketRequest(BaseModel):
     """
     Description:
     Zgłoszenie w kształcie, w jakim helpdesk już je trzyma — wejście `/search`, `/gate/close`,
-    `/parse-ticket` i `/suggest`.
+    `/parse-ticket`, `/suggest` i `/tickets/closed`.
 
     Wymagane tylko `ticket_id` i `body`: id wiąże odpowiedź ze zgłoszeniem w logach i w przyszłym
     feedbacku, a `body` JEST treścią. Reszta opisuje zgłoszenie, nie sterując odpowiedzią, więc

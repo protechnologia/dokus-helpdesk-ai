@@ -1675,9 +1675,21 @@ Wspólne:
   z kodu (`source` „code") to fragment zacytowany jako przyczyna: `item_id` niesie ścieżkę pliku
   z zakresem linii, a daty nie ma (2026-10-07). Z której gałęzi kodu pochodzi, mówi tytuł
   źródła (2026-10-12); osobnego pola z gałęzią odpowiedź nie ma.
-- **Wspólne żądanie `TicketRequest` dla `/search`, `/gate/close`, `/parse-ticket` i `/suggest`**;
-  trasa robi z niego `RawTicket.as_thread()`, czyli ten sam tekst wątku, który widzi parser
-  korpusu. `/gate/reply` i `/polish` biorą samą wiadomość albo notatki.
+- **Wspólne żądanie `TicketRequest` dla `/search`, `/gate/close`, `/parse-ticket`, `/suggest`
+  i `/tickets/closed`**; trasa robi z niego `RawTicket.as_thread()`, czyli ten sam tekst wątku,
+  który widzi parser korpusu. `/gate/reply` i `/polish` biorą samą wiadomość albo notatki.
+- **`POST /tickets/closed` dokłada zamknięte zgłoszenie do korpusu (2026-11-11, p. 30).** Trasa
+  uruchamia bramkę zamknięcia. Przy „pass” uruchamia na tym samym wątku graf `parse_ticket`, a kartę
+  oddaje `ClosedTicketIndexer` razem z wątkiem po anonimizacji z grafu karty, tym, z którego
+  powstała karta. Przy „block” korpus i indeksy zostają bez zmian. Odpowiedź ma werdykt pod tymi
+  samymi nazwami co `/gate/close` (z furtką i wersją reguł), więc helpdesk obsługuje go jednym
+  kodem. Do tego `outcome` (`blocked`, `indexed` albo `dropped`), `replaced`, `useful_reason`,
+  `dropped_by` oraz `usage` i `log` obu grafów. Odpowiada tylko JSON-em: uruchamia dwa grafy i
+  zapis, więc `GraphResponder` jej nie obsługuje. Awaria indeksu po zapisie plików to 503, a pliki
+  zostają. Serwis korpusu powstaje raz na proces. Przy atrapie modelu generującego trasa kończy się
+  błędem konfiguracji (500), zanim cokolwiek uruchomi: atrapa grafu karty oddaje zawsze tę samą
+  kartę, a anonimizator przyjmuje wtedy tekst bez zmian. Cena: zgłoszenie anonimizuje się dwa razy,
+  raz na graf (do p. 74).
 - **Odpowiedź bramki: `overridable` zawsze `true` i `rules_version`** — furtka jest kontraktem
   (zasada 10), a wersja zestawu reguł pozwala odtworzyć, dlaczego wczoraj przeszło. Reguły bierze
   trasa z `get_rule_set()`, nigdy z żądania.
@@ -3852,7 +3864,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/transport/`            | test klienta HTTP: `with_transport()`, `always()`, `routed()`, `capturing()`, `raising()` |
 | `tests/_helpers/anonymization/`        | anonimizacja: zmyślone zgłoszenie z danymi osobowymi i jego postać po anonimizacji, fragmenty, których nie wolno zobaczyć w logach (`SENSITIVE`), klient usługi `anonymizer` na atrapie transportu (`anonymizer_client_on()`), odpowiedź usługi (`service_answer()`) i sprawdzenie, czy anonimizator przyjmuje wynik atrapy silnika (`accepts_the_fake_engine()`) |
 | `tests/_helpers/postgres/`             | narzędzie na prawdziwej tabeli z podmienionym klientem (`ScriptedPostgres`), także liczenie wierszy albo jego błąd (`count_error`) |
-| `tests/_helpers/tickets_index/`        | indekser zgłoszeń i serwis zamkniętego zgłoszenia: atrapy embeddera, kolekcji zgłoszeń i tabeli wątków (`FakeEmbedder`, `FakeTickets`, `FakeThreads`), serwis na nich (`closed_ticket_indexer_on()`); próbki zamkniętego zgłoszenia w `samples.py` |
+| `tests/_helpers/tickets_index/`        | indekser zgłoszeń, serwis zamkniętego zgłoszenia i trasa `POST /tickets/closed`: atrapy embeddera, kolekcji zgłoszeń i tabeli wątków (`FakeEmbedder`, `FakeTickets`, `FakeThreads`), serwis na nich (`closed_ticket_indexer_on()`), anonimizator zamieniający jeden fragment (`ReplacingAnonymizer`), graf karty z prawdziwym węzłem `respond` (`card_graph()`) i aplikacja trasy na tym wszystkim (`app_closing_tickets()`); próbki zamkniętego zgłoszenia, żądania i werdyktów w `samples.py` |
 | `tests/_helpers/instance/`             | stan instancji: serwis liczący indeksy na atrapach Qdranta i Postgresa (`scripted_inspector()`, `inspector_on()`, klienci `counting_*` i `failing_*`), aplikacja z podanym serwisem (`app_with_inspector()`); próbki `sample_*()` w `samples.py` — raport stanu, paczka kodu, konfiguracja modelu |
 | `tests/_helpers/embedding/`            | embedding: nazwy modeli testowych (`EMBEDDING_MODEL`, `OTHER_MODEL`), odpowiedź usługi `embedder` w kształcie kontraktu (`embedder_answer()`) i payload punktu Qdranta z nazwą modelu (`with_model()`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
