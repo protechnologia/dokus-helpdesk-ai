@@ -850,11 +850,11 @@ wymagające czyszczenia cytowanej historii przed parsowaniem.
   wątek bywa zapisem dochodzenia i **fałszywy trop podsuwa sam komunikat błędu** („java heap
   space" → rozwiązaniem była przeinstalacja, nie pamięć), więc odrzuconą hipotezę trzeba zapisać ·
   `cause` nie ma kolumny, ale zwykle jest w treści rozwiązania.
-- **Rozstrzygnięte w kodzie, nie wracać:** treści są w HTML (strip + unescape w adapterze) ·
-  zrzut zawiera hasła w `konsultant.haslo`, `uzytkownik.haslo`, `skrzynka_email.password`
-  (adapter tych kolumn nie czyta — reszta w p. 39) · 89% zgłoszeń **całej bazy** wyjechało do
-  Mantisa, przez co `typ` i autor komentarza tracą wiarygodność, ale **Dokusa to nie dotyczy**
-  (6 zgłoszeń z 1825) — wróci dopiero przy rozszerzeniu zakresu.
+- **Rozstrzygnięte w kodzie, nie wracać:** treści są w HTML (strip + unescape w adapterze) · zrzut
+  zawiera hasła w `konsultant.haslo`, `uzytkownik.haslo`, `skrzynka_email.password` (adapter tych
+  kolumn nie czyta; to MD5 bez soli, więc zrzutu nie kopiujemy) · 89% zgłoszeń **całej bazy**
+  wyjechało do Mantisa, przez co `typ` i autor komentarza tracą wiarygodność, ale **Dokusa to nie
+  dotyczy** (6 zgłoszeń z 1825) — wróci dopiero przy rozszerzeniu zakresu.
 - **DZIAŁAJĄCE sekrety w treści komentarzy — 1,1% zgłoszeń, i to nie tylko od klientów.**
   W próbce: login i hasło VPN, hasło administratora serwera, **hasło roota**, hasło do skrzynki
   pocztowej wraz z adresami serwerów i listą użytkowników. **Dwa z pięciu przypadków wkleił
@@ -3967,6 +3967,11 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
   (ePUAP, Poczta Polska) to co innego: tekst mówi wtedy, czego dotyczy problem i co dotąd ustalono.
 - **Załączniki zgłoszeń** — tabela `zalacznik` w zrzucie trzyma same ścieżki, bez plików; wystarcza
   treść zgłoszenia i wątku.
+- **Sprawy procedury po stronie klienta** (skreślone 2026-11-11, dawny p. 39) — hasła w zrzucie
+  zapisane jako MD5 bez soli i działające sekrety, które konsultanci wklejają w zgłoszenia
+  (1,1–1,7% zgłoszeń). Tych spraw nie prowadzimy: naprawia je procedura klienta, nie nasz kod. Po
+  naszej stronie eksport nie czyta kolumn z hasłami, a sekrety w treści czekają na detektor
+  (p. 20).
 - **Odrzucone pola karty.** Siedem wypadło przy przeglądzie z 2026-07-31 (17 pól → 10), bo pasowały
   do tego korpusu, a nie do produktu; dwa ostatnie nie weszły wcale:
   - `system` — stały przy zasadzie „jedna instancja = jeden produkt”;
@@ -4379,9 +4384,6 @@ korpusie, przechodzi przy zamknięciu do p. 33.
   helpdesku, pętla mnoży wywołania, a model zewnętrzny to koszt per wywołanie.
 - [ ] **38. Punkt wpięcia i zachowanie przy 503 uzgodnione z helpdeskiem.** *Dlaczego:* bez
   hooka bramek nikt nie woła, a o fail-open decyduje tamta strona.
-- [ ] **39. Sprawy do klienta** — hasła w zrzucie jako niesolone MD5 (zrzut trzymać krótko i nie
-  kopiować), sekrety wklejane przez konsultantów (procedura). *Dlaczego:* to problemy procedury,
-  nie kodu.
 - [ ] **40. Licencja PolDense (gemma).** *Dlaczego:* licencja idzie od modelu-nauczyciela
   (destylacja z BGE-Multilingual-Gemma2), więc wybór embeddera jest też decyzją licencyjną.
   Do sprawdzenia także licencja modelu anonimizującego (Bielik 11B v3).
@@ -4406,7 +4408,7 @@ Rzeczy odłożone świadomie, bez miejsca w kolejności planu. Każdy punkt: cel
   losowych bez etykiety i alarm, który odróżnia poświadczenia od haseł do archiwów, dopiero gdy
   pomiar pokaże, że wersja lekka nie wystarcza. *Dlaczego odłożony:* hasło nie niesie wiedzy,
   a ryzyko leży po stronie umowy i polityki bezpieczeństwa klienta; alarm „zmień hasło" to jego
-  procedura (p. 39).
+  procedura.
 - [ ] **29. Magazyn reguł w SQL** (odłożony 2026-10-30) — osobny schemat i osobna rola w Postgresie z p. 48, nie nowa
   usługa; wersje, audyt werdyktów, kontrola dostępu do edycji; później też magazyn notatek.
   Wtedy słownik rozstrzygnięć dochodzi do scenariuszy wstrzyknięć z p. 59 jako droga ataku.
