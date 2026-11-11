@@ -153,7 +153,7 @@ HELP_BATCH   = "Rozmiar partii przy embedowaniu."
 
 
 def _load_corpus(
-    corpus_dir: pathlib.Path,  # e.g. Path("data/unsafe/parsed/gpt-6.1-sol-golden200-v2")
+    corpus_dir: pathlib.Path,  # e.g. Path("data/unsafe/golden/cards")
 ) -> tuple[list[int], list[str]]:
     """
     Description:
@@ -162,7 +162,7 @@ def _load_corpus(
     text is byte-for-byte what indexing will embed.
 
     Example args:
-        corpus_dir=Path("data/unsafe/parsed/gpt-6.1-sol-golden200-v2")
+        corpus_dir=Path("data/unsafe/golden/cards")
 
     Example result:
         ([5612, 5641], ["Brak dostępności Menu…\\nPo zalogowaniu…", "Brak możliwości…\\n…"])

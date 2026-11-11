@@ -16,7 +16,7 @@ nie zauważy. Filtr jest dziś 1:1 z oceną modelu, więc test mierzy w praktyce
 
 Co się dzieje po drodze (`measure_filter()` z `tests/_helpers/golden_tickets/`):
 
-1. Czyta 200 artefaktów z `data/unsafe/parsed/gpt-6.1-sol-golden200-v2/`.
+1. Czyta 200 artefaktów z `data/unsafe/golden/cards/`.
 2. Czyta id rekordów oznaczonych w przeglądzie jako niosące zero wiedzy (`useful` = false
    w `data/unsafe/golden/tickets.json`).
 3. Uruchamia `filter_tickets()` i liczy, ile odrzuceń trafia w oznaczone, a ile poza nie.

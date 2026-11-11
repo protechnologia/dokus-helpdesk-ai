@@ -128,13 +128,12 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
    Embeddingi i kolekcje Qdranta są wymienne i odtwarzalne — przebieg LLM jest drogi
    i jednorazowy. Re-index **nigdy** nie wymaga ponownego wołania LLM.
    - **Zasada zaczyna obowiązywać dla artefaktu z masowego importu (p. 31)** — jednego przebiegu
-     całego korpusu zamrożoną wersją promptu. Dziś w `data/unsafe/parsed/` leży
-     `gpt-6.1-sol-golden200-v2/` (200 artefaktów, korpus golden setu od 2026-10-23),
-     `bielik-11b-golden200/` (te same zgłoszenia starszym promptem, na nich pisano zapytania) —
-     oba mają przetrwać import — i próbki porównawcze parserów, które import nadpisze albo
-     skasuje.
-   - Pomiary „na 661 rekordach" pochodzą z wcześniejszej próbki, skasowanej 2026-07-31. Zniknęły
-     pliki, nie wiedza — liczby pozostają wiążące.
+     całego korpusu zamrożoną wersją promptu. Do tego czasu chroni karty golden setu
+     w `data/unsafe/golden/cards/` (200 kart `gpt-6.1-sol` z 2026-10-23), na których stoją
+     pomiary filtra i wyszukiwania.
+   - Pomiary „na 661 rekordach" pochodzą z wcześniejszej próbki, skasowanej 2026-07-31, a pomiary
+     na kartach Bielika (`bielik-11b-golden200`) i na próbkach porównania modeli — z kart
+     skasowanych 2026-11-11. Zniknęły pliki, nie wiedza — liczby pozostają wiążące.
 8. **Qdrant jest indeksem, nie źródłem prawdy.** Musi dać się skasować i odbudować z katalogu
    JSON-ów jedną komendą.
 9. **Nie zmyślamy treści merytorycznej.** Odpowiedź powstaje wyłącznie z materiału, który agent
@@ -162,8 +161,8 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
 - **Nie wrzucaj pola `solution` do embeddingu** — rozwiązanie żyje w payloadzie, nie w wektorze
 - **Nie indeksuj surowej treści maila** — indeksujemy wyłącznie sparsowane pola; jedyny wyjątek
   to zanonimizowany wątek w indeksie tekstowym (p. 53), nigdy w wektorze
-- **Nie kasuj i nie nadpisuj plików w `data/unsafe/parsed/`** — to niepowtarzalny wynik przebiegu
-  LLM
+- **Nie kasuj i nie nadpisuj kart w `data/unsafe/golden/cards/`** — to niepowtarzalny wynik
+  przebiegu LLM; nowe karty golden setu zastępują je dopiero po przyjęciu
 - **Nie filtruj korpusu po `status = 'zamkniety'`** — Dokus kończy zgłoszenia na `rozwiazany`,
   `zamkniety` ma 5 sztuk na 1825
 - **Nie szukaj rozwiązań w tabeli `rozwiazanie`** — jest martwa; rozwiązanie to `komentarz`
@@ -281,9 +280,7 @@ dokus-helpdesk-ai/
 │   │   └── code/                 # zmyślona aplikacja: source/ i rules.json (p. 60)
 │   └── unsafe/                   # dane klientów (PII) — NIE w repo
 │       ├── db/                   # zrzuty bazy źródłowej
-│       ├── raw/                  # zgłoszenia źródłowe jak przyszły
-│       ├── parsed/               # sparsowane JSON-y (trwały artefakt, zasada 7)
-│       ├── golden/               # zestawy do ewaluacji: zgłoszenia, dystraktory
+│       ├── golden/               # zestawy do ewaluacji, w tym karty (cards/) i wątki (raw/)
 │       ├── instruction/          # właściwa dokumentacja (p. 55)
 │       ├── code/                 # paczka kodu aplikacji: rules.json, manifest.json, symbols.json, project.md, repo/ (p. 60)
 │       └── docs/                 # raporty z pomiarów i dokumenty projektu
@@ -438,13 +435,13 @@ dokus-helpdesk-ai/
     reguł czyta się jak listę, nie jak kod. Każda reguła to funkcja modułowa — bezstanowa, więc
     klasa dałaby tylko miejsce na `self` — a krotka `RULES` na końcu jest tym, po czym iteruje
     orkiestrator i po czym parametryzują się testy. Dołożenie reguły to dopisanie funkcji.
-  - **Znany koszt tej konwencji, do rozstrzygnięcia przy masowym imporcie (p. 31):** wszystkie
+  - **Znany koszt tej konwencji, do rozstrzygnięcia przy czytniku SQL (p. 34):** wszystkie
     czytniki źródeł produkują ten sam `RawTicket`, więc wariant SQL musi dołożyć źródło do nazwy
     (`parser_ticket_raw_sql`) albo oba dostaną sufiks. Nazwa opisuje WYNIK, a te pliki różni ŹRÓDŁO.
 - **`core_util/` to funkcje bezstanowe bez wiedzy o dziedzinie** — kryterium: czy da się je opisać
   i przetestować, ani razu nie mówiąc „zgłoszenie". Stąd `strip_html()` i
   `describe_validation_error()` są tam, a nie przy swoich wywołujących; drugi powód jest
-  praktyczny — czytnik SQL z masowego importu (p. 31) potrzebuje tego samego strippera.
+  praktyczny — czytnik SQL kolejnych zrzutów (p. 34) potrzebuje tego samego strippera.
   `contains_all()` trafiło tam z jednym wołającym (2026-10-09), żeby następny go użył, zamiast
   pisać od nowa; argument, od którego zależy wynik (wielkość liter), podaje się tam zawsze
   wprost, bez wartości domyślnej. Tak samo `is_path_under()` (2026-10-13): mówi, czy ścieżka
@@ -3044,12 +3041,24 @@ Zestaw to **syntetyczne zapytania**, nie pary historycznych zgłoszeń: produkt 
 zgłoszenie i szuka podobnych, więc para `ticket ↔ ticket` mierzyłaby coś, czego produkt nie robi.
 Uboczny zysk: znika problem singletonów (47% rekordów nie ma bliskiego sąsiada), bo **zapytanie
 dostaje każdy rekord**. Pliki: `data/unsafe/golden/tickets.json` (200 wpisów: 135 z wiedzą, 65 bez i 126
-zapytań; do 2026-10-10 `golden200.json`, potem do 2026-10-15 `tickets-dokus.json`), korpus
-`data/unsafe/parsed/gpt-6.1-sol-golden200-v2/` (200 kart, od 2026-10-23; wcześniej
-`bielik-11b-golden200/`) i dystraktory
+zapytań; do 2026-10-10 `golden200.json`, potem do 2026-10-15 `tickets-dokus.json`), karty
+`data/unsafe/golden/cards/` (200 kart `gpt-6.1-sol` z 2026-10-23; do 2026-11-11 w
+`data/unsafe/parsed/gpt-6.1-sol-golden200-v2/`, a wcześniej karty Bielika, skasowane) i dystraktory
 `data/unsafe/golden/tickets-distractors.json` (wcześniej `distractors.json`, potem
-`tickets-dokus-distractors.json`) — materiał wielokrotnego użytku przy każdej zmianie modelu. „Golden200" zostaje nazwą próbki 200 zgłoszeń
-i katalogu z jej kartami.
+`tickets-dokus-distractors.json`) — materiał wielokrotnego użytku przy każdej zmianie modelu.
+„Golden200" zostaje nazwą próbki 200 zgłoszeń.
+
+- **Karty golden setu zastępuje się w całości, po przyjęciu (2026-11-11).** Jest jeden katalog
+  kart, bez nazwy modelu w ścieżce: model i datę zapisuje ten opis, bo karty nie mają pola
+  z modelem. Nowe parsowanie (`scripts/parse_golden_tickets.py`) idzie do katalogu roboczego,
+  a `golden/cards/` zastępuje dopiero po porównaniu pomiarów na obu; stare karty nie zostają
+  obok. Numery zgłoszeń skrypt bierze z `tickets.json`, a katalog kart z jego metryczki
+  (`meta.corpus_dir`).
+- **Wątki golden setu leżą w `golden/raw/` (2026-11-11):** 200 plików z eksportu lipcowego
+  zrzutu, z których powstały karty i na których przeglądano etykiety. Reszta lipcowego eksportu
+  (1625 plików) jest skasowana: eksport da się powtórzyć z lipcowego zrzutu, a korpus powstaje
+  z sierpniowego (p. 31). Wątki zostają z lipca także przy ponownym parsowaniu, bo w nowszym
+  zrzucie sprawa mogła dostać komentarze, których przegląd etykiet nie widział.
 
 - **Plik to jedna lista wpisów, po jednym na każde zgłoszenie korpusu odniesienia (2026-10-23,
   wcześniej listy `queries` i `rejected` o dwóch kształtach).** Wpis ma `ticket_id`, etykietę
@@ -3245,11 +3254,11 @@ nogi produktu na jednej sprawie.
 - Sprawdzenie opisu projektu wobec paczki, po każdej poprawce opisu:
   `python scripts/build_code_package.py check-description data/unsafe/code` (kod 1, gdy opisu
   nie ma albo któraś ścieżka nie zgadza się z paczką; budowa paczki robi to samo na końcu)
-- Ponowne parsowanie golden setu grafem `parse_ticket` do nowego katalogu kart, z wznawianiem
-  i postępem co 10 zgłoszeń: `python scripts/parse_golden_tickets.py parse <karty wzorcowe>
-  <nowy katalog>` — **płatne, pytaj przed**; wymaga usługi `anonymizer` z modelem
-  anonimizującym i modelu generującego z `.env` (golden200 na `gpt-6.1-sol` kosztował 2026-10-23
-  około 1 USD)
+- Ponowne parsowanie golden setu grafem `parse_ticket` do katalogu roboczego, z wznawianiem
+  i postępem co 10 zgłoszeń: `python scripts/parse_golden_tickets.py parse <nowy katalog>`
+  (numery z `data/unsafe/golden/tickets.json`; do `golden/cards/` nie zapisuje) — **płatne,
+  pytaj przed**; wymaga usługi `anonymizer` z modelem anonimizującym i modelu generującego
+  z `.env` (golden200 na `gpt-6.1-sol` kosztował 2026-10-23 około 1 USD)
 - Mapa symboli do paczki, która już stoi, bez kopiowania kodu od nowa:
   `python scripts/build_code_symbols.py build data/unsafe/code` (zastępuje `symbols.json`;
   budowa paczki robi to samo na końcu)
@@ -3943,7 +3952,7 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   porównuje `eval_embeddings.py`.
 - **Eksport zgłoszeń ze zrzutu jako komenda `helpdesk`** — skrypt woła `docker exec` na kontenerze
   ze zrzutem, a w obrazie `api` nie ma ani Dockera, ani dostępu do tego kontenera. Wraca
-  z czytnikiem SQL (p. 31).
+  z czytnikiem SQL (p. 34).
 - **Komendy `helpdesk` na grafach** (bramki, propozycje, „Popraw", wyszukiwanie, karta
   zgłoszenia; skreślone 2026-10-16) — wołalibyśmy je tylko my, trasy oddają już koszt i log
   przebiegu, a testy na żywym modelu całą rozmowę; komenda musiałaby powtórzyć to, co trasa robi
@@ -4562,11 +4571,11 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
       w kontenerze, na tej samej fabryce grafów co trasy, z kosztem przebiegu w raporcie (zapis
       artefaktu po KAŻDYM zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed
       parsowaniem, model parsujący wybrany na podstawie `porownanie-modeli-parsowania.md`
-      i pomiaru promptu parsującego, czytnik SQL, wznawianie, raport, porządek
-      w `data/unsafe/parsed/` (golden200 zostaje); zanonimizowany wątek idzie do tabeli
-      wyszukiwania, którą ten przebieg zakłada — do ustalenia, czy każdego
-      zgłoszenia, czy tylko tych z kartą przyjętą przez filtr jakości (wątek musi mieć każdy
-      numer, który oddaje wyszukiwanie po kartach); po napełnieniu tabeli powstaje zestaw
+      i pomiaru promptu parsującego, wznawianie, raport. Decyzje z 2026-11-11: zgłoszenia
+      bierze z eksportu sierpniowego zrzutu do JSON-ów (`export_raw_tickets.py --out-dir`), bez
+      czytnika SQL, który wraca z p. 34; bez 139 zgłoszeń kanału „Automat mailowy”, które
+      dochodzą po p. 32 osobnym przebiegiem; zanonimizowany wątek idzie do tabeli wyszukiwania
+      tylko przy karcie przyjętej przez filtr jakości. Po napełnieniu tabeli powstaje zestaw
       zapytań tekstowych do zgłoszeń (komunikaty i kody błędów z wątków, w polach `exact`
       i `words`) i test ewaluacyjny `find_tickets_text` z progiem — dziś narzędzie ma tylko
       test integracyjny na pięciu zmyślonych wątkach, a golden set zgłoszeń ma zapytania
@@ -4579,8 +4588,9 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
       10 zgłoszeniach z porównania, po anonimizatorze. *Dlaczego:* to jedyny
       drogi przebieg (zasada 7), więc anonimizator i prompt muszą być gotowe przed nim.
 - [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
-  „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy. *Dlaczego:* 77 ze 123 zgłoszeń
-  w lipcu, a żadna heurystyka nie odróżni broadcastu od sprawy.
+  „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy; po nim 139 zgłoszeń tego kanału
+  z sierpniowego zrzutu dochodzi do korpusu osobnym przebiegiem, bez parsowania reszty od nowa.
+  *Dlaczego:* 77 ze 123 zgłoszeń w lipcu, a żadna heurystyka nie odróżni broadcastu od sprawy.
 - [ ] **33. Przeliczenia na pełnym korpusie** — `RAG_SCORE_MIN` na zapytaniach sparsowanych
   (na kartach `gpt-6.1-sol` trafienie dostaje 7 z 16 dystraktorów, na kartach Bielika 3 z 16,
   przy tym samym progu 0.48), porównanie embedderów, liczba wątków-projektów, `questions_summary`, rozkład `component`;
@@ -4597,7 +4607,8 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
   wypadły z promptu osobne zasady o dopiskach i znacznikach, oraz decyzja, czy „Popraw” zostaje
   w zakresie. *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na
   zapytaniach surowych, a grafy na zmyślonych sprawach i teście ręcznym.
-- [ ] **34. Tryb odświeżania korpusu** — kolejne zrzuty czy dostęp tylko do odczytu.
+- [ ] **34. Tryb odświeżania korpusu** — kolejne zrzuty czy dostęp tylko do odczytu; przy
+  kolejnych zrzutach czytnik SQL zamiast eksportu do JSON-ów (odłożony z p. 31 2026-11-11).
   *Dlaczego:* +130 zgłoszeń w miesiąc, więc jednorazowy zrzut szybko się starzeje.
 - [ ] **35. Backup `data/unsafe/parsed/`.** *Dlaczego:* jedyny artefakt, którego odtworzenie
       kosztuje ponowny przebieg LLM.

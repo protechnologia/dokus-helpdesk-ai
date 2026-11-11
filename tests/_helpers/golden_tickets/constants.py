@@ -19,12 +19,12 @@ QUERY_DIFFICULTIES = ("typowe", "trudne")
 # wynik.
 DISTRACTORS_FILE = Path("data/unsafe/golden/tickets-distractors.json")
 
-# Korpus odniesienia: 200 sparsowanych zgłoszeń, z których zbudowano indeks i etykiety; ma przetrwać
-# masowy import (p. 31).
-CORPUS_DIR = Path("data/unsafe/parsed/gpt-6.1-sol-golden200-v2")
+# Korpus odniesienia: karty 200 zgłoszeń golden setu, z których buduje się indeks do pomiarów.
+# Sparsowane `gpt-6.1-sol` 2026-10-23; nowsze karty zastępują ten katalog dopiero po przyjęciu.
+CORPUS_DIR = Path("data/unsafe/golden/cards")
 
 # Podpowiedź do błędu pomiaru, gdy kolekcja zgłoszeń jest pusta: polecenie, które ją buduje.
-BUILD_HINT = "zbuduj indeks: helpdesk tickets reindex data/unsafe/parsed/gpt-6.1-sol-golden200-v2"
+BUILD_HINT = "zbuduj indeks: helpdesk tickets reindex data/unsafe/golden/cards"
 
 # Próg: zapytania, na które rekord-cel wraca jako pierwszy. Zmierzone 119 ze 126 (2026-10-23,
 # karty `gpt-6.1-sol`); próg niżej, żeby wyłapać zepsutą ścieżkę, a nie zwykły dryf.

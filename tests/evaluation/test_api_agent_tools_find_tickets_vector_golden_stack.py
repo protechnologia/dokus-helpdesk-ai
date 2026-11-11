@@ -32,7 +32,7 @@ O czym pamiętać przy zmianach:
   (p. 23).
 - Indeksem jest skonfigurowana kolekcja, a nie własna, bo zbudowanie własnej z 200 artefaktów trwa
   na CPU ponad dwie i pół minuty. Pusta kolekcja wywala test; buduje ją
-  `helpdesk tickets reindex data/unsafe/parsed/gpt-6.1-sol-golden200-v2`.
+  `helpdesk tickets reindex data/unsafe/golden/cards`.
 - Indeks i golden set to te same rekordy, więc liczby pilnują, że ścieżka się nie zepsuła,
   a skutecznością produktu nie są.
 - Zmiana `RAG_SCORE_MIN` albo `RAG_TOP_K` przesuwa wszystkie trzy liczby. Co próg robi z każdym

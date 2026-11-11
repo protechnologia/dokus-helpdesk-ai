@@ -7,11 +7,11 @@ Do czego:
 
 WYMAGA ZBUDOWANEGO INDEKSU I CHODZĄCEGO STACKU:
 
-    docker compose up -d                          # embedder + qdrant
-    helpdesk tickets index data/unsafe/parsed/<zestaw>       # napełnij kolekcję
-    python scripts/eval_threshold.py table        # tabela koszt/zysk per próg
-    python scripts/eval_threshold.py detail       # rozbicie per dystraktor i lista strat
-    python scripts/eval_threshold.py plot         # wykres obu rozkładów z linią progu (PNG)
+    docker compose up -d                             # embedder + qdrant
+    helpdesk tickets index data/unsafe/golden/cards  # napełnij kolekcję
+    python scripts/eval_threshold.py table           # tabela koszt/zysk per próg
+    python scripts/eval_threshold.py detail          # rozbicie per dystraktor i lista strat
+    python scripts/eval_threshold.py plot            # wykres obu rozkładów z linią progu (PNG)
 
 Przykład wyjścia (`table`, przebieg z 2026-10-05):
 

@@ -1,26 +1,27 @@
 """Parsuje od nowa zgłoszenia golden setu grafem `parse_ticket` i zapisuje karty do nowego katalogu.
 
 Do czego:
-    Karty w `data/unsafe/parsed/bielik-11b-golden200/` powstały starszym promptem i nie mają pól
-    dodanych później do kontraktu (`excluded_causes`, `useful`, `useful_reason`), więc nowy
-    `ParsedTicket` ich nie przyjmuje. Ten skrypt bierze numery zgłoszeń z tamtego katalogu, czyta
-    ich wątki z `data/unsafe/raw/` i parsuje każdy tą samą drogą co trasa `/parse-ticket`:
-    anonimizator, potem model generujący z `.env`. Stary katalog zostaje nietknięty (zasada 7).
+    Pomiary filtra jakości i wyszukiwania stoją na kartach golden setu
+    w `data/unsafe/golden/cards/`. Gdy zmienia się prompt parsujący, kontrakt karty albo model,
+    te karty trzeba policzyć od nowa.
+    Skrypt bierze numery zgłoszeń z golden setu (`data/unsafe/golden/tickets.json`), czyta ich
+    wątki z `data/unsafe/golden/raw/` i parsuje każdy tą samą drogą co trasa `/parse-ticket`:
+    anonimizator, potem model generujący z `.env`. Karty idą do nowego katalogu roboczego,
+    a katalog odniesienia zastępują dopiero wtedy, gdy człowiek je przyjmie.
 
 WYMAGA DZIAŁAJĄCEJ USŁUGI `anonymizer` Z MODELEM ANONIMIZUJĄCYM I PRAWDZIWEGO MODELU
 GENERUJĄCEGO — KAŻDE ZGŁOSZENIE TO PŁATNE WYWOŁANIE:
 
-    python scripts/parse_golden_tickets.py parse <karty wzorcowe> <nowy katalog kart>
+    python scripts/parse_golden_tickets.py parse <nowy katalog kart>
 
     # cały zestaw, 4 naraz:
-    python scripts/parse_golden_tickets.py parse data/unsafe/parsed/bielik-11b-golden200 \
-        data/unsafe/parsed/gpt-6.1-sol-golden200
+    python scripts/parse_golden_tickets.py parse data/unsafe/golden/cards-gpt-6.1-sol-v3
 
     # próba na dwóch zgłoszeniach: to samo z `--limit 2`
 
 Przykład wyjścia (zmyślone liczby):
 
-    Zgłoszeń: 200, już sparsowanych: 0, do zrobienia: 200 → data/unsafe/parsed/gpt-6.1-sol-golden200
+    Zgłoszeń: 200, już sparsowanych: 0, do zrobienia: 200 → data/unsafe/golden/cards-gpt-6.1-sol-v3
      10/200  błędów: 0  koszt: 0.0812 USD
      20/200  błędów: 1  koszt: 0.1655 USD
     …
@@ -29,10 +30,11 @@ Przykład wyjścia (zmyślone liczby):
 
 Co się dzieje po drodze:
 
-1. Numery zgłoszeń to nazwy plików z katalogu wzorcowego (pierwszy argument).
+1. Numery zgłoszeń to wpisy golden setu (`--golden`), a katalog kart odniesienia to jego
+   `meta.corpus_dir`; do tego katalogu skrypt nie zapisuje.
 2. Zgłoszenie, którego karta już leży w katalogu wyjściowym, jest pomijane, więc przerwany
    przebieg wznawia się tym samym poleceniem.
-3. Wątek z `data/unsafe/raw/zgloszenie-<numer>.json` przechodzi przez graf `parse_ticket` na
+3. Wątek z `data/unsafe/golden/raw/zgloszenie-<numer>.json` przechodzi przez graf `parse_ticket` na
    węzłach właściwych: anonimizacja, jedna tura modelu, walidacja karty.
 4. Karta trafia na dysk od razu po sparsowaniu, a nie na końcu przebiegu.
 5. Co dziesiąte zgłoszenie skrypt wypisuje postęp z sumą kosztu.
@@ -41,9 +43,11 @@ O czym pamiętać:
 
 - Na wyjściu są wyłącznie numery, liczby i nazwy błędów, nigdy treść zgłoszeń: przebieg
   operuje na danych klientów.
-- Oba katalogi podaje się wprost, bez wartości domyślnych: nazwa katalogu kart mówi, którym
-  modelem powstały, a model wybiera `.env`, więc domyślna nazwa w kodzie kłamałaby po jego
-  zmianie.
+- Katalog wyjściowy podaje się wprost, bez wartości domyślnej: nazwa katalogu roboczego mówi,
+  którym modelem powstały karty, a model wybiera `.env`, więc domyślna nazwa w kodzie kłamałaby
+  po jego zmianie.
+- Przyjęte karty zastępują `data/unsafe/golden/cards/` ręcznie, po porównaniu pomiarów na obu
+  katalogach; skrypt katalogu odniesienia nie rusza.
 - Adres usługi `anonymizer` w `.env` to nazwa z sieci compose; z hosta skrypt woła ją pod
   `--anonymizer-url`.
 - Błąd konfiguracji (model, klucz, anonimizator na atrapie silnika) zatrzymuje cały przebieg;
@@ -52,6 +56,7 @@ O czym pamiętać:
 """
 
 import asyncio
+import json
 import pathlib
 import sys
 
@@ -73,8 +78,11 @@ from app.engine_anonymization import (  # noqa: E402
 )
 from app.engine_llm import LLMConfigError, LLMError, get_llm_client  # noqa: E402
 
-# Wątki zgłoszeń, tak jak zdjął je `export_raw_tickets.py`.
-RAW_DIR_DEFAULT = REPO_ROOT / "data" / "unsafe" / "raw"
+# Golden set zgłoszeń: wpis na każde zgłoszenie i w metryczce katalog kart odniesienia.
+GOLDEN_DEFAULT = REPO_ROOT / "data" / "unsafe" / "golden" / "tickets.json"
+
+# Wątki zgłoszeń golden setu z lipcowego zrzutu, tak jak zdjął je `export_raw_tickets.py`.
+RAW_DIR_DEFAULT = REPO_ROOT / "data" / "unsafe" / "golden" / "raw"
 
 # Usługa `anonymizer` z hosta — zgodne z DOCKER_ANONYMIZER_PORT w `.env.example`.
 ANONYMIZER_URL_DEFAULT = "http://localhost:8002"
@@ -104,26 +112,46 @@ def main() -> None:
     """
 
 
+def golden_tickets(
+    golden: pathlib.Path,  # np. Path("data/unsafe/golden/tickets.json")
+) -> tuple[list[str], pathlib.Path]:
+    """
+    Description:
+    Czyta z pliku golden setu numery jego zgłoszeń, posortowane, i katalog kart odniesienia
+    z metryczki (`meta.corpus_dir`, ścieżka od korzenia repo).
+
+    Example args:
+        golden=Path("data/unsafe/golden/tickets.json")
+
+    Example result:
+        (["10012", "10170", …], Path("/…/data/unsafe/golden/cards"))
+    """
+    data      = json.loads(golden.read_text(encoding="utf-8"))
+    ids       = sorted(entry["ticket_id"] for entry in data["tickets"])
+    cards_dir = REPO_ROOT / data["meta"]["corpus_dir"]
+
+    return ids, cards_dir
+
+
 def wanted_ids(
-    ids_from: pathlib.Path,  # np. Path("data/unsafe/parsed/bielik-11b-golden200")
-    out_dir:  pathlib.Path,  # np. Path("data/unsafe/parsed/gpt-6.1-sol-golden200")
-    limit:    int | None,    # np. 2 — próba na początku listy; None znaczy wszystkie
+    all_ids: list[str],     # np. ["10012", "10170"]
+    out_dir: pathlib.Path,  # np. Path("data/unsafe/golden/cards-gpt-6.1-sol-v3")
+    limit:   int | None,    # np. 2 — próba na początku listy; None znaczy wszystkie
 ) -> tuple[list[str], int, int]:
     """
     Description:
-    Numery zgłoszeń do sparsowania: nazwy plików katalogu wzorcowego, posortowane, bez tych,
-    których karta już leży w katalogu wyjściowym. Oddaje też, ile zgłoszeń ma zestaw i ile
-    z nich jest już sparsowanych.
+    Wybiera numery zgłoszeń do sparsowania: wszystkie z golden setu bez tych, których karta już
+    leży w katalogu wyjściowym. Oddaje też, ile zgłoszeń ma zestaw i ile z nich jest już
+    sparsowanych.
 
     Example args:
-        ids_from=Path("data/unsafe/parsed/bielik-11b-golden200")
-        out_dir=Path("data/unsafe/parsed/gpt-6.1-sol-golden200")
+        all_ids=["10012", "10170", …]
+        out_dir=Path("data/unsafe/golden/cards-gpt-6.1-sol-v3")
         limit=None
 
     Example result:
         (["10012", "10170", …], 200, 0)
     """
-    all_ids = sorted(path.stem for path in ids_from.glob("*.json"))
     done    = {path.stem for path in out_dir.glob("*.json")} & set(all_ids)
     todo    = [ticket_id for ticket_id in all_ids if ticket_id not in done]
 
@@ -135,8 +163,8 @@ def wanted_ids(
 
 async def parse_all(
     ticket_ids:     list[str],     # np. ["10012", "10170"]
-    raw_dir:        pathlib.Path,  # np. Path("data/unsafe/raw")
-    out_dir:        pathlib.Path,  # np. Path("data/unsafe/parsed/gpt-6.1-sol-golden200")
+    raw_dir:        pathlib.Path,  # np. Path("data/unsafe/golden/raw")
+    out_dir:        pathlib.Path,  # np. Path("data/unsafe/golden/cards-gpt-6.1-sol-v3")
     anonymizer_url: str,           # np. "http://localhost:8002"
     concurrency:    int,           # np. 4
 ) -> tuple[int, list[tuple[str, str]], float]:
@@ -147,8 +175,8 @@ async def parse_all(
 
     Example args:
         ticket_ids=["10012", "10170"]
-        raw_dir=Path("data/unsafe/raw")
-        out_dir=Path("data/unsafe/parsed/gpt-6.1-sol-golden200")
+        raw_dir=Path("data/unsafe/golden/raw")
+        out_dir=Path("data/unsafe/golden/cards-gpt-6.1-sol-v3")
         anonymizer_url="http://localhost:8002"
         concurrency=4
 
@@ -240,8 +268,8 @@ async def parse_all(
 
 @cli.command("parse", help="Parsuje golden set od nowa do nowego katalogu kart.")
 def parse(
-    ids_from:       pathlib.Path = typer.Argument(help="Karty, z których brać numery."),
     out_dir:        pathlib.Path = typer.Argument(help="Nowy katalog kart."),
+    golden:         pathlib.Path = typer.Option(GOLDEN_DEFAULT, help="Golden set zgłoszeń."),
     raw_dir:        pathlib.Path = typer.Option(RAW_DIR_DEFAULT, help="Wątki zgłoszeń."),
     anonymizer_url: str          = typer.Option(ANONYMIZER_URL_DEFAULT, help="Anonymizer z hosta."),
     concurrency:    int          = typer.Option(CONCURRENCY_DEFAULT, help="Ile zgłoszeń naraz."),
@@ -253,9 +281,9 @@ def parse(
     błędów na końcu. Kończy się kodem 1, gdy któreś zgłoszenie się nie udało.
 
     Example args:
-        ids_from=Path("data/unsafe/parsed/bielik-11b-golden200")
-        out_dir=Path("data/unsafe/parsed/gpt-6.1-sol-golden200")
-        raw_dir=Path("data/unsafe/raw")
+        out_dir=Path("data/unsafe/golden/cards-gpt-6.1-sol-v3")
+        golden=Path("data/unsafe/golden/tickets.json")
+        raw_dir=Path("data/unsafe/golden/raw")
         anonymizer_url="http://localhost:8002"
         concurrency=4
         limit=None
@@ -264,14 +292,18 @@ def parse(
         None — karty w `out_dir`, podsumowanie na wyjściu
 
     Raises:
-        typer.Exit: code 1, gdy któreś zgłoszenie skończyło się błędem
+        typer.Exit: code 1, gdy któreś zgłoszenie skończyło się błędem; code 2, gdy katalog
+            wyjściowy to katalog kart odniesienia
     """
-    # Katalog wzorcowy jest niepowtarzalnym artefaktem: wyjście w nim nadpisałoby karty.
-    if out_dir.resolve() == ids_from.resolve():
-        typer.echo("BŁĄD: katalog wyjściowy to katalog wzorcowy — karty by nadpisał.", err=True)
+    all_ids, cards_dir = golden_tickets(golden)
+
+    # Na kartach odniesienia stoją pomiary, a zastępuje się je dopiero po przyjęciu nowych:
+    # wyjście w tym katalogu nadpisałoby je bez porównania.
+    if out_dir.resolve() == cards_dir.resolve():
+        typer.echo("BŁĄD: katalog wyjściowy to katalog kart odniesienia — nadpisałby je.", err=True)
         raise typer.Exit(code=2)
 
-    todo, total, done = wanted_ids(ids_from, out_dir, limit)
+    todo, total, done = wanted_ids(all_ids, out_dir, limit)
 
     typer.echo(
         f"Zgłoszeń: {total}, już sparsowanych: {done}, do zrobienia: {len(todo)} → {out_dir}"
