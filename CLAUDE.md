@@ -3910,11 +3910,17 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
   LangGraph wchodzi wyłącznie jako silnik przebiegu grafów: narzędzia to nasz kontrakt Pydantic,
   wiadomości to nasze `ChatMessage`, model wołamy przez `LLMClient`. **LangSmith zablokowany
   jawnie** — jego tracing wysyła pełne prompty do chmury, czyli dane sprzed anonimizacji.
-- **Fuzja wyników tekstowych z wektorowymi** — wyszukiwanie tekstowe to osobne narzędzia agenta;
-  agent sam wybiera drogę, a próg `RAG_SCORE_MIN` zostaje przy cosinusie.
-- **Synthetic queries jako dodatkowy named vector** — rozważane, nieprzyjęte.
-- **Siedem pól schematu odrzuconych przy przeglądzie pod kątem uniwersalności** (2026-07-31,
-  17 pól → 10). Wspólna przyczyna: były projektowane pod ten jeden korpus, a nie pod produkt.
+- **Automatyczny wybór wariantu generacji za człowieka** — guzik klika człowiek: system nie wie,
+  czy zgłoszenie wymaga działania serwisu, a wysoki score nie znaczy „mam rozwiązanie". Wraca,
+  gdy dane z klikania dadzą podstawę do oceny (p. 42).
+- **Odesłanie zgłoszenia do innego działu wewnętrznego** — nie ma działu, do którego się odsyła,
+  a grzeczna formułka bez treści to udokumentowana patologia korpusu. Nie dotyczy eskalacji do
+  operatora zewnętrznego (ePUAP, Poczta Polska): tam tekst ma nieść, czego dotyczy problem i co
+  dotąd ustalono. Dotyczy tak samo wariantu `handoff`.
+- **Załączniki zgłoszeń** — tabela `zalacznik` trzyma tylko ścieżki, samych plików w zrzucie nie
+  ma; treść zgłoszenia i wątku wystarcza.
+- **Odrzucone pola karty** — siedem wypadło przy przeglądzie pod kątem uniwersalności (2026-07-31,
+  17 pól → 10), bo projektowano je pod ten jeden korpus, a nie pod produkt; dwa kolejne nie weszły.
   - `system` — stała przy założeniu „jedna instancja = jeden produkt".
   - `component_other`, `audience`, `version`, `portable` — wchłonięte przez `component`,
     `resolution` albo tekst `solution`.
@@ -3924,141 +3930,128 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
   - `category` — 86% rekordów w trzech wartościach, granica „Błąd"/„Usterka" nieostra nawet dla
     człowieka. Kategoria „Automat mailowy" zostaje sygnałem dla adaptera, który czyta ją ze
     źródła, nie z artefaktu.
-- **Rozdzielenie `solution` na trzy pola** (*co zrobiono* / *co ustalono* / *zastrzeżenia*) —
-  nadmierna struktura. Zastrzeżenia zostają częścią tekstu `solution`; model streszczający
-  potrafi zgubić zdanie o zastrzeżeniu, dlatego są jawnym wymogiem promptu parsującego i promptu
-  generacji.
-- **Filtr odrzucający dopiero przy „brak” w `solution` i `useful` = false** — nie gubił dobrych
-  kart, ale zostawiał w indeksie 36 z 71 pustych, a trafienie bez treści jest gorsze niż brak
-  trafienia. Wraca, gdyby ocena `useful` okazała się niestabilna na pełnym korpusie (p. 33).
-- **Dopisek do reguły pola `useful` o czynności jednorazowej** (2026-10-23, „Sam fakt, że coś
-  zrobiono, to za mało”, „Zlecenie, w którym klient wie, co zrobić, to nie wiedza” i osiem
-  innych) — dopisek miał być kilkusłowny i ogólny, a żaden z dziesięciu wariantów w dwóch
-  przebiegach na 25 wątkach nie odwrócił ocen kart przepuszczanych (najlepszy 11 z 16, cel 13),
-  nie psując ocen dobrych (najlepszy wynik 25–26 z 28, cel 27). Reguła została bez zmian,
-  a 6 kart przepuszczanych przez filtr na golden200 to znany koszt.
-- **Lista dosłownych pytań konsultanta zamiast syntezy** (`asked_questions`) — przy medianie
-  jednego pytania na zgłoszenie lista to niemal to samo co synteza, a forma pytająca ciągnie
-  model do przepisania cudzych pytań wprost. Warunek: synteza zachowuje konkrety.
-- **Eksport zgłoszeń ze zrzutu jako komenda `helpdesk`** — skrypt woła `docker exec` na kontenerze
-  ze zrzutem, a w obrazie `api` nie ma ani Dockera, ani dostępu do tego kontenera. Wraca
-  z czytnikiem SQL (p. 34).
-- **Komendy `helpdesk` na grafach** (bramki, propozycje, „Popraw", wyszukiwanie, karta
-  zgłoszenia; skreślone 2026-10-16) — wołalibyśmy je tylko my, trasy oddają już koszt i log
-  przebiegu, a testy na żywym modelu całą rozmowę; komenda musiałaby powtórzyć to, co trasa robi
-  wokół grafu (reguły, słownik rozstrzygnięć, rejestr wariantów, zapytania agenta). Parsowanie
-  korpusu wchodzi z masowym importem (p. 31), a graf na pliku z eksportu z pełną rozmową wraca,
-  gdy będą go potrzebować pomiary (p. 23).
+  - `solution` rozdzielone na trzy pola (*co zrobiono* / *co ustalono* / *zastrzeżenia*) — nadmierna
+    struktura. Zastrzeżenia zostają częścią tekstu `solution`; model streszczający potrafi zgubić
+    zdanie o zastrzeżeniu, dlatego są jawnym wymogiem promptu parsującego i promptu generacji.
+  - `asked_questions`, lista dosłownych pytań konsultanta zamiast syntezy — przy medianie jednego
+    pytania na zgłoszenie lista to niemal to samo co synteza, a forma pytająca ciągnie model do
+    przepisania cudzych pytań wprost. Warunek: synteza zachowuje konkrety.
+- **Inny filtr jakości albo dopisek do reguły pola `useful`** — filtr odrzucający dopiero przy
+  „brak” w `solution` i `useful` = false nie gubił dobrych kart, ale zostawiał w indeksie 36 z 71
+  pustych, a trafienie bez treści jest gorsze niż brak trafienia; wraca, gdyby ocena `useful`
+  okazała się niestabilna na pełnym korpusie (p. 33). Dopisek do reguły pola `useful` o czynności
+  jednorazowej (2026-10-23, „Sam fakt, że coś zrobiono, to za mało”, „Zlecenie, w którym klient wie,
+  co zrobić, to nie wiedza” i osiem innych) miał być kilkusłowny i ogólny, a żaden z dziesięciu
+  wariantów w dwóch przebiegach na 25 wątkach nie odwrócił ocen kart przepuszczanych (najlepszy
+  11 z 16, cel 13), nie psując ocen dobrych (najlepszy wynik 25–26 z 28, cel 27). Reguła została bez
+  zmian, a 6 kart przepuszczanych przez filtr na golden200 to znany koszt.
+- **Deduplikacja rekordów przy indeksacji** — wielość rekordów jest informacją, nie nadmiarem:
+  scalenie zgodnych rekordów usuwa dowód, że rozwiązanie jest sprawdzone, a rozłącznych —
+  materiał do pytań. Pomiar: na 200 artefaktach 8 par o podobnym `problem` i ani jednej do
+  scalenia. Puste `cause` po obu stronach nie jest zgodnością. Prawdziwe duplikaty (to samo
+  zgłoszenie wysłane dwa razy) to inna klasa, do rozważenia przy pełnym korpusie.
+- **Fuzja wyników tekstowych z wektorowymi** — wyszukiwanie tekstowe to osobne narzędzia agenta;
+  agent sam wybiera drogę, a próg `RAG_SCORE_MIN` zostaje przy cosinusie.
+- **Synthetic queries jako dodatkowy named vector** — rozważane, nieprzyjęte.
+- **Zgodność trafień liczona kodem**, w trzech postaciach. Ocena zgodności co do `cause` wymaga
+  porównywania swobodnych polskich opisów przyczyn, a przy 103 pustych `cause` na 200 rekordów
+  naiwne porównanie zamienia brak wiedzy w pewność; o tym, czy materiał wystarcza, decyduje agent, a
+  pułapka pustego `cause` obowiązuje go tak samo (p. 23). Zwijanie zgodnych trafień w wynikach
+  wyszukiwania: przy `RAG_TOP_K` = 5 licznik zgodnych trafień jest artefaktem okna, nie pomiarem
+  korpusu, a bez licznika zostaje sama krótsza lista; wraca z rozdzieleniem „ile pobrać" od „ile
+  pokazać", bez re-indeksu. Pole-dana o zgodności przyczyn w odpowiedzi `/search` (`zgodne` /
+  `rozbieżne` / `nie da się ocenić`) stoi blisko wskazywania guzika i przy pustych `cause` też
+  zamienia brak wiedzy w pewność; zgodność opisują uwagi, a pole wraca, gdy helpdesk zechce pokazać
+  ją jako znacznik.
 - **Narzędzia tylko zbudowanych materiałów jako ustawienie instancji** (decyzja 2026-10-20) —
   graf dostawałby tylko narzędzia istniejących indeksów, a pominięte nazywałby log przebiegu.
   Pokaz chodziłby wtedy na układzie, którego produkcja nie ma: prompt wymienia narzędzia,
   których model nie dostał. Puste indeksy zakładane ręcznie dają to samo bez kodu w `api`.
   Cena: model robi puste wywołania, a odczyt wątku zgłoszenia znalezionego po karcie kończy się
   błędem, dopóki tabela wątków jest pusta.
-- **Deduplikacja rekordów przy indeksacji** — wielość rekordów jest informacją, nie nadmiarem:
-  scalenie zgodnych rekordów usuwa dowód, że rozwiązanie jest sprawdzone, a rozłącznych —
-  materiał do pytań. Pomiar: na 200 artefaktach 8 par o podobnym `problem` i ani jednej do
-  scalenia. Puste `cause` po obu stronach nie jest zgodnością. Prawdziwe duplikaty (to samo
-  zgłoszenie wysłane dwa razy) to inna klasa, do rozważenia przy pełnym korpusie.
-- **Zwijanie zgodnych trafień w wynikach wyszukiwania** — przy `RAG_TOP_K` = 5 licznik zgodnych
-  trafień jest artefaktem okna, nie pomiarem korpusu, a bez licznika zostaje sama krótsza lista.
-  Wraca z rozdzieleniem „ile pobrać" od „ile pokazać"; bez re-indeksu.
-- **Ocena zgodności trafień co do `cause` w kodzie** — wymaga porównywania swobodnych polskich
-  opisów przyczyn, a przy 103 pustych `cause` na 200 rekordów naiwne porównanie zamienia brak
-  wiedzy w pewność. O tym, czy materiał wystarcza, decyduje agent; pułapka pustego `cause`
-  obowiązuje go tak samo (p. 23).
-- **Automatyczny wybór wariantu generacji za człowieka** — guzik klika człowiek: system nie wie,
-  czy zgłoszenie wymaga działania serwisu, a wysoki score nie znaczy „mam rozwiązanie". Wraca,
-  gdy dane z klikania dadzą podstawę do oceny (p. 42).
-- **Odesłanie zgłoszenia do innego działu wewnętrznego** — nie ma działu, do którego się odsyła,
-  a grzeczna formułka bez treści to udokumentowana patologia korpusu. Nie dotyczy eskalacji do
-  operatora zewnętrznego (ePUAP, Poczta Polska): tam tekst ma nieść, czego dotyczy problem i co
-  dotąd ustalono. Dotyczy tak samo wariantu `handoff`.
 - **Osobne trasy strumienia** (`/search/stream`…) — zostajemy przy jednej trasie na graf
   z nagłówkiem `Accept` (decyzja 2026-10-19): różnica dotyczy sposobu oddania wyniku, nie
   funkcji, a osobne trasy powieliłyby budowę stanu sześć razy. Front pokazowy (p. 77) ich nie
   potrzebował. Wraca, gdy wpięcie w helpdesk (p. 38) pokaże konkretny powód, na przykład klienta
   HTTP, który nie ustawi nagłówka.
+- **Komendy `helpdesk` do eksportu ze zrzutu i do grafów** — eksport woła `docker exec` na
+  kontenerze ze zrzutem, a w obrazie `api` nie ma ani Dockera, ani dostępu do tego kontenera; wraca
+  z czytnikiem SQL (p. 34). Komendy na grafach (bramki, propozycje, „Popraw", wyszukiwanie, karta
+  zgłoszenia; skreślone 2026-10-16) wołalibyśmy tylko my: trasy oddają już koszt i log przebiegu,
+  testy na żywym modelu całą rozmowę, a komenda musiałaby powtórzyć to, co trasa robi wokół grafu
+  (reguły, słownik rozstrzygnięć, rejestr wariantów, zapytania agenta). Parsowanie korpusu wchodzi z
+  masowym importem (p. 31), a graf na pliku z eksportu z pełną rozmową wraca, gdy będą go
+  potrzebować pomiary (p. 23).
 - **Reguły bramek jako regexy/lista słów zamiast LLM-a** — „potoczne słownictwo" i „nie widać,
   co zrobiono" nie są wyrażalne słownikiem. Kandydat na tanie pre-filtry przed wywołaniem
   LLM-a, jeśli koszt zacznie boleć.
 - **Tryb strict narzędzi u OpenAI** — wymaga schematów, w których każde pole jest wymagane;
   argumenty i tak waliduje `run_tools`, a błąd wraca do modelu. Wraca, gdy pomiar pokaże częste
   błędne argumenty (p. 23).
-- **Przywracanie danych w odpowiedziach (mapowanie znaczników na dane)** — po anonimizacji
-  wszystko działa na znacznikach (decyzja 2026-10-16): człowiek czyta to samo, co widział model,
-  więc łatwiej mu zaufać wynikowi i wyłapać lukę w anonimizacji. Cena: wdrożeniowiec sam
-  wstawia dane przed wysłaniem odpowiedzi klientowi.
-- **Numerowane znaczniki osób (`{OSOBA_1}`, `{OSOBA_2}`) i słownik osób z helpdesku** —
-  numeracja wymaga grupowania odmian nazwiska w wątku, a słownik integracji z helpdeskiem;
-  kto pisał który komentarz, model i tak wie z etykiet ról w wątku. Cena: kilku osób w jednym
-  zgłoszeniu nie da się rozróżnić, na przykład w „przenieś sprawy od `{IMIĘ} {NAZWISKO}`
-  do `{IMIĘ} {NAZWISKO}`”. Wraca, gdy pomiary grafów (p. 21–28) pokażą, że model myli osoby.
-- **Maskowanie fragmentów wskazanych przez model-strażnika zamiast zatrzymania grafu** —
-  fałszywy alarm po cichu niszczyłby wiedzę, a zatrzymanie jest jawne: każde to sygnał, co
-  poprawić we wzorcach albo w prompcie modelu, i nowy przypadek do golden setu. Wraca, gdy
-  zatrzymań będzie tyle, że zaczną przeszkadzać w pracy.
-- **Przepisywanie tekstu modelem anonimizującym, także z wyrównaniem wyniku do wejścia**
-  (decyzja 2026-10-17) — model kopiuje całe wątki bez zmian, zwłaszcza gdy stoją w nich już
-  znaczniki, a poza tym poprawia i przeredagowuje tekst: na 32 wątkach zgubił 300–420 słów
-  i przepuścił 12–16 imion. Model wskazuje osoby, a zamienia kod (p. 19.5).
-- **NER osób (spaCy `pl_core_news_lg`, PolDeepNer2) zamiast modelu anonimizującego**
-  (2026-10-17) — spaCy przepuszczał nazwiska i niszczył nazwy usług (8 z 36), a PolDeepNer2
-  przepuszczał więcej osób niż model i liczył na CPU ponad 10 s na wątek. Wraca, gdy instancja
-  nie może mieć zaufanego endpointu modelu.
-- **Model jako sędzia listy kandydatów** (osoby ze spaCy, każde słowo z wielkiej litery albo
-  własna lista do odfiltrowania) — odrzuca prawdziwe nazwiska, a przy długiej liście gubi się
-  całkiem (do 24 z 45 nazwisk przecieku przy 1421 kandydatach).
-- **Model-strażnik po anonimizacji** (decyzja 2026-10-16: zawsze; skreślony 2026-10-19, dawny
-  p. 19.6) — model miał po zamianie odpowiadać, czy zostały dane osobowe, i zatrzymywać graf.
-  Ten sam model wskazuje osoby w silniku `agent`, więc nie byłby niezależnym sprawdzeniem, a
-  w sondzie z 2026-10-17 każda postać wypadła źle: ocena ryzyka zatrzymałaby 6 z 32 czystych
-  tekstów i wykryła 8 z 24 z osobami, TAK albo NIE — 1 z 32 i 2 z 24, wypisanie osób — 13 z 32
-  i 24 z 24. Po strojeniu z 2026-10-19 golden set nie ma przecieku. Wraca, gdy pomiar na pełnym
-  korpusie albo produkcja pokażą przecieki — wtedy inny model albo strażnik bez modelu
-  (słowa, które słownik zna tylko jako imię lub nazwisko), z własnym golden setem i liczonymi
-  fałszywymi zatrzymaniami.
-- **Drugi przebieg modelu „tekst jest już zanonimizowany, upewnij się”** — domknął 4 z 4
-  przecieków, ale zamienił 215 fragmentów bez danej i podwoił czas; te same przecieki domyka
-  bez wywołania rozprowadzenie wskazanych słów po wątku (p. 19.5).
-- **Narzędzia kodu w `suggest_handoff`** (decyzja 2026-10-30) — jedna tura kosztuje tyle co bramka,
-  a sprawa na kodzie Dokusa to 8–20 tur i 0,09–0,20 USD, żeby dodać namiar, którego klient nie
-  potrzebuje.
-- **Obowiązkowe „czego brakuje” w tekście przekazania** (2026-10-30) — kusi model do zmyślania
-  potrzeb serwisu; wiadomość mówi, czego dotyczy problem i co dotąd ustalono.
-- **Poprawka dla wariantu wymagającego źródeł, gdy źródeł nie ma** — brak źródeł nie jest błędem
-  formatu, a w sprawie bez podobnych zgłoszeń dodatkowa tura niczego nie zmieni. Wraca, gdy
-  pomiar pokaże, że model kończy przed odczytem (p. 26).
-- **Załączniki zgłoszeń** — tabela `zalacznik` trzyma tylko ścieżki, samych plików w zrzucie nie
-  ma; treść zgłoszenia i wątku wystarcza.
-- **Blokada źródła `code` w wariancie wymagającym źródeł** — zatrzymywałaby sprawę bez podobnych
-  zgłoszeń i instrukcji, czyli tę, dla której narzędzia kodu powstają. Wraca w węższej postaci
-  (liczy się tylko plik znaleziony dosłownym trafieniem), gdy pomiar pokaże odpowiedzi z luźno
-  powiązanych plików (p. 59).
-- **Tabela komunikatów z parsowania napisów w kodzie** — wymaga osobnego tokenizera PHP i JS.
-  Wraca, gdy szukanie po liniach da za dużo nietrafionych wyników.
-- **Pole-dana o zgodności przyczyn w odpowiedzi `/search`** (`zgodne` / `rozbieżne` / `nie da
-  się ocenić`) — stoi blisko wskazywania guzika, a przy pustych `cause` zamienia brak wiedzy
-  w pewność; zgodność opisują uwagi. Wraca, gdy helpdesk zechce pokazać ją jako znacznik.
+- **Poprawka albo blokada w wariancie wymagającym źródeł** — poprawki, gdy źródeł nie ma, wariant
+  nie dostaje: brak źródeł nie jest błędem formatu, a w sprawie bez podobnych zgłoszeń dodatkowa
+  tura niczego nie zmieni; wraca, gdy pomiar pokaże, że model kończy przed odczytem (p. 26). Źródła
+  `code` wariant nie blokuje: blokada zatrzymywałaby sprawę bez podobnych zgłoszeń i instrukcji,
+  czyli tę, dla której narzędzia kodu powstają; wraca w węższej postaci (liczy się tylko plik
+  znaleziony dosłownym trafieniem), gdy pomiar pokaże odpowiedzi z luźno powiązanych plików (p. 59).
+- **Narzędzia kodu i obowiązkowe „czego brakuje” w `suggest_handoff`** (2026-10-30) — jedna tura
+  kosztuje tyle co bramka, a sprawa na kodzie Dokusa to 8–20 tur i 0,09–0,20 USD, żeby dodać namiar,
+  którego klient nie potrzebuje. „Czego brakuje” kusi model do zmyślania potrzeb serwisu; wiadomość
+  mówi, czego dotyczy problem i co dotąd ustalono.
+- **Opis projektu i spis dokumentacji w prompcie systemowym zamiast narzędzi** (`describe_code`,
+  `list_docs`) — przy narzędziu sprawa, która po ten materiał nie sięga (np. organizacyjna), za
+  niego nie płaci, a opis i spis to dane paczki, nie nasz prompt.
 - **Kod aplikacji w `search` tylko wtedy, gdy zgłoszenia i instrukcje nie rozstrzygają
   przyczyny** — tańsze, ale kod nie jest wtedy trzecim materiałem na równi, tylko wyjściem
   awaryjnym.
-- **Opis projektu w prompcie systemowym zamiast narzędzia** — przy narzędziu sprawa
-  organizacyjna za opis nie płaci, a opis to dane paczki, nie nasz prompt.
-- **Spis dokumentacji w prompcie systemowym zamiast `list_docs`** — przy narzędziu sprawa, która
-  po dokumentację nie sięga, za spis nie płaci, a spis to dane paczki, nie nasz prompt.
-- **Wzorce karty płatniczej, IBAN-u zagranicznego, numeru rejestracyjnego, loginu i numeru
-  księgi wieczystej** (przegląd 2026-10-18) — w 1825 zgłoszeniach korpusu: kart 0 (dwa
-  trafienia sumy Luhna to dwunastocyfrowe numery bez słowa „karta”), IBAN-u zagranicznego 0,
-  numeru rejestracyjnego po etykiecie 1, loginu po etykiecie 7, księgi wieczystej 0. Login
-  zostaje poza oceną z decyzji 2026-10-17. Wracają, gdy któryś rodzaj pojawi się w korpusie
-  albo w golden secie.
-- **Trzecia kotwica adresu: oznaczenie lokalu albo miejscowość z SIMC (TERYT)** (2026-10-18) —
-  w 1825 zgłoszeniach korpusu obie nie znalazły żadnego adresu ponad dwie obecne kotwice:
-  „lok”, „lokal” i „mieszk.” nie stoją w korpusie ani razu, „m.” dało 2 trafienia w jednym
-  zgłoszeniu, a „ulica z numerem, miejscowość z SIMC” (36 263 nazwy) 0 nowych. SIMC kosztowałby
-  plik 5,5 MB w obrazie, odświeżanie i nazwy będące zwykłymi słowami (Góra, Kolonia, Wola).
-  Adresy bez kodu pocztowego i bez słowa przed ulicą wskazuje model (p. 19.5).
+- **Przywracanie danych w odpowiedziach i numerowane znaczniki osób** — po anonimizacji wszystko
+  działa na znacznikach (decyzja 2026-10-16): człowiek czyta to samo, co widział model, więc łatwiej
+  mu zaufać wynikowi i wyłapać lukę w anonimizacji. Cena: wdrożeniowiec sam wstawia dane przed
+  wysłaniem odpowiedzi klientowi. Numerowane znaczniki (`{OSOBA_1}`, `{OSOBA_2}`) i słownik osób z
+  helpdesku też odpadają: numeracja wymaga grupowania odmian nazwiska w wątku, słownik — integracji
+  z helpdeskiem, a kto pisał który komentarz, model i tak wie z etykiet ról w wątku. Cena: kilku
+  osób w jednym zgłoszeniu nie da się rozróżnić, na przykład w „przenieś sprawy od
+  `{IMIĘ} {NAZWISKO}` do `{IMIĘ} {NAZWISKO}`”. Wraca, gdy pomiary grafów (p. 21–28) pokażą, że model
+  myli osoby.
+- **Inne drogi wykrywania osób niż wskazanie modelem i zamiana kodem** (sondy 2026-10-17 –
+  2026-10-19, silnik z p. 19.5):
+  - przepisywanie tekstu modelem, także z wyrównaniem wyniku do wejścia — model kopiuje całe wątki
+    bez zmian, zwłaszcza gdy stoją w nich już znaczniki, a poza tym poprawia i przeredagowuje tekst:
+    na 32 wątkach zgubił 300–420 słów i przepuścił 12–16 imion;
+  - NER (spaCy `pl_core_news_lg`, PolDeepNer2) — spaCy przepuszczał nazwiska i niszczył nazwy usług
+    (8 z 36), a PolDeepNer2 przepuszczał więcej osób niż model i liczył na CPU ponad 10 s na wątek;
+    wraca, gdy instancja nie może mieć zaufanego endpointu modelu;
+  - model jako sędzia listy kandydatów (osoby ze spaCy, każde słowo z wielkiej litery albo własna
+    lista do odfiltrowania) — odrzuca prawdziwe nazwiska, a przy długiej liście gubi się całkiem (do
+    24 z 45 nazwisk przecieku przy 1421 kandydatach);
+  - drugi przebieg modelu „tekst jest już zanonimizowany, upewnij się” — domknął 4 z 4 przecieków,
+    ale zamienił 215 fragmentów bez danej i podwoił czas; te same przecieki domyka bez wywołania
+    rozprowadzenie wskazanych słów po wątku.
+- **Model-strażnik po anonimizacji** (decyzja 2026-10-16: zawsze; skreślony 2026-10-19, dawny
+  p. 19.6) — model miał po zamianie odpowiadać, czy zostały dane osobowe, i zatrzymywać graf. Ten
+  sam model wskazuje osoby w silniku `agent`, więc nie byłby niezależnym sprawdzeniem, a w sondzie z
+  2026-10-17 każda postać wypadła źle: ocena ryzyka zatrzymałaby 6 z 32 czystych tekstów i wykryła
+  8 z 24 z osobami, TAK albo NIE — 1 z 32 i 2 z 24, wypisanie osób — 13 z 32 i 24 z 24. Po strojeniu
+  z 2026-10-19 golden set nie ma przecieku. Wraca, gdy pomiar na pełnym korpusie albo produkcja
+  pokażą przecieki — wtedy inny model albo strażnik bez modelu (słowa, które słownik zna tylko jako
+  imię lub nazwisko), z własnym golden setem i liczonymi fałszywymi zatrzymaniami. Gdy wróci,
+  zatrzymuje graf, a nie maskuje wskazanych fragmentów: fałszywy alarm po cichu niszczyłby wiedzę, a
+  zatrzymanie jest jawne — każde to sygnał, co poprawić we wzorcach albo w prompcie modelu, i nowy
+  przypadek do golden setu. Maskowanie wraca, gdy zatrzymań będzie tyle, że zaczną przeszkadzać w
+  pracy.
+- **Dodatkowe wzorce i trzecia kotwica adresu** (przegląd 2026-10-18 na 1825 zgłoszeniach korpusu) —
+  wzorce karty płatniczej, IBAN-u zagranicznego, numeru rejestracyjnego, loginu i numeru księgi
+  wieczystej: kart 0 (dwa trafienia sumy Luhna to dwunastocyfrowe numery bez słowa „karta”), IBAN-u
+  zagranicznego 0, numeru rejestracyjnego po etykiecie 1, loginu po etykiecie 7, księgi wieczystej
+  0; login zostaje poza oceną z decyzji 2026-10-17, a wzorce wracają, gdy któryś rodzaj pojawi się w
+  korpusie albo w golden secie. Trzecia kotwica adresu, oznaczenie lokalu albo miejscowość z SIMC
+  (TERYT), nie znalazła żadnego adresu ponad dwie obecne kotwice: „lok”, „lokal” i „mieszk.” nie
+  stoją w korpusie ani razu, „m.” dało 2 trafienia w jednym zgłoszeniu, a „ulica z numerem,
+  miejscowość z SIMC” (36 263 nazwy) 0 nowych. SIMC kosztowałby plik 5,5 MB w obrazie, odświeżanie i
+  nazwy będące zwykłymi słowami (Góra, Kolonia, Wola). Adresy bez kodu pocztowego i bez słowa przed
+  ulicą wskazuje model (p. 19.5).
+- **Tabela komunikatów z parsowania napisów w kodzie** — wymaga osobnego tokenizera PHP i JS.
+  Wraca, gdy szukanie po liniach da za dużo nietrafionych wyników.
 
 ### Plan
 
