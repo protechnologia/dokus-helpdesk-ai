@@ -30,7 +30,7 @@ class QdrantClient:
 
     Piszemy wprost na REST Qdranta, bez `qdrant-client`: użytych końcówek jest kilka, `httpx`
     i tak jest zależnością, a warstwa pośrednia ukryłaby to, co tu kontrolujemy ręcznie — nazwane
-    wektory i metrykę (CLAUDE.md -> „Świadomie pominięte").
+    wektory i metrykę (CLAUDE.md -> „Warstwa bazy wektorowej (Qdrant)").
     """
 
     def __init__(

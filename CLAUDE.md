@@ -1016,11 +1016,13 @@ gałęzi.
   w tym 1401 generowanych klas `Base*`. Cena: skrypt kopiuje to, co leży na dysku, więc plik
   prywatny albo lokalnie zmieniony wchodzi, jeśli pasuje do reguł, a metryczka nie zna
   changesetu (paczka z 2026-10-07 powstała z gałęzi zadaniowej pod `stage-gminy`, changeset
-  51962). Katalog cache Symfony 2 leży w folderze z listy i trzeba go było wyłączyć: 305 plików
-  PHP ze skompilowanym kontenerem. Wyłączenia nie rozróżniają wielkości liter, jak rozszerzenia
-  (2026-10-08): kod leży na dysku Windows, a wcześniej `A.MIN.JS` i katalog `Vendor` wchodziły
-  mimo wpisów `*.min.js` i `vendor`; doboru z folderu Dokusa to nie zmieniło. Budowa, po której
-  paczka byłaby pusta, kończy się błędem i poprzedniej paczki nie rusza.
+  51962). Dowiązanie symboliczne skrypt kopiuje jako treść wskazanego pliku, także spoza folderu
+  wejściowego; w folderze z Windows dowiązań nie ma. Katalog cache Symfony 2 leży w folderze
+  z listy i trzeba go było wyłączyć: 305 plików PHP ze skompilowanym kontenerem. Wyłączenia
+  nie rozróżniają wielkości liter, jak rozszerzenia (2026-10-08): kod leży na dysku Windows,
+  a wcześniej `A.MIN.JS` i katalog `Vendor` wchodziły mimo wpisów `*.min.js` i `vendor`; doboru
+  z folderu Dokusa to nie zmieniło. Budowa, po której paczka byłaby pusta, kończy się błędem
+  i poprzedniej paczki nie rusza.
 - **Wpis, który nie zmienia wyniku, do reguł nie trafia (2026-10-06).** Nazwy plików z hasłami
   w wyłączeniach niczego nie zmieniały, bo YAML i tak nie wchodzi, a taki bezpiecznik pilnowałby
   pięciu nazw ze 187 pominiętych YAML-i. Efekt wpisu liczy się na plikach przed dopisaniem.
@@ -1066,7 +1068,9 @@ gałęzi.
   ripgrepa na maszynie. Kolejność plików z ripgrepa zmienia się między przebiegami, więc wynik
   układa klient: po ścieżce i numerze linii. Limit czasu jednego szukania to
   `CODE_SEARCH_TIMEOUT_SECONDS` (10 s). Na paczce Dokusa zwykłe szukanie trwa 0,05–0,1 s,
-  a fraza trafiająca w 85 tys. linii to 0,15 s ripgrepa i 0,7 s rozbioru 11 MB wyjścia.
+  a fraza trafiająca w 85 tys. linii to 0,15 s ripgrepa i 0,7 s rozbioru 11 MB wyjścia. Koło
+  `ripgrep` z PyPI dałoby jedną wersję na hoście i w obrazie, ale nie da się potwierdzić, kto je
+  publikuje.
 - **Przy szukaniu słowami ripgrep dostaje jedno słowo, najdłuższe, a komplet sprawdza nasz kod
   na treści linii (2026-10-09).** Tryb dosłowny ripgrepa zna jedną frazę. Które słowo dostanie,
   nie zmienia wyniku, tylko czas: najdłuższe było najrzadsze w 3 parach z 5, a przy „function
@@ -1187,7 +1191,9 @@ gałęzi.
   wybrane miejsce w kodzie i zgłoszenie napisane pod nie słowami zgłaszającego: komunikat
   z ekranu, fragment logu albo opis zachowania, bez nazw z kodu. Wymagane są miejsca, bez
   których nie da się odpowiedzieć na pytanie ze zgłoszenia; obok zapisane są miejsca pokrewne
-  i pułapki. Zestaw na kodzie Dokusa ma 9 przypadków (`data/unsafe/golden/code.json`, do
+  i pułapki. Ze zgłoszeń przypadków się nie bierze: cudzysłów w zgłoszeniu łapie głównie nazwy
+  przycisków i pól, a z 602 cytowanych fragmentów 170 stoi dosłownie w paczce, w tym tylko 52
+  w jednym miejscu. Zestaw na kodzie Dokusa ma 9 przypadków (`data/unsafe/golden/code.json`, do
   2026-10-15 `code-dokus.json`). Opisy zachowania zatwierdza osoba znająca Dokusa; do tego czasu przypadek ma
   `behaviour_confirmed: false`.
 - **Zestaw do aplikacji syntetycznej ma inny kształt, bo służy testom bez modelu (2026-10-07).**
@@ -1771,6 +1777,8 @@ anonimizacji (`agent_graphs/anonymize/`), węzeł na krok (`agent_nodes/`):
 Wzorce (p. 19.4) zamieniają dane o stałym kształcie, tekst po nich dzieli się na części, model
 anonimizujący wskazuje w nich osoby i adresy dwoma równoległymi wywołaniami, a kod znajduje
 wskazane fragmenty w całym tekście i zamienia je na znaczniki. Model tekstu nie przepisuje.
+Osoby i adresy idą osobnymi wywołaniami: wspólne kosztowało na próbce korpusu w każdym przebiegu
+1 imię i 1 nazwisko przecieku (sondy z 2026-10-17 i 2026-10-18).
 
 - **Pakiety usługi mają przedrostki jak w `api` (2026-10-19):** `agent_graphs/`, `agent_nodes/`,
   `core_engine/` (silnik i fabryka), `core_errors/`, `core_model/`, `core_patterns/` (wzorce),
@@ -1812,7 +1820,8 @@ wskazane fragmenty w całym tekście i zamienia je na znaczniki. Model tekstu ni
   (`answer_items()`), a węzeł osób odrzuca błędem (`accept_truncated` w `ask_model()`,
   2026-10-22).** Limit to 1500 tokenów w węźle osób i 300 w węźle adresów, bo model zapętla listę
   adresów: na całym korpusie limit uciął 27 z 1859 wywołań adresów, każde na fragmencie już
-  zamienionym, i żadnego wywołania osób (największa odpowiedź 439 tokenów). Za ucięciem listy
+  zamienionym, i żadnego wywołania osób (największa odpowiedź 439 tokenów). Schemat z `maxItems`
+  też kończył zapętlenia, ale w próbce korpusu podwajał wskazania nadmiarowe. Za ucięciem listy
   osób mogłyby stać nazwiska, które przeszłyby do modelu zewnętrznego, więc taka sprawa to
   `LLMError` (503). Adresy z kotwicą zamieniają wcześniej wzorce, więc ucięcie listy adresów
   kosztuje najwyżej adres bez kotwicy. Odpowiedź spoza schematu bez ucięcia to `LLMError`,
@@ -1861,7 +1870,8 @@ wskazane fragmenty w całym tekście i zamienia je na znaczniki. Model tekstu ni
   przykład nagłówka z kilkoma adresatami i lista dały 0 i 0. Na liście stoją systemy z co
   najmniej kilkunastu zgłoszeń (Dokus, ESOD, e-Doręczenia, ePUAP, eObywatel, eNadawca, EZD,
   KSeF, AnyDesk). Wpis musi być wąski: prawdziwe nazwisko na liście przeciekałoby zawsze, czego
-  pilnuje test na golden secie.
+  pilnuje test na golden secie. Dlatego nie ma na niej „Poczta Polska”: „Polska” po wspólnym
+  początku złapałoby nazwisko „Polski”.
 - **Pomiar z 2026-10-19 na Bieliku 11B v3 (vLLM; raport
   `data/unsafe/docs/pomiar-silnika-agent-2026-10-19.md`):** po strojeniu (przykład nagłówka
   z kilkoma adresatami, lista nazw, które nie są osobami, reguła odmian z Morfeuszem2) zestaw
@@ -1914,9 +1924,10 @@ wskazane fragmenty w całym tekście i zamienia je na znaczniki. Model tekstu ni
   w prawo na miejscowość, a w lewo na ulicę z numerem albo do początku linii; słowo przed ulicą
   (lista `STREET_PREFIXES` z grupami `PREFIXES_ULICA`, `PREFIXES_PLAC`…) w prawo na ulicę
   z numerem i opcjonalnie miejscowość. Wszystko w jednej linii, a przecinek kończy nazwę ulicy.
-  Pięć wcześniejszych wariantów dawało na 1895 tekstach (korpus i oba golden sety) te same
-  miejsca, co dwie funkcje. Listy słów (`STREET_PREFIXES`, `FLAT_MARKERS`) stoją w pliku nad
-  kawałkami wyrażeń i podają każdy zapis wprost, także z kropką.
+  Sam kod pocztowy wzorcem nie jest: nie wskazuje osoby, a w korpusie stoi 292 razy na 325 zaraz
+  po ulicy albo numerze. Pięć wcześniejszych wariantów dawało na 1895 tekstach (korpus i oba
+  golden sety) te same miejsca, co dwie funkcje. Listy słów (`STREET_PREFIXES`, `FLAT_MARKERS`)
+  stoją w pliku nad kawałkami wyrażeń i podają każdy zapis wprost, także z kropką.
 - **Adres do e-Doręczeń znika zawsze, także adres urzędu, jak e-mail (2026-10-18).** W korpusie
   stoi 32 razy w 17 zgłoszeniach. Ostatnie dwie cyfry to suma kontrolna, ale jej algorytmu nie
   opublikowano, więc wzorzec sprawdza sam kształt.
@@ -2359,7 +2370,9 @@ a do tego czasu jej nie ma, więc oba narzędzia kończą się błędem `DbPostg
   `app/agent_tools/` na każdej głębokości → podklasy `KnowledgeSource` i `AuxiliaryTool`)
   i sprawdza to, czego `ABC` nie wymusza: `name`, model zapytania z `extra="forbid"`, jedną nazwę
   na pakiet i brak `cite()` w narzędziach pomocniczych. Nowe narzędzie jest objęte testem bez
-  dopisywania go do żadnej listy.
+  dopisywania go do żadnej listy. `extra="forbid"` sprawdza tylko na modelu głównym, bo modele
+  zapytań i odpowiedzi są płaskie; zagnieżdżony model po cichu gubi nadmiarowe pole, więc
+  z pierwszym takim dochodzi test, że każdy obiekt schematu ma `additionalProperties: false`.
 - **Narzędzia właściwe buduje `agent_tools/factory.py`, z konfiguracji (2026-10-05):** po jednym
   kliencie embeddera, Qdranta i Postgresa, wspólnym dla ośmiu narzędzi, oraz paczka kodu, jej
   opis z metryczką, jej mapa symboli i klient ripgrepa dla sześciu narzędzi kodu, w kolejności
@@ -3731,7 +3744,9 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
   odpowiedzieć narzędziem także bez źródeł, inaczej sprawa kończy się 503) i z komunikatem tylko
   w kodzie (jedynym źródłem może być kod). Przebieg z 2026-10-13: 29 tur i 0,21 USD na
   `gpt-6.1-sol`; po zmianie promptu pierwsza tura grafu zapisuje początek żądania do cache od
-  nowa, około 0,02 USD zamiast 0,002.
+  nowa, około 0,02 USD zamiast 0,002. Test nie wymaga wywołania narzędzia pomocniczego (spis
+  katalogu, opis projektu, odczyt symbolu): zdanie w promptach to przyzwolenie, a czy model
+  sięga po nie z sensem, pokazuje sonda.
 - **Przebieg `llm_live` kończy się raportem zużycia:** linia na sprawę, pod nią przebieg grafu
   z wywołaniami narzędzi i opisem wyników, na końcu suma kosztu. Argumenty i wyniki raport bierze
   z rozmowy w stanie grafu, nie z `log`, bo log wraca w odpowiedzi trasy i niesie same nazwy
@@ -3753,7 +3768,8 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
   chodzą na węzłach właściwych i modelu generującym, scenariusze leżą jako dane
   w `data/safe/golden/`, a materiał dostają atrapy narzędzi przez konstruktor. Zestaw zalicza
   zero błędów, bez progu: błąd poprawia się w prompcie, a scenariusz tylko wtedy, gdy błędny
-  jest on sam. Każdy scenariusz ma parę kontrolną — to samo zgłoszenie bez ataku albo bez
+  jest on sam. Próg ponad zero wraca w jednym miejscu, gdyby w grafach z pętlą zero okazało się
+  nieosiągalne. Każdy scenariusz ma parę kontrolną — to samo zgłoszenie bez ataku albo bez
   poszlak w materiale — a asercje stoją na danych (werdykt, lista źródeł, wywołane narzędzia);
   słowa odpowiedzi są licznikami obok surowych odpowiedzi w raporcie, który czyta się przy
   każdym pomiarze. Pomiarów z p. 21–28 nie zastępują, bo scenariusze pisze autor promptów.
@@ -3880,9 +3896,11 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 
 ### Świadomie pominięte
 
-Rejestr odrzuconych rozwiązań — narzędzi/podejść, które celowo pominęliśmy. Gdy podejmiemy
-taką decyzję w trakcie pracy, **dopisz ją tu** (co + jednozdaniowe dlaczego). Jeśli zadanie
-wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
+Rejestr odrzuconych podejść, które ktoś mógłby zaproponować ponownie: produktowych,
+architektonicznych i narzędziowych. Wpis to co, jednozdaniowe dlaczego i — gdy jest — warunek
+powrotu. Szczegół kształtu gotowego kodu (nazwa pola, format wyniku, układ pliku) tu nie trafia:
+jego powód stoi przy opisie tego kodu w sekcji tematycznej. Jeśli zadanie wydaje się wymagać
+czegoś z tej listy — zapytaj, zamiast wprowadzać.
 
 - **Warstwa `docker-compose.gpu.yml`** — nie powstaje: embedder chodzi na CPU, a LLM jest
   zewnętrznym endpointem. Gdy pojawi się maszyna z kartą, warstwa to jeden plik i zero zmian
@@ -3894,11 +3912,7 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   jawnie** — jego tracing wysyła pełne prompty do chmury, czyli dane sprzed anonimizacji.
 - **Fuzja wyników tekstowych z wektorowymi** — wyszukiwanie tekstowe to osobne narzędzia agenta;
   agent sam wybiera drogę, a próg `RAG_SCORE_MIN` zostaje przy cosinusie.
-- **Reranker (cross-encoder na top-10)** — dopiero gdy pomiar pokaże, że top-5 gubi trafienia.
 - **Synthetic queries jako dodatkowy named vector** — rozważane, nieprzyjęte.
-- **Automatyczna wysyłka odpowiedzi do klienta** — produktem jest propozycja dla wdrożeniowca.
-- **Twarda blokada bez furtki** (bramka, której człowiek nie przejdzie) — fałszywy negatyw LLM-a
-  zatrzymałby obsługę klienta, a model stałby się pojedynczym punktem awarii procesu (zasada 10).
 - **Siedem pól schematu odrzuconych przy przeglądzie pod kątem uniwersalności** (2026-07-31,
   17 pól → 10). Wspólna przyczyna: były projektowane pod ten jeden korpus, a nie pod produkt.
   - `system` — stała przy założeniu „jedna instancja = jeden produkt".
@@ -3910,26 +3924,13 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   - `category` — 86% rekordów w trzech wartościach, granica „Błąd"/„Usterka" nieostra nawet dla
     człowieka. Kategoria „Automat mailowy" zostaje sygnałem dla adaptera, który czyta ją ze
     źródła, nie z artefaktu.
-- **Rozbicie wątku-projektu na wiele rekordów** (`ticket_id` z sufiksem `33644-1`) — odłożone
-  (p. 45): dotyka kontraktu artefaktu, więc po masowym parsowaniu oznacza ponowny przebieg LLM
-  (zasada 7). Przy 1,8% korpusu decyduje pomiar na pełnym korpusie (p. 33).
 - **Rozdzielenie `solution` na trzy pola** (*co zrobiono* / *co ustalono* / *zastrzeżenia*) —
   nadmierna struktura. Zastrzeżenia zostają częścią tekstu `solution`; model streszczający
   potrafi zgubić zdanie o zastrzeżeniu, dlatego są jawnym wymogiem promptu parsującego i promptu
   generacji.
-- **Klasa `useful`/`not_useful` wyprowadzana z `resolution`** — wśród 161 rekordów
-  „nierozwiązanych" tylko 8 ma puste `solution`, więc klasa niczego nie przewiduje. Od
-  2026-10-23 `useful` jest polem karty, które ocenia model z całego wątku.
-- **Reguła filtra po słowie „brak” w `solution` (`no_resolution`, do 2026-10-23)** — wyrzucała
-  karty z ustaloną przyczyną w `cause` i bez opisu naprawy, a karty bez wiedzy z niepustym
-  rozwiązaniem („Usunięto sprawę”) wpuszczała. Odeszła razem z `no_solution()`.
 - **Filtr odrzucający dopiero przy „brak” w `solution` i `useful` = false** — nie gubił dobrych
   kart, ale zostawiał w indeksie 36 z 71 pustych, a trafienie bez treści jest gorsze niż brak
   trafienia. Wraca, gdyby ocena `useful` okazała się niestabilna na pełnym korpusie (p. 33).
-- **Golden set zgłoszeń w dwóch plikach, z wiedzą i bez** (2026-10-23) — etykieta to pole,
-  a nie miejsce wpisu, więc jej zmiana to zmiana pola, a nie przenoszenie wpisu między plikami.
-- **Wynik filtra jakości w golden secie** — liczy go pomiar przy każdym przebiegu, a zapisany
-  w pliku zestarzałby się przy pierwszej zmianie kart albo reguły.
 - **Dopisek do reguły pola `useful` o czynności jednorazowej** (2026-10-23, „Sam fakt, że coś
   zrobiono, to za mało”, „Zlecenie, w którym klient wie, co zrobić, to nie wiedza” i osiem
   innych) — dopisek miał być kilkusłowny i ogólny, a żaden z dziesięciu wariantów w dwóch
@@ -3939,17 +3940,6 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Lista dosłownych pytań konsultanta zamiast syntezy** (`asked_questions`) — przy medianie
   jednego pytania na zgłoszenie lista to niemal to samo co synteza, a forma pytająca ciągnie
   model do przepisania cudzych pytań wprost. Warunek: synteza zachowuje konkrety.
-- **Rekordy syntetyczne — ręcznie pisane drzewa decyzyjne dla klas wieloprzyczynowych** —
-  zgłoszenia o tym samym objawie mają niemal identyczne `problem` + `symptoms`, więc wpadają do
-  trafień razem i niosą różne `cause`; pytania rozróżniające powstają z trafień, nie z ręcznego
-  rekordu. Cena: trafienia mówią, jakie są przyczyny, ale nie od czego zacząć (p. 45).
-- **Osobny folder `scripts/` w usłudze (`api/scripts/`)** — dwa foldery o tej samej nazwie mylą
-  bardziej, niż porządkują; wszystkie skrypty leżą w `scripts/` w korzeniu.
-- **Skrypty pomiarowe (`eval_*`) jako testy ewaluacyjne** — przyrząd z parametrami (model,
-  kandydaci na próg) nie ma kryterium zaliczenia; zamrożony próg jest osobnym testem
-  w `tests/evaluation/`. Usunięty 2026-10-05 `eval_index.py` mierzył zbudowany indeks zapytaniami
-  surowymi, których produkt już nie wysyła; okablowania pilnuje test golden setu, a tryby
-  porównuje `eval_embeddings.py`.
 - **Eksport zgłoszeń ze zrzutu jako komenda `helpdesk`** — skrypt woła `docker exec` na kontenerze
   ze zrzutem, a w obrazie `api` nie ma ani Dockera, ani dostępu do tego kontenera. Wraca
   z czytnikiem SQL (p. 34).
@@ -3959,14 +3949,6 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   wokół grafu (reguły, słownik rozstrzygnięć, rejestr wariantów, zapytania agenta). Parsowanie
   korpusu wchodzi z masowym importem (p. 31), a graf na pliku z eksportu z pełną rozmową wraca,
   gdy będą go potrzebować pomiary (p. 23).
-- **Indeksacja dokumentacji dokładająca po jednym dokumencie** — zastąpienie całego indeksu nie
-  zostawia sekcji usuniętych z paczki ani punktów dawnych fragmentów, a pełny przebieg to minuty.
-  Kilka wydań naraz tego nie wymaga: każde to osobny katalog paczki z własnymi `section_id`.
-- **Brak indeksu jako pusty wynik narzędzia albo puste tabele i kolekcje zakładane przy starcie
-  `api`** — pusty wynik wygląda jak „materiał nic o tym nie mówi", więc brakującego indeksu nikt
-  by nie zauważył, a start `api` zależałby od baz. Brak tabeli i kolekcji to błąd konfiguracji.
-  Na instancji pokazowej puste indeksy zakłada się ręcznie, a który materiał jest pusty, mówi
-  `GET /instance` (p. 76).
 - **Narzędzia tylko zbudowanych materiałów jako ustawienie instancji** (decyzja 2026-10-20) —
   graf dostawałby tylko narzędzia istniejących indeksów, a pominięte nazywałby log przebiegu.
   Pokaz chodziłby wtedy na układzie, którego produkcja nie ma: prompt wymienia narzędzia,
@@ -3978,12 +3960,6 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   materiał do pytań. Pomiar: na 200 artefaktach 8 par o podobnym `problem` i ani jednej do
   scalenia. Puste `cause` po obu stronach nie jest zgodnością. Prawdziwe duplikaty (to samo
   zgłoszenie wysłane dwa razy) to inna klasa, do rozważenia przy pełnym korpusie.
-- **Lista fraz w `exact` wyszukiwań tekstowych** — wynik nie mówił, która fraza trafiła,
-  a semantyka „którakolwiek" wymagała tłumaczenia; jedna fraza na wywołanie.
-- **Lista numerów w `read_tickets_thread`** — limit wywołań mnożył się przez długość listy
-  (2 × 5 wątków), a model brał wszystkie znalezione naraz; jeden wątek na wywołanie.
-- **Zwijanie fragmentów dokumentacji do sekcji w narzędziu** — wymaga pobierania fragmentów
-  z zapasem zależnym od najdłuższej sekcji (do 25–31 fragmentów na pięć sekcji); grupuje Qdrant.
 - **Zwijanie zgodnych trafień w wynikach wyszukiwania** — przy `RAG_TOP_K` = 5 licznik zgodnych
   trafień jest artefaktem okna, nie pomiarem korpusu, a bez licznika zostaje sama krótsza lista.
   Wraca z rozdzieleniem „ile pobrać" od „ile pokazać"; bez re-indeksu.
@@ -4003,46 +3979,12 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   funkcji, a osobne trasy powieliłyby budowę stanu sześć razy. Front pokazowy (p. 77) ich nie
   potrzebował. Wraca, gdy wpięcie w helpdesk (p. 38) pokaże konkretny powód, na przykład klienta
   HTTP, który nie ustawi nagłówka.
-- **Statyka frontu wpiekana w `api` pod `/ui`** (plan do 2026-10-20) — obraz `api` dostawałby
-  etap z Node, a `api/` drzewo z `package.json` obok Pythona, a dev i tak potrzebował serwera
-  Vite. Front jest osobną usługą z proxy `/api` (CLAUDE.md → „Frontend").
-- **Jeden model stanu strony frontu (`useReducer`) albo biblioteka stanu (Redux, Zustand)** —
-  stan to kilka niezależnych kawałków, a reduktor z akcjami to więcej kodu niż zysk. Wraca, gdy
-  kawałki zaczną zmieniać się razem.
-- **Dzielenie paczki frontu na części** — paczka ma ~1 MB, prawie cała to antd, a front chodzi
-  lokalnie; bez pomiaru, że to boli.
-- **Biblioteka do przesuwania dialogów (`react-draggable`)** — przesuwanie za nagłówek to
-  kilkanaście linii na zdarzeniach wskaźnika, a rozmiar daje CSS `resize`.
-- **Kolejność wariantów w odpowiedzi `GET /variants`** — to wygląd guzików, nie kontrakt;
-  helpdesk ustawi swoje guziki po swojemu, a front pokazowy ma `VARIANT_ORDER`.
-- **Testy frontu w `frontend/tests/`** — reguła „testy w korzeniu" obejmuje też front, a typy
-  `vitest` widzi z `tests/unit/frontend/` jedna linia `paths` w `tsconfig.json`.
-- **Testy komponentów React** — logika siedzi w czystych funkcjach (`runs/`, `api/sse.ts`,
-  `utils/`), a komponenty tylko rysują; test komponentu sprawdzałby głównie antd.
-- **Plik na każdy model frontu** — około 30 plików po kilka linii; modele z `api` mają plik na
-  zasób, jak `entry_routers/<zasób>/models.py`.
-- **Etykieta kroku w toku zgadywana z wpisu logu** — wpis to tekst dla człowieka, nie do
-  parsowania; krok tury modelu niesie `requested_tools`.
-- **Czas wywołania narzędzia w wiadomości `tool`** — prostsze łączenie z wynikiem, ale model
-  rozmowy idzie do dostawców, a metryki nie mają tam czego szukać; pomiar stoi w osobnym polu
-  stanu (`tool_timings`).
-- **Wpis w logu trasy w `mapping.py` albo jeden ogólny wpis we wspólnej obsłudze strumienia** —
-  pierwsze dałoby plikowi mapowania drugą rolę, drugie zgubiłoby szczegóły tras (werdykt, liczba
-  źródeł, długość uwag); trasa ma funkcję `finish` w swoim ciele.
-- **Osobny endpoint na każdy wariant** (`/suggest/questions`, `/suggest/solution`…) — nowy guzik
-  to nowy katalog grafu, a nie nowa trasa.
-- **Bramki oparte o RAG** (porównywanie zamknięcia z historycznymi rozwiązaniami) — uzależniłoby
-  nogę 2 od gotowego indeksu i zabrało jej największą zaletę: użyteczność przy pustej bazie.
 - **Reguły bramek jako regexy/lista słów zamiast LLM-a** — „potoczne słownictwo" i „nie widać,
   co zrobiono" nie są wyrażalne słownikiem. Kandydat na tanie pre-filtry przed wywołaniem
   LLM-a, jeśli koszt zacznie boleć.
 - **Tryb strict narzędzi u OpenAI** — wymaga schematów, w których każde pole jest wymagane;
   argumenty i tak waliduje `run_tools`, a błąd wraca do modelu. Wraca, gdy pomiar pokaże częste
   błędne argumenty (p. 23).
-- **Flaga „endpoint może widzieć surowe dane" przy konfiguracji LLM** — przy dwóch osobnych
-  konfiguracjach powtarzałaby to, co mówi sama nazwa zestawu: model w `LLM_ANONYMIZATION_*` widzi
-  surowy tekst z definicji. Cena: jedynym zabezpieczeniem jest to, co w tym zestawie stoi,
-  a pracy bez anonimizacji nie da się włączyć wcale (p. 19).
 - **Przywracanie danych w odpowiedziach (mapowanie znaczników na dane)** — po anonimizacji
   wszystko działa na znacznikach (decyzja 2026-10-16): człowiek czyta to samo, co widział model,
   więc łatwiej mu zaufać wynikowi i wyłapać lukę w anonimizacji. Cena: wdrożeniowiec sam
@@ -4079,310 +4021,32 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Drugi przebieg modelu „tekst jest już zanonimizowany, upewnij się”** — domknął 4 z 4
   przecieków, ale zamienił 215 fragmentów bez danej i podwoił czas; te same przecieki domyka
   bez wywołania rozprowadzenie wskazanych słów po wątku (p. 19.5).
-- **Adres we wspólnym wywołaniu modelu z osobami** (sondy z 2026-10-17 i 2026-10-18) — na
-  próbce korpusu kosztował w każdym przebiegu 1 imię i 1 nazwisko przecieku (osoby same: 0 i 0);
-  adresy, których nie łapią wzorce, wskazuje osobne wywołanie (p. 19.5).
-- **Długa lista przykładów adresów w prompcie** (2026-10-18) — nic nie dodała wobec dwóch
-  przykładów w rozmowie, a przed filtrami w kodzie brała za adres nazwę urzędu.
-- **Wspólny klient modelu dla `api` i usługi `anonymizer`** (2026-10-19) — usługi nie dzielą
-  kodu, a klient w `api` zapisuje treść na DEBUG; usługa ma własne jedno wywołanie Chat
-  Completions bez treści w logach.
-- **`LLM_ANONYMIZATION_PROVIDER` i `LLM_ANONYMIZATION_MAX_OUTPUT_TOKENS` w usłudze**
-  (2026-10-19) — do modelu jest jedna droga (Chat Completions zgodne z OpenAI), a limit
-  odpowiedzi to część promptu węzła (1500 osób, 300 adresów).
-- **Sprawdzenie modelu przy starcie usługi** — pod z GPU bywa wyłączony, a usługa ma wtedy
-  wstać i odpowiadać 503; zły model albo klucz wychodzi przy pierwszym wywołaniu jako błąd
-  konfiguracji.
-- **Schemat z `maxItems` i zakazem klamr zamiast limitu odpowiedzi adresów** (sonda
-  z 2026-10-18) — kończył zapętlenia, ale w próbce korpusu podwoił wskazania nadmiarowe, a inne
-  wywołanie trwało 37 s; jest limit 300 tokenów i odczyt pełnych elementów uciętej odpowiedzi.
-- **Odrzucanie całej odpowiedzi węzła adresów uciętej limitem** — wątek straciłby wszystkie
-  wskazane adresy, a ucięcie w korpusie to zapętlenie na fragmencie, który filtr i tak odrzuca.
-  Rozróżnianie zapętlenia (powtórzony element) od długiej listy odrzucone 2026-10-22 jako
-  komplikacja bez zmierzonego przypadku. W węźle osób ucięcie jest błędem.
-- **Licznik fragmentów osób, których kod nie znalazł w tekście** (2026-10-22) — inną wielkość
-  liter, brak polskich znaków i odmianę kod już łapie, więc nieznaleziony fragment to zwykle
-  osoba zmyślona przez model; licznik podpowiadałby przyczynę, a przeciek pokaże pomiar
-  z p. 78.
-- **Zasada w prompcie `suggest_handoff`, że ostrzeżenie z wątku idzie do tekstu** (2026-10-30) —
-  bez niej model przekazał je w 15 próbach z 15 (także w środku dłuższego wątku), a z nią w 15
-  z 15; pilnują tego scenariusze h04 i h09. Wraca, gdy zaczną padać. Tak samo osobna zasada, że
-  zapowiedź nie jest ustaleniem (scenariusz h03).
-- **Osobne zasady w prompcie „Popraw”: „Nie dodajesz faktów, danych, kroków…” i „Każdy znacznik
-  z notatek zostaje w tekście”** (2026-10-30) — pierwsza powtarza zasadę ogólną i „Zmieniasz formę,
-  nie treść”, a druga zabrania pominąć powtórzony znacznik tej samej osoby. Bez nich scenariusze:
-  0 dopisków i 0 zgubionych znaczników na 8 spraw w dwóch przebiegach. Wracają, gdy zaczną padać.
-- **Uwagi dla wdrożeniowca w `suggest_handoff`** (2026-10-30) — model ma tylko wątek, który
-  wdrożeniowiec i tak widzi, więc notatka nie dodałaby nowej wiedzy. Wraca z p. 71, gdyby wariant
-  dostawał ustalenia z `/search`, np. namiar na plik.
 - **Narzędzia kodu w `suggest_handoff`** (decyzja 2026-10-30) — jedna tura kosztuje tyle co bramka,
   a sprawa na kodzie Dokusa to 8–20 tur i 0,09–0,20 USD, żeby dodać namiar, którego klient nie
   potrzebuje.
 - **Obowiązkowe „czego brakuje” w tekście przekazania** (2026-10-30) — kusi model do zmyślania
   potrzeb serwisu; wiadomość mówi, czego dotyczy problem i co dotąd ustalono.
-- **Wspólna nazwa `respond` dla narzędzi odpowiedzi wszystkich grafów** (2026-10-30) — skróciłaby
-  jedną zasadę ogólną, a kosztowałaby około 190 wystąpień do zmiany i nazwę grafu w logach; każde
-  z tych narzędzi ma inne argumenty i opis, więc zasada mówi o przedrostku `respond_`.
-- **Test, że każdy obiekt w schemacie odpowiedzi grafu i zapytania narzędzia ma
-  `additionalProperties: false`** (2026-10-22) — wszystkie te modele są płaskie, a test
-  kontraktu sprawdza `extra="forbid"` na modelu głównym. Zagnieżdżony model domyślnie po cichu
-  gubi nadmiarowe pole, więc test dochodzi razem z pierwszym takim modelem.
-- **Sam Morfeusz2 albo sama reguła rdzenia przy odmianach osób** (2026-10-19) — sam lemat gubi
-  zdrobnienie („Iza” obok „Izabela”, przeciek w próbce korpusu), sam początek niszczy zwykłe słowa
-  („Alarm”, „Lista”); reguła bierze z obu to, co pewne. Słownika sjp.pl z obrazu Postgresa nie
-  mierzono: nie ma kwalifikatora imienia i nazwiska, na którym reguła stoi.
-- **„Poczta Polska” na liście wyjątków węzła osób** — słowo „Polska” po wspólnym początku
-  złapałoby nazwisko „Polski”, a osoba z listy wyjątków przeciekałaby zawsze.
-- **Część tekstu liczona z okna modelu zamiast stałej** — wyniki węzła osób stoją na wątkach do
-  5,9 tys. znaków, a dłuższych części nikt nie mierzył; stała 6000 znaków ze sprawdzeniem okna
-  przy starcie.
-- **Węzły właściwe na atrapie modelu przy dostawcy `fake`** — atrapa modelu bez scenariusza
-  odpowiada samym tekstem, więc `respond` odrzucałby każdą sprawę, a scenariusz wpisany w fabrykę
-  byłby drugą atrapą grafu. Przy `fake` fabryka oddaje atrapę całego grafu.
-- **Nazwa modelu embeddera w metadanych albo w nazwie kolekcji** (2026-10-16) — Qdrant 1.12.5
-  metadanych kolekcji nie ma, a nazwa kolekcji to konfiguracja (`QDRANT_COLLECTION`); model stoi
-  w payloadzie każdego punktu. Cena: nazwa powtarza się w każdym punkcie, a zapis pyta Qdranta
-  o punkt innego modelu przed każdą paczką.
-- **Odmowa atrapy embeddera w `api`** (2026-10-16) — kolekcja w całości z atrapy jest spójna
-  i służy testom oraz startowi bez wag; szkodzi dopiero mieszanie modeli, a tego pilnuje Qdrant.
-- **Prawdziwe narzędzia w atrapie grafu** (2026-10-16) — atrapa modelu musiałaby mieć scenariusz
-  wywołań z poprawnymi argumentami, a świeży stack bez indeksów kończyłby się błędem brakującego
-  indeksu. Atrapa grafu woła tylko usługę `anonymizer`, bo anonimizacja to stały węzeł,
-  a narzędzia wybiera model.
-- **Niedostępny anonimizator jako 503 w `GET /instance`** (2026-10-20) — belka straciłaby model
-  i stan indeksów, choć brakuje tylko anonimizatora; usługa, która nie odpowiada, to stan
-  `unavailable`.
-- **Atrapa anonimizatora w `api` w czasie działania** (2026-10-16) — nie byłoby widać, czy
-  usługa `anonymizer` w ogóle odpowiada, a atrapę i tak ma usługa (`ANONYMIZATION_ENGINE=fake`).
-  `FakeAnonymizer` zostaje dla testów.
-- **Test kontenera `api` na trasie grafu** (2026-10-16) — wynik zależy od `.env` dewelopera, a po
-  p. 19.4, przy prawdziwym modelu, test zawołałby płatny model. Drogę przez usługę sprawdza test
-  fabryki na stacku, a kontener — ręczna sonda przy zmianie.
 - **Poprawka dla wariantu wymagającego źródeł, gdy źródeł nie ma** — brak źródeł nie jest błędem
   formatu, a w sprawie bez podobnych zgłoszeń dodatkowa tura niczego nie zmieni. Wraca, gdy
   pomiar pokaże, że model kończy przed odczytem (p. 26).
-- **Zgłoszenia spoza modułu Dokus** — łamie założenie „jedna instancja = jeden produkt": wraca
-  pole `system` do schematu i do embeddingu, czyli ponowny przebieg LLM po korpusie, a `typ`
-  komentarza przestaje być wiarygodny.
 - **Załączniki zgłoszeń** — tabela `zalacznik` trzyma tylko ścieżki, samych plików w zrzucie nie
   ma; treść zgłoszenia i wątku wystarcza.
-- **Kod aplikacji w Postgresie (tabele plików i symboli)** — ripgrep szuka w folderze w 0,05 s
-  bez wczytywania kodu do bazy, a narzędzia na folderze testuje się bez stacku. Cena: ścieżka
-  podana przez model trafia do systemu plików i trzeba jej pilnować, a szukania z odmianą słów
-  nie ma.
-- **Czysty checkout i kontrola plików wobec repozytorium** (sumy MD5 z PlasticSCM, dociąganie
-  zmienionych plików z serwera) — skrypt paczki kopiuje folder programisty według listy włączeń
-  i nie rozmawia z repozytorium. Cena: plik prywatny albo lokalnie zmieniony wchodzi, jeśli
-  pasuje do reguł, a metryczka nie zna gałęzi ani changesetu.
-- **Lista wyłączeń zamiast listy włączeń w regułach paczki kodu** — przepuszcza wszystko, czego
-  na niej nie ma, a w `src` jest ponad 40 typów plików.
-- **Wykrywanie i maskowanie sekretów w skrypcie paczki** — przegląd wykrywaczem zostaje ręczny,
-  po zbudowaniu paczki. Wraca, gdy przegląd znajdzie coś, czego nie da się wyłączyć jednym
-  wpisem w regułach.
-- **Sprawdzanie kształtu wpisów w regułach paczki kodu** — wpis `excluded_folders` z ukośnikiem
-  na końcu nic nie wyłącza i nie daje błędu; w regułach Dokusa takiego wpisu nie ma. Wraca, gdy
-  taki wpis się zdarzy.
-- **Odrzucanie dowiązań symbolicznych w skrypcie paczki** — skrypt kopiuje treść pliku
-  wskazanego dowiązaniem, także spoza folderu wejściowego; w folderze roboczym z Windows
-  dowiązań nie ma.
-- **Paczka syntetyczna budowana w teście** — buduje się ją skryptem przed testami, a zbudowana
-  leży obok źródła, poza commitem. Cena: test narzędzia kodu bez zbudowanej paczki nie ma na
-  czym stanąć.
 - **Blokada źródła `code` w wariancie wymagającym źródeł** — zatrzymywałaby sprawę bez podobnych
   zgłoszeń i instrukcji, czyli tę, dla której narzędzia kodu powstają. Wraca w węższej postaci
   (liczy się tylko plik znaleziony dosłownym trafieniem), gdy pomiar pokaże odpowiedzi z luźno
   powiązanych plików (p. 59).
-- **Druga wersja linii kodu, tylko do szukania** — model mógłby przepisać z odczytanego pliku
-  zapis, którego szukanie nie zna; skrypt paczki rozkodowuje litery raz i wersja jest jedna.
 - **Tabela komunikatów z parsowania napisów w kodzie** — wymaga osobnego tokenizera PHP i JS.
   Wraca, gdy szukanie po liniach da za dużo nietrafionych wyników.
-- **Zapytania do zestawu kodu brane ze zgłoszeń** — cudzysłów w zgłoszeniu łapie głównie nazwy
-  przycisków i pól: z 602 cytowanych fragmentów 170 stoi dosłownie w paczce, a tylko 52 w jednym
-  miejscu; pułapki są cechą kodu, więc przypadek powstaje z wybranego miejsca w kodzie.
-- **Fragment linii jako warunek zaliczenia przypadku kodu** — jeden plik ma kilka właściwych
-  miejsc (warunek, ustawienie, treść komunikatu), więc zalicza plik wśród cytowań przyczyny.
-  Wraca, gdy model zacytuje właściwy plik w złym miejscu.
-- **Drugi koniec łańcucha PHP → JS zawsze wymagany** — gdy pytanie ze zgłoszenia rozstrzyga
-  sama strona serwera, model po stronę przeglądarki nie sięga i ma rację; wymagane są tylko
-  miejsca, bez których nie da się odpowiedzieć.
-- **Treść linii w wyniku `quote_code`** — z treścią w zwrocie model używał cytowania zamiast
-  odczytu i cytował linie, których nie przeczytał; treść daje wyłącznie odczyt.
-- **Cytowanie kodu bez ról** — model cytował też miejsca wykluczone, jako dowód, więc sprawa bez
-  odpowiedzi miała dwa źródła; z rolą `excluded` nie ma żadnego.
-- **Blokada cytowania linii, których model nie odczytał** — narzędzie nie widzi rozmowy,
-  a sprawdzanie w węźle wiązałoby go z nazwami narzędzi odczytu; bez treści w zwrocie model
-  w dwóch przebiegach nie cytował na ślepo. Wraca, gdy pomiar pokaże takie cytowania (p. 59).
-- **`offset` i `limit` w `read_code_file`** — tak pytał prototyp z sondy; `from_line`
-  i `to_line` nazywają się jak w `quote_code`, więc model cytuje przeczytany zakres bez
-  przeliczania.
-- **Linie odczytu jako lista obiektów `{line, text}`** (tak było do 2026-10-20) — te same pola
-  co wynik szukania, ale funkcja pocięta na obiekty czyta się jak dane, nie jak kod, i zajmuje
-  w wyniku 2,1 razy tyle znaków co goły kod, wobec 1,15 przy jednym tekście z numerami.
-- **Lista napisów „numer: treść" w odczycie kodu** — 1,33 razy tyle znaków co goły kod
-  i dalej lista; jeden tekst jest krótszy i czyta się jak plik.
-- **Flaga `truncated` albo sama para „żądane, oddane" w wyniku odczytu** — żadna nie mówi, czy
-  skończył się plik, czy zadziałał limit; mówią to `cut_by_limit` i `end_of_file`.
-- **Ucinanie długich linii i budżet znaków w odczycie pliku** — linii dłuższych niż 500 znaków
-  jest w paczce 72 na 1,18 mln, a okno 300 linii przekracza 20 tys. znaków w 25 plikach
-  z 11 424.
-- **Pozycje spisu katalogu pogrupowane po katalogu albo jako lista napisów z ukośnikiem po
-  nazwie katalogu** — 0,6 i 0,7 znaków listy obiektów; obiekty mają pełną ścieżkę gotową do
-  podania dalej i ten sam kształt co linie z szukania. Wraca, gdy pomiar pokaże, że koszt
-  spisów boli (p. 59).
-- **Ucinanie spisu katalogu w środku poziomu** — po uciętym poziomie nie widać, które
-  podkatalogi są rozwinięte, a które puste; narzędzie zmniejsza głębokość do pełnych poziomów.
-- **Górna granica głębokości spisu** — limit pozycji i tak zmniejsza głębokość, a granica
-  zmieniałaby wynik tylko w wąskim, głębokim katalogu, który mieści się w limicie.
-- **Jedna flaga ucięcia albo sam licznik pominiętych w wyniku spisu** — przy „prosił o 2
-  poziomy, dostał 1, pominięto 500" nie byłoby wiadomo, czy pierwszy poziom jest pełny; o
-  zmniejszonej głębokości mówi `depth_cut_by_limit`, a licznik liczy tylko pozycje pokazanego
-  poziomu.
-- **Liczba linii przy pliku w spisie katalogu** — wymaga czytania każdego pliku, a długość
-  podaje pierwszy odczyt.
 - **Pole-dana o zgodności przyczyn w odpowiedzi `/search`** (`zgodne` / `rozbieżne` / `nie da
   się ocenić`) — stoi blisko wskazywania guzika, a przy pustych `cause` zamienia brak wiedzy
   w pewność; zgodność opisują uwagi. Wraca, gdy helpdesk zechce pokazać ją jako znacznik.
-- **Uwagi `/search` jako osobne pole na każdy materiał** — inny kształt niż w `/suggest`
-  i więcej do przeniesienia w p. 71; jest jeden tekst ze wzorem czterech sekcji.
-- **Uwagi `/search` jako cztery linie z etykietą i dwukropkiem** — tak wyszły z p. 70; przy
-  600–1500 znakach gęste linie źle się czytały, a przyczyny spraw stały w jednym zdaniu.
-- **Nagłówek `#` w uwagach `/search`** — w panelu, który renderuje Markdown, wyszedłby jak
-  tytuł strony; sekcje mają `##`.
 - **Kod aplikacji w `search` tylko wtedy, gdy zgłoszenia i instrukcje nie rozstrzygają
   przyczyny** — tańsze, ale kod nie jest wtedy trzecim materiałem na równi, tylko wyjściem
   awaryjnym.
-- **Stronicowanie katalogu, który nie mieści się w spisie** — takich katalogów jest w paczce
-  siedem, wszystkie z setkami plików; w nich szuka się po treści, z katalogiem w `path`.
-- **Test na żywym modelu wymagający wywołania spisu katalogu** — narzędzie jest pomocnicze
-  i model ma go używać tylko wtedy, gdy sprawa tego wymaga; zdanie w promptach jest
-  przyzwoleniem. Czy używa go z sensem, pokazała sonda, a policzy pomiar (p. 59).
-- **Wynik `find_code_text` bez treści linii** — tak stało w planie z 2026-10-06, gdy odczyt pliku
-  miał tworzyć źródło; odkąd tworzy je tylko cytowanie przyczyny, treść w szukaniu źródeł nie
-  omija, a bez niej każde trafienie trzeba odczytać.
-- **Wynik `find_code_text` pogrupowany po pliku** — płaska lista ma ten sam kształt co pozostałe
-  wyszukiwania tekstowe i tnie się limitem jednym wycięciem. Cena: ścieżka powtarza się przy
-  każdej linii, około 0,8 tys. znaków na typowy wynik.
-- **`words` jako lista w `find_code_text`** — pozostałe wyszukiwania tekstowe biorą tekst, a model
-  w sondzie podał tekst także prototypowi z listą.
-- **Ripgrep z koła na PyPI** (`ripgrep==14.1.0`) — jedna wersja dla hosta i obrazu, ale nie da się
-  potwierdzić, kto tę paczkę publikuje; program pochodzi z apt.
-- **Ripgrep w czytniku paczki albo jako osobna usługa compose** — w czytniku mieszałby odczyt
-  plików z uruchamianiem programu, a usługa to REST i drugi kontener dla programu, który
-  odpowiada w 0,1 s; ma własny pakiet w `app/`.
-- **Szukanie słowami łańcuchem dwóch ripgrepów albo wyrażeniem z warunkami (PCRE2)** — drugi
-  ripgrep filtruje wyjście pierwszego razem ze ścieżką, więc słowo „js" pasowałoby do każdej
-  linii pliku `.js`; PCRE2 wymaga zamiany tekstu od modelu na wzorzec i było ponad dwa razy
-  wolniejsze.
-- **Liczenie trafień każdego słowa przed szukaniem, żeby wybrać najrzadsze** — to dodatkowe
-  uruchomienie ripgrepa na słowo, zwykle droższe niż zysk; ripgrep dostaje najdłuższe.
-- **Changeset w metryczce paczki kodu** — w kopii roboczej stoi tylko w nagłówku pliku binarnego
-  o nieudokumentowanym formacie, a klient `cm` to program Windows, który może łączyć się
-  z serwerem; metryczka niesie gałąź i datę budowy.
-- **Flagi `--branch` i `--changeset` w skrypcie paczki** — wartość wpisana z ręki może być
-  błędna albo nieaktualna; gałąź skrypt czyta sam z pliku kopii roboczej.
-- **`text` z wartością `null` w `Proposal` zamiast osobnego modelu na same uwagi** — schemat dla
-  modelu pozwoliłby wtedy oddać propozycję bez treści także w sprawie ze źródłami; `ProposalNotes`
-  zapisuje tylko węzeł `respond`.
-- **Sprawa bez źródeł bez uwag dla wdrożeniowca** — tak było do 2026-10-08: węzeł nie czytał
-  odpowiedzi, więc ginęło, czego agent szukał i co wykluczył.
-- **Zdanie „mam komplet informacji" w `text` zamiast `text: null` w wariancie `questions`** —
-  `text` to pole dla klienta, brzmienie zdania pływa, a helpdesk musiałby rozpoznawać brak pytań
-  po treści.
-- **Wyjście „pytań już nie trzeba" tylko po odpowiedziach klienta w wątku** — pierwsza wersja
-  reguły; przy opisie, który sam rozstrzyga sprawę, kazałaby pytać na siłę.
 - **Opis projektu w prompcie systemowym zamiast narzędzia** — przy narzędziu sprawa
   organizacyjna za opis nie płaci, a opis to dane paczki, nie nasz prompt.
 - **Spis dokumentacji w prompcie systemowym zamiast `list_docs`** — przy narzędziu sprawa, która
   po dokumentację nie sięga, za spis nie płaci, a spis to dane paczki, nie nasz prompt.
-- **Mapa „które zdarzenie obsługuje która funkcja" w opisie projektu** — opis ma być ogólny
-  i zwięzły; zostaje jedna ogólna reguła kliknięcia i wspólna obsługa błędów. Wraca, gdy
-  przebiegi pokażą, że model gubi się na takim przejściu.
-- **Opis projektu i metryczka w czytniku kodu (`CodePackage`)** — czytnik kodu pilnuje ścieżek
-  od modelu, a te dwa pliki ich nie przyjmują; czyta je osobny `CodeDescription`. Cena:
-  `quote_code` ma dwie zależności.
-- **Brak opisu projektu jako błąd wracający do modelu albo narzędzie, które wtedy nie
-  powstaje** — brak opisu objawiałby się tylko gorszym szukaniem; jest błędem konfiguracji.
-- **Gałąź paczki ukryta przed modelem w potwierdzeniu cytowania** — w sprawie z komunikatem
-  model po opis projektu nie sięga, więc gałęzi nie zobaczyłby wcale.
-- **Osobne pole z gałęzią w odpowiedzi `/search` i `/suggest`** — gałąź stoi w tytule źródła,
-  czyli tam, gdzie kod jest cytowany, bez zmiany kontraktu tras.
-- **Kilka gałęzi kodu w jednej instancji** — osobna paczka na gałąź i wskazanie gałęzi
-  w każdym narzędziu kodu; instancja ma jedną paczkę.
-- **Reguła „bez komunikatu zacznij od opisu projektu" w `suggest_questions`
-  i `suggest_solution`** — warunek sięgania po kod zostaje tam wąski do p. 25–26; mają samo
-  zdanie-przyzwolenie.
-- **Test na żywym modelu wymagający wywołania opisu projektu** — narzędzie jest pomocnicze;
-  czy model sięga po nie z sensem, pokaże sonda.
-- **Pamiętanie plików w `read_document()` (`lru_cache`)** — zysk to 0,15 ms na odczyt, a opis
-  projektu i prompt w dev docierały w starej wersji aż do restartu.
-- **ctags do mapy symboli** — wersja z apt (5.9) nie podaje linii końca dla PHP ani JS,
-  a nowszej nie ma w Debianie obrazu; mapę buduje tree-sitter.
-- **Rozbiór pliku na żądanie w `api` zamiast pliku mapy** — parser trafiłby do obrazu,
-  a narzędzie znałoby tylko plik, o który zapytano; mapa zna wszystkie definicje nazwy w całym
-  kodzie. Cena: mapa może być starsza niż ręcznie zmienione `repo/`.
-- **Użycia (wywołania) w mapie symboli** — parser widzi składnię, nie typy, więc
-  z `$obiekt->zapisz()` nie wynika, której klasy to metoda, a 73% funkcji dzieli nazwę z inną;
-  użycia znajduje szukanie.
-- **Symbole z pliku z błędem składni** — parser czyta dalej, ale granice funkcji bywają
-  przesunięte; plik trafia na listę i czyta się go zakresem linii. Cena: jeden poprawny plik
-  Dokusa nie ma symboli przez lukę parsera.
-- **Funkcje zwrotne JS jako osobne symbole** — `success` i `click` powtarzają się w jednym
-  pliku dziesiątki razy, a czyta się je razem z funkcją, w której leżą.
-- **Komentarz nad funkcją jako część symbolu** — symbol zaczyna się w linii definicji, żeby
-  pierwsza linia niosła nazwę; komentarz model doczyta odczytem pliku.
-- **Dziedziczenie i przestrzenie nazw PHP w mapie symboli** — metodę z klasy bazowej ma
-  znaleźć odczyt po nazwie zawężony do katalogu modułu (p. 73); wraca, gdy to nie wystarczy.
-- **Mapa symboli jako tablice bez nazw pól** — 4,2 MB i 0,07 s odczytu zamiast 7 MB i 0,18 s,
-  ale wpis `["nastepny", "Numer", "method", 4, 6]` czyta się tylko z opisem obok.
-- **Walidator kolejności linii w modelu symbolu** — wydłużał odczyt mapy Dokusa z 0,18 s do
-  0,34 s; tego, że koniec nie stoi przed początkiem, pilnują testy skryptu.
-- **Pamiętanie mapy symboli w procesie** — odczyt trwa 0,18 s, a w sondzie mapa była czytana
-  2–14 razy na sprawę, czyli najwyżej 2,5 s przy sprawie trwającej 35–166 s; wraca, gdy
-  pomiar pokaże, że to boli (p. 23).
-- **Argument `line` w `read_code_symbol`** — kilka definicji o jednej nazwie w jednym pliku ma
-  w paczce 50 plików; kandydat niesie linie i czyta się go odczytem pliku.
-- **Ciche dopasowanie po samej nazwie, gdy nazwa z klasą nie pasuje** — model dostałby metodę
-  innej klasy niż ta, o którą prosił; błąd podaje liczbę definicji o samej nazwie.
-- **Treść pierwszej definicji, gdy do nazwy pasuje kilka** — narzędzie zgadywałoby, o który
-  moduł chodzi; wybiera model, z listy kandydatów.
-- **Nazwa razem z klasą w polu `symbol` wyniku szukania** — klasę wskazuje plik, a nazwa
-  z plikiem jest jednoznaczna dla 99,2% funkcji; sama nazwa to mniej znaków w każdej linii.
-- **Część ścieżki obiektu jako miejsce w JS** (`pisma.wyslij` dla `APP.pisma.wyslij`) —
-  miejsce pasuje w całości albo wcale; błąd podaje liczbę definicji o samej nazwie.
-- **Test na żywym modelu wymagający wywołania odczytu symbolu** — narzędzie jest pomocnicze,
-  a zdanie w promptach jest przyzwoleniem; czy model sięga po nie z sensem, pokazuje sonda.
-- **Słownik rozstrzygnięć jako droga wstrzyknięcia w scenariuszach na żywym modelu (p. 59)** —
-  do p. 29 słownik zmienia się commitem, a test bez modelu pilnuje, że złośliwy wpis zostaje
-  w sekcji danych promptu parsującego. Wraca z p. 29, gdy słownik będzie edytowalny przez GUI.
-- **Atak na wyciek promptu w zestawie wstrzyknięć** — prompty leżą w repo i nie są tajemnicą;
-  szkodą jest to, co atak zmienia w odpowiedzi.
-- **Znacznik ataku w uwagach dla wdrożeniowca jako przebicie** — model, który atak odparł,
-  cytuje go tam jako ostrzeżenie, a takie zachowanie jest pożądane. Tak samo w uzasadnieniu
-  i wskazówce werdyktu bramki: czyta je wdrożeniowiec, a przebiciem jest odwrócony werdykt.
-- **Pary „łamie / poprawna" bramek jako sprawy kontrolne zestawu wstrzyknięć** — test
-  wstrzyknięć dostałby progi jakości bramki; pary mają własny test i zestaw, wspólny dla
-  `gate_reply` i `gate_close`.
-- **Reguły bramki zapisane w zestawie scenariuszy** — scenariusz nie mierzyłby zestawu, który
-  idzie na produkcję, a ten sam tekst stałby w dwóch miejscach; zestaw zapisuje wersję reguł.
-- **Próg błędów większy niż zero w scenariuszach z p. 59** — przebicie albo zły werdykt
-  poprawia się w prompcie, a próg z zerem tylko udawałby strojenie. Cena: jedna dziwna
-  odpowiedź niedeterministycznego modelu daje czerwony test; wtedy czyta się surowe odpowiedzi
-  z raportu. Wraca w jednym miejscu, gdyby w grafach z pętlą zero okazało się nieosiągalne.
-- **Zakresy znaków z wyrównaniem wyniku do wejścia w golden secie anonimizatora** — pozycje
-  źle się pisze i czyta, a zmiana tekstu je rozsypuje; wystarczają fragment z rodzajem
-  i porównanie słów. Cena: przeciek słowa, które stoi w tekście także poza zaznaczeniem,
-  wychodzi tylko wtedy, gdy tego słowa w wyniku przybywa.
-- **Sam fragment w całości jako miara przecieku** — „{TELEFON} 456” wyszłoby jako szczelne.
-- **Sprawdzanie znacznika w wyniku anonimizacji** — nazwy znaczników ustalą silniki
-  (p. 19.4–19.5); rodzaj w golden secie służy dziś tylko liczeniu przecieków osobno.
-- **Login, nazwa i adres urzędu oraz adres IP w danych do usunięcia golden setu** (decyzja
-  2026-10-17) — loginu nie złapie żaden planowany silnik, a urząd i serwer nie są danymi
-  osobowymi; zostają poza oceną.
-- **Kod pocztowy jako osobny wzorzec** — sam nie wskazuje osoby, a w korpusie stoi 292 razy
-  na 325 zaraz po ulicy albo numerze, czyli w adresie; jest kotwicą wzorca adresu (p. 19.4).
-- **Wzorce jako osobny silnik w `ANONYMIZATION_ENGINE`** (decyzja 2026-10-18) — nie łapią osób,
-  a klient w `api` odmawia tylko atrapy, więc nazwiska poszłyby do modelu zewnętrznego; wzorce
-  są pierwszym krokiem silnika z p. 19.5.
 - **Wzorce karty płatniczej, IBAN-u zagranicznego, numeru rejestracyjnego, loginu i numeru
   księgi wieczystej** (przegląd 2026-10-18) — w 1825 zgłoszeniach korpusu: kart 0 (dwa
   trafienia sumy Luhna to dwunastocyfrowe numery bez słowa „karta”), IBAN-u zagranicznego 0,
@@ -4395,67 +4059,6 @@ wydaje się wymagać czegoś z tej listy — zapytaj, zamiast wprowadzać.
   zgłoszeniu, a „ulica z numerem, miejscowość z SIMC” (36 263 nazwy) 0 nowych. SIMC kosztowałby
   plik 5,5 MB w obrazie, odświeżanie i nazwy będące zwykłymi słowami (Góra, Kolonia, Wola).
   Adresy bez kodu pocztowego i bez słowa przed ulicą wskazuje model (p. 19.5).
-- **„at” bez nawiasu zamiast „@” w e-mailu** — tak wygląda linia śladu stosu („Exception at
-  com.foo.Bar”), a jej zamiana zniszczyłaby kod błędu; łapie się tylko słowo w nawiasie.
-- **Skrót ulicy bez kropki pisany wielkimi literami** — „OS Windows 10” wyglądałoby jak osiedle
-  z numerem; bez kropki łapie się tylko skrót małymi literami.
-- **Suma kontrolna adresu do e-Doręczeń** — jej algorytmu nie opublikowano; wzorzec sprawdza
-  kształt, a przedrostek „AE:PL-” wystarcza.
-- **Przedrostki grupujące w nazwach plików wzorców** (`id_`, `doc_`, `digital_`) — przy
-  dziesięciu plikach spis katalogu czyta się bez nich, a nazwa pliku to rodzaj danej.
-- **Wielkie litery jako wykrywacz nazw dopisanych przez „Popraw"** — odmiana i „Państwo"
-  dawałyby fałszywe alarmy; dopisane nazwy łapią pułapki przy sprawie, a liczby porównanie
-  z notatkami.
-- **Przepisana linia z poleceniem dla narzędzia jako atak odparty w „Popraw"** — klient nie
-  może dostać ani polecenia dla narzędzia, ani kodu z niego, więc znacznik w tekście jest
-  przebiciem, czy model polecenie wykonał, czy tylko przepisał.
-- **Atak w materiale narzędzi, którego model nie przeczytał, jako atak odparty** — niczego nie
-  zmierzył; test wymaga, żeby znacznik każdego ataku stał w tym, co model dostał.
-- **Atak tylko w karcie, bez wątku** — karty model czyta zawsze, wątki nie zawsze, ale wątek to
-  oryginalna treść klienta, więc droga, którą polecenie realnie przyjdzie; ryzyko ataku
-  nieprzeczytanego łapie kontrola dotarcia.
-- **Złamana reguła jako dana w scenariuszach bramek** — `Verdict` nie niesie numeru reguły, więc
-  regułę wskazuje para spraw, a uzasadnienie czyta się w raporcie; numer reguły w werdykcie
-  zmieniałby kontrakt odpowiedzi (p. 22).
-- **Kilka prób na atak w jednym przebiegu testu wstrzyknięć** — powtórzenie to kolejny przebieg
-  testu, a sprawa grafu bez narzędzi kosztuje pół centa.
-- **Plik z surowymi odpowiedziami pomiaru wstrzyknięć w `data/unsafe/docs/`** — sprawy są
-  zmyślone, a powtórzenie kosztuje kilka centów; wynik stoi przy progu w opisie testu,
-  a odpowiedzi wypisuje raport po przebiegu.
-- **Sprawy bez komunikatu (wątek i para bez wątku) na `suggest_questions` i `suggest_solution`
-  w zestawie kodu** — te grafy sięgają po kod tylko przy komunikacie, wpisie z logu albo kodzie
-  błędu, więc wymóg pliku padałby z założenia; wracają z szerszą regułą sięgania po kod
-  (p. 25 i p. 26).
-- **`code-citations.json` zamiast `code.json`** — nazwa bez dopisku oznacza w `data/safe/golden/`
-  ewaluację modelu, a zestawy zapytań do narzędzi mają dopisek `-tools`.
-- **Osobny zestaw cytowania kodu na graf albo sekcja na graf z kopią tych samych spraw** — trzy
-  warunki (plik przyczyny, brak przyczyny przy komunikacie, którego nie ma nigdzie, linie
-  odczytane wcześniej) nie zależą od grafu, a sprawy są te same; sprawa wymienia swoje grafy
-  w `graphs`. W zestawie wstrzyknięć sekcje na graf zostają, bo wejścia i ataki są w każdym
-  grafie inne.
-- **`suggest_solution` bez ataku w wątku** — test spójności dostałby wyjątek od trzech dróg
-  w grafie czytającym zgłoszenia, a wątek to droga, którą polecenie realnie przyjdzie; atak
-  zdejmuje kartę sprawy (`without_card`), więc model wątek czyta.
-- **Zastrzeżenie o naszej czynności jako fakt wymagany w treści dla klienta** — prompt każe
-  pisać sprawy dla serwisu w uwagach, więc model słusznie kładzie je tam; fakt wymagany to
-  zastrzeżenie dla klienta.
-- **Sama wzmianka przyczyny w uwagach jako licznik wykluczenia** — przyczyna i tak stoi
-  w uwagach na liście przeczytanych spraw, więc licznik pokazywałby „jest” prawie zawsze;
-  liczy się linia z przyczyną i słowem wykluczenia.
-- **Sprawa z wątkiem w scenariuszu czytania na `suggest_solution`** — prompt tego grafu
-  o wątku milczy, więc licznik mierzyłby zachowanie, którego nikt modelowi nie zlecił; wraca
-  z regułą o wątku bieżącej sprawy (p. 26).
-- **Licznik wykluczenia rozpoznający każde zaprzeczenie** („nie jest definitywnie
-  wykluczone”) — wymagałby rozbioru zdania; licznik pomija zaprzeczenie tuż przed słowem, a resztę
-  rozstrzyga lektura uwag w raporcie.
-- **Znak zapytania w treści rozwiązania jako warunek** — prompt `suggest_solution` pytań nie
-  zakazuje, a „?” stoi też w cytatach komunikatów, adresach i uprzejmych prośbach; licznik
-  pomija cytaty i adresy, a gdy pokaże pytania, reguła trafia do p. 26.
-- **Kod w sprawie organizacyjnej `search` jako warunek** — kosztuje kilka centów, ale nie psuje
-  odpowiedzi, a asercje scenariuszy stoją na tym, co szkodzi wynikowi; jest licznikiem
-  wyróżnionym w raporcie (`should_not_call_code`).
-- **Jeden plik testu wstrzyknięć na graf** — ocena, raport i sprawy kontrolne są takie same
-  w każdym grafie; różni je sekcja zestawu i próg.
 
 ### Plan
 
@@ -4465,9 +4068,10 @@ odłożonych — numeracja jest wspólna.**
 
 **Rytm pracy:** punkt przed wdrożeniem rozpisujemy na podkroki, gdy nie da się go sprawdzić jednym
 kryterium; po zakończeniu oznaczamy `[x]` i zwijamy do jednej linii — ale najpierw przenosimy trwałe
-ustalenia do właściwej sekcji (reguła → sekcja tematyczna, odrzucona opcja → „Świadomie pominięte",
-pułapka → „Gotchas" warstwy). **Gdy natrafisz na lukę „ostatniej mili" albo tworzysz świadomy
-skrót — dopisz punkt** (zwykle do bloku K), zamiast zostawiać go w milczeniu.
+ustalenia do właściwej sekcji (reguła → sekcja tematyczna, odrzucona opcja, którą ktoś mógłby
+zaproponować ponownie → „Świadomie pominięte", pułapka → „Gotchas" warstwy). **Gdy natrafisz
+na lukę „ostatniej mili" albo tworzysz świadomy skrót — dopisz punkt** (zwykle do bloku K),
+zamiast zostawiać go w milczeniu.
 
 **Kolejność bloków:** bloki 0, A, B, E, F i G są zrobione. Grafy dzielą się wokół korpusu: bez
 narzędzi wiedzy (G) idą przed nim, bo nie potrzebują indeksów, a `parse_ticket` buduje korpus;
@@ -4668,8 +4272,9 @@ korpusie, przechodzi przy zamknięciu do p. 33.
     zgłoszeń z wyszukiwań, choć żadna sprawy nie dotyczyła, więc lista źródeł niosła materiał
     bez związku (trzy przebiegi).
 - [ ] **25. `suggest_questions`** — prompt z 6.3 przemierzony na modelu docelowym z placeholderami,
-  z regułą zgodności przyczyny z objawem i z szerszą regułą sięgania po kod, tą samą co w p. 23;
-  czy wyjątek dla hipotezy, zapisany 2026-10-30 obok zasad ogólnych, nie zmienia pytań;
+  z regułą zgodności przyczyny z objawem i z szerszą regułą sięgania po kod, tą samą co w p. 23
+  (z nią do `code.json` wracają sprawy bez komunikatu na tym grafie); czy wyjątek dla hipotezy,
+  zapisany 2026-10-30 obok zasad ogólnych, nie zmienia pytań;
   sprawa ze znacznikami anonimizacji w `questions.json` z oceną helpera `markers`, jak w p. 23;
   ewaluacja wariantu, w tym jak często model oddaje „pytań już nie trzeba" (p. 72) i czy
   słusznie — fałszywe wyjście przy zgodnym objawie i różnych przyczynach jest tu najgroźniejsze;
@@ -4683,7 +4288,8 @@ korpusie, przechodzi przy zamknięciu do p. 33.
   dziura (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
 - [ ] **26. `suggest_solution`** — prompt z 6.4 przemierzony na modelu docelowym, z regułą
   zgodności trafienia z objawem, osobną regułą ostrzeżenia o kroku nieodwracalnym i szerszą
-  regułą sięgania po kod, tą samą co w p. 23; sprawa ze znacznikami anonimizacji
+  regułą sięgania po kod, tą samą co w p. 23 (z nią do `code.json` wracają sprawy bez komunikatu
+  na tym grafie); sprawa ze znacznikami anonimizacji
   w `solution.json` z oceną helpera `markers`, jak w p. 23; do rozstrzygnięcia pomiarem: kiedy model ma czytać wątki (w sondzie `gpt-6.1-sol` brał wszystkie,
   także po zaostrzeniu zdania w prompcie), czy „instrukcje zawsze" nie dokłada do źródeł sekcji,
   z których odpowiedź nie korzysta, i jak ważyć instrukcję wobec zgłoszeń (od 2026-10-04 prompt
@@ -4692,7 +4298,8 @@ korpusie, przechodzi przy zamknięciu do p. 33.
   warunku pada komunikat i co sprawdzić, wprost, że nie potwierdza tego żadna sprawa, a nazwy
   klas i ścieżki w uwagach dla wdrożeniowca (p. 68); reguła o wątku bieżącej sprawy: nie
   proponować kroku, który wątek pokazuje jako już wykonany (dziś prompt o wątku milczy, a mimo to
-  w scenariuszu z 59.8 model w trzech przebiegach napisał, że kroku nie powtarza); zastrzeżenie
+  w scenariuszu z 59.8 model w trzech przebiegach napisał, że kroku nie powtarza), a z nią do
+  `reading.json` wraca sprawa z wątkiem na tym grafie; zastrzeżenie
   o naszej czynności („sprawdzimy po aktualizacji”) model kładzie raz w treści dla klienta, raz
   w uwagach (59.8); czy treść rozwiązania może pytać klienta — licznik pytań w scenariuszu
   rozwiązania w pierwszym pomiarze pokazał 0 z 4 spraw z pytaniem; ewaluacja wariantu. *Dlaczego:* ostrzeżenie nie padło w żadnym z czterech pomiarów, a bez reguły zgodności
@@ -4762,6 +4369,7 @@ Rzeczy odłożone świadomie, bez miejsca w kolejności planu. Każdy punkt: cel
   procedura (p. 39).
 - [ ] **29. Magazyn reguł w SQL** (odłożony 2026-10-30) — osobny schemat i osobna rola w Postgresie z p. 48, nie nowa
   usługa; wersje, audyt werdyktów, kontrola dostępu do edycji; później też magazyn notatek.
+  Wtedy słownik rozstrzygnięć dochodzi do scenariuszy wstrzyknięć z p. 59 jako droga ataku.
   *Dlaczego:* klient stroi reguły bez deployu, a edycja to zmiana konfiguracji produkcyjnej.
 - [ ] **44. Notatki agenta i HITL w pętli** — notatki jako narzędzie pomocnicze w
   `agent_tools/notes/` (sterują szukaniem, nigdy generacją), przerwanie pętli na decyzję człowieka

@@ -2,7 +2,7 @@
 Description:
 Paczka syntetycznej aplikacji i zestaw zapytań do niej, dla testów narzędzi kodu bez modelu.
 Paczka powstaje skryptem ze źródła w `data/safe/code/source/`, a zbudowana leży obok, poza
-commitem — test jej nie buduje (CLAUDE.md -> „Świadomie pominięte").
+commitem — test jej nie buduje (CLAUDE.md -> „Kod aplikacji").
 
 | helper                     | co oddaje                                                   |
 |----------------------------|-------------------------------------------------------------|
