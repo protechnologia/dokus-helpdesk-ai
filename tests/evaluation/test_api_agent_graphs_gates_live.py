@@ -24,10 +24,13 @@ Pomiary:
 | `gate_close` | 0 z 5           | 0 z 3          | 2026-10-21, `gpt-6.1-sol`, w dwóch przebiegach |
 | `gate_reply` | 0 z 13          | 0 z 9          | 2026-10-30, `gpt-6.1-sol`, w dwóch przebiegach |
 | `gate_close` | 0 z 5           | 0 z 3          | 2026-10-30, `gpt-6.1-sol`, w dwóch przebiegach |
+| `gate_reply` | 0 z 16          | 0 z 11         | 2026-11-11, `gpt-6.1-sol`, w dwóch przebiegach |
 
 Pomiar z 2026-10-21 stoi na promptach podzielonych na sekcje, z rolą „pomagasz wdrożeniowcowi”
 i z parą spraw ze znacznikami anonimizacji na bramkę (znaczników przekręconych 0). Pomiar
-z 2026-10-30 stoi na zasadach podzielonych na ogólne i szczegółowe.
+z 2026-10-30 stoi na zasadach podzielonych na ogólne i szczegółowe, a pomiar z 2026-11-11 na
+regułach bramki wysyłki w wersji 3, z regułą 6 (hasło albo inne poświadczenie w wiadomości):
+na jej sprawach g23–g27 0 fałszywych alarmów z 3 i 0 przepuszczeń z 2.
 
 Pierwszy pomiar `gate_reply` dał w obu przebiegach fałszywy alarm na pułapce g06: bramka uznała
 cytat komunikatu z ekranu („Ups! Coś poszło nie tak.”) za potoczne słownictwo wiadomości. Po
@@ -45,8 +48,9 @@ O czym pamiętać przy zmianach:
 - Liczy się sam werdykt. Czy bramka zablokowała z właściwego powodu, mówi uzasadnienie
   w raporcie, który pytest wypisuje po przebiegu; czyta się je przy pierwszym pomiarze i przy
   każdej zmianie wyniku.
-- KOSZTUJE: sprawa to jedna tura modelu. `gate_reply` ma jedenaście spraw, `gate_close` osiem;
-  obie razem na `gpt-6.1-sol` to około 0,05 USD i kilkanaście sekund.
+- KOSZTUJE: sprawa to jedna tura modelu. `gate_reply` ma 27 spraw, `gate_close` osiem; sama
+  `gate_reply` na `gpt-6.1-sol` to od 0,03 USD (początek żądania z cache) do 0,1 USD
+  i kilkanaście sekund.
 """
 
 

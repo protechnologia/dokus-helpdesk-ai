@@ -1,0 +1,137 @@
+{
+  "meta": {
+    "name": "closed-v1",
+    "created": "2026-11-11",
+    "purpose": "Wynik trasy POST /tickets/closed na żywym modelu (p. 30): czy prawdziwa bramka zamknięcia, karta z grafu parse_ticket i filtr jakości prowadzą zamknięte zgłoszenie do właściwego wyniku — zablokowane, w indeksach albo odrzucone przez filtr. NIE mierzy skuteczności bramki ani karty na prawdziwych zamknięciach (p. 33): zgłoszenia pisze autor scenariuszy.",
+    "rules": [
+      "cases: id, expected i request — treść żądania do trasy w kształcie TicketRequest. Numery zgłoszeń są różne, bo wszystkie sprawy jednego przebiegu piszą do jednego korpusu testu.",
+      "expected: blocked — z wątku nie wynika problem albo to, co zrobiono (reguły zestawu domyślnego bramki zamknięcia), więc karta nie powstaje; indexed — wątek podaje przyczynę albo sposób naprawy, które przydadzą się w innej sprawie; dropped — bramka przepuszcza, bo widać problem i to, co zrobiono, ale wiedza dotyczy tylko tej sprawy (termin, echo prośby), więc karta ma useful = false i filtr ją odrzuca.",
+      "Każdy wynik ma co najmniej dwie sprawy. Dane są zmyślone i bez osób: anonimizator jest w teście atrapą, która oddaje tekst bez zmian."
+    ]
+  },
+  "cases": [
+    {
+      "id": "c01",
+      "expected": "indexed",
+      "request": {
+        "ticket_id": "90601",
+        "date": "2026-11-10",
+        "category": "Błąd",
+        "subject": "Nie przychodzą przesyłki z e-Doręczeń",
+        "body": "Od wczoraj w skrzynce e-Doręczeń nie pojawiają się nowe przesyłki, choć nadawcy potwierdzają wysyłkę.",
+        "comments": [
+          {
+            "role": "konsultant",
+            "created_at": "2026-11-10 09:12:00",
+            "body": "Kolejka pobierania przesyłek zatrzymała się po przerwanym połączeniu z usługą e-Doręczeń o 23:40 i nie wznowiła się sama."
+          },
+          {
+            "role": "konsultant",
+            "created_at": "2026-11-10 09:40:00",
+            "body": "Zrestartowaliśmy kolejkę pobierania. Zaległe przesyłki (14 szt.) zostały pobrane, klient potwierdził, że widzi je w skrzynce. Od wersji 5.12 kolejka po przerwanym połączeniu wznawia się sama, więc zalecamy aktualizację."
+          }
+        ]
+      }
+    },
+    {
+      "id": "c02",
+      "expected": "indexed",
+      "request": {
+        "ticket_id": "90602",
+        "date": "2026-11-10",
+        "category": "Błąd",
+        "subject": "Brak UPO z ePUAP",
+        "body": "Od trzech dni pisma wysłane przez ePUAP nie dostają UPO, choć adresaci je odbierają.",
+        "comments": [
+          {
+            "role": "konsultant",
+            "created_at": "2026-11-10 10:05:00",
+            "body": "Certyfikat skrytki ePUAP wygasł 8 listopada, dlatego aplikacja nie mogła pobrać potwierdzeń."
+          },
+          {
+            "role": "klient",
+            "created_at": "2026-11-10 11:20:00",
+            "body": "Wgraliśmy nowy certyfikat w menu Ustawienia → Skrzynki ePUAP i nowe UPO już przychodzą."
+          },
+          {
+            "role": "konsultant",
+            "created_at": "2026-11-10 11:45:00",
+            "body": "Potwierdzamy. UPO za pisma wysłane od 8 do 10 listopada trzeba pobrać ręcznie przyciskiem „Pobierz UPO” przy każdym piśmie, automatycznie nie dojdą."
+          }
+        ]
+      }
+    },
+    {
+      "id": "c03",
+      "expected": "blocked",
+      "request": {
+        "ticket_id": "90603",
+        "date": "2026-11-10",
+        "category": "Błąd",
+        "subject": "Problem z drukiem",
+        "body": "Nie drukuje się.",
+        "comments": [
+          {
+            "role": "konsultant",
+            "created_at": "2026-11-10 11:00:00",
+            "body": "Zamykam."
+          }
+        ]
+      }
+    },
+    {
+      "id": "c04",
+      "expected": "blocked",
+      "request": {
+        "ticket_id": "90604",
+        "date": "2026-11-10",
+        "category": "Błąd",
+        "subject": "Błąd przy nadawaniu numeru pisma",
+        "body": "Przy rejestracji pisma przychodzącego pojawia się komunikat „Nie można nadać numeru: brak aktywnej sekwencji” i pismo się nie zapisuje. Dotyczy wszystkich użytkowników od rana.",
+        "comments": [
+          {
+            "role": "konsultant",
+            "created_at": "2026-11-10 12:30:00",
+            "body": "Problem rozwiązany, zamykam zgłoszenie."
+          }
+        ]
+      }
+    },
+    {
+      "id": "c05",
+      "expected": "dropped",
+      "request": {
+        "ticket_id": "90605",
+        "date": "2026-11-10",
+        "category": "Pytanie",
+        "subject": "Termin szkolenia",
+        "body": "Kiedy odbędzie się szkolenie z obsługi rejestru pism dla nowych pracowników?",
+        "comments": [
+          {
+            "role": "konsultant",
+            "created_at": "2026-11-10 13:00:00",
+            "body": "Szkolenie dla nowych pracowników odbędzie się 5 grudnia o 10:00 w formie zdalnej, link wyślemy dzień wcześniej. Odpowiedzieliśmy na pytanie, zamykamy zgłoszenie."
+          }
+        ]
+      }
+    },
+    {
+      "id": "c06",
+      "expected": "dropped",
+      "request": {
+        "ticket_id": "90606",
+        "date": "2026-11-10",
+        "category": "Pytanie",
+        "subject": "Usunięcie sprawy z rejestru",
+        "body": "Prosimy o usunięcie z rejestru sprawy ZP.271.14.2026, założonej omyłkowo drugi raz.",
+        "comments": [
+          {
+            "role": "konsultant",
+            "created_at": "2026-11-10 14:10:00",
+            "body": "Usunęliśmy z rejestru zdublowaną sprawę ZP.271.14.2026 zgodnie z prośbą. Druga, właściwa sprawa zostaje bez zmian."
+          }
+        ]
+      }
+    }
+  ]
+}

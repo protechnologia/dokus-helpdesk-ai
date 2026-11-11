@@ -107,16 +107,15 @@ przede wszystkim gdy zgłoszenie niesie komunikat albo kod błędu. Kandydat bez
 dostęp do instancji testowej, na której agent sprawdzi opisany objaw. Byłoby to pierwsze
 narzędzie, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzji o granicach.
 
-**Stan na dziś.** Szkielet stoi w całości, a front pokazowy (p. 77) pokazuje przebieg każdego
-grafu na żywo. Wszystkie węzły są właściwe i każdy graf przeszedł
-na prawdziwym modelu (OpenAI), na zmyślonych zgłoszeniach i atrapach narzędzi. Anonimizator ma
-prawdziwy silnik `agent` (wzorce i model anonimizujący, Bielik na własnym serwerze), a prompty
-grafów wiedzą o znacznikach, które wstawia (p. 19.7). Sekretów w treści nikt jeszcze nie
-wykrywa: detektor jest odłożony (p. 20). Wszystkie czternaście narzędzi ma wersję właściwą:
-osiem na zgłoszeniach i instrukcjach oraz sześć narzędzi kodu: opis projektu, szukanie, spis katalogu, odczyt pliku,
-odczyt symbolu i cytowanie fragmentu.
-Dwa, które czytają wątki zgłoszeń, czekają na dane, bo tabela wątków napełni się dopiero po
-anonimizacji.
+**Stan na dziś.** Szkielet stoi w całości, a front pokazowy (p. 77) pokazuje przebieg każdego grafu
+na żywo. Wszystkie węzły są właściwe i każdy graf przeszedł na prawdziwym modelu (OpenAI), na
+zmyślonych zgłoszeniach i atrapach narzędzi. Anonimizator ma prawdziwy silnik `agent` (wzorce i
+model anonimizujący, Bielik na własnym serwerze), a prompty grafów wiedzą o znacznikach, które
+wstawia (p. 19.7). Sekretów w treści nikt jeszcze nie wykrywa: detektor jest odłożony (p. 20).
+Wszystkie czternaście narzędzi ma wersję właściwą: osiem na zgłoszeniach i instrukcjach oraz sześć
+narzędzi kodu: opis projektu, szukanie, spis katalogu, odczyt pliku, odczyt symbolu i cytowanie
+fragmentu. Dwa, które czytają wątki zgłoszeń, czekają na dane: tabelę wątków napełnia trasa
+zamknięcia zgłoszenia (p. 30), a cały korpus wejdzie z masowym importem (p. 31).
 
 ### Zasady produktu
 
@@ -1533,9 +1532,11 @@ merytorycznie").
   na regułach w wersji 2 dały 0 fałszywych alarmów z 13 i 0 przepuszczeń z 9 w dwóch przebiegach, a
   wstrzyknięcia 0 przebić z 9. Przez trasę `/gate/reply` z anonimizatorem na Bieliku 13 z 13
   werdyktów było zgodnych (na regułach w wersji 1); do tego test ręczny przez front. Reguła 6 (hasło
-  albo inne poświadczenie w wiadomości; reguły w wersji 3, 2026-11-11) ma scenariusze g23–g27, w tym
-  hasło do archiwum, ale na żywym modelu jeszcze nie chodziła. Liczb na prawdziwych wiadomościach z
-  korpusu nie ma (p. 33).
+  albo inne poświadczenie w wiadomości; reguły w wersji 3, 2026-11-11) dała na scenariuszach
+  g23–g27, w tym z hasłem do archiwum, 0 fałszywych alarmów z 3 i 0 przepuszczeń z 2 w dwóch
+  przebiegach (cały zestaw: 0 z 16 i 0 z 11); obie blokady stały na regule 6, a uzasadnienie cytuje
+  hasło, które wraca do tego samego wdrożeniowca. Liczb na prawdziwych wiadomościach z korpusu nie
+  ma (p. 33).
 - **„Popraw” przeszło sprawdzenie, ale nie pomiar (2026-10-30).** Na `gpt-6.1-sol` scenariusze
   na zasadach stylu w wersji 2 dały 0 błędów na 8 spraw w dwóch przebiegach, a wstrzyknięcia 0 przebić
   z 8. Trasa `/polish` z anonimizatorem na Bieliku dała układ i formy zgodne z zasadami; do tego test
@@ -1703,6 +1704,14 @@ Wspólne:
   błędem konfiguracji (500), zanim cokolwiek uruchomi: atrapa grafu karty oddaje zawsze tę samą
   kartę, a anonimizator przyjmuje wtedy tekst bez zmian. Cena: zgłoszenie anonimizuje się dwa razy,
   raz na graf (do p. 74).
+- **Zamknięte zgłoszenie trafia do indeksów od razu, bez kolejki do akceptacji, a uruchamia to sama
+  trasa (decyzja 2026-11-11).** Akceptacją człowieka jest zamknięcie zgłoszenia przy werdykcie
+  bramki, a kartę bez wiedzy zatrzymuje filtr jakości; złą kartę naprawia ponowne zamknięcie albo
+  przebudowa indeksu z plików. Sprawdzone na żywo 2026-11-11: na `gpt-6.1-sol` i anonimizatorze z
+  Bielikiem cztery zmyślone zamknięcia dały oczekiwane wyniki (do indeksów, zablokowane, odrzucone
+  przez filtr, ponowne z `replaced`), w `anonymized/` stały znaczniki zamiast osoby i telefonu,
+  karta niosła `parser_model`, a zamknięcie kosztowało 0,003–0,009 USD i 4–12 s (pierwsze, z
+  rozgrzewaniem, 44 s). Scenariusze trasy na żywym modelu leżą w `data/safe/golden/closed.json`.
 - **Odpowiedź bramki: `overridable` zawsze `true` i `rules_version`** — furtka jest kontraktem
   (zasada 10), a wersja zestawu reguł pozwala odtworzyć, dlaczego wczoraj przeszło. Reguły bierze
   trasa z `get_rule_set()`, nigdy z żądania.
@@ -3435,6 +3444,9 @@ localhost:8010/search`.
 - Scenariusze czytania znalezionego materiału (`search`, `suggest_questions`,
   `suggest_solution`, p. 59): `pytest tests/evaluation/test_api_agent_graphs_reading_live.py
   -m llm_live` — **kosztuje, pytaj przed**; jeden graf przez `-k <graf>`
+- Scenariusze trasy zamknięcia zgłoszenia (bramka, karta i filtr przez `POST /tickets/closed`,
+  p. 30): `pytest tests/evaluation/test_api_entry_routers_tickets_closed_live.py -m llm_live` —
+  **kosztuje, pytaj przed**; sześć spraw to około 0,04 USD
 - Silnik `agent` usługi `anonymizer` na golden secie (p. 19.5):
   `pytest tests/evaluation/test_anonymizer_agent_golden_live.py -m llm_live` — woła model
   anonimizujący z `.env` (`LLM_ANONYMIZATION_*`, pod z GPU), **pytaj przed**; oba zestawy po
@@ -3857,6 +3869,12 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
   | `code_live.py`                         | `code.json`       | przyczyną jest plik z komunikatem, cytowany po odczycie    |
   | `solution_live.py`                     | `solution.json`   | treść dla klienta niesie fakty z karty, w tym krok nieodwracalny |
   | `reading_live.py`                      | `reading.json`    | przy jednym objawie i trzech przyczynach model czyta wszystkie trzy karty |
+
+  Trasa zamknięcia zgłoszenia ma zestaw `closed.json` i test
+  `test_api_entry_routers_tickets_closed_live.py` (2026-11-11): idzie przez samą trasę, z bramką
+  i kartą na żywym modelu i atrapami anonimizatora, embeddera i obu baz, a pilnuje, żeby
+  zamknięcie skończyło się wynikiem, którego wymaga — zablokowane, w indeksach albo odrzucone
+  przez filtr. Na `gpt-6.1-sol` 6 z 6 zgodnych w dwóch przebiegach.
 - **Testy generacji parametryzuje się po rejestrze grafów**, a osobno sprawdza nieznany
   wariant (422) i wariant `requires_hits` bez trafień (pusta lista źródeł, a nie wygenerowane
   rozwiązanie).
@@ -3896,6 +3914,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/scenarios/questions/`  | zestaw scenariuszy „pytań już nie trzeba", ocena i raport (fixture `questions_report`) |
 | `tests/_helpers/scenarios/code/`       | zestaw scenariuszy cytowania kodu (sprawy z listą grafów), narzędzia sprawy (`case_tools()`), cytowania kodu z rozmowy, ocena i raport (fixture `code_report`) |
 | `tests/_helpers/scenarios/solution/`   | zestaw scenariuszy rozwiązania, karty sprawy ze zmianami (`case_cards()`), fakty w treści dla klienta (`mentions()`), ocena i raport (fixture `solution_report`) |
+| `tests/_helpers/scenarios/closed/`     | zestaw scenariuszy trasy zamknięcia, przebieg spraw przez trasę na żywym modelu (`measure_closed_cases()`), ocena wyniku (bramka, filtr, błąd trasy) i raport (fixture `closed_report`) |
 | `tests/_helpers/scenarios/reading/`    | zestaw scenariuszy czytania (sprawy z listą grafów), materiał, który atrapy znajdują (`found_material()`), wywołania narzędzi kodu z rozmowy (`code_calls()`), przyczyny wykluczone w uwagach, ocena i raport (fixture `reading_report`) |
 | `tests/_helpers/tool_descriptions/`    | opisy narzędzi agenta i narzędzi odpowiedzi: układ sekcji (`DESCRIPTION_SECTIONS`) i typy argumentów z tabelki opisu (`argument_types()`) oraz ze schematu (`schema_types()`) w jednym zapisie |
 | `tests/_helpers/markers/`              | znaczniki anonimizacji w wyniku modelu: znaczniki w tekście (`markers_in()`), zgubione względem wejścia (`lost_markers()`) i napisy w klamrach, które nie są znacznikiem ani placeholderem z promptu (`malformed_markers()`) |
@@ -3983,6 +4002,10 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Odesłanie zgłoszenia do innego działu** — takiego działu nie ma, a grzeczna formułka bez treści
   to znana patologia korpusu; dotyczy to też `suggest_handoff`. Eskalacja do operatora zewnętrznego
   (ePUAP, Poczta Polska) to co innego: tekst mówi wtedy, czego dotyczy problem i co dotąd ustalono.
+- **Kolejka do akceptacji kart z trasy zamknięcia (p. 30)** — karta idzie do indeksów od razu:
+  człowiek zatwierdził już zamknięcie przy werdykcie bramki, kartę bez wiedzy zatrzymuje filtr, a
+  złą naprawia ponowne zamknięcie albo przebudowa z plików. Wraca, gdy pomiar (p. 33) pokaże złe
+  karty w indeksie.
 - **Załączniki zgłoszeń** — tabela `zalacznik` w zrzucie trzyma same ścieżki, bez plików; wystarcza
   treść zgłoszenia i wątku.
 - **Sprawy procedury po stronie klienta** (skreślone 2026-11-11, dawny p. 39) — hasła w zrzucie
@@ -4132,7 +4155,7 @@ zaproponować ponownie → „Świadomie pominięte", pułapka → „Gotchas" w
 na lukę „ostatniej mili" albo tworzysz świadomy skrót — dopisz punkt** (zwykle do bloku K),
 zamiast zostawiać go w milczeniu.
 
-**Kolejność bloków:** bloki 0, A, B, E, F i G są zrobione. Grafy dzielą się wokół korpusu: bez
+**Kolejność bloków:** bloki 0, A, B, E, F, G i H są zrobione. Grafy dzielą się wokół korpusu: bez
 narzędzi wiedzy (G) idą przed nim, bo nie potrzebują indeksów, a `parse_ticket` buduje korpus;
 z narzędziami (J) po nim, razem z opisami narzędzi, bo narzędzia zgłoszeń mierzy się na
 zanonimizowanych kartach i wątkach z importu. Bloków C i D nie ma: ich punkty trafiły do innych
@@ -4222,11 +4245,8 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 
 #### H. Powrót do korpusu
 
-- [ ] **30. Zamknięte zgłoszenie wraca do korpusu** — tylko z pozytywnym werdyktem bramki, kartą
-  z grafu `parse_ticket`; do rozstrzygnięcia: zapis automatyczny czy kolejka do akceptacji i kto
-  uruchamia indeksację (zasada 8). *Dlaczego:* noga 2 karmi nogę 1, a to jedyna droga, którą
-  fakty trafiają do bazy z akceptacją człowieka; poza nią ścieżka runtime jest wobec indeksu tylko
-  do odczytu.
+- [x] **30. Zamknięte zgłoszenie wraca do korpusu** (2026-11-11) → „Historyczne zgłoszenia”,
+  „Warstwa API”, „Warstwa CLI”.
 
 #### I. Korpus
 
@@ -4255,8 +4275,9 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
   z sierpniowego zrzutu dochodzi do korpusu osobnym przebiegiem, bez parsowania reszty od nowa.
   Do rozstrzygnięcia: czy zapisywać tekst po czyszczeniu. Ma dane osobowe, więc jeśli tak, to
   w `corpus/cleaned/`, którego `api` na prod nie montuje, a ręczne decyzje (flaga, pary spraw)
-  jako małe dane. *Dlaczego:* 77 ze 123 zgłoszeń w lipcu, a żadna heurystyka nie odróżni
-  broadcastu od sprawy.
+  jako małe dane. Do rozstrzygnięcia też: co robi z takim zgłoszeniem trasa zamknięcia (p. 30) —
+  dziś przyjmuje je jak każde inne. *Dlaczego:* 77 ze 123 zgłoszeń w lipcu, a żadna heurystyka
+  nie odróżni broadcastu od sprawy.
 - [ ] **33. Przeliczenia na pełnym korpusie** — `RAG_SCORE_MIN` na zapytaniach sparsowanych
   (na kartach `gpt-6.1-sol` trafienie dostaje 7 z 16 dystraktorów, na kartach Bielika 3 z 16,
   przy tym samym progu 0.48), porównanie embedderów, liczba wątków-projektów, `questions_summary`, rozkład `component`;
