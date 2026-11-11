@@ -1462,10 +1462,11 @@ choć nie były to sprawy błahe. Do tego **zły zapis przechodzi filtr etapu 4*
 „problem został rozwiązany" daje niepuste `solution`, więc jakości zapisu nie da się nadrobić
 filtrem po fakcie.
 
-**Bramka wysyłki** sprawdza treść wobec reguł: brak prośby o hasło, brak potocznego
-i wulgarnego słownictwa, forma zwrotu do klienta, brak prośby o niebezpieczne zachowania
-(wyłączenie antywirusa, ręczna zmiana danych w bazie…), ortografia i polskie znaki. Reguły są
-**danymi** (niżej), nie kodem.
+**Bramka wysyłki** sprawdza treść wobec reguł: brak prośby o hasło, brak potocznego i wulgarnego
+słownictwa, forma zwrotu do klienta, brak prośby o niebezpieczne zachowania (wyłączenie antywirusa,
+ręczna zmiana danych w bazie…), ortografia i polskie znaki, a od 2026-11-11 brak hasła i innych
+poświadczeń w samej wiadomości, także hasła do załączonego archiwum (podawanie go w wiadomości jest
+nieprofesjonalne). Reguły są **danymi** (niżej), nie kodem.
 
 **„Popraw"** to jedyna funkcja, która **zwraca tekst do wysłania**, nie werdykt. Dlatego ma
 najostrzejsze ograniczenie: **przepisuje formę, nie treść.** Nie wolno jej dodać kroku
@@ -1519,11 +1520,13 @@ merytorycznie").
   zamknięć przez trasę `/gate/close`, z anonimizatorem na Bieliku, dało zgodne werdykty bez
   danych osobowych w uzasadnieniach, 2–7,5 s i około 0,003 USD na sprawę; do tego test ręczny
   przez front. Liczb na prawdziwych zamknięciach z korpusu nie ma (p. 33).
-- **Bramka wysyłki przeszła sprawdzenie, ale nie pomiar (2026-10-22).** Na `gpt-6.1-sol`
-  scenariusze na regułach w wersji 2 dały 0 fałszywych alarmów z 13 i 0 przepuszczeń z 9
-  w dwóch przebiegach, a wstrzyknięcia 0 przebić z 9. Przez trasę `/gate/reply` z anonimizatorem
-  na Bieliku 13 z 13 werdyktów było zgodnych (na regułach w wersji 1); do tego test ręczny przez
-  front. Liczb na prawdziwych wiadomościach z korpusu nie ma (p. 33).
+- **Bramka wysyłki przeszła sprawdzenie, ale nie pomiar (2026-10-22).** Na `gpt-6.1-sol` scenariusze
+  na regułach w wersji 2 dały 0 fałszywych alarmów z 13 i 0 przepuszczeń z 9 w dwóch przebiegach, a
+  wstrzyknięcia 0 przebić z 9. Przez trasę `/gate/reply` z anonimizatorem na Bieliku 13 z 13
+  werdyktów było zgodnych (na regułach w wersji 1); do tego test ręczny przez front. Reguła 6 (hasło
+  albo inne poświadczenie w wiadomości; reguły w wersji 3, 2026-11-11) ma scenariusze g23–g27, w tym
+  hasło do archiwum, ale na żywym modelu jeszcze nie chodziła. Liczb na prawdziwych wiadomościach z
+  korpusu nie ma (p. 33).
 - **„Popraw” przeszło sprawdzenie, ale nie pomiar (2026-10-30).** Na `gpt-6.1-sol` scenariusze
   na zasadach stylu w wersji 2 dały 0 błędów na 8 spraw w dwóch przebiegach, a wstrzyknięcia 0 przebić
   z 8. Trasa `/polish` z anonimizatorem na Bieliku dała układ i formy zgodne z zasadami; do tego test
@@ -3968,10 +3971,10 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Załączniki zgłoszeń** — tabela `zalacznik` w zrzucie trzyma same ścieżki, bez plików; wystarcza
   treść zgłoszenia i wątku.
 - **Sprawy procedury po stronie klienta** (skreślone 2026-11-11, dawny p. 39) — hasła w zrzucie
-  zapisane jako MD5 bez soli i działające sekrety, które konsultanci wklejają w zgłoszenia
-  (1,1–1,7% zgłoszeń). Tych spraw nie prowadzimy: naprawia je procedura klienta, nie nasz kod. Po
-  naszej stronie eksport nie czyta kolumn z hasłami, a sekrety w treści czekają na detektor
-  (p. 20).
+  zapisane jako MD5 bez soli i działające sekrety, które konsultanci wklejają w zgłoszenia (1,1–1,7%
+  zgłoszeń). Tych spraw nie prowadzimy: naprawia je procedura klienta, nie nasz kod. Po naszej
+  stronie eksport nie czyta kolumn z hasłami, wiadomość do klienta z hasłem zatrzymuje bramka
+  wysyłki (reguła 6), a sekrety w treści zgłoszeń czekają na detektor (p. 20).
 - **Odrzucone pola karty.** Siedem wypadło przy przeglądzie z 2026-07-31 (17 pól → 10), bo pasowały
   do tego korpusu, a nie do produktu; dwa ostatnie nie weszły wcale:
   - `system` — stały przy zasadzie „jedna instancja = jeden produkt”;
@@ -4247,7 +4250,7 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
   z czytaniem uzasadnień — kandydatem na zestaw są wątki z badania jakości z 2026-09-02
   (43 poprowadzone słabo i 41 dobrze) — oraz czas na długich wątkach wobec cierpliwości UI
   helpdesku (p. 38). `gate_reply` (2026-10-22): fałszywe alarmy i przepuszczenia na każdą
-  z pięciu reguł na prawdziwych wiadomościach do klientów, w dwóch przebiegach, z czytaniem
+  z sześciu reguł na prawdziwych wiadomościach do klientów, w dwóch przebiegach, z czytaniem
   uzasadnień; osobno zasada, że cytaty reguł nie łamią — bez niej bramka blokowała cytat
   komunikatu z ekranu „Ups! Coś poszło nie tak.” jako potoczny, a czy z nią nie przepuszcza
   prośby o hasło schowanej w cytacie, nikt nie mierzył. `suggest_handoff` (2026-10-30): ocena na

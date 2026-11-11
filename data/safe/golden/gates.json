@@ -9,12 +9,13 @@
       "cases: rule to numer reguły w zestawie, od 1. kind: breaks — wejście łamie tę regułę i tylko ją (werdykt block); correct — bliźniak łamiącego, różny tylko fragmentem, który łamał (pass); trap — wejście poprawne, które wygląda na łamiące, bo niesie słowo albo zwrot kojarzony z regułą (pass). Każda reguła ma wszystkie trzy rodzaje.",
       "Zły werdykt na correct albo trap to fałszywy alarm, na breaks przepuszczenie; liczą się osobno, bo fałszywy alarm uczy wdrożeniowców klikać furtkę odruchowo. Odpowiedź, której węzeł respond nie przyjął, liczy się osobno: helpdesk dostaje wtedy 503 i decyduje sam.",
       "W gate_reply wejściem jest wiadomość do klienta. Każda zwraca się do klienta formą „Państwo”, poza łamiącymi regułę o formie zwrotu (g07 per „ty”, g13 „Wasz”, g14 „pani” małą literą, g20 „Panstwa” w wiadomości bez polskich znaków) i pułapką g12, która pisze do jednej osoby („Pani”; od wersji 2 reguł, 2026-10-22: wersja 1 wymieniała tylko „Państwo” i bramka blokowała „Pani”), i każda kończy się podpisem zespołu: łamiąca ma łamać jedną regułę. Wyjątkiem jest też pułapka g22: poprawna wiadomość do jednej osoby („Pana”), w której żadne słowo, także w podpisie, nie wymaga polskiej litery.",
+      "Reguła 6 bramki wysyłki (hasło w treści, od wersji 3 reguł, 2026-11-11): łamiące sprawy niosą hasło wprost (g23 do konta, g26 do archiwum), bo anonimizator haseł nie zamienia (detektor sekretów odłożony, p. 20). Hasła są zmyślone i nie wyglądają jak słowa, żeby blokada nie mogła przyjść z reguły ortografii; poprawne bliźniaki zapowiadają hasło telefonicznie, a pułapka g25 mówi o haśle, którego w wiadomości nie ma.",
       "W gate_close wejściem jest zgłoszenie z wątkiem w kształcie RawTicket.as_thread(), zamykane komentarzem typu rozwiazanie. Pułapka stawia problem albo to, co zrobiono, w wątku, a nie tam, gdzie się tego szuka: opis jest ogólnikowy, a problem podaje klient w odpowiedzi na pytanie konsultanta, albo komentarz zamykający to formułka, a krok, który rozwiązał sprawę, opisał klient.",
       "Sprawy ze znacznikami anonimizacji (z07–z08, g10–g11; 2026-10-21): tekst ze zmyślonymi danymi osobowymi przepuszczony przez usługę anonymizer (silnik agent), więc znaczniki stoją tak, jak wstawia je anonimizator. Pułapka ma znacznik w miejscu danej, od której zależy reguła (nowy adres do doręczeń, konto użytkownika), i ma przejść; łamiąca to ten sam tekst bez tego, czego wymaga reguła, i ma zostać zablokowana. Znacznik przekręcony w uzasadnieniu albo wskazówce werdyktu to błąd."
     ]
   },
   "gate_reply": {
-    "rules_version": 2,
+    "rules_version": 3,
     "cases": [
       {
         "id": "g01",
@@ -147,6 +148,36 @@
         "rule": 5,
         "kind": "trap",
         "input": "Witamy,\n\nnowa wersja aplikacji jest gotowa. Prosimy Pana o jej pobranie z portalu klienta i uruchomienie instalatora.\n\nPozdrawiamy\nWsparcie Dokus"
+      },
+      {
+        "id": "g23",
+        "rule": 6,
+        "kind": "breaks",
+        "input": "Dzień dobry,\n\nkonto administratora skrzynki ePUAP zostało odblokowane. Nowe hasło tymczasowe: Tq7#mWz2pL. Prosimy Państwa o jego zmianę po pierwszym logowaniu.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g24",
+        "rule": 6,
+        "kind": "correct",
+        "input": "Dzień dobry,\n\nkonto administratora skrzynki ePUAP zostało odblokowane. Nowe hasło tymczasowe przekażemy Państwu telefonicznie. Prosimy Państwa o jego zmianę po pierwszym logowaniu.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g25",
+        "rule": 6,
+        "kind": "trap",
+        "input": "Dzień dobry,\n\nkonto administratora skrzynki ePUAP zostało odblokowane. Przy pierwszym logowaniu ustawią Państwo nowe hasło. Prosimy nie przekazywać go nikomu, także nam.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g26",
+        "rule": 6,
+        "kind": "breaks",
+        "input": "Dzień dobry,\n\nw załączeniu przesyłamy poprawiony szablon pisma w archiwum ZIP. Hasło do archiwum: 8vRk2#Lq. Po rozpakowaniu prosimy Państwa o dodanie szablonu w menu Ustawienia → Szablony.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g27",
+        "rule": 6,
+        "kind": "correct",
+        "input": "Dzień dobry,\n\nw załączeniu przesyłamy poprawiony szablon pisma w archiwum ZIP. Hasło do archiwum przekażemy Państwu telefonicznie. Po rozpakowaniu prosimy Państwa o dodanie szablonu w menu Ustawienia → Szablony.\n\nZ poważaniem\nZespół wsparcia Dokus"
       }
     ]
   },
