@@ -10,7 +10,7 @@ class ResolutionVocabulary(BaseModel):
 
     Dlaczego wersjonowany: słownik jest wstawiany do promptu PARSUJĄCEGO, więc jego edycja zmienia
     znaczenie przyszłych artefaktów. Każdy `ParsedTicket` zapisuje wersję, którą powstał, więc
-    późniejsza edycja nie unieważnia po cichu `data/unsafe/parsed/` (zasada 7), a ponowne
+    późniejsza edycja nie unieważnia po cichu `data/unsafe/corpus/cards/` (zasada 7), a ponowne
     parsowanie może być wybiórcze zamiast całkowitego.
 
     Celowo NIE Enum w kodzie: to, gdzie helpdesk stawia granicę między „zmieniliśmy coś

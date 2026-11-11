@@ -21,7 +21,7 @@
      treści" w CLAUDE.md.
 
      REŻIM ZMIANY: nasz kod, ale wolno go stroić taniej niż prompt parsujący — zmiana nie
-     unieważnia data/unsafe/parsed/. Dlatego strażnik pilnuje tylko rzeczy niewidocznych w diffie
+     unieważnia data/unsafe/corpus/cards/. Dlatego strażnik pilnuje tylko rzeczy niewidocznych w diffie
      (placeholdery, sekcje danych, brak instrukcji w turze użytkownika), a NIE dosłownych fraz:
      freeze brzmienia kupowałby pozorne bezpieczeństwo za sztywność. Czy treść jest dobra,
      rozstrzyga pomiar na wyjściu modelu (podkrok 6.10).

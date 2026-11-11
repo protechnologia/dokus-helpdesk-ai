@@ -16,4 +16,5 @@ się z serwisami.
 | `quality_verdict.py`      | `QualityVerdict`, `RuleHit` | werdykt filtru o zgłoszeniu   |
 | `quality_report.py`       | `QualityReport`             | werdykty filtru dla korpusu   |
 | `tickets_index_report.py` | `TicketsIndexReport`        | co zrobiła jedna indeksacja   |
+| `tickets_corpus.py`       | `TicketsCorpus`             | układ katalogu korpusu        |
 """

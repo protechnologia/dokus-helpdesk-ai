@@ -74,7 +74,7 @@
      SCORE: dawniej nie było go w danych; wynik `find_tickets_vector` go niesie, ale reguły na nim nie
      stoją.
 
-     REŻIM ZMIANY: nasz kod, ale strojenie jest tanie — zmiana nie unieważnia data/unsafe/parsed/.
+     REŻIM ZMIANY: nasz kod, ale strojenie jest tanie — zmiana nie unieważnia data/unsafe/corpus/cards/.
      Strażnik pilnuje rzeczy niewidocznych w diffie, nie brzmienia.
 
      OSTRZEŻENIE O KROKU NIEODWRACALNYM NIE DZIAŁA — zmierzone czterokrotnie, u obu modeli, w obu

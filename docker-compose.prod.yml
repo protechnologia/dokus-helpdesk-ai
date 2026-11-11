@@ -14,10 +14,15 @@ services:
     # z hosta, bo prod uruchamia kod z obrazu, czyli dokładnie to, co zbudowaliśmy
     # i przetestowaliśmy. Znika też ./data: katalog artefaktów dostarcza na prod wdrożenie.
     #
-    # Zostaje jeden wpis: paczka kodu aplikacji dla narzędzi agenta (p. 60), tylko do odczytu.
-    # Nie da się jej wpiec w obraz, bo to dane klienta spoza repo.
+    # Zostają dane klienta spoza repo, których nie da się wpiec w obraz: paczka kodu aplikacji
+    # dla narzędzi agenta (p. 60), tylko do odczytu, oraz te części korpusu zgłoszeń, do których
+    # pisze trasa zamknięcia zgłoszenia (p. 30) — karty, wątki po anonimizacji i surowe
+    # zgłoszenia z trasy. Eksportu zrzutu bazy (`raw-db/`) kontener nie widzi.
     volumes: !override
       - ./data/unsafe/code:/code/data/unsafe/code:ro
+      - ./data/unsafe/corpus/cards:/code/data/unsafe/corpus/cards
+      - ./data/unsafe/corpus/anonymized:/code/data/unsafe/corpus/anonymized
+      - ./data/unsafe/corpus/raw-route:/code/data/unsafe/corpus/raw-route
     # No --reload: the reloader watches the filesystem and restarts the worker on every write,
     # which is a development convenience and a liability in production.
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

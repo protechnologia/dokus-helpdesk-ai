@@ -1,4 +1,5 @@
-"""Export helpdesk tickets from a MariaDB container into data/unsafe/raw/, one JSON file per ticket.
+"""Export helpdesk tickets from a MariaDB container into data/unsafe/corpus/raw-db/, one JSON
+file per ticket.
 
 Do czego:
     Zdejmuje zgłoszenia jednego modułu ze zrzutu bazy `helpdesk` zaimportowanego do kontenera
@@ -33,9 +34,9 @@ import subprocess
 import typer
 
 REPO_ROOT   = pathlib.Path(__file__).resolve().parent.parent
-DEFAULT_OUT = REPO_ROOT / "data" / "unsafe" / "raw"
+DEFAULT_OUT = REPO_ROOT / "data" / "unsafe" / "corpus" / "raw-db"
 
-cli = typer.Typer(help="Eksport zgłoszeń helpdesku ze zrzutu bazy do data/unsafe/raw/.")
+cli = typer.Typer(help="Eksport zgłoszeń helpdesku ze zrzutu bazy do data/unsafe/corpus/raw-db/.")
 
 # MariaDB buduje JSON sam — treści z HTML-em i znakami nowej linii nie przechodzą wtedy
 # przez parsowanie TSV po stronie klienta, które by je rozjechało.
@@ -179,7 +180,7 @@ def _fetch_ticket(
 
 
 def _write_ticket(
-    out_dir: pathlib.Path,  # e.g. Path("/root/projects/dokus-helpdesk-ai/data/unsafe/raw")
+    out_dir: pathlib.Path,  # e.g. Path("/root/…/data/unsafe/corpus/raw-db")
     ticket:  dict,          # e.g. {"zgloszenie": {"id": 34458, ...}, "komentarze": [...]}
 ) -> int:
     """
@@ -187,7 +188,7 @@ def _write_ticket(
     Writes one ticket to out_dir as zgloszenie-<id>.json and returns its comment count.
 
     Example args:
-        out_dir=Path("data/unsafe/raw")
+        out_dir=Path("data/unsafe/corpus/raw-db")
         ticket={"zgloszenie": {"id": 34458, ...}, "komentarze": [...]}
 
     Example result:
@@ -204,7 +205,7 @@ def _verify(
     database:         str,            # e.g. "helpdesk"
     password:         str,            # e.g. "analiza"
     module_id:        int,            # e.g. 116
-    out_dir:          pathlib.Path,   # e.g. Path("data/unsafe/raw")
+    out_dir:          pathlib.Path,   # e.g. Path("data/unsafe/corpus/raw-db")
     written_comments: int,            # e.g. 4014
 ) -> bool:
     """
@@ -216,7 +217,7 @@ def _verify(
         database="helpdesk"
         password="analiza"
         module_id=116
-        out_dir=Path("data/unsafe/raw")
+        out_dir=Path("data/unsafe/corpus/raw-db")
         written_comments=4014
 
     Example result:
@@ -280,7 +281,7 @@ def export(
     Example args:
         module_id=116
         container="helpdesk-analiza"
-        out_dir=Path("data/unsafe/raw")
+        out_dir=Path("data/unsafe/corpus/raw-db")
 
     Example result:
         None (pliki na dysku + podsumowanie na stdout)

@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from app.entry_cli.cli import cli
@@ -50,6 +51,25 @@ def test_valid_directory_exits_zero(tmp_path: Path) -> None:
     _write(tmp_path, "ok.json", VALID_TICKET)
 
     result = runner.invoke(cli, ["tickets", "validate", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "Sprawdzono 1, błędnych 0." in result.output
+
+
+def test_without_a_directory_the_corpus_cards_are_checked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sprawdza, czy `helpdesk tickets validate` bez katalogu sprawdza karty korpusu: przy
+    `TICKETS_CORPUS_DIR` wskazującym katalog z jedną kartą w `cards/` sprawdza właśnie ją.
+
+    Wyłapuje komendę, która bez argumentu patrzy gdzie indziej niż indeksacja, np. w dawne
+    `data/unsafe/parsed`: walidacja przechodziłaby na pustym miejscu, a indeks budowałby się
+    z kart, których nikt nie sprawdził."""
+    (tmp_path / "cards").mkdir()
+    _write(tmp_path / "cards", "ok.json", VALID_TICKET)
+    monkeypatch.setenv("TICKETS_CORPUS_DIR", str(tmp_path))
+
+    result = runner.invoke(cli, ["tickets", "validate"])
 
     assert result.exit_code == 0
     assert "Sprawdzono 1, błędnych 0." in result.output

@@ -4,6 +4,8 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core_model.tickets.tickets_corpus import TicketsCorpus
+
 
 class LLMSettings(BaseModel):
     """
@@ -111,6 +113,12 @@ class Settings(BaseSettings):
     postgres_user:            str        = "helpdesk"
     postgres_password:        str | None = None         # np. "helpdesk"
     postgres_timeout_seconds: float      = 30.0         # sekundy: łączenie i każde zapytanie
+
+    # --- korpus zgłoszeń ---
+    # Katalog korpusu po stronie kontenera: karty, wątki po anonimizacji i surowe zgłoszenia, każde
+    # w swoim podkatalogu (`TicketsCorpus`). Z niego komendy `helpdesk tickets` budują indeksy, a od
+    # p. 30 zapisuje do niego trasa zamknięcia zgłoszenia. Montowania nie przestawia.
+    tickets_corpus_dir: Path = Path("/code/data/unsafe/corpus")
 
     # --- kod aplikacji: paczka dla narzędzi agenta ---
     # Katalog paczki zbudowanej przez `scripts/build_code_package.py` (kod w `repo/`, obok
@@ -254,6 +262,20 @@ class Settings(BaseSettings):
         )
 
         return llm
+
+    def tickets_corpus(self) -> TicketsCorpus:
+        """
+        Description:
+        Zwraca katalog korpusu zgłoszeń z nazwanymi podkatalogami (karty, wątki po anonimizacji,
+        surowe zgłoszenia).
+
+        Example args:
+            (brak)
+
+        Example result:
+            TicketsCorpus(root=Path("/code/data/unsafe/corpus"))
+        """
+        return TicketsCorpus(root=self.tickets_corpus_dir)
 
     def tool_call_limits(self) -> dict[str, int]:
         """

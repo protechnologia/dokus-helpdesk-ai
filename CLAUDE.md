@@ -161,8 +161,9 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
 - **Nie wrzucaj pola `solution` do embeddingu** — rozwiązanie żyje w payloadzie, nie w wektorze
 - **Nie indeksuj surowej treści maila** — indeksujemy wyłącznie sparsowane pola; jedyny wyjątek
   to zanonimizowany wątek w indeksie tekstowym (p. 53), nigdy w wektorze
-- **Nie kasuj i nie nadpisuj kart w `data/unsafe/golden/cards/`** — to niepowtarzalny wynik
-  przebiegu LLM; nowe karty golden setu zastępują je dopiero po przyjęciu
+- **Nie kasuj i nie nadpisuj plików w `data/unsafe/corpus/cards/`, `corpus/anonymized/`
+  i `data/unsafe/golden/cards/`** — to niepowtarzalny wynik przebiegu LLM i anonimizatora; nowe
+  karty golden setu zastępują swoje dopiero po przyjęciu
 - **Nie filtruj korpusu po `status = 'zamkniety'`** — Dokus kończy zgłoszenia na `rozwiazany`,
   `zamkniety` ma 5 sztuk na 1825
 - **Nie szukaj rozwiązań w tabeli `rozwiazanie`** — jest martwa; rozwiązanie to `komentarz`
@@ -280,6 +281,7 @@ dokus-helpdesk-ai/
 │   │   └── code/                 # zmyślona aplikacja: source/ i rules.json (p. 60)
 │   └── unsafe/                   # dane klientów (PII) — NIE w repo
 │       ├── db/                   # zrzuty bazy źródłowej
+│       ├── corpus/               # korpus zgłoszeń: raw-db/, raw-route/, anonymized/, cards/
 │       ├── golden/               # zestawy do ewaluacji, w tym karty (cards/) i wątki (raw/)
 │       ├── instruction/          # właściwa dokumentacja (p. 55)
 │       ├── code/                 # paczka kodu aplikacji: rules.json, manifest.json, symbols.json, project.md, repo/ (p. 60)
@@ -613,18 +615,18 @@ MariaDB 10.3, aplikacja na Doctrine/Symfony, 21 tabel). Nie jest to eksport plik
 mailowa — **źródłem jest relacyjna baza produkcyjna**, więc adapter w `core_service/` czyta SQL,
 nie CSV.
 
-**`data/unsafe/raw/` jest zdejmowane ze zrzutu skryptem `scripts/export_raw_tickets.py`** — wiernie,
-bez stripowania HTML-u i bez filtra jakości (filtr to decyzja etapu 4, zabetonowany w artefakcie
-przestałby być widoczny). Eksport jest odtwarzalny i nie woła LLM-a, więc **nie podlega zasadzie
-7** — w razie potrzeby wolno go powtórzyć albo zmienić jego kształt. Kolumny z hasłami nie są
-czytane przez żadne zapytanie tego skryptu.
+**Zgłoszenia źródłowe zdejmuje ze zrzutu skrypt `scripts/export_raw_tickets.py`, do
+`data/unsafe/corpus/raw-db/`** — wiernie, bez stripowania HTML-u i bez filtra jakości (filtr to
+decyzja etapu 4, zabetonowany w artefakcie przestałby być widoczny). Eksport jest odtwarzalny
+i nie woła LLM-a, więc **nie podlega zasadzie 7** — w razie potrzeby wolno go powtórzyć albo
+zmienić jego kształt. Kolumny z hasłami nie są czytane przez żadne zapytanie tego skryptu.
 
 **Droga od źródła do indeksu** (offline, odpalana świadomie z CLI):
 
 ```
 zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedTicket (JSON na dysku)
                                                                     │
-                              data/unsafe/parsed/*.json ──────────────────┘
+                        data/unsafe/corpus/cards/*.json ────────────┘
                                      │
                                      ├─ filtr jakości (raportuje, co odrzuca)
                                      ├─ [embedder] problem+symptoms → wektory
@@ -645,6 +647,13 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   z korpusu, raporty. W `data/safe/` — wyłącznie dane zmyślone, i tylko ono jest w repo.
   `.gitignore` wycina całe `data/` poza `safe/`, więc katalog założony obok przez pomyłkę też
   nie trafi do commita.
+- **Korpus zgłoszeń leży w `data/unsafe/corpus/`, w podkatalogu na etap (2026-11-11):** `raw-db/`
+  (eksport zrzutu bazy), `raw-route/` (zgłoszenia z trasy zamknięcia, p. 30), `anonymized/`
+  (wątki po anonimizacji) i `cards/` (karty). Katalog podaje `TICKETS_CORPUS_DIR`, a nazwy
+  podkatalogów `TicketsCorpus` (`core_model/tickets/tickets_corpus.py`). Dane osobowe są tylko
+  w `raw-*`; indeksy odbudowują się z `cards/` i `anonymized/`. Jeden katalog, a nie katalog na
+  model, bo karty dopisują się miesiącami, a model w `.env` może się zmienić. Karty i wątki
+  golden setu leżą osobno, w `data/unsafe/golden/`.
 
 #### Zakres korpusu: wyłącznie moduł Dokus
 
@@ -1040,8 +1049,8 @@ gałęzi.
   zobaczy hasła słownikowego, a reguły nie widzą sekretu wpisanego w kod, więc przegląd
   powtarza się po zmianie reguł albo folderu wejściowego.
 - **Folder paczki jest montowany do `api` tylko do odczytu, w obu warstwach compose
-  (2026-10-06).** W dev wpis nakłada się na montowane do zapisu `./data`, w prod jest jedynym
-  montowaniem `api`. Narzędzia dostają ścieżki od modelu, więc kontener nie może mieć jak
+  (2026-10-06).** W dev wpis nakłada się na montowane do zapisu `./data`, w prod stoi obok
+  katalogów korpusu zgłoszeń. Narzędzia dostają ścieżki od modelu, więc kontener nie może mieć jak
   zmienić paczki.
 - **Paczkę czyta `CodePackage` z `core_service/loader_code_package.py`, a jej katalog podaje
   `CODE_PACKAGE_DIR` (2026-10-07).** To ścieżka po stronie kontenera; montowania nie przestawia.
@@ -1556,7 +1565,9 @@ Wspólne:
   (`core_service/factory_docs_indexer.py`, `factory_tickets_indexer.py`), jak trasy biorą graf
   z `agent_graphs/factory.py`, i zamyka go jednym `aclose()`.
 - **Komendy niszczące (`tickets reindex`, `docs index`) pytają o potwierdzenie** albo wymagają
-  `--yes`; pytanie nazywa to, co zniknie.
+  `--yes`; pytanie nazywa to, co zniknie, i skąd przyjdzie nowe. Kasują dopiero wtedy, gdy
+  mają z czego odbudować: `tickets reindex` odmawia, zanim skasuje kolekcję, gdy katalogu nie
+  ma albo nie ma w nim kart (kod 2).
 
 #### Gotchas
 
@@ -2074,7 +2085,8 @@ a do tego czasu jej nie ma, więc oba narzędzia kończą się błędem `DbPostg
 - **Skrypty z `initdb/` i zmienne `POSTGRES_DB/USER/PASSWORD` działają tylko na pustym
   wolumenie.** Zmiana mapowania albo hasła nie dociera do istniejącej bazy. Do p. 29 wolno
   odtworzyć wolumen `postgres_data`, bo tabele wyszukiwania odbudowują się z plików (zasada 8).
-- **Do bazy trafia wyłącznie tekst po anonimizacji** — surowy wątek zostaje w `data/unsafe/raw/`.
+- **Do bazy trafia wyłącznie tekst po anonimizacji** — surowy wątek zostaje w `raw-db/` albo
+  `raw-route/` korpusu (`data/unsafe/corpus/`).
   Dzięki temu narzędzie może pokazać modelowi dopasowany fragment.
 - **Pakiet `api/app/db_postgres/`: klient, tabele, wiersze — a reszta aplikacji używa tylko
   tabel.**
@@ -2897,8 +2909,8 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
     Wyjątek dotyczy **treści**, nie szkieletu: rama promptu zostaje w repo pod
     testem-strażnikiem, a z magazynu reguł wchodzą dane wstawiane w wyznaczone miejsce.
   - **Prompt parsujący zgłoszenie NIE jest konfigurowalny** — jest kontraktem artefaktu
-    (zasada 7). Jego zmiana unieważnia `data/unsafe/parsed/`, więc należy do kodu i do gita, nie do
-    ustawień klienta.
+    (zasada 7). Jego zmiana unieważnia karty korpusu (`data/unsafe/corpus/cards/`), więc należy do
+    kodu i do gita, nie do ustawień klienta.
   - **Wyjątek w wyjątku: słowniki wstawiane do promptu parsującego** (`resolution`, podpowiedź
     dla `component`) **są danymi klienta** — inny helpdesk ma inne rodzaje rozstrzygnięć
     („odpowiedzialność po stronie urzędu" nie znaczy nic poza sektorem publicznym). Żyją
@@ -2916,7 +2928,7 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   konstrukcji nie ma). Bez tego prompt dryfuje przy każdej edycji.
   - **Siła strażnika ma odpowiadać kosztowi cichego dryfu.** Przy prompcie parsującym zamrożenie
     fraz jest uzasadnione (dryf = ~1500 wywołań LLM do powtórzenia); przy promptach generacji zmiana
-    nie unieważnia `data/unsafe/parsed/`, więc strażnik pilnuje **wyłącznie rzeczy niewidocznych w
+    nie unieważnia kart korpusu, więc strażnik pilnuje **wyłącznie rzeczy niewidocznych w
     diffie** — placeholderów, braku instrukcji w turze użytkownika, wyciętych komentarzy. Fraz nie
     zamraża: o jakości treści rozstrzyga pomiar.
   - **Jedna fraza jest zamrożona w każdym prompcie systemowym (2026-10-05): „tekst w sekcjach
@@ -3256,9 +3268,9 @@ nogi produktu na jednej sprawie.
 - Weryfikacja realnej konfiguracji: `docker compose config` (nie zawartość `.env`)
 
 **Przygotowanie danych (skrypty repo)**
-- Eksport zgłoszeń ze zrzutu do `data/unsafe/raw/`: `python scripts/export_raw_tickets.py export
-  --module-id 116` (wymaga kontenera z zaimportowanym zrzutem; kontrola liczb wobec bazy na końcu
-  przebiegu)
+- Eksport zgłoszeń ze zrzutu do `data/unsafe/corpus/raw-db/`:
+  `python scripts/export_raw_tickets.py export --module-id 116` (wymaga kontenera
+  z zaimportowanym zrzutem; kontrola liczb wobec bazy na końcu przebiegu)
 - Paczka kodu aplikacji: `python scripts/build_code_package.py build <folder z kodem>
   data/unsafe/code` (reguły z `rules.json` w katalogu paczki albo z `--rules`; zastępuje `repo/`,
   `manifest.json` i `symbols.json`)
@@ -3277,10 +3289,12 @@ nogi produktu na jednej sprawie.
   budowa paczki robi to samo na końcu)
 
 **Pipeline danych (CLI `helpdesk`)**
-- Walidacja artefaktów: `helpdesk tickets validate data/unsafe/parsed/`
-- Indeksacja do Qdranta: `helpdesk tickets index <katalog>`
-- Pełna odbudowa indeksu: `helpdesk tickets reindex` (kasuje kolekcję, wstaje
-  z `data/unsafe/parsed/`)
+- Walidacja kart: `helpdesk tickets validate [<katalog>]` (bez katalogu: `cards/` korpusu
+  z `TICKETS_CORPUS_DIR`; tak samo w dwóch komendach niżej)
+- Indeksacja do Qdranta: `helpdesk tickets index [<katalog>]`
+- Pełna odbudowa indeksu: `helpdesk tickets reindex [<katalog>]` (kasuje kolekcję i buduje ją
+  od zera; katalogu, którego nie ma albo w którym nie ma kart, nie przyjmie, zanim cokolwiek
+  skasuje)
 - Sprawdzenie paczki dokumentacji: `helpdesk docs validate <katalog>` (same pliki, bez stacku)
 - Indeksacja dokumentacji: `helpdesk docs index <katalog>` (zastępuje tabelę i kolekcję;
   **wymaga stacku**); paczka syntetyczna do osobnego indeksu:
@@ -3386,14 +3400,14 @@ localhost:8010/search`.
 
 **Konfiguracja (ENV):**
 - Cała konfiguracja przez ENV (pydantic-settings) — żadnych sekretów/endpointów na sztywno.
-- **Jeden `.env` w korzeniu** (nie per usługa; wartości rozdzielamy prefiksami
-  `LLM_GENERATION_*`, `LLM_ANONYMIZATION_*`, `ANONYMIZATION_*`, `EMBEDDING_*`, `QDRANT_*`,
-  `POSTGRES_*`, `RAG_*`, `CODE_*`, `AGENT_*`, `FRONTEND_*`). `.env` w `.gitignore`, **`.env.example` w repo =
+- **Jeden `.env` w korzeniu** (nie per usługa; wartości rozdzielamy prefiksami `LLM_GENERATION_*`,
+  `LLM_ANONYMIZATION_*`, `ANONYMIZATION_*`, `EMBEDDING_*`, `QDRANT_*`, `POSTGRES_*`, `RAG_*`,
+  `TICKETS_*`, `CODE_*`, `AGENT_*`, `FRONTEND_*`). `.env` w `.gitignore`, **`.env.example` w repo =
   kontrakt** — każda zmienna z compose i `Settings` musi tam być. Bez `.env.prod`/`.env.dev` —
-  różnice środowisk przez warstwy compose i ENV na maszynie docelowej. `LLM_ANONYMIZATION_*`
-  i `ANONYMIZATION_ENGINE` czyta usługa `anonymizer`, a `ANONYMIZATION_BASE_URL`
-  i `ANONYMIZATION_TIMEOUT_SECONDS` — `api`. `FRONTEND_API_URL` czyta front: konfiguracja Vite
-  w dev i szablon nginx na prod; test plumbingu bierze te odwołania z obu plików.
+  różnice środowisk przez warstwy compose i ENV na maszynie docelowej. `LLM_ANONYMIZATION_*` i
+  `ANONYMIZATION_ENGINE` czyta usługa `anonymizer`, a `ANONYMIZATION_BASE_URL` i
+  `ANONYMIZATION_TIMEOUT_SECONDS` — `api`. `FRONTEND_API_URL` czyta front: konfiguracja Vite w dev i
+  szablon nginx na prod; test plumbingu bierze te odwołania z obu plików.
 - **Progi i parametry retrievalu (`RAG_TOP_K`, `RAG_SCORE_MIN`…) idą do ENV** — to strojenie,
   nie logika.
 - **ENV do kontenerów jawnie przez `environment:`**, nie `env_file:` — wtedy `docker compose
@@ -3428,12 +3442,15 @@ localhost:8010/search`.
 **Dev vs prod (kod):**
 - **Baza montuje kod z hosta** (bind-mount) — zmiany `.py` żywe bez rebuildu.
 - **Prod zdejmuje mount kodu** — `docker-compose.prod.yml` kasuje wolumeny embeddera przez
-  `volumes: !reset []`, a listę `api` zastępuje przez `!override` jednym wpisem: paczką kodu
-  aplikacji, tylko do odczytu (uruchamiamy kod z obrazu, nie z hosta).
+  `volumes: !reset []`, a listę `api` zastępuje przez `!override` danymi klienta spoza repo:
+  paczką kodu aplikacji tylko do odczytu oraz `cards/`, `anonymized/` i `raw-route/` korpusu do
+  zapisu (uruchamiamy kod z obrazu, nie z hosta). Eksportu zrzutu (`raw-db/`) kontener nie
+  widzi.
 
 **Trwałość danych:**
-- **Wolumen Qdranta to wygoda, nie kopia zapasowa** — źródłem prawdy jest `data/unsafe/parsed/`
-  (zasada 8). Backup dotyczy katalogu JSON-ów, nie kolekcji.
+- **Wolumeny Qdranta i Postgresa to wygoda, nie kopia zapasowa** — źródłem prawdy są karty
+  i wątki po anonimizacji w `data/unsafe/corpus/` (zasada 8). Backup dotyczy plików, nie
+  kolekcji ani tabel.
 
 **Pułapki:**
 - **Pusty string zamiast braku** — `docker compose` dla niezdefiniowanego `${VAR:-}` wstawia
@@ -4179,7 +4196,10 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 - [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
   „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy; po nim 139 zgłoszeń tego kanału
   z sierpniowego zrzutu dochodzi do korpusu osobnym przebiegiem, bez parsowania reszty od nowa.
-  *Dlaczego:* 77 ze 123 zgłoszeń w lipcu, a żadna heurystyka nie odróżni broadcastu od sprawy.
+  Do rozstrzygnięcia: czy zapisywać tekst po czyszczeniu. Ma dane osobowe, więc jeśli tak, to
+  w `corpus/cleaned/`, którego `api` na prod nie montuje, a ręczne decyzje (flaga, pary spraw)
+  jako małe dane. *Dlaczego:* 77 ze 123 zgłoszeń w lipcu, a żadna heurystyka nie odróżni
+  broadcastu od sprawy.
 - [ ] **33. Przeliczenia na pełnym korpusie** — `RAG_SCORE_MIN` na zapytaniach sparsowanych
   (na kartach `gpt-6.1-sol` trafienie dostaje 7 z 16 dystraktorów, na kartach Bielika 3 z 16,
   przy tym samym progu 0.48), porównanie embedderów, liczba wątków-projektów, `questions_summary`, rozkład `component`;
@@ -4199,8 +4219,9 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 - [ ] **34. Tryb odświeżania korpusu** — kolejne zrzuty czy dostęp tylko do odczytu; przy
   kolejnych zrzutach czytnik SQL zamiast eksportu do JSON-ów (odłożony z p. 31 2026-11-11).
   *Dlaczego:* +130 zgłoszeń w miesiąc, więc jednorazowy zrzut szybko się starzeje.
-- [ ] **35. Backup `data/unsafe/parsed/`.** *Dlaczego:* jedyny artefakt, którego odtworzenie
-      kosztuje ponowny przebieg LLM.
+- [ ] **35. Backup `data/unsafe/corpus/cards/` i `anonymized/`.** *Dlaczego:* jedyne
+      artefakty, których odtworzenie kosztuje ponowny przebieg LLM albo anonimizatora; `raw-db/`
+      odtwarza eksport zrzutu.
 - [ ] **55. Przygotowanie właściwej dokumentacji** (dopisany 2026-10-03) — podział mocnym modelem
   na pliki `.md` i metryczkę, skrypt sprawdzający, że każda sekcja jest dosłownym podciągiem
   źródła i że sekcje pokrywają całość, przegląd opisów przez człowieka, próg ostrzeżenia

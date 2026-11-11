@@ -4,8 +4,12 @@ import typer
 
 from app.core_model.tickets.validation_report import ValidationReport
 from app.core_service.validator_ticket_parsed import validate_directory
+from app.entry_cli.tickets.common import CARDS_DIR_HELP, cards_dir_or_default
 
 HELP = "Sprawdź pliki JSON w katalogu wobec kontraktu ParsedTicket."
+
+# Pomoc flagi `--verbose`.
+VERBOSE_HELP = "Wypisz też poprawne pliki."
 
 
 def _print_report(
@@ -43,8 +47,8 @@ def _print_report(
 
 
 def validate_artifacts(
-    directory: Path = typer.Argument(Path("data/unsafe/parsed"), help="Katalog z artefaktami."),
-    verbose:   bool = typer.Option(False, "--verbose", "-v", help="Wypisz też poprawne pliki."),
+    directory: Path | None = typer.Argument(None, help=CARDS_DIR_HELP),
+    verbose:   bool        = typer.Option(False, "--verbose", "-v", help=VERBOSE_HELP),
 ) -> None:
     """
     Description:
@@ -55,7 +59,7 @@ def validate_artifacts(
     import (p. 31) użyje tego samego sprawdzenia bez przechodzenia przez CLI.
 
     Example args:
-        directory=Path("data/unsafe/parsed")
+        directory=None  # karty korpusu z TICKETS_CORPUS_DIR
         verbose=False
 
     Example result:
@@ -65,7 +69,7 @@ def validate_artifacts(
         typer.Exit: kod 1 przy błędnych plikach, kod 2, gdy katalog nie istnieje
     """
     try:
-        report = validate_directory(directory)
+        report = validate_directory(cards_dir_or_default(directory))
     except NotADirectoryError as exc:
         # Kod 2 oddziela „wskazałeś nic" od „artefakty są zepsute" — potok musi odróżnić złą
         # konfigurację od rzeczywistej porażki.

@@ -406,6 +406,34 @@ async def test_rebuild_is_idempotent(tmp_path: Path) -> None:
     assert [p.point_id for p in first.points] == [p.point_id for p in second.points]
 
 
+async def test_rebuild_of_a_missing_directory_keeps_the_collection(tmp_path: Path) -> None:
+    """Sprawdza, czy przebudowa z katalogu, którego nie ma, kończy się `NotADirectoryError`
+    i nie kasuje kolekcji.
+
+    Wyłapuje przebudowę, która najpierw kasuje, a dopiero potem szuka katalogu: literówka
+    w ścieżce albo domyślny katalog, którego jeszcze nie ma, zostawiłyby pusty indeks."""
+    tickets = FakeTickets()
+
+    with pytest.raises(NotADirectoryError):
+        await _indexer(FakeEmbedder(), tickets).rebuild(tmp_path / "nie-ma")
+
+    assert "drop" not in tickets.calls
+
+
+async def test_rebuild_of_a_directory_without_cards_keeps_the_collection(tmp_path: Path) -> None:
+    """Sprawdza, czy przebudowa z katalogu bez kart kończy się `FileNotFoundError` i nie kasuje
+    kolekcji.
+
+    Wyłapuje przebudowę, która kasuje kolekcję, choć nie ma jej z czego odbudować: wyszukiwanie
+    zgłoszeń straciłoby cały indeks przez wskazanie pustego katalogu."""
+    tickets = FakeTickets()
+
+    with pytest.raises(FileNotFoundError):
+        await _indexer(FakeEmbedder(), tickets).rebuild(tmp_path)
+
+    assert "drop" not in tickets.calls
+
+
 async def test_missing_directory_is_an_error(tmp_path: Path) -> None:
     """Sprawdza, czy wskazanie katalogu, którego nie ma, kończy się błędem `NotADirectoryError`.
 

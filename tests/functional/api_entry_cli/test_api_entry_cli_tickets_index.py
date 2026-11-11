@@ -274,6 +274,52 @@ def test_rebuild_proceeds_when_confirmed(tmp_path: Path, stub_run: StubRun) -> N
     assert stub_run.calls[0]["drop_first"] is True
 
 
+def test_rebuild_names_the_directory_in_the_prompt(tmp_path: Path, stub_run: StubRun) -> None:
+    """Sprawdza, czy pytanie o potwierdzenie w `helpdesk tickets reindex` zawiera katalog, z którego
+    kolekcja ma zostać zbudowana.
+
+    Wyłapuje pytanie, które nie mówi, skąd przyjdzie nowy indeks: przy katalogu wziętym
+    z konfiguracji operator nie wiedziałby, że przebudowa sięgnie gdzie indziej, niż myśli."""
+    directory = _corpus(tmp_path)
+
+    result = runner.invoke(cli, ["tickets", "reindex", str(directory)], input="n\n")
+
+    assert str(directory) in result.stdout
+
+
+@pytest.mark.parametrize("command", [["index"], ["reindex", "--yes"]])
+def test_without_a_directory_the_corpus_cards_are_indexed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stub_run: StubRun, command: list[str]
+) -> None:
+    """Sprawdza, czy `helpdesk tickets index` i `helpdesk tickets reindex` bez katalogu indeksują
+    `cards/` korpusu wskazanego przez `TICKETS_CORPUS_DIR`.
+
+    Wyłapuje komendę, która bez argumentu sięga gdzie indziej niż zapis kart, np. w dawne
+    `data/unsafe/parsed`: przebudowa nie miałaby z czego zbudować indeksu albo zbudowałaby go
+    z innych kart niż te, które zapisuje trasa."""
+    monkeypatch.setenv("TICKETS_CORPUS_DIR", str(tmp_path))
+
+    result = runner.invoke(cli, ["tickets", *command])
+
+    assert result.exit_code == 0
+    assert stub_run.calls[0]["directory"] == tmp_path / "cards"
+
+
+def test_rebuild_without_cards_exits_two(tmp_path: Path, stub_run: StubRun) -> None:
+    """Sprawdza, czy `helpdesk tickets reindex` kończy się kodem 2 i wypisuje „BŁĄD”, gdy indekser
+    odmówi przebudowy, bo w katalogu nie ma kart.
+
+    Wyłapuje komendę, która taką odmowę przepuszcza jako awarię bez czytelnego komunikatu albo
+    jako sukces: operator nie wiedziałby, że wskazał pusty katalog, a skrypt wywołujący —
+    że indeks nie został przebudowany."""
+    stub_run.error = FileNotFoundError("brak kart w katalogu, kolekcja zostaje: /pusty")
+
+    result = runner.invoke(cli, ["tickets", "reindex", str(tmp_path), "--yes"])
+
+    assert result.exit_code == 2
+    assert "BŁĄD" in result.output
+
+
 def test_rebuild_with_yes_skips_the_prompt(tmp_path: Path, stub_run: StubRun) -> None:
     """Sprawdza, czy `helpdesk tickets reindex --yes` kończy się kodem 0 i uruchamia indeksację
     z kasowaniem kolekcji, nie czekając na odpowiedź operatora.

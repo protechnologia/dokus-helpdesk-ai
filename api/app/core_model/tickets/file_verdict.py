@@ -10,7 +10,7 @@ class FileVerdict(BaseModel):
     po korpusie robi się po to, żeby dowiedzieć się, CO jest nie tak, a nie ile plików odpadło.
     """
 
-    path:   Path      = Field(examples=[Path("data/unsafe/parsed/33644.json")])
+    path:   Path      = Field(examples=[Path("data/unsafe/corpus/cards/33644.json")])
     errors: list[str] = Field(default_factory=list, examples=[["resolution: spoza słownika"]])
 
     @property

@@ -22,7 +22,7 @@ import typer
 from app.entry_cli.tickets import index, reindex, validate
 
 tickets = typer.Typer(
-    help            = "Sparsowane zgłoszenia z data/unsafe/parsed/: walidacja i indeks.",
+    help            = "Sparsowane zgłoszenia z data/unsafe/corpus/cards/: walidacja i indeks.",
     no_args_is_help = True,
 )
 
