@@ -8,14 +8,15 @@ Do czego:
 WYMAGA ZBUDOWANEGO INDEKSU I CHODZĄCEGO STACKU:
 
     docker compose up -d                        # embedder + qdrant
-    helpdesk tickets index data/unsafe/golden   # napełnij kolekcję kartami golden setu
+    QDRANT_COLLECTION=tickets_golden helpdesk tickets reindex data/unsafe/golden
+                                                # kolekcja kart golden setu, osobna od instancji
     python scripts/eval_threshold.py table      # tabela koszt/zysk per próg
     python scripts/eval_threshold.py detail     # rozbicie per dystraktor i lista strat
     python scripts/eval_threshold.py plot       # wykres obu rozkładów z linią progu (PNG)
 
 Przykład wyjścia (`table`, przebieg z 2026-10-05):
 
-    Kolekcja 'tickets': 171 punktów
+    Kolekcja 'tickets_golden': 171 punktów
     A: 162 zapytań golden setu · B: 16 dystraktorów
 
     A: rekord poprawny     n=162  min 0.409  p05 0.499  p25 0.566  med 0.597  p75 0.634  p95 0.673  max 0.702
@@ -106,6 +107,10 @@ DEFAULT_DISTRACTORS = REPO_ROOT / "data" / "unsafe" / "golden" / "tickets-distra
 # Adresy z HOSTA, nie z sieci compose: skrypt chodzi obok stacku.
 DEFAULT_EMBEDDER = "http://localhost:8001"
 DEFAULT_QDRANT   = "http://localhost:6333"
+
+# Kolekcja z kartami golden setu, osobna od kolekcji instancji, która trzyma pełny korpus.
+DEFAULT_COLLECTION = "tickets_golden"
+HELP_COLLECTION    = "Kolekcja Qdranta do przeszukania."
 
 DEFAULT_PLOT_OUT = REPO_ROOT / "data" / "unsafe" / "docs" / "pomiar-progu-score.png"
 
@@ -294,7 +299,8 @@ def _collection_size(
 
     if info.status_code == 404:
         typer.echo(
-            f"BŁĄD: nie ma kolekcji '{collection}' — zbuduj ją `helpdesk tickets index`.", err=True
+            f"BŁĄD: nie ma kolekcji '{collection}' — zbuduj ją: QDRANT_COLLECTION={collection} "
+            "helpdesk tickets reindex data/unsafe/golden", err=True
         )
         raise typer.Exit(code=2)
 
@@ -444,7 +450,7 @@ def _measure(
 
 @cli.command("table", help=HELP_TABLE)
 def table(
-    collection:  str          = typer.Option("tickets", help="Kolekcja Qdranta do przeszukania."),
+    collection:  str          = typer.Option(DEFAULT_COLLECTION, help=HELP_COLLECTION),
     golden:      pathlib.Path = typer.Option(DEFAULT_GOLDEN, help="Plik golden setu."),
     distractors: pathlib.Path = typer.Option(DEFAULT_DISTRACTORS, help="Plik dystraktorów."),
     embedder:    str          = typer.Option(DEFAULT_EMBEDDER, help="Adres usługi embeddera."),
@@ -516,7 +522,7 @@ def table(
 @cli.command("detail", help=HELP_DETAIL)
 def detail(
     threshold:   float        = typer.Option(0.48, help="Próg, dla którego wypisać straty."),
-    collection:  str          = typer.Option("tickets", help="Kolekcja Qdranta do przeszukania."),
+    collection:  str          = typer.Option(DEFAULT_COLLECTION, help=HELP_COLLECTION),
     golden:      pathlib.Path = typer.Option(DEFAULT_GOLDEN, help="Plik golden setu."),
     distractors: pathlib.Path = typer.Option(DEFAULT_DISTRACTORS, help="Plik dystraktorów."),
     embedder:    str          = typer.Option(DEFAULT_EMBEDDER, help="Adres usługi embeddera."),
@@ -581,7 +587,7 @@ def detail(
 def plot(
     out:         pathlib.Path = typer.Option(DEFAULT_PLOT_OUT, help="Gdzie zapisać PNG."),
     threshold:   float        = typer.Option(0.48, help="Próg do zaznaczenia pionową linią."),
-    collection:  str          = typer.Option("tickets", help="Kolekcja Qdranta do przeszukania."),
+    collection:  str          = typer.Option(DEFAULT_COLLECTION, help=HELP_COLLECTION),
     golden:      pathlib.Path = typer.Option(DEFAULT_GOLDEN, help="Plik golden setu."),
     distractors: pathlib.Path = typer.Option(DEFAULT_DISTRACTORS, help="Plik dystraktorów."),
     embedder:    str          = typer.Option(DEFAULT_EMBEDDER, help="Adres usługi embeddera."),

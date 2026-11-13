@@ -23,8 +23,16 @@ DISTRACTORS_FILE = Path("data/unsafe/golden/tickets-distractors.json")
 # Sparsowane `gpt-6.1-sol` 2026-10-23; nowsze karty zastępują ten katalog dopiero po przyjęciu.
 CORPUS_DIR = Path("data/unsafe/golden/cards")
 
-# Podpowiedź do błędu pomiaru, gdy kolekcja zgłoszeń jest pusta: polecenie, które ją buduje.
-BUILD_HINT = "zbuduj indeks: helpdesk tickets reindex data/unsafe/golden"
+# Kolekcja Qdranta z kartami korpusu odniesienia, osobna od kolekcji instancji (2026-11-13):
+# instancja trzyma karty pełnego korpusu, a pomiar ma stać na 200 kartach golden setu.
+GOLDEN_COLLECTION = "tickets_golden"
+
+# Podpowiedź do błędu pomiaru, gdy kolekcji golden setu nie ma albo jest pusta: polecenie, które
+# ją buduje — ta sama komenda co indeks instancji, z nazwą kolekcji podaną w środowisku.
+BUILD_HINT = (
+    f"zbuduj indeks: QDRANT_COLLECTION={GOLDEN_COLLECTION} "
+    "helpdesk tickets reindex data/unsafe/golden"
+)
 
 # Próg: zapytania, na które rekord-cel wraca jako pierwszy. Zmierzone 119 ze 126 (2026-10-23,
 # karty `gpt-6.1-sol`); próg niżej, żeby wyłapać zepsutą ścieżkę, a nie zwykły dryf.

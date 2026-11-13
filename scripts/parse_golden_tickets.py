@@ -50,7 +50,8 @@ O czym pamiętać:
   katalogach; skrypt katalogu odniesienia nie rusza.
 - Katalog wyjściowy to `cards/` w osobnym katalogu korpusu (np.
   `data/unsafe/golden-gpt-6.1-sol-v3/cards`), bo komendy `helpdesk tickets` biorą katalog
-  korpusu: indeks do pomiaru buduje `helpdesk tickets reindex data/unsafe/golden-gpt-6.1-sol-v3`.
+  korpusu: indeks do pomiaru buduje `QDRANT_COLLECTION=tickets_golden helpdesk tickets reindex
+  data/unsafe/golden-gpt-6.1-sol-v3` (kolekcja golden setu, osobna od instancji).
 - Adres usługi `anonymizer` w `.env` to nazwa z sieci compose; z hosta skrypt woła ją pod
   `--anonymizer-url`.
 - Błąd konfiguracji (model, klucz, anonimizator na atrapie silnika) zatrzymuje cały przebieg;

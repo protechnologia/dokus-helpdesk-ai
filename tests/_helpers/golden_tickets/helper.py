@@ -9,7 +9,7 @@ po znaczeniu na stacku i filtra jakości na plikach.
 | `golden_set()`             | cały plik golden setu: liczniki z metryczki i wpisy          |
 | `golden_queries()`         | zapytania przy wpisach z wiedzą, w parze z id rekordu-celu   |
 | `distractor_queries()`     | zapytania bez odpowiednika w indeksie                        |
-| `measure_tickets_vector()` | pomiar `find_tickets_vector` na skonfigurowanej kolekcji     |
+| `measure_tickets_vector()` | pomiar `find_tickets_vector` na kolekcji golden setu         |
 | `corpus()`                 | artefakty korpusu odniesienia                                |
 | `not_useful_ids()`         | id rekordów oznaczonych w przeglądzie jako bez wiedzy        |
 | `measure_filter()`         | odrzucenia filtra jakości wobec etykiet przeglądu            |
@@ -24,11 +24,14 @@ O czym pamiętać przy zmianach:
 - `query_problem` i `query_symptoms` napisano z samego `query_raw`, bez wglądu w rekord-cel. Nie
   wolno ich poprawiać pod wynik: zastępują zapytanie agenta do czasu pomiaru na prawdziwym modelu
   (p. 23).
-- Kolekcją jest skonfigurowana kolekcja, a nie własna, bo zbudowanie własnej z 200 artefaktów
-  trwa na CPU ponad dwie i pół minuty.
+- Pomiar czyta własną kolekcję golden setu (`GOLDEN_COLLECTION`), a nie kolekcję instancji, bo
+  ta trzyma karty pełnego korpusu (2026-11-13). Buduje się ją raz, komendą z `BUILD_HINT`, a nie
+  w teście, bo indeks 200 kart liczy się na CPU ponad dwie i pół minuty.
 """
 
 import json
+
+import pytest
 
 from app.agent_tools.tickets.find_tickets_vector import (
     FindTicketsVectorQuery,
@@ -37,12 +40,13 @@ from app.agent_tools.tickets.find_tickets_vector import (
 from app.config import Settings
 from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_service.filter_ticket_quality import filter_tickets
-from app.db_qdrant import QdrantClient, TicketsCollection
+from app.db_qdrant import DbQdrantMissingCollectionError, QdrantClient, TicketsCollection
 from app.engine_embedding import EmbeddingClient
 from tests._helpers.golden_tickets.constants import (
     BUILD_HINT,
     CORPUS_DIR,
     DISTRACTORS_FILE,
+    GOLDEN_COLLECTION,
     GOLDEN_FILE,
 )
 from tests._helpers.golden_tickets.models.filter_measurement import FilterMeasurement
@@ -136,9 +140,9 @@ async def measure_tickets_vector(
     """
     Description:
     Przepuszcza golden set i dystraktory przez `FindTicketsVectorTool` zbudowane tak jak
-    w produkcie: skonfigurowana kolekcja, `RAG_TOP_K` i `RAG_SCORE_MIN` z konfiguracji. Pustą
-    kolekcję odrzuca od razu — inaczej wszystkie liczby wyszłyby zerowe i wyglądały na zepsute
-    wyszukiwanie.
+    w produkcie, z `RAG_TOP_K` i `RAG_SCORE_MIN` z konfiguracji, na kolekcji golden setu.
+    Brakującą albo pustą kolekcję odrzuca od razu, z poleceniem, które ją buduje — inaczej
+    wszystkie liczby wyszłyby zerowe i wyglądały na zepsute wyszukiwanie.
 
     Example args:
         settings=Settings(embedding_base_url="http://localhost:8001", …)
@@ -147,9 +151,9 @@ async def measure_tickets_vector(
         TicketsVectorMeasurement(target_first=119, target_returned=126, distractors_with_hits=7)
 
     Raises:
-        AssertionError: skonfigurowana kolekcja jest pusta
+        Failed: kolekcji golden setu nie ma albo jest pusta
         EmbeddingError: embedder jest nieosiągalny albo odpowiedział błędem
-        DbQdrantError: Qdrant jest nieosiągalny albo kolekcja nie istnieje
+        DbQdrantError: Qdrant jest nieosiągalny
     """
     embedder = EmbeddingClient(
         base_url = settings.embedding_base_url,
@@ -161,7 +165,7 @@ async def measure_tickets_vector(
     )
     tickets = TicketsCollection(
         client      = qdrant,
-        name        = settings.qdrant_collection,
+        name        = GOLDEN_COLLECTION,
         vector_size = settings.embedding_vector_size,
     )
     tool = FindTicketsVectorTool(
@@ -173,9 +177,13 @@ async def measure_tickets_vector(
 
     try:
         # --- warunek wstępny: jest w czym szukać ---
-        indexed = await tickets.count()
+        try:
+            indexed = await tickets.count()
+        except DbQdrantMissingCollectionError:
+            pytest.fail(f"nie ma kolekcji `{GOLDEN_COLLECTION}` — {BUILD_HINT}")
 
-        assert indexed > 0, f"kolekcja `{settings.qdrant_collection}` jest pusta — {BUILD_HINT}"
+        if not indexed:
+            pytest.fail(f"kolekcja `{GOLDEN_COLLECTION}` jest pusta — {BUILD_HINT}")
 
         # --- zapytania z rekordem-celem ---
         target_first    = 0

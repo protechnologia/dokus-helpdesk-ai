@@ -21,7 +21,7 @@ Co się dzieje po drodze:
    z wiedzą z `data/unsafe/golden/tickets.json` (126, każde ze wskazanym rekordem-celem)
    i z `data/unsafe/golden/tickets-distractors.json` (16, bez odpowiednika w indeksie).
 2. Każde wysyła do `FindTicketsVectorTool` polami `query_problem` i `query_symptoms`, na
-   skonfigurowanej kolekcji, z `RAG_TOP_K` i `RAG_SCORE_MIN` z konfiguracji.
+   kolekcji golden setu (`tickets_golden`), z `RAG_TOP_K` i `RAG_SCORE_MIN` z konfiguracji.
 3. Liczy, ile razy rekord-cel wrócił jako pierwszy, ile razy wrócił w ogóle i ile dystraktorów
    dostało choć jedno trafienie.
 
@@ -30,9 +30,10 @@ O czym pamiętać przy zmianach:
 - `query_problem` i `query_symptoms` napisano z samego `query_raw`, bez wglądu w rekord-cel. Nie
   wolno ich poprawiać pod wynik: zastępują zapytanie agenta do czasu pomiaru na prawdziwym modelu
   (p. 23).
-- Indeksem jest skonfigurowana kolekcja, a nie własna, bo zbudowanie własnej z 200 artefaktów trwa
-  na CPU ponad dwie i pół minuty. Pusta kolekcja wywala test; buduje ją
-  `helpdesk tickets reindex data/unsafe/golden`.
+- Indeksem jest osobna kolekcja golden setu, `tickets_golden`, a nie kolekcja instancji, bo ta
+  trzyma karty pełnego korpusu (2026-11-13). Test jej nie buduje, bo indeks 200 kart liczy się na
+  CPU ponad dwie i pół minuty; brakująca albo pusta kolekcja wywala test, a buduje ją
+  `QDRANT_COLLECTION=tickets_golden helpdesk tickets reindex data/unsafe/golden`.
 - Indeks i golden set to te same rekordy, więc liczby pilnują, że ścieżka się nie zepsuła,
   a skutecznością produktu nie są.
 - Zmiana `RAG_SCORE_MIN` albo `RAG_TOP_K` przesuwa wszystkie trzy liczby. Co próg robi z każdym

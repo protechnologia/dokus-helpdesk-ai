@@ -3149,7 +3149,10 @@ zapytań; do 2026-10-10 `golden200.json`, potem do 2026-10-15 `tickets-dokus.jso
   trafienie dostaje 7 z 16 dystraktorów (2026-10-23, karty `gpt-6.1-sol`). Na kartach Bielika
   było 152 ze 162 (93,8%, wobec 98,1% dla zapytań surowych), 160 zwróconych i 3 z 16
   dystraktorów. Pilnuje tego
-  `tests/evaluation/test_api_agent_tools_find_tickets_vector_golden_stack.py`.
+  `tests/evaluation/test_api_agent_tools_find_tickets_vector_golden_stack.py`, na własnej
+  kolekcji golden setu, `tickets_golden` (2026-11-13): kolekcja instancji trzyma karty pełnego
+  korpusu, więc pomiar na niej mierzyłby co innego. Buduje ją `QDRANT_COLLECTION=tickets_golden
+  helpdesk tickets reindex data/unsafe/golden`, a test jej nie buduje (ok. 2,5 minuty na CPU).
 
 - **Zapytanie zna WYŁĄCZNIE to, co widzi zgłaszający** — nigdy przyczyny ani terminologii
   z rozwiązania. Inaczej zadanie staje się za łatwe dla **wszystkich** modeli i pomiar przestaje
@@ -3329,7 +3332,7 @@ nogi produktu na jednej sprawie.
 - Ponowne parsowanie golden setu grafem `parse_ticket` do katalogu roboczego, z wznawianiem
   i postępem co 10 zgłoszeń: `python scripts/parse_golden_tickets.py parse <nowy katalog>/cards`
   (numery z `data/unsafe/golden/tickets.json`; do `golden/cards/` nie zapisuje; indeks do
-  pomiaru: `helpdesk tickets reindex <nowy katalog>`) — **płatne,
+  pomiaru: `QDRANT_COLLECTION=tickets_golden helpdesk tickets reindex <nowy katalog>`) — **płatne,
   pytaj przed**; wymaga usługi `anonymizer` z modelem anonimizującym i modelu generującego
   z `.env` (golden200 na `gpt-6.1-sol` kosztował 2026-10-23 około 1 USD)
 - Mapa symboli do paczki, która już stoi, bez kopiowania kodu od nowa:
@@ -3338,7 +3341,8 @@ nogi produktu na jednej sprawie.
 
 **Pipeline danych (CLI `helpdesk`)**
 - Argumentem czterech komend niżej jest katalog korpusu (bez niego `TICKETS_CORPUS_DIR`);
-  golden set to `data/unsafe/golden`, który ma same karty
+  golden set to `data/unsafe/golden`, który ma same karty, a jego indeks stoi w osobnej kolekcji:
+  `QDRANT_COLLECTION=tickets_golden helpdesk tickets reindex data/unsafe/golden`
 - Masowy import z eksportu do korpusu: `helpdesk tickets import [<korpus>] [--limit N]
   [--concurrency 4]` (z `raw-db/` do `anonymized/` i `cards/`; pomija zgłoszenia w toku,
   „Automat mailowy” i te z kartą, więc przerwany przebieg wznawia to samo polecenie; postęp
@@ -3408,8 +3412,8 @@ localhost:8010/search`.
 - Na stacku: `pytest tests/integration/ tests/functional/ -m stack` (albo `-m stack_<usługa>`)
 - Ewaluacyjne: `pytest tests/evaluation/` — bez korpusu odniesienia w `data/` testy się pomijają;
   z pomiarem `find_tickets_vector` na golden secie i z indeksem paczki syntetycznej:
-  `pytest tests/evaluation/ -m "not llm_live"` (stack i oba zbudowane indeksy: zgłoszeń oraz
-  syntetyczny dokumentacji)
+  `pytest tests/evaluation/ -m "not llm_live"` (stack i oba zbudowane indeksy: kolekcja
+  `tickets_golden` oraz syntetyczny dokumentacji)
 - Na żywym LLM:
   `pytest tests/integration/api_engine_llm/ tests/integration/api_agent_graphs/ -m llm_live` —
   **kosztuje / bije po sieci, pytaj przed**; woła model generujący z konfiguracji
