@@ -4271,6 +4271,15 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
       z p. 59 na nowym prompcie (wstrzyknięcia w karcie), test ręczny przez front i pomiar na
       10 zgłoszeniach z porównania, po anonimizatorze. *Dlaczego:* to jedyny
       drogi przebieg (zasada 7), więc anonimizator i prompt muszą być gotowe przed nim.
+      Stan 2026-11-13: kroki 1–4 zrobione. Eksport sierpniowego zrzutu leży w `raw-db/` (1955
+      zgłoszeń, 1758 w zakresie importu), komenda `helpdesk tickets import` i kolekcja golden
+      setu `tickets_golden` stoją. Prompt sprawdzony bez zmian: 6 z 10 zgłoszeń porównania jest
+      poza zakresem (3 w toku, 3 „Automat mailowy”, w tym 33319 i 33644), więc próba szła na 27
+      zgłoszeniach w zakresie (4 z porównania, 20 z golden setu, 3 najdłuższe wątki), 0,15 USD,
+      0 błędów. Ocena `useful` zgodna z etykietą w 16 z 20 (dobre 8 z 8, bez wiedzy 5 z 6,
+      przepuszczane dotąd wbrew etykiecie 3 z 6, wcześniej 0 z 6); w `questions_summary` zero
+      sentineli i pytań proceduralnych, w `cause` zero domysłów (11312: hipoteza konsultanta
+      w `solution` jako przypuszczenie); wstrzyknięcia 0 przebić z 6. Test przez front pominięty.
 - [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
   „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy; po nim 139 zgłoszeń tego kanału
   z sierpniowego zrzutu dochodzi do korpusu osobnym przebiegiem, bez parsowania reszty od nowa.
