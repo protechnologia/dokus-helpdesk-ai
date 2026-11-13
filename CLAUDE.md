@@ -241,8 +241,8 @@ compose.
   Zdarzyło się przy pomiarze progu: trzy nazwiska w wyjściu `eval_threshold.py detail`,
   wyłapane dopiero przy commicie. Wnioski i liczby przenoś **do CLAUDE.md** (bez cytatów),
   a raport z pomiaru po tym kasuj: pomiar powtarza skrypt albo test (decyzja 2026-11-13).
-  Zostają tylko `prezentacje/`: folder na prezentację, nazwa od daty
-  (`2026-11-09-pokaz-pracownicy`), żeby układały się po kolei.
+  Zostają tylko `prezentacje/`: folder na prezentację, nazwa to data i temat
+  (`2026-11-09-ogolnie-ai-dla-pracownikow`), żeby układały się po kolei.
 - **README** — „jak": uruchomienie i kontrakt dla użytkownika. Proponowany podział na sekcje:
   1. **Stack** — technologie i ich role.
   2. **Flow działania** — ogólny algorytm (wejście → etapy → wyjście).
