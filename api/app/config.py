@@ -140,7 +140,7 @@ class Settings(BaseSettings):
     # this is the pool the threshold narrows down to them.
     # Ta sama liczba ogranicza wynik obu wyszukiwań w dokumentacji: tyle sekcji oddaje jedno.
     rag_top_k:     int   = 5                            # e.g. 10
-    # Measured 2026-08-20 on 171 records (data/unsafe/docs/pomiary/pomiar-progu-score.md): 0.48
+    # Measured 2026-08-20 on 171 records (scripts/eval_threshold.py): 0.48
     # keeps 157 of 162 correct hits and fully silences 14 of 16 distractors. The trade leans
     # towards cutting rubbish on purpose — with 47% of the corpus being singletons, "found nothing"
     # is a normal answer, while a contentless hit looks like an answer and is worse than none.

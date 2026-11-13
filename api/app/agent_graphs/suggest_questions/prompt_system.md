@@ -36,7 +36,6 @@
      jest najgorszym z wariantów.
      Zdania o `Brak pytań rozróżniających.` nie ma z tego samego pomiaru: model traktował je jako
      formułkę zamykającą i doklejał po pytaniach w 7 przebiegach na 8.
-     Raport: data/unsafe/docs/pomiary/pomiar-wariantow-promptu-questions-2026-08-26.md
 
      NOTATKI DLA WDROŻENIOWCA SĄ OSOBNYM POLEM (`internal_notes`, p. 68, 2026-10-08), a nie
      nawiasem po pytaniu: lista pytań ma dać się wysłać klientowi bez wycinania. Pomiar z 2026-08

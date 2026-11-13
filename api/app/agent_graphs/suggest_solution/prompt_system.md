@@ -17,9 +17,9 @@
      reguła jest jednym prostym poleceniem, z przykładem zamiast definicji. Uzasadnienia korpusowe
      należą do tego komentarza, nie do treści.
 
-     TA WERSJA POWSTAŁA ZE STROJENIA NA ŻYWYCH MODELACH (2026-08-28, raport
-     `data/unsafe/docs/pomiary/pomiar-promptu-solution-2026-08-28.md`): 7 prób jedną zmianą na raz na jednym
-     zgłoszeniu, 7 prób weryfikacyjnych na pozostałych, po dwa przebiegi Bielika przed i po.
+     TA WERSJA POWSTAŁA ZE STROJENIA NA ŻYWYCH MODELACH (2026-08-28): 7 prób jedną zmianą na raz
+     na jednym zgłoszeniu, 7 prób weryfikacyjnych na pozostałych, po dwa przebiegi Bielika przed
+     i po.
      Cztery rzeczy do zapamiętania, zanim ktoś tu cokolwiek zmieni:
 
      (1) WZÓR ODPOWIEDZI JEST KOTWICĄ FORMY — i to jedyną. Zmierzone: cztery sekcje i uwagi 2+2

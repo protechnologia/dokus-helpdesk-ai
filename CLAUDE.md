@@ -235,14 +235,14 @@ compose.
   żeby dało się ją przenieść albo przepisać bez poprawiania pozostałych (2026-10-04). Wyjątkiem są
   numery punktów planu („p. N"), bo są stałe. Starsze odwołania usuwamy przy zmianach w sekcji,
   nie hurtem.
-- **`data/unsafe/docs/` — raporty z pomiarów i dokumenty projektu, POZA repo** (2026-08-20).
-  Powód: **raport cytujący korpus niesie PII**, choćby
-  autor tego nie zamierzał — wystarczy wkleić zrzut z konsoli operującej na zgłoszeniach, żeby
-  trafiły tam nazwiska użytkowników. Zdarzyło się przy pomiarze progu: trzy nazwiska w wyjściu
-  `eval_threshold.py detail`, wyłapane dopiero przy commicie. Wnioski trwałe przenoś **do
-  CLAUDE.md** (bez cytatów), a plik z pomiarem zostaw w `data/unsafe/docs/`. Katalog ma
-  folder na rodzaj dokumentu (2026-11-13): `pomiary/` (liczby, na których stoją decyzje)
-  i `prezentacje/`.
+- **`data/unsafe/docs/` — raporty robocze i prezentacje, POZA repo** (2026-08-20).
+  Powód: **raport cytujący korpus niesie PII**, choćby autor tego nie zamierzał — wystarczy
+  wkleić zrzut z konsoli operującej na zgłoszeniach, żeby trafiły tam nazwiska użytkowników.
+  Zdarzyło się przy pomiarze progu: trzy nazwiska w wyjściu `eval_threshold.py detail`,
+  wyłapane dopiero przy commicie. Wnioski i liczby przenoś **do CLAUDE.md** (bez cytatów),
+  a raport z pomiaru po tym kasuj: pomiar powtarza skrypt albo test (decyzja 2026-11-13).
+  Zostają tylko `prezentacje/`: folder na prezentację, nazwa od daty
+  (`2026-11-09-pokaz-pracownicy`), żeby układały się po kolei.
 - **README** — „jak": uruchomienie i kontrakt dla użytkownika. Proponowany podział na sekcje:
   1. **Stack** — technologie i ich role.
   2. **Flow działania** — ogólny algorytm (wejście → etapy → wyjście).
@@ -287,7 +287,7 @@ dokus-helpdesk-ai/
 │       ├── golden/               # zestawy do ewaluacji, w tym karty (cards/) i wątki (raw/)
 │       ├── instruction/          # właściwa dokumentacja (p. 55)
 │       ├── code/                 # paczka kodu aplikacji: rules.json, manifest.json, symbols.json, project.md, repo/ (p. 60)
-│       └── docs/                 # pomiary/ i prezentacje/
+│       └── docs/                 # prezentacje/ i raporty robocze
 ├── api/                          # folder = usługa z compose, nazwany tak samo
 │   ├── Dockerfile
 │   ├── .dockerignore
@@ -710,8 +710,7 @@ poprawne — mierzą co innego, więc przy etapie 4 nie należy szukać „zgubi
 #### Ile z tego naprawdę wejdzie do indeksu
 
 Liczby niżej pochodzą z **ręcznego sparsowania 661 zgłoszeń** (36% modułu, 44% korpusu po filtrze
-długościowym), nie z szacunku. Materiał źródłowy:
-`data/unsafe/docs/pomiary/synteza-korpusu-i-pojemnosc-rag.md`.
+długościowym), nie z szacunku.
 
 | etap lejka | liczba | uwaga |
 |---|---|---|
@@ -825,9 +824,8 @@ wymagające czyszczenia cytowanej historii przed parsowaniem.
   trafiają się zgłoszenia o Portalu Mieszkańca czy login.gov.pl. Stąd `component` wyprowadza LLM
   z treści, nigdy z `modul_zgloszenia.nazwa`, i jest polem swobodnym.
 - **Kanał „Automat mailowy" jest w tym korpusie osobną klasą szkody — ZMIERZONE 2026-09-02 na 108
-  wątkach** (raport: `data/unsafe/docs/pomiary/jakosc-zgloszen/`). Wchodzi 2026-06-12 i od razu
-  dominuje: w lipcu **77 ze 123** nowych zgłoszeń modułu. Pięć wad, każda osobno rozstrzygająca dla
-  masowego importu:
+  wątkach.** Wchodzi 2026-06-12 i od razu dominuje: w lipcu **77 ze 123** nowych zgłoszeń
+  modułu. Pięć wad, każda osobno rozstrzygająca dla masowego importu:
   - **Role są zepsute w 96% wątków, nie „bywają odwrócone".** System zapisuje nadawcę maila, a nie
     autora cytowanej wypowiedzi, więc odpowiedzi konsultantów figurują jako wypowiedzi klienta.
     **Flaga autora w bazie jest tu bezużyteczna — rozstrzyga wyłącznie podpis w treści.**
@@ -990,12 +988,11 @@ dokumentacji jeszcze nie ma (p. 55) — indeksacja i narzędzia powstają na pac
   `helpdesk docs index --synthetic` pisze do tabeli `docs_text_synthetic` i kolekcji o nazwie
   z dopiskiem `_synthetic`, a flaga komendy i `synthetic` w manifeście muszą się zgadzać w obie
   strony.
-- **Fragmenty po 1000 znaków — zmierzone 2026-10-05** (raport:
-  `data/unsafe/docs/pomiary/pomiar-dokumentacji-fragmenty-i-prog.md`). Paczka daje wtedy 58
-  fragmentów i wszystkie 24 zapytania wektorowe z odpowiedzią mają cel na pierwszym miejscu.
-  Zapytanie o szczegół z końca najdłuższej sekcji wygrywa o 0,058; przy 1500 znakach przegrywa o
-  0,004, przy jednym wektorze na sekcję wypada poza pierwszą piątkę, a przy samym tytule i opisie
-  ląduje na 19. miejscu. Paczka ma jedną długą sekcję, więc między 400 a 1000 znaków nie rozstrzyga.
+- **Fragmenty po 1000 znaków — zmierzone 2026-10-05.** Paczka daje wtedy 58 fragmentów i wszystkie
+  24 zapytania wektorowe z odpowiedzią mają cel na pierwszym miejscu. Zapytanie o szczegół z końca
+  najdłuższej sekcji wygrywa o 0,058; przy 1500 znakach przegrywa o 0,004, przy jednym wektorze na
+  sekcję wypada poza pierwszą piątkę, a przy samym tytule i opisie ląduje na 19. miejscu. Paczka ma
+  jedną długą sekcję, więc między 400 a 1000 znaków nie rozstrzyga.
 
 ### Kod aplikacji
 
@@ -1793,7 +1790,7 @@ Embedder to `OPI-PIB/PolDense-150M`: ModernBERT, wymiar 768, liczony na CPU. Wyb
 razem z trybem wyszukiwania `query→passage`. Na 200 rekordach daje `recall@1` 98% — to sufit
 zadania, nie dowód przewagi modelu (anglojęzyczny model kontrolny miał 88%), więc porównanie
 z innymi modelami wraca na pełnym korpusie (p. 33). Wąskim gardłem nie jest model, tylko jakość
-i kompletność zgłoszeń. Raport: `data/unsafe/docs/pomiary/pomiar-embedderow.md`.
+i kompletność zgłoszeń. Pomiar powtarza `scripts/eval_embeddings.py`.
 
 PolDense rozróżnia tryby prefiksem doklejanym do tekstu. Ten sam tekst z innym prefiksem daje inny
 wektor:
@@ -1929,8 +1926,7 @@ Osoby i adresy idą osobnymi wywołaniami: wspólne kosztowało na próbce korpu
   KSeF, AnyDesk). Wpis musi być wąski: prawdziwe nazwisko na liście przeciekałoby zawsze, czego
   pilnuje test na golden secie. Dlatego nie ma na niej „Poczta Polska”: „Polska” po wspólnym
   początku złapałoby nazwisko „Polski”.
-- **Pomiar z 2026-10-19 na Bieliku 11B v3 (vLLM; raport
-  `data/unsafe/docs/pomiary/pomiar-silnika-agent-2026-10-19.md`):** po strojeniu (przykład nagłówka
+- **Pomiar z 2026-10-19 na Bieliku 11B v3 (vLLM):** po strojeniu (przykład nagłówka
   z kilkoma adresatami, lista nazw, które nie są osobami, reguła odmian z Morfeuszem2) zestaw
   zmyślony (54 przypadki, w tym trudne adresy z sondy) i próbka korpusu bez przecieku w każdym
   rodzaju i bez zniszczonej wiedzy w czterech przebiegach po kolei; wątek próbki, który wcześniej
@@ -2084,7 +2080,7 @@ Osoby i adresy idą osobnymi wywołaniami: wspólne kosztowało na próbce korpu
   ostry próg wygląda dokładnie tak samo jak pusty indeks, a to dwie różne awarie. Przy
   `RAG_SCORE_MIN` = 0.48 odcinanie jest regułą, nie wyjątkiem.
 - **`RAG_SCORE_MIN` = 0.48 stoi świadomie po stronie odsiewania śmieci** (pomiar na 171 rekordach,
-  raport `data/unsafe/docs/pomiary/pomiar-progu-score.md`) — trafienie bez treści wygląda na
+  pomiar powtarza `scripts/eval_threshold.py`) — trafienie bez treści wygląda na
   odpowiedź, a przy 47% singletonów „nic nie znalazłem" jest normalną odpowiedzią. Próg zostaje
   także teraz, gdy model widzi `score` i czyta karty sam (2026-10-04): to jedyne miejsce, w którym
   KOD mówi „nic nie znaleziono" — bez niego wyszukiwanie zawsze oddaje komplet numerów, źródła
@@ -3062,8 +3058,6 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 
 Prompty `questions` i `solution` były strojone w 2026-08 na słabszym modelu lokalnym; na modelu
 docelowym mierzymy je od nowa (p. 25–27). Z tamtych pomiarów zostaje to, co nie zależy od modelu.
-Raporty: `data/unsafe/docs/pomiary/pomiar-wariantow-promptu-questions-2026-08-26.md`,
-`data/unsafe/docs/pomiary/pomiar-promptu-solution-2026-08-28.md`.
 
 - **Limit liczby kroków i uwag to decyzja o treści** — model sam wybiera, co poświęci, a reguła
   rozbijająca bez limitu puchnie.
@@ -3381,7 +3375,7 @@ nogi produktu na jednej sprawie.
 - Pomiar progu odcięcia: `python scripts/eval_threshold.py table` (rozkłady + tabela koszt/zysk
   per kandydat na próg), `... detail --threshold 0.48` (co ten próg robi z każdym dystraktorem
   i które trafienia poprawne kosztuje) oraz `... plot` (wykres obu rozkładów z linią progu do
-  `data/unsafe/docs/pomiary/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz
+  `data/unsafe/docs/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz
   `data/unsafe/golden/tickets-distractors.json`; sam golden set mierzy tylko połowę rozkładu
 
 **Grafy (bramki, propozycje, „Popraw", wyszukiwanie, karta zgłoszenia) uruchamia się przez API**,
@@ -4245,8 +4239,8 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 - [ ] **31. Masowy import z nowszego zrzutu** — przez graf `parse_ticket`, komendą `helpdesk`
       w kontenerze, na tej samej fabryce grafów co trasy, z kosztem przebiegu w raporcie (zapis
       artefaktu po KAŻDYM zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed
-      parsowaniem, model parsujący wybrany na podstawie `porownanie-modeli-parsowania.md`
-      i pomiaru promptu parsującego, wznawianie, raport. Decyzje z 2026-11-11: zgłoszenia
+      parsowaniem, model parsujący `gpt-6.1-sol` (decyzja 2026-11-13: na jego kartach
+      zmierzono filtr jakości), wznawianie, raport. Decyzje z 2026-11-11: zgłoszenia
       bierze z eksportu sierpniowego zrzutu do JSON-ów (`export_raw_tickets.py --out-dir`), bez
       czytnika SQL, który wraca z p. 34; bez 139 zgłoszeń kanału „Automat mailowy”, które
       dochodzą po p. 32 osobnym przebiegiem; zanonimizowany wątek idzie do tabeli wyszukiwania
@@ -4275,8 +4269,8 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
   przy tym samym progu 0.48), porównanie embedderów, liczba wątków-projektów, `questions_summary`, rozkład `component`;
   do tego pomiary grafów zamkniętych po teście ręcznym. `gate_close` (2026-10-22): fałszywe
   alarmy i przepuszczenia na każdą regułę na prawdziwych zamknięciach, w dwóch przebiegach,
-  z czytaniem uzasadnień — kandydatem na zestaw są wątki z badania jakości z 2026-09-02
-  (43 poprowadzone słabo i 41 dobrze) — oraz czas na długich wątkach wobec cierpliwości UI
+  z czytaniem uzasadnień, na zestawie zamknięć dobrych i słabych do zbudowania (oceny z badania
+  jakości z 2026-09-02 skasowane 2026-11-13) — oraz czas na długich wątkach wobec cierpliwości UI
   helpdesku (p. 38). `gate_reply` (2026-10-22): fałszywe alarmy i przepuszczenia na każdą
   z sześciu reguł na prawdziwych wiadomościach do klientów, w dwóch przebiegach, z czytaniem
   uzasadnień; osobno zasada, że cytaty reguł nie łamią — bez niej bramka blokowała cytat
