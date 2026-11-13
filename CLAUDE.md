@@ -302,7 +302,7 @@ dokus-helpdesk-ai/
 │       │                         #   (streaming.py) na górze pakietu
 │       │                         # --- nasza strona: podział po RODZAJU obiektu ---
 │       ├── core_model/           # tickets/, docs/, code/, dicts/, graphs/, instance/ — folder na temat, plik nazwany jak model
-│       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, indexer_*, inspector_*, factory_*
+│       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, indexer_*, importer_*, writer_*, inspector_*, factory_*
 │       ├── core_text/            # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
 │       ├── core_util/            # html, validation_text, time, text, path
 │       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
@@ -427,7 +427,8 @@ dokus-helpdesk-ai/
   **bezgłośnie**.
 - **Nazwa pliku mówi, CO ROBI, nie czego dotyczy** — `validator_ticket_parsed.py`, nie
   `artifacts.py`. W `core_service/` oś `<rola>_<przedmiot>` (`parser_`, `validator_`, `builder_`,
-  `loader_`, `filter_`, `normalizer_`, `indexer_`, `inspector_`, `factory_`), a przedmiot mówi,
+  `loader_`, `filter_`, `normalizer_`, `indexer_`, `importer_`, `writer_`, `inspector_`,
+  `factory_`), a przedmiot mówi,
   którego materiału plik dotyczy (`builder_ticket_embedding_text.py` obok
   `builder_doc_embedding_text.py`). W `core_model/` folder na temat (od 2026-10-05): `tickets/`
   i `docs/` na materiały, jak w `agent_tools/` i w pakietach baz, `dicts/` na słowniki i zestawy
@@ -664,7 +665,8 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   podkatalogów `TicketsCorpus` (`core_model/tickets/tickets_corpus.py`). Dane osobowe są tylko
   w `raw-*`; indeksy odbudowują się z `cards/` i `anonymized/`. Jeden katalog, a nie katalog na
   model, bo karty dopisują się miesiącami, a model w `.env` może się zmienić. Karty i wątki
-  golden setu leżą osobno, w `data/unsafe/golden/`.
+  golden setu leżą osobno, w `data/unsafe/golden/`. W samym katalogu korpusu leżą raporty
+  przebiegów masowego importu, `import-<data i godzina startu>.json`, same numery i liczby.
 - **Zamknięte zgłoszenie dokłada do korpusu `ClosedTicketIndexer`
   (`core_service/indexer_closed_ticket.py`, p. 30).** Najpierw zapisuje trzy pliki: surowe
   zgłoszenie do `raw-route/`, wątek po anonimizacji do `anonymized/` i kartę do `cards/`,
@@ -3312,8 +3314,10 @@ nogi produktu na jednej sprawie.
 
 **Przygotowanie danych (skrypty repo)**
 - Eksport zgłoszeń ze zrzutu do `data/unsafe/corpus/raw-db/`:
-  `python scripts/export_raw_tickets.py export --module-id 116` (wymaga kontenera
-  z zaimportowanym zrzutem; kontrola liczb wobec bazy na końcu przebiegu)
+  `python scripts/export_raw_tickets.py export --module-id 116 --database
+  helpdesk_20260826_131135 --source mysql_helpdesk_20260826-131135.sql` (wymaga kontenera
+  `helpdesk-analiza`, w którym każdy zrzut stoi w osobnej bazie; kontrola liczb wobec bazy na
+  końcu przebiegu)
 - Paczka kodu aplikacji: `python scripts/build_code_package.py build <folder z kodem>
   data/unsafe/code` (reguły z `rules.json` w katalogu paczki albo z `--rules`; zastępuje `repo/`,
   `manifest.json` i `symbols.json`)
@@ -3333,8 +3337,14 @@ nogi produktu na jednej sprawie.
   budowa paczki robi to samo na końcu)
 
 **Pipeline danych (CLI `helpdesk`)**
-- Argumentem trzech komend niżej jest katalog korpusu z `cards/` i `anonymized/` (bez niego
-  `TICKETS_CORPUS_DIR`); golden set to `data/unsafe/golden`, który ma same karty
+- Argumentem czterech komend niżej jest katalog korpusu (bez niego `TICKETS_CORPUS_DIR`);
+  golden set to `data/unsafe/golden`, który ma same karty
+- Masowy import z eksportu do korpusu: `helpdesk tickets import [<korpus>] [--limit N]
+  [--concurrency 4]` (z `raw-db/` do `anonymized/` i `cards/`; pomija zgłoszenia w toku,
+  „Automat mailowy” i te z kartą, więc przerwany przebieg wznawia to samo polecenie; postęp
+  z kosztem co 10 zgłoszeń, raport w korpusie) — **płatne, pytaj przed**; wymaga usługi
+  `anonymizer` z modelem anonimizującym i modelu generującego z `.env`; indeksy buduje potem
+  `helpdesk tickets reindex`
 - Walidacja kart: `helpdesk tickets validate [<korpus>]`
 - Indeksacja kart do Qdranta i wątków do tabeli wątków: `helpdesk tickets index [<korpus>]`
   (korpus bez `anonymized/` buduje same karty)
@@ -3887,6 +3897,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/anonymization/`        | anonimizacja: zmyślone zgłoszenie z danymi osobowymi i jego postać po anonimizacji, fragmenty, których nie wolno zobaczyć w logach (`SENSITIVE`), klient usługi `anonymizer` na atrapie transportu (`anonymizer_client_on()`), odpowiedź usługi (`service_answer()`) i sprawdzenie, czy anonimizator przyjmuje wynik atrapy silnika (`accepts_the_fake_engine()`) |
 | `tests/_helpers/postgres/`             | narzędzie na prawdziwej tabeli z podmienionym klientem (`ScriptedPostgres`), także liczenie wierszy albo jego błąd (`count_error`) |
 | `tests/_helpers/tickets_index/`        | indekser zgłoszeń, serwis zamkniętego zgłoszenia i trasa `POST /tickets/closed`: atrapy embeddera, kolekcji zgłoszeń i tabeli wątków (`FakeEmbedder`, `FakeTickets`, `FakeThreads`), indekser zgłoszeń na nich (`tickets_indexer_on()`), karta i wątek w korpusie testu (`write_card()`, `write_thread()`), serwis zamkniętego zgłoszenia (`closed_ticket_indexer_on()`), anonimizator zamieniający jeden fragment (`ReplacingAnonymizer`), graf karty z prawdziwym węzłem `respond` (`card_graph()`) i aplikacja trasy na tym wszystkim (`app_closing_tickets()`); próbki zamkniętego zgłoszenia, żądania i werdyktów w `samples.py` |
+| `tests/_helpers/tickets_import/`       | masowy import: plik eksportu zgłoszenia w `raw-db/` (`write_export()`), atrapa modelu, która na każde zgłoszenie odpowiada kartą, a na wskazane numery błędem (`CardLLM`), serwis importu na prawdziwych węzłach grafu karty (`importer_on()`) i atrapy serwisu i jego fabryki do testów komendy (`StubImporter`, `StubImporterFactory`); próbki raportu w `samples.py` |
 | `tests/_helpers/instance/`             | stan instancji: serwis liczący indeksy na atrapach Qdranta i Postgresa (`scripted_inspector()`, `inspector_on()`, klienci `counting_*` i `failing_*`), aplikacja z podanym serwisem (`app_with_inspector()`); próbki `sample_*()` w `samples.py` — raport stanu, paczka kodu, konfiguracja modelu |
 | `tests/_helpers/embedding/`            | embedding: nazwy modeli testowych (`EMBEDDING_MODEL`, `OTHER_MODEL`), odpowiedź usługi `embedder` w kształcie kontraktu (`embedder_answer()`) i payload punktu Qdranta z nazwą modelu (`with_model()`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |

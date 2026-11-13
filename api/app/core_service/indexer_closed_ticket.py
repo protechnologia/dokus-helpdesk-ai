@@ -60,6 +60,7 @@ from app.core_model.tickets.raw_ticket import RawTicket
 from app.core_model.tickets.tickets_corpus import TicketsCorpus
 from app.core_service.filter_ticket_quality import evaluate_ticket
 from app.core_service.indexer_tickets import TicketsIndexer
+from app.core_service.writer_ticket_card import write_card_with_thread
 from app.engine_anonymization import AnonymizedText
 
 logger = logging.getLogger(__name__)
@@ -181,8 +182,9 @@ class ClosedTicketIndexer:
     ) -> bool:
         """
         Description:
-        Zapisuje surowe zgłoszenie, wątek i kartę, kartę na końcu, i mówi, czy karta tego numeru
-        leżała już w korpusie. Katalogi zakłada, gdy ich nie ma.
+        Zapisuje surowe zgłoszenie, potem wątek i kartę wspólnym zapisem korpusu (karta na
+        końcu), i mówi, czy karta tego numeru leżała już w korpusie. Katalogi zakłada, gdy ich
+        nie ma.
 
         Example args:
             raw=RawTicket(ticket_id="41002", …)
@@ -192,21 +194,11 @@ class ClosedTicketIndexer:
         Example result:
             False — karty 41002 wcześniej nie było
         """
-        ticket_id = card.ticket_id
-        card_path = self._corpus.cards_dir / f"{ticket_id}.json"
-        replaced  = card_path.exists()
+        raw_path = self._corpus.raw_route_dir / f"{card.ticket_id}.json"
 
-        # Kolejność wpisów to kolejność zapisu: karta ostatnia, żeby nie leżała bez wątku.
-        raw_path    = self._corpus.raw_route_dir / f"{ticket_id}.json"
-        thread_path = self._corpus.anonymized_dir / f"{ticket_id}.txt"
-        files       = {
-            raw_path:    raw.model_dump_json(indent=2) + "\n",
-            thread_path: thread.text,
-            card_path:   card.model_dump_json(indent=2) + "\n",
-        }
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        raw_path.write_text(raw.model_dump_json(indent=2) + "\n", encoding="utf-8")
 
-        for path, text in files.items():
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text, encoding="utf-8")
+        replaced = write_card_with_thread(self._corpus, thread, card)
 
         return replaced

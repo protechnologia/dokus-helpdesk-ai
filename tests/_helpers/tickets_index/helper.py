@@ -426,7 +426,7 @@ class ReplacingAnonymizer(Anonymizer):
     """
     Description:
     Anonimizator do testów, który zamienia jeden podany fragment na podane znaczniki i zapisuje
-    każdy tekst, który dostał.
+    każdy tekst, który dostał, oraz to, czy go zamknięto.
 
     Stub, bo `FakeAnonymizer` oddaje tekst bez zmian, więc wątek przed anonimizacją i po niej
     wyglądałyby tak samo i test nie odróżniłby, który z nich trafił do korpusu.
@@ -446,9 +446,10 @@ class ReplacingAnonymizer(Anonymizer):
             markers="{IMIĘ} {NAZWISKO}"
 
         Example result:
-            ReplacingAnonymizer z pustym `texts`
+            ReplacingAnonymizer z pustym `texts`, niezamknięty
         """
         self.texts: list[str] = []
+        self.closed    = False
         self._fragment = fragment
         self._markers  = markers
 
@@ -482,6 +483,19 @@ class ReplacingAnonymizer(Anonymizer):
             AnonymizerInfo(available=True, engine="fake", model=None)
         """
         return await FakeAnonymizer().describe()
+
+    async def aclose(self) -> None:
+        """
+        Description:
+        Zapisuje, że anonimizator został zamknięty.
+
+        Example args:
+            (brak)
+
+        Example result:
+            None
+        """
+        self.closed = True
 
 
 def card_graph(

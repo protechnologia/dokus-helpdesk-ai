@@ -16,6 +16,7 @@ from app.entry_cli.tickets import tickets
 # | `tickets validate [<korpus>]` | `tickets/validate.py` | karty korpusu wobec ParsedTicket |
 # | `tickets index [<korpus>]`    | `tickets/index.py`    | karty i wątki do obu indeksów    |
 # | `tickets reindex [<korpus>]`  | `tickets/reindex.py`  | indeksy zgłoszeń od zera         |
+# | `tickets import [<korpus>]`   | `tickets/import_.py`  | raw-db/ na wątki i karty; płatne |
 # | `docs validate <kat.>`        | `docs/validate.py`    | paczka dokumentacji wobec plików |
 # | `docs index <kat.>`           | `docs/index.py`       | indeks dokumentacji od zera      |
 #

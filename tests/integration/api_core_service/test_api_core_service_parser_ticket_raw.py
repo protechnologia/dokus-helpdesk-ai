@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.core_service.parser_ticket_raw import load_raw_ticket
+from app.core_service.parser_ticket_raw import is_closed_in_source, load_raw_ticket
 
 
 def _write_export(tmp_path: Path, **overrides) -> Path:
@@ -141,3 +141,24 @@ def test_broken_json_is_reported(tmp_path: Path):
 
     with pytest.raises(ValueError):
         load_raw_ticket(path)
+
+
+@pytest.mark.parametrize(
+    ("status", "closed"),
+    [
+        pytest.param("rozwiazany",            True,  id="rozwiazany"),
+        pytest.param("zamkniety",             True,  id="zamkniety"),
+        pytest.param("w_weryfikacji",         False, id="w_weryfikacji"),
+        pytest.param("oczekujacy_na_klienta", False, id="oczekujacy_na_klienta"),
+        pytest.param("oczekuje_na_akceptacje", False, id="oczekuje_na_akceptacje"),
+    ],
+)
+def test_closed_in_source_means_a_final_status(tmp_path: Path, status: str, closed: bool):
+    """Sprawdza, czy za zamknięte w źródle uchodzą oba statusy końcowe Dokusa, `rozwiazany`
+    i `zamkniety`, a statusy spraw w toku (`w_weryfikacji`, `oczekujacy_na_klienta`,
+    `oczekuje_na_akceptacje`) nie.
+
+    Wyłapuje filtr po samym `zamkniety`, który odciąłby prawie cały korpus (Dokus kończy
+    zgłoszenia na `rozwiazany`), i filtr, który przepuszcza sprawy w toku z niedokończonym
+    wątkiem."""
+    assert is_closed_in_source(_write_export(tmp_path, status=status)) is closed

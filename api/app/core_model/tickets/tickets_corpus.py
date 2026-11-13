@@ -12,10 +12,14 @@ import (p. 31) trafiały w te same miejsca. Czyta go `Settings.tickets_corpus()`
 | `raw-db/`     | eksport zrzutu bazy, `zgloszenie-<numer>.json`     | tak          |
 | `raw-route/`  | zgłoszenia, które przyszły trasą, jako `RawTicket` | tak          |
 
+Raporty masowego importu leżą w samym katalogu korpusu, po jednym na przebieg:
+`import-<data i godzina startu>.json` (`import_report_path()`), same numery i liczby.
+
 O czym pamiętać: indeksy odbudowują się z `cards/` i `anonymized/` (zasada 8), więc tych dwóch
 podkatalogów nie wolno kasować; surowe zgłoszenia służą tylko ponownej anonimizacji.
 """
 
+from datetime import datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -85,3 +89,20 @@ class TicketsCorpus(BaseModel):
             Path("/code/data/unsafe/corpus/raw-route")
         """
         return self.root / "raw-route"
+
+    def import_report_path(
+        self,
+        started_at: datetime,  # np. datetime(2026, 11, 13, 10, 15, tzinfo=UTC)
+    ) -> Path:
+        """
+        Description:
+        Zwraca ścieżkę raportu przebiegu masowego importu, który ruszył o podanej chwili. Nazwa
+        zaczyna się od daty i godziny, więc raporty układają się po kolei.
+
+        Example args:
+            started_at=datetime(2026, 11, 13, 10, 15, tzinfo=UTC)
+
+        Example result:
+            Path("/code/data/unsafe/corpus/import-2026-11-13T10-15-00.json")
+        """
+        return self.root / f"import-{started_at:%Y-%m-%dT%H-%M-%S}.json"

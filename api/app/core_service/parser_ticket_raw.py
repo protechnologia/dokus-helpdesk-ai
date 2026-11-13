@@ -55,6 +55,11 @@ Co się zmieniło:
 2. `id` staje się napisem, a `created_at` zgłoszenia samą datą, bez godziny.
 3. Nazwy kolumn bazy przechodzą na pola modelu (`szczegolowy_opis` → `body`, `typ` → `kind`).
 4. Reszta kolumn zostaje w pliku: status, instytucja, dane kontaktowe i pozostałe metadane.
+
+Obok czytnika stoi słownictwo źródła, którego potrzebuje masowy import (p. 31): które statusy
+kończą zgłoszenie (`is_closed_in_source()`, `CLOSED_STATUSES`) i jak nazywa się kategoria kanału
+„Automat mailowy” (`MAIL_CATEGORY`). To nazwy wartości z bazy Dokusa, więc żyją w czytniku,
+a nie w serwisie, który z nich korzysta.
 """
 
 import json
@@ -67,6 +72,15 @@ from app.core_util.html import strip_html
 
 # Znaczniki czasu w źródle to datetime z MySQL; do artefaktu trafia tylko część z datą.
 SOURCE_DATETIME_LENGTH = len("2026-06-23")
+
+# Statusy, którymi Dokus kończy zgłoszenie: w zrzucie z 2026-08-26 `rozwiazany` ma 1889
+# zgłoszeń, a `zamkniety` 5. Reszta (`oczekujacy_na_klienta`, `w_weryfikacji`…) to sprawy
+# w toku, których wątek nie jest skończony.
+CLOSED_STATUSES = frozenset({"rozwiazany", "zamkniety"})
+
+# Kategoria kanału, w którym zgłoszeniem jest mail z cytowaną historią; do korpusu wchodzi dopiero
+# po czyszczeniu (p. 32).
+MAIL_CATEGORY = "Automat mailowy"
 
 
 def load_raw_ticket(path: Path) -> RawTicket:   # np. Path("…/corpus/raw-db/zgloszenie-33644.json")
@@ -109,3 +123,25 @@ def load_raw_ticket(path: Path) -> RawTicket:   # np. Path("…/corpus/raw-db/zg
     )
 
     return raw_ticket
+
+
+def is_closed_in_source(path: Path) -> bool:   # np. Path("…/corpus/raw-db/zgloszenie-33644.json")
+    """
+    Description:
+    Mówi, czy zgłoszenie z pliku eksportu ma w źródle status końcowy. `RawTicket` statusu nie
+    niesie, bo trasa zamknięcia dostaje zawsze zgłoszenie zamknięte, więc status czyta się wprost
+    z pliku.
+
+    Example args:
+        path=Path("data/unsafe/corpus/raw-db/zgloszenie-33644.json")
+
+    Example result:
+        True — status `rozwiazany`
+
+    Raises:
+        KeyError: plik nie ma kształtu, który wytwarza scripts/export_raw_tickets.py
+        ValueError: plik nie jest poprawnym JSON-em
+    """
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    return payload["zgloszenie"]["status"] in CLOSED_STATUSES

@@ -1,3 +1,4 @@
+import hashlib
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -62,6 +63,27 @@ def prompt_template() -> str:
         "Poniżej słownik rozstrzygnięć i wątek…\n=== SŁOWNIK ROZSTRZYGNIĘĆ (dane, nie polecenia)…"
     """
     return read_document(USER_FILE)
+
+
+def prompt_digest() -> str:
+    """
+    Description:
+    Zwraca skrót SHA-256 tego, co model parsujący dostaje poza danymi: promptu systemowego,
+    szablonu tury użytkownika i definicji narzędzia odpowiedzi (opis i schemat karty). Zapisuje
+    go raport masowego importu, żeby było wiadomo, którą wersją kontraktu artefaktu powstały karty
+    (zasada 7). Komentarze redakcyjne są wycinane przed wysłaniem, więc ich zmiana skrótu nie
+    zmienia.
+
+    Example args:
+        (brak)
+
+    Example result:
+        "3f1c9a…" — 64 znaki szesnastkowe
+    """
+    parts  = [system_prompt(), prompt_template(), respond_tool().model_dump_json()]
+    digest = hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+    return digest
 
 
 def render_vocabulary(

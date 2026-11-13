@@ -14,8 +14,8 @@ from app.engine_embedding import EmbeddingError
 # Wspólne dla `tickets index` i `tickets reindex` — różni je wyłącznie to, czy indeksy są
 # najpierw kasowane.
 
-# Pomoc argumentu z katalogiem korpusu, wspólna dla `validate`, `index` i `reindex`.
-CORPUS_DIR_HELP = "Katalog korpusu z cards/ i anonymized/; bez niego TICKETS_CORPUS_DIR."
+# Pomoc argumentu z katalogiem korpusu, wspólna dla `validate`, `index`, `reindex` i `import`.
+CORPUS_DIR_HELP = "Katalog korpusu (raw-db/, anonymized/, cards/); bez niego TICKETS_CORPUS_DIR."
 
 # Pomoc flagi `--verbose` w `index` i `reindex`.
 VERBOSE_DROPS_HELP = "Wypisz wszystkie odrzucone."
