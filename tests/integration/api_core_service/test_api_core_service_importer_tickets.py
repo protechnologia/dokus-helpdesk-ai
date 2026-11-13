@@ -7,6 +7,7 @@ from app.agent_graphs import parse_ticket
 from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_model.tickets.ticket_import_failure import TicketImportFailure
 from app.core_model.tickets.tickets_import_report import TicketsImportReport
+from app.core_service.importer_tickets import MAX_FAILURES_IN_ROW, TicketsImportAbortedError
 from app.engine_anonymization import AnonymizationError, AnonymizedText
 from app.engine_llm import LLMConfigError, LLMError
 from tests._helpers.tickets_import import COST_PER_TICKET, MODEL, CardLLM, importer_on, write_export
@@ -310,3 +311,42 @@ async def test_aclose_closes_the_anonymizer(tmp_path: Path) -> None:
 
     assert anonymizer.closed is True
 
+
+
+async def test_ten_failures_in_a_row_stop_the_run(tmp_path: Path) -> None:
+    """Sprawdza, czy po 10 zgłoszeniach z rzędu zakończonych błędem przebieg staje błędem
+    `TicketsImportAbortedError`, jedenaste zgłoszenie nie idzie do modelu, a raport z dziesięcioma
+    błędami i tak trafia do korpusu.
+
+    Wyłapuje import bez hamulca: gdy padnie pod z anonimizatorem albo dostawca modelu, przebieg
+    przeleciałby przez całą resztę listy, zapisując same błędy, zamiast od razu powiedzieć, że
+    padła zależność."""
+    for ticket_id in range(1, 12):
+        write_export(tmp_path, ticket_id)
+    llm = CardLLM(failures={str(number): LLMError("pod nie odpowiada") for number in range(1, 12)})
+
+    with pytest.raises(TicketsImportAbortedError):
+        await importer_on(tmp_path, llm, _anonymizer(), concurrency=1).run(None, _ignore)
+
+    [path] = tmp_path.glob("import-*.json")
+
+    assert len(llm.prompts) == MAX_FAILURES_IN_ROW
+    saved = TicketsImportReport.model_validate_json(path.read_text(encoding="utf-8"))
+
+    assert len(saved.failed) == MAX_FAILURES_IN_ROW
+
+
+async def test_a_saved_card_resets_the_failure_count(tmp_path: Path) -> None:
+    """Sprawdza, czy 9 błędów, potem udana karta i znowu 9 błędów nie zatrzymują przebiegu:
+    wszystkie 19 zgłoszeń przechodzi, z 18 błędami i jedną kartą.
+
+    Wyłapuje hamulec, który liczy wszystkie błędy zamiast błędów z rzędu: przebieg tysiąca
+    zgłoszeń stanąłby po dziesiątej pojedynczej, chwilowej awarii."""
+    for ticket_id in range(1, 20):
+        write_export(tmp_path, ticket_id)
+    failures = {str(number): LLMError("chwilowa awaria") for number in range(1, 20) if number != 10}
+    llm      = CardLLM(failures=failures)
+
+    report = await importer_on(tmp_path, llm, _anonymizer(), concurrency=1).run(None, _ignore)
+
+    assert (report.parsed, len(report.failed)) == (1, 18)

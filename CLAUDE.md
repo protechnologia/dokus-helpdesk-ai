@@ -3346,7 +3346,8 @@ nogi produktu na jednej sprawie.
 - Masowy import z eksportu do korpusu: `helpdesk tickets import [<korpus>] [--limit N]
   [--concurrency 4]` (z `raw-db/` do `anonymized/` i `cards/`; pomija zgłoszenia w toku,
   „Automat mailowy” i te z kartą, więc przerwany przebieg wznawia to samo polecenie; postęp
-  z kosztem co 10 zgłoszeń, raport w korpusie) — **płatne, pytaj przed**; wymaga usługi
+  z kosztem co 10 zgłoszeń, raport w korpusie; staje po 10 błędach z rzędu) — **płatne, pytaj
+  przed**; wymaga usługi
   `anonymizer` z modelem anonimizującym i modelu generującego z `.env`; indeksy buduje potem
   `helpdesk tickets reindex`
 - Walidacja kart: `helpdesk tickets validate [<korpus>]`

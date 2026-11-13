@@ -6,6 +6,7 @@ from typer.testing import CliRunner
 from app.core_model.tickets.ticket_import_failure import TicketImportFailure
 from app.core_model.tickets.tickets_corpus import TicketsCorpus
 from app.core_service.factory_tickets_importer import TicketsImportConfigError
+from app.core_service.importer_tickets import TicketsImportAbortedError
 from app.engine_anonymization import AnonymizationConfigError
 from app.engine_llm import LLMConfigError
 from app.entry_cli.cli import cli
@@ -143,13 +144,14 @@ def test_a_configuration_error_at_build_exits_two(
     [
         pytest.param(NotADirectoryError("brak raw-db/"),          id="brak-eksportu"),
         pytest.param(AnonymizationConfigError("atrapa silnika"), id="anonimizator"),
+        pytest.param(TicketsImportAbortedError("10 z rzędu"),    id="seria-bledow"),
     ],
 )
 def test_a_configuration_error_in_the_run_exits_two_and_closes(
     tmp_path: Path, built: StubImporterFactory, error: Exception
 ) -> None:
-    """Sprawdza, czy brak `raw-db/` albo błąd konfiguracji anonimizatora w trakcie przebiegu
-    kończy komendę kodem 2, a serwis i tak zostaje zamknięty.
+    """Sprawdza, czy brak `raw-db/`, błąd konfiguracji anonimizatora albo seria 10 błędów z rzędu
+    w trakcie przebiegu kończy komendę kodem 2, a serwis i tak zostaje zamknięty.
 
     Wyłapuje komendę, która przy błędzie w przebiegu zostawia otwarte połączenia albo kończy się
     innym kodem niż przy złej konfiguracji na starcie."""

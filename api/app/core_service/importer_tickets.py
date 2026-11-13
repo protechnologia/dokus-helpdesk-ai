@@ -40,7 +40,9 @@ O czym pamiętać przy zmianach:
 - Wątek bez karty (zapis przerwany między plikami) następny przebieg nadpisuje — to jedyny plik
   korpusu, który import nadpisuje.
 - Błąd konfiguracji (model, klucz, anonimizator na atrapie silnika) zatrzymuje cały przebieg;
-  błąd jednego zgłoszenia trafia na listę błędów, a przebieg idzie dalej.
+  błąd jednego zgłoszenia trafia na listę błędów, a przebieg idzie dalej — chyba że błędów jest
+  10 z rzędu (`MAX_FAILURES_IN_ROW`): to znaczy, że padł pod z anonimizatorem albo dostawca
+  modelu, i bez hamulca przebieg przeleciałby przez resztę listy, zapisując same błędy.
 - W logu i raporcie stoją tylko numery, liczby i nazwy: przebieg operuje na danych klientów.
 """
 
@@ -71,6 +73,20 @@ EXPORT_PREFIX = "zgloszenie-"
 
 # Co dostaje wołający po wyborze zgłoszeń i po każdym zgłoszeniu: raport z bieżącymi liczbami.
 ProgressCallback = Callable[[TicketsImportReport], None]
+
+# Ile zgłoszeń z rzędu może skończyć się błędem, zanim przebieg stanie (decyzja 2026-11-13).
+# Pojedyncze błędy to chwilowe awarie; seria znaczy, że padła zależność, a każde następne
+# zgłoszenie skończy się tak samo.
+MAX_FAILURES_IN_ROW = 10
+
+
+class TicketsImportAbortedError(Exception):
+    """
+    Description:
+    Przebieg stanął, bo `MAX_FAILURES_IN_ROW` zgłoszeń z rzędu skończyło się błędem: padł pod
+    z anonimizatorem albo dostawca modelu. Karty zapisane wcześniej zostają, a to samo polecenie
+    wznowi import po naprawie.
+    """
 
 
 class TicketsImporter:
@@ -125,6 +141,9 @@ class TicketsImporter:
         self._model       = model
         self._concurrency = concurrency
 
+        # Ile zgłoszeń z rzędu skończyło się błędem; zeruje je każda zapisana karta.
+        self._failures_in_row = 0
+
     async def run(
         self,
         limit:       int | None,        # np. 20 — próba na pierwszych; None = wszystkie
@@ -147,8 +166,11 @@ class TicketsImporter:
             NotADirectoryError: korpus nie ma katalogu `raw-db/`
             LLMConfigError: model generujący jest źle skonfigurowany
             AnonymizationConfigError: anonimizator odmówił z powodu konfiguracji
+            TicketsImportAbortedError: `MAX_FAILURES_IN_ROW` zgłoszeń z rzędu skończyło się błędem
         """
         todo, report = self._select(limit)
+
+        self._failures_in_row = 0
 
         on_progress(report)
 
@@ -265,7 +287,7 @@ class TicketsImporter:
         """
         Description:
         Parsuje jedno zgłoszenie grafem karty i zapisuje wątek z kartą; błąd zgłoszenia dopisuje
-        do raportu bez treści. Potem oddaje raport wołającemu.
+        do raportu bez treści i liczy, ile błędów było z rzędu. Potem oddaje raport wołającemu.
 
         Example args:
             raw=RawTicket(ticket_id="33644", …)
@@ -279,6 +301,7 @@ class TicketsImporter:
         Raises:
             LLMConfigError: model generujący jest źle skonfigurowany
             AnonymizationConfigError: anonimizator odmówił z powodu konfiguracji
+            TicketsImportAbortedError: tym zgłoszeniem seria błędów doszła do `MAX_FAILURES_IN_ROW`
         """
         async with gate:
             state = parse_ticket.STATE(
@@ -299,10 +322,22 @@ class TicketsImporter:
 
                 report.failed.append(failure)
                 logger.warning("import ticket_id=%s error=%s", raw.ticket_id, failure.error)
+
+                self._failures_in_row += 1
             else:
                 self._record(report, final)
 
+                self._failures_in_row = 0
+
             on_progress(report)
+
+            # --- seria błędów: padła zależność, następne zgłoszenia skończą się tak samo ---
+            if self._failures_in_row >= MAX_FAILURES_IN_ROW:
+                raise TicketsImportAbortedError(
+                    f"{self._failures_in_row} zgłoszeń z rzędu skończyło się błędem (ostatni: "
+                    f"{report.failed[-1].error}) — sprawdź anonimizator i model; to samo "
+                    "polecenie wznowi import"
+                )
 
     def _record(
         self,

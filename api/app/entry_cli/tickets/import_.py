@@ -24,7 +24,8 @@ O czym pamiętać przy zmianach:
   i idzie w tle, a ktoś czyta jego wyjście.
 - Na wyjściu są wyłącznie numery, liczby i nazwy błędów, nigdy treść zgłoszeń.
 - Kody wyjścia: 0 — wszystko sparsowane albo nic do zrobienia, 1 — któreś zgłoszenie się nie
-  udało (to samo polecenie je ponowi), 2 — konfiguracja albo brak `raw-db/`, 130 — przerwane.
+  udało (to samo polecenie je ponowi), 2 — konfiguracja, brak `raw-db/` albo 10 błędów z rzędu
+  (padł pod z anonimizatorem albo dostawca modelu), 130 — przerwane.
 """
 
 import asyncio
@@ -40,6 +41,7 @@ from app.core_service.factory_tickets_importer import (
     TicketsImportConfigError,
     build_tickets_importer,
 )
+from app.core_service.importer_tickets import TicketsImportAbortedError
 from app.core_util.time import format_duration
 from app.engine_anonymization import AnonymizationConfigError
 from app.engine_llm import LLMConfigError
@@ -85,8 +87,8 @@ def import_tickets(
         wypisuje zakres, postęp i podsumowanie; kod 0, gdy wszystkie zgłoszenia się udały
 
     Raises:
-        typer.Exit: kod 1, gdy któreś zgłoszenie się nie udało; 2 przy złej konfiguracji albo
-            braku `raw-db/`; 130 po przerwaniu
+        typer.Exit: kod 1, gdy któreś zgłoszenie się nie udało; 2 przy złej konfiguracji, braku
+            `raw-db/` albo serii błędów; 130 po przerwaniu
     """
     corpus = corpus_or_default(directory)
 
@@ -97,6 +99,7 @@ def import_tickets(
         TicketsImportConfigError,  # model generujący to atrapa
         LLMConfigError,            # dostawca, klucz albo model modelu generującego
         AnonymizationConfigError,  # adres anonimizatora albo jego atrapa przy prawdziwym modelu
+        TicketsImportAbortedError, # seria błędów: padł pod z anonimizatorem albo dostawca modelu
     ) as exc:
         typer.echo(f"BŁĄD: {exc}", err=True)
         raise typer.Exit(code=2) from exc
