@@ -4281,6 +4281,16 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
       przepuszczane dotąd wbrew etykiecie 3 z 6, wcześniej 0 z 6); w `questions_summary` zero
       sentineli i pytań proceduralnych, w `cause` zero domysłów (11312: hipoteza konsultanta
       w `solution` jako przypuszczenie); wstrzyknięcia 0 przebić z 6. Test przez front pominięty.
+      Krok 5 (2026-11-13): przebieg lokalnie, w kontenerze `api`, po próbie na 20 zgłoszeniach —
+      1758 kart, 0 błędów, 1081 przydatnych (61%), 8,15 USD modelu i ok. 0,9 USD poda, 44 min;
+      `helpdesk tickets reindex` dał 1081 kart w `tickets` i 1081 wątków w tabeli wątków
+      (24 min 48 s na CPU), pod usunięty. W trakcie ok. 40 losowych kart przejrzanych ze
+      zgłoszeniem i wątkiem: bez przecieku danych osobowych, bez zmyślonych przyczyn; sporne
+      pojedyncze `useful` przy jednorazowych naprawach dostawcy, sprawy wysyłki przez ePUAP
+      zwykle z `component` „główna aplikacja” (ePUAP 52, e-Doręczenia 45, eNadawca 11 na 1758),
+      w `questions_summary` czasem prośba o numer pisma zamiast pytania diagnostycznego. Bez
+      dodatkowej kopii korpusu (decyzja 2026-11-13); przeniesienie na serwer pokazowy robi
+      użytkownik. Zostają krok 7 (zapytania tekstowe i test `find_tickets_text`) i krok 8.
 - [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
   „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy; po nim 139 zgłoszeń tego kanału
   z sierpniowego zrzutu dochodzi do korpusu osobnym przebiegiem, bez parsowania reszty od nowa.
