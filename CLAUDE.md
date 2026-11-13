@@ -240,7 +240,9 @@ compose.
   autor tego nie zamierzał — wystarczy wkleić zrzut z konsoli operującej na zgłoszeniach, żeby
   trafiły tam nazwiska użytkowników. Zdarzyło się przy pomiarze progu: trzy nazwiska w wyjściu
   `eval_threshold.py detail`, wyłapane dopiero przy commicie. Wnioski trwałe przenoś **do
-  CLAUDE.md** (bez cytatów), a plik z pomiarem zostaw w `data/unsafe/docs/`.
+  CLAUDE.md** (bez cytatów), a plik z pomiarem zostaw w `data/unsafe/docs/`. Katalog ma
+  folder na rodzaj dokumentu (2026-11-13): `pomiary/` (liczby, na których stoją decyzje)
+  i `prezentacje/`.
 - **README** — „jak": uruchomienie i kontrakt dla użytkownika. Proponowany podział na sekcje:
   1. **Stack** — technologie i ich role.
   2. **Flow działania** — ogólny algorytm (wejście → etapy → wyjście).
@@ -285,7 +287,7 @@ dokus-helpdesk-ai/
 │       ├── golden/               # zestawy do ewaluacji, w tym karty (cards/) i wątki (raw/)
 │       ├── instruction/          # właściwa dokumentacja (p. 55)
 │       ├── code/                 # paczka kodu aplikacji: rules.json, manifest.json, symbols.json, project.md, repo/ (p. 60)
-│       └── docs/                 # raporty z pomiarów i dokumenty projektu
+│       └── docs/                 # pomiary/ i prezentacje/
 ├── api/                          # folder = usługa z compose, nazwany tak samo
 │   ├── Dockerfile
 │   ├── .dockerignore
@@ -709,7 +711,7 @@ poprawne — mierzą co innego, więc przy etapie 4 nie należy szukać „zgubi
 
 Liczby niżej pochodzą z **ręcznego sparsowania 661 zgłoszeń** (36% modułu, 44% korpusu po filtrze
 długościowym), nie z szacunku. Materiał źródłowy:
-`data/unsafe/docs/synteza-korpusu-i-pojemnosc-rag.md`.
+`data/unsafe/docs/pomiary/synteza-korpusu-i-pojemnosc-rag.md`.
 
 | etap lejka | liczba | uwaga |
 |---|---|---|
@@ -823,9 +825,9 @@ wymagające czyszczenia cytowanej historii przed parsowaniem.
   trafiają się zgłoszenia o Portalu Mieszkańca czy login.gov.pl. Stąd `component` wyprowadza LLM
   z treści, nigdy z `modul_zgloszenia.nazwa`, i jest polem swobodnym.
 - **Kanał „Automat mailowy" jest w tym korpusie osobną klasą szkody — ZMIERZONE 2026-09-02 na 108
-  wątkach** (raport: `data/unsafe/docs/jakosc-zgloszen/`). Wchodzi 2026-06-12 i od razu dominuje: w
-  lipcu **77 ze 123** nowych zgłoszeń modułu. Pięć wad, każda osobno rozstrzygająca dla masowego
-  importu:
+  wątkach** (raport: `data/unsafe/docs/pomiary/jakosc-zgloszen/`). Wchodzi 2026-06-12 i od razu
+  dominuje: w lipcu **77 ze 123** nowych zgłoszeń modułu. Pięć wad, każda osobno rozstrzygająca dla
+  masowego importu:
   - **Role są zepsute w 96% wątków, nie „bywają odwrócone".** System zapisuje nadawcę maila, a nie
     autora cytowanej wypowiedzi, więc odpowiedzi konsultantów figurują jako wypowiedzi klienta.
     **Flaga autora w bazie jest tu bezużyteczna — rozstrzyga wyłącznie podpis w treści.**
@@ -989,24 +991,23 @@ dokumentacji jeszcze nie ma (p. 55) — indeksacja i narzędzia powstają na pac
   z dopiskiem `_synthetic`, a flaga komendy i `synthetic` w manifeście muszą się zgadzać w obie
   strony.
 - **Fragmenty po 1000 znaków — zmierzone 2026-10-05** (raport:
-  `data/unsafe/docs/pomiar-dokumentacji-fragmenty-i-prog.md`). Paczka daje wtedy 58 fragmentów
-  i wszystkie 24 zapytania wektorowe z odpowiedzią mają cel na pierwszym miejscu. Zapytanie
-  o szczegół z końca najdłuższej sekcji wygrywa o 0,058; przy 1500 znakach przegrywa o 0,004, przy
-  jednym wektorze na sekcję wypada poza pierwszą piątkę, a przy samym tytule i opisie ląduje na
-  19. miejscu. Paczka ma jedną długą sekcję, więc między 400 a 1000 znaków nie rozstrzyga.
+  `data/unsafe/docs/pomiary/pomiar-dokumentacji-fragmenty-i-prog.md`). Paczka daje wtedy 58
+  fragmentów i wszystkie 24 zapytania wektorowe z odpowiedzią mają cel na pierwszym miejscu.
+  Zapytanie o szczegół z końca najdłuższej sekcji wygrywa o 0,058; przy 1500 znakach przegrywa o
+  0,004, przy jednym wektorze na sekcję wypada poza pierwszą piątkę, a przy samym tytule i opisie
+  ląduje na 19. miejscu. Paczka ma jedną długą sekcję, więc między 400 a 1000 znaków nie rozstrzyga.
 
 ### Kod aplikacji
 
-Trzeci materiał obok zgłoszeń i instrukcji: kod źródłowy Dokusa, czytany narzędziami agenta
-(p. 60–67). Ma pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają, przede wszystkim gdy
-zgłoszenie niesie komunikat albo kod błędu. Z narzędzi są opis projektu (`describe_code`,
-p. 65), szukanie (`find_code_text`, p. 62), spis katalogu (`list_code_files`, p. 64), odczyt
-pliku (`read_code_file`, p. 63), odczyt symbolu (`read_code_symbol`, p. 73) i cytowanie
-fragmentu (`quote_code`, p. 67). Są też paczka kodu (p. 60), jej mapa symboli (p. 66) i zestaw
-przypadków (p. 61). Wyniki sond na żywym modelu to pojedyncze przebiegi, nie pomiar; tu stoi
-wniosek i liczba, która go niesie, a przebieg w raporcie. Liczby bez dopisku „w paczce"
-pochodzą z rozpoznania na kopii roboczej gałęzi jednego klienta, a paczka powstała z innej
-gałęzi.
+Trzeci materiał obok zgłoszeń i instrukcji: kod źródłowy Dokusa, czytany narzędziami agenta (p.
+60–67). Ma pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają, przede wszystkim gdy zgłoszenie
+niesie komunikat albo kod błędu. Z narzędzi są opis projektu (`describe_code`, p. 65), szukanie
+(`find_code_text`, p. 62), spis katalogu (`list_code_files`, p. 64), odczyt pliku (`read_code_file`,
+p. 63), odczyt symbolu (`read_code_symbol`, p. 73) i cytowanie fragmentu (`quote_code`, p. 67). Są
+też paczka kodu (p. 60), jej mapa symboli (p. 66) i zestaw przypadków (p. 61). Wyniki sond na żywym
+modelu to pojedyncze przebiegi, nie pomiar; tu stoi wniosek i liczba, która go niesie, a zapisy
+przebiegów skasowano 2026-11-13. Liczby bez dopisku „w paczce" pochodzą z rozpoznania na kopii
+roboczej gałęzi jednego klienta, a paczka powstała z innej gałęzi.
 
 - **Kod może wyjść do modelu zewnętrznego (decyzja 2026-10-06).** Nie przechodzi przez
   anonimizację: wynik narzędzia idzie do modelu wprost.
@@ -1112,25 +1113,20 @@ gałęzi.
   o działaniu aplikacji, a bez komunikatu zaczyna od opisu projektu; pozostałe dwa grafy sięgają
   po kod tylko przy komunikacie, wpisie z logu albo kodzie błędu, których zgłoszenia i instrukcje
   nie tłumaczą (do p. 25–26).
-- **Bez komunikatu model sam sięga po opis projektu, z komunikatem go pomija** (sonda `search`
-  na `gpt-6.1-sol`, 2026-10-12, 8 przebiegów; raport
-  `data/unsafe/docs/przebieg-describe-code-gpt-6.1-sol-2026-10-12.md`). Opis skraca szukanie
-  napisu, który stoi w wielu plikach (K7: oba miejsca w 11 turach, bez opisu limit 20 tur i zero
-  cytatów), a tam, gdzie niczego nie skraca, podnosi koszt (K6: 0,116 wobec 0,090 USD). Sprawa
-  na kodzie Dokusa to 8–20 tur i 0,09–0,20 USD. Zdanie-przyzwolenie nie zadziałało ani razu.
-  Opis nie wymienia nazw głównych modułów, więc model je zgaduje (`obidokumentywychodzace`
-  zamiast `obidokout`).
+- **Bez komunikatu model sam sięga po opis projektu, z komunikatem go pomija** (sonda `search` na
+  `gpt-6.1-sol`, 2026-10-12, 8 przebiegów). Opis skraca szukanie napisu, który stoi w wielu plikach
+  (K7: oba miejsca w 11 turach, bez opisu limit 20 tur i zero cytatów), a tam, gdzie niczego nie
+  skraca, podnosi koszt (K6: 0,116 wobec 0,090 USD). Sprawa na kodzie Dokusa to 8–20 tur i 0,09–0,20
+  USD. Zdanie-przyzwolenie nie zadziałało ani razu. Opis nie wymienia nazw głównych modułów, więc
+  model je zgaduje (`obidokumentywychodzace` zamiast `obidokout`).
 - **Model sam sięga po odczyt symbolu, ale wyniku to nie poprawia** (sonda `search` na
-  `gpt-6.1-sol`, 2026-10-13, 4 sprawy Dokusa z narzędziem i bez; raport
-  `data/unsafe/docs/przebieg-read-code-symbol-gpt-6.1-sol-2026-10-13.md`). Z 14 wywołań 13
+  `gpt-6.1-sol`, 2026-10-13, 4 sprawy Dokusa z narzędziem i bez). Z 14 wywołań 13
   oddało definicję od razu, a odczytów pliku było 9 zamiast 18. Wymagane miejsca zacytował
   w obu wariantach, przy 34 turach wobec 29. Dwa odczyty urwał limit 300 linii, każdy to
   około 25 tys. znaków.
-- **Model idzie drogą szukanie → odczyt → cytowanie** (sondy na `gpt-6.1-sol`, 2026-10-09,
-  7 spraw z komunikatem; raport
-  `data/unsafe/docs/przebieg-read-code-file-gpt-6.1-sol-2026-10-09.md`).
-  Cytował tylko linie wcześniej odczytane, a długi plik czytał zakresem wokół trafienia.
-  Limitu 300 linii nie osiągnął, więc `cut_by_limit` sprawdzają tylko testy bez modelu.
+- **Model idzie drogą szukanie → odczyt → cytowanie** (sondy na `gpt-6.1-sol`, 2026-10-09, 7 spraw z
+  komunikatem). Cytował tylko linie wcześniej odczytane, a długi plik czytał zakresem wokół
+  trafienia. Limitu 300 linii nie osiągnął, więc `cut_by_limit` sprawdzają tylko testy bez modelu.
 - **Katalogi paczki są małe, a kilka jest bardzo dużych (2026-10-10).** Paczka ma 2375
   katalogów: połowa ma do 2 pozycji, 90% do 9, 99% do 53, a największy 1264; katalog główny
   ma jedną. Stąd spis pokazuje kilka poziomów naraz (domyślnie 2) i najwyżej 200 pozycji. Sam
@@ -1138,8 +1134,7 @@ gałęzi.
   odpadałyby jeszcze cztery, w tym trzy listy podkatalogów (114–155), czyli spisy modułów.
   Dwa poziomy nie mieszczą się w 18 katalogach. Spis od katalogu głównego trwa 0,08 s.
 - **Model sięga po spis katalogu, gdy sprawa tego wymaga, i nie sięga, gdy nie wymaga** (sonda
-  na `gpt-6.1-sol`, 2026-10-10, 3 przebiegi; raport
-  `data/unsafe/docs/przebieg-list-code-files-gpt-6.1-sol-2026-10-10.md`). W obu sprawach
+  na `gpt-6.1-sol`, 2026-10-10, 3 przebiegi). W obu sprawach
   z nadmiarowym plikiem przeczytał plik, którego nazwę znał tylko ze spisu, a w kontrolnej
   spisu nie wywołał.
 - **Jeden komunikat ma w kodzie kilka brzmień** — „Nie udało się skomunikować z serwerem" trzy,
@@ -1245,8 +1240,8 @@ gałęzi.
   bliźniaczą klasę filtra, której nic nie wpina, akcję bez przycisku. Zestaw zapisuje je jako
   pułapki.
 - **Zacytowany komunikat daje wejście jednym szukaniem; trudność leży w przejściu na drugi
-  koniec łańcucha PHP → JS** (sonda na `claude-sonnet-5-5` z prototypami narzędzi, 2026-10-07;
-  raport `data/unsafe/docs/proby-zestawu-kodu-2026-10-07.md`). Sam łańcuch to 8–15 tur.
+  koniec łańcucha PHP → JS** (sonda na `claude-sonnet-5-5` z prototypami narzędzi,
+  2026-10-07). Sam łańcuch to 8–15 tur.
 
 ## Architektura
 
@@ -1798,7 +1793,7 @@ Embedder to `OPI-PIB/PolDense-150M`: ModernBERT, wymiar 768, liczony na CPU. Wyb
 razem z trybem wyszukiwania `query→passage`. Na 200 rekordach daje `recall@1` 98% — to sufit
 zadania, nie dowód przewagi modelu (anglojęzyczny model kontrolny miał 88%), więc porównanie
 z innymi modelami wraca na pełnym korpusie (p. 33). Wąskim gardłem nie jest model, tylko jakość
-i kompletność zgłoszeń. Raport: `data/unsafe/docs/pomiar-embedderow.md`.
+i kompletność zgłoszeń. Raport: `data/unsafe/docs/pomiary/pomiar-embedderow.md`.
 
 PolDense rozróżnia tryby prefiksem doklejanym do tekstu. Ten sam tekst z innym prefiksem daje inny
 wektor:
@@ -1935,7 +1930,7 @@ Osoby i adresy idą osobnymi wywołaniami: wspólne kosztowało na próbce korpu
   pilnuje test na golden secie. Dlatego nie ma na niej „Poczta Polska”: „Polska” po wspólnym
   początku złapałoby nazwisko „Polski”.
 - **Pomiar z 2026-10-19 na Bieliku 11B v3 (vLLM; raport
-  `data/unsafe/docs/pomiar-silnika-agent-2026-10-19.md`):** po strojeniu (przykład nagłówka
+  `data/unsafe/docs/pomiary/pomiar-silnika-agent-2026-10-19.md`):** po strojeniu (przykład nagłówka
   z kilkoma adresatami, lista nazw, które nie są osobami, reguła odmian z Morfeuszem2) zestaw
   zmyślony (54 przypadki, w tym trudne adresy z sondy) i próbka korpusu bez przecieku w każdym
   rodzaju i bez zniszczonej wiedzy w czterech przebiegach po kolei; wątek próbki, który wcześniej
@@ -2089,12 +2084,12 @@ Osoby i adresy idą osobnymi wywołaniami: wspólne kosztowało na próbce korpu
   ostry próg wygląda dokładnie tak samo jak pusty indeks, a to dwie różne awarie. Przy
   `RAG_SCORE_MIN` = 0.48 odcinanie jest regułą, nie wyjątkiem.
 - **`RAG_SCORE_MIN` = 0.48 stoi świadomie po stronie odsiewania śmieci** (pomiar na 171 rekordach,
-  raport `data/unsafe/docs/pomiar-progu-score.md`) — trafienie bez treści wygląda na odpowiedź, a
-  przy 47% singletonów „nic nie znalazłem" jest normalną odpowiedzią. Próg zostaje także teraz, gdy
-  model widzi `score` i czyta karty sam (2026-10-04): to jedyne miejsce, w którym KOD mówi „nic nie
-  znaleziono" — bez niego wyszukiwanie zawsze oddaje komplet numerów, źródła zawsze są, a
-  `requires_hits` nic nie znaczy. Może za to stać niżej, bo ma odcinać tylko oczywiste śmieci (do
-  przeliczenia w p. 33). Trzy pułapki strojenia:
+  raport `data/unsafe/docs/pomiary/pomiar-progu-score.md`) — trafienie bez treści wygląda na
+  odpowiedź, a przy 47% singletonów „nic nie znalazłem" jest normalną odpowiedzią. Próg zostaje
+  także teraz, gdy model widzi `score` i czyta karty sam (2026-10-04): to jedyne miejsce, w którym
+  KOD mówi „nic nie znaleziono" — bez niego wyszukiwanie zawsze oddaje komplet numerów, źródła
+  zawsze są, a `requires_hits` nic nie znaczy. Może za to stać niżej, bo ma odcinać tylko oczywiste
+  śmieci (do przeliczenia w p. 33). Trzy pułapki strojenia:
   - **Nie stroi się go liczbą „ile procent zachowanych"** — krótkie teksty mają niski score mimo
     idealnego dopasowania (0,455 przy niemal tym samym zdaniu), więc z pięciu traconych zapytań
     cztery stały na pierwszym miejscu. Zawsze `eval_threshold.py detail` przed zmianą wartości.
@@ -2740,8 +2735,7 @@ nowe zgłoszenie (surowy tekst)
   `suggest_questions`, a zgłoszenia przykładowe tych grafów i ich testów to sam opis
   zgłaszającego.
 - **Na żywym `gpt-6.1-sol` rozpoznanie wyszło w siedmiu zmyślonych sprawach (2026-10-11,
-  pojedyncze przebiegi, nie pomiar; raport
-  `data/unsafe/docs/przebieg-search-rozpoznanie-gpt-6.1-sol-2026-10-11.md`).** Narzędzia kodu
+  pojedyncze przebiegi, nie pomiar).** Narzędzia kodu
   prawdziwe, na aplikacji syntetycznej; razem 33 tury i 0,19 USD, bez poprawki odpowiedzi.
   W sześciu sprawach o działaniu aplikacji model wszedł w kod w pierwszej turze, w sprawie
   organizacyjnej ani razu. Sprawa to 3–6 tur i 0,01–0,05 USD, bo model woła kilka narzędzi
@@ -2796,18 +2790,16 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 - **`questions` działa dwutorowo:** bez trafień pyta na podstawie samego zgłoszenia,
   z trafieniami dokłada `questions_summary` z podobnych spraw. Ryzykiem nie jest puste pole, tylko
   sentinel w przebraniu („Brak pytań ze strony prowadzącego sprawę.") — 28 na 200 rekordów.
-- **`questions` może oddać brak pytań (2026-10-11).** Gdy fakty ze zgłoszenia — z opisu albo
-  z odpowiedzi klienta w wątku — zostawiają jedną przyczynę albo nic, o co klient mógłby
-  odpowiedzieć bez diagnozy, model oddaje `text: null` i uwagi zamiast pytań na siłę. Wyjściem
-  jest wartość pola, nie zdanie: zdanie-formułkę o braku pytań słabszy model doklejał po
-  pytaniach w 7 przebiegach na 8. Hamulec w prompcie: zgodny objaw to nie jedna przyczyna, więc
-  gdy przeczytane sprawy podają różne przyczyny, a zgłoszenie ich nie rozróżnia, pytania są.
-  Na żywym `gpt-6.1-sol` (cztery pojedyncze przebiegi, 0,13 USD, raport
-  `data/unsafe/docs/przebieg-suggest-questions-pytan-nie-trzeba-gpt-6.1-sol-2026-10-11.md`)
-  model oddał brak pytań w obu sprawach, w których fakty rozstrzygały (raz z wątku, raz
-  z samego opisu), a pytania w obu, w których nie rozstrzygały: jedno nowe po odpowiedziach,
-  które tylko zawężały, i pięć przy samym objawie. Guzik nadal nie pamięta pytań
-  wygenerowanych, ale niewysłanych.
+- **`questions` może oddać brak pytań (2026-10-11).** Gdy fakty ze zgłoszenia — z opisu albo z
+  odpowiedzi klienta w wątku — zostawiają jedną przyczynę albo nic, o co klient mógłby odpowiedzieć
+  bez diagnozy, model oddaje `text: null` i uwagi zamiast pytań na siłę. Wyjściem jest wartość pola,
+  nie zdanie: zdanie-formułkę o braku pytań słabszy model doklejał po pytaniach w 7 przebiegach na
+  8. Hamulec w prompcie: zgodny objaw to nie jedna przyczyna, więc gdy przeczytane sprawy podają
+  różne przyczyny, a zgłoszenie ich nie rozróżnia, pytania są. Na żywym `gpt-6.1-sol` (cztery
+  pojedyncze przebiegi, 0,13 USD) model oddał brak pytań w obu sprawach, w których fakty
+  rozstrzygały (raz z wątku, raz z samego opisu), a pytania w obu, w których nie rozstrzygały: jedno
+  nowe po odpowiedziach, które tylko zawężały, i pięć przy samym objawie. Guzik nadal nie pamięta
+  pytań wygenerowanych, ale niewysłanych.
 - **Prompt `questions` nie może przepisać cudzych pytań.** Materiał historyczny to wzorzec:
   odrzuć pytania niepasujące do sprawy, przeformułuj pod to zgłoszenie, pomiń te, na które
   odpowiedź już jest w treści.
@@ -2931,7 +2923,7 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   Model czyta wątki wszystkich znalezionych zgłoszeń, także wbrew promptowi — na prawdziwych
   wątkach to będzie główny koszt sprawy (p. 23–26). Reguła „instrukcje sprawdzasz zawsze" musi iść
   w parze z regułą, że fakty wolno brać także z instrukcji: inaczej trop z instrukcji ląduje tylko
-  w uwagach. Zapisy rozmów: `data/unsafe/docs/przebieg-*.md`. Od 2026-10-05 każdy graf na
+  w uwagach. Zapisy rozmów skasowane 2026-11-13; liczby zostają. Od 2026-10-05 każdy graf na
   węzłach właściwych jest testem `llm_live`; jeden przebieg na `gpt-6.1-sol` to osiem spraw,
   19 tur i 0,108 USD, bez ani jednej poprawki odpowiedzi. Sama pętla `search` to 5 tur, 0,027 USD
   i 25 tys. z 33 tys. tokenów wejścia odczytanych z cache.
@@ -3070,8 +3062,8 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 
 Prompty `questions` i `solution` były strojone w 2026-08 na słabszym modelu lokalnym; na modelu
 docelowym mierzymy je od nowa (p. 25–27). Z tamtych pomiarów zostaje to, co nie zależy od modelu.
-Raporty: `data/unsafe/docs/pomiar-wariantow-promptu-questions-2026-08-26.md`,
-`data/unsafe/docs/pomiar-promptu-solution-2026-08-28.md`.
+Raporty: `data/unsafe/docs/pomiary/pomiar-wariantow-promptu-questions-2026-08-26.md`,
+`data/unsafe/docs/pomiary/pomiar-promptu-solution-2026-08-28.md`.
 
 - **Limit liczby kroków i uwag to decyzja o treści** — model sam wybiera, co poświęci, a reguła
   rozbijająca bez limitu puchnie.
@@ -3389,7 +3381,7 @@ nogi produktu na jednej sprawie.
 - Pomiar progu odcięcia: `python scripts/eval_threshold.py table` (rozkłady + tabela koszt/zysk
   per kandydat na próg), `... detail --threshold 0.48` (co ten próg robi z każdym dystraktorem
   i które trafienia poprawne kosztuje) oraz `... plot` (wykres obu rozkładów z linią progu do
-  `data/unsafe/docs/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz
+  `data/unsafe/docs/pomiary/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz
   `data/unsafe/golden/tickets-distractors.json`; sam golden set mierzy tylko połowę rozkładu
 
 **Grafy (bramki, propozycje, „Popraw", wyszukiwanie, karta zgłoszenia) uruchamia się przez API**,

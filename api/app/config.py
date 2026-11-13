@@ -140,10 +140,10 @@ class Settings(BaseSettings):
     # this is the pool the threshold narrows down to them.
     # Ta sama liczba ogranicza wynik obu wyszukiwań w dokumentacji: tyle sekcji oddaje jedno.
     rag_top_k:     int   = 5                            # e.g. 10
-    # Measured 2026-08-20 on 171 records (data/unsafe/docs/pomiar-progu-score.md): 0.48 keeps 157 of
-    # 162 correct hits and fully silences 14 of 16 distractors. The trade leans towards cutting
-    # rubbish on purpose — with 47% of the corpus being singletons, "found nothing" is a normal
-    # answer, while a contentless hit looks like an answer and is worse than none.
+    # Measured 2026-08-20 on 171 records (data/unsafe/docs/pomiary/pomiar-progu-score.md): 0.48
+    # keeps 157 of 162 correct hits and fully silences 14 of 16 distractors. The trade leans
+    # towards cutting rubbish on purpose — with 47% of the corpus being singletons, "found nothing"
+    # is a normal answer, while a contentless hit looks like an answer and is worse than none.
     # KNOWN COST: four correct hits drop out and THREE of them sat at rank 1, because short texts on
     # both sides score low however well they match — so this threshold systematically penalises the
     # shortest records. Do NOT raise without re-measuring: 0.50 takes four more.
