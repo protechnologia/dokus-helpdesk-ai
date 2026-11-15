@@ -69,8 +69,8 @@ dysku: `find_code_text` szuka w niej programem ripgrep (`engine_process/`), `lis
 `read_code_file` i `quote_code` czytają jej katalogi i pliki wprost, `read_code_symbol` bierze
 granice funkcji z mapy symboli paczki, a `describe_code` oddaje opis projektu, który stoi
 w paczce obok kodu. Tabela zgłoszeń
-w Postgresie dostanie prawdziwe wątki po anonimizacji (p. 19) i masowym imporcie (p. 31), więc
-`find_tickets_text` i `read_tickets_thread` są sprawdzone na zmyślonych.
+w Postgresie ma od masowego importu (p. 31) prawdziwe wątki po anonimizacji: `find_tickets_text`
+jest sprawdzone na zmyślonych i na wątkach golden setu, `read_tickets_thread` na zmyślonych.
 Narzędzia dokumentacji są opcjonalne: bez dokumentacji nie trafiają do rejestru.
 """
 

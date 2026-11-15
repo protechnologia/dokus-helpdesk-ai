@@ -1,7 +1,7 @@
 """
 Description:
 Graf `parse_ticket` — karta zgłoszenia: wątek zamieniony na `ParsedTicket` promptem parsującym.
-Ten sam prompt zbuduje korpus przy masowym imporcie (p. 31), więc to KONTRAKT ARTEFAKTU (zasada 7):
+Ten sam prompt zbudował korpus przy masowym imporcie (p. 31), więc to KONTRAKT ARTEFAKTU (zasada 7):
 `prompt_system.md`, `prompt_user.md` i `respond_tool.md` pod testem-strażnikiem.
 
 Przebieg: anonymize → agent → respond. Bez narzędzi wiedzy; kartę model oddaje narzędziem

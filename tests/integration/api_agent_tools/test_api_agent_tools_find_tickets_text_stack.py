@@ -17,8 +17,9 @@ O czym pamiętać przy zmianach:
 
 - Łączenie dróg, etykiety i limit sprawdzają testy jednostkowe na kliencie-atrapie; tu zostaje
   to, co wie tylko baza: odmiana, wielkość liter i białe znaki.
-- Na prawdziwych wątkach narzędzie ruszy dopiero po anonimizacji (p. 19) i masowym imporcie
-  (p. 31); do tego czasu to jedyne sprawdzenie na bazie.
+- Na prawdziwych wątkach narzędzie mierzy test ewaluacyjny na wątkach golden setu
+  (`test_api_agent_tools_find_tickets_text_golden_stack.py`); tu baza dostaje zmyślone wątki,
+  w których każdy przypadek widać wprost.
 """
 
 import pytest

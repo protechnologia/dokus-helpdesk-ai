@@ -18,8 +18,8 @@ wywołanie to jeden wątek, więc limit wywołań jest limitem wątków przeczyt
 Przykład zapytania i wyniku — w opisie `tool.py`; przykład tekstu, który czyta model — w opisie
 `base.py`.
 
-Narzędzie właściwe jest sprawdzone na zmyślonych wątkach. Tabela zgłoszeń dostanie prawdziwe
-wątki dopiero po anonimizacji (p. 19) i masowym imporcie (p. 31) — do tego czasu jest pusta.
+Narzędzie właściwe jest sprawdzone na zmyślonych wątkach. Tabela instancji ma od masowego
+importu (p. 31) wątki 1081 zgłoszeń po anonimizacji.
 """
 
 from app.agent_tools.tickets.read_tickets_thread.base import ReadTicketsThreadToolBase

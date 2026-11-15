@@ -56,8 +56,8 @@ def validate_artifacts(
     niezerowym, gdy coś jest nie tak, więc komenda działa jako bramka w potoku, a nie tylko dla
     czytającego.
 
-    Cienki adapter nad `validate_directory()`: logiki walidacji tu nie ma, dzięki czemu masowy
-    import (p. 31) użyje tego samego sprawdzenia bez przechodzenia przez CLI.
+    Cienki adapter nad `validate_directory()`: logiki walidacji tu nie ma, dzięki czemu to samo
+    sprawdzenie da się zawołać bez przechodzenia przez CLI.
 
     Example args:
         directory=None  # korpus z TICKETS_CORPUS_DIR

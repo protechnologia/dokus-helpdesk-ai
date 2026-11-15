@@ -114,8 +114,10 @@ model anonimizujący, Bielik na własnym serwerze), a prompty grafów wiedzą o 
 wstawia (p. 19.7). Sekretów w treści nikt jeszcze nie wykrywa: detektor jest odłożony (p. 20).
 Wszystkie czternaście narzędzi ma wersję właściwą: osiem na zgłoszeniach i instrukcjach oraz sześć
 narzędzi kodu: opis projektu, szukanie, spis katalogu, odczyt pliku, odczyt symbolu i cytowanie
-fragmentu. Dwa, które czytają wątki zgłoszeń, czekają na dane: tabelę wątków napełnia trasa
-zamknięcia zgłoszenia (p. 30), a cały korpus wejdzie z masowym importem (p. 31).
+fragmentu. Korpus zgłoszeń jest zaimportowany z sierpniowego zrzutu (p. 31, 2026-11-13): 1758
+kart, z których 1081 przeszło filtr jakości, więc instancja szuka wśród 1081 kart i 1081 wątków
+po anonimizacji, a każde zamknięte zgłoszenie dokłada się do nich trasą zamknięcia (p. 30).
+Poza korpusem zostało 136 zgłoszeń kanału „Automat mailowy” (p. 32).
 
 ### Zasady produktu
 
@@ -123,33 +125,21 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
 
 #### Co obowiązuje
 
-7. **Sparsowany JSON zgłoszenia jest trwałym artefaktem na dysku, nie efektem ubocznym.**
-   Embeddingi i kolekcje Qdranta są wymienne i odtwarzalne — przebieg LLM jest drogi
-   i jednorazowy. Re-index **nigdy** nie wymaga ponownego wołania LLM.
-   - **Zasada zaczyna obowiązywać dla artefaktu z masowego importu (p. 31)** — jednego przebiegu
-     całego korpusu zamrożoną wersją promptu. Do tego czasu chroni karty golden setu
-     w `data/unsafe/golden/cards/` (200 kart `gpt-6.1-sol` z 2026-10-23), na których stoją
-     pomiary filtra i wyszukiwania.
-   - Pomiary „na 661 rekordach" pochodzą z wcześniejszej próbki, skasowanej 2026-07-31, a pomiary
-     na kartach Bielika (`bielik-11b-golden200`) i na próbkach porównania modeli — z kart
-     skasowanych 2026-11-11. Zniknęły pliki, nie wiedza — liczby pozostają wiążące.
-8. **Qdrant jest indeksem, nie źródłem prawdy.** Musi dać się skasować i odbudować z katalogu
-   JSON-ów jedną komendą.
-9. **Nie zmyślamy treści merytorycznej.** Odpowiedź powstaje wyłącznie z materiału, który agent
-   odczytał; brakujące dane to **placeholder** (`{IMIĘ}`, `{NR_URZĄDZENIA}`), nigdy wymyślona
-   wartość. Brak źródeł = brak rozwiązania, a nie propozycja „z głowy". **Dotyczy też „Popraw":**
-   poprawiamy formę, nie treść — model nie ma prawa dodać faktu, którego nie było w bazgrołach.
-   - **Indeks zawiera wyłącznie rekordy wyprowadzone ze źródeł** (zgłoszenia, instrukcje), nigdy
-     ręcznie pisane rekordy scalające. Klasy wieloprzyczynowe („nic nie przychodzi z e-Doręczeń"
-     — 6 zgłoszeń, 6 rozłącznych przyczyn) obsługują trafienia czytane razem: niosą sześć
-     różnych `cause`, więc materiał do pytań rozróżniających jest w nich wprost. Dlatego te
-     rekordy zostają w indeksie osobno i nie deduplikujemy.
-10. **Werdykt bramki nie jest wyrokiem.** Blokada zawsze ma **furtkę dla człowieka** i zawsze
-    niesie **uzasadnienie oraz wskazówkę, czego brakuje** — samo „nie" zamienia narzędzie
-    jakości w przeszkodę, którą wdrożeniowcy nauczą się obchodzić na ślepo.
-11. **Nasze API opiniuje, helpdesk egzekwuje.** Zwracamy werdykt; blokadę fizycznie realizuje
-    aplikacja helpdesku. Nie budujemy tu iluzji, że to my „nie pozwalamy" — to zmienia kontrakt
-    i obowiązki obu stron.
+7. **Karta zgłoszenia to trwały artefakt na dysku, a indeksy są wymienne.** Przebieg LLM jest
+   drogi i jednorazowy, więc przebudowa indeksów nigdy go nie powtarza. Zasada chroni karty
+   i wątki korpusu (`data/unsafe/corpus/`, masowy import p. 31) i golden setu
+   (`data/unsafe/golden/`); karty korpusu zmienia tylko ponowne zamknięcie zgłoszenia (p. 30).
+   Liczby z kart już skasowanych (próbka 661, karty Bielika) zostają wiążące.
+8. **Qdrant i Postgres są indeksem, nie źródłem prawdy:** każdy kasuje i odbudowuje z plików
+   jedna komenda.
+9. **Nie zmyślamy treści.** Odpowiedź stoi wyłącznie na przeczytanym materiale; brakująca dana
+   to placeholder (`{IMIĘ}`), a brak źródeł to brak rozwiązania. „Popraw” zmienia formę, nie
+   fakty. Indeks trzyma tylko rekordy ze źródeł, bez rekordów scalających i bez deduplikacji:
+   zgłoszenia o jednym objawie i różnych przyczynach to materiał do pytań.
+10. **Werdykt bramki ma furtkę dla człowieka, uzasadnienie i wskazówkę, czego brakuje** — samo
+    „nie” wdrożeniowcy nauczą się obchodzić na ślepo.
+11. **Nasze API opiniuje, helpdesk egzekwuje:** zwracamy werdykt, a blokadę realizuje aplikacja
+    helpdesku.
 
 #### Czego nie robić
 
@@ -646,7 +636,8 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   indeksacja odmawia, zanim cokolwiek zapisze albo skasuje.
 
 - **Import to cienka warstwa adapterów** — jeden czytnik na format źródłowy
-  (`core_service/parser_ticket_raw.py`, przy masowym imporcie obok wariantu SQL); reszta systemu
+  (`core_service/parser_ticket_raw.py`; przy kolejnych zrzutach dojdzie obok wariant SQL,
+  p. 34); reszta systemu
   widzi wyłącznie znormalizowany `RawTicket`. **Model `RawTicket` mieszka w `core_model/`, czytnik w
   `core_service/`** — jest wejściową połową kontraktu, którego wyjściem jest `ParsedTicket`, więc
   nie należy do żadnego z czytników.
@@ -667,6 +658,21 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   model, bo karty dopisują się miesiącami, a model w `.env` może się zmienić. Karty i wątki
   golden setu leżą osobno, w `data/unsafe/golden/`. W samym katalogu korpusu leżą raporty
   przebiegów masowego importu, `import-<data i godzina startu>.json`, same numery i liczby.
+- **Korpus instancji to masowy import sierpniowego zrzutu (p. 31, 2026-11-13).** Eksport
+  `export_raw_tickets.py` do `raw-db/` (1955 zgłoszeń, bez czytnika SQL, decyzja 2026-11-11),
+  a z niego `helpdesk tickets import` w kontenerze `api`: graf `parse_ticket` z tej samej
+  fabryki co trasy, anonimizator na Bieliku, model `gpt-6.1-sol` (decyzja 2026-11-13: na jego
+  kartach zmierzono filtr jakości). Zakres to 1758 zgłoszeń: poza nim 61 w toku i 136
+  zamkniętych z kanału „Automat mailowy”, który czeka na p. 32. Wynik: 1758 kart jednym
+  przebiegiem promptu o skrócie `308c1c483d78` (pełny skrót i model w raporcie importu), 0 błędów,
+  1081 przyjętych przez filtr (61%), 8,15 USD modelu i ok. 0,9 USD poda, 44 min przy 4
+  zgłoszeniach naraz, po próbie na 20; indeksy z `reindex` w 24 min 48 s na CPU. Przegląd
+  około 40 losowych kart ze zgłoszeniem i wątkiem: bez przecieku danych osobowych i bez
+  zmyślonych przyczyn. Uwagi z przeglądu czekają na pomiary: sporne pojedyncze oceny `useful`
+  przy jednorazowych naprawach dostawcy (p. 33), sprawy wysyłki przez ePUAP zwykle
+  z `component` „główna aplikacja” (p. 33), w `questions_summary` czasem prośba o numer pisma
+  zamiast pytania diagnostycznego (p. 25). Dodatkowej kopii korpusu nie ma (decyzja
+  2026-11-13, p. 35).
 - **Zamknięte zgłoszenie dokłada do korpusu `ClosedTicketIndexer`
   (`core_service/indexer_closed_ticket.py`, p. 30).** Najpierw zapisuje trzy pliki: surowe
   zgłoszenie do `raw-route/`, wątek po anonimizacji do `anonymized/` i kartę do `cards/`,
@@ -697,9 +703,10 @@ rekordów rocznie i rosnący.
 
 **Jest DRUGI zrzut, nowszy: `mysql_helpdesk_20260826-131135.sql` (2026-08-26).** Ma **1955 zgłoszeń
 Dokusa**, 1894 domknięte, w tym **139 z kanału „Automat mailowy"** — czyli **+130 w miesiąc**, tempo
-wyższe niż zakładane „~500 użytecznych rocznie". **Korpus i wszystkie pomiary etapów 3–6 stoją na
-zrzucie lipcowym i tak zostaje** (zasada 7): nowszy służył wyłącznie pomiarowi jakości zgłoszeń
-z 2026-09-02 i jest właściwym wejściem dla masowego importu (p. 31).
+wyższe niż zakładane „~500 użytecznych rocznie". **Pomiary etapów 3–6 i golden200 stoją na
+zrzucie lipcowym i tak zostaje** (zasada 7), a korpus instancji powstał z nowszego masowym
+importem (p. 31, 2026-11-13); wcześniej nowszy służył wyłącznie pomiarowi jakości zgłoszeń
+z 2026-09-02.
 
 **Uwaga: 1496 to filtr długościowy, NIE liczba użytecznych rekordów.** Patrz „Ile z tego
 naprawdę wejdzie do indeksu" — realny lejek jest o ~35% węższy.
@@ -1345,6 +1352,10 @@ Zasady schematu:
   przed którym ostrzegają „Ryzyka jakości treści” („im poważniejsza operacyjnie sprawa, tym
   większa szansa, że wątek urwie się bez odpowiedzi”): wśród „nierozwiązanych” na 661 rekordach
   tylko **8 na 161 ma puste `solution`**.
+  - **Na sierpniowym zrzucie (2026-11-13, przed masowym importem) ocena `useful` zgodna
+    z etykietą w 16 z 20 zgłoszeń golden setu**: dobre 8 z 8, bez wiedzy 5 z 6, dotąd
+    przepuszczane wbrew etykiecie 3 z 6 (na kartach z 2026-10-23 — 0 z 6); cztery niezgodne to
+    przypadki sporne. Filtr przyjął 1081 z 1758 kart importu (61%).
   - Konsekwencja: **`resolution` nie jest polem krytycznym dla działania systemu.** Gdy klient
     nie skonfiguruje słownika, produkt nadal działa — traci wzbogacenie odpowiedzi, nie indeks.
   - **Puste `cause` też NIE jest sygnałem braku wiedzy** — **73% takich rekordów przechodzi filtr**
@@ -1402,7 +1413,11 @@ i dziewięć innych sformułowań). Model streszcza chętniej, niż sonda liczy�
 nie wyjątkiem. Zastrzeżenie: golden200 to próbka **warstwowa dobrana pod jakość**, więc 84% jest
 górnym oszacowaniem; do przeliczenia na pełnym korpusie (p. 33).
 **Konsekwencja: `brak` NIE jest normą, ale sentinel w przebraniu jest częsty** — prompt musi
-odsiewać wpisy stwierdzające, że pytań nie było, a nie zakładać puste pole.
+odsiewać wpisy stwierdzające, że pytań nie było, a nie zakładać puste pole. Prompt z p. 24 to
+robi: w próbie przed masowym importem (2026-11-13, 27 kart) pole nie miało ani jednego sentinela
+ani pytania proceduralnego, a `cause` ani jednego domysłu — hipoteza konsultanta trafiła do
+`solution` jako przypuszczenie. W przeglądzie importu zdarza się za to prośba o numer pisma
+zamiast pytania diagnostycznego (p. 25).
 
 - **MUSI zachować konkrety** — nazwy narzędzi, ustawienia, wersje, miejsca w aplikacji. „Pytano
   o konfigurację stanowiska" jest bezwartościowe; „pytano o rozdzielczość ekranu i profil
@@ -2107,8 +2122,8 @@ i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs index`, a czytają
 `find_docs_text` i `read_docs`. Tabelę zgłoszeń czytają `find_tickets_text`
 i `read_tickets_thread`. Zakłada ją i wypełnia `helpdesk tickets index` z wątków po anonimizacji
 w `anonymized/` korpusu (od 2026-11-11), a pojedyncze zgłoszenie dokłada trasa zamknięcia
-(p. 30); korpus napełni masowy import (p. 31). Tam, gdzie tabeli nie ma, oba narzędzia kończą się
-błędem `DbPostgresMissingTableError`.
+(p. 30); korpus napełnił masowy import (p. 31, 1081 wątków). Tam, gdzie tabeli nie ma, oba
+narzędzia kończą się błędem `DbPostgresMissingTableError`.
 
 - **Trzy drogi dopasowania, każda do czego innego:** słowa (`plainto_tsquery` — dowolna kolejność
   i odmiana), fraza (`phraseto_tsquery` — cały komunikat w tej samej kolejności) i podciąg
@@ -2223,8 +2238,8 @@ błędem `DbPostgresMissingTableError`.
   z metryczki, treść `read_docs`. Model nie wie, która baza co trzyma, i wybiera kartę albo wątek
   niezależnie od tego, jak zgłoszenie znalazł. Każde ma narzędzie właściwe i atrapę (od
   2026-10-05); `find_tickets_text` i `read_tickets_thread` są sprawdzone na zmyślonych wątkach,
-  bo prawdziwe przyjdą po anonimizacji (p. 19, p. 31). Cena: jedna tura modelu więcej na każde
-  wyszukanie.
+  a `find_tickets_text` od 2026-11-15 także na wątkach golden setu. Cena: jedna tura modelu
+  więcej na każde wyszukanie.
 - **W wyszukiwaniu tekstowym `exact` i `words` szukają niezależnie, a wyniki się sumują.** Fraza
   z `exact` idzie podciągiem; słowa z `words` idą przez słownik i muszą wystąpić wszystkie.
   Trafienia frazą stoją pierwsze, a element znaleziony obiema drogami jest w wyniku raz, jako
@@ -2763,7 +2778,9 @@ nowe zgłoszenie (surowy tekst)
   nadal jest KONTRAKTEM ARTEFAKTU (zasada 7): `prompt_system.md` (rola, jak czytać wątek),
   `respond_tool.md` (znaczenie pól, przykłady) i `prompt_user.md` (słownik i wątek) pod
   testem-strażnikiem `test_api_agent_graphs_parse_ticket_prompt.py`, który zamraża frazy. Korpus
-  przy masowym imporcie (p. 31) zbuduje ten sam graf — innej drogi do tego promptu nie ma.
+  przy masowym imporcie (p. 31) zbudował ten sam graf — innej drogi do tego promptu nie ma.
+  Przed importem prompt sprawdzono bez zmian (2026-11-13): scenariusze wstrzyknięć
+  `-k parse_ticket` 0 przebić z 6, test ręczny przez front pominięty.
 - **Reguły klienta (`gate_close`, `gate_reply`, `polish`) są wymagane: brak albo pusta lista to
   `ValidationError` przy budowie stanu** (decyzja 2026-10-02) — graf w ogóle nie rusza.
 
@@ -3004,7 +3021,7 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
     z narzędziami wiedzy — że znaczników nie wpisuje się do zapytań. Brak tej sekcji nie objawia się na zmyślonych zgłoszeniach, bo nie
     ma w nich znaczników. Prompt parsujący ma ją od 2026-10-23 (p. 24, wcześniej planowana na
     p. 31): pomiar karty idzie do modelu zewnętrznego, więc na wątkach po anonimizatorze, a prompt
-    i tak zamraża się dopiero przy masowym imporcie.
+    zamroził masowy import (p. 31).
 - **Prompt systemowy ma sekcje z nagłówkiem `#` (2026-10-21):** „Zadanie" na początku, sekcje
   własne grafu („Szukanie", „Jak myśleć", „Jak zapisać"…), „Zasady ogólne" i „Zasady szczegółowe"
   w punktach (od 2026-10-30, wcześniej jedna sekcja „Zasady"), a na końcu „Anonimizacja" i „Dane
@@ -4118,7 +4135,7 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
   (p. 34). Komendy na grafach skreślono 2026-10-16: wołalibyśmy je tylko my, trasy oddają koszt i
   log, a testy na żywym modelu całą rozmowę, więc komenda powtarzałaby to, co trasa robi wokół
   grafu. Graf na pliku z eksportu wraca, gdy będą go potrzebować pomiary (p. 23); parsowanie korpusu
-  wchodzi z masowym importem (p. 31).
+  weszło komendą masowego importu (`helpdesk tickets import`, p. 31).
 - **Reguły bramek jako regexy albo lista słów zamiast modelu** — „potocznego słownictwa” ani „nie
   widać, co zrobiono” nie da się zapisać słownikiem. Mogą wrócić jako tani filtr przed modelem, gdy
   koszt zacznie boleć.
@@ -4302,60 +4319,26 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 
 #### I. Korpus
 
-- [ ] **31. Masowy import z nowszego zrzutu** — przez graf `parse_ticket`, komendą `helpdesk`
-      w kontenerze, na tej samej fabryce grafów co trasy, z kosztem przebiegu w raporcie (zapis
-      artefaktu po KAŻDYM zgłoszeniu, jak robił skasowany `tickets parse`), anonimizacja przed
-      parsowaniem, model parsujący `gpt-6.1-sol` (decyzja 2026-11-13: na jego kartach
-      zmierzono filtr jakości), wznawianie, raport. Decyzje z 2026-11-11: zgłoszenia
-      bierze z eksportu sierpniowego zrzutu do JSON-ów (`export_raw_tickets.py --out-dir`), bez
-      czytnika SQL, który wraca z p. 34; bez 139 zgłoszeń kanału „Automat mailowy”, które
-      dochodzą po p. 32 osobnym przebiegiem; zanonimizowany wątek idzie do tabeli wyszukiwania
-      tylko przy karcie przyjętej przez filtr jakości. Po napełnieniu tabeli powstaje zestaw
-      zapytań tekstowych do zgłoszeń (komunikaty i kody błędów z wątków, w polach `exact`
-      i `words`) i test ewaluacyjny `find_tickets_text` z progiem — dziś narzędzie ma tylko
-      test integracyjny na pięciu zmyślonych wątkach, a golden set zgłoszeń ma zapytania
-      wyłącznie w kształcie wyszukiwania po znaczeniu. Przed przebiegiem prompt parsujący,
-      zamknięty w p. 24 bez pomiaru: luki z porównania — zgłoszenie informacyjne bez treści
-      (6 wariantów z 9), pytania proceduralne w `questions_summary` mimo zakazu (4 modele)
-      i sentinele w przebraniu w tym polu (28 kart z 200); czy reguła `cause` „tylko przyczyna
-      potwierdzona w wątku” wystarcza na niepotwierdzone hipotezy (4 modele z 8); scenariusze
-      z p. 59 na nowym prompcie (wstrzyknięcia w karcie), test ręczny przez front i pomiar na
-      10 zgłoszeniach z porównania, po anonimizatorze. *Dlaczego:* to jedyny
-      drogi przebieg (zasada 7), więc anonimizator i prompt muszą być gotowe przed nim.
-      Stan 2026-11-13: kroki 1–4 zrobione. Eksport sierpniowego zrzutu leży w `raw-db/` (1955
-      zgłoszeń, 1758 w zakresie importu), komenda `helpdesk tickets import` i kolekcja golden
-      setu `tickets_golden` stoją. Prompt sprawdzony bez zmian: 6 z 10 zgłoszeń porównania jest
-      poza zakresem (3 w toku, 3 „Automat mailowy”, w tym 33319 i 33644), więc próba szła na 27
-      zgłoszeniach w zakresie (4 z porównania, 20 z golden setu, 3 najdłuższe wątki), 0,15 USD,
-      0 błędów. Ocena `useful` zgodna z etykietą w 16 z 20 (dobre 8 z 8, bez wiedzy 5 z 6,
-      przepuszczane dotąd wbrew etykiecie 3 z 6, wcześniej 0 z 6); w `questions_summary` zero
-      sentineli i pytań proceduralnych, w `cause` zero domysłów (11312: hipoteza konsultanta
-      w `solution` jako przypuszczenie); wstrzyknięcia 0 przebić z 6. Test przez front pominięty.
-      Krok 5 (2026-11-13): przebieg lokalnie, w kontenerze `api`, po próbie na 20 zgłoszeniach —
-      1758 kart, 0 błędów, 1081 przydatnych (61%), 8,15 USD modelu i ok. 0,9 USD poda, 44 min;
-      `helpdesk tickets reindex` dał 1081 kart w `tickets` i 1081 wątków w tabeli wątków
-      (24 min 48 s na CPU), pod usunięty. W trakcie ok. 40 losowych kart przejrzanych ze
-      zgłoszeniem i wątkiem: bez przecieku danych osobowych, bez zmyślonych przyczyn; sporne
-      pojedyncze `useful` przy jednorazowych naprawach dostawcy, sprawy wysyłki przez ePUAP
-      zwykle z `component` „główna aplikacja” (ePUAP 52, e-Doręczenia 45, eNadawca 11 na 1758),
-      w `questions_summary` czasem prośba o numer pisma zamiast pytania diagnostycznego. Bez
-      dodatkowej kopii korpusu (decyzja 2026-11-13); przeniesienie na serwer pokazowy robi
-      użytkownik. Krok 7 (2026-11-15): nazwa tabeli wątków w konfiguracji
-      (`POSTGRES_TICKETS_TABLE`), wątki golden200 po anonimizacji w `golden/anonymized/`, tabela
-      `tickets_text_golden` i na niej zestaw tekstowy z testem `find_tickets_text`; zestaw na
-      pełnym korpusie wraca w p. 79. Zostaje krok 8.
+- [x] **31. Masowy import z nowszego zrzutu** (2026-11-13 – 2026-11-15) → „Historyczne
+  zgłoszenia”, „Domena”, „Golden set retrievalu”, „Warstwa wyszukiwania tekstowego (Postgres)”.
 - [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
   „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy; po nim 139 zgłoszeń tego kanału
   z sierpniowego zrzutu dochodzi do korpusu osobnym przebiegiem, bez parsowania reszty od nowa.
   Do rozstrzygnięcia: czy zapisywać tekst po czyszczeniu. Ma dane osobowe, więc jeśli tak, to
   w `corpus/cleaned/`, którego `api` na prod nie montuje, a ręczne decyzje (flaga, pary spraw)
   jako małe dane. Do rozstrzygnięcia też: co robi z takim zgłoszeniem trasa zamknięcia (p. 30) —
-  dziś przyjmuje je jak każde inne. *Dlaczego:* 77 ze 123 zgłoszeń w lipcu, a żadna heurystyka
-  nie odróżni broadcastu od sprawy.
+  dziś przyjmuje je jak każde inne. Przed przebiegiem tego kanału luka promptu parsującego
+  z porównania modeli: zgłoszenie informacyjne bez treści (6 wariantów z 9; jego przypadki, np.
+  33644, są w tym kanale, więc przed p. 31 nie dało się go sprawdzić). *Dlaczego:* 77 ze 123
+  zgłoszeń w lipcu, a żadna heurystyka nie odróżni broadcastu od sprawy.
 - [ ] **33. Przeliczenia na pełnym korpusie** — `RAG_SCORE_MIN` na zapytaniach sparsowanych
   (na kartach `gpt-6.1-sol` trafienie dostaje 7 z 16 dystraktorów, na kartach Bielika 3 z 16,
-  przy tym samym progu 0.48), porównanie embedderów, liczba wątków-projektów, `questions_summary`, rozkład `component`;
-  do tego pomiary grafów zamkniętych po teście ręcznym. `gate_close` (2026-10-22): fałszywe
+  przy tym samym progu 0.48), porównanie embedderów, liczba wątków-projektów, `questions_summary`,
+  rozkład `component` (na kartach importu ePUAP 52, e-Doręczenia 45, eNadawca 11 na 1758, a sprawy
+  wysyłki przez ePUAP zwykle jako „główna aplikacja”), oceny `useful` przy jednorazowych naprawach
+  dostawcy (w przeglądzie importu sporne pojedyncze karty) — korpus z importu stoi od 2026-11-13,
+  a pomiary na nim czekają na pełny golden (p. 79); do tego pomiary grafów zamkniętych po teście
+  ręcznym. `gate_close` (2026-10-22): fałszywe
   alarmy i przepuszczenia na każdą regułę na prawdziwych zamknięciach, w dwóch przebiegach,
   z czytaniem uzasadnień, na zestawie zamknięć dobrych i słabych do zbudowania (oceny z badania
   jakości z 2026-09-02 skasowane 2026-11-13) — oraz czas na długich wątkach wobec cierpliwości UI
@@ -4373,7 +4356,9 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
   *Dlaczego:* +130 zgłoszeń w miesiąc, więc jednorazowy zrzut szybko się starzeje.
 - [ ] **35. Backup `data/unsafe/corpus/cards/` i `anonymized/`.** *Dlaczego:* jedyne
       artefakty, których odtworzenie kosztuje ponowny przebieg LLM albo anonimizatora; `raw-db/`
-      odtwarza eksport zrzutu.
+      odtwarza eksport zrzutu. Po masowym imporcie (2026-11-13) na razie bez dodatkowej kopii
+      (decyzja użytkownika); odtworzenie kart to około 9 USD i godzina przebiegu, a wątki
+      wymagają poda z anonimizatorem.
 - [ ] **55. Przygotowanie właściwej dokumentacji** (dopisany 2026-10-03) — podział mocnym modelem
   na pliki `.md` i metryczkę, skrypt sprawdzający, że każda sekcja jest dosłownym podciągiem
   źródła i że sekcje pokrywają całość, przegląd opisów przez człowieka, próg ostrzeżenia
@@ -4437,6 +4422,8 @@ korpusie, przechodzi przy zamknięciu do p. 33.
   (z nią do `code.json` wracają sprawy bez komunikatu na tym grafie); czy wyjątek dla hipotezy,
   zapisany 2026-10-30 obok zasad ogólnych, nie zmienia pytań;
   sprawa ze znacznikami anonimizacji w `questions.json` z oceną helpera `markers`, jak w p. 23;
+  czy `questions_summary` z kart importu nie podsuwa pytań proceduralnych w przebraniu (w przeglądzie
+  importu zdarza się prośba o numer pisma zamiast pytania diagnostycznego);
   ewaluacja wariantu, w tym jak często model oddaje „pytań już nie trzeba" (p. 72) i czy
   słusznie — fałszywe wyjście przy zgodnym objawie i różnych przyczynach jest tu najgroźniejsze;
   sentinele `questions_summary` trzeba rozpoznać nową funkcją w `core_service/` (moduł fraz
@@ -4520,7 +4507,8 @@ Rzeczy odłożone świadomie, bez miejsca w kolejności planu. Każdy punkt: cel
   zgłoszeń: hasła do VPN, roota, skrzynek) idzie po anonimizacji do zewnętrznego modelu i do
   indeksów. Gdy wróci, najpierw w wersji lekkiej: reguły kontekstu („hasło: …", „login … /
   hasło …") i znane kształty (klucz prywatny, JWT, adres połączenia z hasłem) zamieniane na
-  `{HASŁO}`, a przy masowym imporcie (p. 31) przegląd zgłoszeń z sekretami. Entropia dla haseł
+  `{HASŁO}`, a w korpusie z masowego importu (p. 31, poszedł bez detektora) przegląd zgłoszeń
+  z sekretami. Entropia dla haseł
   losowych bez etykiety i alarm, który odróżnia poświadczenia od haseł do archiwów, dopiero gdy
   pomiar pokaże, że wersja lekka nie wystarcza. *Dlaczego odłożony:* hasło nie niesie wiedzy,
   a ryzyko leży po stronie umowy i polityki bezpieczeństwa klienta; alarm „zmień hasło" to jego
@@ -4547,8 +4535,8 @@ Rzeczy odłożone świadomie, bez miejsca w kolejności planu. Każdy punkt: cel
   model i przejrzanych przez człowieka, w osobnym pliku w `data/unsafe/golden/`; jeden przebieg
   testu `llm_live` silnika `agent`, bez strojenia na tym zestawie. *Dlaczego:* prompty, przykłady
   i filtry silnika stroiliśmy na tym samym golden secie, na którym mierzymy, więc „bez
-  przecieku” to wynik optymistyczny. Wraca przed masowym importem (p. 31) albo przy podejrzeniu
-  przecieku.
+  przecieku” to wynik optymistyczny. Masowy import (p. 31) poszedł bez niego (decyzja
+  2026-11-13); wraca razem z p. 79 albo przy podejrzeniu przecieku.
 - [ ] **79. Golden set z korpusu importu** (dopisany 2026-11-15) — zamrożona kopia `cards/`
   i `anonymized/` z masowego importu jako korpus golden w standardowym układzie; etykiety
   i zapytania wektorowe z golden200 przepięte na jej karty (około 10 etykiet do przejrzenia,

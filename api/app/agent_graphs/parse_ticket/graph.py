@@ -18,7 +18,7 @@ from app.core_util.markdown import read_document
 from app.engine_llm import ToolDefinition
 
 # Prompt parsujący to KONTRAKT ARTEFAKTU (zasada 7): ten graf buduje kartę w runtime i ten sam
-# będzie budował korpus przy masowym imporcie (p. 31) — jeden tekst, jedna droga do niego.
+# zbudował korpus przy masowym imporcie (p. 31) — jeden tekst, jedna droga do niego.
 GRAPH_DIR   = Path(__file__).parent
 SYSTEM_FILE = GRAPH_DIR / "prompt_system.md"
 USER_FILE   = GRAPH_DIR / "prompt_user.md"

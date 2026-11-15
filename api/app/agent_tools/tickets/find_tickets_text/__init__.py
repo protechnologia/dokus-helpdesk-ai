@@ -16,8 +16,9 @@ znaleziono; treść agent czyta osobno, przez `read_tickets_thread` albo `read_t
 Przykład zapytania i wyniku — w opisie `tool.py`; przykład tekstu, który czyta model — w opisie
 `base.py`.
 
-Narzędzie właściwe jest sprawdzone na zmyślonych wątkach. Tabela zgłoszeń dostanie prawdziwe
-wątki dopiero po anonimizacji (p. 19) i masowym imporcie (p. 31) — do tego czasu jest pusta.
+Narzędzie właściwe jest sprawdzone na zmyślonych wątkach (test integracyjny) i na wątkach
+golden200 po anonimizacji (test ewaluacyjny na tabeli `tickets_text_golden`, 2026-11-15). Tabela
+instancji ma od masowego importu (p. 31) wątki 1081 zgłoszeń.
 """
 
 from app.agent_tools.tickets.find_tickets_text.base import FindTicketsTextToolBase
