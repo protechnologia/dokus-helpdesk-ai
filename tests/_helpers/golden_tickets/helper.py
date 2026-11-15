@@ -13,6 +13,10 @@ po znaczeniu na stacku i filtra jakości na plikach.
 | `corpus()`                 | artefakty korpusu odniesienia                                |
 | `not_useful_ids()`         | id rekordów oznaczonych w przeglądzie jako bez wiedzy        |
 | `measure_filter()`         | odrzucenia filtra jakości wobec etykiet przeglądu            |
+| `golden_text_set()`        | zestaw tekstowy: zapytania z celem i bez celu                |
+| `golden_thread()`          | wątek zgłoszenia golden setu po anonimizacji                 |
+| `contains_phrase()`        | czy fraza stoi w tekście tak, jak szuka jej podciąg w bazie  |
+| `measure_tickets_text()`   | pomiar `find_tickets_text` na tabeli wątków golden setu      |
 
 O czym pamiętać przy zmianach:
 
@@ -24,15 +28,22 @@ O czym pamiętać przy zmianach:
 - `query_problem` i `query_symptoms` napisano z samego `query_raw`, bez wglądu w rekord-cel. Nie
   wolno ich poprawiać pod wynik: zastępują zapytanie agenta do czasu pomiaru na prawdziwym modelu
   (p. 23).
-- Pomiar czyta własną kolekcję golden setu (`GOLDEN_COLLECTION`), a nie kolekcję instancji, bo
-  ta trzyma karty pełnego korpusu (2026-11-13). Buduje się ją raz, komendą z `BUILD_HINT`, a nie
-  w teście, bo indeks 200 kart liczy się na CPU ponad dwie i pół minuty.
+- Pomiary czytają własną kolekcję i tabelę golden setu (`GOLDEN_COLLECTION`, `GOLDEN_TABLE`),
+  a nie indeksy instancji, bo te trzymają pełny korpus (2026-11-13, tabela od 2026-11-15).
+  Buduje je raz komenda z `BUILD_HINT`, a nie test, bo indeks 200 kart liczy się na CPU ponad
+  dwie i pół minuty.
+- Pomiar tekstowy sprawdza najpierw, czy tabela trzyma dokładnie wątki kart przyjętych przez
+  filtr: tabela z innego korpusu dałaby liczby, które nic nie znaczą.
 """
 
 import json
 
 import pytest
 
+from app.agent_tools.tickets.find_tickets_text import (
+    FindTicketsTextQuery,
+    FindTicketsTextTool,
+)
 from app.agent_tools.tickets.find_tickets_vector import (
     FindTicketsVectorQuery,
     FindTicketsVectorTool,
@@ -40,6 +51,7 @@ from app.agent_tools.tickets.find_tickets_vector import (
 from app.config import Settings
 from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_service.filter_ticket_quality import filter_tickets
+from app.db_postgres import DbPostgresMissingTableError, PostgresClient, TicketsTable
 from app.db_qdrant import DbQdrantMissingCollectionError, QdrantClient, TicketsCollection
 from app.engine_embedding import EmbeddingClient
 from tests._helpers.golden_tickets.constants import (
@@ -48,11 +60,20 @@ from tests._helpers.golden_tickets.constants import (
     DISTRACTORS_FILE,
     GOLDEN_COLLECTION,
     GOLDEN_FILE,
+    GOLDEN_TABLE,
+    TEXT_FILE,
+    THREADS_DIR,
+    WHITESPACE,
 )
 from tests._helpers.golden_tickets.models.filter_measurement import FilterMeasurement
 from tests._helpers.golden_tickets.models.golden_query import GoldenQuery
 from tests._helpers.golden_tickets.models.golden_set import GoldenSet
+from tests._helpers.golden_tickets.models.golden_text_query import GoldenTextQuery
+from tests._helpers.golden_tickets.models.golden_text_set import GoldenTextSet
 from tests._helpers.golden_tickets.models.golden_ticket import GoldenTicket
+from tests._helpers.golden_tickets.models.tickets_text_measurement import (
+    TicketsTextMeasurement,
+)
 from tests._helpers.golden_tickets.models.tickets_vector_measurement import (
     TicketsVectorMeasurement,
 )
@@ -267,6 +288,162 @@ def measure_filter() -> FilterMeasurement:
     measurement = FilterMeasurement(
         labelled_drops  = len(dropped & not_useful),
         false_positives = len(dropped - not_useful),
+    )
+
+    return measurement
+
+
+def golden_text_set() -> GoldenTextSet:
+    """
+    Description:
+    Czyta zestaw tekstowy: liczniki z metryczki, zapytania z celem i zapytania bez celu,
+    w kolejności z pliku.
+
+    Example args:
+        (brak)
+
+    Example result:
+        GoldenTextSet(counts={"queries": 21, "distractors": 5},
+                      queries=[GoldenTextQuery(ticket_id="5641", kind="komunikat_log", …), …],
+                      distractors=[GoldenTextQuery(ticket_id=None, kind="komunikat_log", …), …])
+    """
+    data    = json.loads(TEXT_FILE.read_text(encoding="utf-8"))
+    queries = [
+        GoldenTextQuery(
+            ticket_id  = entry["ticket_id"],
+            kind       = entry["kind"],
+            difficulty = entry["difficulty"],
+            exact      = entry["exact"],
+            words      = entry["words"],
+            note       = entry.get("note"),
+        )
+        for entry in data["queries"]
+    ]
+    distractors = [
+        GoldenTextQuery(
+            ticket_id  = None,
+            kind       = entry["kind"],
+            difficulty = "typowe",
+            exact      = entry["exact"],
+            words      = entry.get("words"),
+            note       = None,
+        )
+        for entry in data["distractors"]
+    ]
+    text_set = GoldenTextSet(
+        counts      = data["meta"]["counts"],
+        queries     = queries,
+        distractors = distractors,
+    )
+
+    return text_set
+
+
+def golden_thread(
+    ticket_id: str,  # np. "18387"
+) -> str:
+    """
+    Description:
+    Czyta wątek zgłoszenia golden setu po anonimizacji, ten, z którego `reindex` buduje tabelę
+    wątków golden setu.
+
+    Example args:
+        ticket_id="18387"
+
+    Example result:
+        "ZGŁOSZENIE 18387 z 2024-10-31\nTemat: …"
+    """
+    return (THREADS_DIR / f"{ticket_id}.txt").read_text(encoding="utf-8")
+
+
+def contains_phrase(
+    text:   str,  # np. "…pojawia się komunikat „Wygasły dane\nlogowania użytkownika”…"
+    phrase: str,  # np. "wygasły dane logowania użytkownika"
+) -> bool:
+    """
+    Description:
+    Mówi, czy fraza stoi w tekście tak, jak szuka jej podciąg w bazie: bez względu na wielkość
+    liter i na to, jak tekst złamano między liniami. Polskie litery muszą się zgadzać, jak w bazie.
+
+    Example args:
+        text="…komunikat „Wygasły dane\nlogowania użytkownika”…"
+        phrase="wygasły dane logowania użytkownika"
+
+    Example result:
+        True
+    """
+    flat_text   = WHITESPACE.sub(" ", text).lower()
+    flat_phrase = WHITESPACE.sub(" ", phrase).strip().lower()
+
+    return flat_phrase in flat_text
+
+
+async def measure_tickets_text(
+    client: PostgresClient,  # np. build_postgres_client() — Postgres dostępny z hosta
+    limit:  int,             # np. 5 — RAG_TOP_K
+) -> TicketsTextMeasurement:
+    """
+    Description:
+    Przepuszcza zestaw tekstowy przez `FindTicketsTextTool` zbudowane tak jak w produkcie,
+    z limitem `RAG_TOP_K`, na tabeli wątków golden setu. Najpierw sprawdza, czy tabela trzyma
+    dokładnie wątki kart przyjętych przez filtr jakości: brakująca, pusta albo zbudowana z innego
+    korpusu tabela kończy test błędem z poleceniem, które ją buduje.
+
+    Example args:
+        client=build_postgres_client()
+        limit=5
+
+    Example result:
+        TicketsTextMeasurement(target_first=19, target_returned=20, distractors_with_hits=0)
+
+    Raises:
+        Failed: tabeli wątków golden setu nie ma, jest pusta albo nie odpowiada korpusowi
+        DbPostgresError: Postgres jest nieosiągalny
+    """
+    table = TicketsTable(client, GOLDEN_TABLE)
+    tool  = FindTicketsTextTool(tickets=table, limit=limit)
+
+    try:
+        # --- warunek wstępny: tabela to dokładnie wątki kart przyjętych przez filtr ---
+        try:
+            indexed = await table.count()
+        except DbPostgresMissingTableError:
+            pytest.fail(f"nie ma tabeli `{GOLDEN_TABLE}` — {BUILD_HINT}")
+
+        kept  = sorted(verdict.ticket_id for verdict in filter_tickets(corpus()).kept)
+        found = {row.ticket_id for row in await table.read_by_id(kept)}
+
+        if indexed != len(kept) or found != set(kept):
+            pytest.fail(
+                f"tabela `{GOLDEN_TABLE}` ma {indexed} wierszy, z tego {len(found)} z {len(kept)} "
+                f"wątków kart przyjętych przez filtr — {BUILD_HINT}"
+            )
+
+        # --- zapytania z celem ---
+        target_first    = 0
+        target_returned = 0
+
+        for query in golden_text_set().queries:
+            result = await tool.find(FindTicketsTextQuery(exact=query.exact, words=query.words))
+            ids    = [ticket.ticket_id for ticket in result.tickets]
+
+            target_first    += ids[:1] == [query.ticket_id]
+            target_returned += query.ticket_id in ids
+
+        # --- zapytania bez celu: każde trafienie jest tu pomyłką ---
+        distractors_with_hits = 0
+
+        for query in golden_text_set().distractors:
+            result = await tool.find(FindTicketsTextQuery(exact=query.exact, words=query.words))
+
+            distractors_with_hits += bool(result.tickets)
+    finally:
+        await tool.aclose()
+
+    measurement = TicketsTextMeasurement(
+        target_first          = target_first,
+        target_returned       = target_returned,
+        distractors_with_hits = distractors_with_hits,
     )
 
     return measurement

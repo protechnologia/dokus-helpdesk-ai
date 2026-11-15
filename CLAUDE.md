@@ -2125,6 +2125,10 @@ błędem `DbPostgresMissingTableError`.
   „e-Doręczeń".
 - **Słownik odmienia, ale nie zna słowotwórstwa** — „komunikacja" nie znajduje „skomunikować".
   To zostaje zadaniem embeddera.
+- **Ani podciąg, ani słownik nie zrównują liter z ogonkami i bez nich (zmierzone 2026-11-15
+  na golden secie)** — „Wygasly dane logowania” nie znajduje „Wygasły dane logowania” ani frazą,
+  ani słowami, więc komunikat przepisany z notatki pisanej bez polskich znaków chybia. Czy to
+  boli, pokaże pomiar narzędzi na prawdziwych zapytaniach agenta (p. 23.2).
 - **Dlaczego nie filtr tekstowy Qdranta:** zmierzony na 1.12.5 wymaga wszystkich słów, ale nie
   odmienia („serwer" nie znajduje „serwerem") i nie zna frazy.
 - **Słownik ładuje się w KAŻDEJ sesji: około 0,6 s i 32 MB na połączenie.** Klient musi trzymać
@@ -3151,10 +3155,21 @@ w pliku wektorowym, bo stoją na tych samych 200 zgłoszeniach.
   (`tickets_golden`, `tickets_text_golden`), podane w poleceniu `reindex`.
 - **Golden200 jest słabym punktem odniesienia (2026-11-15).** Pochodzi z lipcowego zrzutu,
   a instancja z sierpniowego; szuka wśród 141 kart, a produkt wśród 1081; komunikat albo kod
-  błędu ma tylko 18 przyjętych zgłoszeń, więc przypadek częstego komunikatu, który przy wynikach
+  błędu ma tylko 19 przyjętych zgłoszeń, więc przypadek częstego komunikatu, który przy wynikach
   od najnowszych wypycha cel poza limit, prawie w nim nie występuje. Ręczne etykiety przenoszą
   się na karty importu prawie bez strat (z 135 z wiedzą filtr przyjął 131, z 65 bez wiedzy
   odrzucił 56). Pełny golden z korpusu importu to p. 79.
+- **Zestaw tekstowy to `data/unsafe/golden/tickets-text.json` (2026-11-15, p. 31): 23 zapytania
+  w kształcie `find_tickets_text` do wątków golden200 i 6 bez celu, na tabeli
+  `tickets_text_golden`.** Cel to zgłoszenie, z którego wątku wzięto komunikat albo kod, i tylko
+  takie, którego karta o nim mówi; słowa stoją w innej odmianie niż w wątku, a zapytania bez celu
+  to komunikaty z korpusu instancji, których w wątkach golden setu nie ma. Wynik: cel pierwszy
+  w 21, zwrócony w 22, zapytania bez celu bez trafień; test porównuje liczby dokładnie, bo tabela
+  jest zamrożona, a szukanie deterministyczne. Częsty komunikat ze słowami kontekstu nie zawęża:
+  trafienia frazą idą pierwsze i od najnowszych, więc cel najstarszy z czterech wątków jest
+  czwarty, a same słowa (komunikat z czynnością) zawężają do jednej sprawy. Zwykłe zapytania nie
+  odróżniały podciągu od słów, bo komunikaty w 141 wątkach są prawie unikalne; odróżniają je
+  zapytania dobrane celowo: fragment kodu i fraza bez celu, której słowa stoją w innym wątku.
 
 - **Plik to jedna lista wpisów, po jednym na każde zgłoszenie korpusu odniesienia (2026-10-23,
   wcześniej listy `queries` i `rejected` o dwóch kształtach).** Wpis ma `ticket_id`, etykietę
@@ -3445,9 +3460,9 @@ localhost:8010/search`.
 - Jeden rodzaj: `pytest tests/unit/`, `pytest tests/integration/`, `pytest tests/functional/`
 - Na stacku: `pytest tests/integration/ tests/functional/ -m stack` (albo `-m stack_<usługa>`)
 - Ewaluacyjne: `pytest tests/evaluation/` — bez korpusu odniesienia w `data/` testy się pomijają;
-  z pomiarem `find_tickets_vector` na golden secie i z indeksem paczki syntetycznej:
-  `pytest tests/evaluation/ -m "not llm_live"` (stack i oba zbudowane indeksy: kolekcja
-  `tickets_golden` oraz syntetyczny dokumentacji)
+  z pomiarami `find_tickets_vector` i `find_tickets_text` na golden secie i z indeksem paczki
+  syntetycznej: `pytest tests/evaluation/ -m "not llm_live"` (stack i zbudowane indeksy:
+  kolekcja `tickets_golden`, tabela `tickets_text_golden` oraz syntetyczny dokumentacji)
 - Na żywym LLM:
   `pytest tests/integration/api_engine_llm/ tests/integration/api_agent_graphs/ -m llm_live` —
   **kosztuje / bije po sieci, pytaj przed**; woła model generujący z konfiguracji
@@ -3958,7 +3973,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/numbered_lines/`       | linie z numerami z wyniku `read_code_file` i `read_code_symbol` rozebrane z powrotem na pary „numer, treść" (`numbered_pairs()`), same numery (`line_numbers()`) albo samą treść (`line_texts()`) |
 | `tests/_helpers/synthetic_code/`       | aplikacja syntetyczna: zbudowana paczka, jej źródło i reguły, opis projektu, mapa symboli, zapytania z zestawu syntetycznego i prawdziwe narzędzia kodu na niej (`synthetic_code_tools()`) |
 | `tests/_helpers/synthetic_docs/`       | dokumentacja syntetyczna: indeks wobec paczki (`table_differences()`, `collection_differences()`) i pomiary obu wyszukiwań w dokumentacji |
-| `tests/_helpers/golden_tickets/`       | golden set zgłoszeń: wpisy z etykietami i zapytaniami (`golden_set()`), dystraktory, korpus odniesienia, pomiar `find_tickets_vector` i filtra jakości |
+| `tests/_helpers/golden_tickets/`       | golden set zgłoszeń: wpisy z etykietami i zapytaniami (`golden_set()`), dystraktory, zestaw tekstowy (`golden_text_set()`), korpus odniesienia z wątkami po anonimizacji (`golden_thread()`), pomiar `find_tickets_vector`, `find_tickets_text` (`measure_tickets_text()`) i filtra jakości |
 | `tests/_helpers/golden_anonymization/` | golden set anonimizatora: oba zestawy, ocena przecieków i zniszczonej wiedzy, pomiar z licznikami na rodzaj (`measure_anonymization()`), kontrola zaznaczeń (`annotation_problems()`) i wzorcowa zamiana (`ideal_anonymizer()`) |
 | `tests/_helpers/anonymizer_llm/`      | model anonimizujący usługi `anonymizer`: odpowiedź Chat Completions (`chat_answer()`), klient modelu na atrapie transportu (`model_client_on()`) i odpowiadający węzłom osób i adresów (`scripted_llm()`), konfiguracja z `.env` dla `llm_live` (`live_agent_settings()`), pomiar silnika `agent` na golden secie (`measure_agent()`), przecieki ponad próg i progi |
 | `tests/_helpers/patterns/`            | wzorce usługi `anonymizer`: tekst po zamianie miejscami z jednego wariantu (`replaced_by()`), zamiana wszystkimi wzorcami jako funkcja do pomiaru golden setu (`anonymize_with_patterns()`), rodzaje od wzorców, progi przecieków na zestaw i odczyt pomiaru (`kinds_over_threshold()`, `leaked_fragments()`, `destroyed_fragments()`, `removed_kinds()`) |
@@ -4325,7 +4340,10 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
       zwykle z `component` „główna aplikacja” (ePUAP 52, e-Doręczenia 45, eNadawca 11 na 1758),
       w `questions_summary` czasem prośba o numer pisma zamiast pytania diagnostycznego. Bez
       dodatkowej kopii korpusu (decyzja 2026-11-13); przeniesienie na serwer pokazowy robi
-      użytkownik. Zostają krok 7 (zapytania tekstowe i test `find_tickets_text`) i krok 8.
+      użytkownik. Krok 7 (2026-11-15): nazwa tabeli wątków w konfiguracji
+      (`POSTGRES_TICKETS_TABLE`), wątki golden200 po anonimizacji w `golden/anonymized/`, tabela
+      `tickets_text_golden` i na niej zestaw tekstowy z testem `find_tickets_text`; zestaw na
+      pełnym korpusie wraca w p. 79. Zostaje krok 8.
 - [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
   „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy; po nim 139 zgłoszeń tego kanału
   z sierpniowego zrzutu dochodzi do korpusu osobnym przebiegiem, bez parsowania reszty od nowa.
@@ -4400,7 +4418,10 @@ korpusie, przechodzi przy zamknięciu do p. 33.
   - [ ] **23.2 Narzędzia zgłoszeń** — trafność zapytań pisanych przez agenta wobec zapytań
     z parsera korpusu (golden set, `recall@1` i MRR; punkt odniesienia to pola `query_problem`
     i `query_symptoms` golden setu — 119 ze 126 na pierwszym miejscu); wkład narzędzi `_text`
-    liczony osobno — czy znajdują coś, czego wektor nie znajduje, jest dziś niezmierzone; czy
+    liczony osobno — czy znajdują coś, czego wektor nie znajduje, jest dziś niezmierzone; dwie
+    słabości `find_tickets_text` z zestawu tekstowego (2026-11-15): komunikat bez polskich znaków
+    chybia frazą i słowami, a słowa kontekstu nie zawężają częstego komunikatu, bo trafienia
+    frazą idą pierwsze — czy agent wpada w którąś z nich i czy go to kosztuje; czy
     model czyta karty WSZYSTKICH znalezionych numerów, czy tylko pierwszego, i ile kosztuje
     dodatkowa tura odczytu; na prawdziwych wątkach: ile wątków na sprawę (dziś 3), limit
     długości wątku i czy wątek ma nieść etykiety z `as_thread()` („KOMENTARZ", rola, data).

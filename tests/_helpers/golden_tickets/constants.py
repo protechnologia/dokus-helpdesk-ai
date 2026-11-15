@@ -4,6 +4,7 @@ Stałe golden setu zgłoszeń: pliki zestawu i korpusu odniesienia oraz progi ob
 wyszukiwania po znaczeniu i filtra jakości.
 """
 
+import re
 from pathlib import Path
 
 # Golden set: wpis na każde zgłoszenie korpusu odniesienia z etykietą przeglądu (`useful`)
@@ -49,6 +50,37 @@ MIN_TARGET_RETURNED = 123
 # Próg: dystraktory z choć jednym trafieniem. Zmierzone 7 z 16 (na kartach Bielika 3 z 16).
 # Trafienie na zapytanie bez odpowiednika wygląda na odpowiedź, a nią nie jest.
 MAX_DISTRACTORS_WITH_HITS = 8
+
+# Zestaw tekstowy: zapytania w kształcie `find_tickets_text` do wątków golden setu, z celem
+# i bez celu (2026-11-15). Dane klienta, poza repo.
+TEXT_FILE = Path("data/unsafe/golden/tickets-text.json")
+
+# Wątki golden setu po anonimizacji, z których `reindex` buduje tabelę `GOLDEN_TABLE`.
+THREADS_DIR = Path("data/unsafe/golden/anonymized")
+
+# Warstwy zapytań tekstowych: kod błędu albo pliku, komunikat z ekranu, komunikat z logu albo
+# biblioteki i nazwa funkcji albo dokumentu. Wartość spoza listy to literówka w zestawie.
+TEXT_QUERY_KINDS = ("kod", "komunikat_ekran", "komunikat_log", "nazwa")
+
+# Białe znaki, które baza sprowadza do jednej spacji po obu stronach szukania podciągiem: `\s`
+# i twarda spacja, której `\s` bazy nie obejmuje. Na tym samym wzorcu test spójności zestawu
+# sprawdza, że fraza stoi w wątku celu.
+WHITESPACE = re.compile(r"[\s ]+")
+
+# Oczekiwane wyniki pomiaru tekstowego (2026-11-15). Szukanie w zamrożonej tabeli jest
+# deterministyczne, więc test porównuje je dokładnie: zmiana w dowolną stronę to zmiana
+# w narzędziu, w bazie albo w zestawie, a nie dryf. Liczba zawyżona przez zepsuty pomiar też
+# wychodzi, czego próg „co najmniej” by nie złapał.
+
+# Zapytania, na które zgłoszenie-cel wraca jako pierwsze: 21 z 23. Nie wraca pierwsze częsty
+# komunikat, którego wątek-cel jest najstarszy, i fraza bez polskich znaków.
+TEXT_TARGET_FIRST = 21
+
+# Zapytania, na które zgłoszenie-cel w ogóle wraca: 22 z 23. Chybia fraza bez polskich znaków.
+TEXT_TARGET_RETURNED = 22
+
+# Zapytania bez celu z choć jednym trafieniem: 0 z 6.
+TEXT_DISTRACTORS_WITH_HITS = 0
 
 # Próg: rekordy oznaczone w przeglądzie jako bez wiedzy, które filtr odrzuca. Zmierzone 59 z 65
 # (2026-10-23, karty `gpt-6.1-sol`); próg niżej, żeby wyłapać filtr, który zamilkł, a nie dryf.
