@@ -403,7 +403,7 @@ def test_rebuild_names_the_collection_and_table_from_the_configuration(
 def test_rebuild_says_the_threads_table_stays_without_threads(
     tmp_path: Path, stub_run: StubRun
 ) -> None:
-    """Sprawdza, czy przy korpusie bez `anonymized/` (jak golden set) pytanie przed przebudową
+    """Sprawdza, czy przy korpusie bez `anonymized/` (same karty) pytanie przed przebudową
     mówi, że tabela wątków zostaje.
 
     Wyłapuje pytanie, które straszy skasowaniem wątków, choć przebudowa ich nie ruszy, albo

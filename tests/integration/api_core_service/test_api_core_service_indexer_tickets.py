@@ -191,7 +191,7 @@ async def test_threads_of_kept_cards_go_to_the_table(tmp_path: Path) -> None:
 
 
 async def test_a_corpus_without_threads_leaves_the_table_alone(tmp_path: Path) -> None:
-    """Sprawdza, czy korpus bez katalogu `anonymized/` (jak golden set) buduje karty, nie dotyka
+    """Sprawdza, czy korpus bez katalogu `anonymized/` (same karty) buduje karty, nie dotyka
     tabeli wątków i daje raport z `threads` równym `None`.
 
     Wyłapuje budowę, która przy braku wątków zakłada albo czyści tabelę: indeksacja golden setu

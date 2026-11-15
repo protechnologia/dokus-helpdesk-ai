@@ -35,7 +35,13 @@ from app.core_service.indexer_closed_ticket import ClosedTicketIndexer
 from app.core_service.indexer_tickets import TicketsIndexer
 from app.db_postgres import TicketRow
 from app.db_qdrant import TicketPoint
-from app.engine_anonymization import AnonymizedText, Anonymizer, AnonymizerInfo, FakeAnonymizer
+from app.engine_anonymization import (
+    AnonymizationError,
+    AnonymizedText,
+    Anonymizer,
+    AnonymizerInfo,
+    FakeAnonymizer,
+)
 from app.engine_embedding import Embeddings
 from app.main import create_app
 from tests._helpers.embedding import EMBEDDING_MODEL
@@ -434,16 +440,19 @@ class ReplacingAnonymizer(Anonymizer):
 
     def __init__(
         self,
-        fragment: str,  # np. "Anna Nowak"
-        markers:  str,  # np. "{IMIĘ} {NAZWISKO}"
+        fragment: str,               # np. "Anna Nowak"
+        markers:  str,               # np. "{IMIĘ} {NAZWISKO}"
+        fail_on:  str | None = None, # np. "ZGŁOSZENIE 41003" — tekst z nim kończy się błędem
     ) -> None:
         """
         Description:
-        Zapamiętuje, co zamieniać i na co, z pustym dziennikiem tekstów.
+        Zapamiętuje, co zamieniać i na co, oraz po czym poznać tekst, na którym usługa ma
+        zawieść, z pustym dziennikiem tekstów.
 
         Example args:
             fragment="Anna Nowak"
             markers="{IMIĘ} {NAZWISKO}"
+            fail_on=None
 
         Example result:
             ReplacingAnonymizer z pustym `texts`, niezamknięty
@@ -452,6 +461,7 @@ class ReplacingAnonymizer(Anonymizer):
         self.closed    = False
         self._fragment = fragment
         self._markers  = markers
+        self._fail_on  = fail_on
 
     async def anonymize(
         self,
@@ -459,15 +469,22 @@ class ReplacingAnonymizer(Anonymizer):
     ) -> AnonymizedText:
         """
         Description:
-        Zapisuje tekst i oddaje go z fragmentem zamienionym na znaczniki.
+        Zapisuje tekst i oddaje go z fragmentem zamienionym na znaczniki, a tekst z `fail_on`
+        odrzuca tak, jak usługa, która chwilowo nie odpowiada.
 
         Example args:
             text="…potwierdziła Anna Nowak."
 
         Example result:
             AnonymizedText(text="…potwierdziła {IMIĘ} {NAZWISKO}.")
+
+        Raises:
+            AnonymizationError: tekst zawiera `fail_on`
         """
         self.texts.append(text)
+
+        if self._fail_on is not None and self._fail_on in text:
+            raise AnonymizationError("anonimizator nie odpowiedział")
 
         return AnonymizedText(text=text.replace(self._fragment, self._markers))
 

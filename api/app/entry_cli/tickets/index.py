@@ -21,8 +21,8 @@ def index_artifacts(
     `helpdesk tickets index` — indeksuje karty korpusu do istniejącej kolekcji, a wątki kart
     przyjętych do tabeli wątków, nadpisując punkty i wiersze zgłoszeń, które już tam są. Ponowne
     uruchomienie jest bezpieczne: id punktu i klucz wiersza wynikają z `ticket_id`, więc to samo
-    zgłoszenie trafia w to samo miejsce, zamiast się dublować. Korpus bez `anonymized/` (golden
-    set) buduje same karty.
+    zgłoszenie trafia w to samo miejsce, zamiast się dublować. Korpus bez `anonymized/` (np.
+    katalog roboczy ponownego parsowania golden setu) buduje same karty.
 
     Example args:
         directory=None  # korpus z TICKETS_CORPUS_DIR

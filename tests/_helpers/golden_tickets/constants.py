@@ -27,10 +27,15 @@ CORPUS_DIR = Path("data/unsafe/golden/cards")
 # instancja trzyma karty pełnego korpusu, a pomiar ma stać na 200 kartach golden setu.
 GOLDEN_COLLECTION = "tickets_golden"
 
-# Podpowiedź do błędu pomiaru, gdy kolekcji golden setu nie ma albo jest pusta: polecenie, które
-# ją buduje — ta sama komenda co indeks instancji, z nazwą kolekcji podaną w środowisku.
+# Tabela Postgresa z wątkami golden setu (po anonimizacji, z `golden/anonymized/`), osobna od
+# tabeli instancji z tego samego powodu co kolekcja (2026-11-15).
+GOLDEN_TABLE = "tickets_text_golden"
+
+# Podpowiedź do błędu pomiaru, gdy indeksu golden setu nie ma albo jest pusty: polecenie, które
+# go buduje — ta sama komenda co indeks instancji, z nazwami kolekcji i tabeli podanymi
+# w środowisku. Bez którejkolwiek przebudowa skasowałaby indeks instancji.
 BUILD_HINT = (
-    f"zbuduj indeks: QDRANT_COLLECTION={GOLDEN_COLLECTION} "
+    f"zbuduj indeks: QDRANT_COLLECTION={GOLDEN_COLLECTION} POSTGRES_TICKETS_TABLE={GOLDEN_TABLE} "
     "helpdesk tickets reindex data/unsafe/golden"
 )
 

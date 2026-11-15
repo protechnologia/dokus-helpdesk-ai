@@ -58,8 +58,9 @@ Co się dzieje po drodze:
 
 O czym pamiętać przy zmianach:
 
-- Korpus bez katalogu `anonymized/` (golden set, którego wątki są tylko surowe) buduje same
-  karty, a tabela wątków zostaje bez zmian — raport mówi to polem `threads` równym `None`.
+- Korpus bez katalogu `anonymized/` (np. katalog roboczy ponownego parsowania golden setu)
+  buduje same karty, a tabela wątków zostaje bez zmian — raport mówi to polem `threads` równym
+  `None`.
 - Gdy `anonymized/` jest, każda karta musi mieć w nim swój wątek: brak to zepsuty korpus, więc
   przebieg odmawia, zanim cokolwiek zapisze albo skasuje.
 """
@@ -394,7 +395,7 @@ class TicketsIndexer:
         Raises:
             FileNotFoundError: `anonymized/` jest, ale nie ma w nim wątku którejś karty
         """
-        # --- korpus bez wątków (golden set): same karty, tabela bez zmian ---
+        # --- korpus bez wątków (np. same nowe karty): same karty, tabela bez zmian ---
         if not corpus.anonymized_dir.is_dir():
             return False
 

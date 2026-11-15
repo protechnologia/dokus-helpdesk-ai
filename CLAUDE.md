@@ -284,7 +284,7 @@ dokus-helpdesk-ai/
 │   └── unsafe/                   # dane klientów (PII) — NIE w repo
 │       ├── db/                   # zrzuty bazy źródłowej
 │       ├── corpus/               # korpus zgłoszeń: raw-db/, raw-route/, anonymized/, cards/
-│       ├── golden/               # zestawy do ewaluacji, w tym karty (cards/) i wątki (raw/)
+│       ├── golden/               # zestawy do ewaluacji i korpus golden setu: raw-db/, cards/, anonymized/
 │       ├── instruction/          # właściwa dokumentacja (p. 55)
 │       ├── code/                 # paczka kodu aplikacji: rules.json, manifest.json, symbols.json, project.md, repo/ (p. 60)
 │       └── docs/                 # prezentacje/ i raporty robocze
@@ -640,8 +640,8 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
 - **Oba indeksy zgłoszeń buduje jeden serwis, `TicketsIndexer` (2026-11-11, p. 30), jak
   `DocsIndexer` przy dokumentacji.** Z `cards/` korpusu robi kolekcję kart w Qdrancie, a wątki
   kart przyjętych z `anonymized/` wstawia do tabeli wątków w Postgresie; tego samego serwisu
-  używa trasa zamknięcia zgłoszenia dla jednej karty. Korpus bez `anonymized/` (golden set,
-  którego wątki są tylko surowe) buduje same karty, a tabeli wątków nie rusza. Gdy
+  używa trasa zamknięcia zgłoszenia dla jednej karty. Korpus bez `anonymized/` (np. katalog
+  roboczy ponownego parsowania golden setu) buduje same karty, a tabeli wątków nie rusza. Gdy
   `anonymized/` jest, każda karta musi mieć w nim swój wątek: brak to zepsuty korpus, więc
   indeksacja odmawia, zanim cokolwiek zapisze albo skasuje.
 
@@ -3124,8 +3124,8 @@ z 2026-10-23; do 2026-11-11 w `data/unsafe/parsed/gpt-6.1-sol-golden200-v2/`, a 
 Bielika, skasowane) i dystraktory `data/unsafe/golden/tickets-vector-distractors.json` (wcześniej
 `distractors.json`, `tickets-dokus-distractors.json` i `tickets-distractors.json`) — materiał
 wielokrotnego użytku przy każdej zmianie modelu. „Golden200" zostaje nazwą próbki 200 zgłoszeń.
-Dopisek `-vector` od 2026-11-15: obok staje zestaw wyszukiwania tekstowego w wątkach instancji
-(p. 31), a dwa pliki `tickets*` nie mówiły, który mierzy co. Etykiety filtra jakości zostają
+Dopisek `-vector` od 2026-11-15: obok staje zestaw wyszukiwania tekstowego w wątkach golden setu
+(p. 31), a dwa pliki `tickets*` nie mówiłyby, który mierzy co. Etykiety filtra jakości zostają
 w pliku wektorowym, bo stoją na tych samych 200 zgłoszeniach.
 
 - **Karty golden setu zastępuje się w całości, po przyjęciu (2026-11-11).** Jest jeden katalog kart,
@@ -3134,11 +3134,27 @@ w pliku wektorowym, bo stoją na tych samych 200 zgłoszeniach.
   komendy `helpdesk tickets` biorą katalog korpusu, a `golden/cards/` zastępuje dopiero po
   porównaniu pomiarów na obu; stare karty nie zostają obok. Numery zgłoszeń skrypt bierze z
   `tickets-vector.json`, a katalog kart z jego metryczki (`meta.corpus_dir`).
-- **Wątki golden setu leżą w `golden/raw/` (2026-11-11):** 200 plików z eksportu lipcowego
-  zrzutu, z których powstały karty i na których przeglądano etykiety. Reszta lipcowego eksportu
+- **Wątki golden setu leżą w `golden/raw-db/` (2026-11-11, do 2026-11-15 w `golden/raw/`):**
+  200 plików z eksportu lipcowego zrzutu, z których powstały karty i na których przeglądano
+  etykiety. Katalog nazywa się jak w korpusie, więc `golden/` ma układ korpusu, a skrypt golden
+  setu czyta go przez `TicketsCorpus`; import na nim nic nie zrobi, bo każde zgłoszenie ma
+  kartę. Reszta lipcowego eksportu
   (1625 plików) jest skasowana: eksport da się powtórzyć z lipcowego zrzutu, a korpus powstaje
   z sierpniowego (p. 31). Wątki zostają z lipca także przy ponownym parsowaniu, bo w nowszym
   zrzucie sprawa mogła dostać komentarze, których przegląd etykiet nie widział.
+- **Wątki golden setu po anonimizacji leżą w `golden/anonymized/` (2026-11-15)**, z tych samych
+  plików `raw-db/`, z których powstały karty; zapisuje je `parse_golden_tickets.py anonymize`.
+  Z nich `reindex` golden setu buduje tabelę wątków, na której mierzy się `find_tickets_text`
+  (p. 31). Karty powstały z wątków po innym przebiegu anonimizatora, bo graf karty swojego wątku
+  nie zapisywał, a Bielik nie jest deterministyczny: znaczniki mogą stać minimalnie inaczej niż
+  w tekście, który widział model. Kolekcja i tabela golden setu mają własne nazwy
+  (`tickets_golden`, `tickets_text_golden`), podane w poleceniu `reindex`.
+- **Golden200 jest słabym punktem odniesienia (2026-11-15).** Pochodzi z lipcowego zrzutu,
+  a instancja z sierpniowego; szuka wśród 141 kart, a produkt wśród 1081; komunikat albo kod
+  błędu ma tylko 18 przyjętych zgłoszeń, więc przypadek częstego komunikatu, który przy wynikach
+  od najnowszych wypycha cel poza limit, prawie w nim nie występuje. Ręczne etykiety przenoszą
+  się na karty importu prawie bez strat (z 135 z wiedzą filtr przyjął 131, z 65 bez wiedzy
+  odrzucił 56). Pełny golden z korpusu importu to p. 79.
 
 - **Plik to jedna lista wpisów, po jednym na każde zgłoszenie korpusu odniesienia (2026-10-23,
   wcześniej listy `queries` i `rejected` o dwóch kształtach).** Wpis ma `ticket_id`, etykietę
@@ -3161,8 +3177,9 @@ w pliku wektorowym, bo stoją na tych samych 200 zgłoszeniach.
   dystraktorów. Pilnuje tego
   `tests/evaluation/test_api_agent_tools_find_tickets_vector_golden_stack.py`, na własnej
   kolekcji golden setu, `tickets_golden` (2026-11-13): kolekcja instancji trzyma karty pełnego
-  korpusu, więc pomiar na niej mierzyłby co innego. Buduje ją `QDRANT_COLLECTION=tickets_golden
-  helpdesk tickets reindex data/unsafe/golden`, a test jej nie buduje (ok. 2,5 minuty na CPU).
+  korpusu, więc pomiar na niej mierzyłby co innego. Buduje ją razem z tabelą wątków golden setu
+  polecenie z „Commands” (`QDRANT_COLLECTION=tickets_golden POSTGRES_TICKETS_TABLE=…`), a test
+  jej nie buduje (ok. 2,5 minuty na CPU).
 
 - **Zapytanie zna WYŁĄCZNIE to, co widzi zgłaszający** — nigdy przyczyny ani terminologii
   z rozwiązania. Inaczej zadanie staje się za łatwe dla **wszystkich** modeli i pomiar przestaje
@@ -3342,17 +3359,22 @@ nogi produktu na jednej sprawie.
 - Ponowne parsowanie golden setu grafem `parse_ticket` do katalogu roboczego, z wznawianiem
   i postępem co 10 zgłoszeń: `python scripts/parse_golden_tickets.py parse <nowy katalog>/cards`
   (numery z `data/unsafe/golden/tickets-vector.json`; do `golden/cards/` nie zapisuje; indeks do
-  pomiaru: `QDRANT_COLLECTION=tickets_golden helpdesk tickets reindex <nowy katalog>`) — **płatne,
+  pomiaru: `QDRANT_COLLECTION=tickets_golden POSTGRES_TICKETS_TABLE=tickets_text_golden helpdesk
+  tickets reindex <nowy katalog>`) — **płatne,
   pytaj przed**; wymaga usługi `anonymizer` z modelem anonimizującym i modelu generującego
   z `.env` (golden200 na `gpt-6.1-sol` kosztował 2026-10-23 około 1 USD)
+- Wątki golden setu po anonimizacji do `data/unsafe/golden/anonymized/`, z wznawianiem:
+  `python scripts/parse_golden_tickets.py anonymize` (z `golden/raw-db/`; kart nie rusza) — wymaga
+  usługi `anonymizer` z modelem anonimizującym, a model generujący nie może być atrapą
 - Mapa symboli do paczki, która już stoi, bez kopiowania kodu od nowa:
   `python scripts/build_code_symbols.py build data/unsafe/code` (zastępuje `symbols.json`;
   budowa paczki robi to samo na końcu)
 
 **Pipeline danych (CLI `helpdesk`)**
 - Argumentem czterech komend niżej jest katalog korpusu (bez niego `TICKETS_CORPUS_DIR`);
-  golden set to `data/unsafe/golden`, który ma same karty, a jego indeks stoi w osobnej kolekcji:
-  `QDRANT_COLLECTION=tickets_golden helpdesk tickets reindex data/unsafe/golden`
+  golden set to `data/unsafe/golden`, a jego indeksy stoją w osobnej kolekcji i tabeli:
+  `QDRANT_COLLECTION=tickets_golden POSTGRES_TICKETS_TABLE=tickets_text_golden helpdesk tickets
+  reindex data/unsafe/golden` (bez którejś zmiennej przebudowa kasuje indeks instancji)
 - Masowy import z eksportu do korpusu: `helpdesk tickets import [<korpus>] [--limit N]
   [--concurrency 4]` (z `raw-db/` do `anonymized/` i `cards/`; pomija zgłoszenia w toku,
   „Automat mailowy” i te z kartą, więc przerwany przebieg wznawia to samo polecenie; postęp
@@ -4506,3 +4528,13 @@ Rzeczy odłożone świadomie, bez miejsca w kolejności planu. Każdy punkt: cel
   i filtry silnika stroiliśmy na tym samym golden secie, na którym mierzymy, więc „bez
   przecieku” to wynik optymistyczny. Wraca przed masowym importem (p. 31) albo przy podejrzeniu
   przecieku.
+- [ ] **79. Golden set z korpusu importu** (dopisany 2026-11-15) — zamrożona kopia `cards/`
+  i `anonymized/` z masowego importu jako korpus golden w standardowym układzie; etykiety
+  i zapytania wektorowe z golden200 przepięte na jej karty (około 10 etykiet do przejrzenia,
+  bo filtr ocenił je inaczej niż przegląd), zapytania tekstowe dobrane z 1081 przyjętych wątków
+  (około 40, z komunikatami powtarzającymi się w wielu wątkach), indeksy z `reindex` do własnej
+  kolekcji i tabeli; nowe progi zamiast liczb z golden200. *Dlaczego:* golden200 jest z lipcowego
+  zrzutu, szuka wśród 141 kart zamiast 1081 i ma za mało komunikatów, żeby zmierzyć, czy częsty
+  komunikat wypycha cel poza limit wyników — a to największa słabość wyszukiwania tekstowego.
+  Cena: jednorazowo około 25 minut liczenia wektorów na CPU, a stare liczby przestają być
+  porównywalne.

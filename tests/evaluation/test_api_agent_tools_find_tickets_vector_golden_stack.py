@@ -32,8 +32,9 @@ O czym pamiętać przy zmianach:
   (p. 23).
 - Indeksem jest osobna kolekcja golden setu, `tickets_golden`, a nie kolekcja instancji, bo ta
   trzyma karty pełnego korpusu (2026-11-13). Test jej nie buduje, bo indeks 200 kart liczy się na
-  CPU ponad dwie i pół minuty; brakująca albo pusta kolekcja wywala test, a buduje ją
-  `QDRANT_COLLECTION=tickets_golden helpdesk tickets reindex data/unsafe/golden`.
+  CPU ponad dwie i pół minuty; brakująca albo pusta kolekcja wywala test, a buduje ją razem
+  z tabelą wątków golden setu `QDRANT_COLLECTION=tickets_golden
+  POSTGRES_TICKETS_TABLE=tickets_text_golden helpdesk tickets reindex data/unsafe/golden`.
 - Indeks i golden set to te same rekordy, więc liczby pilnują, że ścieżka się nie zepsuła,
   a skutecznością produktu nie są.
 - Zmiana `RAG_SCORE_MIN` albo `RAG_TOP_K` przesuwa wszystkie trzy liczby. Co próg robi z każdym
