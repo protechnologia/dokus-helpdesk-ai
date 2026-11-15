@@ -4,10 +4,10 @@ Do czego:
     Pomiary filtra jakości i wyszukiwania stoją na kartach golden setu
     w `data/unsafe/golden/cards/`. Gdy zmienia się prompt parsujący, kontrakt karty albo model,
     te karty trzeba policzyć od nowa.
-    Skrypt bierze numery zgłoszeń z golden setu (`data/unsafe/golden/tickets.json`), czyta ich
-    wątki z `data/unsafe/golden/raw/` i parsuje każdy tą samą drogą co trasa `/parse-ticket`:
-    anonimizator, potem model generujący z `.env`. Karty idą do nowego katalogu roboczego,
-    a katalog odniesienia zastępują dopiero wtedy, gdy człowiek je przyjmie.
+    Skrypt bierze numery zgłoszeń z golden setu (`data/unsafe/golden/tickets-vector.json`),
+    czyta ich wątki z `data/unsafe/golden/raw/` i parsuje każdy tą samą drogą co trasa
+    `/parse-ticket`: anonimizator, potem model generujący z `.env`. Karty idą do nowego katalogu
+    roboczego, a katalog odniesienia zastępują dopiero wtedy, gdy człowiek je przyjmie.
 
 WYMAGA DZIAŁAJĄCEJ USŁUGI `anonymizer` Z MODELEM ANONIMIZUJĄCYM I PRAWDZIWEGO MODELU
 GENERUJĄCEGO — KAŻDE ZGŁOSZENIE TO PŁATNE WYWOŁANIE:
@@ -83,7 +83,7 @@ from app.engine_anonymization import (  # noqa: E402
 from app.engine_llm import LLMConfigError, LLMError, get_llm_client  # noqa: E402
 
 # Golden set zgłoszeń: wpis na każde zgłoszenie i w metryczce katalog kart odniesienia.
-GOLDEN_DEFAULT = REPO_ROOT / "data" / "unsafe" / "golden" / "tickets.json"
+GOLDEN_DEFAULT = REPO_ROOT / "data" / "unsafe" / "golden" / "tickets-vector.json"
 
 # Wątki zgłoszeń golden setu z lipcowego zrzutu, tak jak zdjął je `export_raw_tickets.py`.
 RAW_DIR_DEFAULT = REPO_ROOT / "data" / "unsafe" / "golden" / "raw"
@@ -117,7 +117,7 @@ def main() -> None:
 
 
 def golden_tickets(
-    golden: pathlib.Path,  # np. Path("data/unsafe/golden/tickets.json")
+    golden: pathlib.Path,  # np. Path("data/unsafe/golden/tickets-vector.json")
 ) -> tuple[list[str], pathlib.Path]:
     """
     Description:
@@ -125,7 +125,7 @@ def golden_tickets(
     z metryczki (`meta.corpus_dir`, ścieżka od korzenia repo).
 
     Example args:
-        golden=Path("data/unsafe/golden/tickets.json")
+        golden=Path("data/unsafe/golden/tickets-vector.json")
 
     Example result:
         (["10012", "10170", …], Path("/…/data/unsafe/golden/cards"))
@@ -286,7 +286,7 @@ def parse(
 
     Example args:
         out_dir=Path("data/unsafe/golden-gpt-6.1-sol-v3/cards")
-        golden=Path("data/unsafe/golden/tickets.json")
+        golden=Path("data/unsafe/golden/tickets-vector.json")
         raw_dir=Path("data/unsafe/golden/raw")
         anonymizer_url="http://localhost:8002"
         concurrency=4

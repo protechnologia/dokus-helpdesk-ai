@@ -3110,20 +3110,23 @@ dobre rozwiązanie: pierwsze mają trafiać w niewiadome, drugie w sprawdzony kr
 Zestaw to **syntetyczne zapytania**, nie pary historycznych zgłoszeń: produkt bierze nowe
 zgłoszenie i szuka podobnych, więc para `ticket ↔ ticket` mierzyłaby coś, czego produkt nie robi.
 Uboczny zysk: znika problem singletonów (47% rekordów nie ma bliskiego sąsiada), bo **zapytanie
-dostaje każdy rekord**. Pliki: `data/unsafe/golden/tickets.json` (200 wpisów: 135 z wiedzą, 65 bez i 126
-zapytań; do 2026-10-10 `golden200.json`, potem do 2026-10-15 `tickets-dokus.json`), karty
-`data/unsafe/golden/cards/` (200 kart `gpt-6.1-sol` z 2026-10-23; do 2026-11-11 w
-`data/unsafe/parsed/gpt-6.1-sol-golden200-v2/`, a wcześniej karty Bielika, skasowane) i dystraktory
-`data/unsafe/golden/tickets-distractors.json` (wcześniej `distractors.json`, potem
-`tickets-dokus-distractors.json`) — materiał wielokrotnego użytku przy każdej zmianie modelu.
-„Golden200" zostaje nazwą próbki 200 zgłoszeń.
+dostaje każdy rekord**. Pliki: `data/unsafe/golden/tickets-vector.json` (200 wpisów: 135 z wiedzą,
+65 bez i 126 zapytań; do 2026-10-10 `golden200.json`, do 2026-10-15 `tickets-dokus.json`, do
+2026-11-15 `tickets.json`), karty `data/unsafe/golden/cards/` (200 kart `gpt-6.1-sol`
+z 2026-10-23; do 2026-11-11 w `data/unsafe/parsed/gpt-6.1-sol-golden200-v2/`, a wcześniej karty
+Bielika, skasowane) i dystraktory `data/unsafe/golden/tickets-vector-distractors.json` (wcześniej
+`distractors.json`, `tickets-dokus-distractors.json` i `tickets-distractors.json`) — materiał
+wielokrotnego użytku przy każdej zmianie modelu. „Golden200" zostaje nazwą próbki 200 zgłoszeń.
+Dopisek `-vector` od 2026-11-15: obok staje zestaw wyszukiwania tekstowego w wątkach instancji
+(p. 31), a dwa pliki `tickets*` nie mówiły, który mierzy co. Etykiety filtra jakości zostają
+w pliku wektorowym, bo stoją na tych samych 200 zgłoszeniach.
 
 - **Karty golden setu zastępuje się w całości, po przyjęciu (2026-11-11).** Jest jeden katalog kart,
   bez nazwy modelu w ścieżce: model i datę zapisuje ten opis, bo karty nie mają pola z modelem. Nowe
   parsowanie (`scripts/parse_golden_tickets.py`) idzie do `cards/` w osobnym katalogu roboczym, bo
   komendy `helpdesk tickets` biorą katalog korpusu, a `golden/cards/` zastępuje dopiero po
   porównaniu pomiarów na obu; stare karty nie zostają obok. Numery zgłoszeń skrypt bierze z
-  `tickets.json`, a katalog kart z jego metryczki (`meta.corpus_dir`).
+  `tickets-vector.json`, a katalog kart z jego metryczki (`meta.corpus_dir`).
 - **Wątki golden setu leżą w `golden/raw/` (2026-11-11):** 200 plików z eksportu lipcowego
   zrzutu, z których powstały karty i na których przeglądano etykiety. Reszta lipcowego eksportu
   (1625 plików) jest skasowana: eksport da się powtórzyć z lipcowego zrzutu, a korpus powstaje
@@ -3331,7 +3334,7 @@ nogi produktu na jednej sprawie.
   nie ma albo któraś ścieżka nie zgadza się z paczką; budowa paczki robi to samo na końcu)
 - Ponowne parsowanie golden setu grafem `parse_ticket` do katalogu roboczego, z wznawianiem
   i postępem co 10 zgłoszeń: `python scripts/parse_golden_tickets.py parse <nowy katalog>/cards`
-  (numery z `data/unsafe/golden/tickets.json`; do `golden/cards/` nie zapisuje; indeks do
+  (numery z `data/unsafe/golden/tickets-vector.json`; do `golden/cards/` nie zapisuje; indeks do
   pomiaru: `QDRANT_COLLECTION=tickets_golden helpdesk tickets reindex <nowy katalog>`) — **płatne,
   pytaj przed**; wymaga usługi `anonymizer` z modelem anonimizującym i modelu generującego
   z `.env` (golden200 na `gpt-6.1-sol` kosztował 2026-10-23 około 1 USD)
@@ -3391,7 +3394,8 @@ nogi produktu na jednej sprawie.
   per kandydat na próg), `... detail --threshold 0.48` (co ten próg robi z każdym dystraktorem
   i które trafienia poprawne kosztuje) oraz `... plot` (wykres obu rozkładów z linią progu do
   `data/unsafe/docs/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz
-  `data/unsafe/golden/tickets-distractors.json`; sam golden set mierzy tylko połowę rozkładu
+  `data/unsafe/golden/tickets-vector-distractors.json`; sam golden set mierzy tylko połowę
+  rozkładu
 
 **Grafy (bramki, propozycje, „Popraw", wyszukiwanie, karta zgłoszenia) uruchamia się przez API**,
 nie komendą `helpdesk`: na przykład `curl -s -H 'Content-Type: application/json' -d @zgloszenie.json
@@ -3739,8 +3743,10 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
   ewaluacji modelu z p. 59 (`injections`, `gates`, `polish`, `handoff`, `questions`, `code`, `solution`,
   `reading`). Zestawy
   w `data/unsafe/golden/` nie mają dopisku paczki (do 2026-10-15 `-dokus`): instancja obsługuje
-  jeden produkt, więc dane klienta są zawsze z tej samej paczki (`tickets.json`,
-  `tickets-distractors.json`, `code.json`). `code.json` w `unsafe` to sprawy dla agenta na
+  jeden produkt, więc dane klienta są zawsze z tej samej paczki (`tickets-vector.json`,
+  `tickets-vector-distractors.json`, `code.json`). Zestawy zgłoszeń mają za to dopisek
+  wyszukiwania, które mierzą (`-vector`, a od p. 31 `-text`; 2026-11-15), bo oba stoją na
+  zgłoszeniach. `code.json` w `unsafe` to sprawy dla agenta na
   prawdziwym kodzie, ten sam rodzaj co `code.json` w `safe` na aplikacji syntetycznej. Tak samo
   `anonymization.json` (2026-10-17): golden set anonimizatora w jednym kształcie, zmyślony
   w `safe` i próbka korpusu w `unsafe`.
