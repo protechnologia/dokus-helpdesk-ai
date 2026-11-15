@@ -121,7 +121,7 @@ def build_agent_tools(
         name        = settings.qdrant_docs_collection,
         vector_size = settings.embedding_vector_size,
     )
-    tickets_threads = TicketsTable(postgres)
+    tickets_threads = TicketsTable(postgres, settings.postgres_tickets_table)
     docs_sections   = DocsTable(postgres)
 
     # --- kod aplikacji: folder paczki, bez bazy; szuka w nim program uruchamiany procesem ---

@@ -381,6 +381,25 @@ def test_rebuild_names_the_threads_table_when_the_corpus_has_threads(
     assert "zostaje" not in result.stdout
 
 
+def test_rebuild_names_the_collection_and_table_from_the_configuration(
+    tmp_path: Path, stub_run: StubRun, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sprawdza, czy pytanie przed przebudową nazywa kolekcję i tabelę wątków podane
+    w `QDRANT_COLLECTION` i `POSTGRES_TICKETS_TABLE`, a nie domyślne (tu `tickets_golden`
+    i `tickets_text_golden`, jak przy golden secie).
+
+    Wyłapuje pytanie z nazwą zaszytą w kodzie: operator, który przebudowuje golden set obok
+    instancji, potwierdzałby skasowanie tabeli instancji, nie widząc, że to nie ta."""
+    monkeypatch.setenv("QDRANT_COLLECTION", "tickets_golden")
+    monkeypatch.setenv("POSTGRES_TICKETS_TABLE", "tickets_text_golden")
+    (_corpus(tmp_path) / "anonymized").mkdir()
+
+    result = runner.invoke(cli, ["tickets", "reindex", str(tmp_path)], input="n\n")
+
+    assert "kolekcję 'tickets_golden'" in result.stdout
+    assert "tabelę 'tickets_text_golden'" in result.stdout
+
+
 def test_rebuild_says_the_threads_table_stays_without_threads(
     tmp_path: Path, stub_run: StubRun
 ) -> None:

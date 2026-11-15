@@ -113,6 +113,9 @@ class Settings(BaseSettings):
     postgres_user:            str        = "helpdesk"
     postgres_password:        str | None = None         # np. "helpdesk"
     postgres_timeout_seconds: float      = 30.0         # sekundy: łączenie i każde zapytanie
+    # Tabela wątków zgłoszeń. Inna nazwa buduje i czyta indeks obok tabeli instancji, jak
+    # `qdrant_collection` przy kartach: tak golden set ma własną tabelę wątków (2026-11-15).
+    postgres_tickets_table:   str        = "tickets_text"
 
     # --- korpus zgłoszeń ---
     # Katalog korpusu po stronie kontenera: karty, wątki po anonimizacji i surowe zgłoszenia, każde

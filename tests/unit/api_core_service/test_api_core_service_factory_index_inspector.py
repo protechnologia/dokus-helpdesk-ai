@@ -5,6 +5,7 @@ import pytest
 from app.config import Settings
 from app.core_service import factory_index_inspector
 from app.core_service.factory_index_inspector import (
+    build_index_inspector,
     close_process_index_inspector,
     get_index_inspector,
     process_index_inspector,
@@ -96,3 +97,18 @@ async def test_closing_without_a_built_inspector_builds_nothing(
     await close_process_index_inspector()
 
     assert process_index_inspector.cache_info().currsize == 0
+
+
+async def test_the_inspector_counts_the_configured_threads_table() -> None:
+    """Sprawdza, czy stan instancji liczy wątki w tabeli o nazwie z `POSTGRES_TICKETS_TABLE`
+    (tu `watki`), tej samej, w której szukają narzędzia.
+
+    Wyłapuje tabelę zaszytą w kodzie: `GET /instance` pokazywałby pustą albo cudzą tabelę,
+    a belka frontu mówiłaby o innym indeksie niż ten, z którego korzysta agent."""
+    settings  = Settings(_env_file=None, postgres_password="x", postgres_tickets_table="watki")
+    inspector = build_index_inspector(settings)
+
+    try:
+        assert inspector._tickets_threads.name == "watki"
+    finally:
+        await inspector.aclose()

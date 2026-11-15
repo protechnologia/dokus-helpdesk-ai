@@ -40,6 +40,24 @@ async def test_every_built_tool_has_a_call_limit_in_the_configuration() -> None:
         await tool.aclose()
 
 
+async def test_thread_tools_read_the_configured_table() -> None:
+    """Sprawdza, czy oba narzędzia na wątkach zgłoszeń, `find_tickets_text`
+    i `read_tickets_thread`, czytają tabelę o nazwie z `POSTGRES_TICKETS_TABLE` (tu `watki`).
+
+    Wyłapuje narzędzie, które czyta tabelę zaszytą w kodzie: indeksacja pisałaby wątki do
+    tabeli z konfiguracji, a agent szukałby w innej i dostawał puste wyniki."""
+    settings = Settings(_env_file=None, postgres_password="x", postgres_tickets_table="watki")
+    tools    = build_agent_tools(settings)
+    by_name  = {tool.name: tool for tool in tools}
+
+    try:
+        assert by_name["find_tickets_text"]._tickets.name == "watki"
+        assert by_name["read_tickets_thread"]._tickets.name == "watki"
+    finally:
+        for tool in tools:
+            await tool.aclose()
+
+
 def test_building_without_the_database_password_is_refused() -> None:
     """Sprawdza, czy fabryka narzędzi odmawia budowy, gdy konfiguracja nie ma hasła do bazy.
 

@@ -2194,6 +2194,13 @@ błędem `DbPostgresMissingTableError`.
 - **Nazwa tabeli jest sprawdzana wzorcem identyfikatora**, bo nie da się jej podać parametrem
   zapytania; wszystko inne — zapytanie agenta, limit — idzie parametrem. Zapytanie do podciągu
   przechodzi wcześniej przez unieszkodliwienie `%` i `_`.
+- **Nazwę tabeli wątków zgłoszeń podaje `POSTGRES_TICKETS_TABLE` (domyślnie `tickets_text`,
+  2026-11-15), tak jak `QDRANT_COLLECTION` nazwę kolekcji kart.** Czytają ją indekser, narzędzia
+  i stan instancji, więc korpus inny niż instancji (golden set) buduje się obok, do własnej
+  kolekcji i tabeli, tą samą komendą. Wcześniej nazwa była stała, a `reindex` korpusu
+  z `anonymized/` kasował zawsze tabelę instancji. Cena: przebudowa obok instancji to dwie
+  zmienne w poleceniu, a zapomniana kasuje indeks instancji; pytanie przed przebudową nazywa
+  oba cele.
 - **Wyszukiwanie i reguły bramek (p. 29) dostają osobne schematy i role**, żeby przebudowa
   indeksu nie mogła dotknąć reguł.
 

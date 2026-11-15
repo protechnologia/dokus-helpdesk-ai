@@ -62,7 +62,7 @@ class TicketsTable(TextTable):
     def __init__(
         self,
         client: PostgresClient,       # np. PostgresClient(host="postgres", …)
-        name:   str = TICKETS_TABLE,  # inna nazwa tylko w testach — własna tabela testu
+        name:   str = TICKETS_TABLE,  # inna: POSTGRES_TICKETS_TABLE albo własna tabela testu
     ):
         """
         Description:

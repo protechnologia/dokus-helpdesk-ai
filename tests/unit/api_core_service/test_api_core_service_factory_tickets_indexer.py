@@ -6,18 +6,38 @@ from app.db_postgres.table.tickets.table import TICKETS_TABLE
 # nie łączy.
 
 
-async def test_the_indexer_writes_to_the_configured_collection_and_the_threads_table() -> None:
-    """Sprawdza, czy indekser zgłoszeń pisze karty do kolekcji o nazwie z konfiguracji (przy
-    `QDRANT_COLLECTION` ustawionym na `zgloszenia` jego kolekcja nazywa się `zgloszenia`),
-    a wątki do tabeli wątków zgłoszeń, z której czytają narzędzia agenta.
+async def test_the_indexer_writes_to_the_configured_collection_and_table() -> None:
+    """Sprawdza, czy indekser zgłoszeń pisze karty do kolekcji, a wątki do tabeli o nazwach
+    z konfiguracji: przy `QDRANT_COLLECTION` = `zgloszenia` i `POSTGRES_TICKETS_TABLE` =
+    `watki` jego kolekcja nazywa się `zgloszenia`, a tabela `watki`.
 
-    Wyłapuje nazwę kolekcji zaszytą w kodzie albo wziętą z innego pola oraz tabelę inną niż ta,
-    w której szukają narzędzia: indeksacja pisałaby wtedy gdzie indziej, niż szuka agent."""
-    settings = Settings(_env_file=None, qdrant_collection="zgloszenia", postgres_password="x")
-    indexer  = build_tickets_indexer(settings)
+    Wyłapuje nazwę zaszytą w kodzie albo wziętą z innego pola: przebudowa golden setu, której
+    polecenie podaje własną kolekcję i tabelę, skasowałaby wtedy indeks instancji."""
+    settings = Settings(
+        _env_file              = None,
+        qdrant_collection      = "zgloszenia",
+        postgres_tickets_table = "watki",
+        postgres_password      = "x",
+    )
+    indexer = build_tickets_indexer(settings)
 
     try:
         assert indexer._tickets.name == "zgloszenia"
+        assert indexer._threads.name == "watki"
+    finally:
+        await indexer.aclose()
+
+
+async def test_by_default_the_indexer_writes_to_the_table_the_tools_read() -> None:
+    """Sprawdza, czy bez `POSTGRES_TICKETS_TABLE` indekser pisze wątki do tabeli
+    `tickets_text`, tej, którą tabela zgłoszeń ma jako nazwę domyślną.
+
+    Wyłapuje wartość domyślną w konfiguracji, która rozjechała się z nazwą domyślną tabeli:
+    stack bez tej zmiennej w `.env` pisałby i czytał wątki z tabeli, której nie zna żadne inne
+    miejsce."""
+    indexer = build_tickets_indexer(Settings(_env_file=None, postgres_password="x"))
+
+    try:
         assert indexer._threads.name == TICKETS_TABLE
     finally:
         await indexer.aclose()

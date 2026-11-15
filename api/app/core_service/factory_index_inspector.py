@@ -67,7 +67,7 @@ def build_index_inspector(
             name        = settings.qdrant_collection,
             vector_size = settings.embedding_vector_size,
         ),
-        tickets_threads = TicketsTable(postgres),
+        tickets_threads = TicketsTable(postgres, settings.postgres_tickets_table),
         docs_sections   = DocsTable(postgres),
         docs_fragments  = DocsCollection(
             client      = qdrant,

@@ -37,6 +37,7 @@ def build_tickets_indexer(
     Raises:
         EmbeddingConfigError: pusty adres embeddera
         DbQdrantConfigError: niedozwolona nazwa kolekcji albo wymiar wektora
+        DbPostgresConfigError: niedozwolona nazwa tabeli wątków
     """
     embedder = EmbeddingClient(
         base_url = settings.embedding_base_url,
@@ -63,7 +64,7 @@ def build_tickets_indexer(
     indexer = TicketsIndexer(
         embedder = embedder,
         tickets  = tickets,
-        threads  = TicketsTable(postgres),
+        threads  = TicketsTable(postgres, settings.postgres_tickets_table),
     )
 
     return indexer

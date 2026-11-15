@@ -74,6 +74,7 @@ services:
       POSTGRES_USER:             ${POSTGRES_USER:-helpdesk}
       POSTGRES_PASSWORD:         ${POSTGRES_PASSWORD:-helpdesk}
       POSTGRES_TIMEOUT_SECONDS:  ${POSTGRES_TIMEOUT_SECONDS:-30}
+      POSTGRES_TICKETS_TABLE:    ${POSTGRES_TICKETS_TABLE:-tickets_text}
       # Korpus zgłoszeń: ścieżka po stronie KONTENERA, w ./data montowanym wyżej do zapisu.
       TICKETS_CORPUS_DIR:        ${TICKETS_CORPUS_DIR:-/code/data/unsafe/corpus}
       # Paczka kodu aplikacji: ścieżka po stronie KONTENERA, pod którą stoi montowanie wyżej.

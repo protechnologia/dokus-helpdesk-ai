@@ -3,7 +3,6 @@ from pathlib import Path
 import typer
 
 from app.config import Settings
-from app.db_postgres.table.tickets.table import TICKETS_TABLE
 from app.entry_cli.tickets.common import (
     CORPUS_DIR_HELP,
     VERBOSE_DROPS_HELP,
@@ -44,16 +43,17 @@ def reindex_artifacts(
     # Pytanie nazywa to, co zniknie, i skąd przyjdzie nowe, bo wszystko może przyjść
     # z konfiguracji — potwierdzenie niszczącej operacji bez nazwania celu to sposób na
     # skasowanie nie tego indeksu. Tabelę wątków wymienia tylko wtedy, gdy będzie kasowana.
+    collection = settings.qdrant_collection
+    table      = settings.postgres_tickets_table
+
     if corpus.anonymized_dir.is_dir():
         question = (
-            f"Skasować kolekcję '{settings.qdrant_collection}' i tabelę '{TICKETS_TABLE}' "
-            f"i zbudować je z {corpus.root}?"
+            f"Skasować kolekcję '{collection}' i tabelę '{table}' i zbudować je z {corpus.root}?"
         )
     else:
         question = (
-            f"Skasować kolekcję '{settings.qdrant_collection}' i zbudować ją z "
-            f"{corpus.cards_dir}? Tabela '{TICKETS_TABLE}' zostaje: w {corpus.root} nie ma "
-            "anonymized/."
+            f"Skasować kolekcję '{collection}' i zbudować ją z {corpus.cards_dir}? "
+            f"Tabela '{table}' zostaje: w {corpus.root} nie ma anonymized/."
         )
 
     if not yes and not typer.confirm(question):
