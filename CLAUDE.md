@@ -4321,16 +4321,33 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 
 - [x] **31. Masowy import z nowszego zrzutu** (2026-11-13 – 2026-11-15) → „Historyczne
   zgłoszenia”, „Domena”, „Golden set retrievalu”, „Warstwa wyszukiwania tekstowego (Postgres)”.
-- [ ] **32. Automat mailowy w adapterze** — role z podpisów, odcięcie cytatów, ręczna flaga
-  „nie do korpusu", sklejanie spraw rozbitych na dwa rekordy; po nim 139 zgłoszeń tego kanału
-  z sierpniowego zrzutu dochodzi do korpusu osobnym przebiegiem, bez parsowania reszty od nowa.
-  Do rozstrzygnięcia: czy zapisywać tekst po czyszczeniu. Ma dane osobowe, więc jeśli tak, to
-  w `corpus/cleaned/`, którego `api` na prod nie montuje, a ręczne decyzje (flaga, pary spraw)
-  jako małe dane. Do rozstrzygnięcia też: co robi z takim zgłoszeniem trasa zamknięcia (p. 30) —
-  dziś przyjmuje je jak każde inne. Przed przebiegiem tego kanału luka promptu parsującego
-  z porównania modeli: zgłoszenie informacyjne bez treści (6 wariantów z 9; jego przypadki, np.
-  33644, są w tym kanale, więc przed p. 31 nie dało się go sprawdzić). *Dlaczego:* 77 ze 123
-  zgłoszeń w lipcu, a żadna heurystyka nie odróżni broadcastu od sprawy.
+- [ ] **32. Automat mailowy w adapterze** — czyszczenie wątków tego kanału, a po nim 136
+  zamkniętych zgłoszeń z sierpniowego zrzutu dochodzi do korpusu osobnym przebiegiem. Rozpoznanie
+  z 2026-11-18: w 106 ze 139 opisów mail stoi dwa razy (HTML i zwykły tekst), a 74 z 96
+  komentarzy „klient” podpisał dostawca. Ustalone 2026-11-18: do indeksów wpuszcza filtr
+  `useful`, nie ręczna flaga, bo trasa zamknięcia dostaje takich zgłoszeń dziesiątki miesięcznie;
+  sprawy rozbitej na dwa rekordy nie sklejamy, bo późniejszy rekord cytuje prośbę.
+  *Dlaczego:* 77 ze 123 zgłoszeń w lipcu, a treść to kilka procent opisu.
+  - [x] **32.1 Etykiety** (2026-11-18) — `data/unsafe/golden/tickets-mail.json`: 79 spraw,
+    57 powiadomień, 27 z wiedzą, autorzy i 6 par. Ślepy przegląd: `useful` zgodne w 131 ze 136
+    (kappa 0,89); sporna klasa to poprawka dostawcy bez przyczyny.
+  - [ ] **32.2 Czyszczenie** — `core_service/normalizer_ticket_mail.py`, ustalone 2026-11-18
+    sondami na 136 wątkach. Najpierw autor wiadomości z podpisu firmy dostawcy (nazwa
+    z konfiguracji instancji): 95% zgodnie z etykietami, role z bazy 51%. Potem usuwane są całe
+    linie leżące w ciągu co najmniej 12 słów, który już stał wcześniej w wątku, albo w słowniku
+    szablonów (ciągi 12 słów z co najmniej 10 wątków kanału, zapisane jako skróty), oraz linie
+    `[cid:…]`. Zostaje 27,5% tekstu; w przeglądzie agentami ocena `useful` z oczyszczonego wątku
+    zgadzała się z etykietą w 136 ze 136. Znany koszt: odpowiedzi wplecione w cytat (4 wątki,
+    wszystkie bez wiedzy). Tekstu po czyszczeniu nie zapisujemy: liczy się w locie ze źródła,
+    jak `as_thread()`.
+  - [ ] **32.3 Pomiar bez modelu** — testy na zmyślonych mailach, a na 136 prawdziwych role
+    wobec etykiet i brak zgubionych wiadomości.
+  - [ ] **32.4 Import i trasy** — import i trasy przy `category` „Automat mailowy” czyszczą
+    wątek przed anonimizacją.
+  - [ ] **32.5 Przebieg** — próba na 20, całość po zgodzie (ok. 0,7 USD), potem
+    `helpdesk tickets index`.
+  - [ ] **32.6 Luka promptu** — zgłoszenie informacyjne bez treści (np. 33644): poprawka promptu
+    parsującego tylko wtedy, gdy zapowiedzi bez wiedzy przejdą filtr.
 - [ ] **33. Przeliczenia na pełnym korpusie** — `RAG_SCORE_MIN` na zapytaniach sparsowanych
   (na kartach `gpt-6.1-sol` trafienie dostaje 7 z 16 dystraktorów, na kartach Bielika 3 z 16,
   przy tym samym progu 0.48), porównanie embedderów, liczba wątków-projektów, `questions_summary`,
