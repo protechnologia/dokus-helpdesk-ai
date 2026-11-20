@@ -1573,6 +1573,12 @@ choć nie były to sprawy błahe. Do tego **zły zapis przechodzi filtr etapu 4*
 „problem został rozwiązany" daje niepuste `solution`, więc jakości zapisu nie da się nadrobić
 filtrem po fakcie.
 
+**Powiadomienie nie przechodzi bramki zamknięcia
+([GAT-001](docs/adr/GAT-001_powiadomienie-nie-przechodzi-bramki-zamkniecia.md)).** Bramka ocenia
+je dosłownie i blokuje, a zamyka je człowiek: furtką albo akcją helpdesku „Zamknij bez
+procedowania”, która nie woła bramki ani trasy zamknięcia. Reguł klienta i promptu nie
+uzupełniamy o wyjątek dla powiadomień, bo bramka musiałaby je rozpoznawać.
+
 **Bramka wysyłki** sprawdza treść wobec reguł: brak prośby o hasło, brak potocznego i wulgarnego
 słownictwa, forma zwrotu do klienta, brak prośby o niebezpieczne zachowania (wyłączenie antywirusa,
 ręczna zmiana danych w bazie…), ortografia i polskie znaki, a od 2026-11-11 brak hasła i innych
@@ -1631,6 +1637,20 @@ merytorycznie").
   zamknięć przez trasę `/gate/close`, z anonimizatorem na Bieliku, dało zgodne werdykty bez
   danych osobowych w uzasadnieniach, 2–7,5 s i około 0,003 USD na sprawę; do tego test ręczny
   przez front. Liczb na prawdziwych zamknięciach z korpusu nie ma (p. 33).
+- **Zestaw prawdziwych zamknięć: `data/unsafe/golden/gate-close.json` (2026-11-20, p. 33.2).**
+  120 zamknięć z korpusu instancji, warstwami: 10 najdłuższych wątków, 10 z kanału „Automat
+  mailowy”, 40 z kart odrzuconych przez filtr i 60 losowych. Wejście bramki to wątek
+  z `corpus/anonymized/` ucięty na zamknięciu: komentarze do `data_zamkniecia` z minutą zapasu,
+  a data bez godziny (552 zgłoszenia korpusu) to koniec dnia; ucięcie dotyczy 156 z 1894
+  wątków, a 13 zgłoszeń zamknięto bez komentarza. Przy wpisie liczba komentarzy w chwili
+  zamknięcia, skrót uciętego wątku, rodzaj zgłoszenia i dwie etykiety z powodem, po jednej na
+  regułę. Oznaczali agenci na ślepo; drugi, niezależny oceniający na 40 wpisach zgadza się
+  w regule 1 w 40 (kappa 1,00), w regule 2 w 37 (kappa 0,85) i w rodzaju w 40, a trzy
+  niezgodności rozstrzygnął człowiek. W kanale mailowym rodzaj pochodzi z `tickets-mail.json`:
+  kopia naszej korespondencji, która niesie sprawę, to sprawa (decyzja 2026-11-20 przy dwóch
+  wpisach, w których oceniający dali „powiadomienie”). Zestaw ma 113 spraw i 7 powiadomień,
+  a oczekiwanych blokad 59 i przepuszczeń 61; reguła 1 jest złamana tylko w 3 sprawach, więc jej
+  przepuszczeń zestaw prawie nie mierzy.
 - **Bramka wysyłki przeszła sprawdzenie, ale nie pomiar (2026-10-22).** Na `gpt-6.1-sol` scenariusze
   na regułach w wersji 2 dały 0 fałszywych alarmów z 13 i 0 przepuszczeń z 9 w dwóch przebiegach, a
   wstrzyknięcia 0 przebić z 9. Przez trasę `/gate/reply` z anonimizatorem na Bieliku 13 z 13
@@ -3887,6 +3907,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/tickets_import/`       | masowy import: plik eksportu zgłoszenia w `raw-db/` (`write_export()`), atrapa modelu, która na każde zgłoszenie odpowiada kartą, a na wskazane numery błędem (`CardLLM`), serwis importu na prawdziwych węzłach grafu karty (`importer_on()`) i atrapy serwisu i jego fabryki do testów komendy (`StubImporter`, `StubImporterFactory`); próbki raportu w `samples.py` |
 | `tests/_helpers/mail/`                 | słownik maili zmyślony z `data/safe/mail/` (`safe_templates()`, `safe_vendor_names()`), jego zmyślone wątki (`safe_mail_ticket()`), te same jako żądanie do tras (`safe_mail_request()`) i plik eksportu w korpusie testu (`copy_safe_mail_export()`) oraz zgłoszenie kanału z podanym opisem i komentarzami (`mail_ticket()`); maile z przykładów notatki o metodzie i oczyszczony wątek wzorcowy w `samples.py` |
 | `tests/_helpers/golden_mail/`          | golden set kanału „Automat mailowy”: wątki z `useful` i polami (autor, oznaczenia linii) (`golden_mail_tickets()`, `parse_ranges()`, `field_digest()`), wątek źródłowy (`mail_thread()`) i pomiar normalizera maili na nich (`measure_mail_cleaning()`) z progami |
+| `tests/_helpers/golden_gate_close/`    | zestaw bramki zamknięcia na prawdziwych zamknięciach: wpisy z rodzajem i etykietami na regułę (`golden_gate_close_cases()`), wątek z korpusu ucięty na zamknięciu (`closing_thread()`, `thread_at_close()`) i skrót uciętego wątku (`thread_digest()`) |
 | `tests/_helpers/instance/`             | stan instancji: serwis liczący indeksy na atrapach Qdranta i Postgresa (`scripted_inspector()`, `inspector_on()`, klienci `counting_*` i `failing_*`), aplikacja z podanym serwisem (`app_with_inspector()`); próbki `sample_*()` w `samples.py` — raport stanu, paczka kodu, konfiguracja modelu |
 | `tests/_helpers/embedding/`            | embedding: nazwy modeli testowych (`EMBEDDING_MODEL`, `OTHER_MODEL`), odpowiedź usługi `embedder` w kształcie kontraktu (`embedder_answer()`) i payload punktu Qdranta z nazwą modelu (`with_model()`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
@@ -4272,15 +4293,21 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
     zgłoszenia”, „Domena”, „Reguły parsowania”, „`questions_summary`”, „Ewaluacja bramek”,
     „Embeddingi”, „Warianty generacji”, „Świadomie pominięte”; `RAG_SCORE_MIN` w p. 79,
     porównanie embedderów w p. 40, „Popraw” w p. 80.
-  - [ ] **33.2 `gate_close` na prawdziwych zamknięciach** — zestaw zamknięć dobrych i słabych
-    z wątków `corpus/anonymized/`, które graf dostaje przez anonimizator przepuszczający tekst
-    bez zmian, bez poda (decyzja 2026-11-20); etykiety na każdą z dwóch reguł od agentów na
-    ślepo, bez wglądu w werdykt, z drugim, niezależnym oceniającym na części zestawu
-    i niezgodnościami do przeglądu człowieka (decyzja 2026-11-20); fałszywe alarmy
-    i przepuszczenia na regułę w dwóch przebiegach, z czytaniem uzasadnień; czas na długich
-    wątkach wobec cierpliwości UI helpdesku (p. 38), z anonimizacją doliczoną z pomiaru
-    z 2026-10-19 (mediana 2,0 s, maks. 6,5 s na wątek korpusu). Oceny z badania jakości
-    z 2026-09-02 skasowano 2026-11-13.
+  - [ ] **33.2 `gate_close` na prawdziwych zamknięciach** — decyzje 2026-11-20: wątki
+    z `corpus/anonymized/`, które graf dostaje przez anonimizator przepuszczający tekst bez
+    zmian, bez poda; etykiety na każdą z dwóch reguł od agentów na ślepo, bez wglądu w werdykt,
+    z drugim, niezależnym oceniającym na części zestawu i niezgodnościami do przeglądu
+    człowieka; próg równy gorszemu z dwóch przebiegów, osobno dla fałszywych alarmów
+    i przepuszczeń. Oceny z badania jakości z 2026-09-02 skasowano 2026-11-13.
+    - [x] **33.2.1 Zestaw `gate-close.json`** (2026-11-20) → „Ewaluacja bramek”, „Helpery”.
+    - [ ] **33.2.2 Test `llm_live` na zestawie** — fałszywe alarmy i przepuszczenia osobno dla
+      spraw łamiących regułę 1, regułę 2 i obie; dla powiadomienia oczekiwany werdykt to blokada
+      (GAT-001). Uzasadnienia w raporcie i czas sprawy
+      (mediana, p90, maks.) wobec cierpliwości UI helpdesku (p. 38), z anonimizacją doliczoną
+      z pomiaru z 2026-10-19 (mediana 2,0 s, maks. 6,5 s na wątek korpusu); dwa przebiegi na
+      `gpt-6.1-sol`, około 1 USD.
+    - [ ] **33.2.3 Wnioski** — wynik do „Ewaluacji bramek”, a poprawka promptu albo reguł jako
+      osobna decyzja.
   - [ ] **33.3 `gate_reply` na prawdziwych wiadomościach** — wiadomości konsultantów z tych
     samych wątków (2631 komentarzy z rolą „konsultant” poza kanałem „Automat mailowy”, w którym
     rola z bazy nie mówi, kto pisał), te same decyzje co w 33.2; fałszywe alarmy na losowych
@@ -4421,7 +4448,10 @@ korpusie, przechodzi przy zamknięciu do p. 33.
   pobrać. *Dlaczego:* bramki dają ruch proporcjonalny do całej pracy
   helpdesku, pętla mnoży wywołania, a model zewnętrzny to koszt per wywołanie.
 - [ ] **38. Punkt wpięcia i zachowanie przy 503 uzgodnione z helpdeskiem** — przy wpięciu trasy
-  zamknięcia ostatni zrzut dobiera zgłoszenia zamknięte od poprzedniego (p. 34). *Dlaczego:* bez
+  zamknięcia ostatni zrzut dobiera zgłoszenia zamknięte od poprzedniego (p. 34). Warunek
+  wdrożenia bramki zamknięcia (GAT-001): akcja „Zamknij bez procedowania”, która nie woła bramki
+  ani trasy zamknięcia, albo skrzynka helpdesku poza kopią rozsyłki dostawcy, inaczej
+  wdrożeniowiec obchodzi blokadę powiadomień kilkadziesiąt razy w miesiącu. *Dlaczego:* bez
   hooka bramek nikt nie woła, a o fail-open decyduje tamta strona.
 - [ ] **40. Licencja PolDense (gemma).** *Dlaczego:* licencja idzie od modelu-nauczyciela
   (destylacja z BGE-Multilingual-Gemma2), więc wybór embeddera jest też decyzją licencyjną.

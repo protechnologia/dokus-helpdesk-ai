@@ -43,12 +43,13 @@ przeczytaj jego ADR-y ze statusem „Przyjęta”.
 
 ## Decyzje
 
-| ID                                                       | decyzja                                                    | status              | zastępuje |
-|----------------------------------------------------------|------------------------------------------------------------|---------------------|-----------|
-| [AGT-001](AGT-001_zapytanie-w-ksztalcie-indeksu.md)      | Zapytanie wektorowe pisze agent, w kształcie indeksu       | Przyjęta 2026-10-02 | —         |
-| [AGT-002](AGT-002_opis-narzedzia-wspolny-dla-grafow.md)  | Opis narzędzia dla modelu jest jeden, przy narzędziu       | Przyjęta 2026-10-03 | —         |
-| [AGT-003](AGT-003_narzedzia-wiedzy-dwustopniowo.md)      | Wyszukiwanie oddaje identyfikatory, źródłem jest odczyt    | Przyjęta 2026-10-04 | —         |
-| [AGT-004](AGT-004_zrodlo-z-kodu-to-cytowana-przyczyna.md) | Źródłem z kodu jest fragment zacytowany jako przyczyna     | Przyjęta 2026-10-06 | —         |
+| ID                                                                   | decyzja                                                 | status              | zastępuje |
+|----------------------------------------------------------------------|---------------------------------------------------------|---------------------|-----------|
+| [AGT-001](AGT-001_zapytanie-w-ksztalcie-indeksu.md)                  | Zapytanie wektorowe pisze agent, w kształcie indeksu    | Przyjęta 2026-10-02 | —         |
+| [AGT-002](AGT-002_opis-narzedzia-wspolny-dla-grafow.md)              | Opis narzędzia dla modelu jest jeden, przy narzędziu    | Przyjęta 2026-10-03 | —         |
+| [AGT-003](AGT-003_narzedzia-wiedzy-dwustopniowo.md)                  | Wyszukiwanie oddaje identyfikatory, źródłem jest odczyt | Przyjęta 2026-10-04 | —         |
+| [AGT-004](AGT-004_zrodlo-z-kodu-to-cytowana-przyczyna.md)            | Źródłem z kodu jest fragment zacytowany jako przyczyna  | Przyjęta 2026-10-06 | —         |
+| [GAT-001](GAT-001_powiadomienie-nie-przechodzi-bramki-zamkniecia.md) | Powiadomienie nie przechodzi bramki zamknięcia          | Przyjęta 2026-11-20 | —         |
 
 ## Szablon
 
