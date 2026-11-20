@@ -2314,49 +2314,48 @@ tej sekcji idzie tylko to.
 - **W `agent_tools/` jest wyłącznie to, co agent może wywołać i co się wykonuje.** Narzędzie
   odpowiedzi grafu (`respond_<graf>`) tu nie trafia — nic go nie wykonuje, to kontrakt wyjścia
   grafu. Tabela narzędzi i układ pakietu stoją na górze `agent_tools/__init__.py`.
+- **Bez typów generycznych i bez modeli bazowych — świadomie (2026-10-02):** kod wspólny dla
+  narzędzi potrzebuje wyłącznie zapisu cytowania (`SourceRef`), więc tylko on jest wspólny,
+  a zapytanie i wynik każde narzędzie trzyma w swoim `models.py`. `base.py` w katalogu narzędzia
+  to część wspólna z atrapą: różni je wyłącznie pobranie wyniku, więc test na atrapie sprawdza
+  tekst, który model dostaje na produkcji. Modele zapytań i wyników są płaskie, więc test
+  kontraktu sprawdza `extra="forbid"` tylko na modelu głównym; zagnieżdżony model po cichu gubi
+  nadmiarowe pole, więc z pierwszym takim dochodzi test, że każdy obiekt schematu ma
+  `additionalProperties: false`.
+- **Każde narzędzie jest tylko do odczytu** — wstrzyknięcie przez treść zgłoszenia może co
+  najwyżej skierować agenta do nietrafionego materiału, nie zmienić indeksu.
+- **Opis narzędzia dla modelu leży w katalogu narzędzia (`description.md`) i jest ten sam
+  w każdym grafie (2026-10-03).** Wcześniej leżał w każdym grafie osobno: 18 plików, w których
+  różniło się jedno zdanie, a i to prompty systemowe już mówiły. Układ opisu stoi w komentarzu
+  każdego `description.md`, a pilnuje go test kontraktu (2026-10-05). Przykład w tabelce
+  argumentów to wzór, który model może przepisać — z tego powodu schemat odpowiedzi przykładów
+  nie niesie — więc do sprawdzenia w pomiarach grafów (p. 23). Od 2026-10-21:
+  - typ to nazwa z JSON-a (`string`, `integer`, `string[]`), bo model wypełnia argumenty JSON-em
+    i obok opisu dostaje schemat w JSON Schema; „liczba" nie mówiła, czy całkowita. Pole
+    wymagane, które przyjmuje `null`, ma „string albo null" (słowem, bo `|` kończy komórkę),
+    a opcjonalne zostaje przy samym typie, bo `null` znaczy tam tylko „nie podano";
+  - pole o kilku wartościach albo dwóch postaciach ma w kolumnie „przykłady" każdą z nich
+    (`role` w `quote_code`: `"cause", "excluded"`), żeby jeden przykład nie podsuwał wyboru.
 - **Zgłoszenia i dokumentacja: dwustopniowo (2026-10-04).** Wyszukiwanie oddaje identyfikatory,
   treść daje odczyt, i tylko odczyt cytuje — lista źródeł pokazuje to, co model przeczytał,
-  a nie to, co znalazł. Cena: jedna tura modelu więcej na każde wyszukanie.
-- **`exact` to jedna fraza, nie lista (2026-10-05).** Przy liście wynik nie mówił, która fraza
-  trafiła, a „którakolwiek z fraz" obok „wszystkie słowa" trzeba było modelowi tłumaczyć;
-  w zestawie zapytań żadne nie podawało więcej niż jednej. Cena: kilka tropów (kod z ekranu, kod
-  z logów, komunikat) to kilka wywołań, stąd limit 5 wywołań wyszukiwania.
+  a nie to, co znalazł. Dlatego wynik wyszukiwania nie niesie żadnej treści, także dopasowanego
+  fragmentu: fragment mógłby modelowi wystarczyć zamiast odczytu, a wtedy odpowiedź niosłaby
+  treść bez źródła. Opis sekcji z metryczki zostaje: mówi, o czym sekcja jest, nie co w niej
+  stoi. Cena: jedna tura modelu więcej na każde wyszukanie.
 - **Wyszukiwanie zgłoszeń oddaje sam numer, bez `problem` karty.** Sprawy o tym samym objawie
   mają różne przyczyny; wiersz z samym objawem zachęcałby do przeczytania jednej karty, a przy
   gołych numerach model nie ma po czym wybierać i czyta wszystkie. `score` widzi tylko model
   i służy do decyzji, czy szukać dalej — nie jest miarą trafności rozwiązania.
-- **Wynik wyszukiwania nie niesie żadnej treści, także dopasowanego fragmentu.** Fragment mógłby
-  modelowi wystarczyć zamiast odczytu, a wtedy odpowiedź niosłaby treść bez źródła. Opis sekcji
-  z metryczki zostaje: mówi, o czym sekcja jest, nie co w niej stoi.
-- **Szukanie w kodzie, `find_code_text` (2026-10-09), oddaje treść trafionej linii.** To wyjątek
-  wśród wyszukiwań: bez niej model nie odróżni definicji od setek użyć tej samej nazwy
-  („raiseError" stoi w 550 liniach w 197 plikach), a źródła w kodzie nie tworzy ani szukanie, ani
-  odczyt, tylko cytowanie przyczyny. `words` to tekst, nie lista, bo w sondzie model podał tekst
-  i stracił dwa szukania. Cena: model może wskazać przyczynę po jednej linii, której otoczenia nie
-  czytał; mówi o tym opis dla modelu, a liczy pomiar (p. 59).
-- **Odczyt pliku kodu, `read_code_file` (2026-10-09): 10 odczytów na sprawę**, bo w sondzie było
-  ich 4–10 przy 150 liniach. Koniec zakresu za końcem pliku nie jest błędem, bo model nie zna
-  długości pliku przed odczytem. Linie idą jednym tekstem, każda z numerem i tabulatorem, jak
-  `cat -n` (od 2026-10-20, wcześniej lista obiektów `line`, `text`), bo model czyta kod jak kod,
-  a nie jak listę obiektów: tekst z numerami zajmuje 1,15 razy tyle znaków co goły kod, lista
-  obiektów 2,1 razy, więc mediana odczytu 150 linii w paczce Dokusa spadła z 11,4 do 6,3 tys.
-  znaków. Cena: numer i treść linii rozdziela tylko tabulator, a model musi wiedzieć, że numer
-  nie należy do kodu (mówi o tym opis narzędzia).
-- **Spis katalogu kodu, `list_code_files` (2026-10-10), oddaje tyle pełnych poziomów, ile się
-  mieści, zamiast ucinać poziom w środku:** po uciętym poziomie nie byłoby widać, które
-  podkatalogi są rozwinięte. Cena: pełna ścieżka powtarza się przy każdej pozycji, więc lista
-  obiektów zajmuje 1,4 razy tyle znaków co lista napisów i 1,65 razy tyle co pozycje pogrupowane
-  po katalogu; największy możliwy wynik to 29 tys. znaków, a trzy poziomy od katalogu głównego
-  paczki Dokusa to 4,3 tys. Druga cena: `has_more_depth` mówi „jest coś głębiej", a `end_of_file`
-  w odczycie „dalej nic nie ma", więc dwa narzędzia kodu mają flagi o przeciwnym kierunku.
-- **Odczyt symbolu, `read_code_symbol` (2026-10-13), oddaje jedną definicję z liniami albo listę
-  kandydatów bez treści.** Na paczce Dokusa metodę odziedziczoną z klasy bazowej oddaje jedno
-  wywołanie z katalogiem modułu, a `__construct` bez ścieżki daje 20 kandydatów i 1603
-  pominiętych. Cena: sama nazwa wskazuje jedną definicję tylko dla 27% funkcji, więc wywołanie
-  bez ścieżki bywa zużyte na listę kandydatów.
-- **`find_code_text` podaje przy każdej linii nazwę funkcji, w której linia leży (`symbol`,
-  2026-10-13).** Cena: około 25 znaków na linię wyniku i odczyt mapy symboli przy każdym
-  szukaniu, które coś znalazło.
+- **Zapytanie niesie wyłącznie to, czego szukać** — ile pobrać i gdzie uciąć to strojenie
+  (`RAG_TOP_K`, `RAG_SCORE_MIN`), nie decyzja modelu. **Kształt zapytania dobiera się do
+  indeksu:** `find_tickets_vector` przyjmuje `problem` + `symptoms`, czyli pola, z których
+  zbudowano wektory, i nie woła parsera — sparsowanie zgłoszenia pod wyszukiwanie to zadanie
+  agenta. Cena: zapytanie nie powstaje tym samym promptem co korpus, więc jego trafność trzeba
+  zmierzyć (p. 23).
+- **`exact` to jedna fraza, nie lista (2026-10-05).** Przy liście wynik nie mówił, która fraza
+  trafiła, a „którakolwiek z fraz" obok „wszystkie słowa" trzeba było modelowi tłumaczyć;
+  w zestawie zapytań żadne nie podawało więcej niż jednej. Cena: kilka tropów (kod z ekranu, kod
+  z logów, komunikat) to kilka wywołań, stąd limit 5 wywołań wyszukiwania.
 - **Brak karty nie jest błędem, brak wątku albo sekcji jest.** Wątek ma każde zgłoszenie, kartę
   tylko to, które przeszło parsowanie i filtr jakości, więc `read_tickets_card` oddaje numery bez
   karty w `without_card`. Nieznany numer w `read_tickets_thread` i nieznany identyfikator
@@ -2368,33 +2367,6 @@ tej sekcji idzie tylko to.
   w jednej turze. Limit to 3 wątki na sprawę zamiast dziesięciu (do przestrojenia w p. 23).
   Karty zostają listą: są krótkie, a przy jednym objawie i różnych przyczynach model ma je
   przeczytać razem.
-- **Opis narzędzia dla modelu leży w katalogu narzędzia (`description.md`) i jest ten sam
-  w każdym grafie (2026-10-03).** Wcześniej leżał w każdym grafie osobno: 18 plików, w których
-  różniło się jedno zdanie, a i to prompty systemowe już mówiły.
-- **Opisy narzędzi mają jeden układ, opisany w komentarzu każdego `description.md` i pilnowany
-  testem kontraktu (2026-10-05).** Przykład w tabelce argumentów to wzór, który model może
-  przepisać — z tego powodu schemat odpowiedzi przykładów nie niesie — więc do sprawdzenia
-  w pomiarach grafów (p. 23). Od 2026-10-21:
-  - typ to nazwa z JSON-a (`string`, `integer`, `string[]`), bo model wypełnia argumenty JSON-em
-    i obok opisu dostaje schemat w JSON Schema; „liczba" nie mówiła, czy całkowita. Pole
-    wymagane, które przyjmuje `null`, ma „string albo null" (słowem, bo `|` kończy komórkę),
-    a opcjonalne zostaje przy samym typie, bo `null` znaczy tam tylko „nie podano";
-  - pole o kilku wartościach albo dwóch postaciach ma w kolumnie „przykłady" każdą z nich
-    (`role` w `quote_code`: `"cause", "excluded"`), żeby jeden przykład nie podsuwał wyboru.
-- **Bez typów generycznych i bez modeli bazowych — świadomie (2026-10-02):** kod wspólny dla
-  narzędzi potrzebuje wyłącznie zapisu cytowania (`SourceRef`), więc tylko on jest wspólny,
-  a zapytanie i wynik każde narzędzie trzyma w swoim `models.py`. `base.py` w katalogu narzędzia
-  to część wspólna z atrapą: różni je wyłącznie pobranie wyniku, więc test na atrapie sprawdza
-  tekst, który model dostaje na produkcji.
-- **Zapytanie niesie wyłącznie to, czego szukać** — ile pobrać i gdzie uciąć to strojenie
-  (`RAG_TOP_K`, `RAG_SCORE_MIN`), nie decyzja modelu. **Kształt zapytania dobiera się do
-  indeksu:** `find_tickets_vector` przyjmuje `problem` + `symptoms`, czyli pola, z których
-  zbudowano wektory, i nie woła parsera — sparsowanie zgłoszenia pod wyszukiwanie to zadanie
-  agenta. Cena: zapytanie nie powstaje tym samym promptem co korpus, więc jego trafność trzeba
-  zmierzyć (p. 23).
-- **Test kontraktu narzędzi sprawdza `extra="forbid"` tylko na modelu głównym**, bo modele
-  zapytań i odpowiedzi są płaskie; zagnieżdżony model po cichu gubi nadmiarowe pole, więc
-  z pierwszym takim dochodzi test, że każdy obiekt schematu ma `additionalProperties: false`.
 - **Kod aplikacji liczy się jako źródło jak zgłoszenie i instrukcja, także w wariancie
   wymagającym źródeł (decyzja 2026-10-06, narzędzia w p. 62–67).** Odpowiedź opartą wyłącznie na
   kodzie wołający rozpoznaje po rodzaju źródła (`code`). Źródłem jest fragment, który model
@@ -2402,18 +2374,43 @@ tej sekcji idzie tylko to.
   więc przy zasadzie „odczyt cytuje" taki wariant prawie nigdy nie powiedziałby „nie mam z czego
   zaproponować". Czy model powstrzyma się od wskazania przyczyny przy szukaniu na ślepo,
   sprawdza p. 59.
+- **Szukanie w kodzie, `find_code_text` (2026-10-09), oddaje treść trafionej linii, a od
+  2026-10-13 także nazwę funkcji, w której linia leży (`symbol`).** Treść linii to wyjątek wśród
+  wyszukiwań: bez niej model nie odróżni definicji od setek użyć tej samej nazwy („raiseError"
+  stoi w 550 liniach w 197 plikach), a źródła w kodzie nie tworzy ani szukanie, ani odczyt,
+  tylko cytowanie przyczyny. `words` to tekst, nie lista, bo w sondzie model podał tekst
+  i stracił dwa szukania. Cena: model może wskazać przyczynę po jednej linii, której otoczenia
+  nie czytał; mówi o tym opis dla modelu, a liczy pomiar (p. 59). Pole `symbol` kosztuje około
+  25 znaków na linię wyniku i odczyt mapy symboli przy każdym szukaniu, które coś znalazło.
+- **Odczyt pliku kodu, `read_code_file` (2026-10-09): 10 odczytów na sprawę**, bo w sondzie było
+  ich 4–10 przy 150 liniach. Koniec zakresu za końcem pliku nie jest błędem, bo model nie zna
+  długości pliku przed odczytem. Linie idą jednym tekstem, każda z numerem i tabulatorem, jak
+  `cat -n` (od 2026-10-20, wcześniej lista obiektów `line`, `text`), bo model czyta kod jak kod,
+  a nie jak listę obiektów: tekst z numerami zajmuje 1,15 razy tyle znaków co goły kod, lista
+  obiektów 2,1 razy, więc mediana odczytu 150 linii w paczce Dokusa spadła z 11,4 do 6,3 tys.
+  znaków. Cena: numer i treść linii rozdziela tylko tabulator, a model musi wiedzieć, że numer
+  nie należy do kodu (mówi o tym opis narzędzia).
+- **Odczyt symbolu, `read_code_symbol` (2026-10-13), oddaje jedną definicję z liniami albo listę
+  kandydatów bez treści.** Na paczce Dokusa metodę odziedziczoną z klasy bazowej oddaje jedno
+  wywołanie z katalogiem modułu, a `__construct` bez ścieżki daje 20 kandydatów i 1603
+  pominiętych. Cena: sama nazwa wskazuje jedną definicję tylko dla 27% funkcji, więc wywołanie
+  bez ścieżki bywa zużyte na listę kandydatów.
+- **Spis katalogu kodu, `list_code_files` (2026-10-10), oddaje tyle pełnych poziomów, ile się
+  mieści, zamiast ucinać poziom w środku:** po uciętym poziomie nie byłoby widać, które
+  podkatalogi są rozwinięte. Cena: pełna ścieżka powtarza się przy każdej pozycji, więc lista
+  obiektów zajmuje 1,4 razy tyle znaków co lista napisów i 1,65 razy tyle co pozycje pogrupowane
+  po katalogu; największy możliwy wynik to 29 tys. znaków, a trzy poziomy od katalogu głównego
+  paczki Dokusa to 4,3 tys. Druga cena: `has_more_depth` mówi „jest coś głębiej", a `end_of_file`
+  w odczycie „dalej nic nie ma", więc dwa narzędzia kodu mają flagi o przeciwnym kierunku.
 - **Kod cytuje osobne narzędzie, `quote_code` (2026-10-07): jeden fragment na wywołanie, z rolą.**
   Fragment ma najwyżej 40 linii, a limit to 5 cytowań na sprawę, przyczyn i wykluczeń razem;
   obie liczby pochodzą z sondy i wracają do pomiaru w p. 59. Źródłem jest tylko przyczyna
   (`cause`). Wykluczenie nie cofa źródła zacytowanego wcześniej jako przyczyna i źródłem nie
   jest: do człowieka trafia przez uwagi dla wdrożeniowca, jeśli model je tam opisze
-  (2026-10-08), a w odpowiedzi `/search` w `queries`.
-- **`quote_code` oddaje samo potwierdzenie i nie sprawdza, czy model cytowane linie czytał
-  (2026-10-07).** Bez treści linii, bo z treścią w zwrocie model w sondzie używał cytowania
-  zamiast odczytu. Narzędzie nie widzi rozmowy, więc regułę „cytuj tylko to, co przeczytałeś
-  narzędziem `read_code_file`" niesie opis dla modelu, a liczy pomiar (p. 59).
-- **Każde narzędzie jest tylko do odczytu** — wstrzyknięcie przez treść zgłoszenia może co
-  najwyżej skierować agenta do nietrafionego materiału, nie zmienić indeksu.
+  (2026-10-08), a w odpowiedzi `/search` w `queries`. Narzędzie oddaje samo potwierdzenie, bez
+  treści linii, bo z treścią w zwrocie model w sondzie używał cytowania zamiast odczytu. Nie
+  widzi rozmowy, więc nie sprawdza, czy model cytowane linie czytał: regułę „cytuj tylko to, co
+  przeczytałeś narzędziem `read_code_file`" niesie opis dla modelu, a liczy pomiar (p. 59).
 
 ### Warstwa węzłów (`agent_nodes/`)
 
