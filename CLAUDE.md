@@ -659,8 +659,8 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   a z niego `helpdesk tickets import` w kontenerze `api`: graf `parse_ticket` z tej samej
   fabryki co trasy, anonimizator na Bieliku, model `gpt-6.1-sol` (decyzja 2026-11-13: na jego
   kartach zmierzono filtr jakości). Zakres to 1758 zgłoszeń: poza nim 61 w toku i 136
-  zamkniętych z kanału „Automat mailowy”, który doszedł po czyszczeniu (p. 32). Wynik: 1758 kart jednym
-  przebiegiem promptu o skrócie `308c1c483d78` (pełny skrót i model w raporcie importu), 0 błędów,
+  zamkniętych z kanału „Automat mailowy”, który doszedł po czyszczeniu (p. 32). Wynik: 1758
+  kart jednym przebiegiem promptu o skrócie `308c1c483d78` (pełny skrót i model w raporcie importu), 0 błędów,
   1081 przyjętych przez filtr (61%), 8,15 USD modelu i ok. 0,9 USD poda, 44 min przy 4
   zgłoszeniach naraz, po próbie na 20; indeksy z `reindex` w 24 min 48 s na CPU. Przegląd
   około 40 losowych kart ze zgłoszeniem i wątkiem: bez przecieku danych osobowych i bez
@@ -670,11 +670,11 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   zamiast pytania diagnostycznego (p. 25). Dodatkowej kopii korpusu nie ma (decyzja
   2026-11-13, p. 35).
 - **Kanał „Automat mailowy” doszedł do korpusu osobnym przebiegiem importu (2026-11-20,
-  p. 32.5):** 136 zamkniętych zgłoszeń, wątki oczyszczone normalizerem maili, ten sam model
+  p. 32):** 136 zamkniętych zgłoszeń, wątki oczyszczone normalizerem maili, ten sam model
   i prompt. Wynik: 136 kart, 0 błędów, 0,66 USD modelu i ok. 0,2 USD poda, 46 s próby na 20
   i 3 min 04 s reszty przy 4 naraz; `helpdesk tickets index` dołożył karty i wątki w 27 min
-  38 s na CPU, więc w indeksach stoi 1115 kart i 1115 wątków. Filtr przyjął 34 ze 136 (25%). Ocena `useful` zgadza się z etykietami golden setu kanału
-  w 125 ze 136 (kappa 0,77; drugi oceniający na oczyszczonym wątku: 131 ze 136, kappa 0,89):
+  38 s na CPU, więc w indeksach stoi 1115 kart i 1115 wątków. Filtr przyjął 34 ze 136 (25%).
+  Ocena `useful` zgadza się z etykietami golden setu kanału w 125 ze 136 (kappa 0,77; drugi oceniający na oczyszczonym wątku: 131 ze 136, kappa 0,89):
   powiadomienia 57 z 57 (56 bez wiedzy odrzucone, jedyne z wiedzą, 34722, przyjęte), sprawy
   68 z 79. Z 11 niezgodnych 8 stoi przy wpisach oznaczonych w etykietach jako wątpliwe. 9 to
   karty przyjęte wbrew etykiecie, prawie wszystkie z klasy spornej: poprawka albo czynność
@@ -710,10 +710,11 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   do obrazków (`[cid:…]`) i całe linie leżące w ciągu co najmniej 12 słów, który stał już
   wcześniej w wątku, także w tym samym polu, albo w słowniku szablonów (`core_util/repetition.py`).
   Zostaje 26,9% słów, a 10 opisów zostaje pustych: masowy mail dostawcy wysłany do 10 urzędów
-  jest w całości szablonem (wszystkie 10 bez wiedzy). Tekstu po czyszczeniu nie zapisujemy:
-  liczy się w locie ze źródła.
+  jest w całości szablonem (wszystkie 10 bez wiedzy). Znany koszt: odpowiedź wpleciona w cytat
+  znika, gdy nie dokłada do linii żadnego słowa (4 wątki, wszystkie bez wiedzy). Tekstu po
+  czyszczeniu nie zapisujemy: liczy się w locie ze źródła.
 - **Wątek czyści `MailNormalizer` w pięciu trasach grafów i w masowym imporcie (2026-11-20,
-  p. 32.4), zanim trafi do anonimizatora.** Trasy (`/search`, `/gate/close`, `/parse-ticket`,
+  p. 32), zanim trafi do anonimizatora.** Trasy (`/search`, `/gate/close`, `/parse-ticket`,
   `/suggest`, `/tickets/closed`) biorą go zależnością FastAPI (`get_mail_normalizer()`), a import
   od swojej fabryki; katalog słownika podaje `TICKETS_MAIL_DIR`. Słownik czyta przy każdym
   zgłoszeniu z kanału, a zgłoszenie z innego kanału przechodzi bez czytania, więc instancja bez
@@ -721,7 +722,7 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   konfiguracji: trasa kończy się 500, a import kodem 2. `/tickets/closed` zapisuje do
   `raw-route/` surowe zgłoszenie, a oczyszczony wątek idzie do grafów i po anonimizacji do
   `anonymized/`. Import nie pomija kanału, a jego 136 zamkniętych zgłoszeń z sierpniowego zrzutu
-  już jest w korpusie (p. 32.5).
+  już jest w korpusie (p. 32).
 - **Słownik maili leży w `data/unsafe/mail/`, bo powstaje z maili klienta, choć niesie same
   skróty (decyzja 2026-11-20).** `slownik.json` buduje `scripts/build_mail_dictionary.py`
   z wątków kanału w `raw-db/` (338 skrótów BLAKE2b po 8 bajtów: fragmenty z co najmniej 10 ze
@@ -729,9 +730,11 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   ruszyć nazw, jak przy `rules.json` paczki kodu. Słownik zmyślony, z trzech zmyślonych wątków
   i progiem 2, leży w `data/safe/mail/`, a test pilnuje, że zgadza się ze źródłem. Brak pliku to
   `MailDictionaryConfigError`, a nie pusty słownik, który przepuściłby wątek bez czyszczenia.
-- **Czyszczenie mierzy golden set kanału, `tickets-mail.json` (2026-11-20, p. 32.3):** wpis na
-  każdy ze 136 wątków z etykietami z 32.1 (rodzaj, `useful`) i polami wątku, każde z autorem
-  i etykietą na każdą linię ze słowami: `tresc`, `podpis`, `naglowek`, `kopia` albo `stopka`,
+- **Czyszczenie mierzy golden set kanału, `tickets-mail.json` (2026-11-18 – 2026-11-20, p. 32):**
+  wpis na każdy ze 136 wątków z rodzajem i `useful` (79 spraw i 57 powiadomień, 27 z wiedzą,
+  6 par jednej sprawy; ślepy przegląd zgodny w 131 ze 136, kappa 0,89, a sporna klasa to
+  poprawka dostawcy bez przyczyny) i z polami wątku, każde z autorem i etykietą na każdą linię
+  ze słowami: `tresc`, `podpis`, `naglowek`, `kopia` albo `stopka`,
   z regułami w metryczce pliku. Linie oznaczali agenci na ślepo, bez
   wglądu w wynik czyszczenia (9889 linii w 4 partiach), a druga, niezależna ocena 40 wątków
   zgadza się z pierwszą w 99,6% linii (kappa 0,995). Wynik ze słownikiem z tego dnia: role
@@ -896,9 +899,11 @@ wymagające czyszczenia cytowanej historii przed parsowaniem.
   - **Role są zepsute w 96% wątków, nie „bywają odwrócone".** System zapisuje nadawcę maila, a nie
     autora cytowanej wypowiedzi, więc odpowiedzi konsultantów figurują jako wypowiedzi klienta.
     **Flaga autora w bazie jest tu bezużyteczna — rozstrzyga wyłącznie podpis w treści.**
+    W 136 zamkniętych wątkach (2026-11-18) 74 z 96 komentarzy z rolą „klient” podpisał dostawca.
   - **Treść to 4–10% opisu** (zmierzone na czterech kolejnych rekordach: 93 zn. na 2563, 129 na
     1821, 231 na 3139, 324 na 3410). Po odjęciu narzutu z całego wątku zostaje ~40% objętości.
-    Skrajny przypadek 34096: **2460 wyrazów, z czego 94 to treść**.
+    Skrajny przypadek 34096: **2460 wyrazów, z czego 94 to treść**. W 106 ze 139 opisów mail stoi
+    dwa razy: część HTML i jej kopia tekstowa (2026-11-18).
   - **47% tego kanału to NIE są zgłoszenia**, tylko nasz własny broadcast, który wrócił na helpdesk,
     bo skrzynka jest w kopii (zapowiedzi aktualizacji, potwierdzenia wdrożeń, wykazy zmian). Jedno
     wdrożenie potrafi dać trzy rekordy, a ten sam mail wysłany dwa razy w odstępie 15 minut — dwa.
@@ -906,9 +911,12 @@ wymagające czyszczenia cytowanej historii przed parsowaniem.
     powiadomienie wychodzące, a niesie najlepszą diagnozę w całym materiale (weryfikacja podpisu:
     `No CRL/OCSP address/data` → brak dostępu do listy unieważnień na stanowisku). Odwrotnie 34722 —
     powiadomienie o aktualizacji z ukrytą w środku niedziałającą integracją KSeF. **Stąd do indeksów
-    wpuszcza filtr `useful` na oczyszczonym wątku, a nie reguła po kanale (p. 32).**
+    wpuszcza filtr `useful` na oczyszczonym wątku, a nie reguła po kanale ani ręczna flaga, bo
+    trasa zamknięcia dostaje takich zgłoszeń dziesiątki miesięcznie (decyzja 2026-11-18, p. 32).**
   - **Jedna sprawa rozpada się na dwa rekordy**, gdy prośba klienta i nasza odpowiedź wpadają
     osobno (33942/33951, 33967/34046, 34300/34387). Czytając którykolwiek osobno, widzi się połowę.
+    Takich par nie sklejamy (decyzja 2026-11-18): późniejszy rekord zwykle cytuje prośbę, więc po
+    czyszczeniu niesie obie połowy.
   - **Załączników nie ma w bazie**, więc rozwiązanie „nowa wersja w załączniku" (34352) nie
     istnieje.
   **Czyszczenie i role z podpisów robi normalizer maili (p. 32), w trasach i w imporcie.**
@@ -4280,6 +4288,24 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
   Wzorce wracają, gdy któryś rodzaj pojawi się w korpusie albo w golden secie. SIMC (36 263 nazwy)
   kosztowałby plik 5,5 MB w obrazie, odświeżanie i nazwy będące zwykłymi słowami (Góra, Kolonia,
   Wola). Adresy bez kodu pocztowego i bez słowa przed ulicą wskazuje model (p. 19.5).
+- **Inne sposoby czyszczenia wątków mailowych** (sondy z 2026-11-18 na 136 wątkach kanału
+  „Automat mailowy”) — wygrało okno 12 słów w jednym przebiegu przez wątek, słownik szablonów
+  z co najmniej 10 wątków i usuwanie samych całych linii, z którymi zostaje 27,5% słów:
+
+  | wariant | wynik | dlaczego odpadł |
+  |---|---|---|
+  | same powtórzone linie | zostaje 64% | kopia HTML i kopia tekstowa łamią linie inaczej |
+  | podział maila na wiadomości po nagłówkach | zostaje 62% | podpisy i częściowo powtórzone cytaty zostają |
+  | okno 5 albo 8 słów | 70 albo 17 cięć w nowej treści | tnie adresy, linki i kawałki zdań |
+  | dłuższe okna (24–40 słów) | gubią krótkie, ucięte kopie | |
+  | najdłuższy wcześniejszy ciąg (jak w LZ77) | to samo co okno | więcej kodu |
+  | Jaccard, difflib, ciągi liter | bez zysku | Jaccard 70 razy wolniejszy, ciąg 20 liter dopasowuje przypadkiem |
+  | słownik od 5 albo 20 wątków | zostaje 21,1% albo 26,7% (przy 10: 24,1%) | od 5 tnie linie wykazów zmian wspólne kilku powiadomieniom |
+  | cięcie po słowach zamiast całych linii | zostaje 26,1% | strzępy w 82 ze 136 wątków |
+  | czyszczenie powtarzane do skutku | nic nie zmienia | jeden przebieg porównuje z całym wcześniejszym tekstem |
+
+  Wraca, gdy w kanale przybędzie przeredagowanych powtórzeń, których okno nie łapie; wtedy do
+  sprawdzenia miara przyrostu informacji po kompresji (NCD), dziś niesprawdzona.
 - **Tabela komunikatów z rozbioru napisów w kodzie** — wymaga osobnego tokenizera PHP i JS. Wraca,
   gdy szukanie po liniach da za dużo nietrafionych wyników.
 
@@ -4393,22 +4419,8 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 
 - [x] **31. Masowy import z nowszego zrzutu** (2026-11-13 – 2026-11-15) → „Historyczne
   zgłoszenia”, „Domena”, „Golden set retrievalu”, „Warstwa wyszukiwania tekstowego (Postgres)”.
-- [ ] **32. Automat mailowy w adapterze** — czyszczenie wątków tego kanału, a po nim 136
-  zamkniętych zgłoszeń z sierpniowego zrzutu dochodzi do korpusu osobnym przebiegiem. Rozpoznanie
-  z 2026-11-18: w 106 ze 139 opisów mail stoi dwa razy (HTML i zwykły tekst), a 74 z 96
-  komentarzy „klient” podpisał dostawca. Ustalone 2026-11-18: do indeksów wpuszcza filtr
-  `useful`, nie ręczna flaga, bo trasa zamknięcia dostaje takich zgłoszeń dziesiątki miesięcznie;
-  sprawy rozbitej na dwa rekordy nie sklejamy, bo późniejszy rekord cytuje prośbę.
-  *Dlaczego:* 77 ze 123 zgłoszeń w lipcu, a treść to kilka procent opisu.
-  - [x] **32.1 Etykiety** (2026-11-18) — `data/unsafe/golden/tickets-mail.json`: 79 spraw,
-    57 powiadomień, 27 z wiedzą, autorzy i 6 par. Ślepy przegląd: `useful` zgodne w 131 ze 136
-    (kappa 0,89); sporna klasa to poprawka dostawcy bez przyczyny.
-  - [x] **32.2 Czyszczenie** (2026-11-20) → „Historyczne zgłoszenia”.
-  - [x] **32.3 Pomiar bez modelu** (2026-11-20) → „Historyczne zgłoszenia”.
-  - [x] **32.4 Import i trasy** (2026-11-20) → „Historyczne zgłoszenia”.
-  - [x] **32.5 Przebieg** (2026-11-20) → „Historyczne zgłoszenia”.
-  - [x] **32.6 Luka promptu** (2026-11-20) — niepotrzebna: filtr odrzucił 56 z 56 powiadomień bez
-    wiedzy, w tym 33644.
+- [x] **32. Automat mailowy w adapterze** (2026-11-18 – 2026-11-20) → „Historyczne zgłoszenia”,
+  „Świadomie pominięte”.
 - [ ] **33. Przeliczenia na pełnym korpusie** — `RAG_SCORE_MIN` na zapytaniach sparsowanych
   (na kartach `gpt-6.1-sol` trafienie dostaje 7 z 16 dystraktorów, na kartach Bielika 3 z 16,
   przy tym samym progu 0.48), porównanie embedderów, liczba wątków-projektów, `questions_summary`,
