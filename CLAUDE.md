@@ -655,33 +655,32 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   golden setu leżą osobno, w `data/unsafe/golden/`. W samym katalogu korpusu leżą raporty
   przebiegów masowego importu, `import-<data i godzina startu>.json`, same numery i liczby.
 - **Korpus instancji to masowy import sierpniowego zrzutu (p. 31, 2026-11-13).** Eksport
-  `export_raw_tickets.py` do `raw-db/` (1955 zgłoszeń, bez czytnika SQL, decyzja 2026-11-11),
-  a z niego `helpdesk tickets import` w kontenerze `api`: graf `parse_ticket` z tej samej
-  fabryki co trasy, anonimizator na Bieliku, model `gpt-6.1-sol` (decyzja 2026-11-13: na jego
-  kartach zmierzono filtr jakości). Zakres to 1758 zgłoszeń: poza nim 61 w toku i 136
-  zamkniętych z kanału „Automat mailowy”, który doszedł po czyszczeniu (p. 32). Wynik: 1758
-  kart jednym przebiegiem promptu o skrócie `308c1c483d78` (pełny skrót i model w raporcie importu), 0 błędów,
-  1081 przyjętych przez filtr (61%), 8,15 USD modelu i ok. 0,9 USD poda, 44 min przy 4
-  zgłoszeniach naraz, po próbie na 20; indeksy z `reindex` w 24 min 48 s na CPU. Przegląd
-  około 40 losowych kart ze zgłoszeniem i wątkiem: bez przecieku danych osobowych i bez
-  zmyślonych przyczyn. Uwagi z przeglądu czekają na pomiary: sporne pojedyncze oceny `useful`
-  przy jednorazowych naprawach dostawcy (p. 33), sprawy wysyłki przez ePUAP zwykle
-  z `component` „główna aplikacja” (p. 33), w `questions_summary` czasem prośba o numer pisma
-  zamiast pytania diagnostycznego (p. 25). Dodatkowej kopii korpusu nie ma (decyzja
-  2026-11-13, p. 35).
-- **Kanał „Automat mailowy” doszedł do korpusu osobnym przebiegiem importu (2026-11-20,
-  p. 32):** 136 zamkniętych zgłoszeń, wątki oczyszczone normalizerem maili, ten sam model
-  i prompt. Wynik: 136 kart, 0 błędów, 0,66 USD modelu i ok. 0,2 USD poda, 46 s próby na 20
-  i 3 min 04 s reszty przy 4 naraz; `helpdesk tickets index` dołożył karty i wątki w 27 min
-  38 s na CPU, więc w indeksach stoi 1115 kart i 1115 wątków. Filtr przyjął 34 ze 136 (25%).
-  Ocena `useful` zgadza się z etykietami golden setu kanału w 125 ze 136 (kappa 0,77; drugi oceniający na oczyszczonym wątku: 131 ze 136, kappa 0,89):
-  powiadomienia 57 z 57 (56 bez wiedzy odrzucone, jedyne z wiedzą, 34722, przyjęte), sprawy
-  68 z 79. Z 11 niezgodnych 8 stoi przy wpisach oznaczonych w etykietach jako wątpliwe. 9 to
-  karty przyjęte wbrew etykiecie, prawie wszystkie z klasy spornej: poprawka albo czynność
-  dostawcy bez przyczyny, a karta pisze wtedy w `cause` „brak” albo „nie wskazano”. 2 to karty
-  odrzucone, choć wiedza stoi w opisie klienta, a nie w odpowiedzi dostawcy. W 20 wątkach próby
-  nie ma adresu e-mail ani telefonu, a w pięciu przeczytanych żadnej osoby. Dwa zgłoszenia
-  (35152, 34786) weszły świadomie z loginami i hasłami w treści, jak import sierpniowy (p. 20).
+  `export_raw_tickets.py` do `raw-db/` (1955 zgłoszeń, bez czytnika SQL, decyzja 2026-11-11), a z
+  niego `helpdesk tickets import` w kontenerze `api`: graf `parse_ticket` z tej samej fabryki co
+  trasy, anonimizator na Bieliku, model `gpt-6.1-sol` (decyzja 2026-11-13: na jego kartach zmierzono
+  filtr jakości). Zakres to 1758 zgłoszeń: poza nim 61 w toku i 136 zamkniętych z kanału „Automat
+  mailowy”, który doszedł po czyszczeniu (p. 32). Wynik: 1758 kart jednym przebiegiem promptu o
+  skrócie `308c1c483d78` (pełny skrót i model w raporcie importu), 0 błędów, 1081 przyjętych przez
+  filtr (61%), 8,15 USD modelu i ok. 0,9 USD poda, 44 min przy 4 zgłoszeniach naraz, po próbie na
+  20; indeksy z `reindex` w 24 min 48 s na CPU. Przegląd około 40 losowych kart ze zgłoszeniem i
+  wątkiem: bez przecieku danych osobowych i bez zmyślonych przyczyn. Uwagi z przeglądu czekają na
+  pomiary: sporne pojedyncze oceny `useful` przy jednorazowych naprawach dostawcy (p. 33), sprawy
+  wysyłki przez ePUAP zwykle z `component` „główna aplikacja” (p. 33), w `questions_summary` czasem
+  prośba o numer pisma zamiast pytania diagnostycznego (p. 25). Dodatkowej kopii korpusu nie ma
+  (decyzja 2026-11-13, p. 35).
+- **Kanał „Automat mailowy” doszedł do korpusu osobnym przebiegiem importu (2026-11-20, p. 32):**
+  136 zamkniętych zgłoszeń, wątki oczyszczone normalizerem maili, ten sam model i prompt. Wynik: 136
+  kart, 0 błędów, 0,66 USD modelu i ok. 0,2 USD poda, 46 s próby na 20 i 3 min 04 s reszty przy 4
+  naraz; `helpdesk tickets index` dołożył karty i wątki w 27 min 38 s na CPU, więc w indeksach stoi
+  1115 kart i 1115 wątków. Filtr przyjął 34 ze 136 (25%). Ocena `useful` zgadza się z etykietami
+  golden setu kanału w 125 ze 136 (kappa 0,77; drugi oceniający na oczyszczonym wątku: 131 ze 136,
+  kappa 0,89): powiadomienia 57 z 57 (56 bez wiedzy odrzucone, jedyne z wiedzą, 34722, przyjęte),
+  sprawy 68 z 79. Z 11 niezgodnych 8 stoi przy wpisach oznaczonych w etykietach jako wątpliwe. 9 to
+  karty przyjęte wbrew etykiecie, prawie wszystkie z klasy spornej: poprawka albo czynność dostawcy
+  bez przyczyny, a karta pisze wtedy w `cause` „brak” albo „nie wskazano”. 2 to karty odrzucone,
+  choć wiedza stoi w opisie klienta, a nie w odpowiedzi dostawcy. W 20 wątkach próby nie ma adresu
+  e-mail ani telefonu, a w pięciu przeczytanych żadnej osoby. Dwa zgłoszenia (35152, 34786) weszły
+  świadomie z loginami i hasłami w treści, jak import sierpniowy (p. 20).
 - **Docelowo korpus odświeża trasa zamknięcia, a do jej wpięcia kolejne zrzuty (decyzja
   2026-11-20, p. 34).** Zrzuty są przejściowe: dobierają zaległości obecnym eksportem
   (`export_raw_tickets.py`) i importem, który pomija zgłoszenia z kartą, więc bierze tylko
