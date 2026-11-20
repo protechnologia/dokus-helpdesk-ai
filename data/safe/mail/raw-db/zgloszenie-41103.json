@@ -1,0 +1,21 @@
+{
+  "zrodlo": "zmyślone — dane do testów normalizera maili (p. 32)",
+  "tabela": "zgloszenie",
+  "zgloszenie": {
+    "id": 41103,
+    "created_at": "2026-07-03 10:12:00",
+    "status": "rozwiazany",
+    "kategoria": "Automat mailowy",
+    "czego_dotyczy": "Pytanie o raport",
+    "szczegolowy_opis": "<p>Dzień dobry,</p><p>gdzie znajdę raport pism przyjętych w danym miesiącu?</p><p>Dziękuję<br />Maria Lis<br />Starostwo Powiatowe w Zmyślonowie</p>"
+  },
+  "komentarze": [
+    {
+      "id": 411031,
+      "typ": "zwyczajny",
+      "autor_rola": "klient",
+      "created_at": "2026-07-08 09:15:00",
+      "tresc": "<p>Dzień dobry,<br />raport jest w menu Raporty → Pisma przyjęte; okres wybiera się nad tabelą.</p><p>Pozdrawiam<br />Ewa Zielińska<br />Wdrożeniowiec | Przykładsoft Sp. z o.o.</p><p>Ta wiadomość i jej załączniki są poufne i przeznaczone wyłącznie dla wskazanego odbiorcy.<br />Jeśli otrzymali ją Państwo przez pomyłkę, prosimy o poinformowanie nadawcy<br />i trwałe usunięcie wiadomości wraz z załącznikami.</p><p>W dniu 7 lipca 2026 Maria Lis napisał(a):</p><p>&gt; Dzień dobry,<br />&gt; gdzie znajdę raport pism przyjętych w danym miesiącu?</p>"
+    }
+  ]
+}

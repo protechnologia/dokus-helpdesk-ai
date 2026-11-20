@@ -1,0 +1,33 @@
+{
+  "built_on": "2026-11-20",
+  "source": "data/safe/mail",
+  "threads": 3,
+  "run_words": 12,
+  "min_threads": 2,
+  "digests": [
+    "0163ece99073ac35",
+    "09e16a74f356dbcc",
+    "20661b13c6bdfc83",
+    "2e274baa3bcd712c",
+    "4fb622d155cd8e87",
+    "5705455ac3eda8f5",
+    "5b7f4fb26d661422",
+    "6977bae5ff6cedfd",
+    "6b1d57f99ed5ae0e",
+    "6fa8346b784093ce",
+    "71a9fa8f8127c352",
+    "7f6ac1d914896d3f",
+    "7fe0aa7f000f3bb7",
+    "95040597833ab3ed",
+    "a316aba127e7f456",
+    "adf3033535ed0765",
+    "af21ab6b35c942f4",
+    "ba1a8812e63c905c",
+    "c58cbacfc34488e6",
+    "c78c6dc71af56336",
+    "e7a68f80148c89f7",
+    "e9b4f554963a7120",
+    "f0a1b3f4eda81915",
+    "fa572d0116abf50b"
+  ]
+}

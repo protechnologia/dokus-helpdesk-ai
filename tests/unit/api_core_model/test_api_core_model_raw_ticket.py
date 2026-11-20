@@ -97,6 +97,20 @@ def test_thread_says_when_the_body_is_empty():
     assert "(brak opisu)" in _ticket(body="").as_thread()
 
 
+def test_the_body_header_names_the_author_only_when_it_is_known() -> None:
+    """Sprawdza, czy nagłówek opisu ma autora („OPIS ZGŁASZAJĄCEGO — konsultant:”), gdy
+    zgłoszenie go niesie, a bez autora zostaje w dawnym brzmieniu („OPIS ZGŁASZAJĄCEGO:”).
+
+    Wyłapuje autora opisu zgubionego w wątku: w kanale mailowym opis to zwykle mail dostawcy,
+    a model brałby go za opis zgłaszającego. Wyłapuje też zmianę nagłówka dla wszystkich
+    zgłoszeń: wątki spoza kanału rozjechałyby się z tymi, z których parsowano korpus."""
+    with_role    = _ticket(body_role="konsultant").as_thread()
+    without_role = _ticket().as_thread()
+
+    assert "\nOPIS ZGŁASZAJĄCEGO — konsultant:\nNie działa wysyłka" in with_role
+    assert "\nOPIS ZGŁASZAJĄCEGO:\nNie działa wysyłka" in without_role
+
+
 def test_the_subject_is_cut_back_out_of_the_thread() -> None:
     """Sprawdza, czy z tekstu wątku da się z powrotem wyciąć temat: wątek zgłoszenia o temacie
     „Błąd wysyłki przez ePUAP" oddaje dokładnie ten temat.

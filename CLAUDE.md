@@ -270,6 +270,7 @@ dokus-helpdesk-ai/
 │   ├── safe/                     # dane zmyślone — W repo
 │   │   ├── instruction/          # syntetyczna dokumentacja: manifest.json + pliki .md
 │   │   ├── golden/               # zestaw zapytań do niej
+│   │   ├── mail/                 # zmyślony słownik maili: slownik.json, nazwy.json, raw-db/ (p. 32)
 │   │   └── code/                 # zmyślona aplikacja: source/ i rules.json (p. 60)
 │   └── unsafe/                   # dane klientów (PII) — NIE w repo
 │       ├── db/                   # zrzuty bazy źródłowej
@@ -277,6 +278,7 @@ dokus-helpdesk-ai/
 │       ├── golden/               # zestawy do ewaluacji i korpus golden setu: raw-db/, cards/, anonymized/
 │       ├── instruction/          # właściwa dokumentacja (p. 55)
 │       ├── code/                 # paczka kodu aplikacji: rules.json, manifest.json, symbols.json, project.md, repo/ (p. 60)
+│       ├── mail/                 # słownik maili: slownik.json, nazwy.json (p. 32)
 │       └── docs/                 # prezentacje/ i raporty robocze
 ├── api/                          # folder = usługa z compose, nazwany tak samo
 │   ├── Dockerfile
@@ -294,7 +296,7 @@ dokus-helpdesk-ai/
 │       ├── core_model/           # tickets/, docs/, code/, dicts/, graphs/, instance/ — folder na temat, plik nazwany jak model
 │       ├── core_service/         # parser_*, validator_*, filter_*, loader_*, builder_*, normalizer_*, indexer_*, importer_*, writer_*, inspector_*, factory_*
 │       ├── core_text/            # dict_*.json — wyłącznie dane klienta (słowniki, zestawy reguł)
-│       ├── core_util/            # html, validation_text, time, text, path
+│       ├── core_util/            # html, validation_text, time, text, path, repetition
 │       │                         # --- za granicą procesu: pakiet na USŁUGĘ ---
 │       ├── engine_llm/           # LLMClient + fabryka; client/, pricing/, models/
 │       ├── engine_embedding/     # EmbeddingClient (HTTP do `embedder`) + prefiksy
@@ -683,6 +685,27 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   odbuduje indeks. Ponowne zamknięcie nadpisuje wszystkie trzy pliki (decyzja 2026-11-11):
   nowszy wątek jest pełniejszy, a karta kosztuje grosze. Cena: poprzedniej karty nie da się
   odzyskać.
+- **Wątek kanału „Automat mailowy” czyści `normalize_mail_ticket()`
+  (`core_service/normalizer_ticket_mail.py`, p. 32, 2026-11-20), zanim trafi do anonimizatora;
+  wątek z innego kanału wraca bez zmian.** Najpierw autor każdej wiadomości z podpisu:
+  `konsultant`, gdy przed cytatem stoi nazwa dostawcy z `nazwy.json` (porównywana słowami),
+  a rola `konsultant` z bazy zostaje; na 136 wątkach 96,2% pól zgodnie z etykietami, role z bazy
+  51%. Cytat zaczyna się od nagłówka za co najmniej trzema słowami własnej treści, więc
+  przekazanie z samym „FYI” bierze autora z podpisu przekazanej wiadomości (przy jednym słowie
+  95,6%). Autor opisu idzie do `RawTicket.body_role`, a `as_thread()` pisze go w nagłówku
+  opisu tylko wtedy, gdy jest: wątki spoza kanału zostają znak w znak. Potem znikają odwołania
+  do obrazków (`[cid:…]`) i całe linie leżące w ciągu co najmniej 12 słów, który stał już
+  wcześniej w wątku, także w tym samym polu, albo w słowniku szablonów (`core_util/repetition.py`).
+  Zostaje 26,9% słów, a 10 opisów zostaje pustych: masowy mail dostawcy wysłany do 10 urzędów
+  jest w całości szablonem (wszystkie 10 bez wiedzy). Tekstu po czyszczeniu nie zapisujemy:
+  liczy się w locie ze źródła.
+- **Słownik maili leży w `data/unsafe/mail/`, bo powstaje z maili klienta, choć niesie same
+  skróty (decyzja 2026-11-20).** `slownik.json` buduje `scripts/build_mail_dictionary.py`
+  z wątków kanału w `raw-db/` (338 skrótów BLAKE2b po 8 bajtów: fragmenty z co najmniej 10 ze
+  139 wątków, 8 KB, 1,4 s), a `nazwy.json` pisze człowiek; dwa pliki, bo przebudowa nie może
+  ruszyć nazw, jak przy `rules.json` paczki kodu. Słownik zmyślony, z trzech zmyślonych wątków
+  i progiem 2, leży w `data/safe/mail/`, a test pilnuje, że zgadza się ze źródłem. Brak pliku to
+  `MailDictionaryConfigError`, a nie pusty słownik, który przepuściłby wątek bez czyszczenia.
 
 #### Zakres korpusu: wyłącznie moduł Dokus
 
@@ -847,13 +870,14 @@ wymagające czyszczenia cytowanej historii przed parsowaniem.
   - **Żadna reguła automatyczna nie odróżni broadcastu od realnej sprawy.** Dowód: 33968 wygląda jak
     powiadomienie wychodzące, a niesie najlepszą diagnozę w całym materiale (weryfikacja podpisu:
     `No CRL/OCSP address/data` → brak dostępu do listy unieważnień na stanowisku). Odwrotnie 34722 —
-    powiadomienie o aktualizacji z ukrytą w środku niedziałającą integracją KSeF. **Stąd flaga
-    „nie do korpusu" ustawiana ręcznie, nie heurystyka.**
+    powiadomienie o aktualizacji z ukrytą w środku niedziałającą integracją KSeF. **Stąd do indeksów
+    wpuszcza filtr `useful` na oczyszczonym wątku, a nie reguła po kanale (p. 32).**
   - **Jedna sprawa rozpada się na dwa rekordy**, gdy prośba klienta i nasza odpowiedź wpadają
     osobno (33942/33951, 33967/34046, 34300/34387). Czytając którykolwiek osobno, widzi się połowę.
   - **Załączników nie ma w bazie**, więc rozwiązanie „nowa wersja w załączniku" (34352) nie
     istnieje.
-  **Nic z tego nie jest zrobione — wchodzi w p. 32.**
+  **Czyszczenie i role z podpisów robi normalizer maili (p. 32); wpięcie w import i trasy to
+  p. 32.4.**
 - **Część rozwiązań jest pusta merytorycznie** — „Już powinno działać", „Zamykam", „Proszę się
   przelogować". Formalnie komentarz `typ='rozwiazanie'`, ale nie niesie wiedzy do zaproponowania
   komuś innemu. **Filtr jakości musi to odsiewać**: trafienie bez treści jest gorsze niż brak
@@ -3401,6 +3425,10 @@ nogi produktu na jednej sprawie.
 - Mapa symboli do paczki, która już stoi, bez kopiowania kodu od nowa:
   `python scripts/build_code_symbols.py build data/unsafe/code` (zastępuje `symbols.json`;
   budowa paczki robi to samo na końcu)
+- Słownik szablonów maili po przyroście korpusu (p. 32):
+  `python scripts/build_mail_dictionary.py build data/unsafe/corpus data/unsafe/mail` (zastępuje
+  `slownik.json`, `nazwy.json` zostaje); słownik zmyślony do testów, po zmianie jego wątków:
+  `python scripts/build_mail_dictionary.py build data/safe/mail data/safe/mail --min-threads 2`
 
 **Pipeline danych (CLI `helpdesk`)**
 - Argumentem czterech komend niżej jest katalog korpusu (bez niego `TICKETS_CORPUS_DIR`);
@@ -3970,6 +3998,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/postgres/`             | narzędzie na prawdziwej tabeli z podmienionym klientem (`ScriptedPostgres`), także liczenie wierszy albo jego błąd (`count_error`) |
 | `tests/_helpers/tickets_index/`        | indekser zgłoszeń, serwis zamkniętego zgłoszenia i trasa `POST /tickets/closed`: atrapy embeddera, kolekcji zgłoszeń i tabeli wątków (`FakeEmbedder`, `FakeTickets`, `FakeThreads`), indekser zgłoszeń na nich (`tickets_indexer_on()`), karta i wątek w korpusie testu (`write_card()`, `write_thread()`), serwis zamkniętego zgłoszenia (`closed_ticket_indexer_on()`), anonimizator zamieniający jeden fragment (`ReplacingAnonymizer`), graf karty z prawdziwym węzłem `respond` (`card_graph()`) i aplikacja trasy na tym wszystkim (`app_closing_tickets()`); próbki zamkniętego zgłoszenia, żądania i werdyktów w `samples.py` |
 | `tests/_helpers/tickets_import/`       | masowy import: plik eksportu zgłoszenia w `raw-db/` (`write_export()`), atrapa modelu, która na każde zgłoszenie odpowiada kartą, a na wskazane numery błędem (`CardLLM`), serwis importu na prawdziwych węzłach grafu karty (`importer_on()`) i atrapy serwisu i jego fabryki do testów komendy (`StubImporter`, `StubImporterFactory`); próbki raportu w `samples.py` |
+| `tests/_helpers/mail/`                 | słownik maili zmyślony z `data/safe/mail/` (`safe_templates()`, `safe_vendor_names()`), jego zmyślone wątki (`safe_mail_ticket()`) i zgłoszenie kanału z podanym opisem i komentarzami (`mail_ticket()`); maile z przykładów notatki o metodzie i oczyszczony wątek wzorcowy w `samples.py` |
 | `tests/_helpers/instance/`             | stan instancji: serwis liczący indeksy na atrapach Qdranta i Postgresa (`scripted_inspector()`, `inspector_on()`, klienci `counting_*` i `failing_*`), aplikacja z podanym serwisem (`app_with_inspector()`); próbki `sample_*()` w `samples.py` — raport stanu, paczka kodu, konfiguracja modelu |
 | `tests/_helpers/embedding/`            | embedding: nazwy modeli testowych (`EMBEDDING_MODEL`, `OTHER_MODEL`), odpowiedź usługi `embedder` w kształcie kontraktu (`embedder_answer()`) i payload punktu Qdranta z nazwą modelu (`with_model()`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
@@ -4331,19 +4360,15 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
   - [x] **32.1 Etykiety** (2026-11-18) — `data/unsafe/golden/tickets-mail.json`: 79 spraw,
     57 powiadomień, 27 z wiedzą, autorzy i 6 par. Ślepy przegląd: `useful` zgodne w 131 ze 136
     (kappa 0,89); sporna klasa to poprawka dostawcy bez przyczyny.
-  - [ ] **32.2 Czyszczenie** — `core_service/normalizer_ticket_mail.py`, ustalone 2026-11-18
-    sondami na 136 wątkach. Najpierw autor wiadomości z podpisu firmy dostawcy (nazwa
-    z konfiguracji instancji): 95% zgodnie z etykietami, role z bazy 51%. Potem usuwane są całe
-    linie leżące w ciągu co najmniej 12 słów, który już stał wcześniej w wątku, albo w słowniku
-    szablonów (ciągi 12 słów z co najmniej 10 wątków kanału, zapisane jako skróty), oraz linie
-    `[cid:…]`. Zostaje 27,5% tekstu; w przeglądzie agentami ocena `useful` z oczyszczonego wątku
-    zgadzała się z etykietą w 136 ze 136. Znany koszt: odpowiedzi wplecione w cytat (4 wątki,
-    wszystkie bez wiedzy). Tekstu po czyszczeniu nie zapisujemy: liczy się w locie ze źródła,
-    jak `as_thread()`.
-  - [ ] **32.3 Pomiar bez modelu** — testy na zmyślonych mailach, a na 136 prawdziwych role
-    wobec etykiet i brak zgubionych wiadomości.
+  - [x] **32.2 Czyszczenie** (2026-11-20) → „Historyczne zgłoszenia”.
+  - [ ] **32.3 Pomiar bez modelu** — test ewaluacyjny na 136 prawdziwych wątkach: role wobec
+    etykiet (dziś 96,2%), udział tekstu, który zostaje (26,9% słów), i brak zgubionych
+    wiadomości: pole puste po czyszczeniu tylko wtedy, gdy cała wiadomość jest powtórzeniem
+    albo szablonem. Testy na zmyślonych mailach weszły w 32.2.
   - [ ] **32.4 Import i trasy** — import i trasy przy `category` „Automat mailowy” czyszczą
-    wątek przed anonimizacją.
+    wątek przed anonimizacją. Do tego `TICKETS_MAIL_DIR` w `Settings`, `.env.example` i compose
+    oraz `data/unsafe/mail/` montowany do `api` tylko do odczytu w obu warstwach (przesunięte
+    z 32.2: wcześniej nikt ich nie czyta).
   - [ ] **32.5 Przebieg** — próba na 20, całość po zgodzie (ok. 0,7 USD), potem
     `helpdesk tickets index`.
   - [ ] **32.6 Luka promptu** — zgłoszenie informacyjne bez treści (np. 33644): poprawka promptu

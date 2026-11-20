@@ -1,0 +1,13 @@
+{
+  "zrodlo": "zmyślone — dane do testów normalizera maili (p. 32)",
+  "tabela": "zgloszenie",
+  "zgloszenie": {
+    "id": 41102,
+    "created_at": "2026-07-03 10:12:00",
+    "status": "rozwiazany",
+    "kategoria": "Automat mailowy",
+    "czego_dotyczy": "Zapowiedź aktualizacji",
+    "szczegolowy_opis": "<p>Szanowni Państwo,</p><p>w sobotę od 8:00 do 12:00 zainstalujemy nową wersję aplikacji.<br />W tym czasie logowanie nie będzie możliwe.</p><p>Z poważaniem<br />Piotr Wiśniewski<br />Konsultant | Przykładsoft Sp. z o.o.</p><p>Ta wiadomość i jej załączniki są poufne i przeznaczone wyłącznie dla wskazanego odbiorcy.<br />Jeśli otrzymali ją Państwo przez pomyłkę, prosimy o poinformowanie nadawcy<br />i trwałe usunięcie wiadomości wraz z załącznikami.</p>"
+  },
+  "komentarze": null
+}

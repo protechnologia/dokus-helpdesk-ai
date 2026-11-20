@@ -1,0 +1,21 @@
+{
+  "zrodlo": "zmyślone — dane do testów normalizera maili (p. 32)",
+  "tabela": "zgloszenie",
+  "zgloszenie": {
+    "id": 41101,
+    "created_at": "2026-07-03 10:12:00",
+    "status": "rozwiazany",
+    "kategoria": "Automat mailowy",
+    "czego_dotyczy": "Błąd wysyłki",
+    "szczegolowy_opis": "<p>Dzień dobry,</p><p>od wczoraj nie możemy wysłać żadnego pisma do ePUAP.</p><p>Przy wysyłce pojawia się komunikat „Brak uprawnień do skrzynki podawczej”.</p><p>Pozdrawiam<br />Jan Kowalski<br />Urząd Gminy Przykładowo</p><p>Administratorem Pani/Pana danych osobowych jest Wójt Gminy<br />Przykładowo, ul. Przykładowa 1, kontakt: iod@przykladowo.example.pl.</p><div><p>Dzień dobry,<br />od wczoraj nie możemy wysłać żadnego pisma do ePUAP. Przy<br />wysyłce pojawia się komunikat „Brak uprawnień do skrzynki<br />podawczej”.<br /><br />Pozdrawiam<br />Jan Kowalski</p></div>"
+  },
+  "komentarze": [
+    {
+      "id": 411011,
+      "typ": "zwyczajny",
+      "autor_rola": "klient",
+      "created_at": "2026-07-03 10:40:00",
+      "tresc": "<p>Dzień dobry,<br />po aktualizacji trzeba ponownie nadać uprawnienie do skrzynki<br />ePUAP: Administracja → Skrzynki → Uprawnienia. Wysyłki z błędem<br />proszę ponowić dopiero po nadaniu uprawnienia.</p><p>Z poważaniem<br />Anna Nowak<br />Specjalista ds. help desk | Przykładsoft Sp. z o.o. [cid:image001.png@01DCF2C1.5B3E9A40]</p><p>Ta wiadomość i jej załączniki są poufne i przeznaczone wyłącznie dla wskazanego odbiorcy.<br />Jeśli otrzymali ją Państwo przez pomyłkę, prosimy o poinformowanie nadawcy<br />i trwałe usunięcie wiadomości wraz z załącznikami.</p><p>Od: Jan Kowalski<br />Wysłano: 3 lipca 2026 10:12<br />Temat: Błąd wysyłki</p><p>Dzień dobry,</p><p>od wczoraj nie możemy wysłać żadnego pisma do ePUAP.</p><p>Przy wysyłce pojawia się komunikat „Brak uprawnień do skrzynki podawczej”.</p><p>Pozdrawiam<br />Jan Kowalski<br />Urząd Gminy Przykładowo</p><p>Administratorem Pani/Pana danych osobowych jest Wójt Gminy<br />Przykładowo, ul. Przykładowa 1, kontakt: iod@przykladowo.example.pl.</p>"
+    }
+  ]
+}

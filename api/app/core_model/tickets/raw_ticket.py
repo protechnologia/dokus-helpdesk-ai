@@ -37,6 +37,9 @@ class RawTicket(BaseModel):
     category:  str  = Field(examples=["Automat mailowy", "Błąd"])
     subject:   str  = Field(examples=["ESOD Dokus - Zakończona aktualizacja środowiska testowego"])
     body:      str  = Field(examples=["Dzień dobry, po aktualizacji nie działa wysyłka…"])
+    # Autor opisu, gdy da się go ustalić; pusty: opis napisał zgłaszający, jak zwykle. Ustawia go
+    # tylko normalizer kanału „Automat mailowy”, gdzie opis to zwykle mail dostawcy (p. 32).
+    body_role: str  = Field(default="", examples=["konsultant", ""])
 
     comments: list[RawComment] = Field(default_factory=list)
 
@@ -49,7 +52,9 @@ class RawTicket(BaseModel):
 
         Autor i typ komentarza są podpisane, ale nic z nich nie wynika: prompt każe modelowi
         ważyć treść ponad etykiety, więc ich ukrycie zabrałoby kontekst, a zaufanie im
-        powtórzyłoby udokumentowaną wadę tej bazy.
+        powtórzyłoby udokumentowaną wadę tej bazy. Autor opisu stoi w nagłówku tylko wtedy, gdy
+        go ustalono (`body_role`), więc wątki spoza kanału mailowego zostają znak w znak takie,
+        z jakich parsowano korpus.
 
         Example args:
             (brak)
@@ -57,11 +62,16 @@ class RawTicket(BaseModel):
         Example result:
             "ZGŁOSZENIE 33644 z 2026-06-23\\nTemat: Błąd wysyłki\\n\\nOPIS ZGŁASZAJĄCEGO:\\n…"
         """
+        # Bez ustalonego autora nagłówek zostaje w brzmieniu, z którego parsowano korpus.
+        body_header = "OPIS ZGŁASZAJĄCEGO:"
+        if self.body_role:
+            body_header = f"OPIS ZGŁASZAJĄCEGO — {self.body_role}:"
+
         parts = [
             f"ZGŁOSZENIE {self.ticket_id} z {self.date.isoformat()}",
             f"{SUBJECT_PREFIX}{self.subject}",
             "",
-            "OPIS ZGŁASZAJĄCEGO:",
+            body_header,
             self.body or "(brak opisu)",
         ]
 
