@@ -706,6 +706,18 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   ruszyć nazw, jak przy `rules.json` paczki kodu. Słownik zmyślony, z trzech zmyślonych wątków
   i progiem 2, leży w `data/safe/mail/`, a test pilnuje, że zgadza się ze źródłem. Brak pliku to
   `MailDictionaryConfigError`, a nie pusty słownik, który przepuściłby wątek bez czyszczenia.
+- **Czyszczenie mierzy golden set kanału, `tickets-mail.json` (2026-11-20, p. 32.3):** wpis na
+  każdy ze 136 wątków z etykietami z 32.1 (rodzaj, `useful`) i polami wątku, każde z autorem
+  i etykietą na każdą linię ze słowami: `tresc`, `podpis`, `naglowek`, `kopia` albo `stopka`,
+  z regułami w metryczce pliku. Linie oznaczali agenci na ślepo, bez
+  wglądu w wynik czyszczenia (9889 linii w 4 partiach), a druga, niezależna ocena 40 wątków
+  zgadza się z pierwszą w 99,6% linii (kappa 0,995). Wynik ze słownikiem z tego dnia: role
+  96,2%, zostaje 27,5% słów, znika 92,8% słów kopii i stopek, a wśród słów, które zostają,
+  śmieci jest 18,7% — głównie stopki urzędów przy pierwszym wystąpieniu, których słownik nie
+  zna. Ginie 1,0% słów treści, prawie w całości tło masowego maila dostawcy z 12 wątków, który
+  jest w całości szablonem; w jedynym z nich z wiedzą (34722) dopisane zdanie o KSeF zostaje.
+  Pomiar bierze linie z `repeated_lines()` (`core_util/repetition.py`) i w każdym polu sprawdza,
+  że normalizer oddał dokładnie słowa linii, które zostały.
 
 #### Zakres korpusu: wyłącznie moduł Dokus
 
@@ -3999,6 +4011,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/tickets_index/`        | indekser zgłoszeń, serwis zamkniętego zgłoszenia i trasa `POST /tickets/closed`: atrapy embeddera, kolekcji zgłoszeń i tabeli wątków (`FakeEmbedder`, `FakeTickets`, `FakeThreads`), indekser zgłoszeń na nich (`tickets_indexer_on()`), karta i wątek w korpusie testu (`write_card()`, `write_thread()`), serwis zamkniętego zgłoszenia (`closed_ticket_indexer_on()`), anonimizator zamieniający jeden fragment (`ReplacingAnonymizer`), graf karty z prawdziwym węzłem `respond` (`card_graph()`) i aplikacja trasy na tym wszystkim (`app_closing_tickets()`); próbki zamkniętego zgłoszenia, żądania i werdyktów w `samples.py` |
 | `tests/_helpers/tickets_import/`       | masowy import: plik eksportu zgłoszenia w `raw-db/` (`write_export()`), atrapa modelu, która na każde zgłoszenie odpowiada kartą, a na wskazane numery błędem (`CardLLM`), serwis importu na prawdziwych węzłach grafu karty (`importer_on()`) i atrapy serwisu i jego fabryki do testów komendy (`StubImporter`, `StubImporterFactory`); próbki raportu w `samples.py` |
 | `tests/_helpers/mail/`                 | słownik maili zmyślony z `data/safe/mail/` (`safe_templates()`, `safe_vendor_names()`), jego zmyślone wątki (`safe_mail_ticket()`) i zgłoszenie kanału z podanym opisem i komentarzami (`mail_ticket()`); maile z przykładów notatki o metodzie i oczyszczony wątek wzorcowy w `samples.py` |
+| `tests/_helpers/golden_mail/`          | golden set kanału „Automat mailowy”: wątki z `useful` i polami (autor, oznaczenia linii) (`golden_mail_tickets()`, `parse_ranges()`, `field_digest()`), wątek źródłowy (`mail_thread()`) i pomiar normalizera maili na nich (`measure_mail_cleaning()`) z progami |
 | `tests/_helpers/instance/`             | stan instancji: serwis liczący indeksy na atrapach Qdranta i Postgresa (`scripted_inspector()`, `inspector_on()`, klienci `counting_*` i `failing_*`), aplikacja z podanym serwisem (`app_with_inspector()`); próbki `sample_*()` w `samples.py` — raport stanu, paczka kodu, konfiguracja modelu |
 | `tests/_helpers/embedding/`            | embedding: nazwy modeli testowych (`EMBEDDING_MODEL`, `OTHER_MODEL`), odpowiedź usługi `embedder` w kształcie kontraktu (`embedder_answer()`) i payload punktu Qdranta z nazwą modelu (`with_model()`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
@@ -4361,10 +4374,7 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
     57 powiadomień, 27 z wiedzą, autorzy i 6 par. Ślepy przegląd: `useful` zgodne w 131 ze 136
     (kappa 0,89); sporna klasa to poprawka dostawcy bez przyczyny.
   - [x] **32.2 Czyszczenie** (2026-11-20) → „Historyczne zgłoszenia”.
-  - [ ] **32.3 Pomiar bez modelu** — test ewaluacyjny na 136 prawdziwych wątkach: role wobec
-    etykiet (dziś 96,2%), udział tekstu, który zostaje (26,9% słów), i brak zgubionych
-    wiadomości: pole puste po czyszczeniu tylko wtedy, gdy cała wiadomość jest powtórzeniem
-    albo szablonem. Testy na zmyślonych mailach weszły w 32.2.
+  - [x] **32.3 Pomiar bez modelu** (2026-11-20) → „Historyczne zgłoszenia”.
   - [ ] **32.4 Import i trasy** — import i trasy przy `category` „Automat mailowy” czyszczą
     wątek przed anonimizacją. Do tego `TICKETS_MAIL_DIR` w `Settings`, `.env.example` i compose
     oraz `data/unsafe/mail/` montowany do `api` tylko do odczytu w obu warstwach (przesunięte

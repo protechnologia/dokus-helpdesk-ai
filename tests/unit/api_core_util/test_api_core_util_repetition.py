@@ -7,6 +7,7 @@ go cytuje, z ciągiem 12 słów jak w normalizerze.
 
 from app.core_util.repetition import (
     remove_repeated_lines,
+    repeated_lines,
     run_digest,
     run_digests,
     words_of,
@@ -155,3 +156,18 @@ def test_run_digests_cover_every_window_once() -> None:
     assert len(run_digests(thirteen, RUN_WORDS)) == 2
     assert len(run_digests(repeated, RUN_WORDS)) == 1
     assert run_digests("za krótki tekst", RUN_WORDS) == set()
+
+
+def test_repeated_lines_flag_every_line_and_never_one_without_words() -> None:
+    """Sprawdza, czy `repeated_lines()` oddaje dla każdej linii każdego tekstu, czy znika:
+    w odpowiedzi z cytatem znika tylko linia cytatu, a pusta linia i linia z samym „>” stoją
+    jako zostające, w tej samej liczbie co linie tekstu.
+
+    Wyłapuje rozjazd między oznaczeniami a tekstem (za mało albo za dużo pozycji przesunęłoby
+    pomiar czyszczenia o linię) i linie bez słów oznaczone jako znikające."""
+    mail, reply, _ = sample_quote()
+    reply_lines    = f"{reply}\n\n>"
+
+    flags = repeated_lines([mail, reply_lines], RUN_WORDS, set())
+
+    assert flags == [[False, False], [False, True, True, False, False]]

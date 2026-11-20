@@ -22,7 +22,8 @@ Pierwsza linia cytatu znika, bo każde jej słowo leży w ciągu pięciu słów,
 w tekście 1. Druga zostaje, bo stoi w niej nowe słowo „nadal”: żaden ciąg z nim wcześniej nie
 stał.
 
-Kroki (`remove_repeated_lines`):
+Kroki (`remove_repeated_lines`, a dwa pierwsze także `repeated_lines`, które mówi o każdej
+linii, czy znika):
 
 1. Tekst dzieli się na słowa, każde z miejscem w tekście.
 2. Każde okno `run_words` kolejnych słów, które stało już wcześniej albo którego skrót jest na
@@ -126,18 +127,44 @@ def remove_repeated_lines(
     Oddaje teksty w tej samej kolejności, każdy bez linii, które w całości leżą w powtórzonych
     oknach: takich, które stały już wcześniej (w tym tekście albo w poprzednich), albo takich,
     których skrót jest na liście znanych. Linia znanego fragmentu znika także przy pierwszym
-    wystąpieniu.
+    wystąpieniu. Które linie znikają, mówi `repeated_lines()`.
 
     Example args:
-        texts=["Nie możemy wysłać pisma.", "Proszę odnowić.\n> nie możemy wysłać pisma"]
+        texts=["Nie możemy wysłać pisma.", "Proszę odnowić.\\n> nie możemy wysłać pisma"]
         run_words=5
         known=set()
 
     Example result:
         ["Nie możemy wysłać pisma.", "Proszę odnowić."]
     """
-    seen:    set[tuple[str, ...]] = set()
-    cleaned: list[str]            = []
+    flags   = repeated_lines(texts, run_words, known)
+    cleaned = [_kept_text(text, removed) for text, removed in zip(texts, flags, strict=True)]
+
+    return cleaned
+
+
+def repeated_lines(
+    texts:     Sequence[str],    # np. ["Nie możemy wysłać…", "Proszę odnowić…\n> nie możemy…"]
+    run_words: int,              # np. 12 — od ilu kolejnych słów liczy się powtórzenie
+    known:     Collection[str],  # np. {"5be28f491fc44ae7"} — skróty okien usuwanych zawsze
+) -> list[list[bool]]:
+    """
+    Description:
+    Mówi o każdej linii każdego tekstu (linie dzieli znak nowej linii), czy znika: `True`, gdy
+    każde jej słowo leży w powtórzonym oknie albo w oknie ze znanym skrótem. Linia bez słów nie
+    znika nigdy. Na tej odpowiedzi stoi `remove_repeated_lines()`, a pomiar czyszczenia porównuje
+    ją z oznaczeniami linii.
+
+    Example args:
+        texts=["Nie możemy wysłać pisma.", "Proszę odnowić.\\n> nie możemy wysłać pisma"]
+        run_words=5
+        known=set()
+
+    Example result:
+        [[False], [False, True]]
+    """
+    seen:  set[tuple[str, ...]] = set()
+    flags: list[list[bool]]     = []
 
     for text in texts:
         matches  = list(WORD.finditer(text))
@@ -155,20 +182,20 @@ def remove_repeated_lines(
             # wystąpienie, także w tym samym tekście (druga kopia maila w jednym polu).
             seen.add(window)
 
-        cleaned.append(_without_repeated_lines(text, matches, repeated))
+        flags.append(_line_flags(text, matches, repeated))
 
-    return cleaned
+    return flags
 
 
-def _without_repeated_lines(
+def _line_flags(
     text:     str,                  # np. "Proszę odnowić.\n> od wczoraj nie możemy wysłać pisma"
     matches:  Sequence[re.Match],   # słowa tekstu z miejscami, w kolejności
     repeated: Sequence[bool],       # np. [False, False, True, True, …] — słowo po słowie
-) -> str:
+) -> list[bool]:
     """
     Description:
-    Składa tekst z linii, które zostają: bez słów albo z choć jednym słowem spoza powtórzeń.
-    Puste linie zwija do jednej i zdejmuje białe znaki z brzegów.
+    Przenosi oznaczenia ze słów na linie: linia znika, gdy ma słowa i każde z nich jest
+    powtórzone.
 
     Example args:
         text="Proszę odnowić.\\n> od wczoraj nie możemy wysłać pisma"
@@ -176,11 +203,11 @@ def _without_repeated_lines(
         repeated=[False, False, True, True, True, True, True, True]
 
     Example result:
-        "Proszę odnowić."
+        [False, True]
     """
-    kept:  list[str] = []
-    index: int       = 0
-    start: int       = 0
+    flags: list[bool] = []
+    index: int        = 0
+    start: int        = 0
 
     for line in text.split("\n"):
         end = start + len(line)
@@ -192,12 +219,31 @@ def _without_repeated_lines(
             index += 1
 
         # Linia bez słów zostaje: nie ma w niej czego powtórzyć, a pusta linia dzieli akapity.
-        if not (line_words and all(line_words)):
-            kept.append(line)
+        flags.append(bool(line_words) and all(line_words))
 
         # Znak nowej linii, którego `split()` nie oddaje.
         start = end + 1
 
+    return flags
+
+
+def _kept_text(
+    text:    str,              # np. "Proszę odnowić.\n> od wczoraj nie możemy wysłać pisma"
+    removed: Sequence[bool],   # np. [False, True] — linia po linii, czy znika
+) -> str:
+    """
+    Description:
+    Składa tekst z linii, które zostają, zwija puste linie do jednej i zdejmuje białe znaki
+    z brzegów.
+
+    Example args:
+        text="Proszę odnowić.\\n> od wczoraj nie możemy wysłać pisma"
+        removed=[False, True]
+
+    Example result:
+        "Proszę odnowić."
+    """
+    kept   = [line for line, gone in zip(text.split("\n"), removed, strict=True) if not gone]
     joined = BLANK_LINES.sub("\n\n", "\n".join(kept)).strip()
 
     return joined
