@@ -234,9 +234,10 @@ compose.
   z README, agent proponuje nowy obszar z prefiksem i dopisuje go dopiero po akceptacji
   użytkownika.
 - **Co jakiś czas odchudzamy jedną podsekcję CLAUDE.md (2026-11-20)**: wypada to, co się nie
-  przyda albo łatwo wyciągnąć z kodu, a duże decyzje podsekcji idą przy tym do ADR. Trzy
-  przejścia — czyszczenie, łączenie, zwięzłość — każde z plikiem do przeglądu przed zmianą
-  i osobnym commitem; po każdym skrypt porównuje liczby i odesłania do planu obu wersji.
+  przyda albo łatwo wyciągnąć z kodu, a duże decyzje podsekcji idą do ADR. Cztery kroki, każdy
+  z plikiem do przeglądu przed zmianą i osobnym commitem: najpierw wybór dużych decyzji
+  podsekcji do ADR (decyzja, opcje, powód), potem czyszczenie, łączenie i zwięzłość; po każdym
+  skrypt porównuje liczby i odesłania do planu obu wersji.
 - **`data/unsafe/docs/` — raporty robocze i prezentacje, POZA repo** (2026-08-20).
   Powód: **raport cytujący korpus niesie PII**, choćby autor tego nie zamierzał — wystarczy
   wkleić zrzut z konsoli operującej na zgłoszeniach, żeby trafiły tam nazwiska użytkowników.
