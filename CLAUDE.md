@@ -663,11 +663,11 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   skrócie `308c1c483d78` (pełny skrót i model w raporcie importu), 0 błędów, 1081 przyjętych przez
   filtr (61%), 8,15 USD modelu i ok. 0,9 USD poda, 44 min przy 4 zgłoszeniach naraz, po próbie na
   20; indeksy z `reindex` w 24 min 48 s na CPU. Przegląd około 40 losowych kart ze zgłoszeniem i
-  wątkiem: bez przecieku danych osobowych i bez zmyślonych przyczyn. Uwagi z przeglądu czekają na
-  pomiary: sporne pojedyncze oceny `useful` przy jednorazowych naprawach dostawcy (p. 33), sprawy
-  wysyłki przez ePUAP zwykle z `component` „główna aplikacja” (p. 33), w `questions_summary` czasem
-  prośba o numer pisma zamiast pytania diagnostycznego (p. 25). Dodatkowej kopii korpusu nie ma
-  (decyzja 2026-11-13, p. 35).
+  wątkiem: bez przecieku danych osobowych i bez zmyślonych przyczyn. Uwagi z przeglądu: sporne
+  pojedyncze oceny `useful` przy jednorazowych naprawach dostawcy to znany koszt reguły tego pola,
+  sprawy wysyłki przez ePUAP mają zwykle `component` „główna aplikacja”, co przy polu opisowym
+  niczego nie psuje, a w `questions_summary` stoi czasem prośba o numer pisma zamiast pytania
+  diagnostycznego (p. 25). Dodatkowej kopii korpusu nie ma (decyzja 2026-11-13, p. 35).
 - **Kanał „Automat mailowy” doszedł do korpusu osobnym przebiegiem importu (2026-11-20, p. 32):**
   136 zamkniętych zgłoszeń, wątki oczyszczone normalizerem maili, ten sam model i prompt. Wynik: 136
   kart, 0 błędów, 0,66 USD modelu i ok. 0,2 USD poda, 46 s próby na 20 i 3 min 04 s reszty przy 4
@@ -1388,7 +1388,11 @@ Zasady schematu:
   wywołaniach warianty zapisu tej samej usługi („ePUAP" / „epuap" / „platforma ePUAP") są niemal
   pewne, więc pole NIE nadaje się na filtr Qdranta bez normalizacji.** Traktujemy je jako
   opisowe. Tanie ubezpieczenie: raport rozkładu wartości po pierwszej setce rekordów — wychwytuje
-  rozjazd, zanim obejmie cały korpus.
+  rozjazd, zanim obejmie cały korpus. Na 1894 kartach importu (2026-11-20) jest 30 wartości:
+  „główna aplikacja” 1741 (92%), e-Doręczenia 55, ePUAP 54, eNadawca 11, reszta po 1–4. Warianty
+  zapisu jednej rzeczy dotyczą około 10 kart (helpdesk w pięciu zapisach, „Elektroniczny Nadawca”
+  obok eNadawcy, NAPS obok NAPS2, DOKUS zamiast „główna aplikacja”), więc rozjazd jest mały, ale
+  pole rozróżnia niewiele: inną wartość niż główna aplikacja ma 8% kart.
 - **`resolution` jest słownikiem OPISOWYM — kod nie wyprowadza z niego żadnej klasy.** Wartość
   idzie do payloadu i do promptu generacji, bo „bez zmian w systemie" prowadzi do innej odpowiedzi
   niż „naprawione" — pierwsza mówi, co klient ma zrobić u siebie, druga że sprawa jest zamknięta
@@ -1413,10 +1417,13 @@ Zasady schematu:
   karty z ustaloną przyczyną w `cause` i wpuszczała echo prośby. Raport podaje przy każdym
   odrzuceniu `useful_reason`. Cena: filtr stoi na jednej ocenie modelu, która dla tego samego
   wątku potrafi wyjść różnie w dwóch przebiegach, a reguła pola `useful` w prompcie parsującym
-  jest od teraz kontraktem filtra. Filtr oparty o `resolution` odtwarzałby binarny odsiew,
-  przed którym ostrzegają „Ryzyka jakości treści” („im poważniejsza operacyjnie sprawa, tym
-  większa szansa, że wątek urwie się bez odpowiedzi”): wśród „nierozwiązanych” na 661 rekordach
-  tylko **8 na 161 ma puste `solution`**.
+  jest od teraz kontraktem filtra. Różnie wychodzi rzadko (2026-11-20): wątki golden200
+  sparsowane dwa razy, 2026-10-23 i przy masowym imporcie, tym samym modelem, z promptem różnym
+  tylko zasadami ogólnymi z 2026-10-30 i po innym przebiegu anonimizatora, dały tę samą ocenę
+  w 195 z 200 (4 karty odpadły, 1 doszła), a z etykietą zgodnych było 194 i 191. Filtr oparty
+  o `resolution` odtwarzałby binarny odsiew, przed którym ostrzegają „Ryzyka jakości treści”
+  („im poważniejsza operacyjnie sprawa, tym większa szansa, że wątek urwie się bez odpowiedzi”):
+  wśród „nierozwiązanych” na 661 rekordach tylko **8 na 161 ma puste `solution`**.
   - **Na sierpniowym zrzucie (2026-11-13, przed masowym importem) ocena `useful` zgodna
     z etykietą w 16 z 20 zgłoszeń golden setu**: dobre 8 z 8, bez wiedzy 5 z 6, dotąd
     przepuszczane wbrew etykiecie 3 z 6 (na kartach z 2026-10-23 — 0 z 6); cztery niezgodne to
@@ -1463,27 +1470,32 @@ streszczeniem pięciu rozwiązań: wektor nie trafia w żadną z nich, a przy tr
 wdrożeniowcowi cztery odpowiedzi na pytania, których nie zadał.
 
 **Decyzja: nie rozbijamy.** Filtr jakości tych rekordów nie wykrywa — heurystyka po długości
-opisu została zmierzona i obalona, bo parser opis streszcza. Rozbicie na wiele rekordów
-rozważamy dopiero, gdy pomiar na pełnym korpusie pokaże, że realnie psują trafienia (p. 33).
+opisu została zmierzona i obalona, bo parser opis streszcza. Na kartach importu (2026-11-20) co
+najmniej 3 pozycje listy w opisie (`<li>` albo linia od punktora lub numeru) ma 67 z 1894
+zgłoszeń (3,5%), z tego 31 przeszło filtr; lipcowej metody liczenia nie zapisano, więc liczb nie
+porównuje się wprost. Wpływu na trafienia nie mierzymy: przy tym udziale wymagałby osobnych
+zapytań pod te karty, a rozbicie — ponownego parsowania. Wraca, gdy pomiary wyszukiwania
+(p. 23) pokażą takie karty za złymi propozycjami.
 
 #### `questions_summary` — synteza bez konkretów jest bezwartościowa
 
 Synteza tego, **czego konsultant nie wiedział i o co dopytywał**. Jedyne miejsce w korpusie, gdzie
 widać **jak ten helpdesk diagnozuje** — tego nie da się wyprowadzić z `problem` i `symptoms`.
 **Dwa pomiary mierzą co innego i nie wolno ich mylić** (rozjazd wyszedł 2026-08-26): sonda na 1825
-**surowych** zgłoszeniach dała **16,7%** — tyle wątków zawiera pytania konsultanta. Ale w gotowych
-**artefaktach** pole niesie treść w **84%** (168 z 200 w `bielik-11b-golden200`; 4 to dosłowne
-`brak`, a **28 to sentinele w przebraniu** — „Brak pytań ze strony prowadzącego sprawę." 15×
-i dziewięć innych sformułowań). Model streszcza chętniej, niż sonda liczyła.
-**Wiążący dla wariantu `questions` jest ten drugi**, bo to on widzi artefakty — pole jest normą,
-nie wyjątkiem. Zastrzeżenie: golden200 to próbka **warstwowa dobrana pod jakość**, więc 84% jest
-górnym oszacowaniem; do przeliczenia na pełnym korpusie (p. 33).
-**Konsekwencja: `brak` NIE jest normą, ale sentinel w przebraniu jest częsty** — prompt musi
-odsiewać wpisy stwierdzające, że pytań nie było, a nie zakładać puste pole. Prompt z p. 24 to
-robi: w próbie przed masowym importem (2026-11-13, 27 kart) pole nie miało ani jednego sentinela
-ani pytania proceduralnego, a `cause` ani jednego domysłu — hipoteza konsultanta trafiła do
-`solution` jako przypuszczenie. W przeglądzie importu zdarza się za to prośba o numer pisma
-zamiast pytania diagnostycznego (p. 25).
+**surowych** zgłoszeniach dała **16,7%** — tyle wątków zawiera pytania konsultanta. Karty Bielika
+(`bielik-11b-golden200`) niosły w polu treść w 84% (168 z 200, w tym **28 sentineli
+w przebraniu** — „Brak pytań ze strony prowadzącego sprawę." 15× i dziewięć innych sformułowań):
+model streszczał chętniej, niż sonda liczyła. **Wiążące są karty importu (2026-11-20): treść ma
+380 z 1894 kart (20%), a w indeksie 230 z 1115 (21%); reszta to dosłowne `brak`, a sentinela
+w przebraniu nie ma ani jednego.** Prompt z p. 24 bierze wyłącznie pytania prowadzącego sprawę,
+bez proceduralnych, a gdy wątek czegoś nie ustalił, każe wpisać „brak” zamiast wypełniać pole na
+siłę, więc liczba zgadza się z sondą na surowych zgłoszeniach, a nie z kartami Bielika.
+**Konsekwencja: `brak` jest normą, a treść wyjątkiem** — wariant `questions` dostaje cudze
+pytania z co piątej przeczytanej karty, więc jego główną drogą są pytania z samego zgłoszenia.
+W próbie przed masowym importem (2026-11-13, 27 kart) pole nie miało ani jednego pytania
+proceduralnego, a `cause` ani jednego domysłu — hipoteza konsultanta trafiła do `solution` jako
+przypuszczenie. W przeglądzie importu zdarza się za to prośba o numer pisma zamiast pytania
+diagnostycznego (p. 25).
 
 - **MUSI zachować konkrety** — nazwy narzędzi, ustawienia, wersje, miejsca w aplikacji. „Pytano
   o konfigurację stanowiska" jest bezwartościowe; „pytano o rozdzielczość ekranu i profil
@@ -1617,7 +1629,8 @@ merytorycznie").
   z 8. Trasa `/polish` z anonimizatorem na Bieliku dała układ i formy zgodne z zasadami; do tego test
   ręczny przez front. Komunikat z notatki bez polskich znaków zostaje bez nich („w oryginale”), co
   przyjęliśmy świadomie. Forma zwrotu bywa niezręczna: „Aniu, czy możesz” daje „Dzień dobry, {IMIĘ}.
-  Czy mogą Państwo”. Liczb na prawdziwych notatkach nie ma (p. 33).
+  Czy mogą Państwo”. Liczb na prawdziwych notatkach nie ma, bo w korpusie są tylko wysłane
+  komentarze (p. 80).
 - **Regułę klienta stroi się przykładami obu stron, a nie jedną formą w nawiasie (2026-10-22).**
   Reguła formy zwrotu w wersji 1 kończyła się „(„Państwo”)” i model czytał to jako jedyną
   dozwoloną formę: w teście przez front zablokował „Pani” w wiadomości do jednej osoby. Wersja 2
@@ -1872,9 +1885,10 @@ dwie różne rzeczy, stąd rozłączne nazwy.
 
 Embedder to `OPI-PIB/PolDense-150M`: ModernBERT, wymiar 768, liczony na CPU. Wybrany 2026-08-05
 razem z trybem wyszukiwania `query→passage`. Na 200 rekordach daje `recall@1` 98% — to sufit
-zadania, nie dowód przewagi modelu (anglojęzyczny model kontrolny miał 88%), więc porównanie
-z innymi modelami wraca na pełnym korpusie (p. 33). Wąskim gardłem nie jest model, tylko jakość
-i kompletność zgłoszeń. Pomiar powtarza `scripts/eval_embeddings.py`.
+zadania, nie dowód przewagi modelu (anglojęzyczny model kontrolny miał 88%). Porównania z innymi
+modelami na pełnym korpusie nie robimy (decyzja 2026-11-20): wąskim gardłem nie jest model, tylko
+jakość i kompletność zgłoszeń, a zmiana modelu to nowa kolekcja. Wraca, gdy licencja PolDense nie
+przejdzie (p. 40). Pomiar powtarza `scripts/eval_embeddings.py`.
 
 PolDense rozróżnia tryby prefiksem doklejanym do tekstu. Ten sam tekst z innym prefiksem daje inny
 wektor:
@@ -2169,7 +2183,7 @@ Osoby i adresy idą osobnymi wywołaniami: wspólne kosztowało na próbce korpu
   także teraz, gdy model widzi `score` i czyta karty sam (2026-10-04): to jedyne miejsce, w którym
   KOD mówi „nic nie znaleziono" — bez niego wyszukiwanie zawsze oddaje komplet numerów, źródła
   zawsze są, a `requires_hits` nic nie znaczy. Może za to stać niżej, bo ma odcinać tylko oczywiste
-  śmieci (do przeliczenia w p. 33). Trzy pułapki strojenia:
+  śmieci (do przeliczenia w p. 79). Trzy pułapki strojenia:
   - **Nie stroi się go liczbą „ile procent zachowanych"** — krótkie teksty mają niski score mimo
     idealnego dopasowania (0,455 przy niemal tym samym zdaniu), więc z pięciu traconych zapytań
     cztery stały na pierwszym miejscu. Zawsze `eval_threshold.py detail` przed zmianą wartości.
@@ -2179,7 +2193,7 @@ Osoby i adresy idą osobnymi wywołaniami: wspólne kosztowało na próbce korpu
   - **Zmierzony na zapytaniach surowych, a agent pyta w kształcie korpusu.** Taki kształt
     upodabnia do korpusu także zapytania bez odpowiednika: w sondzie z 2026-08-20 przy 0.48
     przechodziło 29 z 80 trafień dystraktorów zamiast 2 z 80, a trafienia poprawne nie cierpiały.
-    Odpowiednik dzisiejszego wyboru to okolice 0.52 — do przeliczenia w p. 33.
+    Odpowiednik dzisiejszego wyboru to okolice 0.52 — do przeliczenia w p. 79.
 
 ### Warstwa wyszukiwania tekstowego (Postgres)
 
@@ -2881,8 +2895,9 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   wdrożeniowiec i tak widzi, więc pole wypełnia graf pustym napisem, a odpowiedź `/suggest`
   zachowuje kształt.
 - **`questions` działa dwutorowo:** bez trafień pyta na podstawie samego zgłoszenia,
-  z trafieniami dokłada `questions_summary` z podobnych spraw. Ryzykiem nie jest puste pole, tylko
-  sentinel w przebraniu („Brak pytań ze strony prowadzącego sprawę.") — 28 na 200 rekordów.
+  z trafieniami dokłada `questions_summary` z podobnych spraw. Sentinela w przebraniu na kartach
+  importu nie ma, ale pole rzadko niesie treść: ma ją 21% kart w indeksie (2026-11-20), więc
+  pytania z samego zgłoszenia są drogą główną, nie zapasową.
 - **`questions` może oddać brak pytań (2026-10-11).** Gdy fakty ze zgłoszenia — z opisu albo z
   odpowiedzi klienta w wątku — zostawiają jedną przyczynę albo nic, o co klient mógłby odpowiedzieć
   bez diagnozy, model oddaje `text: null` i uwagi zamiast pytań na siłę. Wyjściem jest wartość pola,
@@ -2899,16 +2914,18 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 - **`handoff` to krótka wiadomość bez narzędzi (2026-10-30, p. 27):** „Dzień dobry.”, podsumowanie
   problemu z tym, co dotąd ustalono, informacja o przekazaniu sprawy, „Pozdrawiam.”. Układ pokazuje
   przykład w opisie pola `text`, a zasady szczegółowe mówią tylko, co niesie podsumowanie, i że
-  model nie obiecuje terminów ani konkretnych akcji. Samo „przekazaliśmy do analizy” nie mówi klientowi, o co chodzi i co już wiadomo; krótkie
-  komentarze z przekazaniem to w korpusie mediana 155 znaków (zgrubne liczenie po słowach, 104
-  komentarze w 100 zgłoszeniach). Dosłownie powtarza się tam tylko jeden tekst (3×), więc problemem
-  jest brak treści, a nie szablon: dawne „≥12×” dotyczyło formułki zamykającej. Przeszło
-  sprawdzenie, nie pomiar: na `gpt-6.1-sol` scenariusze z `handoff.json` dały 0 błędów na 9 spraw
-  w dwóch przebiegach, wstrzyknięcia 0 przebić z 6, a cztery zmyślone sprawy przez `/suggest`
-  z anonimizatorem na Bieliku oczekiwany układ, po około 0,003 USD. Cena: nic już wprost nie mówi,
-  że zapowiedź („sprawdzimy”) nie jest ustaleniem, ani nie każe przekazać ostrzeżenia; pilnują tego
-  tylko scenariusze h03, h04 i h09. Wiadomość nie mówi też klientowi, czy dostanie jeszcze
-  odpowiedź.
+  model nie obiecuje terminów ani konkretnych akcji. Samo „przekazaliśmy do analizy” nie mówi
+  klientowi, o co chodzi i co już wiadomo; krótkie komentarze z przekazaniem to w korpusie
+  mediana 155 znaków (zgrubne liczenie po słowach, 104 komentarze w 100 zgłoszeniach). Dosłownie
+  powtarza się tam tylko jeden tekst (3×), więc problemem jest brak treści, a nie szablon: dawne
+  „≥12×” dotyczyło formułki zamykającej. Przeszło sprawdzenie, nie pomiar: na `gpt-6.1-sol`
+  scenariusze z `handoff.json` dały 0 błędów na 9 spraw w dwóch przebiegach, wstrzyknięcia
+  0 przebić z 6, a cztery zmyślone sprawy przez `/suggest` z anonimizatorem na Bieliku oczekiwany
+  układ, po około 0,003 USD. Cena: nic już wprost nie mówi, że zapowiedź („sprawdzimy”) nie jest
+  ustaleniem, ani nie każe przekazać ostrzeżenia; pilnują tego tylko scenariusze h03, h04 i h09.
+  Wiadomość nie mówi też klientowi, czy dostanie jeszcze odpowiedź. Pomiaru na prawdziwych
+  przekazaniach nie robimy (decyzja 2026-11-20): to w korpusie krótkie formułki, więc nie ma
+  z czym porównać wyniku, a ocena mówiłaby głównie o stylu.
 
 ### Warstwa LLM
 
@@ -4152,8 +4169,8 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
   a zrzuty miałyby zostać na stałe.
 - **Kolejka do akceptacji kart z trasy zamknięcia (p. 30)** — karta idzie do indeksów od razu:
   człowiek zatwierdził już zamknięcie przy werdykcie bramki, kartę bez wiedzy zatrzymuje filtr, a
-  złą naprawia ponowne zamknięcie albo przebudowa z plików. Wraca, gdy pomiar (p. 33) pokaże złe
-  karty w indeksie.
+  złą naprawia ponowne zamknięcie albo przebudowa z plików. Wraca, gdy pomiary wyszukiwania
+  (p. 23) albo przegląd kart pokażą złe karty w indeksie.
 - **Załączniki zgłoszeń** — tabela `zalacznik` w zrzucie trzyma same ścieżki, bez plików; wystarcza
   treść zgłoszenia i wątku.
 - **Sprawy procedury po stronie klienta** (skreślone 2026-11-11, dawny p. 39) — hasła w zrzucie
@@ -4178,10 +4195,11 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
     cudzych pytań. Warunek: synteza zachowuje konkrety.
 - **Inny filtr jakości albo dopisek do reguły pola `useful`.** Filtr odrzucający kartę dopiero przy
   „brak” w `solution` i `useful` = false nie gubił dobrych kart, ale zostawiał w indeksie 36 z 71
-  pustych. Wraca, gdyby ocena `useful` okazała się niestabilna na pełnym korpusie (p. 33). Dopisek o
-  czynności jednorazowej (2026-10-23, np. „Sam fakt, że coś zrobiono, to za mało”) nie zadziałał w
-  żadnym z dziesięciu wariantów, na 25 wątkach w dwóch przebiegach: najlepszy odwracał 11 z 16
-  przepuszczanych kart przy celu 13, a dobre oceniał poprawnie w 25–26 z 28 przy celu 27. Reguła
+  pustych. Wraca, gdyby ocena `useful` okazała się niestabilna; dwa parsowania tych samych 200
+  wątków dały tę samą ocenę w 195 (2026-11-20). Dopisek o czynności jednorazowej (2026-10-23,
+  np. „Sam fakt, że coś zrobiono, to za mało”) nie zadziałał w żadnym z dziesięciu wariantów, na
+  25 wątkach w dwóch przebiegach: najlepszy odwracał 11 z 16 przepuszczanych kart przy celu 13,
+  a dobre oceniał poprawnie w 25–26 z 28 przy celu 27. Reguła
   została bez zmian, a 6 kart przepuszczanych na golden200 to znany koszt.
 - **Deduplikacja rekordów przy indeksacji** — wiele rekordów to informacja: zgodne dowodzą, że
   rozwiązanie jest sprawdzone, a rozłączne dają materiał do pytań. Na 200 kartach było 8 par o
@@ -4403,11 +4421,11 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 
 #### G. Grafy bez narzędzi wiedzy — po jednym punkcie na graf: treść promptu i pomiar
 
-- [x] **21. `gate_close`** (2026-10-21) → „Bramki jakości i asysta pisania”; pomiar w p. 33.
-- [x] **22. `gate_reply`** (2026-10-22) → „Bramki jakości i asysta pisania”; pomiar w p. 33.
+- [x] **21. `gate_close`** (2026-10-21) → „Bramki jakości i asysta pisania”; pomiar w p. 33.2.
+- [x] **22. `gate_reply`** (2026-10-22) → „Bramki jakości i asysta pisania”; pomiar w p. 33.3.
 - [x] **24. `parse_ticket`** (2026-10-23) → „Domena”, „Golden set retrievalu”; pomiar w p. 31.
-- [x] **27. `suggest_handoff`** (2026-10-30) → „Warianty generacji”; pomiar w p. 33.
-- [x] **28. `polish`** (2026-10-30) → „Ewaluacja bramek”; pomiar w p. 33.
+- [x] **27. `suggest_handoff`** (2026-10-30) → „Warianty generacji”.
+- [x] **28. `polish`** (2026-10-30) → „Ewaluacja bramek”; pomiar w p. 80.
 
 #### H. Powrót do korpusu
 
@@ -4420,27 +4438,30 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
   zgłoszenia”, „Domena”, „Golden set retrievalu”, „Warstwa wyszukiwania tekstowego (Postgres)”.
 - [x] **32. Automat mailowy w adapterze** (2026-11-18 – 2026-11-20) → „Historyczne zgłoszenia”,
   „Świadomie pominięte”.
-- [ ] **33. Przeliczenia na pełnym korpusie** — `RAG_SCORE_MIN` na zapytaniach sparsowanych
-  (na kartach `gpt-6.1-sol` trafienie dostaje 7 z 16 dystraktorów, na kartach Bielika 3 z 16,
-  przy tym samym progu 0.48), porównanie embedderów, liczba wątków-projektów, `questions_summary`,
-  rozkład `component` (na kartach importu ePUAP 52, e-Doręczenia 45, eNadawca 11 na 1758, a sprawy
-  wysyłki przez ePUAP zwykle jako „główna aplikacja”), oceny `useful` przy jednorazowych naprawach
-  dostawcy (w przeglądzie importu sporne pojedyncze karty, w kanale „Automat mailowy” 9 ze 136
-  kart przyjętych wbrew etykiecie, prawie wszystkie z tej klasy) — korpus z importu stoi od 2026-11-13,
-  a pomiary na nim czekają na pełny golden (p. 79); do tego pomiary grafów zamkniętych po teście
-  ręcznym. `gate_close` (2026-10-22): fałszywe
-  alarmy i przepuszczenia na każdą regułę na prawdziwych zamknięciach, w dwóch przebiegach,
-  z czytaniem uzasadnień, na zestawie zamknięć dobrych i słabych do zbudowania (oceny z badania
-  jakości z 2026-09-02 skasowane 2026-11-13) — oraz czas na długich wątkach wobec cierpliwości UI
-  helpdesku (p. 38). `gate_reply` (2026-10-22): fałszywe alarmy i przepuszczenia na każdą
-  z sześciu reguł na prawdziwych wiadomościach do klientów, w dwóch przebiegach, z czytaniem
-  uzasadnień; osobno zasada, że cytaty reguł nie łamią — bez niej bramka blokowała cytat
-  komunikatu z ekranu „Ups! Coś poszło nie tak.” jako potoczny, a czy z nią nie przepuszcza
-  prośby o hasło schowanej w cytacie, nikt nie mierzył. `suggest_handoff` (2026-10-30): ocena na
-  prawdziwych przekazaniach. `polish` (2026-10-30): brak nowych faktów na prawdziwych notatkach, bo
-  wypadły z promptu osobne zasady o dopiskach i znacznikach, oraz decyzja, czy „Popraw” zostaje
-  w zakresie. *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na
-  zapytaniach surowych, a grafy na zmyślonych sprawach i teście ręcznym.
+- [ ] **33. Przeliczenia na pełnym korpusie** — pomiary, które czekały na korpus importu; zostały
+  te, które jeszcze coś rozstrzygną (przegląd 2026-11-20). *Dlaczego:* bramki pójdą na produkcję
+  pierwsze, bo działają bez indeksów, a ich liczby stoją na zmyślonych sprawach; fałszywy alarm
+  uczy wdrożeniowców klikać „obejdź”.
+  - [x] **33.1 Liczby z kart importu i przegląd listy** (2026-11-20) → „Historyczne
+    zgłoszenia”, „Domena”, „Reguły parsowania”, „`questions_summary`”, „Ewaluacja bramek”,
+    „Embeddingi”, „Warianty generacji”, „Świadomie pominięte”; `RAG_SCORE_MIN` w p. 79,
+    porównanie embedderów w p. 40, „Popraw” w p. 80.
+  - [ ] **33.2 `gate_close` na prawdziwych zamknięciach** — zestaw zamknięć dobrych i słabych
+    z wątków `corpus/anonymized/`, które graf dostaje przez anonimizator przepuszczający tekst
+    bez zmian, bez poda (decyzja 2026-11-20); etykiety na każdą z dwóch reguł od agentów na
+    ślepo, bez wglądu w werdykt, z drugim, niezależnym oceniającym na części zestawu
+    i niezgodnościami do przeglądu człowieka (decyzja 2026-11-20); fałszywe alarmy
+    i przepuszczenia na regułę w dwóch przebiegach, z czytaniem uzasadnień; czas na długich
+    wątkach wobec cierpliwości UI helpdesku (p. 38), z anonimizacją doliczoną z pomiaru
+    z 2026-10-19 (mediana 2,0 s, maks. 6,5 s na wątek korpusu). Oceny z badania jakości
+    z 2026-09-02 skasowano 2026-11-13.
+  - [ ] **33.3 `gate_reply` na prawdziwych wiadomościach** — wiadomości konsultantów z tych
+    samych wątków (2631 komentarzy z rolą „konsultant” poza kanałem „Automat mailowy”, w którym
+    rola z bazy nie mówi, kto pisał), te same decyzje co w 33.2; fałszywe alarmy na losowych
+    wiadomościach, przepuszczenia na każdą z sześciu reguł tam, gdzie korpus ma prawdziwe
+    przykłady; osobno zasada, że cytaty reguł nie łamią — bez niej bramka blokowała cytat
+    komunikatu z ekranu „Ups! Coś poszło nie tak.” jako potoczny, a czy z nią nie przepuszcza
+    prośby o hasło schowanej w cytacie, nikt nie mierzył.
 - [x] **34. Tryb odświeżania korpusu** (2026-11-20) → „Historyczne zgłoszenia”, „Świadomie
   pominięte”.
 
@@ -4456,6 +4477,20 @@ pomiar p. 23, 25 i 26. Opisy narzędzi dokumentacji mierzy p. 55, na właściwej
 Punkt grafu zamyka się po pracy nad promptem, scenariuszach z p. 59 na żywym modelu i zgrubnym
 teście ręcznym przez front (decyzja 2026-10-22); to, co w punkcie jest pomiarem na prawdziwym
 korpusie, przechodzi przy zamknięciu do p. 33.
+
+- [ ] **79. Golden set z korpusu importu** (przed p. 23, od 2026-11-20 w planie, wcześniej „Na
+  później”) — zamrożona kopia `cards/` i `anonymized/` importu w układzie korpusu: etykiety
+  i zapytania wektorowe golden200 przepięte na jej karty, około 40 zapytań tekstowych
+  z komunikatami z wielu wątków, własna kolekcja i tabela, nowe progi; do tego `RAG_SCORE_MIN`
+  przeliczony na zapytaniach w kształcie narzędzia, z dystraktorami sprawdzonymi wobec kart
+  indeksu (na kartach `gpt-6.1-sol` golden200 trafienie dostaje 7 z 16 dystraktorów, na kartach
+  Bielika 3 z 16, przy tym samym progu 0.48). Wszystkie 200 zgłoszeń golden200 są w korpusie,
+  etykieta zgadza się z oceną karty importu w 191 (9 do przejrzenia: 6 kart przyjętych wbrew
+  etykiecie, 3 odrzucone), a cel ma w indeksie 123 ze 126 zapytań. *Dlaczego:* golden200 jest
+  z lipcowego zrzutu, szuka wśród 141 kart zamiast 1115 i ma za mało powtarzających się
+  komunikatów, żeby zmierzyć największą słabość wyszukiwania tekstowego: częsty komunikat
+  wypycha cel poza limit wyników. Cena: około 25 minut liczenia wektorów na CPU, a stare liczby
+  przestają być porównywalne.
 
 - [ ] **23. `search` i opisy narzędzi** — prompt pętli i opisy narzędzi, które pętla woła;
   w każdym materiale te same liczby na narzędzie, brane z rozmowy, nie z deklaracji modelu:
@@ -4500,11 +4535,11 @@ korpusie, przechodzi przy zamknięciu do p. 33.
   importu zdarza się prośba o numer pisma zamiast pytania diagnostycznego);
   ewaluacja wariantu, w tym jak często model oddaje „pytań już nie trzeba" (p. 72) i czy
   słusznie — fałszywe wyjście przy zgodnym objawie i różnych przyczynach jest tu najgroźniejsze;
-  sentinele `questions_summary` trzeba rozpoznać nową funkcją w `core_service/` (moduł fraz
-  ucieczkowych `solution` usunięto 2026-10-23 razem z regułą `no_resolution`); w scenariuszu z p. 59.6 („wątek tylko zawęża") model
-  w 1 z 3 przebiegów zapytał klienta, czy na serwerze pozostał plik blokady, czyli o diagnozę,
-  której klient nie zna. W scenariuszu cytowania kodu z 59.7 (sprawa z komunikatem tylko
-  w kodzie) pierwsze pytanie do klienta niosło ścieżkę z repozytorium
+  `questions_summary` ma treść tylko w 21% kart indeksu, a sentineli w przebraniu nie ma (p. 33),
+  więc ocena stoi głównie na pytaniach z samego zgłoszenia; w scenariuszu z p. 59.6 („wątek
+  tylko zawęża") model w 1 z 3 przebiegów zapytał klienta, czy na serwerze pozostał plik blokady,
+  czyli o diagnozę, której klient nie zna. W scenariuszu cytowania kodu z 59.7 (sprawa
+  z komunikatem tylko w kodzie) pierwsze pytanie do klienta niosło ścieżkę z repozytorium
   (`src/lib/Urzad/Szablony/pisma`) w 3 z 3 przebiegów, choć prompt każe trzymać ścieżki w uwagach
   dla wdrożeniowca; test tego nie sprawdza. *Dlaczego:* prompt z 6.3 powstał pod słabszy model, a znana
   dziura (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
@@ -4564,7 +4599,9 @@ korpusie, przechodzi przy zamknięciu do p. 33.
   hooka bramek nikt nie woła, a o fail-open decyduje tamta strona.
 - [ ] **40. Licencja PolDense (gemma).** *Dlaczego:* licencja idzie od modelu-nauczyciela
   (destylacja z BGE-Multilingual-Gemma2), więc wybór embeddera jest też decyzją licencyjną.
-  Do sprawdzenia także licencja modelu anonimizującego (Bielik 11B v3).
+  Gdy licencja nie przejdzie, wraca porównanie embedderów na pełnym korpusie, na golden secie
+  z p. 79 (`scripts/eval_embeddings.py`). Do sprawdzenia także licencja modelu anonimizującego
+  (Bielik 11B v3).
 - [ ] **41. Pomiar po stronie użytkownika** — ilu wdrożeniowców, ile czasu tracą na szukanie.
   *Dlaczego:* wszystkie dotychczasowe pomiary dotyczą korpusu, nie ludzi.
 - [ ] **42. Zapis feedbacku** — wybrany wariant, czy propozycja poszła do klienta, później
@@ -4607,10 +4644,7 @@ Rzeczy odłożone świadomie, bez miejsca w kolejności planu. Każdy punkt: cel
   jeden przebieg `llm_live` bez strojenia. *Dlaczego:* silnik stroiliśmy na zestawie, na którym
   mierzymy, więc „bez przecieku" jest wynikiem optymistycznym. Wraca z p. 79 albo przy
   podejrzeniu przecieku.
-- [ ] **79. Golden set z korpusu importu** — zamrożona kopia `cards/` i `anonymized/` importu
-  w układzie korpusu: etykiety i zapytania wektorowe golden200 przepięte na jej karty (około 10
-  etykiet do przejrzenia), około 40 zapytań tekstowych z komunikatami z wielu wątków, własna
-  kolekcja i tabela, nowe progi. *Dlaczego:* golden200 jest z lipcowego zrzutu, szuka wśród 141
-  kart zamiast 1115 i ma za mało powtarzających się komunikatów, żeby zmierzyć największą
-  słabość wyszukiwania tekstowego: częsty komunikat wypycha cel poza limit wyników. Cena: około
-  25 minut liczenia wektorów na CPU, a stare liczby przestają być porównywalne.
+- [ ] **80. „Popraw” na prawdziwych notatkach** (odłożony 2026-11-20) — brak nowych faktów na
+  prawdziwych notatkach wdrożeniowców, bo z promptu wypadły osobne zasady o dopiskach
+  i znacznikach, oraz decyzja, czy „Popraw” zostaje w zakresie. *Dlaczego odłożony:* w korpusie
+  są tylko wysłane komentarze, nie notatki. Wraca, gdy wdrożeniowcy dadzą kilkadziesiąt notatek.
