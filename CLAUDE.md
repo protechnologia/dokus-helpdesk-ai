@@ -103,9 +103,7 @@ jest człowiek: dostaje propozycję albo werdykt ze źródłami i sam decyduje.
 **Rozwój to dokładanie narzędzi.** Narzędzie jest katalogiem z kontraktem, więc kolejne źródło
 wiedzy nie zmienia grafów ani węzłów. Tak doszło czytanie kodu aplikacji (p. 60–67 i 73): sześć
 narzędzi tylko do odczytu, które mają pomóc tam, gdzie zgłoszenia i instrukcje nic nie dają,
-przede wszystkim gdy zgłoszenie niesie komunikat albo kod błędu. Kandydat bez decyzji (p. 58):
-dostęp do instancji testowej, na której agent sprawdzi opisany objaw. Byłoby to pierwsze
-narzędzie, które coś wykonuje, a nie tylko czyta, więc wymaga osobnej decyzji o granicach.
+przede wszystkim gdy zgłoszenie niesie komunikat albo kod błędu.
 
 **Stan na dziś.** Szkielet stoi w całości, a front pokazowy (p. 77) pokazuje przebieg każdego grafu
 na żywo. Wszystkie węzły są właściwe i każdy graf przeszedł na prawdziwym modelu (OpenAI), na
@@ -114,10 +112,10 @@ model anonimizujący, Bielik na własnym serwerze), a prompty grafów wiedzą o 
 wstawia (p. 19.7). Sekretów w treści nikt jeszcze nie wykrywa: detektor jest odłożony (p. 20).
 Wszystkie czternaście narzędzi ma wersję właściwą: osiem na zgłoszeniach i instrukcjach oraz sześć
 narzędzi kodu: opis projektu, szukanie, spis katalogu, odczyt pliku, odczyt symbolu i cytowanie
-fragmentu. Korpus zgłoszeń jest zaimportowany z sierpniowego zrzutu (p. 31, 2026-11-13): 1758
-kart, z których 1081 przeszło filtr jakości, więc instancja szuka wśród 1081 kart i 1081 wątków
-po anonimizacji, a każde zamknięte zgłoszenie dokłada się do nich trasą zamknięcia (p. 30).
-Poza korpusem zostało 136 zgłoszeń kanału „Automat mailowy” (p. 32).
+fragmentu. Korpus zgłoszeń jest zaimportowany z sierpniowego zrzutu (p. 31, 2026-11-13, a kanał
+„Automat mailowy” po czyszczeniu w p. 32, 2026-11-20): 1894 karty, z których 1115 przeszło filtr
+jakości, więc instancja szuka wśród 1115 kart i 1115 wątków po anonimizacji, a każde zamknięte
+zgłoszenie dokłada się do nich trasą zamknięcia (p. 30).
 
 ### Zasady produktu
 
@@ -432,13 +430,9 @@ dokus-helpdesk-ai/
     reguł czyta się jak listę, nie jak kod. Każda reguła to funkcja modułowa — bezstanowa, więc
     klasa dałaby tylko miejsce na `self` — a krotka `RULES` na końcu jest tym, po czym iteruje
     orkiestrator i po czym parametryzują się testy. Dołożenie reguły to dopisanie funkcji.
-  - **Znany koszt tej konwencji, do rozstrzygnięcia przy czytniku SQL (p. 34):** wszystkie
-    czytniki źródeł produkują ten sam `RawTicket`, więc wariant SQL musi dołożyć źródło do nazwy
-    (`parser_ticket_raw_sql`) albo oba dostaną sufiks. Nazwa opisuje WYNIK, a te pliki różni ŹRÓDŁO.
 - **`core_util/` to funkcje bezstanowe bez wiedzy o dziedzinie** — kryterium: czy da się je opisać
   i przetestować, ani razu nie mówiąc „zgłoszenie". Stąd `strip_html()` i
-  `describe_validation_error()` są tam, a nie przy swoich wywołujących; drugi powód jest
-  praktyczny — czytnik SQL kolejnych zrzutów (p. 34) potrzebuje tego samego strippera.
+  `describe_validation_error()` są tam, a nie przy swoich wywołujących.
   `contains_all()` trafiło tam z jednym wołającym (2026-10-09), żeby następny go użył, zamiast
   pisać od nowa; argument, od którego zależy wynik (wielkość liter), podaje się tam zawsze
   wprost, bez wartości domyślnej. Tak samo `is_path_under()` (2026-10-13): mówi, czy ścieżka
@@ -638,9 +632,9 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   indeksacja odmawia, zanim cokolwiek zapisze albo skasuje.
 
 - **Import to cienka warstwa adapterów** — jeden czytnik na format źródłowy
-  (`core_service/parser_ticket_raw.py`; przy kolejnych zrzutach dojdzie obok wariant SQL,
-  p. 34); reszta systemu
-  widzi wyłącznie znormalizowany `RawTicket`. **Model `RawTicket` mieszka w `core_model/`, czytnik w
+  (`core_service/parser_ticket_raw.py` dla eksportu zrzutu, `to_raw_ticket()` z
+  `entry_routers/mapping.py` dla żądania trasy); reszta systemu widzi wyłącznie znormalizowany
+  `RawTicket`. **Model `RawTicket` mieszka w `core_model/`, czytnik w
   `core_service/`** — jest wejściową połową kontraktu, którego wyjściem jest `ParsedTicket`, więc
   nie należy do żadnego z czytników.
 - **Nie zaszywamy założeń o źródle w domenie.** Nazwy pól, kodowanie, sposób sklejania wątku
@@ -665,7 +659,7 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   a z niego `helpdesk tickets import` w kontenerze `api`: graf `parse_ticket` z tej samej
   fabryki co trasy, anonimizator na Bieliku, model `gpt-6.1-sol` (decyzja 2026-11-13: na jego
   kartach zmierzono filtr jakości). Zakres to 1758 zgłoszeń: poza nim 61 w toku i 136
-  zamkniętych z kanału „Automat mailowy”, który czeka na p. 32. Wynik: 1758 kart jednym
+  zamkniętych z kanału „Automat mailowy”, który doszedł po czyszczeniu (p. 32). Wynik: 1758 kart jednym
   przebiegiem promptu o skrócie `308c1c483d78` (pełny skrót i model w raporcie importu), 0 błędów,
   1081 przyjętych przez filtr (61%), 8,15 USD modelu i ok. 0,9 USD poda, 44 min przy 4
   zgłoszeniach naraz, po próbie na 20; indeksy z `reindex` w 24 min 48 s na CPU. Przegląd
@@ -675,6 +669,25 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   z `component` „główna aplikacja” (p. 33), w `questions_summary` czasem prośba o numer pisma
   zamiast pytania diagnostycznego (p. 25). Dodatkowej kopii korpusu nie ma (decyzja
   2026-11-13, p. 35).
+- **Kanał „Automat mailowy” doszedł do korpusu osobnym przebiegiem importu (2026-11-20,
+  p. 32.5):** 136 zamkniętych zgłoszeń, wątki oczyszczone normalizerem maili, ten sam model
+  i prompt. Wynik: 136 kart, 0 błędów, 0,66 USD modelu i ok. 0,2 USD poda, 46 s próby na 20
+  i 3 min 04 s reszty przy 4 naraz; `helpdesk tickets index` dołożył karty i wątki w 27 min
+  38 s na CPU, więc w indeksach stoi 1115 kart i 1115 wątków. Filtr przyjął 34 ze 136 (25%). Ocena `useful` zgadza się z etykietami golden setu kanału
+  w 125 ze 136 (kappa 0,77; drugi oceniający na oczyszczonym wątku: 131 ze 136, kappa 0,89):
+  powiadomienia 57 z 57 (56 bez wiedzy odrzucone, jedyne z wiedzą, 34722, przyjęte), sprawy
+  68 z 79. Z 11 niezgodnych 8 stoi przy wpisach oznaczonych w etykietach jako wątpliwe. 9 to
+  karty przyjęte wbrew etykiecie, prawie wszystkie z klasy spornej: poprawka albo czynność
+  dostawcy bez przyczyny, a karta pisze wtedy w `cause` „brak” albo „nie wskazano”. 2 to karty
+  odrzucone, choć wiedza stoi w opisie klienta, a nie w odpowiedzi dostawcy. W 20 wątkach próby
+  nie ma adresu e-mail ani telefonu, a w pięciu przeczytanych żadnej osoby. Dwa zgłoszenia
+  (35152, 34786) weszły świadomie z loginami i hasłami w treści, jak import sierpniowy (p. 20).
+- **Docelowo korpus odświeża trasa zamknięcia, a do jej wpięcia kolejne zrzuty (decyzja
+  2026-11-20, p. 34).** Zrzuty są przejściowe: dobierają zaległości obecnym eksportem
+  (`export_raw_tickets.py`) i importem, który pomija zgłoszenia z kartą, więc bierze tylko
+  zgłoszenia zamknięte od poprzedniego zrzutu. Po wpięciu trasy w helpdesk (p. 38) zrzuty nie są
+  potrzebne. Cena okresu przejściowego: zgłoszenie otwarte ponownie i zamknięte między zrzutami
+  zostaje ze starą kartą, dopóki nie zamknie go trasa, która kartę nadpisuje.
 - **Zamknięte zgłoszenie dokłada do korpusu `ClosedTicketIndexer`
   (`core_service/indexer_closed_ticket.py`, p. 30).** Najpierw zapisuje trzy pliki: surowe
   zgłoszenie do `raw-route/`, wątek po anonimizacji do `anonymized/` i kartę do `cards/`,
@@ -707,8 +720,8 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   słownika obsługuje pozostałe kanały. Brak słownika przy zgłoszeniu mailowym to błąd
   konfiguracji: trasa kończy się 500, a import kodem 2. `/tickets/closed` zapisuje do
   `raw-route/` surowe zgłoszenie, a oczyszczony wątek idzie do grafów i po anonimizacji do
-  `anonymized/`. Import już nie pomija kanału, więc kolejny przebieg weźmie jego zgłoszenia bez
-  karty.
+  `anonymized/`. Import nie pomija kanału, a jego 136 zamkniętych zgłoszeń z sierpniowego zrzutu
+  już jest w korpusie (p. 32.5).
 - **Słownik maili leży w `data/unsafe/mail/`, bo powstaje z maili klienta, choć niesie same
   skróty (decyzja 2026-11-20).** `slownik.json` buduje `scripts/build_mail_dictionary.py`
   z wątków kanału w `raw-db/` (338 skrótów BLAKE2b po 8 bajtów: fragmenty z co najmniej 10 ze
@@ -1400,7 +1413,8 @@ Zasady schematu:
   - **Na sierpniowym zrzucie (2026-11-13, przed masowym importem) ocena `useful` zgodna
     z etykietą w 16 z 20 zgłoszeń golden setu**: dobre 8 z 8, bez wiedzy 5 z 6, dotąd
     przepuszczane wbrew etykiecie 3 z 6 (na kartach z 2026-10-23 — 0 z 6); cztery niezgodne to
-    przypadki sporne. Filtr przyjął 1081 z 1758 kart importu (61%).
+    przypadki sporne. Filtr przyjął 1081 z 1758 kart importu (61%), a z kanału „Automat
+    mailowy” 34 ze 136 (p. 32).
   - Konsekwencja: **`resolution` nie jest polem krytycznym dla działania systemu.** Gdy klient
     nie skonfiguruje słownika, produkt nadal działa — traci wzbogacenie odpowiedzi, nie indeks.
   - **Puste `cause` też NIE jest sygnałem braku wiedzy** — **73% takich rekordów przechodzi filtr**
@@ -2168,7 +2182,7 @@ i dokumentacji. Tabelę dokumentacji wypełnia `helpdesk docs index`, a czytają
 `find_docs_text` i `read_docs`. Tabelę zgłoszeń czytają `find_tickets_text`
 i `read_tickets_thread`. Zakłada ją i wypełnia `helpdesk tickets index` z wątków po anonimizacji
 w `anonymized/` korpusu (od 2026-11-11), a pojedyncze zgłoszenie dokłada trasa zamknięcia
-(p. 30); korpus napełnił masowy import (p. 31, 1081 wątków). Tam, gdzie tabeli nie ma, oba
+(p. 30); korpus napełnił masowy import (p. 31 i 32, 1115 wątków). Tam, gdzie tabeli nie ma, oba
 narzędzia kończą się błędem `DbPostgresMissingTableError`.
 
 - **Trzy drogi dopasowania, każda do czego innego:** słowa (`plainto_tsquery` — dowolna kolejność
@@ -3217,7 +3231,7 @@ w pliku wektorowym, bo stoją na tych samych 200 zgłoszeniach.
   w tekście, który widział model. Kolekcja i tabela golden setu mają własne nazwy
   (`tickets_golden`, `tickets_text_golden`), podane w poleceniu `reindex`.
 - **Golden200 jest słabym punktem odniesienia (2026-11-15).** Pochodzi z lipcowego zrzutu,
-  a instancja z sierpniowego; szuka wśród 141 kart, a produkt wśród 1081; komunikat albo kod
+  a instancja z sierpniowego; szuka wśród 141 kart, a produkt wśród 1115; komunikat albo kod
   błędu ma tylko 19 przyjętych zgłoszeń, więc przypadek częstego komunikatu, który przy wynikach
   od najnowszych wypycha cel poza limit, prawie w nim nie występuje. Ręczne etykiety przenoszą
   się na karty importu prawie bez strat (z 135 z wiedzą filtr przyjął 131, z 65 bez wiedzy
@@ -4124,6 +4138,11 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Odesłanie zgłoszenia do innego działu** — takiego działu nie ma, a grzeczna formułka bez treści
   to znana patologia korpusu; dotyczy to też `suggest_handoff`. Eskalacja do operatora zewnętrznego
   (ePUAP, Poczta Polska) to co innego: tekst mówi wtedy, czego dotyczy problem i co dotąd ustalono.
+- **Czytnik SQL zrzutów i odczyt bazy helpdesku na żywo** (2026-11-20, p. 34) — korpus odświeża
+  trasa zamknięcia, a do jej wpięcia zrzuty idą obecnym eksportem i importem, więc czytnik nie
+  ma czego zastąpić. Odczyt bazy na żywo wymagałby poświadczeń i sieci do bazy produkcyjnej,
+  w której te same tabele trzymają hasła. Wraca, gdy helpdesk nie wepnie trasy (p. 38),
+  a zrzuty miałyby zostać na stałe.
 - **Kolejka do akceptacji kart z trasy zamknięcia (p. 30)** — karta idzie do indeksów od razu:
   człowiek zatwierdził już zamknięcie przy werdykcie bramki, kartę bez wiedzy zatrzymuje filtr, a
   złą naprawia ponowne zamknięcie albo przebudowa z plików. Wraca, gdy pomiar (p. 33) pokaże złe
@@ -4184,10 +4203,10 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
   `Accept`. Wraca, gdy wpięcie w helpdesk (p. 38) da konkretny powód, np. klienta HTTP, który nie
   ustawi nagłówka.
 - **Komendy `helpdesk` do eksportu ze zrzutu i do grafów.** Eksport woła `docker exec` na kontenerze
-  ze zrzutem, a obraz `api` nie ma Dockera ani dostępu do tego kontenera; wraca z czytnikiem SQL
-  (p. 34). Komendy na grafach skreślono 2026-10-16: wołalibyśmy je tylko my, trasy oddają koszt i
-  log, a testy na żywym modelu całą rozmowę, więc komenda powtarzałaby to, co trasa robi wokół
-  grafu. Graf na pliku z eksportu wraca, gdy będą go potrzebować pomiary (p. 23); parsowanie korpusu
+  ze zrzutem, a obraz `api` nie ma Dockera ani dostępu do tego kontenera; zrzuty są przejściowe,
+  więc eksport zostaje skryptem (p. 34). Komendy na grafach skreślono 2026-10-16: wołalibyśmy je
+  tylko my, trasy oddają koszt i log, a testy na żywym modelu całą rozmowę, więc komenda
+  powtarzałaby to, co trasa robi wokół grafu. Graf na pliku z eksportu wraca, gdy będą go potrzebować pomiary (p. 23); parsowanie korpusu
   weszło komendą masowego importu (`helpdesk tickets import`, p. 31).
 - **Reguły bramek jako regexy albo lista słów zamiast modelu** — „potocznego słownictwa” ani „nie
   widać, co zrobiono” nie da się zapisać słownikiem. Mogą wrócić jako tani filtr przed modelem, gdy
@@ -4387,16 +4406,16 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
   - [x] **32.2 Czyszczenie** (2026-11-20) → „Historyczne zgłoszenia”.
   - [x] **32.3 Pomiar bez modelu** (2026-11-20) → „Historyczne zgłoszenia”.
   - [x] **32.4 Import i trasy** (2026-11-20) → „Historyczne zgłoszenia”.
-  - [ ] **32.5 Przebieg** — próba na 20, całość po zgodzie (ok. 0,7 USD), potem
-    `helpdesk tickets index`.
-  - [ ] **32.6 Luka promptu** — zgłoszenie informacyjne bez treści (np. 33644): poprawka promptu
-    parsującego tylko wtedy, gdy zapowiedzi bez wiedzy przejdą filtr.
+  - [x] **32.5 Przebieg** (2026-11-20) → „Historyczne zgłoszenia”.
+  - [x] **32.6 Luka promptu** (2026-11-20) — niepotrzebna: filtr odrzucił 56 z 56 powiadomień bez
+    wiedzy, w tym 33644.
 - [ ] **33. Przeliczenia na pełnym korpusie** — `RAG_SCORE_MIN` na zapytaniach sparsowanych
   (na kartach `gpt-6.1-sol` trafienie dostaje 7 z 16 dystraktorów, na kartach Bielika 3 z 16,
   przy tym samym progu 0.48), porównanie embedderów, liczba wątków-projektów, `questions_summary`,
   rozkład `component` (na kartach importu ePUAP 52, e-Doręczenia 45, eNadawca 11 na 1758, a sprawy
   wysyłki przez ePUAP zwykle jako „główna aplikacja”), oceny `useful` przy jednorazowych naprawach
-  dostawcy (w przeglądzie importu sporne pojedyncze karty) — korpus z importu stoi od 2026-11-13,
+  dostawcy (w przeglądzie importu sporne pojedyncze karty, w kanale „Automat mailowy” 9 ze 136
+  kart przyjętych wbrew etykiecie, prawie wszystkie z tej klasy) — korpus z importu stoi od 2026-11-13,
   a pomiary na nim czekają na pełny golden (p. 79); do tego pomiary grafów zamkniętych po teście
   ręcznym. `gate_close` (2026-10-22): fałszywe
   alarmy i przepuszczenia na każdą regułę na prawdziwych zamknięciach, w dwóch przebiegach,
@@ -4411,24 +4430,8 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
   wypadły z promptu osobne zasady o dopiskach i znacznikach, oraz decyzja, czy „Popraw” zostaje
   w zakresie. *Dlaczego:* wszystkie te liczby stoją dziś na 200 rekordach albo na
   zapytaniach surowych, a grafy na zmyślonych sprawach i teście ręcznym.
-- [ ] **34. Tryb odświeżania korpusu** — kolejne zrzuty czy dostęp tylko do odczytu; przy
-  kolejnych zrzutach czytnik SQL zamiast eksportu do JSON-ów (odłożony z p. 31 2026-11-11).
-  *Dlaczego:* +130 zgłoszeń w miesiąc, więc jednorazowy zrzut szybko się starzeje.
-- [ ] **35. Backup `data/unsafe/corpus/cards/` i `anonymized/`.** *Dlaczego:* jedyne
-      artefakty, których odtworzenie kosztuje ponowny przebieg LLM albo anonimizatora; `raw-db/`
-      odtwarza eksport zrzutu. Po masowym imporcie (2026-11-13) na razie bez dodatkowej kopii
-      (decyzja użytkownika); odtworzenie kart to około 9 USD i godzina przebiegu, a wątki
-      wymagają poda z anonimizatorem.
-- [ ] **55. Przygotowanie właściwej dokumentacji** (dopisany 2026-10-03) — podział mocnym modelem
-  na pliki `.md` i metryczkę, skrypt sprawdzający, że każda sekcja jest dosłownym podciągiem
-  źródła i że sekcje pokrywają całość, przegląd opisów przez człowieka, próg ostrzeżenia
-  o długiej sekcji (dziś tymczasowo 18 tys. znaków) oraz przeliczenie `RAG_DOCS_FRAGMENT_CHARS`
-  i `RAG_DOCS_SCORE_MIN`, zmierzonych dotąd tylko na paczce syntetycznej, a gdy spis właściwej
-  dokumentacji okaże się za długi, zawężenie `list_docs` do jednego dokumentu; na końcu pomiar
-  opisów czterech narzędzi dokumentacji na grafie `search`, tymi samymi liczbami co w p. 23
-  (paczka syntetyczna sprawdza okablowanie, nie skuteczność). *Dlaczego:*
-  dokumentacja wraca do promptu jako cytowane źródło, więc parafraza modelu stałaby się „tak mówi
-  instrukcja"; model dzieli i opisuje, treści nie przepisuje.
+- [x] **34. Tryb odświeżania korpusu** (2026-11-20) → „Historyczne zgłoszenia”, „Świadomie
+  pominięte”.
 
 #### J. Narzędzia i grafy z narzędziami — opisy narzędzi, treść promptu i pomiar
 
@@ -4545,7 +4548,8 @@ korpusie, przechodzi przy zamknięciu do p. 33.
   budżet na okres i jego egzekwowanie oraz wyniesienie do ENV tego, ile jedno wywołanie może
   pobrać. *Dlaczego:* bramki dają ruch proporcjonalny do całej pracy
   helpdesku, pętla mnoży wywołania, a model zewnętrzny to koszt per wywołanie.
-- [ ] **38. Punkt wpięcia i zachowanie przy 503 uzgodnione z helpdeskiem.** *Dlaczego:* bez
+- [ ] **38. Punkt wpięcia i zachowanie przy 503 uzgodnione z helpdeskiem** — przy wpięciu trasy
+  zamknięcia ostatni zrzut dobiera zgłoszenia zamknięte od poprzedniego (p. 34). *Dlaczego:* bez
   hooka bramek nikt nie woła, a o fail-open decyduje tamta strona.
 - [ ] **40. Licencja PolDense (gemma).** *Dlaczego:* licencja idzie od modelu-nauczyciela
   (destylacja z BGE-Multilingual-Gemma2), więc wybór embeddera jest też decyzją licencyjną.
@@ -4562,48 +4566,40 @@ korpusie, przechodzi przy zamknięciu do p. 33.
 
 Rzeczy odłożone świadomie, bez miejsca w kolejności planu. Każdy punkt: cel — dlaczego.
 
-- [ ] **20. Detektor sekretów w usłudze `anonymizer`** (odłożony 2026-10-19, wcześniej warunek
-  pierwszego wywołania zewnętrznego) — do tego czasu sekret wklejony w zgłoszenie (1,1–1,7%
-  zgłoszeń: hasła do VPN, roota, skrzynek) idzie po anonimizacji do zewnętrznego modelu i do
-  indeksów. Gdy wróci, najpierw w wersji lekkiej: reguły kontekstu („hasło: …", „login … /
-  hasło …") i znane kształty (klucz prywatny, JWT, adres połączenia z hasłem) zamieniane na
-  `{HASŁO}`, a w korpusie z masowego importu (p. 31, poszedł bez detektora) przegląd zgłoszeń
-  z sekretami. Entropia dla haseł
-  losowych bez etykiety i alarm, który odróżnia poświadczenia od haseł do archiwów, dopiero gdy
-  pomiar pokaże, że wersja lekka nie wystarcza. *Dlaczego odłożony:* hasło nie niesie wiedzy,
-  a ryzyko leży po stronie umowy i polityki bezpieczeństwa klienta; alarm „zmień hasło" to jego
-  procedura.
-- [ ] **29. Magazyn reguł w SQL** (odłożony 2026-10-30) — osobny schemat i osobna rola w Postgresie z p. 48, nie nowa
-  usługa; wersje, audyt werdyktów, kontrola dostępu do edycji; później też magazyn notatek.
-  Wtedy słownik rozstrzygnięć dochodzi do scenariuszy wstrzyknięć z p. 59 jako droga ataku.
-  *Dlaczego:* klient stroi reguły bez deployu, a edycja to zmiana konfiguracji produkcyjnej.
-- [ ] **44. Notatki agenta i HITL w pętli** — notatki jako narzędzie pomocnicze w
-  `agent_tools/notes/` (sterują szukaniem, nigdy generacją), przerwanie pętli na decyzję człowieka
-  (odczyt zgłoszeń i sekcji po identyfikatorze jest już narzędziem agenta — p. 52, 56, 57).
-  *Dlaczego:* odłożone świadomie; kontrakt narzędzia pomocniczego z p. 1 i magazyn z p. 29 mają je
-  przyjąć bez zmian we wspólnych węzłach.
-- [ ] **45. Rozszerzenia** — reranker,
-  rozbicie wątków-projektów, kolejność diagnostyczna w `questions`. *Dlaczego:* każde czeka na
-  pomiar, który pokaże, że jest potrzebne.
-- [ ] **58. Narzędzie: instancja testowa** — dostęp do instancji testowej, na której agent
-  sprawdzi opisany objaw; czytanie kodu aplikacji przeszło 2026-10-06 do p. 60–66.
-  *Dlaczego:* kandydat bez decyzji; narzędzie jest katalogiem z kontraktem, więc dojdzie bez zmian
-  w grafach i węzłach, ale byłoby pierwszym narzędziem, które coś wykonuje, a nie tylko czyta —
-  wymaga osobnej decyzji o granicach.
-- [ ] **78. Pomiar anonimizatora na wątkach spoza strojenia** (dopisany 2026-10-22) — około 30
-  wątków korpusu spoza próbki golden setu, dobranych warstwami jak próbka, zaznaczonych przez
-  model i przejrzanych przez człowieka, w osobnym pliku w `data/unsafe/golden/`; jeden przebieg
-  testu `llm_live` silnika `agent`, bez strojenia na tym zestawie. *Dlaczego:* prompty, przykłady
-  i filtry silnika stroiliśmy na tym samym golden secie, na którym mierzymy, więc „bez
-  przecieku” to wynik optymistyczny. Masowy import (p. 31) poszedł bez niego (decyzja
-  2026-11-13); wraca razem z p. 79 albo przy podejrzeniu przecieku.
-- [ ] **79. Golden set z korpusu importu** (dopisany 2026-11-15) — zamrożona kopia `cards/`
-  i `anonymized/` z masowego importu jako korpus golden w standardowym układzie; etykiety
-  i zapytania wektorowe z golden200 przepięte na jej karty (około 10 etykiet do przejrzenia,
-  bo filtr ocenił je inaczej niż przegląd), zapytania tekstowe dobrane z 1081 przyjętych wątków
-  (około 40, z komunikatami powtarzającymi się w wielu wątkach), indeksy z `reindex` do własnej
-  kolekcji i tabeli; nowe progi zamiast liczb z golden200. *Dlaczego:* golden200 jest z lipcowego
-  zrzutu, szuka wśród 141 kart zamiast 1081 i ma za mało komunikatów, żeby zmierzyć, czy częsty
-  komunikat wypycha cel poza limit wyników — a to największa słabość wyszukiwania tekstowego.
-  Cena: jednorazowo około 25 minut liczenia wektorów na CPU, a stare liczby przestają być
-  porównywalne.
+- [ ] **20. Detektor sekretów w usłudze `anonymizer`** (odłożony 2026-10-19) — najpierw wersja
+  lekka: reguły kontekstu („hasło: …", „login … / hasło …") i znane kształty (klucz prywatny, JWT,
+  adres połączenia z hasłem) na `{HASŁO}`, potem przegląd korpusu, bo oba importy (p. 31 i 32)
+  poszły bez detektora. Entropia i odróżnianie haseł do archiwów dopiero, gdy wersja lekka nie
+  wystarczy. *Dlaczego odłożony:* hasło nie niesie wiedzy, a ryzyko i procedura „zmień hasło"
+  leżą po stronie klienta. Do tego czasu sekret ze zgłoszenia (1,1–1,7% zgłoszeń) idzie do modelu
+  zewnętrznego i do indeksów.
+- [ ] **29. Magazyn reguł w SQL** (odłożony 2026-10-30) — osobny schemat i rola w Postgresie:
+  wersje reguł, audyt werdyktów, kontrola edycji, później notatki; słownik rozstrzygnięć
+  dochodzi wtedy do scenariuszy wstrzyknięć (p. 59). *Dlaczego:* klient stroi reguły bez
+  deployu, a edycja zmienia konfigurację produkcyjną.
+- [ ] **35. Backup `cards/` i `anonymized/` korpusu** (odłożony 2026-11-20) — na razie bez kopii.
+  *Dlaczego:* tylko tych plików nie odtworzy eksport: 1894 karty to około 9 USD i godzina modelu,
+  a wątki wymagają poda z anonimizatorem.
+- [ ] **44. Notatki agenta i HITL w pętli** — notatki jako narzędzie pomocnicze
+  (`agent_tools/notes/`, sterują szukaniem, nigdy generacją) i przerwanie pętli na decyzję
+  człowieka. *Dlaczego:* kontrakt narzędzia pomocniczego i magazyn z p. 29 przyjmą je bez zmian
+  we wspólnych węzłach.
+- [ ] **55. Właściwa dokumentacja** (odłożony 2026-11-20: dokumentacji nie mamy i nie zależy to od
+  nas) — podział mocnym modelem na sekcje z metryczką, skrypt sprawdzający, że sekcje są
+  dosłownymi podciągami źródła i pokrywają całość, przegląd opisów przez człowieka. Potem
+  przeliczenie progu długiej sekcji (dziś 18 tys. znaków), `RAG_DOCS_FRAGMENT_CHARS`
+  i `RAG_DOCS_SCORE_MIN` (dziś z paczki syntetycznej), przy długim spisie `list_docs` zawężone do
+  dokumentu i pomiar opisów narzędzi dokumentacji na grafie `search`. *Dlaczego:* sekcja wraca
+  do promptu jako cytowane źródło, więc model dzieli i opisuje, ale treści nie przepisuje.
+- [ ] **78. Pomiar anonimizatora na wątkach spoza strojenia** — około 30 wątków korpusu spoza
+  golden setu, dobranych warstwami, zaznaczonych przez model i przejrzanych przez człowieka;
+  jeden przebieg `llm_live` bez strojenia. *Dlaczego:* silnik stroiliśmy na zestawie, na którym
+  mierzymy, więc „bez przecieku" jest wynikiem optymistycznym. Wraca z p. 79 albo przy
+  podejrzeniu przecieku.
+- [ ] **79. Golden set z korpusu importu** — zamrożona kopia `cards/` i `anonymized/` importu
+  w układzie korpusu: etykiety i zapytania wektorowe golden200 przepięte na jej karty (około 10
+  etykiet do przejrzenia), około 40 zapytań tekstowych z komunikatami z wielu wątków, własna
+  kolekcja i tabela, nowe progi. *Dlaczego:* golden200 jest z lipcowego zrzutu, szuka wśród 141
+  kart zamiast 1115 i ma za mało powtarzających się komunikatów, żeby zmierzyć największą
+  słabość wyszukiwania tekstowego: częsty komunikat wypycha cel poza limit wyników. Cena: około
+  25 minut liczenia wektorów na CPU, a stare liczby przestają być porównywalne.
