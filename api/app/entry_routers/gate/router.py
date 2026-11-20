@@ -5,7 +5,9 @@ from fastapi.responses import StreamingResponse
 
 from app.agent_graphs import gate_close, gate_reply
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
+from app.core_service.factory_mail_normalizer import get_mail_normalizer
 from app.core_service.loader_dict_rules import get_rule_set
+from app.core_service.normalizer_ticket_mail import MailNormalizer
 from app.entry_routers.gate.mapping import to_verdict_response
 from app.entry_routers.gate.models import GateReplyRequest, VerdictResponse
 from app.entry_routers.mapping import to_raw_ticket
@@ -22,6 +24,7 @@ async def check_close(
     request:   TicketRequest,
     build:     GraphBuilder   = Depends(get_graph_builder),
     responder: GraphResponder = Depends(get_graph_responder),
+    mail:      MailNormalizer = Depends(get_mail_normalizer),
 ) -> VerdictResponse | StreamingResponse:
     """
     Description:
@@ -35,8 +38,10 @@ async def check_close(
     Example result:
         VerdictResponse(verdict="pass", reasons=[], …, overridable=True, rules_version=1)
     """
-    rules = get_rule_set("gate_close")
-    state = gate_close.STATE(input_text=to_raw_ticket(request).as_thread(), rules=rules.rules)
+    rules  = get_rule_set("gate_close")
+    # Wątek z kanału „Automat mailowy” przychodzi oczyszczony, każdy inny bez zmian (p. 32).
+    thread = mail.normalize(to_raw_ticket(request)).as_thread()
+    state  = gate_close.STATE(input_text=thread, rules=rules.rules)
 
     def finish(
         final: gate_close.GateCloseState,  # np. GateCloseState(…, output=Verdict(…))

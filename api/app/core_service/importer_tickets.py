@@ -9,9 +9,11 @@ a indeksy buduje z nich potem `helpdesk tickets reindex`. Woła go komenda
 | zgłoszenie w `raw-db/`     | co robi import                             | licznik w raporcie  |
 |----------------------------|--------------------------------------------|---------------------|
 | w toku (status niekońcowy) | pomija: wątek nie jest skończony           | `skipped_open`      |
-| kanał „Automat mailowy”    | pomija: czeka na czyszczenie (p. 32)       | `skipped_mail`      |
 | ma już kartę w `cards/`    | pomija: nie płaci drugi raz, nie nadpisuje | `already_carded`    |
 | reszta                     | parsuje i zapisuje wątek z kartą           | `parsed` / `failed` |
+
+Wątek z kanału „Automat mailowy” idzie do grafu oczyszczony (`MailNormalizer`, p. 32): bez
+drugiej kopii maila, cytatów i stopek, z autorami z podpisów; każdy inny bez zmian.
 
 Przed — plik eksportu ze statusem `rozwiazany` i kategorią „Błąd”:
 
@@ -28,8 +30,8 @@ Co się dzieje po drodze:
 1. `_select()` czyta eksport po numerach rosnąco, odsiewa zgłoszenia spoza zakresu i te z kartą,
    a przy limicie bierze pierwsze N z reszty.
 2. Wołający dostaje raport z liczbami zakresu, zanim ruszy pierwsze wywołanie modelu.
-3. Zgłoszenia idą przez graf po kilka naraz; każde kończy się zapisem wątku i karty albo wpisem
-   na liście błędów.
+3. Zgłoszenia idą przez graf po kilka naraz, z wątkiem oczyszczonym, gdy są z kanału
+   „Automat mailowy”; każde kończy się zapisem wątku i karty albo wpisem na liście błędów.
 4. Po każdym zgłoszeniu wołający dostaje raport z postępem i kosztem.
 5. Na końcu, także po przerwaniu, raport trafia do katalogu korpusu.
 
@@ -39,7 +41,8 @@ O czym pamiętać przy zmianach:
   poleceniem, a karta z trasy zamknięcia, nowsza niż eksport, nie jest cofana.
 - Wątek bez karty (zapis przerwany między plikami) następny przebieg nadpisuje — to jedyny plik
   korpusu, który import nadpisuje.
-- Błąd konfiguracji (model, klucz, anonimizator na atrapie silnika) zatrzymuje cały przebieg;
+- Błąd konfiguracji (model, klucz, anonimizator na atrapie silnika, brak słownika maili przy
+  zgłoszeniu z kanału „Automat mailowy”) zatrzymuje cały przebieg;
   błąd jednego zgłoszenia trafia na listę błędów, a przebieg idzie dalej — chyba że błędów jest
   10 z rzędu (`MAX_FAILURES_IN_ROW`): to znaczy, że padł pod z anonimizatorem albo dostawca
   modelu, i bez hamulca przebieg przeleciałby przez resztę listy, zapisując same błędy.
@@ -61,7 +64,8 @@ from app.core_model.tickets.raw_ticket import RawTicket
 from app.core_model.tickets.ticket_import_failure import TicketImportFailure
 from app.core_model.tickets.tickets_corpus import TicketsCorpus
 from app.core_model.tickets.tickets_import_report import TicketsImportReport
-from app.core_service.parser_ticket_raw import MAIL_CATEGORY, is_closed_in_source, load_raw_ticket
+from app.core_service.normalizer_ticket_mail import MailNormalizer
+from app.core_service.parser_ticket_raw import is_closed_in_source, load_raw_ticket
 from app.core_service.writer_ticket_card import write_card_with_thread
 from app.engine_anonymization import AnonymizationConfigError, AnonymizationError, Anonymizer
 from app.engine_llm import LLMConfigError, LLMError
@@ -114,19 +118,22 @@ class TicketsImporter:
         corpus:      TicketsCorpus,         # np. Settings().tickets_corpus()
         graph:       CompiledStateGraph,    # np. build_real_graph(parse_ticket, …)
         anonymizer:  Anonymizer,            # ten, na którym stoi graf; zamyka go `aclose()`
+        normalizer:  MailNormalizer,        # np. MailNormalizer(Path("/code/data/unsafe/mail"))
         vocabulary:  ResolutionVocabulary,  # np. get_resolution_classes()
         model:       str,                   # np. "gpt-6.1-sol" — do raportu
         concurrency: int,                   # np. 4 — ile zgłoszeń naraz
     ):
         """
         Description:
-        Spina serwis z korpusem, grafem karty i słownikiem rozstrzygnięć. Graf i anonimizator są
-        wstrzykiwane: serwis nie składa klientów sam (zasada 4).
+        Spina serwis z korpusem, grafem karty, czyszczeniem wątków mailowych i słownikiem
+        rozstrzygnięć. Graf i anonimizator są wstrzykiwane: serwis nie składa klientów sam
+        (zasada 4).
 
         Example args:
             corpus=TicketsCorpus(root=Path("/code/data/unsafe/corpus"))
             graph=build_real_graph(parse_ticket, llm=…, anonymizer=…, tools=(), …)
             anonymizer=AnonymizerClient(base_url="http://anonymizer:8000")
+            normalizer=MailNormalizer(Path("/code/data/unsafe/mail"))
             vocabulary=get_resolution_classes()
             model="gpt-6.1-sol"
             concurrency=4
@@ -137,6 +144,7 @@ class TicketsImporter:
         self._corpus      = corpus
         self._graph       = graph
         self._anonymizer  = anonymizer
+        self._normalizer  = normalizer
         self._vocabulary  = vocabulary
         self._model       = model
         self._concurrency = concurrency
@@ -218,16 +226,16 @@ class TicketsImporter:
     ) -> tuple[list[RawTicket], TicketsImportReport]:
         """
         Description:
-        Czyta eksport po numerach rosnąco i wybiera zgłoszenia do sparsowania: zamknięte w źródle,
-        spoza kanału „Automat mailowy” i bez karty w korpusie; przy limicie pierwsze N z nich.
-        Zakłada raport z liczbami zakresu.
+        Czyta eksport po numerach rosnąco i wybiera zgłoszenia do sparsowania: zamknięte w źródle
+        i bez karty w korpusie; przy limicie pierwsze N z nich. Zakłada raport z liczbami
+        zakresu.
 
         Example args:
             limit=None
 
         Example result:
             ([RawTicket(ticket_id="4832", …), …],
-             TicketsImportReport(files=1955, skipped_open=61, skipped_mail=136, todo=1758, …))
+             TicketsImportReport(files=1955, skipped_open=61, already_carded=1758, todo=136, …))
 
         Raises:
             NotADirectoryError: korpus nie ma katalogu `raw-db/`
@@ -238,7 +246,7 @@ class TicketsImporter:
             raise NotADirectoryError(f"brak katalogu eksportu zgłoszeń: {raw_dir}")
 
         paths  = sorted(raw_dir.glob(f"{EXPORT_PREFIX}*.json"), key=_ticket_number)
-        counts = {"open": 0, "mail": 0, "carded": 0}
+        counts = {"open": 0, "carded": 0}
         todo:  list[RawTicket] = []
 
         for path in paths:
@@ -248,11 +256,6 @@ class TicketsImporter:
                 continue
 
             raw = load_raw_ticket(path)
-
-            # --- „Automat mailowy”: cytowana historia czeka na czyszczenie (p. 32) ---
-            if raw.category == MAIL_CATEGORY:
-                counts["mail"] += 1
-                continue
 
             # --- karta już jest: z wcześniejszego przebiegu albo z trasy zamknięcia ---
             if (self._corpus.cards_dir / f"{raw.ticket_id}.json").exists():
@@ -270,7 +273,6 @@ class TicketsImporter:
             prompt_digest  = parse_ticket.prompt_digest(),
             files          = len(paths),
             skipped_open   = counts["open"],
-            skipped_mail   = counts["mail"],
             already_carded = counts["carded"],
             todo           = len(todo),
         )
@@ -286,8 +288,9 @@ class TicketsImporter:
     ) -> None:
         """
         Description:
-        Parsuje jedno zgłoszenie grafem karty i zapisuje wątek z kartą; błąd zgłoszenia dopisuje
-        do raportu bez treści i liczy, ile błędów było z rzędu. Potem oddaje raport wołającemu.
+        Parsuje jedno zgłoszenie grafem karty i zapisuje wątek z kartą; zgłoszenie z kanału
+        „Automat mailowy” idzie do grafu oczyszczone. Błąd zgłoszenia dopisuje do raportu bez
+        treści i liczy, ile błędów było z rzędu. Potem oddaje raport wołającemu.
 
         Example args:
             raw=RawTicket(ticket_id="33644", …)
@@ -301,11 +304,12 @@ class TicketsImporter:
         Raises:
             LLMConfigError: model generujący jest źle skonfigurowany
             AnonymizationConfigError: anonimizator odmówił z powodu konfiguracji
+            MailDictionaryConfigError: zgłoszenie jest z kanału mailowego, a słownika maili nie ma
             TicketsImportAbortedError: tym zgłoszeniem seria błędów doszła do `MAX_FAILURES_IN_ROW`
         """
         async with gate:
             state = parse_ticket.STATE(
-                input_text = raw.as_thread(),
+                input_text = self._normalizer.normalize(raw).as_thread(),
                 ticket_id  = raw.ticket_id,
                 date       = raw.date,
                 vocabulary = self._vocabulary,

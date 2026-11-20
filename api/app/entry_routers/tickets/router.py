@@ -5,9 +5,11 @@ from fastapi import APIRouter, Depends
 from app.agent_graphs import gate_close, parse_ticket, run_graph
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
 from app.core_service.factory_closed_ticket_indexer import get_closed_ticket_indexer
+from app.core_service.factory_mail_normalizer import get_mail_normalizer
 from app.core_service.indexer_closed_ticket import ClosedTicketIndexer
 from app.core_service.loader_dict_resolution import get_resolution_classes
 from app.core_service.loader_dict_rules import get_rule_set
+from app.core_service.normalizer_ticket_mail import MailNormalizer
 from app.entry_routers.mapping import to_raw_ticket
 from app.entry_routers.models import TicketRequest
 from app.entry_routers.tickets.mapping import to_closed_ticket_response
@@ -23,6 +25,7 @@ async def add_closed_ticket(
     request: TicketRequest,
     build:   GraphBuilder        = Depends(get_graph_builder),
     corpus:  ClosedTicketIndexer = Depends(get_closed_ticket_indexer),
+    mail:    MailNormalizer      = Depends(get_mail_normalizer),
 ) -> ClosedTicketResponse:
     """
     Description:
@@ -43,8 +46,10 @@ async def add_closed_ticket(
         DbQdrantError, DbPostgresError, EmbeddingError: indeks nie przyjął zapisu po zapisaniu
             plików — handler oddaje 503, a pliki zostają w korpusie
     """
+    # Do grafów idzie wątek oczyszczony (kanał „Automat mailowy”, p. 32), a do `raw-route/`
+    # surowe zgłoszenie: tekstu po czyszczeniu się nie zapisuje, liczy się go ze źródła.
     raw    = to_raw_ticket(request)
-    thread = raw.as_thread()
+    thread = mail.normalize(raw).as_thread()
     rules  = get_rule_set("gate_close")
 
     # --- bramka: przy blokadzie korpus zostaje bez zmian ---

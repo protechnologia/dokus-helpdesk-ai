@@ -122,6 +122,11 @@ class Settings(BaseSettings):
     # w swoim podkatalogu (`TicketsCorpus`). Z niego komendy `helpdesk tickets` budują indeksy, a od
     # p. 30 zapisuje do niego trasa zamknięcia zgłoszenia. Montowania nie przestawia.
     tickets_corpus_dir: Path = Path("/code/data/unsafe/corpus")
+    # Katalog słownika maili (`slownik.json` i `nazwy.json`), którym trasy i import czyszczą
+    # wątki kanału „Automat mailowy” (p. 32), po stronie kontenera. Montuje go compose, tylko do
+    # odczytu. Nie jest sprawdzany przy starcie: brak słownika wychodzi przy pierwszym
+    # zgłoszeniu z kanału, jako błąd konfiguracji.
+    tickets_mail_dir: Path = Path("/code/data/unsafe/mail")
 
     # --- kod aplikacji: paczka dla narzędzi agenta ---
     # Katalog paczki zbudowanej przez `scripts/build_code_package.py` (kod w `repo/`, obok

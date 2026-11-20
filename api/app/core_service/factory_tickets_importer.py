@@ -26,6 +26,7 @@ from app.config import Settings
 from app.core_model.tickets.tickets_corpus import TicketsCorpus
 from app.core_service.importer_tickets import TicketsImporter
 from app.core_service.loader_dict_resolution import get_resolution_classes
+from app.core_service.normalizer_ticket_mail import MailNormalizer
 from app.engine_anonymization import build_anonymizer
 from app.engine_llm import get_llm_client
 from app.engine_llm.factory import PROVIDER_FAKE
@@ -83,6 +84,7 @@ def build_tickets_importer(
         corpus      = corpus,
         graph       = graph,
         anonymizer  = anonymizer,
+        normalizer  = MailNormalizer(settings.tickets_mail_dir),
         vocabulary  = get_resolution_classes(),
         model       = llm_settings.model or "",
         concurrency = concurrency,

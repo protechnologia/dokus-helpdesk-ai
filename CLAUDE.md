@@ -699,6 +699,16 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   Zostaje 26,9% słów, a 10 opisów zostaje pustych: masowy mail dostawcy wysłany do 10 urzędów
   jest w całości szablonem (wszystkie 10 bez wiedzy). Tekstu po czyszczeniu nie zapisujemy:
   liczy się w locie ze źródła.
+- **Wątek czyści `MailNormalizer` w pięciu trasach grafów i w masowym imporcie (2026-11-20,
+  p. 32.4), zanim trafi do anonimizatora.** Trasy (`/search`, `/gate/close`, `/parse-ticket`,
+  `/suggest`, `/tickets/closed`) biorą go zależnością FastAPI (`get_mail_normalizer()`), a import
+  od swojej fabryki; katalog słownika podaje `TICKETS_MAIL_DIR`. Słownik czyta przy każdym
+  zgłoszeniu z kanału, a zgłoszenie z innego kanału przechodzi bez czytania, więc instancja bez
+  słownika obsługuje pozostałe kanały. Brak słownika przy zgłoszeniu mailowym to błąd
+  konfiguracji: trasa kończy się 500, a import kodem 2. `/tickets/closed` zapisuje do
+  `raw-route/` surowe zgłoszenie, a oczyszczony wątek idzie do grafów i po anonimizacji do
+  `anonymized/`. Import już nie pomija kanału, więc kolejny przebieg weźmie jego zgłoszenia bez
+  karty.
 - **Słownik maili leży w `data/unsafe/mail/`, bo powstaje z maili klienta, choć niesie same
   skróty (decyzja 2026-11-20).** `slownik.json` buduje `scripts/build_mail_dictionary.py`
   z wątków kanału w `raw-db/` (338 skrótów BLAKE2b po 8 bajtów: fragmenty z co najmniej 10 ze
@@ -888,8 +898,7 @@ wymagające czyszczenia cytowanej historii przed parsowaniem.
     osobno (33942/33951, 33967/34046, 34300/34387). Czytając którykolwiek osobno, widzi się połowę.
   - **Załączników nie ma w bazie**, więc rozwiązanie „nowa wersja w załączniku" (34352) nie
     istnieje.
-  **Czyszczenie i role z podpisów robi normalizer maili (p. 32); wpięcie w import i trasy to
-  p. 32.4.**
+  **Czyszczenie i role z podpisów robi normalizer maili (p. 32), w trasach i w imporcie.**
 - **Część rozwiązań jest pusta merytorycznie** — „Już powinno działać", „Zamykam", „Proszę się
   przelogować". Formalnie komentarz `typ='rozwiazanie'`, ale nie niesie wiedzy do zaproponowania
   komuś innemu. **Filtr jakości musi to odsiewać**: trafienie bez treści jest gorsze niż brak
@@ -1736,7 +1745,8 @@ Wspólne:
   źródła (2026-10-12); osobnego pola z gałęzią odpowiedź nie ma.
 - **Wspólne żądanie `TicketRequest` dla `/search`, `/gate/close`, `/parse-ticket`, `/suggest`
   i `/tickets/closed`**; trasa robi z niego `RawTicket.as_thread()`, czyli ten sam tekst wątku,
-  który widzi parser korpusu. `/gate/reply` i `/polish` biorą samą wiadomość albo notatki.
+  który widzi parser korpusu, a wątek z kanału „Automat mailowy” najpierw czyści
+  (`MailNormalizer`, p. 32). `/gate/reply` i `/polish` biorą samą wiadomość albo notatki.
 - **`POST /tickets/closed` dokłada zamknięte zgłoszenie do korpusu (2026-11-11, p. 30).** Trasa
   uruchamia bramkę zamknięcia. Przy „pass” uruchamia na tym samym wątku graf `parse_ticket`, a kartę
   oddaje `ClosedTicketIndexer` razem z wątkiem po anonimizacji z grafu karty, tym, z którego
@@ -3448,8 +3458,9 @@ nogi produktu na jednej sprawie.
   `QDRANT_COLLECTION=tickets_golden POSTGRES_TICKETS_TABLE=tickets_text_golden helpdesk tickets
   reindex data/unsafe/golden` (bez którejś zmiennej przebudowa kasuje indeks instancji)
 - Masowy import z eksportu do korpusu: `helpdesk tickets import [<korpus>] [--limit N]
-  [--concurrency 4]` (z `raw-db/` do `anonymized/` i `cards/`; pomija zgłoszenia w toku,
-  „Automat mailowy” i te z kartą, więc przerwany przebieg wznawia to samo polecenie; postęp
+  [--concurrency 4]` (z `raw-db/` do `anonymized/` i `cards/`; pomija zgłoszenia w toku i te
+  z kartą, więc przerwany przebieg wznawia to samo polecenie; wątki kanału „Automat mailowy”
+  czyści słownikiem maili z `TICKETS_MAIL_DIR`; postęp
   z kosztem co 10 zgłoszeń, raport w korpusie; staje po 10 błędach z rzędu) — **płatne, pytaj
   przed**; wymaga usługi
   `anonymizer` z modelem anonimizującym i modelu generującego z `.env`; indeksy buduje potem
@@ -3612,8 +3623,8 @@ localhost:8010/search`.
 - **Baza montuje kod z hosta** (bind-mount) — zmiany `.py` żywe bez rebuildu.
 - **Prod zdejmuje mount kodu** — `docker-compose.prod.yml` kasuje wolumeny embeddera przez
   `volumes: !reset []`, a listę `api` zastępuje przez `!override` danymi klienta spoza repo:
-  paczką kodu aplikacji tylko do odczytu oraz `cards/`, `anonymized/` i `raw-route/` korpusu do
-  zapisu (uruchamiamy kod z obrazu, nie z hosta). Eksportu zrzutu (`raw-db/`) kontener nie
+  paczką kodu aplikacji i słownikiem maili (`data/unsafe/mail/`) tylko do odczytu oraz `cards/`,
+  `anonymized/` i `raw-route/` korpusu do zapisu (uruchamiamy kod z obrazu, nie z hosta). Eksportu zrzutu (`raw-db/`) kontener nie
   widzi.
 
 **Trwałość danych:**
@@ -4010,14 +4021,14 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/postgres/`             | narzędzie na prawdziwej tabeli z podmienionym klientem (`ScriptedPostgres`), także liczenie wierszy albo jego błąd (`count_error`) |
 | `tests/_helpers/tickets_index/`        | indekser zgłoszeń, serwis zamkniętego zgłoszenia i trasa `POST /tickets/closed`: atrapy embeddera, kolekcji zgłoszeń i tabeli wątków (`FakeEmbedder`, `FakeTickets`, `FakeThreads`), indekser zgłoszeń na nich (`tickets_indexer_on()`), karta i wątek w korpusie testu (`write_card()`, `write_thread()`), serwis zamkniętego zgłoszenia (`closed_ticket_indexer_on()`), anonimizator zamieniający jeden fragment (`ReplacingAnonymizer`), graf karty z prawdziwym węzłem `respond` (`card_graph()`) i aplikacja trasy na tym wszystkim (`app_closing_tickets()`); próbki zamkniętego zgłoszenia, żądania i werdyktów w `samples.py` |
 | `tests/_helpers/tickets_import/`       | masowy import: plik eksportu zgłoszenia w `raw-db/` (`write_export()`), atrapa modelu, która na każde zgłoszenie odpowiada kartą, a na wskazane numery błędem (`CardLLM`), serwis importu na prawdziwych węzłach grafu karty (`importer_on()`) i atrapy serwisu i jego fabryki do testów komendy (`StubImporter`, `StubImporterFactory`); próbki raportu w `samples.py` |
-| `tests/_helpers/mail/`                 | słownik maili zmyślony z `data/safe/mail/` (`safe_templates()`, `safe_vendor_names()`), jego zmyślone wątki (`safe_mail_ticket()`) i zgłoszenie kanału z podanym opisem i komentarzami (`mail_ticket()`); maile z przykładów notatki o metodzie i oczyszczony wątek wzorcowy w `samples.py` |
+| `tests/_helpers/mail/`                 | słownik maili zmyślony z `data/safe/mail/` (`safe_templates()`, `safe_vendor_names()`), jego zmyślone wątki (`safe_mail_ticket()`), te same jako żądanie do tras (`safe_mail_request()`) i plik eksportu w korpusie testu (`copy_safe_mail_export()`) oraz zgłoszenie kanału z podanym opisem i komentarzami (`mail_ticket()`); maile z przykładów notatki o metodzie i oczyszczony wątek wzorcowy w `samples.py` |
 | `tests/_helpers/golden_mail/`          | golden set kanału „Automat mailowy”: wątki z `useful` i polami (autor, oznaczenia linii) (`golden_mail_tickets()`, `parse_ranges()`, `field_digest()`), wątek źródłowy (`mail_thread()`) i pomiar normalizera maili na nich (`measure_mail_cleaning()`) z progami |
 | `tests/_helpers/instance/`             | stan instancji: serwis liczący indeksy na atrapach Qdranta i Postgresa (`scripted_inspector()`, `inspector_on()`, klienci `counting_*` i `failing_*`), aplikacja z podanym serwisem (`app_with_inspector()`); próbki `sample_*()` w `samples.py` — raport stanu, paczka kodu, konfiguracja modelu |
 | `tests/_helpers/embedding/`            | embedding: nazwy modeli testowych (`EMBEDDING_MODEL`, `OTHER_MODEL`), odpowiedź usługi `embedder` w kształcie kontraktu (`embedder_answer()`) i payload punktu Qdranta z nazwą modelu (`with_model()`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
 | `tests/_helpers/live/`                 | żywy model: konfiguracja (`live_generation_llm()`), graf na nim (`run_live_graph()`, z regułami klienta), sprawy grafu naraz (`run_live_cases()` na `LiveCase`: wejście, reguły, narzędzia), reguły z zestawu domyślnego (`default_rules()`), pomiar raz na graf (`remember_per_graph()`), sprawy testu okablowania grafów (`measure_example_case()` i dwie sprawy `suggest_solution`), raport zużycia (fixture `live_usage`) i wydruk rozmowy (`run_as_lines()`) |
 | `tests/_helpers/graphs/`               | grafy aplikacji: lista pakietów (`graph_modules()`, `graph_name()` jako `ids`), typy i pola wyniku, reguły i źródła w stanie, składanie na atrapach (`fake_nodes()`, `built_from()`, `expected_edges()`), przebieg atrapy krok po kroku i w całości (`streamed_fake()`, `ran_fake()`) i próbki kroku przebiegu |
-| `tests/_helpers/routers/`              | trasy HTTP: rozbiór strumienia SSE (`sse_events()`), aplikacja z atrapami grafów na podanym anonimizatorze (`app_on_fake_graphs()`) i z modelem, który zawodzi w środku `search` (`app_with_model_failing_after_tools()`); próbki w `samples.py` — stan końcowy grafu (`final_state()`), rozmowa `search` z zapytaniami do wyciągnięcia, kroki przebiegu, żądania do tras grafów (`GRAPH_REQUESTS`) |
+| `tests/_helpers/routers/`              | trasy HTTP: rozbiór strumienia SSE (`sse_events()`), aplikacja z atrapami grafów na podanym anonimizatorze i normalizerze maili (`app_on_fake_graphs()`), żądanie trasy z jej polami dodatkowymi (`ticket_request()`) i aplikacja z modelem, który zawodzi w środku `search` (`app_with_model_failing_after_tools()`); próbki w `samples.py` — stan końcowy grafu (`final_state()`), rozmowa `search` z zapytaniami do wyciągnięcia, kroki przebiegu, żądania do tras grafów (`GRAPH_REQUESTS`) |
 | `tests/_helpers/scenarios/injections/` | zestaw wstrzyknięć, sprawy sekcji z atakiem także w materiale atrap, kontrola dotarcia (`reached_model()`), ocena sprawy i raport (fixture `injection_report`) |
 | `tests/_helpers/scenarios/gates/`      | zestaw scenariuszy bramek, ocena werdyktu i raport (fixture `gate_report`) |
 | `tests/_helpers/scenarios/polish/`     | zestaw scenariuszy „Popraw", ocena tekstu i raport (fixture `polish_report`) |
@@ -4375,10 +4386,7 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
     (kappa 0,89); sporna klasa to poprawka dostawcy bez przyczyny.
   - [x] **32.2 Czyszczenie** (2026-11-20) → „Historyczne zgłoszenia”.
   - [x] **32.3 Pomiar bez modelu** (2026-11-20) → „Historyczne zgłoszenia”.
-  - [ ] **32.4 Import i trasy** — import i trasy przy `category` „Automat mailowy” czyszczą
-    wątek przed anonimizacją. Do tego `TICKETS_MAIL_DIR` w `Settings`, `.env.example` i compose
-    oraz `data/unsafe/mail/` montowany do `api` tylko do odczytu w obu warstwach (przesunięte
-    z 32.2: wcześniej nikt ich nie czyta).
+  - [x] **32.4 Import i trasy** (2026-11-20) → „Historyczne zgłoszenia”.
   - [ ] **32.5 Przebieg** — próba na 20, całość po zgodzie (ok. 0,7 USD), potem
     `helpdesk tickets index`.
   - [ ] **32.6 Luka promptu** — zgłoszenie informacyjne bez treści (np. 33644): poprawka promptu

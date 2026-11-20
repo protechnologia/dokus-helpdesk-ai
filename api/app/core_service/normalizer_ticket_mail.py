@@ -50,10 +50,16 @@ Co się zmieniło:
 4. Znikają linie szablonów: fragmentów, które stoją w co najmniej 10 różnych wątkach kanału
    (`slownik.json`), także przy pierwszym wystąpieniu.
 
+Trasy grafów i masowy import wołają `MailNormalizer`, który czyta słownik maili z katalogu
+z konfiguracji (`TICKETS_MAIL_DIR`) i oddaje zgłoszenie spoza kanału bez zmian, nie dotykając
+dysku; `normalize_mail_ticket()` zostaje czystą funkcją na podanym słowniku.
+
 O czym pamiętać przy zmianach:
 
 - Tekst po czyszczeniu nigdzie się nie zapisuje: liczy się w locie ze źródła, jak `as_thread()`,
-  więc lepsza reguła działa od razu na całym korpusie, bez przebiegu po plikach.
+  więc lepsza reguła działa od razu na całym korpusie, bez przebiegu po plikach. Surowe
+  zgłoszenie z trasy zamknięcia trafia do `raw-route/` bez czyszczenia, a oczyszczony wątek
+  idzie do grafów i, po anonimizacji, do `anonymized/`.
 - Słownik szablonów musi powstać z tekstów w tym samym kształcie, który czyści normalizer:
   dlatego skrypt słownika bierze je z `message_texts()`, a nie składa sam.
 - Znika cała linia albo nic: strzępy zdań model czyta gorzej niż linię, która została.
@@ -64,11 +70,13 @@ O czym pamiętać przy zmianach:
 """
 
 import re
+from pathlib import Path
 
 from app.core_model.dicts.mail_templates import MailTemplates
 from app.core_model.dicts.vendor_names import VendorNames
 from app.core_model.tickets.raw_comment import RawComment
 from app.core_model.tickets.raw_ticket import RawTicket
+from app.core_service.loader_mail_dictionary import load_mail_templates, load_vendor_names
 from app.core_service.parser_ticket_raw import MAIL_CATEGORY
 from app.core_util.repetition import WORD, remove_repeated_lines, words_of
 
@@ -102,6 +110,66 @@ QUOTE_HEADER = re.compile(
     r")",
     re.IGNORECASE,
 )
+
+
+class MailNormalizer:
+    """
+    Description:
+    Czyszczenie wątków kanału „Automat mailowy” ze słownikiem maili z jednego katalogu: to,
+    czego używają trasy grafów i masowy import przed zrobieniem tekstu wątku.
+
+    Do czego:
+    Spina `normalize_mail_ticket()` ze słownikiem z dysku. Słownik czyta tylko przy zgłoszeniu
+    z kanału, więc instancja bez słownika obsługuje pozostałe kanały, a brak słownika wychodzi
+    przy pierwszym zgłoszeniu mailowym jako błąd konfiguracji. Pliki czyta przy każdym takim
+    zgłoszeniu, bez pamiętania: to dwa małe pliki, a przebudowany słownik działa bez restartu.
+
+    Flow:
+        1. Konstruktor zapamiętuje katalog słownika; dysku nie dotyka.
+        2. `normalize()` oddaje zgłoszenie spoza kanału bez zmian, a mailowe czyści
+           `normalize_mail_ticket()` ze słownikiem i nazwami dostawcy przeczytanymi z katalogu.
+    """
+
+    def __init__(
+        self,
+        directory: Path,  # np. Path("/code/data/unsafe/mail")
+    ):
+        """
+        Description:
+        Zapamiętuje katalog słownika maili. Nie sprawdza, czy pliki istnieją: brak słownika
+        wychodzi przy pierwszym zgłoszeniu z kanału.
+
+        Example args:
+            directory=Path("/code/data/unsafe/mail")
+
+        Example result:
+            MailNormalizer czytający /code/data/unsafe/mail/slownik.json i nazwy.json
+        """
+        self._directory = directory
+
+    def normalize(self, raw: RawTicket) -> RawTicket:   # np. RawTicket(ticket_id="41101", …)
+        """
+        Description:
+        Oddaje zgłoszenie z kanału „Automat mailowy” oczyszczone, z autorami z podpisów, a każde
+        inne bez zmian i bez czytania słownika.
+
+        Example args:
+            raw=RawTicket(ticket_id="41101", category="Automat mailowy", …)
+
+        Example result:
+            RawTicket(ticket_id="41101", body_role="klient", body="Dzień dobry,…", …)
+
+        Raises:
+            MailDictionaryConfigError: zgłoszenie jest z kanału, a słownika maili nie ma albo jest
+                nie do odczytania
+        """
+        if raw.category != MAIL_CATEGORY:
+            return raw
+
+        templates = load_mail_templates(self._directory)
+        vendors   = load_vendor_names(self._directory)
+
+        return normalize_mail_ticket(raw, templates, vendors)
 
 
 def normalize_mail_ticket(

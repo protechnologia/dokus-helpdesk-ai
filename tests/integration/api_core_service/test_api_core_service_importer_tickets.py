@@ -10,6 +10,8 @@ from app.core_model.tickets.tickets_import_report import TicketsImportReport
 from app.core_service.importer_tickets import MAX_FAILURES_IN_ROW, TicketsImportAbortedError
 from app.engine_anonymization import AnonymizationError, AnonymizedText
 from app.engine_llm import LLMConfigError, LLMError
+from tests._helpers.mail import copy_safe_mail_export
+from tests._helpers.mail.samples import sample_cleaned_thread
 from tests._helpers.tickets_import import COST_PER_TICKET, MODEL, CardLLM, importer_on, write_export
 from tests._helpers.tickets_index import ReplacingAnonymizer, write_card, write_thread
 from tests._helpers.tickets_index.samples import PERSON, PERSON_MARKERS, sample_card
@@ -89,16 +91,13 @@ async def test_the_model_and_the_corpus_get_the_anonymized_thread(tmp_path: Path
     assert PERSON_MARKERS in thread
 
 
-async def test_open_and_mail_tickets_stay_out(tmp_path: Path) -> None:
-    """Sprawdza, czy zgłoszenie w toku (`w_weryfikacji`) i zgłoszenie z kanału „Automat mailowy”
-    nie idą do modelu ani do korpusu, a raport liczy je osobno: jedno w toku, jedno mailowe,
-    jedno do zrobienia.
+async def test_an_open_ticket_stays_out(tmp_path: Path) -> None:
+    """Sprawdza, czy zgłoszenie w toku (`w_weryfikacji`) nie idzie do modelu ani do korpusu,
+    a raport liczy je osobno: jedno w toku, jedno do zrobienia.
 
-    Wyłapuje import, który parsuje niedokończone wątki albo maile z cytowaną historią przed
-    czyszczeniem (p. 32): do korpusu trafiłyby karty bez rozstrzygnięcia i z pomieszanymi rolami,
-    za które trzeba zapłacić."""
+    Wyłapuje import, który parsuje niedokończone wątki: do korpusu trafiłyby karty bez
+    rozstrzygnięcia, za które trzeba zapłacić."""
     write_export(tmp_path, 41001, status="w_weryfikacji")
-    write_export(tmp_path, 41002, category="Automat mailowy")
     write_export(tmp_path, 41003)
     llm = CardLLM()
 
@@ -106,7 +105,27 @@ async def test_open_and_mail_tickets_stay_out(tmp_path: Path) -> None:
 
     assert sorted(path.stem for path in (tmp_path / "cards").iterdir()) == ["41003"]
     assert len(llm.prompts) == 1
-    assert (report.files, report.skipped_open, report.skipped_mail, report.todo) == (3, 1, 1, 1)
+    assert (report.files, report.skipped_open, report.todo) == (2, 1, 1)
+
+
+async def test_a_mail_ticket_is_imported_with_a_cleaned_thread(tmp_path: Path) -> None:
+    """Sprawdza, czy zamknięte zgłoszenie z kanału „Automat mailowy” idzie do modelu i do
+    korpusu jako wątek oczyszczony: model dostaje wątek bez drugiej kopii maila, stopki i cytatu,
+    a `anonymized/` trzyma ten sam wątek wzorcowy normalizera, po anonimizacji.
+
+    Wyłapuje import, który dalej pomija ten kanał albo parsuje surowe maile: karty powstałyby
+    z cytatów i stopek, a role z bazy podawałyby odpowiedzi konsultanta jako słowa klienta."""
+    copy_safe_mail_export(tmp_path, 41101)
+    llm = CardLLM()
+
+    report = await importer_on(tmp_path, llm, _anonymizer()).run(None, _ignore)
+
+    thread  = (tmp_path / "anonymized" / "41101.txt").read_text(encoding="utf-8")
+    cleaned = sample_cleaned_thread().replace(PERSON, PERSON_MARKERS)
+
+    assert (report.todo, report.parsed) == (1, 1)
+    assert thread == cleaned
+    assert cleaned in llm.prompts[0]
 
 
 async def test_a_ticket_with_a_card_is_left_alone(tmp_path: Path) -> None:

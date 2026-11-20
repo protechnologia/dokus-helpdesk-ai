@@ -9,12 +9,12 @@ Plik nazywa się `import_.py`, bo `import` to słowo kluczowe Pythona; komenda n
 
 Przykład wyjścia (zmyślone liczby):
 
-    Eksport: 1955 zgłoszeń w raw-db/; w toku: 61, „Automat mailowy”: 136, z kartą: 0.
-    Do zrobienia: 1758 (model gpt-6.1-sol, prompt 308c1c483d78).
-       10/1758  błędów: 0  koszt: 0.0512 USD  czas: 21s  zostało: ~1h 01min
-       20/1758  błędów: 0  koszt: 0.1034 USD  czas: 43s  zostało: ~1h 02min
+    Eksport: 1955 zgłoszeń w raw-db/; w toku: 61, z kartą: 0.
+    Do zrobienia: 1894 (model gpt-6.1-sol, prompt 308c1c483d78).
+       10/1894  błędów: 0  koszt: 0.0512 USD  czas: 21s  zostało: ~1h 06min
+       20/1894  błędów: 0  koszt: 0.1034 USD  czas: 43s  zostało: ~1h 07min
     …
-    Gotowe: 1756 kart z 1758 (przydatnych: 1201), błędów: 2, koszt 9.1234 USD, czas 58min 12s.
+    Gotowe: 1892 kart z 1894 (przydatnych: 1201), błędów: 2, koszt 9.8234 USD, czas 1h 03min.
     Błędy: 10544 (LLMError), 22817 (AnonymizationError)
     Raport: /code/data/unsafe/corpus/import-2026-11-13T10-15-00.json
 
@@ -42,6 +42,7 @@ from app.core_service.factory_tickets_importer import (
     build_tickets_importer,
 )
 from app.core_service.importer_tickets import TicketsImportAbortedError
+from app.core_service.loader_mail_dictionary import MailDictionaryConfigError
 from app.core_util.time import format_duration
 from app.engine_anonymization import AnonymizationConfigError
 from app.engine_llm import LLMConfigError
@@ -99,6 +100,7 @@ def import_tickets(
         TicketsImportConfigError,  # model generujący to atrapa
         LLMConfigError,            # dostawca, klucz albo model modelu generującego
         AnonymizationConfigError,  # adres anonimizatora albo jego atrapa przy prawdziwym modelu
+        MailDictionaryConfigError, # zgłoszenie z kanału mailowego, a słownika maili nie ma
         TicketsImportAbortedError, # seria błędów: padł pod z anonimizatorem albo dostawca modelu
     ) as exc:
         typer.echo(f"BŁĄD: {exc}", err=True)
@@ -137,6 +139,7 @@ async def _run(
         TicketsImportConfigError: model generujący jest atrapą
         LLMConfigError: model generujący jest źle skonfigurowany
         AnonymizationConfigError: anonimizator odmówił z powodu konfiguracji
+        MailDictionaryConfigError: zgłoszenie jest z kanału mailowego, a słownika maili nie ma
     """
     importer = build_tickets_importer(Settings(), corpus, concurrency)
 
@@ -189,14 +192,14 @@ def _print_scope(
     zrobienia oraz którym modelem i promptem.
 
     Example args:
-        report=TicketsImportReport(files=1955, skipped_open=61, skipped_mail=136, todo=1758, …)
+        report=TicketsImportReport(files=1955, skipped_open=61, already_carded=1758, todo=136, …)
 
     Example result:
         None — dwie linie zakresu na wyjściu
     """
     typer.echo(
         f"Eksport: {report.files} zgłoszeń w raw-db/; w toku: {report.skipped_open}, "
-        f"„Automat mailowy”: {report.skipped_mail}, z kartą: {report.already_carded}."
+        f"z kartą: {report.already_carded}."
     )
 
     if not report.todo:

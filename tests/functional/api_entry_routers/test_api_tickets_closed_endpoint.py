@@ -7,8 +7,11 @@ from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_model.tickets.raw_ticket import RawTicket
 from app.core_service.factory_closed_ticket_indexer import ClosedTicketConfigError
 from app.core_service.loader_dict_rules import get_rule_set
+from app.core_service.normalizer_ticket_mail import MailNormalizer
 from app.db_qdrant import DbQdrantError
 from app.main import create_app
+from tests._helpers.mail import SAFE_MAIL_DIR, safe_mail_request
+from tests._helpers.mail.samples import sample_cleaned_thread
 from tests._helpers.tickets_index import (
     GRAPH_NODES,
     FakeThreads,
@@ -95,6 +98,30 @@ def test_the_corpus_gets_the_ticket_its_thread_and_a_card_with_its_identity(
     assert thread == sample_thread(ticket_id).text
     assert PERSON not in thread
     assert (card.ticket_id, card.date) == (ticket_id, sample_raw_ticket().date)
+
+
+def test_a_mail_ticket_is_stored_raw_and_indexed_cleaned(tmp_path: Path) -> None:
+    """Sprawdza, czy zamknięte zgłoszenie z kanału „Automat mailowy” trafia do `raw-route/` takie,
+    jak przyszło (z drugą kopią maila, stopką i cytatem), a do `anonymized/` jako wątek
+    oczyszczony, po anonimizacji — ten sam, z którego graf zrobił kartę.
+
+    Wyłapuje trasę, która zapisuje oczyszczony tekst jako źródło (lepsza reguła czyszczenia nie
+    miałaby już z czego liczyć wątku) albo indeksuje surowy mail: do tabeli wątków trafiłyby
+    stopki i cytaty z nazwiskami."""
+    anonymizer = ReplacingAnonymizer(PERSON, PERSON_MARKERS)
+    corpus     = closed_ticket_indexer_on(tmp_path, FakeTickets(), FakeThreads())
+    app        = app_closing_tickets(
+        corpus, sample_pass(), sample_card(), anonymizer, MailNormalizer(SAFE_MAIL_DIR)
+    )
+    request    = safe_mail_request(41101)
+
+    TestClient(app).post("/tickets/closed", json=request)
+
+    raw    = RawTicket.model_validate_json((tmp_path / "raw-route" / "41101.json").read_text())
+    thread = (tmp_path / "anonymized" / "41101.txt").read_text(encoding="utf-8")
+
+    assert (raw.body, raw.body_role) == (request["body"], "")
+    assert thread == sample_cleaned_thread().replace(PERSON, PERSON_MARKERS)
 
 
 def test_a_blocked_ticket_leaves_the_corpus_untouched(tmp_path: Path) -> None:

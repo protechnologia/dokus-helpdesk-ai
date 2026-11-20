@@ -5,6 +5,8 @@ from fastapi.responses import StreamingResponse
 
 from app.agent_graphs import search
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
+from app.core_service.factory_mail_normalizer import get_mail_normalizer
+from app.core_service.normalizer_ticket_mail import MailNormalizer
 from app.entry_routers.mapping import to_raw_ticket
 from app.entry_routers.models import TicketRequest
 from app.entry_routers.search.mapping import to_search_response
@@ -21,6 +23,7 @@ async def search_tickets(
     request:   TicketRequest,
     build:     GraphBuilder   = Depends(get_graph_builder),
     responder: GraphResponder = Depends(get_graph_responder),
+    mail:      MailNormalizer = Depends(get_mail_normalizer),
 ) -> SearchResponse | StreamingResponse:
     """
     Description:
@@ -38,7 +41,8 @@ async def search_tickets(
                        queries=[AgentQuery(tool="find_tickets_vector", …,
                                            dropped_below_threshold=0), …])
     """
-    state = search.STATE(input_text=to_raw_ticket(request).as_thread())
+    # Wątek z kanału „Automat mailowy” przychodzi oczyszczony, każdy inny bez zmian (p. 32).
+    state = search.STATE(input_text=mail.normalize(to_raw_ticket(request)).as_thread())
 
     def finish(
         final: search.SearchState,  # np. SearchState(…, sources=[…], output=SearchNotes(…))

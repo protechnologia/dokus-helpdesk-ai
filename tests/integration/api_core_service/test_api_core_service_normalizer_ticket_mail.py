@@ -5,12 +5,24 @@ słowniku zmyślonym z `data/safe/mail/` i zmyślonych wątkach, z których ten 
 druga kopia maila, cytat, stopka dostawcy, odwołanie do obrazka i role z podpisów (p. 32).
 """
 
+from pathlib import Path
+
+import pytest
+
+from app.core_service.loader_mail_dictionary import MailDictionaryConfigError
 from app.core_service.normalizer_ticket_mail import (
     CLIENT_ROLE,
     VENDOR_ROLE,
+    MailNormalizer,
     normalize_mail_ticket,
 )
-from tests._helpers.mail import mail_ticket, safe_mail_ticket, safe_templates, safe_vendor_names
+from tests._helpers.mail import (
+    SAFE_MAIL_DIR,
+    mail_ticket,
+    safe_mail_ticket,
+    safe_templates,
+    safe_vendor_names,
+)
 from tests._helpers.mail.samples import sample_cleaned_thread
 
 
@@ -68,3 +80,37 @@ def test_a_ticket_from_another_channel_comes_back_unchanged() -> None:
     raw  = mail_ticket(mail.body, [("klient", mail.body)], category="Błąd")
 
     assert normalize_mail_ticket(raw, safe_templates(), safe_vendor_names()) == raw
+
+
+def test_the_normalizer_cleans_a_mail_ticket_with_the_dictionary_from_its_directory() -> None:
+    """Sprawdza, czy `MailNormalizer` na katalogu słownika zmyślonego oddaje zgłoszenie mailowe
+    dokładnie takie, jak `normalize_mail_ticket()` ze słownikiem i nazwami z tego katalogu.
+
+    Wyłapuje normalizer, który czyta inny plik albo pomija któryś krok: trasy i import
+    czyściłyby inaczej, niż mierzy test ewaluacyjny."""
+    raw = safe_mail_ticket(41101)
+
+    assert MailNormalizer(SAFE_MAIL_DIR).normalize(raw) == normalize_mail_ticket(
+        raw, safe_templates(), safe_vendor_names()
+    )
+
+
+def test_a_ticket_from_another_channel_needs_no_dictionary(tmp_path: Path) -> None:
+    """Sprawdza, czy zgłoszenie spoza kanału „Automat mailowy” przechodzi przez normalizer bez
+    zmian także wtedy, gdy katalogu słownika nie ma.
+
+    Wyłapuje normalizer, który czyta słownik przy każdym zgłoszeniu: instancja bez słownika
+    maili przestałaby obsługiwać wszystkie pozostałe kanały."""
+    raw = mail_ticket("Nie działa wysyłka.", category="Błąd")
+
+    assert MailNormalizer(tmp_path / "brak").normalize(raw) is raw
+
+
+def test_a_mail_ticket_without_the_dictionary_is_a_configuration_error(tmp_path: Path) -> None:
+    """Sprawdza, czy zgłoszenie z kanału „Automat mailowy” przy braku słownika maili kończy się
+    błędem konfiguracji.
+
+    Wyłapuje normalizer, który bez słownika przepuszcza wątek nieoczyszczony: anonimizator
+    dostałby kilka razy dłuższy tekst z nazwiskami ze stopek, a nikt by tego nie zauważył."""
+    with pytest.raises(MailDictionaryConfigError):
+        MailNormalizer(tmp_path / "brak").normalize(safe_mail_ticket(41101))

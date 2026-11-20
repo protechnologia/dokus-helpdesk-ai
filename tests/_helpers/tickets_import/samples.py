@@ -22,7 +22,7 @@ def sample_import_report(
 ) -> TicketsImportReport:
     """
     Description:
-    Zwraca raport importu z 30 zgłoszeniami w eksporcie, po 2 w toku, 2 mailowe i 1 z kartą,
+    Zwraca raport importu z 28 zgłoszeniami w eksporcie, 2 w toku i 1 z kartą,
     ruszony 30 s temu, z podanym postępem.
 
     Example args:
@@ -37,9 +37,8 @@ def sample_import_report(
         started_at     = datetime.now(UTC) - timedelta(seconds=30),
         model          = "gpt-6.1-sol",
         prompt_digest  = SAMPLE_DIGEST,
-        files          = 30,
+        files          = 28,
         skipped_open   = 2,
-        skipped_mail   = 2,
         already_carded = 1,
         todo           = todo,
         parsed         = parsed,

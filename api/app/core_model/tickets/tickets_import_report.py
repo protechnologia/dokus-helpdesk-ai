@@ -18,10 +18,10 @@ class TicketsImportReport(BaseModel):
     zgłoszeniu, a na końcu zapisuje w katalogu korpusu. Treści zgłoszeń w nim nie ma — same
     numery, liczby i nazwy.
 
-    Liczniki zakresu są rozłączne: zgłoszenie niezamknięte wypada przed sprawdzeniem kanału,
-    a zgłoszenie z kartą liczy się w `already_carded` tylko wtedy, gdy przeszło oba wcześniejsze
-    sprawdzenia. Bez limitu razem z `todo` sumują się do `files`; z limitem `todo` to tylko
-    zgłoszenia do zrobienia w tym przebiegu.
+    Liczniki zakresu są rozłączne: zgłoszenie niezamknięte wypada przed sprawdzeniem karty,
+    a zgłoszenie z kartą liczy się w `already_carded` tylko wtedy, gdy jest zamknięte. Bez limitu
+    razem z `todo` sumują się do `files`; z limitem `todo` to tylko zgłoszenia do zrobienia w tym
+    przebiegu.
     """
 
     started_at:     datetime                  = Field(examples=["2026-11-13T10:15:00Z"])
@@ -34,7 +34,6 @@ class TicketsImportReport(BaseModel):
     prompt_digest:  str                       = Field(examples=["3f1c9a…"])
     files:          int                       = Field(examples=[1955])
     skipped_open:   int                       = Field(examples=[61])
-    skipped_mail:   int                       = Field(examples=[136])
     already_carded: int                       = Field(examples=[0])
     todo:           int                       = Field(examples=[1758])
     parsed:         int                       = Field(default=0, examples=[1756])

@@ -5,7 +5,9 @@ from fastapi.responses import StreamingResponse
 
 from app.agent_graphs import parse_ticket
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
+from app.core_service.factory_mail_normalizer import get_mail_normalizer
 from app.core_service.loader_dict_resolution import get_resolution_classes
+from app.core_service.normalizer_ticket_mail import MailNormalizer
 from app.entry_routers.mapping import to_raw_ticket
 from app.entry_routers.models import TicketRequest
 from app.entry_routers.parse_ticket.mapping import to_ticket_card
@@ -22,6 +24,7 @@ async def read_ticket_card(
     request:   TicketRequest,
     build:     GraphBuilder   = Depends(get_graph_builder),
     responder: GraphResponder = Depends(get_graph_responder),
+    mail:      MailNormalizer = Depends(get_mail_normalizer),
 ) -> TicketCard | StreamingResponse:
     """
     Description:
@@ -35,9 +38,10 @@ async def read_ticket_card(
     Example result:
         TicketCard(ticket_id="41002", component="ePUAP", problem="Wysyłka kończy się błędem", …)
     """
+    # Wątek z kanału „Automat mailowy” przychodzi oczyszczony, każdy inny bez zmian (p. 32).
     raw   = to_raw_ticket(request)
     state = parse_ticket.STATE(
-        input_text = raw.as_thread(),
+        input_text = mail.normalize(raw).as_thread(),
         ticket_id  = raw.ticket_id,
         date       = raw.date,
         vocabulary = get_resolution_classes(),

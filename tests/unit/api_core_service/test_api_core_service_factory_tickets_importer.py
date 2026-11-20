@@ -40,16 +40,20 @@ def _settings(**overrides: object) -> Settings:
 
 async def test_the_importer_stands_on_the_configured_model_and_anonymizer() -> None:
     """Sprawdza, czy serwis importu dostaje podany korpus i liczbę zgłoszeń naraz, zapisuje
-    w raporcie model z `LLM_GENERATION_MODEL` i stoi na kliencie usługi `anonymizer` z adresu
-    z konfiguracji, bez zgody na atrapę silnika.
+    w raporcie model z `LLM_GENERATION_MODEL`, stoi na kliencie usługi `anonymizer` z adresu
+    z konfiguracji, bez zgody na atrapę silnika, i czyści wątki mailowe słownikiem z
+    `TICKETS_MAIL_DIR`.
 
-    Wyłapuje fabrykę, która bierze korpus, model albo anonimizator skądinąd niż z konfiguracji,
-    albo przyjmuje wynik atrapy silnika anonimizacji: karty powstawałyby nie tym modelem, raport
-    kłamałby, którym, a tekst bez anonimizacji poszedłby do modelu zewnętrznego."""
+    Wyłapuje fabrykę, która bierze korpus, model, anonimizator albo słownik maili skądinąd niż
+    z konfiguracji, albo przyjmuje wynik atrapy silnika anonimizacji: karty powstawałyby nie tym
+    modelem, raport kłamałby, którym, tekst bez anonimizacji poszedłby do modelu zewnętrznego,
+    a wątki mailowe czyściłby słownik z innego miejsca niż ten, który zbudowano."""
     corpus   = TicketsCorpus(root=Path("/dane/korpus"))
-    importer = build_tickets_importer(
-        _settings(anonymization_base_url="http://anonimizator:8000"), corpus, concurrency=3
+    settings = _settings(
+        anonymization_base_url = "http://anonimizator:8000",
+        tickets_mail_dir       = "/dane/maile",
     )
+    importer = build_tickets_importer(settings, corpus, concurrency=3)
 
     try:
         assert importer._corpus      == corpus
@@ -58,6 +62,7 @@ async def test_the_importer_stands_on_the_configured_model_and_anonymizer() -> N
         assert isinstance(importer._anonymizer, AnonymizerClient)
         assert str(importer._anonymizer._client.base_url).rstrip("/") == "http://anonimizator:8000"
         assert importer._anonymizer._fake_engine_allowed is False
+        assert importer._normalizer._directory == Path("/dane/maile")
     finally:
         await importer.aclose()
 

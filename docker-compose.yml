@@ -34,6 +34,9 @@ services:
       # zapisu, więc ten wpis nakłada na sam jej folder tryb tylko do odczytu: narzędzia kodu
       # dostają ścieżki od modelu i nie mogą mieć jak niczego w paczce zmienić.
       - ./data/unsafe/code:/code/data/unsafe/code:ro
+      # Słownik maili, którym trasy i import czyszczą wątki kanału „Automat mailowy” (p. 32):
+      # buduje go skrypt na hoście, a kontener tylko czyta.
+      - ./data/unsafe/mail:/code/data/unsafe/mail:ro
     # Trzy wartości LLM niżej (BASE_URL, API_KEY i MODEL) interpolują się do PUSTEGO TEKSTU, dopóki
     # dostawcą jest `fake` — celowo: są opcjonalne i wypełnia je dopiero prawdziwy dostawca. Pusty tekst nie dociera do klienta, bo `_drop_blank_values` w Settings zamienia go
     # z powrotem na wartość domyślną; po to ten walidator istnieje, to nie przeoczenie.
@@ -77,6 +80,8 @@ services:
       POSTGRES_TICKETS_TABLE:    ${POSTGRES_TICKETS_TABLE:-tickets_text}
       # Korpus zgłoszeń: ścieżka po stronie KONTENERA, w ./data montowanym wyżej do zapisu.
       TICKETS_CORPUS_DIR:        ${TICKETS_CORPUS_DIR:-/code/data/unsafe/corpus}
+      # Słownik maili: ścieżka po stronie KONTENERA, pod którą stoi montowanie wyżej.
+      TICKETS_MAIL_DIR:          ${TICKETS_MAIL_DIR:-/code/data/unsafe/mail}
       # Paczka kodu aplikacji: ścieżka po stronie KONTENERA, pod którą stoi montowanie wyżej.
       CODE_PACKAGE_DIR:          ${CODE_PACKAGE_DIR:-/code/data/unsafe/code}
       CODE_SEARCH_TIMEOUT_SECONDS: ${CODE_SEARCH_TIMEOUT_SECONDS:-10}

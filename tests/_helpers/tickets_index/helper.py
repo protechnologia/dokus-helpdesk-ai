@@ -31,8 +31,10 @@ from app.core_model.graphs.verdict import Verdict
 from app.core_model.tickets.parsed_ticket import ParsedTicket
 from app.core_model.tickets.tickets_corpus import TicketsCorpus
 from app.core_service.factory_closed_ticket_indexer import get_closed_ticket_indexer
+from app.core_service.factory_mail_normalizer import get_mail_normalizer
 from app.core_service.indexer_closed_ticket import ClosedTicketIndexer
 from app.core_service.indexer_tickets import TicketsIndexer
+from app.core_service.normalizer_ticket_mail import MailNormalizer
 from app.db_postgres import TicketRow
 from app.db_qdrant import TicketPoint
 from app.engine_anonymization import (
@@ -552,6 +554,7 @@ def app_closing_tickets(
     verdict:         Verdict,              # np. Verdict(verdict="pass") — werdykt atrapy bramki
     card:            ParsedTicket,         # np. sample_card() — pola karty od atrapy modelu
     card_anonymizer: Anonymizer,           # np. ReplacingAnonymizer("Anna Nowak", "{IMIĘ} …")
+    mail:            MailNormalizer | None = None,  # np. MailNormalizer(SAFE_MAIL_DIR)
 ) -> FastAPI:
     """
     Description:
@@ -567,6 +570,7 @@ def app_closing_tickets(
         verdict=Verdict(verdict="pass")
         card=sample_card()
         card_anonymizer=ReplacingAnonymizer("Anna Nowak", "{IMIĘ} {NAZWISKO}")
+        mail=None — słownik maili z konfiguracji; zgłoszenie spoza kanału go nie czyta
 
     Example result:
         FastAPI, której `POST /tickets/closed` pisze do katalogu korpusu testu
@@ -579,5 +583,8 @@ def app_closing_tickets(
     app = create_app()
     app.dependency_overrides[get_graph_builder]         = lambda: lambda module: graphs[module]()
     app.dependency_overrides[get_closed_ticket_indexer] = lambda: corpus
+
+    if mail is not None:
+        app.dependency_overrides[get_mail_normalizer] = lambda: mail
 
     return app

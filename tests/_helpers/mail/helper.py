@@ -3,17 +3,22 @@ Description:
 Słownik maili zmyślony i zgłoszenia z kanału „Automat mailowy” do testów normalizera maili,
 jego loadera i skryptu słownika.
 
-| funkcja               | do czego                                                              |
-|-----------------------|-----------------------------------------------------------------------|
-| `safe_templates()`    | słownik szablonów zmyślony, z `data/safe/mail/slownik.json`           |
-| `safe_vendor_names()` | nazwy dostawcy zmyślone, z `data/safe/mail/nazwy.json`                |
-| `safe_mail_ticket()`  | zmyślony wątek kanału z `data/safe/mail/raw-db/`, z którego powstał   |
-|                       | słownik                                                               |
-| `mail_ticket()`       | zgłoszenie kanału z podanym opisem i komentarzami, bez dysku          |
+| funkcja                   | do czego                                                          |
+|---------------------------|-------------------------------------------------------------------|
+| `safe_templates()`        | słownik szablonów zmyślony, z `data/safe/mail/slownik.json`       |
+| `safe_vendor_names()`     | nazwy dostawcy zmyślone, z `data/safe/mail/nazwy.json`            |
+| `safe_mail_ticket()`      | zmyślony wątek kanału z `data/safe/mail/raw-db/`, z którego       |
+|                           | powstał słownik                                                   |
+| `safe_mail_request()`     | ten sam wątek jako żądanie do tras grafów (`TicketRequest`)       |
+| `copy_safe_mail_export()` | ten sam wątek jako plik eksportu w `raw-db/` korpusu testu        |
+| `mail_ticket()`           | zgłoszenie kanału z podanym opisem i komentarzami, bez dysku      |
 """
 
+import shutil
 from collections.abc import Sequence
 from datetime import date as Date
+from pathlib import Path
+from typing import Any
 
 from app.core_model.dicts.mail_templates import MailTemplates
 from app.core_model.dicts.vendor_names import VendorNames
@@ -103,3 +108,57 @@ def mail_ticket(
     )
 
     return ticket
+
+
+def safe_mail_request(ticket_id: int) -> dict[str, Any]:   # np. 41101
+    """
+    Description:
+    Składa żądanie do tras grafów (`TicketRequest` jako JSON) ze zmyślonego wątku kanału
+    z `data/safe/mail/raw-db/`: numer, data, temat, kategoria, surowy opis i komentarze z rolami
+    z bazy, tak jak przysłałby je helpdesk.
+
+    Example args:
+        ticket_id=41101
+
+    Example result:
+        {"ticket_id": "41101", "category": "Automat mailowy", "body": "Dzień dobry,…", …}
+    """
+    raw     = safe_mail_ticket(ticket_id)
+    request = {
+        "ticket_id": raw.ticket_id,
+        "date":      raw.date.isoformat(),
+        "subject":   raw.subject,
+        "category":  raw.category,
+        "body":      raw.body,
+        "comments":  [
+            {"body": comment.body, "role": comment.role, "created_at": comment.created_at}
+            for comment in raw.comments
+        ],
+    }
+
+    return request
+
+
+def copy_safe_mail_export(
+    root:      Path,  # np. tmp_path — katalog korpusu testu
+    ticket_id: int,   # np. 41101
+) -> Path:
+    """
+    Description:
+    Kopiuje plik eksportu zmyślonego wątku kanału z `data/safe/mail/raw-db/` do `raw-db/` korpusu
+    testu, pod tą samą nazwą: zgłoszenie zamknięte, z kategorii „Automat mailowy”.
+
+    Example args:
+        root=Path("/tmp/pytest-0/korpus")
+        ticket_id=41101
+
+    Example result:
+        Path("/tmp/pytest-0/korpus/raw-db/zgloszenie-41101.json")
+    """
+    name   = f"zgloszenie-{ticket_id}.json"
+    target = TicketsCorpus(root=root).raw_db_dir / name
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(TicketsCorpus(root=SAFE_MAIL_DIR).raw_db_dir / name, target)
+
+    return target

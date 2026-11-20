@@ -6,6 +6,8 @@ from fastapi.responses import StreamingResponse
 from app.agent_graphs import GraphState
 from app.agent_graphs.factory import GraphBuilder, get_graph_builder
 from app.agent_graphs.registry import variant_graphs
+from app.core_service.factory_mail_normalizer import get_mail_normalizer
+from app.core_service.normalizer_ticket_mail import MailNormalizer
 from app.entry_routers.mapping import to_raw_ticket
 from app.entry_routers.streaming import STREAM_RESPONSES, GraphResponder, get_graph_responder
 from app.entry_routers.suggest.mapping import to_suggest_response
@@ -47,6 +49,7 @@ async def suggest_answer(
     request:   SuggestRequest,
     build:     GraphBuilder   = Depends(get_graph_builder),
     responder: GraphResponder = Depends(get_graph_responder),
+    mail:      MailNormalizer = Depends(get_mail_normalizer),
 ) -> SuggestResponse | StreamingResponse:
     """
     Description:
@@ -78,7 +81,8 @@ async def suggest_answer(
         raise HTTPException(status_code=422, detail=detail)
 
     graph = graphs[request.variant]
-    state = graph.STATE(input_text=to_raw_ticket(request).as_thread())
+    # Wątek z kanału „Automat mailowy” przychodzi oczyszczony, każdy inny bez zmian (p. 32).
+    state = graph.STATE(input_text=mail.normalize(to_raw_ticket(request)).as_thread())
 
     def finish(
         final: GraphState,  # np. SuggestQuestionsState(…, sources=[…], output=Proposal(…))

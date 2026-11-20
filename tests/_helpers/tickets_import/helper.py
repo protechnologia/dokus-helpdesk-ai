@@ -28,6 +28,7 @@ from app.core_model.tickets.tickets_corpus import TicketsCorpus
 from app.core_model.tickets.tickets_import_report import TicketsImportReport
 from app.core_service.importer_tickets import TicketsImporter
 from app.core_service.loader_dict_resolution import get_resolution_classes
+from app.core_service.normalizer_ticket_mail import MailNormalizer
 from app.engine_anonymization import Anonymizer
 from app.engine_llm import (
     ChatMessage,
@@ -38,6 +39,7 @@ from app.engine_llm import (
     LLMUsage,
     ToolDefinition,
 )
+from tests._helpers.mail import SAFE_MAIL_DIR
 from tests._helpers.tickets_import.constants import COST_PER_TICKET, MODEL
 from tests._helpers.tickets_index.samples import PERSON, sample_card
 
@@ -200,7 +202,8 @@ def importer_on(
     """
     Description:
     Buduje serwis importu na korpusie testu, z grafem karty z węzłów właściwych — tą samą funkcją
-    fabryki grafów co fabryka serwisu — na podanym modelu i anonimizatorze.
+    fabryki grafów co fabryka serwisu — na podanym modelu i anonimizatorze. Wątki kanału
+    „Automat mailowy” czyści słownikiem zmyślonym z `data/safe/mail/`.
 
     Example args:
         root=Path("/tmp/pytest-0/korpus")
@@ -224,6 +227,7 @@ def importer_on(
         corpus      = TicketsCorpus(root=root),
         graph       = graph,
         anonymizer  = anonymizer,
+        normalizer  = MailNormalizer(SAFE_MAIL_DIR),
         vocabulary  = get_resolution_classes(),
         model       = MODEL,
         concurrency = concurrency,

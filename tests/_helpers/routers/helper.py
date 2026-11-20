@@ -10,8 +10,11 @@ from app.agent_nodes.agent import FakeAgentNode, tool_call_turn
 from app.agent_nodes.anonymize import AnonymizeNode
 from app.agent_nodes.respond import FakeRespondNode
 from app.agent_nodes.run_tools import FakeRunToolsNode
+from app.core_service.factory_mail_normalizer import get_mail_normalizer
+from app.core_service.normalizer_ticket_mail import MailNormalizer
 from app.engine_anonymization import Anonymizer, FakeAnonymizer
 from app.main import create_app
+from tests._helpers.routers.samples import GRAPH_REQUESTS
 
 
 def sse_events(
@@ -38,15 +41,19 @@ def sse_events(
 
 
 def app_on_fake_graphs(
-    anonymizer: Anonymizer,  # np. anonymizer_client_on(raising(httpx.ConnectError("…")))
+    anonymizer: Anonymizer,                   # np. FakeAnonymizer() — zapisuje teksty w `texts`
+    mail:       MailNormalizer | None = None,  # np. MailNormalizer(SAFE_MAIL_DIR)
 ) -> FastAPI:
     """
     Description:
     Aplikacja, w której każda trasa grafu dostaje atrapę swojego grafu na podanym anonimizatorze
-    — do odtworzenia awarii anonimizacji, która jest pierwszym krokiem każdego grafu.
+    — do odtworzenia awarii anonimizacji, która jest pierwszym krokiem każdego grafu, i do
+    podejrzenia tekstu, który do niej trafia. Podany normalizer maili zastępuje ten
+    z konfiguracji; bez niego trasy czytają słownik maili z `TICKETS_MAIL_DIR`.
 
     Example args:
-        anonymizer=anonymizer_client_on(raising(httpx.ConnectError("connection refused")))
+        anonymizer=FakeAnonymizer()
+        mail=MailNormalizer(SAFE_MAIL_DIR)
 
     Example result:
         FastAPI, której trasy grafów anonimizują podanym anonimizatorem
@@ -55,6 +62,9 @@ def app_on_fake_graphs(
     app.dependency_overrides[get_graph_builder] = lambda: (
         lambda module: module.build_fake_graph(anonymizer)
     )
+
+    if mail is not None:
+        app.dependency_overrides[get_mail_normalizer] = lambda: mail
 
     return app
 
@@ -86,3 +96,25 @@ def app_with_model_failing_after_tools() -> FastAPI:
     app.dependency_overrides[get_graph_builder] = lambda: (lambda module: graph)
 
     return app
+
+
+def ticket_request(
+    route:  str,             # np. "/suggest"
+    ticket: dict[str, Any],  # np. {"ticket_id": "41101", "body": "Dzień dobry,…", …}
+) -> dict[str, Any]:
+    """
+    Description:
+    Dokłada do podanego zgłoszenia pola, których poza zgłoszeniem wymaga trasa grafu — dziś
+    wariant przy `/suggest` — biorąc je z żądania tej trasy w `GRAPH_REQUESTS`.
+
+    Example args:
+        route="/suggest"
+        ticket={"ticket_id": "41101", "body": "Dzień dobry,…", …}
+
+    Example result:
+        {"ticket_id": "41101", "body": "Dzień dobry,…", …, "variant": "questions"}
+    """
+    extra   = {key: value for key, value in GRAPH_REQUESTS[route].items() if key == "variant"}
+    request = {**ticket, **extra}
+
+    return request
