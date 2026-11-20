@@ -209,6 +209,8 @@ compose.
 
 ### Praca z agentem
 
+- **Na początku sesji przeczytaj `docs/adr/README.md`**: obszary z prefiksami, spis decyzji
+  i ich statusy. Przed zmianą w obszarze przeczytaj jego ADR-y ze statusem „Przyjęta”.
 - **Prośba o plan = zostajesz w planowaniu.** „Jaki masz plan?" / „co proponujesz?" → przedstaw
   plan i **czekaj**. Odpowiedzi na pytania doprecyzowujące to NIE jest zgoda na implementację.
   - Bez zgody wolno: rozpoznanie — czytanie plików, `docker compose config`, sondy w scratchpadzie.
@@ -223,6 +225,18 @@ compose.
   żeby dało się ją przenieść albo przepisać bez poprawiania pozostałych (2026-10-04). Wyjątkiem są
   numery punktów planu („p. N"), bo są stałe. Starsze odwołania usuwamy przy zmianach w sekcji,
   nie hurtem.
+- **`docs/adr/` — decyzje architektoniczne (ADR), w repo (2026-11-20).** ADR mówi, dlaczego tak,
+  a nie inaczej, i co odrzucono; przy decyzji w CLAUDE.md zostaje reguła, to, co z niej wynika,
+  i link do ADR. Zasady, obszary z prefiksami, spis decyzji i szablon stoją w
+  `docs/adr/README.md`. Nową dużą decyzję (trudną do odwrócenia, z realnym wyborem, taką, o którą
+  ktoś zapyta „czemu tak?”) agent od razu proponuje jako ADR; istniejące decyzje przenosimy przy
+  refaktoryzacji podsekcji CLAUDE.md, nie hurtem. Gdy decyzja nie pasuje do żadnego obszaru
+  z README, agent proponuje nowy obszar z prefiksem i dopisuje go dopiero po akceptacji
+  użytkownika.
+- **Co jakiś czas odchudzamy jedną podsekcję CLAUDE.md (2026-11-20)**: wypada to, co się nie
+  przyda albo łatwo wyciągnąć z kodu, a duże decyzje podsekcji idą przy tym do ADR. Trzy
+  przejścia — czyszczenie, łączenie, zwięzłość — każde z plikiem do przeglądu przed zmianą
+  i osobnym commitem; po każdym skrypt porównuje liczby i odesłania do planu obu wersji.
 - **`data/unsafe/docs/` — raporty robocze i prezentacje, POZA repo** (2026-08-20).
   Powód: **raport cytujący korpus niesie PII**, choćby autor tego nie zamierzał — wystarczy
   wkleić zrzut z konsoli operującej na zgłoszeniach, żeby trafiły tam nazwiska użytkowników.
@@ -264,6 +278,7 @@ dokus-helpdesk-ai/
 ├── requirements-dev.txt          # zależności testów/lintera (poza obrazem)
 ├── CLAUDE.md / README.md
 ├── scripts/                      # skrypty repo: przygotowanie danych i pomiary
+├── docs/adr/                     # decyzje (ADR): README.md z obszarami, spisem i szablonem — W repo
 ├── data/
 │   ├── safe/                     # dane zmyślone — W repo
 │   │   ├── instruction/          # syntetyczna dokumentacja: manifest.json + pliki .md
@@ -2322,33 +2337,28 @@ decyzji i otwarte pytania, także przy nowym narzędziu.
   obiekt schematu ma `additionalProperties: false`.
 - **Każde narzędzie jest tylko do odczytu.** Wstrzyknięcie w treści zgłoszenia może najwyżej
   skierować agenta do złego materiału, ale nie zmieni indeksu.
-- **Opis narzędzia dla modelu (`description.md`) leży w katalogu narzędzia i jest wspólny dla grafów
-  (decyzja 2026-10-03).** Wcześniej każdy graf miał własny: 18 plików różniących się jednym zdaniem,
-  które i tak stało w promptach. Układ opisu (2026-10-05) podaje komentarz w każdym
-  `description.md`, a pilnuje go test kontraktu. Przykład w tabelce argumentów to wzór, który model
-  może przepisać (dlatego schemat odpowiedzi przykładów nie niesie); czy przepisuje, pokażą pomiary
-  grafów (p. 23). Decyzje o tabelce argumentów z 2026-10-21:
+- **Opis narzędzia dla modelu jest jeden, w `description.md` narzędzia
+  ([AGT-002](docs/adr/AGT-002_opis-narzedzia-wspolny-dla-grafow.md)).** Po co wyniki w danej
+  funkcji, mówi prompt grafu; po zmianie opisu trzeba przemierzyć wszystkie grafy z tym narzędziem.
+  Układ opisu (2026-10-05) podaje komentarz w każdym `description.md`, a pilnuje go test kontraktu.
+  Przykład w tabelce argumentów to wzór, który model może przepisać (dlatego schemat odpowiedzi
+  przykładów nie niesie); czy przepisuje, pokażą pomiary grafów (p. 23). Decyzje o tabelce
+  argumentów z 2026-10-21:
   - typ to nazwa z JSON-a (`string`, `integer`, `string[]`), bo model wypełnia argumenty JSON-em i
     dostaje obok schemat; „liczba” nie mówiła, czy całkowita;
   - pole wymagane, które przyjmuje `null`, ma „string albo null” (słowem, bo `|` kończy komórkę), a
     opcjonalne sam typ, bo tam `null` znaczy tylko „nie podano”;
   - pole o kilku wartościach albo dwóch postaciach ma w przykładach każdą z nich (`role` w
     `quote_code`: `"cause", "excluded"`), żeby jeden przykład nie podsuwał wyboru.
-- **Zgłoszenia i dokumentacja idą dwustopniowo (decyzja 2026-10-04).** Wyszukiwanie oddaje
-  identyfikatory, a treść daje i cytuje dopiero odczyt, więc lista źródeł pokazuje to, co model
-  przeczytał, a nie to, co znalazł. Z tego samego powodu wynik wyszukiwania nie niesie treści, nawet
-  dopasowanego fragmentu: fragment mógłby modelowi wystarczyć zamiast odczytu, a odpowiedź niosłaby
-  wtedy treść bez źródła. Opis sekcji dokumentacji zostaje, bo mówi, o czym sekcja jest, a nie co w
-  niej stoi. Cena: jedna tura modelu więcej na każde wyszukanie.
-- **Wyszukiwanie zgłoszeń oddaje sam numer, bez `problem` karty.** Sprawy o tym samym objawie mają
-  różne przyczyny. Wiersz z objawem zachęcałby do przeczytania jednej karty, a przy gołych numerach
-  model czyta wszystkie. `score` widzi tylko model: służy do decyzji, czy szukać dalej, a nie mierzy
-  trafności rozwiązania.
-- **Zapytanie niesie tylko to, czego szukać.** Ile pobrać i gdzie uciąć to strojenie (`RAG_TOP_K`,
-  `RAG_SCORE_MIN`), a nie decyzja modelu. Kształt zapytania dobiera się do indeksu:
-  `find_tickets_vector` przyjmuje `problem` i `symptoms`, czyli pola, z których zbudowano wektory, a
-  sparsowanie zgłoszenia pod wyszukiwanie to zadanie agenta, nie parsera. Cena: zapytanie nie
-  powstaje tym samym promptem co korpus, więc jego trafność trzeba zmierzyć (p. 23).
+- **Zgłoszenia i dokumentacja idą dwustopniowo
+  ([AGT-003](docs/adr/AGT-003_narzedzia-wiedzy-dwustopniowo.md)).** Wyszukiwanie oddaje
+  identyfikatory, a treść daje i cytuje dopiero odczyt. Do wyniku wyszukiwania nie dokładamy treści,
+  dopasowanego fragmentu ani `problem` karty; `score` widzi tylko model, do decyzji, czy szukać
+  dalej. Cena: jedna tura modelu więcej na każde wyszukanie.
+- **Zapytanie wektorowe pisze agent, w kształcie indeksu
+  ([AGT-001](docs/adr/AGT-001_zapytanie-w-ksztalcie-indeksu.md)):** `find_tickets_vector` przyjmuje
+  `problem` i `symptoms`, bez parsera; ile pobrać i gdzie uciąć to ENV (`RAG_TOP_K`,
+  `RAG_SCORE_MIN`), nie argument modelu. Trafność zapytań agenta mierzy p. 23.
 - **`exact` to jedna fraza, nie lista (decyzja 2026-10-05).** Przy liście wynik nie mówił, która
   fraza trafiła, a „którakolwiek z fraz” obok „wszystkie słowa” trzeba było modelowi tłumaczyć. W
   zestawie zapytań żadne nie podawało więcej niż jednej frazy. Cena: kilka tropów (kod z ekranu, kod
@@ -2363,16 +2373,15 @@ decyzji i otwarte pytania, także przy nowym narzędziu.
   kilka wywołań, także w jednej turze. Limit to 3 wątki na sprawę zamiast dziesięciu (do
   przestrojenia w p. 23). Karty zostają listą: są krótkie, a przy jednym objawie i różnych
   przyczynach model ma je czytać razem.
-- **Kod aplikacji liczy się jako źródło na równi ze zgłoszeniem i instrukcją, także w wariancie
-  wymagającym źródeł (decyzja 2026-10-06, narzędzia w p. 62–67).** Źródłem jest fragment zacytowany
-  jako przyczyna, a nie każdy przeczytany plik: plik zawsze da się przeczytać, więc przy zasadzie
-  „odczyt cytuje” taki wariant prawie nigdy nie powiedziałby „nie mam z czego zaproponować”.
-  Odpowiedź oparta tylko na kodzie ma źródła rodzaju `code`. Czy model powstrzyma się od wskazania
-  przyczyny przy szukaniu na ślepo, sprawdza p. 59.
-- **`find_code_text` oddaje treść trafionej linii (2026-10-09) i nazwę funkcji, w której linia leży
-  (`symbol`, 2026-10-13).** Treść linii to wyjątek wśród wyszukiwań: bez niej model nie odróżni
-  definicji od setek użyć tej samej nazwy („raiseError” stoi w 550 liniach w 197 plikach). Źródła i
-  tak nie tworzy szukanie ani odczyt, tylko cytowanie przyczyny. `words` to tekst, nie lista: w
+- **Źródłem z kodu jest tylko fragment zacytowany narzędziem `quote_code` jako przyczyna
+  ([AGT-004](docs/adr/AGT-004_zrodlo-z-kodu-to-cytowana-przyczyna.md)).** Kod liczy się jako źródło
+  na równi ze zgłoszeniem i instrukcją, także w wariancie wymagającym źródeł; odczyt i szukanie
+  źródeł nie tworzą. Wykluczenie (`excluded`) źródłem nie jest i trafia do człowieka przez uwagi i
+  `queries`. Limity z sondy, do pomiaru w p. 59: fragment do 40 linii i 5 cytowań na sprawę. Czy
+  model cytuje tylko przeczytane linie i czy powstrzyma się od przyczyny przy szukaniu na ślepo,
+  sprawdza p. 59.
+- **`find_code_text` oddaje treść trafionej linii (2026-10-09; wyjątek od AGT-003, powód w AGT-004)
+  i nazwę funkcji, w której linia leży (`symbol`, 2026-10-13).** `words` to tekst, nie lista: w
   sondzie model podał tekst i stracił dwa szukania. Ceny: model może wskazać przyczynę po jednej
   linii, której otoczenia nie czytał (mówi o tym opis, liczy p. 59), a `symbol` to około 25 znaków
   na linię wyniku i odczyt mapy symboli przy każdym szukaniu z trafieniem.
@@ -2393,13 +2402,6 @@ decyzji i otwarte pytania, także przy nowym narzędziu.
   pogrupowane po katalogu (największy wynik to 29 tys. znaków, trzy poziomy paczki Dokusa 4,3 tys.),
   a flagi idą w przeciwnym kierunku niż w odczycie pliku: `has_more_depth` mówi „jest coś głębiej”,
   `end_of_file` „dalej nic nie ma”.
-- **Kod cytuje osobne narzędzie, `quote_code` (2026-10-07): jeden fragment na wywołanie, z rolą
-  przyczyny albo wykluczenia.** Źródłem jest tylko przyczyna (`cause`). Wykluczenie nie cofa
-  wcześniejszej przyczyny i do człowieka trafia przez uwagi dla wdrożeniowca, jeśli model je tam
-  opisze (2026-10-08), a w `/search` także przez `queries`. Narzędzie oddaje samo potwierdzenie, bez
-  treści linii, bo z treścią model w sondzie cytował zamiast czytać. Nie widzi rozmowy, więc nie
-  sprawdza, czy model cytowane linie czytał: tę regułę niesie opis, a liczy p. 59. Limity z sondy,
-  do pomiaru w p. 59: fragment do 40 linii i 5 cytowań na sprawę, przyczyn i wykluczeń razem.
 
 ### Warstwa węzłów (`agent_nodes/`)
 
