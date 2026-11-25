@@ -1,4 +1,4 @@
-# Pod na RunPodzie z Bielikiem dla anonimizatora
+# RB-002: Pod na RunPodzie z Bielikiem dla anonimizatora
 
 ## Cel
 

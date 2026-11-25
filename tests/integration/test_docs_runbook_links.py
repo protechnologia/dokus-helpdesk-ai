@@ -6,6 +6,7 @@ bez stacku i bez modelu.
 
 | sprawdzenie                   | po co                                                       |
 |-------------------------------|-------------------------------------------------------------|
+| plik z nazwą runbooka         | runbook bez ID umknąłby pozostałym sprawdzeniom             |
 | runbook w spisie README       | spis mówi, jakie procedury są spisane                       |
 | runbook z linkiem w CLAUDE.md | przy regule w sekcji tematycznej agent trafia na procedurę  |
 | link prowadzi do pliku        | zmiana nazwy runbooka nie zostawia martwego odesłania       |
@@ -15,6 +16,22 @@ gdziekolwiek w CLAUDE.md, test nie sprawdza — to zostaje przy przeglądzie.
 """
 
 from tests._helpers.runbook import claude_md_links, readme_links, runbook_files
+from tests._helpers.runbook.constants import RUNBOOK_DIR
+
+
+def test_every_file_in_the_runbook_dir_has_a_runbook_name() -> None:
+    """Sprawdza, czy każdy plik w `docs/runbook/` poza README ma nazwę runbooka z zasad README
+    (`RB-<NNN>_<czynność>.md`).
+
+    Wyłapuje runbook zapisany bez ID: reszta testów widzi tylko pliki o nazwie runbooka, więc
+    taki plik nie stałby w spisie ani nie miałby linku w CLAUDE.md, a żaden test by tego nie
+    zgłosił."""
+    others = sorted(
+        path.name for path in RUNBOOK_DIR.iterdir() if path.name != "README.md"
+    )
+    unnamed = [name for name in others if name not in runbook_files()]
+
+    assert not unnamed, f"Plik w docs/runbook/ bez nazwy runbooka (RB-NNN_…): {unnamed}"
 
 
 def test_every_runbook_is_listed_in_the_readme() -> None:

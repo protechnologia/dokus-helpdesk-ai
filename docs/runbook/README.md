@@ -10,8 +10,11 @@ Przed procedurą przeczytaj jej runbook, a po przejściu popraw go i dopisz wpis
 
 ## Zasady
 
-- Jedna procedura na plik, nazwa od czynności, bez numeru: `<czynność>.md`, małymi literami
-  i z łącznikami. Do runbooka nikt nie odwołuje się numerem, a jego treść się zmienia.
+- Jedna procedura na plik. Nazwa pliku: `RB-<NNN>_<czynność>.md`, numer kolejny, czynność
+  małymi literami i z łącznikami. Jeden przedrostek dla wszystkich runbooków, bez obszarów jak
+  w ADR, żeby ID nie myliło się z decyzją; numer usuniętego runbooka nie wraca.
+- CLAUDE.md, ADR i inne runbooki linkują do runbooka z ID jako tekstem linku
+  (`[RB-001](…)`), tak jak do ADR.
 - Runbook jest żywy, inaczej niż ADR: poprawia się go po każdym przejściu, a „Log” dostaje
   wpis z datą, tym, co przechodzono, wynikiem i tym, co w runbooku poprawiono. Żaden test
   runbooka nie uruchamia, więc procedura, której log długo milczy, może się nie zgadzać z kodem.
@@ -32,10 +35,10 @@ Przed procedurą przeczytaj jej runbook, a po przejściu popraw go i dopisz wpis
 
 ## Spis
 
-| runbook                                                               | kiedy                                           |
-|-----------------------------------------------------------------------|-------------------------------------------------|
-| [Odchudzanie podsekcji CLAUDE.md](odchudzanie-podsekcji-claude-md.md) | co jakiś czas, jedna podsekcja CLAUDE.md naraz  |
-| [Pod na RunPodzie z Bielikiem](pod-runpod-z-bielikiem.md)             | przed pracą z prawdziwym modelem anonimizującym |
+| ID                                                  | procedura                                      | kiedy                                           |
+|-----------------------------------------------------|------------------------------------------------|-------------------------------------------------|
+| [RB-001](RB-001_odchudzanie-podsekcji-claude-md.md) | Odchudzanie podsekcji CLAUDE.md                | co jakiś czas, jedna podsekcja CLAUDE.md naraz  |
+| [RB-002](RB-002_pod-runpod-z-bielikiem.md)          | Pod na RunPodzie z Bielikiem dla anonimizatora | przed pracą z prawdziwym modelem anonimizującym |
 
 ## ToDo
 
@@ -50,7 +53,7 @@ Sekcja bez treści wypada: procedura bez kosztu nie ma „Kosztu”, a bez sprz�
 „Sprzątania”.
 
 ```markdown
-# Tytuł: czynność
+# RB-NNN: Tytuł czynności
 
 ## Cel
 
@@ -101,6 +104,8 @@ Najnowszy wpis na górze.
 Zmiany zasad, szablonu i układu tego pliku, najnowsza na górze. Nowy wiersz spisu albo „ToDo”
 wpisu nie dostaje, bo widać go w tabeli.
 
+- 2026-11-25 — runbooki mają ID `RB-NNN` w nazwie pliku i tytule, a linki do nich mają ID
+  jako tekst; dotąd nazwa bez numeru. Spis dostał kolumnę ID.
 - 2026-11-25 — „ToDo” na runbooki do spisania (tabela: opis i na co czeka) i ten „Log”.
 - 2026-11-25 — „Powiązania” w szablonie to linki względne.
 - 2026-11-25 — README z zasadami, spisem i szablonem: Cel, Kiedy, Wymaga, Koszt, Kroki,

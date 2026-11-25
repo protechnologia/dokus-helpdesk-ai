@@ -17,9 +17,9 @@ RUNBOOK_README = RUNBOOK_DIR / "README.md"
 # Plik czytany na początku sesji; linkuje do runbooków ścieżką od korzenia repo.
 CLAUDE_MD = REPO_ROOT / "CLAUDE.md"
 
-# Przedrostek linku do runbooka w CLAUDE.md, np. „(docs/runbook/odchudzanie-….md)”.
+# Przedrostek linku do runbooka w CLAUDE.md, np. „(docs/runbook/RB-001_odchudzanie-….md)”.
 CLAUDE_MD_LINK_PREFIX = "docs/runbook/"
 
-# Nazwa pliku runbooka z zasad w README: `<czynność>.md`, małymi literami i z łącznikami.
-# README.md jej nie spełnia, więc nie liczy się jako runbook.
-RUNBOOK_FILE_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\.md")
+# Nazwa pliku runbooka z zasad w README: `RB-<NNN>_<czynność>.md`, czynność małymi literami
+# i z łącznikami. README.md jej nie spełnia, więc nie liczy się jako runbook.
+RUNBOOK_FILE_NAME = re.compile(r"RB-\d{3}_[a-z0-9]+(?:-[a-z0-9]+)*\.md")

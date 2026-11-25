@@ -241,7 +241,7 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
 - **Co jakiś czas odchudzamy jedną podsekcję CLAUDE.md (2026-11-20).** Pięć kroków: ADR,
   runbook, czyszczenie, łączenie i zwięzłość, każdy z plikiem do przeglądu przed zmianą
   i osobnym commitem; po każdym skrypt porównuje liczby i odesłania do planu obu wersji.
-  Przebieg: [runbook](docs/runbook/odchudzanie-podsekcji-claude-md.md).
+  Przebieg: [RB-001](docs/runbook/RB-001_odchudzanie-podsekcji-claude-md.md).
 
 ### ADR
 
@@ -268,9 +268,9 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
 - **README i runbooki dzielą procedury po czytelniku, bez dublowania.** To, czego potrzebuje
   operator instancji, stoi w całości w README; runbook zostaje na nasze konta i maszyny, pomiary
   i utrzymanie dokumentacji. Pojedyncze polecenie zostaje w „Commands”.
-- **Przy procedurze w CLAUDE.md zostaje reguła, to, co z niej wynika, i link do runbooka.** Link
-  stoi w sekcji tematycznej procedury, bo tam agent trafia na nią przed czynnością; pilnuje tego
-  `test_docs_runbook_links.py`.
+- **Przy procedurze w CLAUDE.md zostaje reguła, to, co z niej wynika, i link do runbooka
+  z jego ID jako tekstem (`RB-NNN`, jak przy ADR).** Link stoi w sekcji tematycznej procedury,
+  bo tam agent trafia na nią przed czynnością; pilnuje tego `test_docs_runbook_links.py`.
 - **Przed procedurą przeczytaj jej runbook, a po przejściu popraw go i dopisz wpis do „Logu”.**
   Runbook, inaczej niż ADR, jest żywy, a żaden test go nie uruchamia, więc zgadza się z kodem
   tylko wtedy, gdy poprawia go każde przejście.
@@ -2101,7 +2101,7 @@ Osoby i adresy idą osobnymi wywołaniami: wspólne kosztowało na próbce korpu
 - **Model anonimizujący stoi na RunPodzie: pod z vLLM i Bielikiem 11B v3, tworzony z szablonu
   na sesję pracy i usuwany po niej (decyzja 2026-10-23).** Każdy pod ma nowy adres, który trzeba
   wpisać do `LLM_ANONYMIZATION_BASE_URL`; bez poda usługa wstaje, a trasy grafów oddają 503.
-  Przebieg: [runbook](docs/runbook/pod-runpod-z-bielikiem.md).
+  Przebieg: [RB-002](docs/runbook/RB-002_pod-runpod-z-bielikiem.md).
 - **`GET /info` mówi, którym silnikiem i z jakim modelem usługa anonimizuje (2026-10-20):**
   `{engine, model}`, przy atrapie silnika model `null`. Czyta to `api` dla `GET /instance`.
   Usługa nie łączy się przy tym z modelem, więc odpowiada także przy wyłączonym podzie, i nie

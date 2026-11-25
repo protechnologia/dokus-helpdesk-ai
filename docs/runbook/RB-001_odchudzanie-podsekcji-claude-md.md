@@ -1,4 +1,4 @@
-# Odchudzanie podsekcji CLAUDE.md
+# RB-001: Odchudzanie podsekcji CLAUDE.md
 
 ## Cel
 

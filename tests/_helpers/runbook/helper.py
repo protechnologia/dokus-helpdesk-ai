@@ -11,8 +11,8 @@ i z CLAUDE.md.
 | `claude_md_links()`      | nazwy plików runbooków, do których linkuje CLAUDE.md    |
 | `readme_links()`         | nazwy plików runbooków ze spisu w `docs/runbook/README.md` |
 
-Przykład: tekst „Przebieg: [runbook](docs/runbook/odchudzanie-podsekcji.md).” z przedrostkiem
-`docs/runbook/` daje `{"odchudzanie-podsekcji.md"}`.
+Przykład: tekst „Przebieg: [RB-001](docs/runbook/RB-001_odchudzanie.md).” z przedrostkiem
+`docs/runbook/` daje `{"RB-001_odchudzanie.md"}`.
 """
 
 import re
@@ -39,7 +39,7 @@ def runbook_files(
         directory=Path("docs/runbook")
 
     Example result:
-        ["odchudzanie-podsekcji-claude-md.md"]
+        ["RB-001_odchudzanie-podsekcji-claude-md.md", "RB-002_pod-runpod-z-bielikiem.md"]
     """
     names = sorted(
         path.name for path in directory.iterdir() if RUNBOOK_FILE_NAME.fullmatch(path.name)
@@ -49,7 +49,7 @@ def runbook_files(
 
 
 def linked_runbook_files(
-    text:   str,  # np. "Przebieg: [runbook](docs/runbook/odchudzanie-podsekcji.md)."
+    text:   str,  # np. "Przebieg: [RB-001](docs/runbook/RB-001_odchudzanie.md)."
     prefix: str,  # np. "docs/runbook/" w CLAUDE.md, "" w spisie README
 ) -> set[str]:
     """
@@ -58,11 +58,11 @@ def linked_runbook_files(
     Linki do innych plików i ścieżki z innym przedrostkiem pomija.
 
     Example args:
-        text="Przebieg: [runbook](docs/runbook/odchudzanie.md), zob. [ADR](docs/adr/README.md)."
+        text="Przebieg: [RB-001](docs/runbook/RB-001_odchudzanie.md), zob. [ADR](../adr/README.md)."
         prefix="docs/runbook/"
 
     Example result:
-        {"odchudzanie.md"}
+        {"RB-001_odchudzanie.md"}
     """
     pattern = re.compile(rf"\]\({re.escape(prefix)}({RUNBOOK_FILE_NAME.pattern})\)")
     linked  = set(pattern.findall(text))
@@ -79,7 +79,7 @@ def claude_md_links() -> set[str]:
         (brak)
 
     Example result:
-        {"odchudzanie-podsekcji-claude-md.md"}
+        {"RB-001_odchudzanie-podsekcji-claude-md.md", …}
     """
     return linked_runbook_files(CLAUDE_MD.read_text(encoding="utf-8"), prefix=CLAUDE_MD_LINK_PREFIX)
 
@@ -94,6 +94,6 @@ def readme_links() -> set[str]:
         (brak)
 
     Example result:
-        {"odchudzanie-podsekcji-claude-md.md"}
+        {"RB-001_odchudzanie-podsekcji-claude-md.md", …}
     """
     return linked_runbook_files(RUNBOOK_README.read_text(encoding="utf-8"), prefix="")
