@@ -1755,15 +1755,17 @@ merytorycznie").
   zamiast 11 tys. tokenów na zestaw). Koszt zestawu: 0,69 USD, a z początkiem żądania z cache
   0,22 USD. Progi testu stoją na gorszym przebiegu (14 alarmów, przepuszczenia 2 przy
   niewidocznym rozwiązaniu i 1 przy powiadomieniach) i pilnują, żeby nie było gorzej.
-- **Bramka wysyłki przeszła sprawdzenie, ale nie pomiar (2026-10-22).** Na `gpt-6.1-sol` scenariusze
+- **Bramka wysyłki przeszła sprawdzenie na scenariuszach (2026-10-22).** Na `gpt-6.1-sol` scenariusze
   na regułach w wersji 2 dały 0 fałszywych alarmów z 13 i 0 przepuszczeń z 9 w dwóch przebiegach, a
   wstrzyknięcia 0 przebić z 9. Przez trasę `/gate/reply` z anonimizatorem na Bieliku 13 z 13
   werdyktów było zgodnych (na regułach w wersji 1); do tego test ręczny przez front. Reguła 6 (hasło
   albo inne poświadczenie w wiadomości; reguły w wersji 3, 2026-11-11) dała na scenariuszach
   g23–g27, w tym z hasłem do archiwum, 0 fałszywych alarmów z 3 i 0 przepuszczeń z 2 w dwóch
   przebiegach (cały zestaw: 0 z 16 i 0 z 11); obie blokady stały na regule 6, a uzasadnienie cytuje
-  hasło, które wraca do tego samego wdrożeniowca. Liczb na prawdziwych wiadomościach z korpusu nie
-  ma (p. 33.3).
+  hasło, które wraca do tego samego wdrożeniowca. Para spraw cytatu przy regule 1 (2026-11-25,
+  p. 33.3): prośba o login i hasło we własnym cudzysłowie konsultanta (g28) zablokowana, a cytat
+  komunikatu z ekranu ze słowami „login i hasło” (g29) przepuszczony, w obu przebiegach (cały
+  zestaw: 0 z 17 i 0 z 12).
 - **Zestaw prawdziwych wiadomości: `data/unsafe/golden/gate-reply.json` (2026-11-25, p. 33.3).**
   179 wiadomości konsultantów ze 179 zgłoszeń korpusu instancji, poza kanałem „Automat mailowy”,
   w którym rola z bazy nie mówi, kto pisał (pula: 2630 komentarzy w 1707 wątkach). Warstwy: 44 ze
@@ -1784,6 +1786,23 @@ merytorycznie").
   reguł 1, 2, 4 i 6 prawie nie mierzy. Wśród 100 losowych 25 łamie regułę, prawie zawsze 5.
   Cytaty w wiadomościach to prawie same nazwy przycisków i pól: prośby o hasło w cytacie korpus
   nie ma.
+- **Na prawdziwych wiadomościach bramka wysyłki łapie hasła, tokeny i zwroty, ale myli się na
+  granicach, których reguły w wersji 3 nie zapisują (2026-11-25, p. 33.3).** Na `gpt-6.1-sol`,
+  w dwóch przebiegach: fałszywych alarmów 16 i 18 ze 108, przepuszczeń 12 i 11 z 71 (reguła 5: 10
+  i 9 z 58, reguła 2: 2 z 5, reguły 1, 3, 4 i 6: 0 z 24), odpowiedzi nie do przyjęcia
+  i znaczników przekręconych 0; wspólnych fałszywych alarmów 16, przepuszczeń 11. Każdy zły
+  werdykt stoi na granicy, którą człowiek ustalił inaczej, niż mówi brzmienie reguły. Fałszywe
+  alarmy: reguła 2 (12) — żargon helpdesku („admin”, „task”, „screeny”), a do tego „dograna”,
+  „załatana”, „na maila” i „poszło”; reguła 3 (4) — „pani” małą literą o osobie trzeciej, bo
+  reguła wymienia „pani” wśród form niepoprawnych; reguła 1 (1) — pytanie o login jako nazwę
+  konta; reguła 4 (1) — rada spakowania plików do ZIP. Przepuszczenia: reguła 5 (10) — błędna
+  forma wyrazu, zdanie i nazwa własna małą literą i literówka w cytowanej nazwie zakładki;
+  reguła 2 (2) — swobodne zwroty („w razie czego”). Bramka bierze więc za potoczny żargon,
+  a przepuszcza swobodny zwrot. Wśród 75 poprawnych z warstwy losowej fałszywych alarmów 7 i 8.
+  Czas przy 4 wiadomościach naraz: mediana 2,8–3,0 s, p90 5,2–5,3 s, maks. 11,5–12,8 s, a
+  z anonimizacją krótkiego tekstu z pomiaru z 2026-10-19 mediana około 4 s i maks. do 16,6 s.
+  Koszt zestawu: 0,77 USD, a z początkiem żądania z cache 0,23 USD. Progi testu stoją na gorszym
+  przebiegu (18 alarmów, przepuszczenia 10 przy regule 5, 2 przy regule 2, 0 przy pozostałych).
 - **„Popraw” przeszło sprawdzenie, ale nie pomiar (2026-10-30).** Na `gpt-6.1-sol` scenariusze
   na zasadach stylu w wersji 2 dały 0 błędów na 8 spraw w dwóch przebiegach, a wstrzyknięcia 0 przebić
   z 8. Trasa `/polish` z anonimizatorem na Bieliku dała układ i formy zgodne z zasadami; do tego test
@@ -3458,6 +3477,10 @@ localhost:8010/search`.
   `pytest tests/evaluation/test_api_agent_graphs_gate_close_golden_live.py -m llm_live` —
   **kosztuje, pytaj przed**; 0,69 USD (0,22 USD z początkiem żądania z cache) i około 2 minut
   przy 4 zamknięciach naraz; bez zestawu i korpusu w `data/unsafe/` testy się pomija
+- Bramka wysyłki na 179 prawdziwych wiadomościach konsultantów z korpusu (p. 33.3):
+  `pytest tests/evaluation/test_api_agent_graphs_gate_reply_golden_live.py -m llm_live` —
+  **kosztuje, pytaj przed**; 0,77 USD (0,23 USD z początkiem żądania z cache) i około 2,5 minuty
+  przy 4 wiadomościach naraz; bez zestawu i korpusu w `data/unsafe/` testy się pomija
 - Silnik `agent` usługi `anonymizer` na golden secie (p. 19.5):
   `pytest tests/evaluation/test_anonymizer_agent_golden_live.py -m llm_live` — woła model
   anonimizujący z `.env` (`LLM_ANONYMIZATION_*`, pod z GPU), **pytaj przed**; oba zestawy po
@@ -3918,7 +3941,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/mail/`                 | słownik maili zmyślony z `data/safe/mail/` (`safe_templates()`, `safe_vendor_names()`), jego zmyślone wątki (`safe_mail_ticket()`), te same jako żądanie do tras (`safe_mail_request()`) i plik eksportu w korpusie testu (`copy_safe_mail_export()`) oraz zgłoszenie kanału z podanym opisem i komentarzami (`mail_ticket()`); maile z przykładów notatki o metodzie i oczyszczony wątek wzorcowy w `samples.py` |
 | `tests/_helpers/golden_mail/`          | golden set kanału „Automat mailowy”: wątki z `useful` i polami (autor, oznaczenia linii) (`golden_mail_tickets()`, `parse_ranges()`, `field_digest()`), wątek źródłowy (`mail_thread()`) i pomiar normalizera maili na nich (`measure_mail_cleaning()`) z progami |
 | `tests/_helpers/golden_gate_close/`    | zestaw bramki zamknięcia na prawdziwych zamknięciach: wpisy z rodzajem i etykietami na regułę (`golden_gate_close_cases()`) i grupą, która mówi, jakiego werdyktu wymagają, wątek z korpusu ucięty na zamknięciu (`closing_thread()`, `thread_at_close()`), skrót uciętego wątku (`thread_digest()`), ocena werdyktu (`judge_gate_close_case()`), czas spraw (`timing_summary()`), przebieg na żywym modelu po 4 naraz (`measure_gate_close_cases()`), raport (fixture `gate_close_report`) i progi |
-| `tests/_helpers/golden_gate_reply/`    | zestaw bramki wysyłki na prawdziwych wiadomościach: wpisy z łamanymi regułami i powodem (`golden_gate_reply_cases()`), wiadomość konsultanta wycięta z wątku korpusu (`corpus_message()`, `consultant_message()`) i jej skrót (`message_digest()`) |
+| `tests/_helpers/golden_gate_reply/`    | zestaw bramki wysyłki na prawdziwych wiadomościach: wpisy z łamanymi regułami i powodem (`golden_gate_reply_cases()`), wiadomość konsultanta wycięta z wątku korpusu (`corpus_message()`, `consultant_message()`), jej skrót (`message_digest()`), ocena werdyktu (`judge_gate_reply_case()`), przebieg na żywym modelu po 4 naraz (`measure_gate_reply_cases()`), raport z przepuszczeniami na regułę (fixture `gate_reply_report`) i progi |
 | `tests/_helpers/instance/`             | stan instancji: serwis liczący indeksy na atrapach Qdranta i Postgresa (`scripted_inspector()`, `inspector_on()`, klienci `counting_*` i `failing_*`), aplikacja z podanym serwisem (`app_with_inspector()`); próbki `sample_*()` w `samples.py` — raport stanu, paczka kodu, konfiguracja modelu |
 | `tests/_helpers/embedding/`            | embedding: nazwy modeli testowych (`EMBEDDING_MODEL`, `OTHER_MODEL`), odpowiedź usługi `embedder` w kształcie kontraktu (`embedder_answer()`) i payload punktu Qdranta z nazwą modelu (`with_model()`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
@@ -4313,17 +4336,13 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
     ślepo z drugim oceniającym na części zestawu, próg z gorszego z dwóch przebiegów); granice
     etykiet ustalił człowiek, stoją przy opisie zestawu w „Ewaluacji bramek”.
     - [x] **33.3.1 Zestaw `gate-reply.json`** (2026-11-25) → „Ewaluacja bramek”, „Helpery”.
-    - [ ] **33.3.2 Test `llm_live` na zestawie** — fałszywe alarmy wśród 108 wiadomości
-      poprawnych i przepuszczenia osobno na regułę, z uzasadnieniami w raporcie; dwa przebiegi na
-      `gpt-6.1-sol`, około 0,3–0,5 USD każdy. Do tego para scenariuszy w `gates.json`, bo korpus
-      jej nie ma: prośba o hasło we własnym cudzysłowie konsultanta (blokada) i komunikat
-      z ekranu ze słowem „hasło” w cytacie (przepuszczenie) — zasada, że cytaty reguł nie łamią,
-      bez której bramka blokowała „Ups! Coś poszło nie tak.”, nie może przepuszczać prośby
-      schowanej w cytacie.
-    - [ ] **33.3.3 Wnioski** — wynik do „Ewaluacji bramek”, a poprawka promptu albo reguł jako
-      osobna decyzja. Granice odbiegają od brzmienia reguł (login w regule 1, token w regule 4,
-      błędna forma wyrazu w regule 5); rozjazd liczy się jako błąd bramki, a reguły w wersji 4 to
-      decyzja człowieka.
+    - [x] **33.3.2 Test `llm_live` na zestawie** (2026-11-25) → „Ewaluacja bramek”, „Commands”,
+      „Helpery”.
+    - [ ] **33.3.3 Reguły w wersji 4** — człowiek przyjął 2026-11-25 krótkie brzmienie reguł 1, 2,
+      3 i 5, które zapisuje granice etykiet (login jako nazwa konta, żargon helpdesku, zwrot do
+      adresata, błędna forma wyrazu); reguły 4 i 6 bez zmian, a pojedyncze przypadki (ZIP,
+      „poszło”, „nr.”) zostają kosztem. Scenariusze i wstrzyknięcia pod wersję 4, pomiar zestawu
+      w dwóch przebiegach i nowe progi.
 - [x] **34. Tryb odświeżania korpusu** (2026-11-20) → „Historyczne zgłoszenia”, „Świadomie
   pominięte”.
 

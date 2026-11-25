@@ -52,7 +52,8 @@ O czym pamiętać przy zmianach:
   `code_report`, `solution_report`, `reading_report`, `closed_report`), a klasa raportu
   w `tests/_helpers/scenarios/<scenariusz>/`; po przebiegu stoją przed zużyciem modelu. Raport
   bramki zamknięcia na prawdziwych zamknięciach (`gate_close_report`) ma klasę w
-  `tests/_helpers/golden_gate_close/`.
+  `tests/_helpers/golden_gate_close/`, a raport bramki wysyłki na prawdziwych wiadomościach
+  (`gate_reply_report`) w `tests/_helpers/golden_gate_reply/`.
 """
 
 import os
@@ -67,6 +68,7 @@ from app.config import Settings
 from app.db_postgres import PostgresClient
 from app.engine_anonymization import FakeAnonymizer
 from tests._helpers.golden_gate_close import GateCloseReport
+from tests._helpers.golden_gate_reply import GateReplyReport
 from tests._helpers.live import LLM_LIVE_MARKER, LiveUsageReport
 from tests._helpers.scenarios.closed import ClosedReport
 from tests._helpers.scenarios.code import CodeReport
@@ -459,6 +461,33 @@ def gate_close_report(
     return pytestconfig.stash[GATE_CLOSE_REPORT_KEY]
 
 
+# Miejsce raportu bramki wysyłki na prawdziwych wiadomościach w konfiguracji przebiegu, na tej
+# samej zasadzie co raport zużycia.
+GATE_REPLY_REPORT_KEY = pytest.StashKey[GateReplyReport]()
+
+
+@pytest.fixture(scope="session")
+def gate_reply_report(
+    pytestconfig: pytest.Config,  # wstrzykiwane przez pytest; trzyma raport na cały przebieg
+) -> GateReplyReport:
+    """
+    Description:
+    Raport bramki wysyłki na prawdziwych wiadomościach (p. 33.3), jeden na cały przebieg
+    pytesta. Pomiar zgłasza w nim ocenę każdej wiadomości, a po przebiegu pytest wypisuje
+    liczniki, czas bramki i wiadomości niezgodne z etykietami razem z werdyktem.
+
+    Example args:
+        (wstrzykiwane przez pytest)
+
+    Example result:
+        GateReplyReport wspólny dla wszystkich testów przebiegu
+    """
+    if GATE_REPLY_REPORT_KEY not in pytestconfig.stash:
+        pytestconfig.stash[GATE_REPLY_REPORT_KEY] = GateReplyReport()
+
+    return pytestconfig.stash[GATE_REPLY_REPORT_KEY]
+
+
 def pytest_terminal_summary(
     terminalreporter: TerminalReporter,  # wstrzykiwane przez pytest; pisze na ekran
     config:           pytest.Config,     # wstrzykiwane przez pytest; trzyma raporty
@@ -467,7 +496,7 @@ def pytest_terminal_summary(
     Description:
     Po przebiegu wypisuje raporty testów na żywym modelu: najpierw oceny spraw ze scenariuszy
     wstrzyknięć, bramek, „Popraw”, pytań, cytowania kodu, rozwiązania i czytania z polami
-    wyniku, raport bramki zamknięcia na prawdziwych zamknięciach, potem zużycie żywego modelu
+    wyniku, raporty bramek na prawdziwych zamknięciach i wiadomościach, potem zużycie żywego modelu
     z sumą kosztu. Pytest woła tę funkcję sam, po nazwie.
     Raport, do którego żaden test niczego nie zgłosił — czyli każdy w przebiegu bez żywego
     modelu — nie wypisuje nic.
@@ -479,8 +508,8 @@ def pytest_terminal_summary(
         None — na końcu wyjścia pytesta stoją sekcje „wstrzyknięcia poleceń", „scenariusze
         bramek", „scenariusze »Popraw«", „scenariusze pytań", „scenariusze cytowania kodu",
         „scenariusze rozwiązania", „scenariusze czytania", „scenariusze przekazania",
-        „scenariusze trasy zamknięcia", „bramka zamknięcia na prawdziwych zamknięciach"
-        i „zużycie żywego modelu"
+        „scenariusze trasy zamknięcia", „bramka zamknięcia na prawdziwych zamknięciach",
+        „bramka wysyłki na prawdziwych wiadomościach" i „zużycie żywego modelu"
     """
     sections = [
         ("wstrzyknięcia poleceń",        config.stash.get(INJECTION_REPORT_KEY, None)),
@@ -494,6 +523,8 @@ def pytest_terminal_summary(
         ("scenariusze trasy zamknięcia", config.stash.get(CLOSED_REPORT_KEY, None)),
         ("bramka zamknięcia na prawdziwych zamknięciach",
          config.stash.get(GATE_CLOSE_REPORT_KEY, None)),
+        ("bramka wysyłki na prawdziwych wiadomościach",
+         config.stash.get(GATE_REPLY_REPORT_KEY, None)),
         ("zużycie żywego modelu",        config.stash.get(LIVE_USAGE_KEY, None)),
     ]
 

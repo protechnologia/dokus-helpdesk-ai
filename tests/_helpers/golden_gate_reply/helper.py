@@ -12,19 +12,25 @@ z wątku po anonimizacji, tak jak stoi w korpusie.
 | `consultant_message()`              | treść komentarza konsultanta z tekstu wątku              |
 | `corpus_message()`                  | to samo dla wątku z korpusu instancji                    |
 | `message_digest()`                  | skrót wiadomości; pilnuje, że etykiety opisują ten tekst |
+| `judge_gate_reply_case()`           | ocena werdyktu bramki wobec etykiet wpisu                |
 
 O czym pamiętać przy zmianach:
 
 - Komentarz wycina się po nagłówkach z `RawTicket.as_thread()` („KOMENTARZ N — rola, data
   (typ: …):”); gdy zmieni się ich brzmienie, skrót każdego wpisu przestanie się zgadzać i test
   spójności to pokaże.
+- Odpowiedź nie do przyjęcia nie jest ani fałszywym alarmem, ani przepuszczeniem: helpdesk
+  dostaje wtedy 503 i decyduje sam. Liczy się osobno.
 """
 
 import hashlib
 import json
 import re
 
+from pydantic import BaseModel
+
 from tests._helpers.golden_gate_reply.constants import ANONYMIZED_DIR, CONSULTANT_ROLE, GOLDEN_FILE
+from tests._helpers.golden_gate_reply.models.gate_reply_outcome import GateReplyOutcome
 from tests._helpers.golden_gate_reply.models.golden_gate_reply_case import GoldenGateReplyCase
 from tests._helpers.golden_gate_reply.models.rule_violation import RuleViolation
 
@@ -166,3 +172,51 @@ def message_digest(text: str) -> str:   # np. "Dzień dobry,\n\nkonto zostało o
         "a2d4c66de139ad2f"
     """
     return hashlib.blake2b(text.encode("utf-8"), digest_size=8).hexdigest()
+
+
+def judge_gate_reply_case(
+    case:    GoldenGateReplyCase,  # np. GoldenGateReplyCase(ticket_id="23921", …)
+    output:  BaseModel | None,     # np. Verdict(verdict="block", …); None — `respond` nie przyjął
+    retries: int,                  # np. 0 — poprawki odpowiedzi od węzła `respond`
+    seconds: float,                # np. 2.4 — ile trwała sprawa bramki
+) -> GateReplyOutcome:
+    """
+    Description:
+    Ocenia jedną wiadomość: zapisuje werdykt, pola wyniku do raportu i czas sprawy, a brak
+    wyniku jako odpowiedź nie do przyjęcia. Czy to fałszywy alarm, czy przepuszczenie, mówi
+    ocena, porównując werdykt z łamanymi regułami wpisu.
+
+    Example args:
+        case=GoldenGateReplyCase(ticket_id="23921", violations=(RuleViolation(rule=6, …),), …)
+        output=Verdict(verdict="pass")
+        retries=0
+        seconds=2.4
+
+    Example result:
+        GateReplyOutcome(case=GoldenGateReplyCase(ticket_id="23921", …), answer="pass",
+                         retries=0, fields={"verdict": "pass", "reasons": [], "hint": None},
+                         seconds=2.4)
+    """
+    # --- brak wyniku: węzeł `respond` nie przyjął odpowiedzi mimo poprawki ---
+    if output is None:
+        rejected = GateReplyOutcome(
+            case    = case,
+            answer  = None,
+            retries = retries,
+            fields  = {},
+            seconds = seconds,
+        )
+
+        return rejected
+
+    fields = output.model_dump(mode="json")
+
+    outcome = GateReplyOutcome(
+        case    = case,
+        answer  = fields["verdict"],
+        retries = retries,
+        fields  = fields,
+        seconds = seconds,
+    )
+
+    return outcome

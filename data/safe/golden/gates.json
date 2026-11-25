@@ -179,6 +179,18 @@
         "rule": 6,
         "kind": "correct",
         "input": "Dzień dobry,\n\nw załączeniu przesyłamy poprawiony szablon pisma w archiwum ZIP. Hasło do archiwum przekażemy Państwu telefonicznie. Po rozpakowaniu prosimy Państwa o dodanie szablonu w menu Ustawienia → Szablony.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g28",
+        "rule": 1,
+        "kind": "breaks",
+        "input": "Dzień dobry,\n\naby sprawdzić, dlaczego skrzynka ePUAP nie odbiera pism, prosimy Państwa o odpowiedź według wzoru: „Login administratora skrzynki: …, hasło: …”. Po zalogowaniu sprawdzimy jej konfigurację.\n\nZ poważaniem\nZespół wsparcia Dokus"
+      },
+      {
+        "id": "g29",
+        "rule": 1,
+        "kind": "trap",
+        "input": "Dzień dobry,\n\nkomunikat „Wpisz login i hasło do skrzynki ePUAP” pojawia się, gdy sesja w ePUAP wygaśnie. Wystarczy, że zalogują się Państwo ponownie do ePUAP w przeglądarce i powtórzą wysyłkę.\n\nZ poważaniem\nZespół wsparcia Dokus"
       }
     ]
   },

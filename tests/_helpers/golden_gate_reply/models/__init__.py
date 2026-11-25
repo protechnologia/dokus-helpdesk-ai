@@ -7,4 +7,5 @@ pakiet helpera importuje z modułów, a ten plik niczego nie eksportuje.
 |-----------------------------|-----------------------|-----------------------------------------|
 | `golden_gate_reply_case.py` | `GoldenGateReplyCase` | wiadomość: skąd i które reguły łamie    |
 | `rule_violation.py`         | `RuleViolation`       | łamana reguła z powodem                 |
+| `gate_reply_outcome.py`     | `GateReplyOutcome`    | ocena wiadomości na żywym modelu i czas |
 """
