@@ -2098,6 +2098,10 @@ Osoby i adresy idą osobnymi wywołaniami: wspólne kosztowało na próbce korpu
   ma) i bez limitu odpowiedzi (należy do promptu węzła). Brak adresu albo modelu to błąd przy
   starcie, a odpowiedź 401, 403 albo 404 — błąd konfiguracji przy pierwszym wywołaniu, nie 503;
   z modelem przy starcie usługa się nie łączy, bo pod z GPU bywa wyłączony.
+- **Model anonimizujący stoi na RunPodzie: pod z vLLM i Bielikiem 11B v3, tworzony z szablonu
+  na sesję pracy i usuwany po niej (decyzja 2026-10-23).** Każdy pod ma nowy adres, który trzeba
+  wpisać do `LLM_ANONYMIZATION_BASE_URL`; bez poda usługa wstaje, a trasy grafów oddają 503.
+  Przebieg: [runbook](docs/runbook/pod-runpod-z-bielikiem.md).
 - **`GET /info` mówi, którym silnikiem i z jakim modelem usługa anonimizuje (2026-10-20):**
   `{engine, model}`, przy atrapie silnika model `null`. Czyta to `api` dla `GET /instance`.
   Usługa nie łączy się przy tym z modelem, więc odpowiada także przy wyłączonym podzie, i nie

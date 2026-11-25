@@ -30,9 +30,10 @@ Przed procedurą przeczytaj jej runbook, a po przejściu popraw go i dopisz wpis
 
 ## Spis
 
-| runbook                                                               | kiedy                                          |
-|-----------------------------------------------------------------------|------------------------------------------------|
-| [Odchudzanie podsekcji CLAUDE.md](odchudzanie-podsekcji-claude-md.md) | co jakiś czas, jedna podsekcja CLAUDE.md naraz |
+| runbook                                                               | kiedy                                           |
+|-----------------------------------------------------------------------|-------------------------------------------------|
+| [Odchudzanie podsekcji CLAUDE.md](odchudzanie-podsekcji-claude-md.md) | co jakiś czas, jedna podsekcja CLAUDE.md naraz  |
+| [Pod na RunPodzie z Bielikiem](pod-runpod-z-bielikiem.md)             | przed pracą z prawdziwym modelem anonimizującym |
 
 ## Szablon
 
