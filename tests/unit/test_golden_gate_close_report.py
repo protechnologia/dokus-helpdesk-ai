@@ -22,10 +22,10 @@ from tests._helpers.golden_gate_close.samples import (
 @pytest.mark.parametrize(
     ("kind", "problem", "action", "group", "expected"),
     [
-        pytest.param("sprawa", True, True, "pass", "pass", id="obie reguły spełnione"),
-        pytest.param("sprawa", False, True, "rule1", "block", id="nie widać problemu"),
-        pytest.param("sprawa", True, False, "rule2", "block", id="nie widać, co zrobiono"),
-        pytest.param("sprawa", False, False, "both", "block", id="obie reguły złamane"),
+        pytest.param("sprawa", True, True, "pass", "pass", id="widać oba"),
+        pytest.param("sprawa", False, True, "no_problem", "block", id="nie widać problemu"),
+        pytest.param("sprawa", True, False, "no_solution", "block", id="nie widać rozwiązania"),
+        pytest.param("sprawa", False, False, "neither", "block", id="nie widać obu"),
         pytest.param("powiadomienie", True, True, "notice", "block", id="powiadomienie pełne"),
         pytest.param("powiadomienie", True, False, "notice", "block", id="powiadomienie puste"),
     ],
@@ -38,11 +38,11 @@ def test_a_case_falls_into_the_group_its_kind_and_labels_give(
     expected: str,   # oczekiwany werdykt
 ) -> None:
     """Sprawdza, czy sprawa trafia do grupy według złamanych reguł, a powiadomienie zawsze do
-    grupy powiadomień z oczekiwaną blokadą, także gdy spełnia obie reguły.
+    grupy powiadomień z oczekiwaną blokadą, także gdy widać z niego problem i rozwiązanie.
 
-    Wyłapuje pomyloną grupę: przepuszczenia przy regule 1 liczyłyby się jako przy regule 2,
-    a powiadomienie spełniające reguły liczyłoby się jako fałszywy alarm, choć GAT-001 każe je
-    blokować."""
+    Wyłapuje pomyloną grupę: przepuszczenia przy niewidocznym problemie liczyłyby się jako przy
+    niewidocznym rozwiązaniu, a powiadomienie, z którego widać problem i rozwiązanie, liczyłoby się
+    jako fałszywy alarm, choć GAT-001 każe je blokować."""
     case = sample_case(kind=kind, problem=problem, action=action)
 
     assert (case.group, case.expected) == (group, expected)
@@ -122,9 +122,10 @@ def test_the_report_counts_per_group_for_doubtful_entries_and_per_stratum() -> N
     """Sprawdza, czy raport liczy fałszywe alarmy i przepuszczenia razem, w każdej grupie, osobno
     dla wpisów wątpliwych i w każdej warstwie, bez liczników „0 z 0”.
 
-    Wyłapuje licznik, który miesza grupy (przepuszczenie przy regule 2 widoczne jako przy regule
-    1) albo gubi wpisy wątpliwe: decyzja 2026-11-25 każe je liczyć w progach, ale pokazywać
-    osobno, żeby było widać, ile złych werdyktów stoi przy przypadkach granicznych."""
+    Wyłapuje licznik, który miesza grupy (przepuszczenie przy niewidocznym rozwiązaniu widoczne
+    jako przy niewidocznym problemie) albo gubi wpisy wątpliwe: decyzja 2026-11-25 każe je liczyć
+    w progach, ale pokazywać osobno, żeby było widać, ile złych werdyktów stoi przy przypadkach
+    granicznych."""
     report = GateCloseReport()
 
     report.record(sample_outcome(sample_case(ticket="90001"), sample_block()))
@@ -137,12 +138,12 @@ def test_the_report_counts_per_group_for_doubtful_entries_and_per_stratum() -> N
     lines = report.lines()
 
     assert lines[0] == "razem: fałszywych alarmów 1 z 2, przepuszczeń 1 z 2, nie do przyjęcia 0"
-    assert "    spełnia obie reguły: fałszywych alarmów 1 z 2, nie do przyjęcia 0" in lines
-    assert "    łamie regułę 2: przepuszczeń 1 z 1, nie do przyjęcia 0" in lines
+    assert "    widać problem i rozwiązanie: fałszywych alarmów 1 z 2, nie do przyjęcia 0" in lines
+    assert "    nie widać rozwiązania: przepuszczeń 1 z 1, nie do przyjęcia 0" in lines
     assert "    powiadomienie: przepuszczeń 0 z 1, nie do przyjęcia 0" in lines
     assert "    wpisy wątpliwe: przepuszczeń 1 z 1, nie do przyjęcia 0" in lines
     assert "    warstwa mail: przepuszczeń 1 z 1, nie do przyjęcia 0" in lines
-    assert not any("łamie regułę 1" in line or "łamie obie" in line for line in lines)
+    assert not any("nie widać problemu" in line for line in lines)
 
 
 def test_the_report_shows_labels_and_the_verdict_only_under_a_disagreeing_closing() -> None:
@@ -158,15 +159,17 @@ def test_the_report_shows_labels_and_the_verdict_only_under_a_disagreeing_closin
     report.record(sample_outcome(sample_case(ticket="90002"), sample_block(), seconds=4.0))
 
     lines   = report.lines()
-    agreed  = lines.index("    90001 (random, spełnia obie reguły): zgodny; poprawek 0; 2,5 s")
+    agreed  = lines.index(
+        "    90001 (random, widać problem i rozwiązanie): zgodny; poprawek 0; 2,5 s",
+    )
     alarmed = lines.index(
-        "    90002 (random, spełnia obie reguły): FAŁSZYWY ALARM; poprawek 0; 4,0 s",
+        "    90002 (random, widać problem i rozwiązanie): FAŁSZYWY ALARM; poprawek 0; 4,0 s",
     )
 
     assert agreed + 1 == alarmed
     assert lines[alarmed + 1:alarmed + 4] == [
-        "        reguła 1: tak — Powód reguły 1.",
-        "        reguła 2: tak — Powód reguły 2.",
+        "        problem: tak — Powód reguły 1.",
+        "        rozwiązanie: tak — Powód reguły 2.",
         "        rodzaj: sprawa",
     ]
     assert lines[alarmed + 4:] == [

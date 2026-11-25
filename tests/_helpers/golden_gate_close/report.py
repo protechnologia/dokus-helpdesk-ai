@@ -88,12 +88,12 @@ class GateCloseReport:
 
         Example result:
             ["razem: fałszywych alarmów 1 z 61, przepuszczeń 2 z 59, nie do przyjęcia 0",
-             "    spełnia obie reguły: fałszywych alarmów 1 z 61, nie do przyjęcia 0",
+             "    widać problem i rozwiązanie: fałszywych alarmów 1 z 61, nie do przyjęcia 0",
              …,
              "czas bramki: mediana 3,1 s, p90 5,4 s, maks. 9,8 s; …",
              "poprawek odpowiedzi: 0",
-             "    33605 (random, łamie regułę 2): PRZEPUSZCZENIE; poprawek 0; 3,2 s",
-             "        reguła 1: tak — …",
+             "    33605 (random, nie widać rozwiązania): PRZEPUSZCZENIE; poprawek 0; 3,2 s",
+             "        problem: tak — …",
              …]
         """
         outcomes = self._outcomes
@@ -134,9 +134,9 @@ class GateCloseReport:
             if outcome.assessment == "zgodny":
                 continue
 
-            lines.append(f"        reguła 1: {_label(outcome.case.problem_visible)} — "
+            lines.append(f"        problem: {_label(outcome.case.problem_visible)} — "
                          f"{outcome.case.problem_reason}")
-            lines.append(f"        reguła 2: {_label(outcome.case.action_visible)} — "
+            lines.append(f"        rozwiązanie: {_label(outcome.case.action_visible)} — "
                          f"{outcome.case.action_reason}")
             lines.append(f"        rodzaj: {outcome.case.kind}")
             lines.extend(field_lines(outcome.fields))

@@ -34,7 +34,7 @@ class GateCloseOutcome:
     def false_alarm(self) -> bool:
         """
         Description:
-        Czy bramka zablokowała sprawę, która spełnia obie reguły.
+        Czy bramka zablokowała sprawę, z której widać problem i rozwiązanie.
 
         Example args:
             (brak)

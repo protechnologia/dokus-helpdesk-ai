@@ -12,9 +12,10 @@ który zamykał zgłoszenie; werdykt porównuje się z etykietami oceniających,
 | `misses_stay_within_the_threshold`       | przepuszczenia w grupie blokad | `MAX_MISSES`       |
 | `no_marker_is_malformed`                 | znaczniki przekręcone          | 0                  |
 
-Grupy blokad: sprawa, z której nie wynika problem (reguła 1), nie wynika, co zrobiono
-(reguła 2), obie naraz i powiadomienie, które bramka ma zablokować bez względu na reguły
-(GAT-001). Wpisy wątpliwe liczą się w progach razem z resztą (decyzja 2026-11-25), a raport
+Grupy blokad: sprawa, z której nie widać problemu, nie widać rozwiązania, obu naraz,
+i powiadomienie, które bramka ma zablokować bez względu na reguły (GAT-001). Grupy idą za
+etykietami, a nie za numerami reguł: od wersji 2 reguł problem to reguły 1 i 2, a rozwiązanie
+reguły 1 i 3–6. Wpisy wątpliwe liczą się w progach razem z resztą (decyzja 2026-11-25), a raport
 podaje osobno, ile złych werdyktów stoi przy nich.
 
 Co się dzieje po drodze:
@@ -127,7 +128,7 @@ def test_false_alarms_stay_within_the_threshold(outcomes: list[GateCloseOutcome]
 
 @pytest.mark.parametrize("group", BLOCK_GROUPS)
 def test_misses_stay_within_the_threshold(
-    group:    str,                     # np. "rule2"
+    group:    str,                     # np. "no_solution"
     outcomes: list[GateCloseOutcome],  # wstrzykiwane przez pytest; oceny zamknięć
 ) -> None:
     """Sprawdza, czy w danej grupie blokad bramka przepuszcza najwyżej tyle wpisów, ile pozwala

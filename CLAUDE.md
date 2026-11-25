@@ -192,6 +192,11 @@ compose.
 
 ## Zasady ogólne
 
+- **Nie naciągaj etykiet zestawów ewaluacyjnych, żeby poprawić wynik** (2026-11-25). Etykieta
+  mówi, czego chce człowiek, a nie co wynika z brzmienia reguły, promptu czy werdyktu modelu;
+  rozjazd między nimi to błąd, który się liczy i opisuje, a nie chowa. Etykietę zmienia tylko
+  nowa decyzja człowieka o tym, czego chcemy, nigdy sama zmiana reguły ani wynik pomiaru.
+
 ### Zasady techniczne
 
 1. **Konfiguracja wyłącznie przez ENV** (pydantic-settings) — żadnych sekretów ani
@@ -1636,7 +1641,9 @@ merytorycznie").
   także w parze ze znacznikami anonimizacji, a wstrzyknięcia 0 przebić z 9. Dziesięć zmyślonych
   zamknięć przez trasę `/gate/close`, z anonimizatorem na Bieliku, dało zgodne werdykty bez
   danych osobowych w uzasadnieniach, 2–7,5 s i około 0,003 USD na sprawę; do tego test ręczny
-  przez front. Liczby na prawdziwych zamknięciach daje pomiar z p. 33.2.
+  przez front. Na regułach w wersji 2 (2026-11-25) 24 scenariusze dały 0 fałszywych alarmów
+  z 15 i 0 przepuszczeń z 9 w dwóch przebiegach, a wstrzyknięcia 0 przebić z 9. Liczby na
+  prawdziwych zamknięciach daje pomiar z p. 33.2.
 - **Zestaw prawdziwych zamknięć: `data/unsafe/golden/gate-close.json` (2026-11-20, p. 33.2).**
   120 zamknięć z korpusu instancji, warstwami: 10 najdłuższych wątków, 10 z kanału „Automat
   mailowy”, 40 z kart odrzuconych przez filtr i 60 losowych. Wejście bramki to wątek
@@ -4326,12 +4333,17 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
     - [x] **33.2.1 Zestaw `gate-close.json`** (2026-11-20) → „Ewaluacja bramek”, „Helpery”.
     - [x] **33.2.2 Test `llm_live` na zestawie** (2026-11-25) → „Ewaluacja bramek”, „Commands”,
       „Helpery”.
-    - [ ] **33.2.3 Wnioski** — granica z przeglądu alarmów (2026-11-25): zamknięcie przechodzi,
-      gdy mówi coś konkretnego — co zrobiono albo jaka jest przyczyna, choćby prawdopodobna;
-      odpada ogólnik i zamknięcie przy niezałatwionej ostatniej reklamacji klienta. Kolejno:
-      decyzja co do 4 spornych, reguła 2 w wersji 2 do akceptacji (przed i po, z przykładami
-      obu stron), etykiety pod nią (5 na blokadę, sporne, przegląd 49 spraw „łamie regułę 2”,
-      granica w wytycznych etykietowania), pomiar od nowa w dwóch przebiegach.
+    - [ ] **33.2.3 Wnioski** — reguły zamknięcia w wersji 2 zapisane (2026-11-25): sześć reguł —
+      wymóg (z wątku wynika problem, przyczyna i rozwiązanie), definicje problemu, przyczyny
+      i rozwiązania, odpowiedź na ostatnie pytanie albo reklamację klienta i wyjątek dla
+      duplikatu albo odesłania, który reguły o odpowiedzi nie znosi. Przyczyna może wynikać
+      z rozwiązania (wgrana poprawka), a nie jest potrzebna przy prośbie o zmianę albo gdy jej
+      ustalenie się nie udało, więc naprawa samych skutków bez przyczyny jest blokowana. Pod
+      nie: 24 scenariusze bramki (było 8) i 14 etykiet zestawu (8 na blokadę, 6 na
+      przepuszczenie; 59 przepuszczeń i 61 blokad), z granicą od człowieka na 14 wpisach.
+      Reguła 4 uznaje za rozwiązanie także wskazanie klientowi konkretnego ustawienia lub
+      czynności, które usuwają przyczynę. Scenariusze na żywym modelu przeszły (2026-11-25).
+      Zostało: pomiar zestawu w dwóch przebiegach, nowe progi i wnioski do „Ewaluacji bramek”.
   - [ ] **33.3 `gate_reply` na prawdziwych wiadomościach** — wiadomości konsultantów z tych
     samych wątków (2631 komentarzy z rolą „konsultant” poza kanałem „Automat mailowy”, w którym
     rola z bazy nie mówi, kto pisał), te same decyzje co w 33.2; fałszywe alarmy na losowych

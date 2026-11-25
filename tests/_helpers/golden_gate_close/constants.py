@@ -25,19 +25,20 @@ STRATA = ("longest", "mail", "rejected", "random")
 KINDS = ("sprawa", "powiadomienie")
 
 # Grupy wpisów w kolejności raportu, z nazwą po polsku. Grupa mówi, jakiego werdyktu wymaga wpis:
-# przejść ma tylko sprawa, która spełnia obie reguły, a powiadomienie ma zostać zablokowane
-# niezależnie od reguł (GAT-001).
+# przejść ma tylko sprawa, z której widać problem i rozwiązanie, a powiadomienie ma zostać
+# zablokowane niezależnie od reguł (GAT-001). Nazwy mówią o etykietach, a nie o numerach reguł, bo
+# reguł jest więcej niż etykiet: problem to reguły 1 i 2, rozwiązanie reguły 1 i 3–6.
 GROUP_LABELS = {
-    "pass":   "spełnia obie reguły",
-    "rule1":  "łamie regułę 1",
-    "rule2":  "łamie regułę 2",
-    "both":   "łamie obie reguły",
-    "notice": "powiadomienie",
+    "pass":        "widać problem i rozwiązanie",
+    "no_problem":  "nie widać problemu",
+    "no_solution": "nie widać rozwiązania",
+    "neither":     "nie widać problemu ani rozwiązania",
+    "notice":      "powiadomienie",
 }
 
-# Grupy, w których bramka ma zablokować: przepuszczenia liczy się w każdej osobno, bo reguła 1
-# jest złamana tylko w kilku sprawach i zginęłaby w sumie.
-BLOCK_GROUPS = ("rule1", "rule2", "both", "notice")
+# Grupy, w których bramka ma zablokować: przepuszczenia liczy się w każdej osobno, bo spraw bez
+# widocznego problemu jest tylko kilka i zginęłyby w sumie.
+BLOCK_GROUPS = ("no_problem", "no_solution", "neither", "notice")
 
 # Ile zamknięć naraz idzie do modelu (decyzja 2026-11-25): przebieg trwa kilka minut, a czas
 # sprawy jest bliski czasowi jednego zamknięcia na produkcji i nie trafia na limit dostawcy.
@@ -49,14 +50,14 @@ CONCURRENCY = 4
 ANONYMIZATION_MEDIAN_SECONDS = 2.0
 ANONYMIZATION_MAX_SECONDS    = 6.5
 
-# Progi pomiaru: gorszy wynik z dwóch przebiegów na `gpt-6.1-sol` (2026-11-25, reguły w wersji 1).
-# Fałszywe alarmy liczy się wśród 61 spraw, które spełniają obie reguły (było 18 i 19),
-# a przepuszczenia osobno w każdej grupie blokad. Progi pilnują, żeby nie było gorzej; to nie
-# jest stan docelowy (p. 33.2.3).
+# Progi pomiaru: gorszy wynik z dwóch przebiegów na `gpt-6.1-sol`, zmierzony 2026-11-25 jeszcze na
+# regułach i etykietach w wersji 1 (fałszywych alarmów 18 i 19 z 61). Fałszywe alarmy liczy się
+# wśród spraw, z których widać problem i rozwiązanie, a przepuszczenia osobno w każdej grupie
+# blokad. Do przeliczenia po pomiarze na regułach w wersji 2 (p. 33.2.3).
 MAX_FALSE_ALARMS = 19
 MAX_MISSES = {
-    "rule1":  1,
-    "rule2":  0,
-    "both":   0,
-    "notice": 1,
+    "no_problem":  1,
+    "no_solution": 0,
+    "neither":     0,
+    "notice":      1,
 }

@@ -13,9 +13,9 @@ class GoldenGateCloseCase:
     comments_at_close: int   # ile komentarzy stało w wątku w chwili zamknięcia
     digest:            str   # skrót uciętego wątku; pilnuje, że etykiety opisują ten tekst
     kind:              str   # "sprawa" albo "powiadomienie"; powiadomienia liczy się osobno
-    problem_visible:   bool  # reguła 1: z treści wynika, co było problemem
+    problem_visible:   bool  # z treści wynika problem (reguły 1 i 2)
     problem_reason:    str   # jednym zdaniem, co o tym przesądziło
-    action_visible:    bool  # reguła 2: z treści wynika, co zrobiono, żeby problem rozwiązać
+    action_visible:    bool  # z treści wynika rozwiązanie (reguły 1 i 3–6)
     action_reason:     str   # jednym zdaniem, co o tym przesądziło
     doubtful:          bool  # przypadek graniczny: oceniający nie był pewny którejś etykiety
 
@@ -23,7 +23,7 @@ class GoldenGateCloseCase:
     def group(self) -> str:
         """
         Description:
-        Grupa wpisu: powiadomienie albo sprawa według tego, które reguły łamie. Powiadomienie
+        Grupa wpisu: powiadomienie albo sprawa według tego, czego z niej nie widać. Powiadomienie
         idzie do własnej grupy bez patrzenia na reguły, bo bramka ma je zablokować zawsze
         (GAT-001).
 
@@ -31,31 +31,31 @@ class GoldenGateCloseCase:
             (brak)
 
         Example result:
-            "rule2"
+            "no_solution"
         """
         # --- powiadomienie: blokada niezależnie od reguł ---
         if self.kind == "powiadomienie":
             return "notice"
 
-        # --- sprawa, która spełnia obie reguły ---
+        # --- sprawa, z której widać problem i rozwiązanie ---
         if self.problem_visible and self.action_visible:
             return "pass"
 
         # --- widać, co zrobiono, ale nie, co było problemem ---
         if self.action_visible:
-            return "rule1"
+            return "no_problem"
 
         # --- widać problem, ale nie, co zrobiono ---
         if self.problem_visible:
-            return "rule2"
+            return "no_solution"
 
-        return "both"
+        return "neither"
 
     @property
     def expected(self) -> str:
         """
         Description:
-        Werdykt, którego wymaga wpis: przejść ma tylko sprawa, która spełnia obie reguły.
+        Werdykt, którego wymaga wpis: przejść ma tylko sprawa, z której widać problem i rozwiązanie.
 
         Example args:
             (brak)
@@ -75,7 +75,7 @@ class GoldenGateCloseCase:
             (brak)
 
         Example result:
-            "33605 (random, łamie regułę 2, wątpliwy)"
+            "33605 (random, nie widać rozwiązania, wątpliwy)"
         """
         doubtful = ", wątpliwy" if self.doubtful else ""
 

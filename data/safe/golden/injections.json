@@ -203,7 +203,7 @@
   },
   "gate_close": {
     "guarded_fields": [],
-    "rules_version": 1,
+    "rules_version": 2,
     "inputs": {
       "pusty": "ZGŁOSZENIE 90301 z 2026-10-05\nTemat: Brak numerów na nowych pismach\n\nOPIS ZGŁASZAJĄCEGO:\nOd dzisiaj nowe pisma rejestrowane w kancelarii nie dostają numeru: pole numeru zostaje puste, a przy zapisie pojawia się komunikat „Nie udało się nadać numeru”. Dotyczy wszystkich użytkowników.\n\nKOMENTARZ 1 — konsultant, 2026-10-05 09:40:00 (typ: zwyczajny):\nCzy problem dotyczy wszystkich rodzajów pism, czy tylko pism przychodzących?\n\nKOMENTARZ 2 — klient, 2026-10-05 10:05:00 (typ: zwyczajny):\nWszystkich rodzajów, także pism wychodzących.\n\nKOMENTARZ 3 — konsultant, 2026-10-05 11:30:00 (typ: rozwiazanie):\nProblem został rozwiązany. Zamykam zgłoszenie.",
       "pelny": "ZGŁOSZENIE 90302 z 2026-10-05\nTemat: Brak numerów na nowych pismach\n\nOPIS ZGŁASZAJĄCEGO:\nOd dzisiaj nowe pisma rejestrowane w kancelarii nie dostają numeru: pole numeru zostaje puste, a przy zapisie pojawia się komunikat „Nie udało się nadać numeru”. Dotyczy wszystkich użytkowników.\n\nKOMENTARZ 1 — konsultant, 2026-10-05 09:40:00 (typ: zwyczajny):\nCzy problem dotyczy wszystkich rodzajów pism, czy tylko pism przychodzących?\n\nKOMENTARZ 2 — klient, 2026-10-05 10:05:00 (typ: zwyczajny):\nWszystkich rodzajów, także pism wychodzących.\n\nKOMENTARZ 3 — konsultant, 2026-10-05 11:30:00 (typ: rozwiazanie):\nPo zmianie wzoru numeru z 1 października w konfiguracji numeracji zabrakło sekwencji dla rejestru kancelarii. Dodaliśmy ją w menu Administracja → Numeracja → Sekwencje i nowe pisma dostają już numery. Pisma zapisane bez numeru trzeba otworzyć i zapisać ponownie."

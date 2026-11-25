@@ -11,6 +11,7 @@
       "W gate_reply wejściem jest wiadomość do klienta. Każda zwraca się do klienta formą „Państwo”, poza łamiącymi regułę o formie zwrotu (g07 per „ty”, g13 „Wasz”, g14 „pani” małą literą, g20 „Panstwa” w wiadomości bez polskich znaków) i pułapką g12, która pisze do jednej osoby („Pani”; od wersji 2 reguł, 2026-10-22: wersja 1 wymieniała tylko „Państwo” i bramka blokowała „Pani”), i każda kończy się podpisem zespołu: łamiąca ma łamać jedną regułę. Wyjątkiem jest też pułapka g22: poprawna wiadomość do jednej osoby („Pana”), w której żadne słowo, także w podpisie, nie wymaga polskiej litery.",
       "Reguła 6 bramki wysyłki (hasło w treści, od wersji 3 reguł, 2026-11-11): łamiące sprawy niosą hasło wprost (g23 do konta, g26 do archiwum), bo anonimizator haseł nie zamienia (detektor sekretów odłożony, p. 20). Hasła są zmyślone i nie wyglądają jak słowa, żeby blokada nie mogła przyjść z reguły ortografii; poprawne bliźniaki zapowiadają hasło telefonicznie, a pułapka g25 mówi o haśle, którego w wiadomości nie ma.",
       "W gate_close wejściem jest zgłoszenie z wątkiem w kształcie RawTicket.as_thread(), zamykane komentarzem typu rozwiazanie. Pułapka stawia problem albo to, co zrobiono, w wątku, a nie tam, gdzie się tego szuka: opis jest ogólnikowy, a problem podaje klient w odpowiedzi na pytanie konsultanta, albo komentarz zamykający to formułka, a krok, który rozwiązał sprawę, opisał klient.",
+      "W gate_close od wersji 2 reguł (2026-11-25) reguła 1 to wymóg (z wątku wynika problem, przyczyna i rozwiązanie), reguły 2–4 mówią, czym są problem, przyczyna i rozwiązanie, reguła 5 dotyczy ostatniego pytania albo reklamacji klienta, a reguła 6 zwalnia z wymogu problemu, przyczyny i rozwiązania zamknięcie jako duplikat albo z odesłaniem. Sprawy o problemie stoją przy regule 2, o rozwiązaniu przy regule 4. Przy regule 1 sprawa łamiąca ma problem i rozwiązanie, które do siebie nie pasują, a pułapka to prośba o zmianę, która przyczyny nie wymaga. Przy regule 3 sprawy łamiące to ogólnikowe przypuszczenie i naprawa samych skutków bez przyczyny, a pułapki to „prawdopodobnie” przy konkretnym ustawieniu z poleceniem dla klienta (ma przejść, decyzja 2026-11-25), przyczyna, której nie udało się ustalić, i poprawka, z której przyczyna wynika. Przy regule 5 pułapka ma reklamację klienta, którą klient sam potem odwołał, a dodatkowa sprawa łamiąca to odesłanie przy reklamacji bez odpowiedzi, bo wyjątek z reguły 6 jej nie obejmuje. Przy regule 6 sprawa łamiąca to wzmianka o podobnym zgłoszeniu bez odesłania, a pułapka to odesłanie bez numeru.",
       "Sprawy ze znacznikami anonimizacji (z07–z08, g10–g11; 2026-10-21): tekst ze zmyślonymi danymi osobowymi przepuszczony przez usługę anonymizer (silnik agent), więc znaczniki stoją tak, jak wstawia je anonimizator. Pułapka ma znacznik w miejscu danej, od której zależy reguła (nowy adres do doręczeń, konto użytkownika), i ma przejść; łamiąca to ten sam tekst bez tego, czego wymaga reguła, i ma zostać zablokowana. Znacznik przekręcony w uzasadnieniu albo wskazówce werdyktu to błąd."
     ]
   },
@@ -182,55 +183,151 @@
     ]
   },
   "gate_close": {
-    "rules_version": 1,
+    "rules_version": 2,
     "cases": [
       {
         "id": "z01",
-        "rule": 1,
+        "rule": 2,
         "kind": "breaks",
-        "input": "ZGŁOSZENIE 90401 z 2026-10-06\nTemat: Pilne\n\nOPIS ZGŁASZAJĄCEGO:\nNie działa. Proszę o pilny kontakt.\n\nKOMENTARZ 1 — konsultant, 2026-10-06 10:10:00 (typ: rozwiazanie):\nZaktualizowaliśmy komponent serwera do wersji 4.12 i zrestartowaliśmy usługi aplikacji. Zamykam zgłoszenie."
+        "input": "ZGŁOSZENIE 90401 z 2026-10-06\nTemat: Pilne\n\nOPIS ZGŁASZAJĄCEGO:\nNie działa. Proszę o pilny kontakt.\n\nKOMENTARZ 1 — konsultant, 2026-10-06 10:10:00 (typ: rozwiazanie):\nPrzyczyną był wygasły certyfikat w konfiguracji komponentu serwera. Zaktualizowaliśmy komponent do wersji 4.12 z nowym certyfikatem i zrestartowaliśmy usługi aplikacji. Zamykam zgłoszenie."
       },
       {
         "id": "z02",
-        "rule": 1,
+        "rule": 2,
         "kind": "correct",
-        "input": "ZGŁOSZENIE 90402 z 2026-10-06\nTemat: Pilne\n\nOPIS ZGŁASZAJĄCEGO:\nOd rana nie przychodzą przesyłki z e-Doręczeń: skrzynka odbiorcza jest pusta, choć nadawcy potwierdzają wysyłkę. Proszę o pilny kontakt.\n\nKOMENTARZ 1 — konsultant, 2026-10-06 10:10:00 (typ: rozwiazanie):\nZaktualizowaliśmy komponent serwera do wersji 4.12 i zrestartowaliśmy usługi aplikacji. Zamykam zgłoszenie."
+        "input": "ZGŁOSZENIE 90402 z 2026-10-06\nTemat: Pilne\n\nOPIS ZGŁASZAJĄCEGO:\nOd rana nie przychodzą przesyłki z e-Doręczeń: skrzynka odbiorcza jest pusta, choć nadawcy potwierdzają wysyłkę. Proszę o pilny kontakt.\n\nKOMENTARZ 1 — konsultant, 2026-10-06 10:10:00 (typ: rozwiazanie):\nPrzyczyną był wygasły certyfikat w konfiguracji komponentu serwera. Zaktualizowaliśmy komponent do wersji 4.12 z nowym certyfikatem i zrestartowaliśmy usługi aplikacji. Zamykam zgłoszenie."
       },
       {
         "id": "z03",
-        "rule": 1,
+        "rule": 2,
         "kind": "trap",
-        "input": "ZGŁOSZENIE 90403 z 2026-10-06\nTemat: Pilne\n\nOPIS ZGŁASZAJĄCEGO:\nNie działa. Proszę o pilny kontakt.\n\nKOMENTARZ 1 — konsultant, 2026-10-06 09:20:00 (typ: zwyczajny):\nCo dokładnie nie działa i od kiedy?\n\nKOMENTARZ 2 — klient, 2026-10-06 09:35:00 (typ: zwyczajny):\nOd rana nie przychodzą przesyłki z e-Doręczeń: skrzynka odbiorcza jest pusta, choć nadawcy potwierdzają wysyłkę.\n\nKOMENTARZ 3 — konsultant, 2026-10-06 10:10:00 (typ: rozwiazanie):\nZaktualizowaliśmy komponent serwera do wersji 4.12 i zrestartowaliśmy usługi aplikacji. Zamykam zgłoszenie."
+        "input": "ZGŁOSZENIE 90403 z 2026-10-06\nTemat: Pilne\n\nOPIS ZGŁASZAJĄCEGO:\nNie działa. Proszę o pilny kontakt.\n\nKOMENTARZ 1 — konsultant, 2026-10-06 09:20:00 (typ: zwyczajny):\nCo dokładnie nie działa i od kiedy?\n\nKOMENTARZ 2 — klient, 2026-10-06 09:35:00 (typ: zwyczajny):\nOd rana nie przychodzą przesyłki z e-Doręczeń: skrzynka odbiorcza jest pusta, choć nadawcy potwierdzają wysyłkę.\n\nKOMENTARZ 3 — konsultant, 2026-10-06 10:10:00 (typ: rozwiazanie):\nPrzyczyną był wygasły certyfikat w konfiguracji komponentu serwera. Zaktualizowaliśmy komponent do wersji 4.12 z nowym certyfikatem i zrestartowaliśmy usługi aplikacji. Zamykam zgłoszenie."
       },
       {
         "id": "z04",
-        "rule": 2,
+        "rule": 4,
         "kind": "breaks",
         "input": "ZGŁOSZENIE 90404 z 2026-10-07\nTemat: Brak przycisku „Wyślij do ePUAP”\n\nOPIS ZGŁASZAJĄCEGO:\nPo aktualizacji z 1 października w karcie pisma wychodzącego nie ma przycisku „Wyślij do ePUAP”. Pozostałe przyciski są widoczne.\n\nKOMENTARZ 1 — konsultant, 2026-10-07 13:15:00 (typ: rozwiazanie):\nJuż powinno działać. Zamykam zgłoszenie."
       },
       {
         "id": "z05",
-        "rule": 2,
+        "rule": 4,
         "kind": "correct",
         "input": "ZGŁOSZENIE 90405 z 2026-10-07\nTemat: Brak przycisku „Wyślij do ePUAP”\n\nOPIS ZGŁASZAJĄCEGO:\nPo aktualizacji z 1 października w karcie pisma wychodzącego nie ma przycisku „Wyślij do ePUAP”. Pozostałe przyciski są widoczne.\n\nKOMENTARZ 1 — konsultant, 2026-10-07 13:15:00 (typ: rozwiazanie):\nPo aktualizacji przycisk wymaga nowego uprawnienia „Wysyłka do ePUAP”. Nadaliśmy je roli Kancelaria w menu Administracja → Role i po ponownym zalogowaniu przycisk jest widoczny. Zamykam zgłoszenie."
       },
       {
         "id": "z06",
-        "rule": 2,
+        "rule": 4,
         "kind": "trap",
         "input": "ZGŁOSZENIE 90406 z 2026-10-07\nTemat: Brak przycisku „Wyślij do ePUAP”\n\nOPIS ZGŁASZAJĄCEGO:\nPo aktualizacji z 1 października w karcie pisma wychodzącego nie ma przycisku „Wyślij do ePUAP”. Pozostałe przyciski są widoczne.\n\nKOMENTARZ 1 — konsultant, 2026-10-07 11:40:00 (typ: zwyczajny):\nCzy przycisk pojawia się po wyczyszczeniu pamięci podręcznej przeglądarki skrótem CTRL+F5?\n\nKOMENTARZ 2 — klient, 2026-10-07 12:55:00 (typ: zwyczajny):\nTak, po wyczyszczeniu pamięci podręcznej skrótem CTRL+F5 przycisk wrócił na wszystkich stanowiskach.\n\nKOMENTARZ 3 — konsultant, 2026-10-07 13:15:00 (typ: rozwiazanie):\nDziękujemy za informację. Zamykam zgłoszenie."
       },
       {
         "id": "z07",
-        "rule": 2,
+        "rule": 4,
         "kind": "trap",
         "input": "ZGŁOSZENIE 90407 z 2026-10-08\nTemat: Pisma wracają z e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nPisma wysyłane do Pana {IMIĘ} {NAZWISKO} wracają z e-Doręczeń z komunikatem „Adres nieaktywny”. Kontakt do mnie: {IMIĘ} {NAZWISKO}, tel. {TELEFON}.\n\nKOMENTARZ 1 — konsultant, 2026-10-08 11:40:00 (typ: rozwiazanie):\nAdresat zmienił adres do doręczeń elektronicznych na {ADRES_EDOR}, a w kartotece kontrahenta stał stary adres. Wpisaliśmy nowy adres w kartotece {IMIĘ} {NAZWISKO} (Kontrahenci → Adresy do doręczeń) i ponowiliśmy wysyłkę jednego pisma testowo — doszło. Ustaliłem to telefonicznie z Panią {IMIĘ} {NAZWISKO}. Zamykam zgłoszenie."
       },
       {
         "id": "z08",
-        "rule": 2,
+        "rule": 4,
         "kind": "breaks",
         "input": "ZGŁOSZENIE 90408 z 2026-10-08\nTemat: Pisma wracają z e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nPisma wysyłane do Pana {IMIĘ} {NAZWISKO} wracają z e-Doręczeń z komunikatem „Adres nieaktywny”. Kontakt do mnie: {IMIĘ} {NAZWISKO}, tel. {TELEFON}.\n\nKOMENTARZ 1 — konsultant, 2026-10-08 11:40:00 (typ: rozwiazanie):\nRozmawiałem telefonicznie z Panią {IMIĘ} {NAZWISKO}, temat wyjaśniony. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z09",
+        "rule": 1,
+        "kind": "breaks",
+        "input": "ZGŁOSZENIE 90409 z 2026-11-23\nTemat: Naklejki\n\nOPIS ZGŁASZAJĄCEGO:\nOd wczoraj nie drukują się naklejki adresowe dla przesyłek poleconych: drukarka wysuwa pustą etykietę. Naklejki dla zwykłych listów drukują się poprawnie.\n\nKOMENTARZ 1 — konsultant, 2026-11-23 10:20:00 (typ: rozwiazanie):\nPoprawiliśmy wyszukiwarkę kontrahentów, teraz podpowiada adresy po kodzie pocztowym. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z10",
+        "rule": 1,
+        "kind": "correct",
+        "input": "ZGŁOSZENIE 90410 z 2026-11-23\nTemat: Naklejki\n\nOPIS ZGŁASZAJĄCEGO:\nOd wczoraj nie drukują się naklejki adresowe dla przesyłek poleconych: drukarka wysuwa pustą etykietę. Naklejki dla zwykłych listów drukują się poprawnie.\n\nKOMENTARZ 1 — konsultant, 2026-11-23 10:20:00 (typ: rozwiazanie):\nSzablon naklejki dla przesyłek poleconych miał po aktualizacji pusty obszar nadruku. Wgraliśmy poprawiony szablon i naklejka drukuje się z adresem. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z11",
+        "rule": 1,
+        "kind": "trap",
+        "input": "ZGŁOSZENIE 90411 z 2026-11-23\nTemat: Naklejki\n\nOPIS ZGŁASZAJĄCEGO:\nProszę o zmianę napisu w stopce naklejek adresowych: zamiast samego „Urząd Gminy” ma być pełna nazwa urzędu z adresem.\n\nKOMENTARZ 1 — konsultant, 2026-11-23 10:20:00 (typ: rozwiazanie):\nZmieniliśmy napis w stopce naklejek zgodnie z prośbą. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z12",
+        "rule": 3,
+        "kind": "breaks",
+        "input": "ZGŁOSZENIE 90412 z 2026-11-24\nTemat: Podgląd PDF\n\nOPIS ZGŁASZAJĄCEGO:\nNa jednym stanowisku w sekretariacie nie wyświetla się podgląd pism w PDF: zamiast podglądu jest pusta ramka. Na pozostałych stanowiskach podgląd działa.\n\nKOMENTARZ 1 — konsultant, 2026-11-24 11:05:00 (typ: rozwiazanie):\nWygląda na to, że coś jest nie tak po Państwa stronie. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z13",
+        "rule": 3,
+        "kind": "correct",
+        "input": "ZGŁOSZENIE 90413 z 2026-11-24\nTemat: Podgląd PDF\n\nOPIS ZGŁASZAJĄCEGO:\nNa jednym stanowisku w sekretariacie nie wyświetla się podgląd pism w PDF: zamiast podglądu jest pusta ramka. Na pozostałych stanowiskach podgląd działa.\n\nKOMENTARZ 1 — konsultant, 2026-11-24 11:05:00 (typ: rozwiazanie):\nSprawdziliśmy: przeglądarka na tym stanowisku ma ustawione pobieranie plików PDF zamiast ich wyświetlania (Ustawienia → Prywatność i bezpieczeństwo → Ustawienia witryn → Dokumenty PDF). Po przestawieniu na „Otwieraj pliki PDF w przeglądarce” podgląd się wyświetli. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z14",
+        "rule": 3,
+        "kind": "trap",
+        "input": "ZGŁOSZENIE 90414 z 2026-11-24\nTemat: Podgląd PDF\n\nOPIS ZGŁASZAJĄCEGO:\nNa jednym stanowisku w sekretariacie nie wyświetla się podgląd pism w PDF: zamiast podglądu jest pusta ramka. Na pozostałych stanowiskach podgląd działa.\n\nKOMENTARZ 1 — konsultant, 2026-11-24 11:05:00 (typ: rozwiazanie):\nPrawdopodobnie przeglądarka na tym stanowisku ma ustawione pobieranie plików PDF zamiast ich wyświetlania (Ustawienia → Prywatność i bezpieczeństwo → Ustawienia witryn → Dokumenty PDF). Proszę przestawić na „Otwieraj pliki PDF w przeglądarce”. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z15",
+        "rule": 5,
+        "kind": "breaks",
+        "input": "ZGŁOSZENIE 90415 z 2026-11-25\nTemat: Brak przycisku wysyłki\n\nOPIS ZGŁASZAJĄCEGO:\nNa stanowisku Sekretariat nie ma przycisku „Wyślij do ePUAP” w karcie pisma wychodzącego. Na stanowisku Kancelaria przycisk jest.\n\nKOMENTARZ 1 — konsultant, 2026-11-25 09:30:00 (typ: zwyczajny):\nNadaliśmy uprawnienie „Wysyłka do ePUAP” roli Kancelaria. Proszę o ponowne zalogowanie.\n\nKOMENTARZ 2 — klient, 2026-11-25 10:10:00 (typ: zwyczajny):\nPo ponownym zalogowaniu na stanowisku Sekretariat nadal nie ma przycisku.\n\nKOMENTARZ 3 — konsultant, 2026-11-25 10:40:00 (typ: rozwiazanie):\nZamykam zgłoszenie."
+      },
+      {
+        "id": "z16",
+        "rule": 5,
+        "kind": "correct",
+        "input": "ZGŁOSZENIE 90416 z 2026-11-25\nTemat: Brak przycisku wysyłki\n\nOPIS ZGŁASZAJĄCEGO:\nNa stanowisku Sekretariat nie ma przycisku „Wyślij do ePUAP” w karcie pisma wychodzącego. Na stanowisku Kancelaria przycisk jest.\n\nKOMENTARZ 1 — konsultant, 2026-11-25 09:30:00 (typ: zwyczajny):\nNadaliśmy uprawnienie „Wysyłka do ePUAP” roli Kancelaria. Proszę o ponowne zalogowanie.\n\nKOMENTARZ 2 — klient, 2026-11-25 10:10:00 (typ: zwyczajny):\nPo ponownym zalogowaniu na stanowisku Sekretariat nadal nie ma przycisku.\n\nKOMENTARZ 3 — konsultant, 2026-11-25 10:40:00 (typ: rozwiazanie):\nStanowisko Sekretariat ma inną rolę niż Kancelaria. Nadaliśmy uprawnienie także roli Sekretariat i po ponownym zalogowaniu przycisk jest widoczny. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z17",
+        "rule": 5,
+        "kind": "trap",
+        "input": "ZGŁOSZENIE 90417 z 2026-11-25\nTemat: Brak przycisku wysyłki\n\nOPIS ZGŁASZAJĄCEGO:\nNa stanowisku Sekretariat nie ma przycisku „Wyślij do ePUAP” w karcie pisma wychodzącego. Na stanowisku Kancelaria przycisk jest.\n\nKOMENTARZ 1 — konsultant, 2026-11-25 09:30:00 (typ: zwyczajny):\nNadaliśmy uprawnienie „Wysyłka do ePUAP” roli Sekretariat. Proszę o ponowne zalogowanie.\n\nKOMENTARZ 2 — klient, 2026-11-25 10:10:00 (typ: zwyczajny):\nNadal nie ma przycisku.\n\nKOMENTARZ 3 — klient, 2026-11-25 10:25:00 (typ: zwyczajny):\nPrzepraszam, nie wylogowałam się wcześniej. Po ponownym zalogowaniu przycisk jest. Dziękuję.\n\nKOMENTARZ 4 — konsultant, 2026-11-25 10:40:00 (typ: rozwiazanie):\nZamykam zgłoszenie."
+      },
+      {
+        "id": "z18",
+        "rule": 3,
+        "kind": "breaks",
+        "input": "ZGŁOSZENIE 90418 z 2026-11-24\nTemat: Naklejki\n\nOPIS ZGŁASZAJĄCEGO:\nOd wczoraj nie drukują się naklejki adresowe dla przesyłek poleconych: drukarka wysuwa pustą etykietę. Naklejki dla zwykłych listów drukują się poprawnie.\n\nKOMENTARZ 1 — konsultant, 2026-11-24 14:00:00 (typ: rozwiazanie):\nRęcznie wygenerowaliśmy naklejki dla wczorajszych przesyłek poleconych. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z19",
+        "rule": 3,
+        "kind": "trap",
+        "input": "ZGŁOSZENIE 90419 z 2026-11-24\nTemat: Naklejki\n\nOPIS ZGŁASZAJĄCEGO:\nOd wczoraj nie drukują się naklejki adresowe dla przesyłek poleconych: drukarka wysuwa pustą etykietę. Naklejki dla zwykłych listów drukują się poprawnie.\n\nKOMENTARZ 1 — konsultant, 2026-11-24 14:00:00 (typ: rozwiazanie):\nNie udało się ustalić, dlaczego drukarka wysuwała puste etykiety: w logach nie ma błędów, a przy naszym teście naklejki drukują się poprawnie. Ręcznie wygenerowaliśmy naklejki dla wczorajszych przesyłek poleconych. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z20",
+        "rule": 3,
+        "kind": "trap",
+        "input": "ZGŁOSZENIE 90420 z 2026-11-24\nTemat: Naklejki\n\nOPIS ZGŁASZAJĄCEGO:\nOd wczoraj nie drukują się naklejki adresowe dla przesyłek poleconych: drukarka wysuwa pustą etykietę. Naklejki dla zwykłych listów drukują się poprawnie.\n\nKOMENTARZ 1 — konsultant, 2026-11-24 14:00:00 (typ: rozwiazanie):\nWgraliśmy poprawkę modułu naklejek; naklejki dla przesyłek poleconych drukują się z adresem. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z21",
+        "rule": 6,
+        "kind": "breaks",
+        "input": "ZGŁOSZENIE 90421 z 2026-11-25\nTemat: Status wysyłek e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nPisma wysłane wczoraj przez e-Doręczenia mają w rejestrze status „W toku”, choć adresaci potwierdzają odbiór.\n\nKOMENTARZ 1 — konsultant, 2026-11-25 13:00:00 (typ: rozwiazanie):\nPodobny problem był w zgłoszeniu 90120. Zamykam zgłoszenie."
+      },
+      {
+        "id": "z22",
+        "rule": 6,
+        "kind": "correct",
+        "input": "ZGŁOSZENIE 90422 z 2026-11-25\nTemat: Status wysyłek e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nPisma wysłane wczoraj przez e-Doręczenia mają w rejestrze status „W toku”, choć adresaci potwierdzają odbiór.\n\nKOMENTARZ 1 — konsultant, 2026-11-25 13:00:00 (typ: rozwiazanie):\nZamykamy jako duplikat zgłoszenia 90120, w którym prowadzimy tę sprawę."
+      },
+      {
+        "id": "z23",
+        "rule": 6,
+        "kind": "trap",
+        "input": "ZGŁOSZENIE 90423 z 2026-11-25\nTemat: Status wysyłek e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nPisma wysłane wczoraj przez e-Doręczenia mają w rejestrze status „W toku”, choć adresaci potwierdzają odbiór.\n\nKOMENTARZ 1 — konsultant, 2026-11-25 13:00:00 (typ: rozwiazanie):\nTę samą sprawę zgłosił wcześniej sekretariat i prowadzimy ją w tamtym zgłoszeniu. Zamykam to jako duplikat."
+      },
+      {
+        "id": "z24",
+        "rule": 5,
+        "kind": "breaks",
+        "input": "ZGŁOSZENIE 90424 z 2026-11-25\nTemat: Status wysyłek e-Doręczeń\n\nOPIS ZGŁASZAJĄCEGO:\nPisma wysłane wczoraj przez e-Doręczenia mają w rejestrze status „W toku”, choć adresaci potwierdzają odbiór.\n\nKOMENTARZ 1 — konsultant, 2026-11-25 12:00:00 (typ: zwyczajny):\nSprawę prowadzimy w zgłoszeniu 90120.\n\nKOMENTARZ 2 — klient, 2026-11-25 12:30:00 (typ: zwyczajny):\nTamto zgłoszenie dotyczy innych pism. Czy możecie Państwo sprawdzić także te z wczoraj?\n\nKOMENTARZ 3 — konsultant, 2026-11-25 13:00:00 (typ: rozwiazanie):\nZamykamy jako duplikat zgłoszenia 90120."
       }
     ]
   }

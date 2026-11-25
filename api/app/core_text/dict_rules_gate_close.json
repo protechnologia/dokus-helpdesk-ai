@@ -1,8 +1,12 @@
 {
-  "version": 1,
-  "description": "DANE KLIENTA, nie nasz kod — tak jak dict_resolution.json. Zmiana tego pliku jest konfiguracją: podbij `version`, a odpowiedź bramki poda, którą wersją wydano werdykt. Reguły wchodzą do oddzielonej sekcji danych w prompcie grafu `gate_close` — nie mogą przestawić formatu wyjścia ani znieść zakazu zmyślania. Pusta lista to błąd: graf bez reguł nie rusza. Od p. 29 źródłem staje się magazyn reguł, a plik zostaje zestawem domyślnym. Zestaw startowy wyprowadzony z CLAUDE.md; treść stroi się z pomiarem w p. 21.",
+  "version": 2,
+  "description": "DANE KLIENTA, nie nasz kod — tak jak dict_resolution.json. Zmiana tego pliku jest konfiguracją: podbij `version`, a odpowiedź bramki poda, którą wersją wydano werdykt. Reguły wchodzą do oddzielonej sekcji danych w prompcie grafu `gate_close` — nie mogą przestawić formatu wyjścia ani znieść zakazu zmyślania. Pusta lista to błąd: graf bez reguł nie rusza. Od p. 29 źródłem staje się magazyn reguł, a plik zostaje zestawem domyślnym. Zestaw startowy wyprowadzony z CLAUDE.md; treść stroi się z pomiarem (p. 21, a na prawdziwych zamknięciach p. 33.2). Wersja 2 (2026-11-25): pierwsza reguła to wymóg, trzy następne mówią, czym są problem, przyczyna i rozwiązanie, piąta dotyczy niezałatwionego pytania albo reklamacji klienta, a szósta zwalnia z trzech pierwszych wymagań zamknięcie jako duplikat albo z odesłaniem do innego zgłoszenia.",
   "rules": [
-    "Z treści zgłoszenia wynika, co było problemem.",
-    "Z treści zgłoszenia wynika, co zostało zrobione, żeby problem rozwiązać."
+    "Z wątku można wyprowadzić, co było problemem, jaka była przyczyna i jakie było rozwiązanie.",
+    "Problem to objaw lub niedogodność, z którą spotkał się klient, albo jego prośba.",
+    "Przyczyna to powód powstania problemu. Może wynikać z samego rozwiązania (np. wgranie poprawki oznacza błąd w kodzie). Nie trzeba jej podawać, jeśli problem nie wymagał jej ustalenia (np. prośba o zmianę) albo z treści wynika, że próbowano ją ustalić, ale się nie udało. Wystarczy, że ustalono ją w miarę konkretnie i z dużym prawdopodobieństwem.",
+    "Rozwiązanie to czynność, którą obsługa wykonała, aby pomóc klientowi. Rozwiązaniem jest także sprawdzenie, które przyniosło konkretne ustalenia (np. że czynność należy wykonać po stronie klienta), albo wskazanie klientowi konkretnego ustawienia lub czynności, które usuwają przyczynę.",
+    "Ostatnie pytanie albo reklamacja klienta nie zostały bez odpowiedzi.",
+    "Jeśli zgłoszenie zamyka się jako duplikat albo z odesłaniem do innego zgłoszenia, w którym sprawa jest prowadzona, nie trzeba wyprowadzać z wątku problemu, przyczyny ani rozwiązania."
   ]
 }

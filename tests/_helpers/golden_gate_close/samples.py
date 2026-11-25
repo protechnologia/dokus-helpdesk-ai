@@ -32,8 +32,8 @@ from tests._helpers.golden_gate_close.models.golden_gate_close_case import Golde
 
 def sample_case(
     kind:     str = "sprawa",            # np. "powiadomienie"
-    problem:  bool = True,               # np. False — reguła 1 złamana
-    action:   bool = True,               # np. False — reguła 2 złamana
+    problem:  bool = True,               # np. False — nie widać problemu
+    action:   bool = True,               # np. False — nie widać rozwiązania
     stratum:  str = "random",            # np. "mail"
     doubtful: bool = False,              # np. True — przypadek graniczny
     ticket:   str = "90001",             # np. "90002"

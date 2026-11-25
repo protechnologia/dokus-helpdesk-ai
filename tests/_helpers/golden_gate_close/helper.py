@@ -17,13 +17,13 @@ z wątku po anonimizacji, uciętego tak, jak go widział konsultant, który zamy
 
 Grupy wpisów (`GoldenGateCloseCase.group`):
 
-| grupa    | wpis                                     | oczekiwany werdykt | zły werdykt to |
-|----------|------------------------------------------|--------------------|----------------|
-| `pass`   | sprawa, która spełnia obie reguły        | `pass`             | fałszywy alarm |
-| `rule1`  | sprawa, z której nie wynika problem      | `block`            | przepuszczenie |
-| `rule2`  | sprawa, z której nie wynika, co zrobiono | `block`            | przepuszczenie |
-| `both`   | sprawa, która łamie obie reguły          | `block`            | przepuszczenie |
-| `notice` | powiadomienie, bez względu na reguły     | `block` (GAT-001)  | przepuszczenie |
+| grupa         | wpis                                        | werdykt           | zły werdykt to |
+|---------------|---------------------------------------------|-------------------|----------------|
+| `pass`        | sprawa: widać problem i rozwiązanie         | `pass`            | fałszywy alarm |
+| `no_problem`  | sprawa: nie widać problemu                  | `block`           | przepuszczenie |
+| `no_solution` | sprawa: nie widać rozwiązania               | `block`           | przepuszczenie |
+| `neither`     | sprawa: nie widać ani jednego, ani drugiego | `block`           | przepuszczenie |
+| `notice`      | powiadomienie, bez względu na reguły        | `block` (GAT-001) | przepuszczenie |
 
 O czym pamiętać przy zmianach:
 
