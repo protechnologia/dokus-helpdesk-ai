@@ -59,11 +59,13 @@ commita.
 
 ## Powiązania
 
-- CLAUDE.md, „Dokumentacja” → „CLAUDE.md”: reguła odchudzania; „ADR” i „Runbook”: dokąd
-  przechodzą decyzje i procedury.
+- [CLAUDE.md, „Dokumentacja” → „CLAUDE.md”](../../CLAUDE.md#claudemd): reguła odchudzania;
+  [„ADR”](../../CLAUDE.md#adr) i [„Runbook”](../../CLAUDE.md#runbook): dokąd przechodzą decyzje
+  i procedury.
 - [Zasady ADR](../adr/README.md) (krok 1) i [zasady runbooków](README.md) (krok 2).
-- `tests/integration/test_docs_adr_links.py` i `tests/integration/test_docs_runbook_links.py`:
-  linki do ADR i runbooków po przeniesieniu.
+- [`test_docs_adr_links.py`](../../tests/integration/test_docs_adr_links.py)
+  i [`test_docs_runbook_links.py`](../../tests/integration/test_docs_runbook_links.py): linki
+  do ADR i runbooków po przeniesieniu.
 
 ## Log
 

@@ -76,7 +76,8 @@ Co zamknąć, usunąć albo przywrócić po pracy.
 
 ## Powiązania
 
-- Reguła w CLAUDE.md (sekcja), ADR, inne runbooki, skrypty i testy, na których stoją kroki.
+- Linki względne: [reguła w CLAUDE.md](../../CLAUDE.md#sekcja), ADR, inne runbooki, skrypty
+  i testy, na których stoją kroki.
 
 ## Log
 
