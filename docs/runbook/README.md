@@ -11,8 +11,8 @@ Przed procedurą przeczytaj jej runbook, a po przejściu popraw go i dopisz wpis
 ## Zasady
 
 - Jedna procedura na plik. Nazwa pliku: `RB-<NNN>_<czynność>.md`, numer kolejny, czynność
-  małymi literami i z łącznikami. Jeden przedrostek dla wszystkich runbooków, bez obszarów jak
-  w ADR, żeby ID nie myliło się z decyzją; numer usuniętego runbooka nie wraca.
+  małymi literami i z łącznikami. Przedrostek `RB` odróżnia runbook od decyzji (`ADR`); numer
+  usuniętego runbooka nie wraca.
 - CLAUDE.md, ADR i inne runbooki linkują do runbooka z ID jako tekstem linku
   (`[RB-001](…)`), tak jak do ADR.
 - Runbook jest żywy, inaczej niż ADR: poprawia się go po każdym przejściu, a „Log” dostaje

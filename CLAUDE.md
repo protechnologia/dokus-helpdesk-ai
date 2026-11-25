@@ -246,19 +246,17 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
 ### ADR
 
 - **`docs/adr/` — decyzje architektoniczne (ADR), w repo (2026-11-20).** ADR mówi, dlaczego tak,
-  a nie inaczej, i co odrzucono. Zasady, obszary, spis decyzji i szablon stoją
-  w `docs/adr/README.md`; ID to `ADR-NNN`, a obszar stoi w kolumnie spisu (od 2026-11-25,
-  wcześniej przedrostek obszaru w ID, np. `AGT-001`).
-- **Na początku sesji przeczytaj `docs/adr/README.md`**: obszary, spis decyzji z obszarem
-  i statusem. Przed zmianą w obszarze przeczytaj jego ADR-y ze statusem „Przyjęta”.
+  a nie inaczej, i co odrzucono. Zasady, spis decyzji i szablon stoją w `docs/adr/README.md`;
+  ID to `ADR-NNN`, bez obszaru (od 2026-11-25, wcześniej przedrostek obszaru w ID, np.
+  `AGT-001`).
+- **Na początku sesji przeczytaj `docs/adr/README.md`**: spis decyzji ze statusem. Przed zmianą
+  w sekcji przeczytaj ADR-y, do których linkuje, ze statusem „Przyjęta”.
 - **Przy decyzji w CLAUDE.md zostaje reguła, to, co z niej wynika, i link do ADR.** Każdy ADR ma
   taki link w sekcji tematycznej swojej decyzji, bo tam agent trafia na nią przed zmianą, a spis
   w README tylko wylicza ADR-y; pilnuje tego `test_docs_adr_links.py`.
 - **Nową dużą decyzję agent od razu proponuje jako ADR**: trudną do odwrócenia, z realnym
   wyborem, taką, o którą ktoś zapyta „czemu tak?”. Istniejące decyzje przenosimy przy
   refaktoryzacji podsekcji CLAUDE.md, nie hurtem.
-- **Nowy obszar ADR dopiero po akceptacji użytkownika.** Gdy decyzja nie pasuje do żadnego
-  obszaru z README, agent proponuje nowy obszar ze skrótem i dopisuje go dopiero po akceptacji.
 
 ### Runbook
 
@@ -330,7 +328,7 @@ dokus-helpdesk-ai/
 ├── requirements-dev.txt          # zależności testów/lintera (poza obrazem)
 ├── CLAUDE.md / README.md
 ├── scripts/                      # skrypty repo: przygotowanie danych i pomiary
-├── docs/adr/                     # decyzje (ADR): README.md z obszarami, spisem i szablonem — W repo
+├── docs/adr/                     # decyzje (ADR): README.md z zasadami, spisem i szablonem — W repo
 ├── docs/runbook/                 # procedury pracy nad projektem: README.md z zasadami, spisem i szablonem — W repo
 ├── data/
 │   ├── safe/                     # dane zmyślone — W repo

@@ -49,8 +49,8 @@ def test_every_adr_is_linked_from_claude_md() -> None:
     """Sprawdza, czy każdy ADR z `docs/adr/` ma w CLAUDE.md co najmniej jeden link
     (`docs/adr/<plik>`).
 
-    Wyłapuje ADR, którego reguła nie stoi w CLAUDE.md przy swojej decyzji: agent zmieniający
-    ten obszar czyta sekcję tematyczną i nie zobaczy ani decyzji, ani jej powodów."""
+    Wyłapuje ADR, którego reguła nie stoi w CLAUDE.md przy swojej decyzji: agent, który zmienia
+    tę część projektu, czyta sekcję tematyczną i nie zobaczy ani decyzji, ani jej powodów."""
     missing = set(adr_files()) - claude_md_links()
 
     assert not missing, f"ADR bez linku w CLAUDE.md: {sorted(missing)}"
