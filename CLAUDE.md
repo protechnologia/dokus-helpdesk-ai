@@ -237,28 +237,31 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
   żeby dało się ją przenieść albo przepisać bez poprawiania pozostałych (2026-10-04). Wyjątkiem są
   numery punktów planu („p. N"), bo są stałe. Starsze odwołania usuwamy przy zmianach w sekcji,
   nie hurtem.
-- **Co jakiś czas odchudzamy jedną podsekcję CLAUDE.md (2026-11-20)**: wypada to, co się nie
-  przyda albo łatwo wyciągnąć z kodu, a duże decyzje podsekcji idą do ADR. Cztery kroki, każdy
-  z plikiem do przeglądu przed zmianą i osobnym commitem: najpierw wybór dużych decyzji
-  podsekcji do ADR (decyzja, opcje, powód), potem czyszczenie, łączenie (punkty o jednej osi
-  w jeden, ułożone tematycznie, bez przepisywania słów) i zwięzłość (każdy punkt w jednym
-  układzie: pogrubiona decyzja z datą, dlaczego, liczby, na końcu „Cena:” albo otwarte pytanie;
-  fakty bez zmian); po każdym skrypt porównuje liczby i odesłania do planu obu wersji.
+- **Co jakiś czas odchudzamy jedną podsekcję CLAUDE.md (2026-11-20).** Cztery kroki, każdy
+  z plikiem do przeglądu przed zmianą i osobnym commitem; po każdym skrypt porównuje liczby
+  i odesłania do planu obu wersji:
+  1. **ADR** — wybór dużych decyzji podsekcji do ADR (decyzja, opcje, powód).
+  2. **Czyszczenie** — wypada to, co się nie przyda albo łatwo wyciągnąć z kodu; przy „bo jest
+     w kodzie” sprawdzamy, że to naprawdę stoi w docstringu, modelu albo opisie narzędzia.
+  3. **Łączenie** — punkty o jednej osi w jeden, ułożone tematycznie, bez przepisywania słów.
+  4. **Zwięzłość** — każdy punkt w jednym układzie: pogrubiona decyzja z datą, dlaczego, liczby,
+     na końcu „Cena:” albo otwarte pytanie; fakty bez zmian.
 
 ### ADR
 
+- **`docs/adr/` — decyzje architektoniczne (ADR), w repo (2026-11-20).** ADR mówi, dlaczego tak,
+  a nie inaczej, i co odrzucono. Zasady, obszary z prefiksami, spis decyzji i szablon stoją
+  w `docs/adr/README.md`.
 - **Na początku sesji przeczytaj `docs/adr/README.md`**: obszary z prefiksami, spis decyzji
   i ich statusy. Przed zmianą w obszarze przeczytaj jego ADR-y ze statusem „Przyjęta”.
-- **`docs/adr/` — decyzje architektoniczne (ADR), w repo (2026-11-20).** ADR mówi, dlaczego tak,
-  a nie inaczej, i co odrzucono; przy decyzji w CLAUDE.md zostaje reguła, to, co z niej wynika,
-  i link do ADR. Każdy ADR ma taki link w sekcji tematycznej swojej decyzji, bo tam agent trafia
-  na nią przed zmianą, a spis w README tylko wylicza ADR-y; pilnuje tego
-  `test_docs_adr_links.py`. Zasady, obszary z prefiksami, spis decyzji i szablon stoją w
-  `docs/adr/README.md`. Nową dużą decyzję (trudną do odwrócenia, z realnym wyborem, taką, o którą
-  ktoś zapyta „czemu tak?”) agent od razu proponuje jako ADR; istniejące decyzje przenosimy przy
-  refaktoryzacji podsekcji CLAUDE.md, nie hurtem. Gdy decyzja nie pasuje do żadnego obszaru
-  z README, agent proponuje nowy obszar z prefiksem i dopisuje go dopiero po akceptacji
-  użytkownika.
+- **Przy decyzji w CLAUDE.md zostaje reguła, to, co z niej wynika, i link do ADR.** Każdy ADR ma
+  taki link w sekcji tematycznej swojej decyzji, bo tam agent trafia na nią przed zmianą, a spis
+  w README tylko wylicza ADR-y; pilnuje tego `test_docs_adr_links.py`.
+- **Nową dużą decyzję agent od razu proponuje jako ADR**: trudną do odwrócenia, z realnym
+  wyborem, taką, o którą ktoś zapyta „czemu tak?”. Istniejące decyzje przenosimy przy
+  refaktoryzacji podsekcji CLAUDE.md, nie hurtem.
+- **Nowy obszar ADR dopiero po akceptacji użytkownika.** Gdy decyzja nie pasuje do żadnego
+  obszaru z README, agent proponuje nowy obszar z prefiksem i dopisuje go dopiero po akceptacji.
 
 ### Raporty i prezentacje
 
