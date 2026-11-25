@@ -12,8 +12,11 @@ przeczytaj jego ADR-y ze statusem „Przyjęta”.
 - Jedna decyzja na plik, najwyżej strona.
 - ADR piszemy, gdy decyzja jest trudna do odwrócenia, był realny wybór albo ktoś zapyta „czemu
   tak?”. Drobne decyzje zostają jednym zdaniem w CLAUDE.md.
-- Przyjętego ADR nie edytuje się poza statusem. Zmiana decyzji to nowy ADR z polem „Zastępuje”,
+- Przyjętego ADR nie zmienia się merytorycznie. Zmiana decyzji to nowy ADR z polem „Zastępuje”,
   a w starym zmienia się tylko status na „Zastąpiona przez …”.
+- Poprawka niemerytoryczna przyjętego ADR (literówka, martwy link, ścieżka albo nazwa po
+  przeniesieniu w kodzie) jest dozwolona i dostaje wpis w sekcji „Log” na końcu pliku; sekcja
+  dochodzi przy pierwszej takiej poprawce.
 - Najcenniejsze są odrzucone opcje: powód odrzucenia stoi przy samej opcji, a „Koszty” mówią
   tylko o cenie opcji wybranej.
 - Bez danych klienta: wnioski i liczby, bez cytatów z korpusu i bez nazw osób (folder jest
@@ -88,4 +91,10 @@ Wybrana opcja i dlaczego.
 ### Koszty
 
 - ...
+
+## Log
+
+Poprawki niemerytoryczne po przyjęciu, najnowsza na górze.
+
+- RRRR-MM-DD — co poprawiono.
 ```
