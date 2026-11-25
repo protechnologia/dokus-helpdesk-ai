@@ -5,12 +5,17 @@
 - [Produkt](#produkt)
   - [Cel](#cel)
   - [Jak to działa](#jak-to-działa)
-  - [Zasady produktu](#zasady-produktu)
   - [Stack](#stack)
-- [Zasady ogólne](#zasady-ogólne)
+- [Zasady](#zasady)
+  - [Zasady ogólne](#zasady-ogólne)
   - [Zasady techniczne](#zasady-techniczne)
+  - [Zasady produktu](#zasady-produktu)
   - [Praca z agentem](#praca-z-agentem)
-  - [Dokumentacja](#dokumentacja)
+- [Dokumentacja](#dokumentacja)
+  - [CLAUDE.md](#claudemd)
+  - [ADR](#adr)
+  - [Raporty i prezentacje](#raporty-i-prezentacje)
+  - [README](#readme)
 - [Styl kodu i komentarzy](#styl-kodu-i-komentarzy)
   - [Podział na foldery i pliki](#podział-na-foldery-i-pliki)
   - [Warstwy kodu](#warstwy-kodu)
@@ -117,6 +122,53 @@ fragmentu. Korpus zgłoszeń jest zaimportowany z sierpniowego zrzutu (p. 31, 20
 jakości, więc instancja szuka wśród 1115 kart i 1115 wątków po anonimizacji, a każde zamknięte
 zgłoszenie dokłada się do nich trasą zamknięcia (p. 30).
 
+### Stack
+
+- Python, FastAPI, Pydantic, pydantic-settings, Typer (CLI)
+- **Baza wektorowa: Qdrant** — wyszukiwanie po znaczeniu: karty zgłoszeń i instrukcje.
+- **Relacyjna baza: Postgres z polskim słownikiem** — wyszukiwanie tekstowe w wątkach zgłoszeń
+  i w instrukcjach, a od p. 29 w osobnym schemacie także reguły bramek, ich wersje i audyt
+  werdyktów. Nie jest źródłem prawdy: indeks tekstowy odbudowuje się z plików, jak Qdrant
+  (zasada 8).
+- **Embeddingi: lokalny model PL `OPI-PIB/PolDense-150M`** (ModernBERT), na CPU. Licencja:
+  **gemma** — zweryfikować przed komercyjnym wdrożeniem (p. 40). Wymiar wektora jest
+  konfiguracją kolekcji Qdranta: zmiana modelu to nowa kolekcja, nie migracja.
+- **LLM: mocny model zewnętrzny** — komercyjne API albo endpoint self-hosted zgodny z OpenAI
+  (RunPod, Ollama); domyślnie `FakeLLMClient` (offline). Dwie osobne konfiguracje: model
+  generujący (`LLM_GENERATION_*`) i model pomagający anonimizatorowi (`LLM_ANONYMIZATION_*`).
+- **Orkiestracja: LangGraph** — wyłącznie jako silnik przebiegu grafów; model i narzędzia idą
+  przez nasze kontrakty.
+- Deploy: Docker Compose
+
+Usługi w compose: `api` (FastAPI + CLI), `embedder` (model PL za REST-em), `anonymizer` (dane
+osobowe na znaczniki: wzorce i model anonimizujący, p. 19), `qdrant`, `postgres` i `frontend`
+(front pokazowy w React, p. 77). LLM jest **zewnętrznym endpointem**, nie usługą w bazowym
+compose.
+
+## Zasady
+
+### Zasady ogólne
+
+- **Nie naciągaj etykiet zestawów ewaluacyjnych, żeby poprawić wynik** (2026-11-25). Etykieta
+  mówi, czego chce człowiek, a nie co wynika z brzmienia reguły, promptu czy werdyktu modelu;
+  rozjazd między nimi to błąd, który się liczy i opisuje, a nie chowa. Etykietę zmienia tylko
+  nowa decyzja człowieka o tym, czego chcemy, nigdy sama zmiana reguły ani wynik pomiaru.
+
+### Zasady techniczne
+
+1. **Konfiguracja wyłącznie przez ENV** (pydantic-settings) — żadnych sekretów ani
+   endpointów na sztywno w kodzie.
+2. **Komunikacja = REST (HTTP/JSON)** między komponentami.
+3. **Modularność.** Każdy komponent = osobna usługa w `docker-compose`, którą da się podmienić
+   lub zaktualizować **bez zmian w pozostałych** (i bez zmian w logice biznesowej).
+4. **Abstrakcja dostawcy LLM** — logika nigdy nie rozmawia bezpośrednio z SDK dostawcy.
+   To samo dotyczy **embeddera**: domena woła `EmbeddingClient`, nie `sentence-transformers`.
+5. **Dev montuje kod z hosta** (zmiany żywe bez rebuildu); **prod kopiuje kod do obrazu** —
+   uruchamiamy dokładnie tę wersję, którą zbudowaliśmy.
+6. **Praca zawsze w izolowanym `venv`** — nigdy przeciw systemowemu Pythonowi. Przed każdą
+   komendą Pythona (`pytest`/`ruff`/`pip`) `.venv` musi istnieć i być aktywny; jeśli go nie ma —
+   najpierw utwórz i aktywuj.
+
 ### Zasady produktu
 
 Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje się kod i reszta pliku.
@@ -167,55 +219,8 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
   tam pytań proceduralnych („czy problem nadal występuje?") — konkrety (nazwy, ustawienia,
   wersje) są całą wartością tego pola
 
-### Stack
-
-- Python, FastAPI, Pydantic, pydantic-settings, Typer (CLI)
-- **Baza wektorowa: Qdrant** — wyszukiwanie po znaczeniu: karty zgłoszeń i instrukcje.
-- **Relacyjna baza: Postgres z polskim słownikiem** — wyszukiwanie tekstowe w wątkach zgłoszeń
-  i w instrukcjach, a od p. 29 w osobnym schemacie także reguły bramek, ich wersje i audyt
-  werdyktów. Nie jest źródłem prawdy: indeks tekstowy odbudowuje się z plików, jak Qdrant
-  (zasada 8).
-- **Embeddingi: lokalny model PL `OPI-PIB/PolDense-150M`** (ModernBERT), na CPU. Licencja:
-  **gemma** — zweryfikować przed komercyjnym wdrożeniem (p. 40). Wymiar wektora jest
-  konfiguracją kolekcji Qdranta: zmiana modelu to nowa kolekcja, nie migracja.
-- **LLM: mocny model zewnętrzny** — komercyjne API albo endpoint self-hosted zgodny z OpenAI
-  (RunPod, Ollama); domyślnie `FakeLLMClient` (offline). Dwie osobne konfiguracje: model
-  generujący (`LLM_GENERATION_*`) i model pomagający anonimizatorowi (`LLM_ANONYMIZATION_*`).
-- **Orkiestracja: LangGraph** — wyłącznie jako silnik przebiegu grafów; model i narzędzia idą
-  przez nasze kontrakty.
-- Deploy: Docker Compose
-
-Usługi w compose: `api` (FastAPI + CLI), `embedder` (model PL za REST-em), `anonymizer` (dane
-osobowe na znaczniki: wzorce i model anonimizujący, p. 19), `qdrant`, `postgres` i `frontend`
-(front pokazowy w React, p. 77). LLM jest **zewnętrznym endpointem**, nie usługą w bazowym
-compose.
-
-## Zasady ogólne
-
-- **Nie naciągaj etykiet zestawów ewaluacyjnych, żeby poprawić wynik** (2026-11-25). Etykieta
-  mówi, czego chce człowiek, a nie co wynika z brzmienia reguły, promptu czy werdyktu modelu;
-  rozjazd między nimi to błąd, który się liczy i opisuje, a nie chowa. Etykietę zmienia tylko
-  nowa decyzja człowieka o tym, czego chcemy, nigdy sama zmiana reguły ani wynik pomiaru.
-
-### Zasady techniczne
-
-1. **Konfiguracja wyłącznie przez ENV** (pydantic-settings) — żadnych sekretów ani
-   endpointów na sztywno w kodzie.
-2. **Komunikacja = REST (HTTP/JSON)** między komponentami.
-3. **Modularność.** Każdy komponent = osobna usługa w `docker-compose`, którą da się podmienić
-   lub zaktualizować **bez zmian w pozostałych** (i bez zmian w logice biznesowej).
-4. **Abstrakcja dostawcy LLM** — logika nigdy nie rozmawia bezpośrednio z SDK dostawcy.
-   To samo dotyczy **embeddera**: domena woła `EmbeddingClient`, nie `sentence-transformers`.
-5. **Dev montuje kod z hosta** (zmiany żywe bez rebuildu); **prod kopiuje kod do obrazu** —
-   uruchamiamy dokładnie tę wersję, którą zbudowaliśmy.
-6. **Praca zawsze w izolowanym `venv`** — nigdy przeciw systemowemu Pythonowi. Przed każdą
-   komendą Pythona (`pytest`/`ruff`/`pip`) `.venv` musi istnieć i być aktywny; jeśli go nie ma —
-   najpierw utwórz i aktywuj.
-
 ### Praca z agentem
 
-- **Na początku sesji przeczytaj `docs/adr/README.md`**: obszary z prefiksami, spis decyzji
-  i ich statusy. Przed zmianą w obszarze przeczytaj jego ADR-y ze statusem „Przyjęta”.
 - **Prośba o plan = zostajesz w planowaniu.** „Jaki masz plan?" / „co proponujesz?" → przedstaw
   plan i **czekaj**. Odpowiedzi na pytania doprecyzowujące to NIE jest zgoda na implementację.
   - Bez zgody wolno: rozpoznanie — czytanie plików, `docker compose config`, sondy w scratchpadzie.
@@ -223,13 +228,27 @@ compose.
 - **Commity bez trailerów współautorstwa** (`Co-Authored-By` itp.).
 - Język komunikacji: polski.
 
-### Dokumentacja
+## Dokumentacja
+
+### CLAUDE.md
 
 - **CLAUDE.md** — „dlaczego": zasady, trwałe decyzje, pułapki, świadome pominięcia. Sekcje nie
   odwołują się do siebie nawzajem („patrz …", „wyżej", „niżej") — każda ma być zrozumiała sama,
   żeby dało się ją przenieść albo przepisać bez poprawiania pozostałych (2026-10-04). Wyjątkiem są
   numery punktów planu („p. N"), bo są stałe. Starsze odwołania usuwamy przy zmianach w sekcji,
   nie hurtem.
+- **Co jakiś czas odchudzamy jedną podsekcję CLAUDE.md (2026-11-20)**: wypada to, co się nie
+  przyda albo łatwo wyciągnąć z kodu, a duże decyzje podsekcji idą do ADR. Cztery kroki, każdy
+  z plikiem do przeglądu przed zmianą i osobnym commitem: najpierw wybór dużych decyzji
+  podsekcji do ADR (decyzja, opcje, powód), potem czyszczenie, łączenie (punkty o jednej osi
+  w jeden, ułożone tematycznie, bez przepisywania słów) i zwięzłość (każdy punkt w jednym
+  układzie: pogrubiona decyzja z datą, dlaczego, liczby, na końcu „Cena:” albo otwarte pytanie;
+  fakty bez zmian); po każdym skrypt porównuje liczby i odesłania do planu obu wersji.
+
+### ADR
+
+- **Na początku sesji przeczytaj `docs/adr/README.md`**: obszary z prefiksami, spis decyzji
+  i ich statusy. Przed zmianą w obszarze przeczytaj jego ADR-y ze statusem „Przyjęta”.
 - **`docs/adr/` — decyzje architektoniczne (ADR), w repo (2026-11-20).** ADR mówi, dlaczego tak,
   a nie inaczej, i co odrzucono; przy decyzji w CLAUDE.md zostaje reguła, to, co z niej wynika,
   i link do ADR. Każdy ADR ma taki link w sekcji tematycznej swojej decyzji, bo tam agent trafia
@@ -240,13 +259,9 @@ compose.
   refaktoryzacji podsekcji CLAUDE.md, nie hurtem. Gdy decyzja nie pasuje do żadnego obszaru
   z README, agent proponuje nowy obszar z prefiksem i dopisuje go dopiero po akceptacji
   użytkownika.
-- **Co jakiś czas odchudzamy jedną podsekcję CLAUDE.md (2026-11-20)**: wypada to, co się nie
-  przyda albo łatwo wyciągnąć z kodu, a duże decyzje podsekcji idą do ADR. Cztery kroki, każdy
-  z plikiem do przeglądu przed zmianą i osobnym commitem: najpierw wybór dużych decyzji
-  podsekcji do ADR (decyzja, opcje, powód), potem czyszczenie, łączenie (punkty o jednej osi
-  w jeden, ułożone tematycznie, bez przepisywania słów) i zwięzłość (każdy punkt w jednym
-  układzie: pogrubiona decyzja z datą, dlaczego, liczby, na końcu „Cena:” albo otwarte pytanie;
-  fakty bez zmian); po każdym skrypt porównuje liczby i odesłania do planu obu wersji.
+
+### Raporty i prezentacje
+
 - **`data/unsafe/docs/` — raporty robocze i prezentacje, POZA repo** (2026-08-20).
   Powód: **raport cytujący korpus niesie PII**, choćby autor tego nie zamierzał — wystarczy
   wkleić zrzut z konsoli operującej na zgłoszeniach, żeby trafiły tam nazwiska użytkowników.
@@ -255,6 +270,9 @@ compose.
   a raport z pomiaru po tym kasuj: pomiar powtarza skrypt albo test (decyzja 2026-11-13).
   Zostają tylko `prezentacje/`: folder na prezentację, nazwa to data i temat
   (`2026-11-09-ogolnie-ai-dla-pracownikow`), żeby układały się po kolei.
+
+### README
+
 - **README** — „jak": uruchomienie i kontrakt dla użytkownika. Proponowany podział na sekcje:
   1. **Stack** — technologie i ich role.
   2. **Flow działania** — ogólny algorytm (wejście → etapy → wyjście).

@@ -28,7 +28,7 @@ przeczytaj jego ADR-y ze statusem „Przyjęta”.
 
 | prefiks | obszar                                                        | sekcje CLAUDE.md                                    |
 |---------|---------------------------------------------------------------|-----------------------------------------------------|
-| PRD     | produkt i jego zasady                                         | Produkt                                             |
+| PRD     | produkt i jego zasady                                         | Produkt, Zasady produktu                            |
 | DAT     | dane: korpus zgłoszeń, instrukcje, kod aplikacji jako materiał | Dane                                                |
 | DOM     | kontrakt karty zgłoszenia i filtr jakości                     | Domena                                              |
 | GAT     | bramki jakości i „Popraw”                                     | Bramki jakości i asysta pisania                     |
