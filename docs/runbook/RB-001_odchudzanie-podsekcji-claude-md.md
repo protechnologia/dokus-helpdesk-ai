@@ -71,7 +71,7 @@ commita.
 
 Najnowszy wpis na górze.
 
-- 2026-11-25 — „Warstwa grafów”: 210 → 88 linii, ADR-y AGT-005–008, cztery kroki przyjęte bez
+- 2026-11-25 — „Warstwa grafów”: 210 → 88 linii, ADR-006–009 (wtedy AGT-005–008), cztery kroki przyjęte bez
   poprawek; bez kroku 2 (runbook), który doszedł tego dnia. Do runbooka doszło: domysłów powodu
   nie wpisywać do ADR, zdanie bez odpowiednika w kodzie przenieść do komentarza redakcyjnego.
 - 2026-11-20 — „Warstwa narzędzi agenta”: 271 → 97 linii, potem ADR-y do 84. ADR-y powstały

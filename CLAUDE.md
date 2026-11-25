@@ -246,10 +246,11 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
 ### ADR
 
 - **`docs/adr/` — decyzje architektoniczne (ADR), w repo (2026-11-20).** ADR mówi, dlaczego tak,
-  a nie inaczej, i co odrzucono. Zasady, obszary z prefiksami, spis decyzji i szablon stoją
-  w `docs/adr/README.md`.
-- **Na początku sesji przeczytaj `docs/adr/README.md`**: obszary z prefiksami, spis decyzji
-  i ich statusy. Przed zmianą w obszarze przeczytaj jego ADR-y ze statusem „Przyjęta”.
+  a nie inaczej, i co odrzucono. Zasady, obszary, spis decyzji i szablon stoją
+  w `docs/adr/README.md`; ID to `ADR-NNN`, a obszar stoi w kolumnie spisu (od 2026-11-25,
+  wcześniej przedrostek obszaru w ID, np. `AGT-001`).
+- **Na początku sesji przeczytaj `docs/adr/README.md`**: obszary, spis decyzji z obszarem
+  i statusem. Przed zmianą w obszarze przeczytaj jego ADR-y ze statusem „Przyjęta”.
 - **Przy decyzji w CLAUDE.md zostaje reguła, to, co z niej wynika, i link do ADR.** Każdy ADR ma
   taki link w sekcji tematycznej swojej decyzji, bo tam agent trafia na nią przed zmianą, a spis
   w README tylko wylicza ADR-y; pilnuje tego `test_docs_adr_links.py`.
@@ -257,7 +258,7 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
   wyborem, taką, o którą ktoś zapyta „czemu tak?”. Istniejące decyzje przenosimy przy
   refaktoryzacji podsekcji CLAUDE.md, nie hurtem.
 - **Nowy obszar ADR dopiero po akceptacji użytkownika.** Gdy decyzja nie pasuje do żadnego
-  obszaru z README, agent proponuje nowy obszar z prefiksem i dopisuje go dopiero po akceptacji.
+  obszaru z README, agent proponuje nowy obszar ze skrótem i dopisuje go dopiero po akceptacji.
 
 ### Runbook
 
@@ -1625,7 +1626,7 @@ choć nie były to sprawy błahe. Do tego **zły zapis przechodzi filtr etapu 4*
 filtrem po fakcie.
 
 **Powiadomienie nie przechodzi bramki zamknięcia
-([GAT-001](docs/adr/GAT-001_powiadomienie-nie-przechodzi-bramki-zamkniecia.md)).** Bramka ocenia
+([ADR-005](docs/adr/ADR-005_powiadomienie-nie-przechodzi-bramki-zamkniecia.md)).** Bramka ocenia
 je dosłownie i blokuje, a zamyka je człowiek: furtką albo akcją helpdesku „Zamknij bez
 procedowania”, która nie woła bramki ani trasy zamknięcia. Reguł klienta i promptu nie
 uzupełniamy o wyjątek dla powiadomień, bo bramka musiałaby je rozpoznawać.
@@ -2468,7 +2469,7 @@ decyzji i otwarte pytania, także przy nowym narzędziu.
 - **Każde narzędzie jest tylko do odczytu.** Wstrzyknięcie w treści zgłoszenia może najwyżej
   skierować agenta do złego materiału, ale nie zmieni indeksu.
 - **Opis narzędzia dla modelu jest jeden, w `description.md` narzędzia
-  ([AGT-002](docs/adr/AGT-002_opis-narzedzia-wspolny-dla-grafow.md)).** Po co wyniki w danej
+  ([ADR-002](docs/adr/ADR-002_opis-narzedzia-wspolny-dla-grafow.md)).** Po co wyniki w danej
   funkcji, mówi prompt grafu; po zmianie opisu trzeba przemierzyć wszystkie grafy z tym narzędziem.
   Układ opisu (2026-10-05) podaje komentarz w każdym `description.md`, a pilnuje go test kontraktu.
   Przykład w tabelce argumentów to wzór, który model może przepisać (dlatego schemat odpowiedzi
@@ -2481,12 +2482,12 @@ decyzji i otwarte pytania, także przy nowym narzędziu.
   - pole o kilku wartościach albo dwóch postaciach ma w przykładach każdą z nich (`role` w
     `quote_code`: `"cause", "excluded"`), żeby jeden przykład nie podsuwał wyboru.
 - **Zgłoszenia i dokumentacja idą dwustopniowo
-  ([AGT-003](docs/adr/AGT-003_narzedzia-wiedzy-dwustopniowo.md)).** Wyszukiwanie oddaje
+  ([ADR-003](docs/adr/ADR-003_narzedzia-wiedzy-dwustopniowo.md)).** Wyszukiwanie oddaje
   identyfikatory, a treść daje i cytuje dopiero odczyt. Do wyniku wyszukiwania nie dokładamy treści,
   dopasowanego fragmentu ani `problem` karty; `score` widzi tylko model, do decyzji, czy szukać
   dalej. Cena: jedna tura modelu więcej na każde wyszukanie.
 - **Zapytanie wektorowe pisze agent, w kształcie indeksu
-  ([AGT-001](docs/adr/AGT-001_zapytanie-w-ksztalcie-indeksu.md)):** `find_tickets_vector` przyjmuje
+  ([ADR-001](docs/adr/ADR-001_zapytanie-w-ksztalcie-indeksu.md)):** `find_tickets_vector` przyjmuje
   `problem` i `symptoms`, bez parsera; ile pobrać i gdzie uciąć to ENV (`RAG_TOP_K`,
   `RAG_SCORE_MIN`), nie argument modelu. Trafność zapytań agenta mierzy p. 23.
 - **`exact` to jedna fraza, nie lista (decyzja 2026-10-05).** Przy liście wynik nie mówił, która
@@ -2504,13 +2505,13 @@ decyzji i otwarte pytania, także przy nowym narzędziu.
   przestrojenia w p. 23). Karty zostają listą: są krótkie, a przy jednym objawie i różnych
   przyczynach model ma je czytać razem.
 - **Źródłem z kodu jest tylko fragment zacytowany narzędziem `quote_code` jako przyczyna
-  ([AGT-004](docs/adr/AGT-004_zrodlo-z-kodu-to-cytowana-przyczyna.md)).** Kod liczy się jako źródło
+  ([ADR-004](docs/adr/ADR-004_zrodlo-z-kodu-to-cytowana-przyczyna.md)).** Kod liczy się jako źródło
   na równi ze zgłoszeniem i instrukcją, także w wariancie wymagającym źródeł; odczyt i szukanie
   źródeł nie tworzą. Wykluczenie (`excluded`) źródłem nie jest i trafia do człowieka przez uwagi i
   `queries`. Limity z sondy, do pomiaru w p. 59: fragment do 40 linii i 5 cytowań na sprawę. Czy
   model cytuje tylko przeczytane linie i czy powstrzyma się od przyczyny przy szukaniu na ślepo,
   sprawdza p. 59.
-- **`find_code_text` oddaje treść trafionej linii (2026-10-09; wyjątek od AGT-003, powód w AGT-004)
+- **`find_code_text` oddaje treść trafionej linii (2026-10-09; wyjątek od ADR-003, powód w ADR-004)
   i nazwę funkcji, w której linia leży (`symbol`, 2026-10-13).** `words` to tekst, nie lista: w
   sondzie model podał tekst i stracił dwa szukania. Ceny: model może wskazać przyczynę po jednej
   linii, której otoczenia nie czytał (mówi o tym opis, liczy p. 59), a `symbol` to około 25 znaków
@@ -2683,17 +2684,17 @@ kontraktu grafów (2026-11-25). Tu zostają decyzje z ceną, liczby z sond i otw
   Przełącznik globalny (`langsmith.configure(enabled=False)`) wygrywa z ENV; pilnuje go
   `test_api_agent_graphs_langsmith.py`, który bez blokady pada.
 - **Każda funkcja ma własną pętlę i sama dociąga materiał
-  ([AGT-005](docs/adr/AGT-005_funkcja-sama-dociaga-material.md)):** `/suggest` bierze
+  ([ADR-006](docs/adr/ADR-006_funkcja-sama-dociaga-material.md)):** `/suggest` bierze
   zgłoszenie, nie identyfikatory trafień. Cena: każdy guzik szuka od nowa (p. 71), a bez
   odznaczania trafień przez człowieka ginie etykieta do feedbacku (p. 42).
 - **Odpowiedź grafu przychodzi narzędziem `respond_<graf>`, nie tekstem
-  ([AGT-006](docs/adr/AGT-006_odpowiedz-grafu-narzedziem.md)), a opis tego narzędzia ma układ
+  ([ADR-007](docs/adr/ADR-007_odpowiedz-grafu-narzedziem.md)), a opis tego narzędzia ma układ
   opisu narzędzia agenta (2026-10-21)**, bo model dostaje oba rodzaje opisów w jednej liście
   i w każdym szuka argumentów i zasad w tym samym miejscu. Układ stoi w komentarzu każdego
   `respond_tool.md`, a sekcji i zgodności tabelki ze schematem pilnuje test kontraktu grafów.
   Cena: długi tekst idzie w argumencie (`suggest_*`, `polish`), do zmierzenia w p. 25–28.
 - **`search` kończy się uwagami dla wdrożeniowca, a zgodność przyczyn przeczytanych spraw ocenia
-  w nich agent, nie kod ([AGT-008](docs/adr/AGT-008_zgodnosc-przyczyn-ocenia-agent.md)).** Wynik
+  w nich agent, nie kod ([ADR-009](docs/adr/ADR-009_zgodnosc-przyczyn-ocenia-agent.md)).** Wynik
   to źródła z `cite()`, zapytania agenta z `messages` i uwagi (`SearchNotes.internal_notes`);
   źródła dalej powstają z odczytów, nie z uwag (zasada 9). Otwarte: czy uwagi mówią prawdę
   o przeczytanych sprawach i ile mają mieć znaków (p. 23.3).
@@ -2722,7 +2723,7 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 | `handoff`   | informacja o przekazaniu zgłoszenia do dalszych prac po stronie serwisu | nie |
 
 - **Wariant to kod: osobny graf na wariant
-  ([AGT-007](docs/adr/AGT-007_wariant-generacji-to-kod.md)), który deklaruje, czy potrzebuje
+  ([ADR-008](docs/adr/ADR-008_wariant-generacji-to-kod.md)), który deklaruje, czy potrzebuje
   źródeł (`requires_hits`), a egzekwuje to kod węzła odpowiedzi, nie posłuszeństwo modelu.**
   `questions` i `handoff` działają przy pustym indeksie, a `solution` bez odczytanych źródeł
   oddaje same uwagi dla wdrożeniowca, bez treści dla klienta, cokolwiek model napisał
@@ -4431,7 +4432,7 @@ korpusie, przechodzi przy zamknięciu do p. 33.
   helpdesku, pętla mnoży wywołania, a model zewnętrzny to koszt per wywołanie.
 - [ ] **38. Punkt wpięcia i zachowanie przy 503 uzgodnione z helpdeskiem** — przy wpięciu trasy
   zamknięcia ostatni zrzut dobiera zgłoszenia zamknięte od poprzedniego (p. 34). Warunek
-  wdrożenia bramki zamknięcia (GAT-001): akcja „Zamknij bez procedowania”, która nie woła bramki
+  wdrożenia bramki zamknięcia (ADR-005): akcja „Zamknij bez procedowania”, która nie woła bramki
   ani trasy zamknięcia, albo skrzynka helpdesku poza kopią rozsyłki dostawcy, inaczej
   wdrożeniowiec obchodzi blokadę powiadomień kilkadziesiąt razy w miesiącu. *Dlaczego:* bez
   hooka bramek nikt nie woła, a o fail-open decyduje tamta strona.

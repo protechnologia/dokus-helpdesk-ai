@@ -1,4 +1,4 @@
-# AGT-002: Opis narzędzia dla modelu jest jeden, przy narzędziu
+# ADR-002: Opis narzędzia dla modelu jest jeden, przy narzędziu
 
 | pole      | wartość |
 |-----------|---------|
@@ -35,3 +35,9 @@ Opcja 2. Opis mówi, jak pytać narzędzie i co ono oddaje, a to nie zależy od 
 
 - Poprawka opisu zmienia wszystkie grafy naraz, więc po strojeniu jednego trzeba przemierzyć
   pozostałe (p. 23, 25–26).
+
+## Log
+
+Poprawki niemerytoryczne po przyjęciu, najnowsza na górze.
+
+- 2026-11-25 — ID AGT-002 zmienione na ADR-002: ADR-y numerujemy bez przedrostka obszaru.

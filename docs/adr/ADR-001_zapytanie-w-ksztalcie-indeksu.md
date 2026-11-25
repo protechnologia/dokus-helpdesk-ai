@@ -1,4 +1,4 @@
-# AGT-001: Zapytanie wektorowe pisze agent, w kształcie indeksu
+# ADR-001: Zapytanie wektorowe pisze agent, w kształcie indeksu
 
 | pole      | wartość |
 |-----------|---------|
@@ -40,3 +40,9 @@ wyłącznie to, czego szukać: ile pobrać i gdzie uciąć to strojenie (`RAG_TO
   (p. 23). Do tego czasu odniesieniem są zapytania w kształcie narzędzia z golden setu: na kartach
   `gpt-6.1-sol` cel na pierwszym miejscu w 119 ze 126; na kartach Bielika 93,8% wobec 98,1% dla
   zapytań surowych.
+
+## Log
+
+Poprawki niemerytoryczne po przyjęciu, najnowsza na górze.
+
+- 2026-11-25 — ID AGT-001 zmienione na ADR-001: ADR-y numerujemy bez przedrostka obszaru.

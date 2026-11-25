@@ -13,7 +13,7 @@ który zamykał zgłoszenie; werdykt porównuje się z etykietami oceniających,
 | `no_marker_is_malformed`                 | znaczniki przekręcone          | 0                  |
 
 Grupy blokad: sprawa, z której nie widać problemu, nie widać rozwiązania, obu naraz,
-i powiadomienie, które bramka ma zablokować bez względu na reguły (GAT-001). Grupy idą za
+i powiadomienie, które bramka ma zablokować bez względu na reguły (ADR-005). Grupy idą za
 etykietami, a nie za numerami reguł: od wersji 2 reguł problem to reguły 1 i 2, a rozwiązanie
 reguły 1 i 3–6. Wpisy wątpliwe liczą się w progach razem z resztą (decyzja 2026-11-25), a raport
 podaje osobno, ile złych werdyktów stoi przy nich.
@@ -139,7 +139,7 @@ def test_misses_stay_within_the_threshold(
 
     Wyłapuje bramkę, która przepuszcza zamknięcie zdaniem „problem rozwiązany” albo „omówione
     telefonicznie”: do korpusu trafia wtedy karta bez wiedzy, czyli dokładnie to, czemu bramka
-    ma zapobiegać. Przy powiadomieniu wyłapuje bramkę, która przepuszcza rozsyłkę, choć GAT-001
+    ma zapobiegać. Przy powiadomieniu wyłapuje bramkę, która przepuszcza rozsyłkę, choć ADR-005
     każe ją blokować."""
     misses = [
         outcome.case.label

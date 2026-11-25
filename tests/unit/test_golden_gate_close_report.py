@@ -42,7 +42,7 @@ def test_a_case_falls_into_the_group_its_kind_and_labels_give(
 
     Wyłapuje pomyloną grupę: przepuszczenia przy niewidocznym problemie liczyłyby się jako przy
     niewidocznym rozwiązaniu, a powiadomienie, z którego widać problem i rozwiązanie, liczyłoby się
-    jako fałszywy alarm, choć GAT-001 każe je blokować."""
+    jako fałszywy alarm, choć ADR-005 każe je blokować."""
     case = sample_case(kind=kind, problem=problem, action=action)
 
     assert (case.group, case.expected) == (group, expected)

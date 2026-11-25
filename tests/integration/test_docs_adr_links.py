@@ -6,6 +6,7 @@ repo jak dane, bez stacku i bez modelu.
 
 | sprawdzenie                | po co                                                    |
 |----------------------------|----------------------------------------------------------|
+| plik z nazwą ADR           | ADR bez ID umknąłby pozostałym sprawdzeniom              |
 | ADR w spisie README        | spis czyta się na początku każdej sesji                  |
 | ADR z linkiem w CLAUDE.md  | przy regule w sekcji tematycznej agent trafia na decyzję |
 | link prowadzi do pliku     | zmiana nazwy ADR nie zostawia martwego odesłania         |
@@ -15,6 +16,20 @@ gdziekolwiek w CLAUDE.md, test nie sprawdza — to zostaje przy przeglądzie.
 """
 
 from tests._helpers.adr import adr_files, claude_md_links, readme_links
+from tests._helpers.adr.constants import ADR_DIR
+
+
+def test_every_file_in_the_adr_dir_has_an_adr_name() -> None:
+    """Sprawdza, czy każdy plik w `docs/adr/` poza README ma nazwę ADR z zasad README
+    (`ADR-<NNN>_<krótka-nazwa>.md`).
+
+    Wyłapuje ADR zapisany ze starym przedrostkiem obszaru (`AGT-010_…`) albo bez ID: reszta
+    testów widzi tylko pliki o nazwie ADR, więc taki plik nie stałby w spisie ani nie miałby
+    linku w CLAUDE.md, a żaden test by tego nie zgłosił."""
+    others  = sorted(path.name for path in ADR_DIR.iterdir() if path.name != "README.md")
+    unnamed = [name for name in others if name not in adr_files()]
+
+    assert not unnamed, f"Plik w docs/adr/ bez nazwy ADR (ADR-NNN_…): {unnamed}"
 
 
 def test_every_adr_is_listed_in_the_readme() -> None:

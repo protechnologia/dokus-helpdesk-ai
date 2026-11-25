@@ -26,7 +26,7 @@ KINDS = ("sprawa", "powiadomienie")
 
 # Grupy wpisów w kolejności raportu, z nazwą po polsku. Grupa mówi, jakiego werdyktu wymaga wpis:
 # przejść ma tylko sprawa, z której widać problem i rozwiązanie, a powiadomienie ma zostać
-# zablokowane niezależnie od reguł (GAT-001). Nazwy mówią o etykietach, a nie o numerach reguł, bo
+# zablokowane niezależnie od reguł (ADR-005). Nazwy mówią o etykietach, a nie o numerach reguł, bo
 # reguł jest więcej niż etykiet: problem to reguły 1 i 2, rozwiązanie reguły 1 i 3–6.
 GROUP_LABELS = {
     "pass":        "widać problem i rozwiązanie",

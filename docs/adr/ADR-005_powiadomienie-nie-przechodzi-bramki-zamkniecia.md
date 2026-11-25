@@ -1,4 +1,4 @@
-# GAT-001: Powiadomienie nie przechodzi bramki zamknięcia
+# ADR-005: Powiadomienie nie przechodzi bramki zamknięcia
 
 | pole      | wartość |
 |-----------|---------|
@@ -51,3 +51,9 @@ odrzucił 56 z 57 powiadomień kanału.
   odruchem. Dlatego jedno albo drugie to warunek wdrożenia bramki zamknięcia (p. 38).
 - W pomiarze bramki oczekiwany werdykt dla powiadomienia to blokada, niezależnie od etykiet
   reguł, więc rodzaj zgłoszenia trzeba oznaczać w zestawie.
+
+## Log
+
+Poprawki niemerytoryczne po przyjęciu, najnowsza na górze.
+
+- 2026-11-25 — ID GAT-001 zmienione na ADR-005: ADR-y numerujemy bez przedrostka obszaru.

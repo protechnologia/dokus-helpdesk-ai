@@ -1,4 +1,4 @@
-# AGT-005: Każda funkcja sama dociąga materiał w swojej pętli
+# ADR-006: Każda funkcja sama dociąga materiał w swojej pętli
 
 | pole      | wartość |
 |-----------|---------|
@@ -32,7 +32,7 @@ model zewnętrzny, a każda funkcja produktu to graf z pętlą agenta i narzędz
 
 Opcja 3. Agent pisze zapytania sam, może szukać kilka razy i sam ocenia, czy materiał
 wystarcza; narzędzia dostaje z listy dozwolonej dla danej funkcji. Źródłem jest to, co
-przeczytał (AGT-003).
+przeczytał (ADR-003).
 
 ## Konsekwencje
 
@@ -46,3 +46,9 @@ przeczytał (AGT-003).
 - Każdy guzik szuka od nowa: ta sama praca jest opłacana dwa razy, a propozycja może stanąć na
   innych sprawach niż te, które operator widział w `/search` (p. 71).
 - Człowiek nie odznacza trafień przed generacją, więc ginie etykieta do feedbacku (p. 42).
+
+## Log
+
+Poprawki niemerytoryczne po przyjęciu, najnowsza na górze.
+
+- 2026-11-25 — ID AGT-005 zmienione na ADR-006: ADR-y numerujemy bez przedrostka obszaru.

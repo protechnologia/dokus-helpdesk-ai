@@ -23,7 +23,7 @@ Grupy wpisów (`GoldenGateCloseCase.group`):
 | `no_problem`  | sprawa: nie widać problemu                  | `block`           | przepuszczenie |
 | `no_solution` | sprawa: nie widać rozwiązania               | `block`           | przepuszczenie |
 | `neither`     | sprawa: nie widać ani jednego, ani drugiego | `block`           | przepuszczenie |
-| `notice`      | powiadomienie, bez względu na reguły        | `block` (GAT-001) | przepuszczenie |
+| `notice`      | powiadomienie, bez względu na reguły        | `block` (ADR-005) | przepuszczenie |
 
 O czym pamiętać przy zmianach:
 

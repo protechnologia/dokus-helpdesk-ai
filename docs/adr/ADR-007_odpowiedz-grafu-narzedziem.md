@@ -1,4 +1,4 @@
-# AGT-006: Odpowiedź grafu przychodzi narzędziem `respond_<graf>`
+# ADR-007: Odpowiedź grafu przychodzi narzędziem `respond_<graf>`
 
 | pole      | wartość |
 |-----------|---------|
@@ -43,3 +43,9 @@ parsujący jest kontraktem artefaktu.
   mierzą p. 25–28.
 - Modele, którym nie da się wymusić wywołania narzędzia (Claude 5.5, serwery zgodne z OpenAI
   przez dostawcę `ollama`), mogą odpowiedzieć samym tekstem i zużyć jedyną poprawkę.
+
+## Log
+
+Poprawki niemerytoryczne po przyjęciu, najnowsza na górze.
+
+- 2026-11-25 — ID AGT-006 zmienione na ADR-007: ADR-y numerujemy bez przedrostka obszaru.

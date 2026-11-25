@@ -1,4 +1,4 @@
-# AGT-004: Źródłem z kodu jest fragment zacytowany jako przyczyna
+# ADR-004: Źródłem z kodu jest fragment zacytowany jako przyczyna
 
 | pole      | wartość |
 |-----------|---------|
@@ -48,3 +48,9 @@ wymagającym źródeł, ale źródłem jest wskazana przyczyna, nie przeczytany 
   której otoczenia nie czytał.
 - Wykluczenie źródłem nie jest; do człowieka trafia przez uwagi dla wdrożeniowca i `queries`
   w odpowiedzi `/search`.
+
+## Log
+
+Poprawki niemerytoryczne po przyjęciu, najnowsza na górze.
+
+- 2026-11-25 — ID AGT-004 zmienione na ADR-004: ADR-y numerujemy bez przedrostka obszaru.

@@ -1,4 +1,4 @@
-# AGT-007: Wariant generacji to kod: osobny graf na wariant
+# ADR-008: Wariant generacji to kod: osobny graf na wariant
 
 | pole      | wartość |
 |-----------|---------|
@@ -39,3 +39,9 @@ Opcja 2. Zasada 9 obowiązuje każdy wariant, bo piszemy je my.
 ### Koszty
 
 - Nowy guzik wymaga deployu.
+
+## Log
+
+Poprawki niemerytoryczne po przyjęciu, najnowsza na górze.
+
+- 2026-11-25 — ID AGT-007 zmienione na ADR-008: ADR-y numerujemy bez przedrostka obszaru.

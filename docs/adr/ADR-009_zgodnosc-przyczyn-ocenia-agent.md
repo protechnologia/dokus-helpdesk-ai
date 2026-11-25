@@ -1,4 +1,4 @@
-# AGT-008: Zgodność przyczyn ocenia agent w uwagach, nie kod
+# ADR-009: Zgodność przyczyn ocenia agent w uwagach, nie kod
 
 | pole      | wartość |
 |-----------|---------|
@@ -39,10 +39,16 @@ szukał. Uwagi nie podpowiadają, czy dopytać, odpowiedzieć, czy przekazać sp
 ### Zyski
 
 - Wdrożeniowiec widzi zgodność i rozbieżność przyczyn bez czytania kart.
-- Lista źródeł dalej powstaje z odczytów (AGT-003), niezależnie od uwag.
+- Lista źródeł dalej powstaje z odczytów (ADR-003), niezależnie od uwag.
 
 ### Koszty
 
 - Uwagi pisze model, więc zasady 9 pilnuje w nich tylko prompt; kształtu kod nie sprawdza.
 - Uwagi wyszły dłuższe, niż zakładał plan: 620–1770 znaków w trzech zmyślonych sprawach po
   przejściu na sekcje Markdown (pojedyncze przebiegi, nie pomiar).
+
+## Log
+
+Poprawki niemerytoryczne po przyjęciu, najnowsza na górze.
+
+- 2026-11-25 — ID AGT-008 zmienione na ADR-009: ADR-y numerujemy bez przedrostka obszaru.

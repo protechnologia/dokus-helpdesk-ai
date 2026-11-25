@@ -25,7 +25,7 @@ class GoldenGateCloseCase:
         Description:
         Grupa wpisu: powiadomienie albo sprawa według tego, czego z niej nie widać. Powiadomienie
         idzie do własnej grupy bez patrzenia na reguły, bo bramka ma je zablokować zawsze
-        (GAT-001).
+        (ADR-005).
 
         Example args:
             (brak)

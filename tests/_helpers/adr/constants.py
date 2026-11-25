@@ -17,9 +17,9 @@ ADR_README = ADR_DIR / "README.md"
 # Plik czytany na początku sesji; linkuje do ADR-ów ścieżką od korzenia repo.
 CLAUDE_MD = REPO_ROOT / "CLAUDE.md"
 
-# Przedrostek linku do ADR w CLAUDE.md, np. „(docs/adr/AGT-001_….md)”.
+# Przedrostek linku do ADR w CLAUDE.md, np. „(docs/adr/ADR-001_….md)”.
 CLAUDE_MD_LINK_PREFIX = "docs/adr/"
 
-# Nazwa pliku ADR z zasad w README: `<PREFIKS>-<NNN>_<krótka-nazwa>.md`. README.md jej nie
+# Nazwa pliku ADR z zasad w README: `ADR-<NNN>_<krótka-nazwa>.md`. README.md jej nie
 # spełnia, więc nie liczy się jako ADR.
-ADR_FILE_NAME = re.compile(r"[A-Z]{3}-\d{3}_[a-z0-9-]+\.md")
+ADR_FILE_NAME = re.compile(r"ADR-\d{3}_[a-z0-9-]+\.md")

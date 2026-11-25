@@ -1,4 +1,4 @@
-# AGT-003: Wyszukiwanie oddaje identyfikatory, źródłem jest odczyt
+# ADR-003: Wyszukiwanie oddaje identyfikatory, źródłem jest odczyt
 
 | pole      | wartość |
 |-----------|---------|
@@ -44,4 +44,10 @@ dokumentacji zostaje, bo mówi, o czym sekcja jest, a nie co w niej stoi.
 - `score` znika ze źródeł i z odpowiedzi API: widzi go tylko model, do decyzji, czy szukać
   dalej; nie jest miarą trafności rozwiązania.
 - Kod aplikacji idzie inaczej: szukanie w kodzie oddaje treść linii, a źródłem jest dopiero
-  fragment zacytowany jako przyczyna (AGT-004).
+  fragment zacytowany jako przyczyna (ADR-004).
+
+## Log
+
+Poprawki niemerytoryczne po przyjęciu, najnowsza na górze.
+
+- 2026-11-25 — ID AGT-003 zmienione na ADR-003: ADR-y numerujemy bez przedrostka obszaru.
