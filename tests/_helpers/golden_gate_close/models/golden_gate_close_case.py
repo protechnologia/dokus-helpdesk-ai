@@ -1,5 +1,7 @@
 import dataclasses
 
+from tests._helpers.golden_gate_close.constants import GROUP_LABELS
+
 
 @dataclasses.dataclass(frozen=True)
 class GoldenGateCloseCase:
@@ -16,3 +18,65 @@ class GoldenGateCloseCase:
     action_visible:    bool  # reguła 2: z treści wynika, co zrobiono, żeby problem rozwiązać
     action_reason:     str   # jednym zdaniem, co o tym przesądziło
     doubtful:          bool  # przypadek graniczny: oceniający nie był pewny którejś etykiety
+
+    @property
+    def group(self) -> str:
+        """
+        Description:
+        Grupa wpisu: powiadomienie albo sprawa według tego, które reguły łamie. Powiadomienie
+        idzie do własnej grupy bez patrzenia na reguły, bo bramka ma je zablokować zawsze
+        (GAT-001).
+
+        Example args:
+            (brak)
+
+        Example result:
+            "rule2"
+        """
+        # --- powiadomienie: blokada niezależnie od reguł ---
+        if self.kind == "powiadomienie":
+            return "notice"
+
+        # --- sprawa, która spełnia obie reguły ---
+        if self.problem_visible and self.action_visible:
+            return "pass"
+
+        # --- widać, co zrobiono, ale nie, co było problemem ---
+        if self.action_visible:
+            return "rule1"
+
+        # --- widać problem, ale nie, co zrobiono ---
+        if self.problem_visible:
+            return "rule2"
+
+        return "both"
+
+    @property
+    def expected(self) -> str:
+        """
+        Description:
+        Werdykt, którego wymaga wpis: przejść ma tylko sprawa, która spełnia obie reguły.
+
+        Example args:
+            (brak)
+
+        Example result:
+            "block"
+        """
+        return "pass" if self.group == "pass" else "block"
+
+    @property
+    def label(self) -> str:
+        """
+        Description:
+        Nazwa wpisu w raporcie: numer zgłoszenia, warstwa, grupa i dopisek przy wpisie wątpliwym.
+
+        Example args:
+            (brak)
+
+        Example result:
+            "33605 (random, łamie regułę 2, wątpliwy)"
+        """
+        doubtful = ", wątpliwy" if self.doubtful else ""
+
+        return f"{self.ticket_id} ({self.stratum}, {GROUP_LABELS[self.group]}{doubtful})"

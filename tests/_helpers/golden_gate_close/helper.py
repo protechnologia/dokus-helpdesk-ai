@@ -5,24 +5,48 @@ zamknięcie z korpusu instancji: warstwa doboru, liczba komentarzy w chwili zamk
 uciętego wątku i dwie etykiety, po jednej na regułę zamknięcia. Wejście bramki test składa
 z wątku po anonimizacji, uciętego tak, jak go widział konsultant, który zamykał zgłoszenie.
 
-| funkcja                     | do czego                                                     |
-|-----------------------------|--------------------------------------------------------------|
-| `golden_gate_close_cases()` | wpisy zestawu w kolejności pliku                             |
-| `thread_at_close()`         | wątek ucięty po podanej liczbie komentarzy                   |
-| `closing_thread()`          | wątek zgłoszenia z korpusu, ucięty na zamknięciu             |
-| `thread_digest()`           | skrót uciętego wątku, którym etykiety pilnują, że opisują go |
+| funkcja                              | do czego                                              |
+|--------------------------------------|-------------------------------------------------------|
+| `golden_gate_close_cases()`          | wpisy zestawu w kolejności pliku                      |
+| `golden_gate_close_rules_version()`  | wersja reguł bramki, pod którą oznaczano zestaw       |
+| `thread_at_close()`                  | wątek ucięty po podanej liczbie komentarzy            |
+| `closing_thread()`                   | wątek zgłoszenia z korpusu, ucięty na zamknięciu      |
+| `thread_digest()`                    | skrót uciętego wątku; pilnuje, że etykiety opisują go |
+| `judge_gate_close_case()`            | ocena werdyktu bramki wobec etykiet wpisu             |
+| `timing_summary()`                   | mediana, p90 i maksimum czasu spraw                   |
 
-O czym pamiętać przy zmianach: ucięcie liczy się po nagłówkach komentarzy z
-`RawTicket.as_thread()` („KOMENTARZ N — …”); gdy zmieni się ich brzmienie, skrót każdego wpisu
-przestanie się zgadzać i test spójności to pokaże.
+Grupy wpisów (`GoldenGateCloseCase.group`):
+
+| grupa    | wpis                                     | oczekiwany werdykt | zły werdykt to |
+|----------|------------------------------------------|--------------------|----------------|
+| `pass`   | sprawa, która spełnia obie reguły        | `pass`             | fałszywy alarm |
+| `rule1`  | sprawa, z której nie wynika problem      | `block`            | przepuszczenie |
+| `rule2`  | sprawa, z której nie wynika, co zrobiono | `block`            | przepuszczenie |
+| `both`   | sprawa, która łamie obie reguły          | `block`            | przepuszczenie |
+| `notice` | powiadomienie, bez względu na reguły     | `block` (GAT-001)  | przepuszczenie |
+
+O czym pamiętać przy zmianach:
+
+- Ucięcie liczy się po nagłówkach komentarzy z `RawTicket.as_thread()` („KOMENTARZ N — …”);
+  gdy zmieni się ich brzmienie, skrót każdego wpisu przestanie się zgadzać i test spójności to
+  pokaże.
+- Odpowiedź nie do przyjęcia nie jest ani fałszywym alarmem, ani przepuszczeniem: helpdesk
+  dostaje wtedy 503 i decyduje sam. Liczy się osobno.
 """
 
 import hashlib
 import json
+import math
 import re
+import statistics
+from collections.abc import Sequence
+
+from pydantic import BaseModel
 
 from tests._helpers.golden_gate_close.constants import ANONYMIZED_DIR, GOLDEN_FILE
+from tests._helpers.golden_gate_close.models.gate_close_outcome import GateCloseOutcome
 from tests._helpers.golden_gate_close.models.golden_gate_close_case import GoldenGateCloseCase
+from tests._helpers.golden_gate_close.models.timing_summary import TimingSummary
 
 # Nagłówek komentarza w tekście wątku, tak jak pisze go `RawTicket.as_thread()`.
 COMMENT_HEADER = re.compile(r"(?m)^KOMENTARZ (\d+) — ")
@@ -59,6 +83,24 @@ def golden_gate_close_cases() -> list[GoldenGateCloseCase]:
     ]
 
     return cases
+
+
+def golden_gate_close_rules_version() -> int:
+    """
+    Description:
+    Czyta z metryczki zestawu wersję reguł bramki zamknięcia, pod którą oznaczano wpisy. Pomiar
+    porównuje ją z zestawem domyślnym, zanim zawoła model: etykiety pod inne reguły nic nie
+    mierzą.
+
+    Example args:
+        (brak)
+
+    Example result:
+        1
+    """
+    meta = json.loads(GOLDEN_FILE.read_text(encoding="utf-8"))["meta"]
+
+    return meta["rules_version"]
 
 
 def thread_at_close(
@@ -140,3 +182,84 @@ def thread_digest(text: str) -> str:   # np. "ZGŁOSZENIE 33605 z 2026-07-02\nTe
         "46266d8496d232c3"
     """
     return hashlib.blake2b(text.encode("utf-8"), digest_size=8).hexdigest()
+
+
+def judge_gate_close_case(
+    case:    GoldenGateCloseCase,  # np. GoldenGateCloseCase(ticket_id="33605", …)
+    output:  BaseModel | None,     # np. Verdict(verdict="block", …); None — `respond` nie przyjął
+    retries: int,                  # np. 0 — poprawki odpowiedzi od węzła `respond`
+    seconds: float,                # np. 3.2 — ile trwała sprawa bramki
+) -> GateCloseOutcome:
+    """
+    Description:
+    Ocenia jedno zamknięcie: zapisuje werdykt, pola wyniku do raportu i czas sprawy, a brak
+    wyniku jako odpowiedź nie do przyjęcia. Czy to fałszywy alarm, czy przepuszczenie, mówi
+    ocena, porównując werdykt z grupą wpisu.
+
+    Example args:
+        case=GoldenGateCloseCase(ticket_id="33605", kind="sprawa", problem_visible=True,
+                                 action_visible=False, …)
+        output=Verdict(verdict="pass")
+        retries=0
+        seconds=3.2
+
+    Example result:
+        GateCloseOutcome(case=GoldenGateCloseCase(ticket_id="33605", …), answer="pass",
+                         retries=0, fields={"verdict": "pass", "reasons": [], "hint": None},
+                         seconds=3.2)
+    """
+    # --- brak wyniku: węzeł `respond` nie przyjął odpowiedzi mimo poprawki ---
+    if output is None:
+        rejected = GateCloseOutcome(
+            case    = case,
+            answer  = None,
+            retries = retries,
+            fields  = {},
+            seconds = seconds,
+        )
+
+        return rejected
+
+    fields = output.model_dump(mode="json")
+
+    outcome = GateCloseOutcome(
+        case    = case,
+        answer  = fields["verdict"],
+        retries = retries,
+        fields  = fields,
+        seconds = seconds,
+    )
+
+    return outcome
+
+
+def timing_summary(
+    seconds: Sequence[float],  # np. [2.1, 3.4, 9.8] — czasy spraw przebiegu
+) -> TimingSummary:
+    """
+    Description:
+    Liczy medianę, p90 i maksimum czasu spraw. p90 to wartość, której nie przekracza 90% spraw:
+    element z miejsca ⌈0,9 · n⌉ po posortowaniu, bez interpolacji, więc jest czasem prawdziwej
+    sprawy.
+
+    Example args:
+        seconds=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+
+    Example result:
+        TimingSummary(median=5.5, p90=9.0, maximum=10.0)
+
+    Raises:
+        ValueError: lista jest pusta
+    """
+    if not seconds:
+        raise ValueError("brak czasów spraw: nie ma z czego liczyć")
+
+    ordered = sorted(seconds)
+
+    summary = TimingSummary(
+        median  = statistics.median(ordered),
+        p90     = ordered[math.ceil(0.9 * len(ordered)) - 1],
+        maximum = ordered[-1],
+    )
+
+    return summary

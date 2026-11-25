@@ -1,13 +1,15 @@
 """
 Description:
 Testy tej części `tests/_helpers/live/`, która nie woła modelu, a decyduje, co model
-dostanie i ile razy test zapłaci: stan wejściowy sprawy, sprawy puszczane naraz, reguły klienta
+dostanie i ile razy test zapłaci: stan wejściowy sprawy, sprawy puszczane naraz (także z limitem
+i czasem każdej sprawy), reguły klienta
 z zestawu domyślnego po sprawdzeniu wersji i pomiar zapamiętany raz na graf. Wywołanie grafu
 podmienia test. Plik stoi w korzeniu folderu, bo helper służy wszystkim grafom.
 """
 
+import asyncio
 from collections.abc import Sequence
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -24,6 +26,7 @@ from tests._helpers.live import (
     live_state,
     remember_per_graph,
     run_live_cases,
+    run_timed_live_cases,
 )
 from tests._helpers.live import helper as live_helper
 from tests._helpers.live.samples import RULES
@@ -99,6 +102,87 @@ async def test_live_cases_let_other_model_errors_through(
 
     with pytest.raises(LLMError, match="nie odpowiedział"):
         await run_live_cases(gate_reply, None, [LiveCase("pierwsza", RULES)])
+
+
+async def test_timed_live_cases_run_at_most_the_given_number_at_once_and_keep_their_order(
+    monkeypatch: pytest.MonkeyPatch,  # wstrzykiwane przez pytest; podmienia wywołanie grafu
+) -> None:
+    """Sprawdza, czy przy limicie 2 naraz trwają najwyżej dwie sprawy z pięciu, a wyniki wracają
+    w kolejności spraw.
+
+    Wyłapuje limit, który nie działa: 120 zamknięć poszłoby do dostawcy naraz, trafiło na jego
+    limit żądań, a czas sprawy w raporcie mierzyłby kolejkę u dostawcy zamiast bramki."""
+    running = 0
+    peak    = 0
+
+    async def run(
+        graph:      ModuleType,            # np. gate_reply
+        llm:        LLMSettings,           # w teście None
+        given:      Sequence[AgentTool],   # narzędzia sprawy
+        input_text: str,                   # np. "sprawa 0"
+        rules:      Sequence[str] | None,  # np. RULES
+    ) -> str:
+        nonlocal running, peak
+        running += 1
+        peak     = max(peak, running)
+
+        # Kilka oddań sterowania, żeby inne sprawy zdążyły ruszyć, gdyby limit nie działał.
+        for _ in range(3):
+            await asyncio.sleep(0)
+
+        running -= 1
+
+        return f"stan {input_text}"
+
+    monkeypatch.setattr(live_helper, "run_live_graph", run)
+
+    cases = [LiveCase(f"sprawa {number}", RULES) for number in range(5)]
+    runs  = await run_timed_live_cases(gate_reply, None, cases, concurrency=2)
+
+    assert [run.final for run in runs] == [f"stan sprawa {number}" for number in range(5)]
+    assert peak == 2
+
+
+async def test_timed_live_cases_measure_each_case_without_the_wait_for_a_free_slot(
+    monkeypatch: pytest.MonkeyPatch,  # wstrzykiwane przez pytest; podmienia graf i zegar
+) -> None:
+    """Sprawdza, czy przy jednej sprawie naraz czas każdej sprawy to tylko jej własny przebieg:
+    2 i 5 sekund na zegarze testu, a nie 2 i 7.
+
+    Wyłapuje czas liczony od wejścia do kolejki: druga sprawa doliczyłaby czekanie na pierwszą,
+    a raport pokazałby czas bramki dłuższy, niż zobaczy wdrożeniowiec przy jednym zamknięciu."""
+    clock = [0.0]
+
+    async def run(
+        graph:      ModuleType,            # np. gate_reply
+        llm:        LLMSettings,           # w teście None
+        given:      Sequence[AgentTool],   # narzędzia sprawy
+        input_text: str,                   # np. "2" — ile sekund zegara testu trwa sprawa
+        rules:      Sequence[str] | None,  # np. RULES
+    ) -> str:
+        # Oddanie sterowania w trakcie sprawy: druga sprawa staje wtedy w kolejce, zanim pierwsza
+        # skończy, więc czas liczony od wejścia do kolejki wyszedłby dłuższy.
+        await asyncio.sleep(0)
+        clock[0] += float(input_text)
+
+        return "stan"
+
+    monkeypatch.setattr(live_helper, "run_live_graph", run)
+    monkeypatch.setattr(live_helper, "time", SimpleNamespace(perf_counter=lambda: clock[0]))
+
+    cases = [LiveCase("2", RULES), LiveCase("5", RULES)]
+    runs  = await run_timed_live_cases(gate_reply, None, cases, concurrency=1)
+
+    assert [run.seconds for run in runs] == [2.0, 5.0]
+
+
+async def test_timed_live_cases_refuse_a_limit_below_one() -> None:
+    """Sprawdza, czy limit 0 spraw naraz kończy się błędem, zanim cokolwiek ruszy.
+
+    Wyłapuje limit, przy którym żadna sprawa nie dostałaby miejsca: przebieg wisiałby bez końca
+    zamiast od razu powiedzieć, co jest nie tak."""
+    with pytest.raises(ValueError, match="co najmniej 1"):
+        await run_timed_live_cases(gate_reply, None, [LiveCase("pierwsza", RULES)], concurrency=0)
 
 
 def test_default_rules_are_the_rule_set_of_the_graph_in_the_expected_version() -> None:

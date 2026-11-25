@@ -1636,7 +1636,7 @@ merytorycznie").
   także w parze ze znacznikami anonimizacji, a wstrzyknięcia 0 przebić z 9. Dziesięć zmyślonych
   zamknięć przez trasę `/gate/close`, z anonimizatorem na Bieliku, dało zgodne werdykty bez
   danych osobowych w uzasadnieniach, 2–7,5 s i około 0,003 USD na sprawę; do tego test ręczny
-  przez front. Liczb na prawdziwych zamknięciach z korpusu nie ma (p. 33).
+  przez front. Liczby na prawdziwych zamknięciach daje pomiar z p. 33.2.
 - **Zestaw prawdziwych zamknięć: `data/unsafe/golden/gate-close.json` (2026-11-20, p. 33.2).**
   120 zamknięć z korpusu instancji, warstwami: 10 najdłuższych wątków, 10 z kanału „Automat
   mailowy”, 40 z kart odrzuconych przez filtr i 60 losowych. Wejście bramki to wątek
@@ -1651,6 +1651,26 @@ merytorycznie").
   wpisach, w których oceniający dali „powiadomienie”). Zestaw ma 113 spraw i 7 powiadomień,
   a oczekiwanych blokad 59 i przepuszczeń 61; reguła 1 jest złamana tylko w 3 sprawach, więc jej
   przepuszczeń zestaw prawie nie mierzy.
+- **Na prawdziwych zamknięciach bramka zamknięcia jest za surowa (2026-11-25, p. 33.2.2).** Na
+  `gpt-6.1-sol` i regułach w wersji 1, w dwóch przebiegach: fałszywych alarmów 18 i 19 z 61,
+  przepuszczeń 2 z 59 (sprawa z regułą 1 i powiadomienie), odpowiedzi nie do przyjęcia 0
+  i znaczników przekręconych 0. Złe werdykty są prawie te same w obu przebiegach (17 alarmów
+  wspólnych), a 10 alarmów stoi przy wpisach wątpliwych. Przegląd 20 alarmów z obu przebiegów
+  (2026-11-25; drugi, niezależny oceniający bez etykiet i werdyktów zgodny co do faktów w 18
+  z 22 spornych wątków, a granicę wyznaczył człowiek na czterech wątkach): w 11 bramka jest za
+  surowa, bo reguła 2 mówi tylko o tym, „co zostało zrobione” — konkretne wyjaśnienie albo
+  przyczyna bez czynności, także z „prawdopodobnie” (6), i krótka czynność, której przedmiot
+  wynika z wątku (5). W 5 ma rację, a etykieta jest za łagodna: ostatnia reklamacja albo pytanie
+  klienta bez odpowiedzi (4) i ogólnikowe przypuszczenie (1); wszystkie przy wpisach wątpliwych.
+  4 są sporne: dwa wątki z wieloma punktami, z których część jest zapowiedziana, ogólnikowe
+  „zmiany wprowadzone” i „powinno już działać” przy konkretnym fakcie. Z przepuszczeń jedno to
+  rozsyłka bez żadnego problemu (błąd bramki), drugie to „poprawka wgrana” przy problemie
+  opisanym tylko w załączniku (sporne), choć krótką, ale jasną czynność bramka gdzie indziej
+  blokuje. Czas bramki przy 4 zamknięciach naraz: mediana 3,5 s, p90 5,0–5,1 s, maks. 7,2–8,2 s,
+  a z anonimizacją z pomiaru z 2026-10-19 mediana około 5,5 s i maks. do 14,7 s. Koszt zestawu:
+  0,51 USD, a z początkiem żądania z cache 0,17 USD. Progi testu stoją na gorszym przebiegu (19
+  alarmów, przepuszczenia 1 przy regule 1 i 1 przy powiadomieniach) i pilnują, żeby nie było
+  gorzej; co poprawić, rozstrzyga p. 33.2.3.
 - **Bramka wysyłki przeszła sprawdzenie, ale nie pomiar (2026-10-22).** Na `gpt-6.1-sol` scenariusze
   na regułach w wersji 2 dały 0 fałszywych alarmów z 13 i 0 przepuszczeń z 9 w dwóch przebiegach, a
   wstrzyknięcia 0 przebić z 9. Przez trasę `/gate/reply` z anonimizatorem na Bieliku 13 z 13
@@ -3448,6 +3468,10 @@ localhost:8010/search`.
 - Scenariusze trasy zamknięcia zgłoszenia (bramka, karta i filtr przez `POST /tickets/closed`,
   p. 30): `pytest tests/evaluation/test_api_entry_routers_tickets_closed_live.py -m llm_live` —
   **kosztuje, pytaj przed**; sześć spraw to około 0,04 USD
+- Bramka zamknięcia na 120 prawdziwych zamknięciach z korpusu (p. 33.2):
+  `pytest tests/evaluation/test_api_agent_graphs_gate_close_golden_live.py -m llm_live` —
+  **kosztuje, pytaj przed**; 0,51 USD (0,17 USD z początkiem żądania z cache) i około 2 minut
+  przy 4 zamknięciach naraz; bez zestawu i korpusu w `data/unsafe/` testy się pomija
 - Silnik `agent` usługi `anonymizer` na golden secie (p. 19.5):
   `pytest tests/evaluation/test_anonymizer_agent_golden_live.py -m llm_live` — woła model
   anonimizujący z `.env` (`LLM_ANONYMIZATION_*`, pod z GPU), **pytaj przed**; oba zestawy po
@@ -3907,11 +3931,11 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/tickets_import/`       | masowy import: plik eksportu zgłoszenia w `raw-db/` (`write_export()`), atrapa modelu, która na każde zgłoszenie odpowiada kartą, a na wskazane numery błędem (`CardLLM`), serwis importu na prawdziwych węzłach grafu karty (`importer_on()`) i atrapy serwisu i jego fabryki do testów komendy (`StubImporter`, `StubImporterFactory`); próbki raportu w `samples.py` |
 | `tests/_helpers/mail/`                 | słownik maili zmyślony z `data/safe/mail/` (`safe_templates()`, `safe_vendor_names()`), jego zmyślone wątki (`safe_mail_ticket()`), te same jako żądanie do tras (`safe_mail_request()`) i plik eksportu w korpusie testu (`copy_safe_mail_export()`) oraz zgłoszenie kanału z podanym opisem i komentarzami (`mail_ticket()`); maile z przykładów notatki o metodzie i oczyszczony wątek wzorcowy w `samples.py` |
 | `tests/_helpers/golden_mail/`          | golden set kanału „Automat mailowy”: wątki z `useful` i polami (autor, oznaczenia linii) (`golden_mail_tickets()`, `parse_ranges()`, `field_digest()`), wątek źródłowy (`mail_thread()`) i pomiar normalizera maili na nich (`measure_mail_cleaning()`) z progami |
-| `tests/_helpers/golden_gate_close/`    | zestaw bramki zamknięcia na prawdziwych zamknięciach: wpisy z rodzajem i etykietami na regułę (`golden_gate_close_cases()`), wątek z korpusu ucięty na zamknięciu (`closing_thread()`, `thread_at_close()`) i skrót uciętego wątku (`thread_digest()`) |
+| `tests/_helpers/golden_gate_close/`    | zestaw bramki zamknięcia na prawdziwych zamknięciach: wpisy z rodzajem i etykietami na regułę (`golden_gate_close_cases()`) i grupą, która mówi, jakiego werdyktu wymagają, wątek z korpusu ucięty na zamknięciu (`closing_thread()`, `thread_at_close()`), skrót uciętego wątku (`thread_digest()`), ocena werdyktu (`judge_gate_close_case()`), czas spraw (`timing_summary()`), przebieg na żywym modelu po 4 naraz (`measure_gate_close_cases()`), raport (fixture `gate_close_report`) i progi |
 | `tests/_helpers/instance/`             | stan instancji: serwis liczący indeksy na atrapach Qdranta i Postgresa (`scripted_inspector()`, `inspector_on()`, klienci `counting_*` i `failing_*`), aplikacja z podanym serwisem (`app_with_inspector()`); próbki `sample_*()` w `samples.py` — raport stanu, paczka kodu, konfiguracja modelu |
 | `tests/_helpers/embedding/`            | embedding: nazwy modeli testowych (`EMBEDDING_MODEL`, `OTHER_MODEL`), odpowiedź usługi `embedder` w kształcie kontraktu (`embedder_answer()`) i payload punktu Qdranta z nazwą modelu (`with_model()`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
-| `tests/_helpers/live/`                 | żywy model: konfiguracja (`live_generation_llm()`), graf na nim (`run_live_graph()`, z regułami klienta), sprawy grafu naraz (`run_live_cases()` na `LiveCase`: wejście, reguły, narzędzia), reguły z zestawu domyślnego (`default_rules()`), pomiar raz na graf (`remember_per_graph()`), sprawy testu okablowania grafów (`measure_example_case()` i dwie sprawy `suggest_solution`), raport zużycia (fixture `live_usage`) i wydruk rozmowy (`run_as_lines()`) |
+| `tests/_helpers/live/`                 | żywy model: konfiguracja (`live_generation_llm()`), graf na nim (`run_live_graph()`, z regułami klienta), sprawy grafu naraz (`run_live_cases()` na `LiveCase`: wejście, reguły, narzędzia; `run_timed_live_cases()`: najwyżej N naraz, z czasem sprawy bez czekania w kolejce), reguły z zestawu domyślnego (`default_rules()`), pomiar raz na graf (`remember_per_graph()`), sprawy testu okablowania grafów (`measure_example_case()` i dwie sprawy `suggest_solution`), raport zużycia (fixture `live_usage`) i wydruk rozmowy (`run_as_lines()`) |
 | `tests/_helpers/graphs/`               | grafy aplikacji: lista pakietów (`graph_modules()`, `graph_name()` jako `ids`), typy i pola wyniku, reguły i źródła w stanie, składanie na atrapach (`fake_nodes()`, `built_from()`, `expected_edges()`), przebieg atrapy krok po kroku i w całości (`streamed_fake()`, `ran_fake()`) i próbki kroku przebiegu |
 | `tests/_helpers/routers/`              | trasy HTTP: rozbiór strumienia SSE (`sse_events()`), aplikacja z atrapami grafów na podanym anonimizatorze i normalizerze maili (`app_on_fake_graphs()`), żądanie trasy z jej polami dodatkowymi (`ticket_request()`) i aplikacja z modelem, który zawodzi w środku `search` (`app_with_model_failing_after_tools()`); próbki w `samples.py` — stan końcowy grafu (`final_state()`), rozmowa `search` z zapytaniami do wyciągnięcia, kroki przebiegu, żądania do tras grafów (`GRAPH_REQUESTS`) |
 | `tests/_helpers/scenarios/injections/` | zestaw wstrzyknięć, sprawy sekcji z atakiem także w materiale atrap, kontrola dotarcia (`reached_model()`), ocena sprawy i raport (fixture `injection_report`) |
@@ -4300,14 +4324,14 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
     człowieka; próg równy gorszemu z dwóch przebiegów, osobno dla fałszywych alarmów
     i przepuszczeń. Oceny z badania jakości z 2026-09-02 skasowano 2026-11-13.
     - [x] **33.2.1 Zestaw `gate-close.json`** (2026-11-20) → „Ewaluacja bramek”, „Helpery”.
-    - [ ] **33.2.2 Test `llm_live` na zestawie** — fałszywe alarmy i przepuszczenia osobno dla
-      spraw łamiących regułę 1, regułę 2 i obie; dla powiadomienia oczekiwany werdykt to blokada
-      (GAT-001). Uzasadnienia w raporcie i czas sprawy
-      (mediana, p90, maks.) wobec cierpliwości UI helpdesku (p. 38), z anonimizacją doliczoną
-      z pomiaru z 2026-10-19 (mediana 2,0 s, maks. 6,5 s na wątek korpusu); dwa przebiegi na
-      `gpt-6.1-sol`, około 1 USD.
-    - [ ] **33.2.3 Wnioski** — wynik do „Ewaluacji bramek”, a poprawka promptu albo reguł jako
-      osobna decyzja.
+    - [x] **33.2.2 Test `llm_live` na zestawie** (2026-11-25) → „Ewaluacja bramek”, „Commands”,
+      „Helpery”.
+    - [ ] **33.2.3 Wnioski** — granica z przeglądu alarmów (2026-11-25): zamknięcie przechodzi,
+      gdy mówi coś konkretnego — co zrobiono albo jaka jest przyczyna, choćby prawdopodobna;
+      odpada ogólnik i zamknięcie przy niezałatwionej ostatniej reklamacji klienta. Kolejno:
+      decyzja co do 4 spornych, reguła 2 w wersji 2 do akceptacji (przed i po, z przykładami
+      obu stron), etykiety pod nią (5 na blokadę, sporne, przegląd 49 spraw „łamie regułę 2”,
+      granica w wytycznych etykietowania), pomiar od nowa w dwóch przebiegach.
   - [ ] **33.3 `gate_reply` na prawdziwych wiadomościach** — wiadomości konsultantów z tych
     samych wątków (2631 komentarzy z rolą „konsultant” poza kanałem „Automat mailowy”, w którym
     rola z bazy nie mówi, kto pisał), te same decyzje co w 33.2; fałszywe alarmy na losowych

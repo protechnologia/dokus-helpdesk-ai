@@ -50,7 +50,9 @@ O czym pamiętać przy zmianach:
   tylko w `conftest.py`. Tak samo raporty scenariuszy: fixture `<scenariusz>_report`
   (`injection_report`, `gate_report`, `polish_report`, `handoff_report`, `questions_report`,
   `code_report`, `solution_report`, `reading_report`, `closed_report`), a klasa raportu
-  w `tests/_helpers/scenarios/<scenariusz>/`; po przebiegu stoją przed zużyciem modelu.
+  w `tests/_helpers/scenarios/<scenariusz>/`; po przebiegu stoją przed zużyciem modelu. Raport
+  bramki zamknięcia na prawdziwych zamknięciach (`gate_close_report`) ma klasę w
+  `tests/_helpers/golden_gate_close/`.
 """
 
 import os
@@ -64,6 +66,7 @@ from app.agent_graphs import factory as graph_factory
 from app.config import Settings
 from app.db_postgres import PostgresClient
 from app.engine_anonymization import FakeAnonymizer
+from tests._helpers.golden_gate_close import GateCloseReport
 from tests._helpers.live import LLM_LIVE_MARKER, LiveUsageReport
 from tests._helpers.scenarios.closed import ClosedReport
 from tests._helpers.scenarios.code import CodeReport
@@ -429,6 +432,33 @@ def closed_report(
     return pytestconfig.stash[CLOSED_REPORT_KEY]
 
 
+# Miejsce raportu bramki zamknięcia na prawdziwych zamknięciach w konfiguracji przebiegu, na tej
+# samej zasadzie co raport zużycia.
+GATE_CLOSE_REPORT_KEY = pytest.StashKey[GateCloseReport]()
+
+
+@pytest.fixture(scope="session")
+def gate_close_report(
+    pytestconfig: pytest.Config,  # wstrzykiwane przez pytest; trzyma raport na cały przebieg
+) -> GateCloseReport:
+    """
+    Description:
+    Raport bramki zamknięcia na prawdziwych zamknięciach (p. 33.2), jeden na cały przebieg
+    pytesta. Pomiar zgłasza w nim ocenę każdego zamknięcia, a po przebiegu pytest wypisuje
+    liczniki, czas bramki i zamknięcia niezgodne z etykietami razem z werdyktem.
+
+    Example args:
+        (wstrzykiwane przez pytest)
+
+    Example result:
+        GateCloseReport wspólny dla wszystkich testów przebiegu
+    """
+    if GATE_CLOSE_REPORT_KEY not in pytestconfig.stash:
+        pytestconfig.stash[GATE_CLOSE_REPORT_KEY] = GateCloseReport()
+
+    return pytestconfig.stash[GATE_CLOSE_REPORT_KEY]
+
+
 def pytest_terminal_summary(
     terminalreporter: TerminalReporter,  # wstrzykiwane przez pytest; pisze na ekran
     config:           pytest.Config,     # wstrzykiwane przez pytest; trzyma raporty
@@ -437,7 +467,8 @@ def pytest_terminal_summary(
     Description:
     Po przebiegu wypisuje raporty testów na żywym modelu: najpierw oceny spraw ze scenariuszy
     wstrzyknięć, bramek, „Popraw”, pytań, cytowania kodu, rozwiązania i czytania z polami
-    wyniku, potem zużycie żywego modelu z sumą kosztu. Pytest woła tę funkcję sam, po nazwie.
+    wyniku, raport bramki zamknięcia na prawdziwych zamknięciach, potem zużycie żywego modelu
+    z sumą kosztu. Pytest woła tę funkcję sam, po nazwie.
     Raport, do którego żaden test niczego nie zgłosił — czyli każdy w przebiegu bez żywego
     modelu — nie wypisuje nic.
 
@@ -448,7 +479,8 @@ def pytest_terminal_summary(
         None — na końcu wyjścia pytesta stoją sekcje „wstrzyknięcia poleceń", „scenariusze
         bramek", „scenariusze »Popraw«", „scenariusze pytań", „scenariusze cytowania kodu",
         „scenariusze rozwiązania", „scenariusze czytania", „scenariusze przekazania",
-        „scenariusze trasy zamknięcia" i „zużycie żywego modelu"
+        „scenariusze trasy zamknięcia", „bramka zamknięcia na prawdziwych zamknięciach"
+        i „zużycie żywego modelu"
     """
     sections = [
         ("wstrzyknięcia poleceń",        config.stash.get(INJECTION_REPORT_KEY, None)),
@@ -460,6 +492,8 @@ def pytest_terminal_summary(
         ("scenariusze rozwiązania",      config.stash.get(SOLUTION_REPORT_KEY, None)),
         ("scenariusze czytania",         config.stash.get(READING_REPORT_KEY, None)),
         ("scenariusze trasy zamknięcia", config.stash.get(CLOSED_REPORT_KEY, None)),
+        ("bramka zamknięcia na prawdziwych zamknięciach",
+         config.stash.get(GATE_CLOSE_REPORT_KEY, None)),
         ("zużycie żywego modelu",        config.stash.get(LIVE_USAGE_KEY, None)),
     ]
 

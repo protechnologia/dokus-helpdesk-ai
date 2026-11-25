@@ -7,14 +7,15 @@ klienta modelu (`tests/integration/api_engine_llm/`); graf uruchamiają test oka
 (`tests/integration/api_agent_graphs/`) i scenariusze ewaluacyjne (`tests/evaluation/`). Raport
 zużycia leży w `report.py`.
 
-| co                      | do czego                                                           |
-|-------------------------|--------------------------------------------------------------------|
-| `live_generation_llm()` | konfiguracja modelu generującego; odmawia bez jawnego `llm_live`   |
-| `run_live_graph()`      | jedna sprawa: stan przykładowy grafu z podanym wejściem i regułami |
-| `live_state()`          | stan wejściowy takiej sprawy, bez modelu                           |
-| `run_live_cases()`      | wiele spraw grafu naraz; sprawa odrzucona przez `respond` to `None` |
-| `default_rules()`       | reguły klienta z zestawu domyślnego grafu, po sprawdzeniu wersji   |
-| `remember_per_graph()`  | pomiar grafu liczony raz na plik testów, razem z błędem            |
+| co                       | do czego                                                            |
+|--------------------------|---------------------------------------------------------------------|
+| `live_generation_llm()`  | konfiguracja modelu generującego; odmawia bez jawnego `llm_live`    |
+| `run_live_graph()`       | jedna sprawa: stan przykładowy grafu z podanym wejściem i regułami  |
+| `live_state()`           | stan wejściowy takiej sprawy, bez modelu                            |
+| `run_live_cases()`       | wiele spraw grafu naraz; sprawa odrzucona przez `respond` to `None` |
+| `run_timed_live_cases()` | to samo, najwyżej N spraw naraz i z czasem każdej sprawy            |
+| `default_rules()`        | reguły klienta z zestawu domyślnego grafu, po sprawdzeniu wersji    |
+| `remember_per_graph()`   | pomiar grafu liczony raz na plik testów, razem z błędem             |
 
 O czym pamiętać przy zmianach:
 
@@ -30,6 +31,7 @@ O czym pamiętać przy zmianach:
 """
 
 import asyncio
+import time
 from collections.abc import Callable, Sequence
 from types import ModuleType
 from typing import TypeVar
@@ -48,6 +50,7 @@ from app.engine_llm import get_llm_client
 from tests._helpers.fake_tools import fake_agent_tools
 from tests._helpers.live.constants import LLM_LIVE_MARKER
 from tests._helpers.live.models.live_case import LiveCase
+from tests._helpers.live.models.timed_live_run import TimedLiveRun
 
 # Wynik pomiaru, który `remember_per_graph()` zapamiętuje: dowolny, byle jeden na graf.
 Measured = TypeVar("Measured")
@@ -194,9 +197,79 @@ async def run_live_cases(
     Raises:
         LLMError: dostawca odmówił albo nie odpowiedział w czasie
     """
-    finals = await asyncio.gather(*(_run_or_reject(graph, llm, case) for case in cases))
+    # Wszystkie sprawy naraz: limit równy liczbie spraw, a przy pustej liście jeden.
+    runs   = await run_timed_live_cases(graph, llm, cases, concurrency=max(len(cases), 1))
+    finals = [run.final for run in runs]
 
-    return list(finals)
+    return finals
+
+
+async def run_timed_live_cases(
+    graph:       ModuleType,          # np. <module app.agent_graphs.gate_close>
+    llm:         LLMSettings,         # np. live_generation_llm(request.config)
+    cases:       Sequence[LiveCase],  # np. [LiveCase(text="ZGŁOSZENIE 33605…", rules=[…]), …]
+    concurrency: int,                 # np. 4 — najwyżej tyle spraw naraz
+) -> list[TimedLiveRun]:
+    """
+    Description:
+    Przepuszcza sprawy grafu tak jak `run_live_cases()`, ale najwyżej `concurrency` naraz,
+    i przy każdej zapisuje, ile trwała. Czas liczy się od chwili, w której sprawa ruszyła, więc
+    czekanie na wolne miejsce do niego nie wchodzi: wynik ma być bliski czasowi jednej sprawy na
+    produkcji, a nie długości kolejki.
+
+    Example args:
+        graph=<module app.agent_graphs.gate_close>
+        llm=LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", …)
+        cases=[LiveCase(text="ZGŁOSZENIE 33605 z 2026-07-02…", rules=["Z treści…"])]
+        concurrency=4
+
+    Example result:
+        [TimedLiveRun(final=GateCloseState(output=Verdict(verdict="pass", …), …), seconds=3.2)]
+
+    Raises:
+        ValueError: limit mniejszy niż jeden — żadna sprawa by nie ruszyła
+        LLMError: dostawca odmówił albo nie odpowiedział w czasie
+    """
+    if concurrency < 1:
+        raise ValueError(f"limit spraw naraz musi wynosić co najmniej 1, a wynosi {concurrency}")
+
+    limit = asyncio.Semaphore(concurrency)
+    runs  = await asyncio.gather(*(_run_timed(graph, llm, case, limit) for case in cases))
+
+    return list(runs)
+
+
+async def _run_timed(
+    graph: ModuleType,         # np. <module app.agent_graphs.gate_close>
+    llm:   LLMSettings,        # np. live_generation_llm(request.config)
+    case:  LiveCase,           # np. LiveCase(text="ZGŁOSZENIE 33605…", rules=[…])
+    limit: asyncio.Semaphore,  # wspólny dla spraw jednego przebiegu
+) -> TimedLiveRun:
+    """
+    Description:
+    Czeka na wolne miejsce, przepuszcza jedną sprawę przez `_run_or_reject()` i oddaje jej stan
+    końcowy razem z czasem, który minął od startu sprawy.
+
+    Example args:
+        graph=<module app.agent_graphs.gate_close>
+        llm=LLMSettings(env_prefix="LLM_GENERATION_", provider="openai", …)
+        case=LiveCase(text="ZGŁOSZENIE 33605 z 2026-07-02…", rules=["Z treści…"])
+        limit=asyncio.Semaphore(4)
+
+    Example result:
+        TimedLiveRun(final=GateCloseState(…), seconds=3.2)
+
+    Raises:
+        LLMError: dostawca odmówił albo nie odpowiedział w czasie
+    """
+    async with limit:
+        started = time.perf_counter()
+        final   = await _run_or_reject(graph, llm, case)
+        seconds = time.perf_counter() - started
+
+    run = TimedLiveRun(final=final, seconds=seconds)
+
+    return run
 
 
 async def _run_or_reject(

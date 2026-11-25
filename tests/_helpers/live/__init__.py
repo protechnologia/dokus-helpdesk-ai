@@ -25,6 +25,7 @@ from tests._helpers.live.helper import (
     remember_per_graph,
     run_live_cases,
     run_live_graph,
+    run_timed_live_cases,
 )
 from tests._helpers.live.measure import (
     LiveRunOf,
@@ -34,6 +35,7 @@ from tests._helpers.live.measure import (
 )
 from tests._helpers.live.models.live_case import LiveCase
 from tests._helpers.live.models.live_usage import LiveUsage
+from tests._helpers.live.models.timed_live_run import TimedLiveRun
 from tests._helpers.live.report import (
     LiveUsageReport,
     arguments_as_text,
@@ -65,6 +67,8 @@ __all__ = [
     "run_as_lines",
     "run_live_cases",
     "run_live_graph",
+    "run_timed_live_cases",
     "TICKET_WITH_MESSAGE",
+    "TimedLiveRun",
     "usage_as_text",
 ]
