@@ -8,7 +8,8 @@
      Układ jak w opisach narzędzi agenta: cztery sekcje, argumenty w tabelce, linie do 70 znaków;
      dłuższe bywają tylko wiersze tabelki. „Co zwraca" jest bez tabelki, bo narzędzie nic modelowi
      nie oddaje. Sekcji pilnuje test kontraktu grafów. Przykład w tabelce model może przepisać —
-     czy to robi, liczy pomiar w p. 22.
+     czy to robi, liczy pomiar w p. 22. Przy `verdict` stoją oba werdykty, `"pass"` pierwszy, bo
+     fałszywy alarm boli bardziej niż przepuszczenie.
 
      Komentarze redakcyjne jak ten są wycinane przed wysłaniem. -->
 # Do czego służy

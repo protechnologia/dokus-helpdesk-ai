@@ -10,7 +10,8 @@
      je stamtąd (`field_rules()`), żeby skasowana reguła pola nie przechodziła dzięki nazwie
      w tabelce. Przykładów całej karty w JSON-ie nie ma (od 2026-10-23): kształt daje schemat,
      wartości każdego pola tabelka, a to, że pól nie wypełnia się na siłę, gdy wątek niewiele
-     ustalił, mówi jedna z zasad.
+     ustalił, mówi jedna z zasad. Mówi o wątku, a nie o „karcie bez rozstrzygnięcia”, bo to
+     drugie czyta się jak pole bez wartości albo samo pole `resolution`.
 
      UWAGA: POLE `useful` JEST KONTRAKTEM FILTRU JAKOŚCI (od 2026-10-23). Filtr indeksacji
      (reguła `not_useful` w core_service/filter_ticket_quality_rules.py) odrzuca kartę, którą model

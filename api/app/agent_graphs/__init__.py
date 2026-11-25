@@ -36,8 +36,9 @@ do poprawki, raz (respond → agent):
 | `polish`            | —                              | `PolishedText` |
 
 „Zgłoszenia, dokumentacja i kod" to wszystkie narzędzia z `agent_tools/`: dwa wyszukiwania i dwa
-odczyty zgłoszeń, spis treści, dwa wyszukiwania i odczyt dokumentacji oraz cztery narzędzia kodu
-aplikacji: szukanie, spis katalogu, odczyt pliku i cytowanie fragmentu.
+odczyty zgłoszeń, spis treści, dwa wyszukiwania i odczyt dokumentacji oraz sześć narzędzi kodu
+aplikacji: opis projektu, szukanie, spis katalogu, odczyt pliku, odczyt symbolu i cytowanie
+fragmentu.
 """
 
 import langsmith

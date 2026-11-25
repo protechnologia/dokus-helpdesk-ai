@@ -232,7 +232,9 @@ compose.
   nie hurtem.
 - **`docs/adr/` — decyzje architektoniczne (ADR), w repo (2026-11-20).** ADR mówi, dlaczego tak,
   a nie inaczej, i co odrzucono; przy decyzji w CLAUDE.md zostaje reguła, to, co z niej wynika,
-  i link do ADR. Zasady, obszary z prefiksami, spis decyzji i szablon stoją w
+  i link do ADR. Każdy ADR ma taki link w sekcji tematycznej swojej decyzji, bo tam agent trafia
+  na nią przed zmianą, a spis w README tylko wylicza ADR-y; pilnuje tego
+  `test_docs_adr_links.py`. Zasady, obszary z prefiksami, spis decyzji i szablon stoją w
   `docs/adr/README.md`. Nową dużą decyzję (trudną do odwrócenia, z realnym wyborem, taką, o którą
   ktoś zapyta „czemu tak?”) agent od razu proponuje jako ADR; istniejące decyzje przenosimy przy
   refaktoryzacji podsekcji CLAUDE.md, nie hurtem. Gdy decyzja nie pasuje do żadnego obszaru
@@ -2626,151 +2628,45 @@ decyzji i otwarte pytania, także przy nowym narzędziu.
 
 ### Warstwa grafów (`agent_graphs/`)
 
-Przebieg grafu z narzędziami wiedzy:
-
-```
-nowe zgłoszenie (surowy tekst)
-      │
-      ├─ [anonimizacja] → AnonymizedText (stały węzeł, nie narzędzie agenta)
-      ├─ [pętla agenta] ⇄ narzędzia z listy dozwolonych dla tej funkcji, np.:
-      │        find_tickets_vector(problem, symptoms) → [embedder] → top-K z Qdranta → próg score
-      │                                               → numery zgłoszeń
-      │        read_tickets_card(numery) → karty z Qdranta        (odczyt cytuje)
-      │        find_docs_vector(zagadnienie) → [embedder] → opisy sekcji dokumentacji
-      │        read_docs(identyfikatory) → treść sekcji           (odczyt cytuje)
-      └─ [odpowiedź] → propozycja + źródła z `cite()` odczytów
-```
+API grafu, oba kształty przebiegu, fabryka, atrapy, strumień kroków i układ opisów narzędzi
+odpowiedzi stoją w docstringach `agent_graphs/`, w komentarzach `respond_tool.md` i w teście
+kontraktu grafów (2026-11-25). Tu zostają decyzje z ceną, liczby z sond i otwarte pytania.
 
 - **LangSmith wyłącza import pakietu `app.agent_graphs`** — `langsmith.configure(enabled=False)` w
   `agent_graphs/__init__.py`. Zmierzone 2026-10-02: przy `LANGSMITH_TRACING=true` LangGraph wysyła
   stan każdego węzła, także `input_text` sprzed anonimizacji; przełącznik globalny wygrywa z ENV.
-  Pilnuje `test_api_agent_graphs_langsmith.py` (pada bez blokady — sprawdzone). Import LangGrapha
-  ~1,1 s.
-- **`build_graph()` przyjmuje gotowe węzły, a krawędzie prowadzi po nazwach** — węzły zamienione
-  w argumentach dają ten sam graf, dwa o jednej nazwie to błąd przy składaniu.
-- **Fabryka grafów leży w `agent_graphs/factory.py`, jak fabryki innych pakietów, ale
-  `agent_graphs/__init__.py` jej nie eksportuje** — czyta `Settings` i pociąga klientów modelu,
-  anonimizatora i baz, a ten `__init__` importuje każdy graf. Bierze się ją pełną ścieżką
-  `app.agent_graphs.factory`.
-- **`build_real_graph()` składa graf z węzłów właściwych na podanych zależnościach i nie czyta
-  konfiguracji (2026-10-05).** Ta sama funkcja służy fabryce, testom na atrapach zależności
-  i testom na żywym modelu. Z podanych narzędzi graf dostaje te ze swojego `TOOL_NAMES`, w jego
-  kolejności.
-- **Prompt grafu składa `graph.py`: `system_prompt()` i `user_prompt(state)`**; treść zgłoszenia
-  bierze wyłącznie z `anonymized`, a stan przed anonimizacją to błąd, nie pusty prompt.
+  Pilnuje `test_api_agent_graphs_langsmith.py` (pada bez blokady — sprawdzone).
 - **Odpowiedź grafu przychodzi narzędziem `respond_<graf>`, nie tekstem
-  ([AGT-006](docs/adr/AGT-006_odpowiedz-grafu-narzedziem.md)).** Definicja w
-  `respond_tool.py`, opis dla modelu w `respond_tool.md` (znaczenie pól — tylko tam, nie w
-  prompcie), schemat z modelu wyniku przez `json_schema_without_docs()`
-  (`core_util/json_schema.py`), który wycina docstringi i `examples` (notatki dla nas i wzory, które
-  model przepisuje). Schemat nie ma `sources` (zasada 9), odpowiedź musi być jedynym wywołaniem
-  w turze. Także `parse_ticket` (`respond_parse_ticket`) — bez pól `FILLED_BY_GRAPH`
-  (`ticket_id`, `date`, wersja słownika, `parser_model`), które dokłada graf ze stanu. Cena: długi
-  tekst w argumencie (`suggest_*`, `polish`) — do zmierzenia w p. 25–28.
-- **Opis narzędzia odpowiedzi ma układ opisu narzędzia agenta (2026-10-21):** te same cztery
-  sekcje, argumenty w tabelce z typem z JSON-a i przykładami, linie do 70 znaków. „Co zwraca"
-  jest bez tabelki i mówi, że wywołanie kończy sprawę, a odpowiedź łamiąca zasady wraca do
-  poprawki. Model dostaje opisy narzędzi wiedzy i odpowiedzi w jednej liście, więc w każdym szuka
-  argumentów i zasad w tym samym miejscu. Schemat dalej nie niesie przykładów, ale opis je ma:
-  czy model je przepisuje, liczą pomiary grafów (p. 21–28). Przy `verdict` bramek stoją oba
-  werdykty, `"pass"` pierwszy, bo fałszywy alarm boli bardziej niż przepuszczenie, a przy `text`
-  w `suggest_questions` także `null`. Sekcji i zgodności tabelki ze schematem odpowiedzi pilnuje
-  test kontraktu grafów. Opis karty zgłoszenia ma ten układ od 2026-10-23 (p. 24): reguły pól są
-  za długie na komórkę tabelki, więc tabelka mówi o polu jedno zdanie, a reguły stoją
-  w „Zasadach", po punkcie na pole („Wypełniając pole `pole`, …"), skąd czyta je test-strażnik. Dwie zasady
-  przed nimi, za „Wywołaj raz…”, mówią, czym różni się „brak" od „nie dotyczy", i że wątki
-  często nie pozwalają ustalić przyczyny ani rozwiązania, więc pól nie wypełnia się na siłę.
-  Mówią o wątku, a nie o „karcie
-  bez rozstrzygnięcia”, bo to drugie czyta się jak pole bez wartości albo samo pole
-  `resolution`. Dwa przykłady całej karty w JSON-ie wypadły: zostały z czasu, gdy karta
-  wychodziła JSON-em w tekście, a dziś kształt daje schemat, a wartości każdego pola tabelka
-  (bez pomiaru; sprawdzi go pomiar w p. 24).
-- **Atrapa grafu (`build_fake_graph()`) jest jednorazowa** — `FakeAgentNode` ma zaplanowane tury,
-  więc trasa buduje ją na każde wywołanie. `ainvoke` zwraca słownik, nie model stanu.
-- **`stream_graph()` obok `run_graph()` oddaje przebieg krok po kroku (2026-10-19):** po każdym
-  węźle krok (`GraphStep` z `agent_graphs/models.py`) razem ze stanem po nim, a stan po ostatnim
-  kroku to stan końcowy `run_graph()`. Stoi na `astream` LangGrapha w trybach `updates`
-  (zmiana stanu węzła) i `values` (cały stan po nim; pierwszy przychodzi przed pierwszym
-  węzłem). Krok zaczyna się tam, gdzie skończył się poprzedni, bo węzły grafów w `api` idą po
-  kolei. Krok narzędzi łączy pomiar czasu z wywołaniem z ostatniej tury modelu i z wynikiem po
-  `call_id`; tylko z ostatniej tury, bo atrapa modelu numeruje wywołania od nowa w każdej turze.
-  Nazwy zleconych narzędzi krok tury bierze ze swojej zmiany stanu, nie z rozmowy: krok narzędzi
-  ma w rozmowie tę samą ostatnią turę i powtórzyłby je.
-- **Atrapa grafu dostaje anonimizator argumentem i nie wykonuje narzędzi (2026-10-16).** Trasa
-  podaje jej klienta usługi `anonymizer` z fabryki, a test zwykle `FakeAnonymizer`; atrapa nie
-  tworzy go u siebie. Anonimizacja to stały pierwszy węzeł, więc atrapa woła tę jedną usługę.
-  Narzędzi nie wykonuje, bo wybiera je model, którego przy atrapie nie ma.
-- **Każdy graf wystawia to samo API** — `STATE`, `TOOL_NAMES`, `system_prompt()`,
-  `user_prompt(state)`, `model_tools(tools, limits)`, `respond_node()`, `build_graph(…)`,
-  `build_fake_graph(anonymizer, …)`, `example_state()` (oraz `respond_tool()`, a w `suggest_*`
-  `LABEL` i `REQUIRES_HITS`). `test_api_agent_graphs_contract.py` sam znajduje grafy
-  w `app/agent_graphs/` i sprawdza je wszystkie, więc nowy graf jest objęty bez dopisywania
-  i nie ma osobnych plików testów na graf. Świadomie dopisuje się go w dwóch miejscach:
-  w tabelce tego testu, które grafy mają narzędzia wiedzy, i w `GIVEN_OUTPUTS` próbek helpera
-  grafów (`tests/_helpers/graphs/samples.py`), jaki wynik podać jego atrapie.
-- **Dwa kształty przebiegu.** Bez narzędzi wiedzy: anonymize → agent → respond. Z nimi: pętla
-  agent ⇄ run_tools, a o kierunku po turze modelu decyduje wspólne `route_after_agent()` z
-  `agent_graphs/base.py` — po tym, CO model wywołał, i po limicie tur: narzędzia wiedzy →
-  `run_tools`; narzędzie odpowiedzi, sam tekst albo wyczerpany limit → `respond`. Limit dostaje
-  `build_graph()` grafu z pętlą argumentem `max_iterations`. Z `respond` w każdym grafie są dwie
-  drogi (`route_after_respond()`): koniec albo powrót do `agent`, gdy odpowiedź wraca do poprawki.
+  ([AGT-006](docs/adr/AGT-006_odpowiedz-grafu-narzedziem.md)).** Cena: długi tekst w argumencie
+  (`suggest_*`, `polish`) — do zmierzenia w p. 25–28.
+- **Opis narzędzia odpowiedzi ma układ opisu narzędzia agenta (2026-10-21):** model dostaje
+  opisy narzędzi wiedzy i odpowiedzi w jednej liście, więc w każdym szuka argumentów i zasad
+  w tym samym miejscu. Układ stoi w komentarzu na górze każdego `respond_tool.md`, a sekcji
+  i zgodności tabelki ze schematem odpowiedzi pilnuje test kontraktu grafów.
 - **Każda funkcja ma własną pętlę i sama dociąga materiał
   ([AGT-005](docs/adr/AGT-005_funkcja-sama-dociaga-material.md))** — `/suggest` bierze
   zgłoszenie, nie identyfikatory trafień. Cena: człowiek nie odznacza trafień przed generacją,
   więc ginie też etykieta do feedbacku, a każdy guzik szuka od nowa.
-- **Graf decyduje, które narzędzia model widzi (`TOOL_NAMES`), ale nie trzyma ich opisów** — te
-  leżą przy narzędziach; definicję składa `tool_definitions()` z `agent_graphs/base.py`, a narzędzie
-  spoza `TOOL_NAMES` to błąd składania.
-- **Model wyniku wspólny dla kilku grafów — w `core_model/graphs/` (`Verdict`, `Proposal`,
-  `ProposalNotes`);
-  używany przez jeden graf — w `agent_graphs/<graf>/models.py`** (`SearchNotes`, `PolishedText`,
-  `QuestionsAnswer`), jak modele narzędzi.
 - **`search` kończy się `respond_search` z uwagami dla wdrożeniowca, a zgodność przyczyn
   przeczytanych spraw ocenia w nich agent, nie kod
   ([AGT-008](docs/adr/AGT-008_zgodnosc-przyczyn-ocenia-agent.md)).** Wynikiem są źródła
-  z `cite()`, zapytania agenta z `messages` i uwagi (`SearchNotes.internal_notes`) w lekkim
-  Markdownie: cztery sekcje z nagłówkiem `##` — Zgłoszenia historyczne, Instrukcje
-  i dokumentacja, Kod aplikacji, Nie znaleziono — a w nich punkt na sprawę, sekcję instrukcji
-  albo fragment kodu; sekcja bez materiału to jedno zdanie. Uwagi pisze model, lista źródeł
-  nadal powstaje z odczytów (zasada 9). Są wymagane i niepuste, inaczej niż w propozycjach, więc
-  `respond_search` bez uwag wraca do poprawki. Wzór trzyma prompt, kod kształtu nie sprawdza,
-  a zgodność nagłówków z opisem narzędzia odpowiedzi pilnuje test. Uwagi nie podpowiadają, czy
-  dopytać, odpowiedzieć, czy przekazać sprawę.
+  z `cite()`, zapytania agenta z `messages` i uwagi (`SearchNotes.internal_notes`); lista źródeł
+  nadal powstaje z odczytów (zasada 9).
 - **`search` sprawdza kod aplikacji w każdej sprawie o działaniu aplikacji, razem ze
   zgłoszeniami i instrukcjami (decyzja 2026-10-11).** Pomija go tylko sprawa organizacyjna
   (konto, szkolenie, termin). Bez komunikatu wejściem są nazwy z ekranu. W `suggest_questions`
   i `suggest_solution` kod zostaje wyjściem awaryjnym do p. 25–26. Cena: w większości spraw
   dochodzą wywołania narzędzi kodu.
-- **Rozpoznanie stoi na stanie sprawy po ostatniej wiadomości wątku (2026-10-11).** Prompt
-  `search` mówi o pytaniach konsultanta i odpowiedziach klienta, a uwagi mają nazwać przyczyny,
-  które te odpowiedzi wykluczają. Z grafów z narzędziami wiedzy mówi o nim poza tym tylko
-  `suggest_questions`, a zgłoszenia przykładowe tych grafów i ich testów to sam opis
-  zgłaszającego.
 - **Na żywym `gpt-6.1-sol` rozpoznanie wyszło w siedmiu zmyślonych sprawach (2026-10-11,
-  pojedyncze przebiegi, nie pomiar).** Narzędzia kodu
-  prawdziwe, na aplikacji syntetycznej; razem 33 tury i 0,19 USD, bez poprawki odpowiedzi.
+  pojedyncze przebiegi, nie pomiar).** Narzędzia kodu prawdziwe, na aplikacji syntetycznej.
   W sześciu sprawach o działaniu aplikacji model wszedł w kod w pierwszej turze, w sprawie
   organizacyjnej ani razu. Sprawa to 3–6 tur i 0,01–0,05 USD, bo model woła kilka narzędzi
-  w jednej turze; ta sama sprawa co w sondzie z 2026-10-10 zajęła 6 tur zamiast 7. Uwagi miały
-  wtedy kształt czterech linii z etykietą i 600–1500 znaków, więcej niż zakładał plan; po
-  zmianie na sekcje Markdown trzy z tych spraw puszczono jeszcze raz (0,09 USD): model
-  trzymał cztery nagłówki i punkt na sprawę w każdej, bez innych znaczników, a uwagi urosły
-  do 620–1770 znaków, mimo limitu zdań w regułach. Przy trzech różnych
-  przyczynach wymieniały je osobno, przy trzech zgodnych mówiły o zgodności z dopiskiem, że
-  u klienta przyczyna nie jest potwierdzona, a przy wątku z odpowiedziami klienta nazwały
-  przyczynę wykluczoną i te, które zostają. Wszystkie 11 cytowań dotyczyło linii wcześniej
-  odczytanych i żadne uwagi nie podpowiadały, co zrobić ze sprawą. Tych samych spraw na starym
-  prompcie nie puszczano. Bez komunikatu model trafiał w kod jednym albo dwoma szukaniami, ale
-  aplikacja syntetyczna ma 34 pliki, więc o kodzie Dokusa to nic nie mówi.
-- **Prompt parsujący leży w `agent_graphs/parse_ticket/`, jak każdy prompt grafu (2026-10-02)** — i
-  nadal jest KONTRAKTEM ARTEFAKTU (zasada 7): `prompt_system.md` (rola, jak czytać wątek),
-  `respond_tool.md` (znaczenie pól, przykłady) i `prompt_user.md` (słownik i wątek) pod
-  testem-strażnikiem `test_api_agent_graphs_parse_ticket_prompt.py`, który zamraża frazy. Korpus
-  przy masowym imporcie (p. 31) zbudował ten sam graf — innej drogi do tego promptu nie ma.
-  Przed importem prompt sprawdzono bez zmian (2026-11-13): scenariusze wstrzyknięć
-  `-k parse_ticket` 0 przebić z 6, test ręczny przez front pominięty.
-- **Reguły klienta (`gate_close`, `gate_reply`, `polish`) są wymagane: brak albo pusta lista to
-  `ValidationError` przy budowie stanu** (decyzja 2026-10-02) — graf w ogóle nie rusza.
+  w jednej turze. Przy trzech różnych przyczynach uwagi wymieniały je osobno, przy trzech
+  zgodnych mówiły o zgodności z dopiskiem, że u klienta przyczyna nie jest potwierdzona, a przy
+  wątku z odpowiedziami klienta nazwały przyczynę wykluczoną i te, które zostają. Wszystkie 11
+  cytowań dotyczyło linii wcześniej odczytanych i żadne uwagi nie podpowiadały, co zrobić ze
+  sprawą. Bez komunikatu model trafiał w kod jednym albo dwoma szukaniami, ale aplikacja
+  syntetyczna ma 34 pliki, więc o kodzie Dokusa to nic nie mówi.
 
 #### Warianty generacji
 
@@ -2789,18 +2685,11 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   `solution` bez odczytanych źródeł oddaje same uwagi dla wdrożeniowca, bez treści dla klienta,
   cokolwiek model napisał (zasada 9). Wariant bez narzędzi wiedzy wraca z pustą listą źródeł,
   i to jest informacja, nie brak danych.
-- **Wszystkie warianty zwracają ten sam kształt:** tekst propozycji albo jego brak, uwagi dla
-  wdrożeniowca, źródła i wariant, którym powstał.
-- **Uwagi dla wdrożeniowca to osobne pole wyniku, `internal_notes` (2026-10-08).** Model musi je
-  podać, ale może zostawić puste. Bez osobnego pola treść dla klienta niosłaby notatki
-  i analizę z kodu, a nawias w treści model gubi: linia `[UWAGA: …]` nie padła w żadnym
-  z czterech pomiarów. Ostrzeżenie o kroku nieodwracalnym zostaje w treści dla klienta:
-  w `solution` w „Uwagach dla klienta", w `questions` jako linia w nawiasie pod pytaniami.
-  Notatki przy pytaniach idą do uwag, każda w osobnej linii od „Ad. N." — numeru pytania, którego
-  dotyczy (2026-10-20, wcześniej „N:", które w uwagach czytało się jak osobna lista). Zasada 9
-  obowiązuje oba pola. `suggest_handoff` uwag nie ma (2026-10-30): model ma tylko wątek, który
-  wdrożeniowiec i tak widzi, więc pole wypełnia graf pustym napisem, a odpowiedź `/suggest`
-  zachowuje kształt.
+- **Uwagi dla wdrożeniowca to osobne pole wyniku, `internal_notes` (2026-10-08).** Bez osobnego
+  pola treść dla klienta niosłaby notatki i analizę z kodu, a nawias w treści model gubi: linia
+  `[UWAGA: …]` nie padła w żadnym z czterech pomiarów. Ostrzeżenie o kroku nieodwracalnym zostaje
+  w treści dla klienta: w `solution` w „Uwagach dla klienta", w `questions` jako linia w nawiasie
+  pod pytaniami. Zasada 9 obowiązuje oba pola.
 - **`questions` działa dwutorowo:** bez trafień pyta na podstawie samego zgłoszenia,
   z trafieniami dokłada `questions_summary` z podobnych spraw. Sentinela w przebraniu na kartach
   importu nie ma, ale pole rzadko niesie treść: ma ją 21% kart w indeksie (2026-11-20), więc
@@ -2815,17 +2704,12 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   rozstrzygały (raz z wątku, raz z samego opisu), a pytania w obu, w których nie rozstrzygały: jedno
   nowe po odpowiedziach, które tylko zawężały, i pięć przy samym objawie. Guzik nadal nie pamięta
   pytań wygenerowanych, ale niewysłanych.
-- **Prompt `questions` nie może przepisać cudzych pytań.** Materiał historyczny to wzorzec:
-  odrzuć pytania niepasujące do sprawy, przeformułuj pod to zgłoszenie, pomiń te, na które
-  odpowiedź już jest w treści.
 - **`handoff` to krótka wiadomość bez narzędzi (2026-10-30, p. 27):** „Dzień dobry.”, podsumowanie
-  problemu z tym, co dotąd ustalono, informacja o przekazaniu sprawy, „Pozdrawiam.”. Układ pokazuje
-  przykład w opisie pola `text`, a zasady szczegółowe mówią tylko, co niesie podsumowanie, i że
-  model nie obiecuje terminów ani konkretnych akcji. Samo „przekazaliśmy do analizy” nie mówi
-  klientowi, o co chodzi i co już wiadomo; krótkie komentarze z przekazaniem to w korpusie
-  mediana 155 znaków (zgrubne liczenie po słowach, 104 komentarze w 100 zgłoszeniach). Dosłownie
-  powtarza się tam tylko jeden tekst (3×), więc problemem jest brak treści, a nie szablon: dawne
-  „≥12×” dotyczyło formułki zamykającej. Przeszło sprawdzenie, nie pomiar: na `gpt-6.1-sol`
+  problemu z tym, co dotąd ustalono, informacja o przekazaniu sprawy, „Pozdrawiam.”. Samo
+  „przekazaliśmy do analizy” nie mówi klientowi, o co chodzi i co już wiadomo; krótkie komentarze
+  z przekazaniem to w korpusie mediana 155 znaków (zgrubne liczenie po słowach, 104 komentarze
+  w 100 zgłoszeniach). Dosłownie powtarza się tam tylko jeden tekst (3×), więc problemem jest brak
+  treści, a nie szablon. Przeszło sprawdzenie, nie pomiar: na `gpt-6.1-sol`
   scenariusze z `handoff.json` dały 0 błędów na 9 spraw w dwóch przebiegach, wstrzyknięcia
   0 przebić z 6, a cztery zmyślone sprawy przez `/suggest` z anonimizatorem na Bieliku oczekiwany
   układ, po około 0,003 USD. Cena: nic już wprost nie mówi, że zapowiedź („sprawdzimy”) nie jest
@@ -3997,6 +3881,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/golden_anonymization/` | golden set anonimizatora: oba zestawy, ocena przecieków i zniszczonej wiedzy, pomiar z licznikami na rodzaj (`measure_anonymization()`), kontrola zaznaczeń (`annotation_problems()`) i wzorcowa zamiana (`ideal_anonymizer()`) |
 | `tests/_helpers/anonymizer_llm/`      | model anonimizujący usługi `anonymizer`: odpowiedź Chat Completions (`chat_answer()`), klient modelu na atrapie transportu (`model_client_on()`) i odpowiadający węzłom osób i adresów (`scripted_llm()`), konfiguracja z `.env` dla `llm_live` (`live_agent_settings()`), pomiar silnika `agent` na golden secie (`measure_agent()`), przecieki ponad próg i progi |
 | `tests/_helpers/patterns/`            | wzorce usługi `anonymizer`: tekst po zamianie miejscami z jednego wariantu (`replaced_by()`), zamiana wszystkimi wzorcami jako funkcja do pomiaru golden setu (`anonymize_with_patterns()`), rodzaje od wzorców, progi przecieków na zestaw i odczyt pomiaru (`kinds_over_threshold()`, `leaked_fragments()`, `destroyed_fragments()`, `removed_kinds()`) |
+| `tests/_helpers/adr/`                 | ADR-y w repo: pliki w `docs/adr/` (`adr_files()`) i linki do nich w CLAUDE.md (`claude_md_links()`), w spisie README (`readme_links()`) i w dowolnym tekście Markdown (`linked_adr_files()`) |
 
 - **Każdy helper ma folder w `tests/_helpers/`, także bez modeli — dla spójności (2026-10-15,
   wcześniej pliki `tests/helpers_*.py`).** W folderze `helper.py` z logiką, `models/`
