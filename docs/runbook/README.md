@@ -27,6 +27,8 @@ Przed procedurą przeczytaj jej runbook, a po przejściu popraw go i dopisz wpis
 - Krok płatny albo nieodwracalny ma to napisane przy sobie, a agent pyta przed nim.
 - Nową procedurę agent od razu proponuje jako runbook, zamiast zapisywać ją w swojej pamięci:
   pamięć jest prywatna dla jednej maszyny, a jej treść nie przechodzi przeglądu w commicie.
+- Runbook, który ma powstać, stoi w „ToDo” z tym, kiedy go spisać i skąd wziąć treść; wpis
+  znika, gdy runbook trafia do spisu.
 
 ## Spis
 
@@ -34,6 +36,16 @@ Przed procedurą przeczytaj jej runbook, a po przejściu popraw go i dopisz wpis
 |-----------------------------------------------------------------------|-------------------------------------------------|
 | [Odchudzanie podsekcji CLAUDE.md](odchudzanie-podsekcji-claude-md.md) | co jakiś czas, jedna podsekcja CLAUDE.md naraz  |
 | [Pod na RunPodzie z Bielikiem](pod-runpod-z-bielikiem.md)             | przed pracą z prawdziwym modelem anonimizującym |
+
+## ToDo
+
+- **Wdrożenie na serwer pokazowy** — spisać przy najbliższym wdrożeniu, żeby kroki od razu były
+  sprawdzone. Treść: notatka agenta z 2026-10-28, już nieaktualna, bo paczka danych wskazuje
+  katalog kart golden200, którego nie ma od 2026-11-11, a dziś na serwer idzie korpus 1115 kart
+  i wątków. Adres serwera, ścieżka do klucza SSH i warstwa compose serwera zostają poza repo.
+- **Nowe karty golden setu**: parsowanie do katalogu roboczego, indeks obok instancji,
+  porównanie pomiarów i zastąpienie kart — spisać w kroku 2 odchudzania „Golden set
+  retrievalu”. Treść: CLAUDE.md, „Golden set retrievalu” i „Commands”.
 
 ## Szablon
 
