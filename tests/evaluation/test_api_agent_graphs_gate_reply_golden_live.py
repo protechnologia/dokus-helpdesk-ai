@@ -28,18 +28,20 @@ Co się dzieje po drodze:
    regułę, liczniki dla wpisów wątpliwych i na warstwę, czas bramki z doliczoną anonimizacją i pod
    każdym złym werdyktem łamane reguły z powodem i uzasadnienie modelu.
 
-Pomiar (`gpt-6.1-sol`, reguły w wersji 3, dwa przebiegi, 2026-11-25):
+Pomiary (`gpt-6.1-sol`, dwa przebiegi, 2026-11-25):
 
-| fałszywe alarmy | przepuszczenia | reguła 2 | reguła 5    | reguły 1, 3, 4, 6 | czas: mediana |
-|-----------------|----------------|----------|-------------|-------------------|---------------|
-| 16 i 18 ze 108  | 12 i 11 z 71   | 2 z 5    | 10 i 9 z 58 | 0 z 24            | 2,8 i 3,0 s   |
+| reguły | fałszywe alarmy | przepuszczenia | reguła 2 | reguła 5    | reguły 1, 3, 4, 6 |
+|--------|-----------------|----------------|----------|-------------|-------------------|
+| v3     | 16 i 18 ze 108  | 12 i 11 z 71   | 2 z 5    | 10 i 9 z 58 | 0 z 24            |
+| v4     | 9 i 8 ze 108    | 2 i 2 z 71     | 0 z 5    | 2 z 58      | 0 z 24            |
 
-Złe werdykty są prawie te same w obu przebiegach (16 fałszywych alarmów wspólnych, 11
-przepuszczeń wspólnych) i wszystkie stoją na granicach, które człowiek ustalił inaczej, niż mówi
-brzmienie reguł. Bramka bierze za potoczny żargon helpdesku („admin”, „task”, „screeny”,
-„dograna”), a przepuszcza swobodne zwroty („w razie czego”); blokuje „pani {NAZWISKO}” o osobie
-trzeciej, bo reguła 3 wymienia „pani” wśród form niepoprawnych; nie uznaje za błąd błędnej formy
-wyrazu, zdania zaczętego małą literą ani nazwy własnej małą literą.
+Na regułach w wersji 3 wszystkie złe werdykty stały na granicach, które człowiek ustalił inaczej,
+niż mówiło brzmienie reguł: bramka brała za potoczny żargon helpdesku, a przepuszczała swobodne
+zwroty, blokowała „pani” małą literą o osobie trzeciej i nie uznawała za błąd błędnej formy
+wyrazu. Wersja 4 zapisuje te granice. Zostają alarmy przy „poszło”, przy radzie spakowania plików
+do ZIP i przy formach, które bramka uznaje za błędne („PIN” bez końcówki), a wiadomości
+bezosobowe („proszę sprawdzić”) bramka blokowała za brak formy „Pan”, „Pani” albo „Państwo”.
+Zdanie o formie bezosobowej doszło do reguły 3 po pomiarze i nie jest zmierzone.
 
 O czym pamiętać przy zmianach:
 
@@ -49,9 +51,9 @@ O czym pamiętać przy zmianach:
 - Zestaw i korpus to dane klientów, poza repo: bez nich testy się pomija. Raport cytuje
   uzasadnienia modelu, a trzy wiadomości reguły 6 niosą hasła z korpusu, więc wydruk zostaje na
   ekranie, a do CLAUDE.md idą same liczby.
-- KOSZTUJE: sprawa to jedna tura modelu na krótkiej wiadomości. Cały zestaw na `gpt-6.1-sol` to
-  0,77 USD przy pierwszym przebiegu po zmianie reguł albo promptu i 0,23 USD przy kolejnym,
-  z początkiem żądania z cache, oraz około 2,5 minuty.
+- KOSZTUJE: sprawa to jedna tura modelu na krótkiej wiadomości. Cały zestaw na `gpt-6.1-sol`
+  i regułach w wersji 4 to 0,87 USD przy pierwszym przebiegu po zmianie reguł albo promptu
+  i 0,28 USD przy kolejnym, z początkiem żądania z cache, oraz około 3 minut.
 """
 
 import pytest

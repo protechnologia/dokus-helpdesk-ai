@@ -16,7 +16,7 @@
     ]
   },
   "gate_reply": {
-    "rules_version": 3,
+    "rules_version": 4,
     "cases": [
       {
         "id": "g01",

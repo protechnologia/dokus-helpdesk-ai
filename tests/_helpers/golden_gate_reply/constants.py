@@ -39,15 +39,16 @@ ANONYMIZATION_MEAN_SECONDS = 1.0
 ANONYMIZATION_MAX_SECONDS  = 3.8
 
 # Progi pomiaru: gorszy wynik z dwóch przebiegów na `gpt-6.1-sol`, zmierzony 2026-11-25 na regułach
-# w wersji 3 (fałszywych alarmów 16 i 18 ze 108). Fałszywe alarmy liczy się wśród wiadomości
-# poprawnych, a przepuszczenia osobno na każdą regułę: wiadomość łamiąca dwie reguły przepuszczona
-# liczy się przy obu. Pilnują, żeby nie było gorzej.
-MAX_FALSE_ALARMS = 18
+# w wersji 4 bez zdania o formie bezosobowej w regule 3, które doszło po pomiarze i nie jest
+# zmierzone (fałszywych alarmów 9 i 8 ze 108; na wersji 3 było 16 i 18). Fałszywe alarmy liczy się
+# wśród wiadomości poprawnych, a przepuszczenia osobno na każdą regułę: wiadomość łamiąca dwie
+# reguły przepuszczona liczy się przy obu. Pilnują, żeby nie było gorzej.
+MAX_FALSE_ALARMS = 9
 MAX_MISSES = {
     1: 0,
-    2: 2,
+    2: 0,
     3: 0,
     4: 0,
-    5: 10,
+    5: 2,
     6: 0,
 }

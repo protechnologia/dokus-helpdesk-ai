@@ -1801,8 +1801,22 @@ merytorycznie").
   a przepuszcza swobodny zwrot. Wśród 75 poprawnych z warstwy losowej fałszywych alarmów 7 i 8.
   Czas przy 4 wiadomościach naraz: mediana 2,8–3,0 s, p90 5,2–5,3 s, maks. 11,5–12,8 s, a
   z anonimizacją krótkiego tekstu z pomiaru z 2026-10-19 mediana około 4 s i maks. do 16,6 s.
-  Koszt zestawu: 0,77 USD, a z początkiem żądania z cache 0,23 USD. Progi testu stoją na gorszym
-  przebiegu (18 alarmów, przepuszczenia 10 przy regule 5, 2 przy regule 2, 0 przy pozostałych).
+  Koszt zestawu: 0,77 USD, a z początkiem żądania z cache 0,23 USD.
+- **Reguły bramki wysyłki w wersji 4 zapisują granice etykiet krótko, a złych werdyktów jest 11
+  zamiast 30 (2026-11-25, p. 33.3).** Brzmienie ustalił człowiek: reguła 1 dopuszcza pytanie
+  o login, żeby ustalić konto; reguła 2 podaje przykłady potocznych słów i dopuszcza żargon
+  helpdesku (admin, task, screen, mail); reguła 3 wymaga formy Pan, Pani albo Państwo wielką
+  literą, dopuszcza formę bezosobową i małą literę o osobie trzeciej; reguła 5 obejmuje
+  literówkę, brak polskiej litery i błędną formę wyrazu, z przykładami („te same konto”, „ksef”,
+  „nr.”, zdanie od małej litery), bez interpunkcji. Reguły 4 i 6 bez zmian, a z brzmienia
+  wypadły wulgaryzmy i „on, ona”; pojedyncze przypadki (ZIP, „poszło”) zostają kosztem. Na
+  `gpt-6.1-sol`, w dwóch przebiegach: fałszywych alarmów 9 i 8 ze 108, przepuszczeń 2 i 2 z 71,
+  oba przy regule 5; scenariusze 0 z 17 i 0 z 12, wstrzyknięcia 0 przebić z 9. Zostają alarmy
+  przy „poszło”, ZIP, formach, które bramka uznaje za błędne („PIN” bez końcówki), i przy
+  wiadomościach bezosobowych, które bramka blokowała za brak „Pan”, „Pani” albo „Państwo” (5) —
+  zdanie o formie bezosobowej doszło po pomiarze i nie jest zmierzone. Czas: mediana 3,3–3,5 s,
+  maks. 10,6–12,0 s. Koszt zestawu: 0,87 USD, z cache 0,28 USD. Progi testu stoją na gorszym
+  przebiegu (9 alarmów, 2 przepuszczenia przy regule 5, 0 przy pozostałych).
 - **„Popraw” przeszło sprawdzenie, ale nie pomiar (2026-10-30).** Na `gpt-6.1-sol` scenariusze
   na zasadach stylu w wersji 2 dały 0 błędów na 8 spraw w dwóch przebiegach, a wstrzyknięcia 0 przebić
   z 8. Trasa `/polish` z anonimizatorem na Bieliku dała układ i formy zgodne z zasadami; do tego test
@@ -1816,7 +1830,11 @@ merytorycznie").
   podaje przykłady dopuszczalne (Pan, Pani, Państwo) i niepoprawne (te same małą literą, ty, on,
   ona), a pułapka g12 z „Panią” przechodzi. Reguła ortografii nie wspomina o polskich znakach:
   model sam uznaje słowo bez polskiej litery za błąd (g20), a reguła „tekst z polskimi znakami”
-  blokowałaby poprawną wiadomość, w której żadne słowo ich nie wymaga (g22).
+  blokowałaby poprawną wiadomość, w której żadne słowo ich nie wymaga (g22). Przy wersji 4
+  (2026-11-25, p. 33.3) model czytał zdanie opisowe jako nakaz: po „o osobie trzeciej pisze się
+  małą literą” blokował „Pani” wielką literą o osobie trzeciej, a „można pisać” to usunęło;
+  „Interpunkcja się nie liczy” wyłączyło też kropkę po „nr”, dopóki „nr.” nie stanęło wśród
+  przykładów niepoprawnych.
 
 ### Warstwa CLI
 
@@ -3479,7 +3497,7 @@ localhost:8010/search`.
   przy 4 zamknięciach naraz; bez zestawu i korpusu w `data/unsafe/` testy się pomija
 - Bramka wysyłki na 179 prawdziwych wiadomościach konsultantów z korpusu (p. 33.3):
   `pytest tests/evaluation/test_api_agent_graphs_gate_reply_golden_live.py -m llm_live` —
-  **kosztuje, pytaj przed**; 0,77 USD (0,23 USD z początkiem żądania z cache) i około 2,5 minuty
+  **kosztuje, pytaj przed**; 0,87 USD (0,28 USD z początkiem żądania z cache) i około 3 minut
   przy 4 wiadomościach naraz; bez zestawu i korpusu w `data/unsafe/` testy się pomija
 - Silnik `agent` usługi `anonymizer` na golden secie (p. 19.5):
   `pytest tests/evaluation/test_anonymizer_agent_golden_live.py -m llm_live` — woła model
@@ -4321,28 +4339,10 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
   zgłoszenia”, „Domena”, „Golden set retrievalu”, „Warstwa wyszukiwania tekstowego (Postgres)”.
 - [x] **32. Automat mailowy w adapterze** (2026-11-18 – 2026-11-20) → „Historyczne zgłoszenia”,
   „Świadomie pominięte”.
-- [ ] **33. Przeliczenia na pełnym korpusie** — pomiary, które czekały na korpus importu; zostały
-  te, które jeszcze coś rozstrzygną (przegląd 2026-11-20). *Dlaczego:* bramki pójdą na produkcję
-  pierwsze, bo działają bez indeksów, a ich liczby stoją na zmyślonych sprawach; fałszywy alarm
-  uczy wdrożeniowców klikać „obejdź”.
-  - [x] **33.1 Liczby z kart importu i przegląd listy** (2026-11-20) → „Historyczne
-    zgłoszenia”, „Domena”, „Reguły parsowania”, „`questions_summary`”, „Ewaluacja bramek”,
-    „Embeddingi”, „Warianty generacji”, „Świadomie pominięte”; `RAG_SCORE_MIN` w p. 79,
-    porównanie embedderów w p. 40, „Popraw” w p. 80.
-  - [x] **33.2 `gate_close` na prawdziwych zamknięciach** (2026-11-20 – 2026-11-25) → „Ewaluacja
-    bramek”, „Commands”, „Helpery”.
-  - [ ] **33.3 `gate_reply` na prawdziwych wiadomościach** — te same decyzje co w 33.2
-    (wejście z `anonymized/` przez anonimizator bez zmian, etykiety na każdą regułę od agentów na
-    ślepo z drugim oceniającym na części zestawu, próg z gorszego z dwóch przebiegów); granice
-    etykiet ustalił człowiek, stoją przy opisie zestawu w „Ewaluacji bramek”.
-    - [x] **33.3.1 Zestaw `gate-reply.json`** (2026-11-25) → „Ewaluacja bramek”, „Helpery”.
-    - [x] **33.3.2 Test `llm_live` na zestawie** (2026-11-25) → „Ewaluacja bramek”, „Commands”,
-      „Helpery”.
-    - [ ] **33.3.3 Reguły w wersji 4** — człowiek przyjął 2026-11-25 krótkie brzmienie reguł 1, 2,
-      3 i 5, które zapisuje granice etykiet (login jako nazwa konta, żargon helpdesku, zwrot do
-      adresata, błędna forma wyrazu); reguły 4 i 6 bez zmian, a pojedyncze przypadki (ZIP,
-      „poszło”, „nr.”) zostają kosztem. Scenariusze i wstrzyknięcia pod wersję 4, pomiar zestawu
-      w dwóch przebiegach i nowe progi.
+- [x] **33. Przeliczenia na pełnym korpusie** (2026-11-20 – 2026-11-25) → „Historyczne
+  zgłoszenia”, „Domena”, „Reguły parsowania”, „`questions_summary`”, „Ewaluacja bramek”,
+  „Embeddingi”, „Warianty generacji”, „Świadomie pominięte”, „Commands”, „Helpery”;
+  `RAG_SCORE_MIN` w p. 79, porównanie embedderów w p. 40, „Popraw” w p. 80.
 - [x] **34. Tryb odświeżania korpusu** (2026-11-20) → „Historyczne zgłoszenia”, „Świadomie
   pominięte”.
 

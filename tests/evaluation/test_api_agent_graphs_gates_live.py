@@ -34,10 +34,11 @@ z 2026-10-30 stoi na zasadach podzielonych na ogólne i szczegółowe, a pomiar 
 regułach bramki wysyłki w wersji 3, z regułą 6 (hasło albo inne poświadczenie w wiadomości):
 na jej sprawach g23–g27 0 fałszywych alarmów z 3 i 0 przepuszczeń z 2. Pomiar `gate_close`
 z 2026-11-25 stoi na regułach zamknięcia w wersji 2 (sześć reguł) i 24 sprawach, po trzy rodzaje
-na regułę. Pomiar `gate_reply` z 2026-11-25 dokłada parę spraw cytatu
-przy regule 1 (p. 33.3): g28 prosi o login i hasło we własnym cudzysłowie konsultanta i ma zostać
-zablokowana, a pułapka g29 cytuje komunikat z ekranu ze słowami „login i hasło” i ma przejść.
-Obie dały oczekiwany werdykt w obu przebiegach.
+na regułę. Pomiar `gate_reply` z 2026-11-25 dokłada parę spraw cytatu przy regule 1 (p. 33.3):
+g28 prosi o login i hasło we własnym cudzysłowie konsultanta i ma zostać zablokowana, a pułapka
+g29 cytuje komunikat z ekranu ze słowami „login i hasło” i ma przejść. Obie dały oczekiwany
+werdykt w obu przebiegach. Na regułach bramki wysyłki w wersji 4 (2026-11-25, przed zdaniem
+o formie bezosobowej w regule 3) wynik ten sam: 0 fałszywych alarmów z 17 i 0 przepuszczeń z 12.
 
 Pierwszy pomiar `gate_reply` dał w obu przebiegach fałszywy alarm na pułapce g06: bramka uznała
 cytat komunikatu z ekranu („Ups! Coś poszło nie tak.”) za potoczne słownictwo wiadomości. Po
