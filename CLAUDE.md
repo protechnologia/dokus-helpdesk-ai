@@ -241,8 +241,10 @@ compose.
 - **Co jakiś czas odchudzamy jedną podsekcję CLAUDE.md (2026-11-20)**: wypada to, co się nie
   przyda albo łatwo wyciągnąć z kodu, a duże decyzje podsekcji idą do ADR. Cztery kroki, każdy
   z plikiem do przeglądu przed zmianą i osobnym commitem: najpierw wybór dużych decyzji
-  podsekcji do ADR (decyzja, opcje, powód), potem czyszczenie, łączenie i zwięzłość; po każdym
-  skrypt porównuje liczby i odesłania do planu obu wersji.
+  podsekcji do ADR (decyzja, opcje, powód), potem czyszczenie, łączenie (punkty o jednej osi
+  w jeden, ułożone tematycznie, bez przepisywania słów) i zwięzłość (każdy punkt w jednym
+  układzie: pogrubiona decyzja z datą, dlaczego, liczby, na końcu „Cena:” albo otwarte pytanie;
+  fakty bez zmian); po każdym skrypt porównuje liczby i odesłania do planu obu wersji.
 - **`data/unsafe/docs/` — raporty robocze i prezentacje, POZA repo** (2026-08-20).
   Powód: **raport cytujący korpus niesie PII**, choćby autor tego nie zamierzał — wystarczy
   wkleić zrzut z konsoli operującej na zgłoszeniach, żeby trafiły tam nazwiska użytkowników.
@@ -2656,16 +2658,15 @@ nowe zgłoszenie (surowy tekst)
   kolejności.
 - **Prompt grafu składa `graph.py`: `system_prompt()` i `user_prompt(state)`**; treść zgłoszenia
   bierze wyłącznie z `anonymized`, a stan przed anonimizacją to błąd, nie pusty prompt.
-- **Odpowiedź grafu przychodzi narzędziem `respond_<graf>`, nie tekstem (2026-10-02).** Definicja w
+- **Odpowiedź grafu przychodzi narzędziem `respond_<graf>`, nie tekstem
+  ([AGT-006](docs/adr/AGT-006_odpowiedz-grafu-narzedziem.md)).** Definicja w
   `respond_tool.py`, opis dla modelu w `respond_tool.md` (znaczenie pól — tylko tam, nie w
   prompcie), schemat z modelu wyniku przez `json_schema_without_docs()`
   (`core_util/json_schema.py`), który wycina docstringi i `examples` (notatki dla nas i wzory, które
-  model przepisuje). Zysk: koniec pętli rozstrzyga to, CO model wywołał, a nie brak wywołań; format
-  ma jedno źródło; błąd walidacji wraca tą samą drogą co błędne argumenty narzędzia. Schemat nie ma
-  `sources` (zasada 9), odpowiedź musi być jedynym wywołaniem w turze. Długi tekst w argumencie
-  (`suggest_*`, `polish`) — do zmierzenia w p. 25–28. Także `parse_ticket` (`respond_parse_ticket`,
-  2026-10-02) — bez pól `FILLED_BY_GRAPH` (`ticket_id`, `date`, wersja słownika, `parser_model`),
-  które dokłada graf ze stanu.
+  model przepisuje). Schemat nie ma `sources` (zasada 9), odpowiedź musi być jedynym wywołaniem
+  w turze. Także `parse_ticket` (`respond_parse_ticket`) — bez pól `FILLED_BY_GRAPH`
+  (`ticket_id`, `date`, wersja słownika, `parser_model`), które dokłada graf ze stanu. Cena: długi
+  tekst w argumencie (`suggest_*`, `polish`) — do zmierzenia w p. 25–28.
 - **Opis narzędzia odpowiedzi ma układ opisu narzędzia agenta (2026-10-21):** te same cztery
   sekcje, argumenty w tabelce z typem z JSON-a i przykładami, linie do 70 znaków. „Co zwraca"
   jest bez tabelki i mówi, że wywołanie kończy sprawę, a odpowiedź łamiąca zasady wraca do
@@ -2713,7 +2714,8 @@ nowe zgłoszenie (surowy tekst)
   `run_tools`; narzędzie odpowiedzi, sam tekst albo wyczerpany limit → `respond`. Limit dostaje
   `build_graph()` grafu z pętlą argumentem `max_iterations`. Z `respond` w każdym grafie są dwie
   drogi (`route_after_respond()`): koniec albo powrót do `agent`, gdy odpowiedź wraca do poprawki.
-- **Każda funkcja ma własną pętlę i sama dociąga materiał (2026-10-02)** — `/suggest` bierze
+- **Każda funkcja ma własną pętlę i sama dociąga materiał
+  ([AGT-005](docs/adr/AGT-005_funkcja-sama-dociaga-material.md))** — `/suggest` bierze
   zgłoszenie, nie identyfikatory trafień. Cena: człowiek nie odznacza trafień przed generacją,
   więc ginie też etykieta do feedbacku, a każdy guzik szuka od nowa.
 - **Graf decyduje, które narzędzia model widzi (`TOOL_NAMES`), ale nie trzyma ich opisów** — te
@@ -2723,17 +2725,17 @@ nowe zgłoszenie (surowy tekst)
   `ProposalNotes`);
   używany przez jeden graf — w `agent_graphs/<graf>/models.py`** (`SearchNotes`, `PolishedText`,
   `QuestionsAnswer`), jak modele narzędzi.
-- **`search` kończy się `respond_search` z uwagami dla wdrożeniowca (2026-10-11, wcześniej bez
-  argumentów).** Wynikiem są źródła z `cite()`, zapytania agenta z `messages` i uwagi
-  (`SearchNotes.internal_notes`) w lekkim Markdownie: cztery sekcje z nagłówkiem `##` —
-  Zgłoszenia historyczne, Instrukcje i dokumentacja, Kod aplikacji, Nie znaleziono — a w nich
-  punkt na sprawę, sekcję instrukcji albo fragment kodu; sekcja bez materiału to jedno zdanie.
-  Jedna sprawa w jednym punkcie pokazuje zgodność albo rozbieżność przyczyn bez czytania
-  akapitu. Uwagi pisze model, lista źródeł nadal powstaje z odczytów (zasada 9).
-  Są wymagane i niepuste, inaczej niż w propozycjach: przy zerze trafień mówią, czego agent
-  szukał, więc `respond_search` bez uwag wraca do poprawki. Wzór trzyma prompt, kod kształtu
-  nie sprawdza, a zgodność nagłówków z opisem narzędzia odpowiedzi pilnuje test. Uwagi nie
-  podpowiadają, czy dopytać, odpowiedzieć, czy przekazać sprawę.
+- **`search` kończy się `respond_search` z uwagami dla wdrożeniowca, a zgodność przyczyn
+  przeczytanych spraw ocenia w nich agent, nie kod
+  ([AGT-008](docs/adr/AGT-008_zgodnosc-przyczyn-ocenia-agent.md)).** Wynikiem są źródła
+  z `cite()`, zapytania agenta z `messages` i uwagi (`SearchNotes.internal_notes`) w lekkim
+  Markdownie: cztery sekcje z nagłówkiem `##` — Zgłoszenia historyczne, Instrukcje
+  i dokumentacja, Kod aplikacji, Nie znaleziono — a w nich punkt na sprawę, sekcję instrukcji
+  albo fragment kodu; sekcja bez materiału to jedno zdanie. Uwagi pisze model, lista źródeł
+  nadal powstaje z odczytów (zasada 9). Są wymagane i niepuste, inaczej niż w propozycjach, więc
+  `respond_search` bez uwag wraca do poprawki. Wzór trzyma prompt, kod kształtu nie sprawdza,
+  a zgodność nagłówków z opisem narzędzia odpowiedzi pilnuje test. Uwagi nie podpowiadają, czy
+  dopytać, odpowiedzieć, czy przekazać sprawę.
 - **`search` sprawdza kod aplikacji w każdej sprawie o działaniu aplikacji, razem ze
   zgłoszeniami i instrukcjami (decyzja 2026-10-11).** Pomija go tylko sprawa organizacyjna
   (konto, szkolenie, termin). Bez komunikatu wejściem są nazwy z ekranu. W `suggest_questions`
@@ -2780,8 +2782,8 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 | `solution`  | rozwiązanie — gdy zgłoszenie nie wymaga działania serwisu | **tak** |
 | `handoff`   | informacja o przekazaniu zgłoszenia do dalszych prac po stronie serwisu | nie |
 
-- **Wariant to kod: osobny graf na wariant (2026-10-02).** Cena: nowy guzik wymaga deployu.
-  Zysk: zasada 9 obowiązuje każdy wariant, bo piszemy je my.
+- **Wariant to kod: osobny graf na wariant
+  ([AGT-007](docs/adr/AGT-007_wariant-generacji-to-kod.md)).** Cena: nowy guzik wymaga deployu.
 - **Wariant deklaruje, czy potrzebuje źródeł (`requires_hits`), a egzekwuje to kod węzła
   odpowiedzi, nie posłuszeństwo modelu.** `questions` i `handoff` działają przy pustym indeksie,
   `solution` bez odczytanych źródeł oddaje same uwagi dla wdrożeniowca, bez treści dla klienta,

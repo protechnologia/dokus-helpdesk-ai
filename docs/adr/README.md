@@ -49,6 +49,10 @@ przeczytaj jego ADR-y ze statusem „Przyjęta”.
 | [AGT-002](AGT-002_opis-narzedzia-wspolny-dla-grafow.md)              | Opis narzędzia dla modelu jest jeden, przy narzędziu    | Przyjęta 2026-10-03 | —         |
 | [AGT-003](AGT-003_narzedzia-wiedzy-dwustopniowo.md)                  | Wyszukiwanie oddaje identyfikatory, źródłem jest odczyt | Przyjęta 2026-10-04 | —         |
 | [AGT-004](AGT-004_zrodlo-z-kodu-to-cytowana-przyczyna.md)            | Źródłem z kodu jest fragment zacytowany jako przyczyna  | Przyjęta 2026-10-06 | —         |
+| [AGT-005](AGT-005_funkcja-sama-dociaga-material.md)                  | Każda funkcja sama dociąga materiał w swojej pętli      | Przyjęta 2026-10-02 | —         |
+| [AGT-006](AGT-006_odpowiedz-grafu-narzedziem.md)                     | Odpowiedź grafu przychodzi narzędziem `respond_<graf>`  | Przyjęta 2026-10-02 | —         |
+| [AGT-007](AGT-007_wariant-generacji-to-kod.md)                       | Wariant generacji to kod: osobny graf na wariant        | Przyjęta 2026-10-02 | —         |
+| [AGT-008](AGT-008_zgodnosc-przyczyn-ocenia-agent.md)                 | Zgodność przyczyn ocenia agent w uwagach, nie kod       | Przyjęta 2026-10-11 | —         |
 | [GAT-001](GAT-001_powiadomienie-nie-przechodzi-bramki-zamkniecia.md) | Powiadomienie nie przechodzi bramki zamknięcia          | Przyjęta 2026-11-20 | —         |
 
 ## Szablon
