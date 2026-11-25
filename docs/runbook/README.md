@@ -27,8 +27,8 @@ Przed procedurą przeczytaj jej runbook, a po przejściu popraw go i dopisz wpis
 - Krok płatny albo nieodwracalny ma to napisane przy sobie, a agent pyta przed nim.
 - Nową procedurę agent od razu proponuje jako runbook, zamiast zapisywać ją w swojej pamięci:
   pamięć jest prywatna dla jednej maszyny, a jej treść nie przechodzi przeglądu w commicie.
-- Runbook, który ma powstać, stoi w „ToDo” z tym, kiedy go spisać i skąd wziąć treść; wpis
-  znika, gdy runbook trafia do spisu.
+- Runbook, który ma powstać, stoi w „ToDo” z opisem (co i skąd wziąć treść) i tym, na co
+  czeka; wpis znika, gdy runbook trafia do spisu.
 
 ## Spis
 
@@ -39,13 +39,10 @@ Przed procedurą przeczytaj jej runbook, a po przejściu popraw go i dopisz wpis
 
 ## ToDo
 
-- **Wdrożenie na serwer pokazowy** — spisać przy najbliższym wdrożeniu, żeby kroki od razu były
-  sprawdzone. Treść: notatka agenta z 2026-10-28, już nieaktualna, bo paczka danych wskazuje
-  katalog kart golden200, którego nie ma od 2026-11-11, a dziś na serwer idzie korpus 1115 kart
-  i wątków. Adres serwera, ścieżka do klucza SSH i warstwa compose serwera zostają poza repo.
-- **Nowe karty golden setu**: parsowanie do katalogu roboczego, indeks obok instancji,
-  porównanie pomiarów i zastąpienie kart — spisać w kroku 2 odchudzania „Golden set
-  retrievalu”. Treść: CLAUDE.md, „Golden set retrievalu” i „Commands”.
+| Lp. | Opis                                                                                                                                                                                                                                                               | Na co czeka                                              |
+|-----|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------|
+| 1   | Wdrożenie na serwer pokazowy. Treść z notatki agenta z 2026-10-28, już nieaktualnej: wskazuje katalog kart golden200 skasowany 2026-11-11, a dziś na serwer idzie korpus 1115 kart i wątków. Adres serwera, klucz SSH i warstwa compose serwera zostają poza repo. | najbliższe wdrożenie, żeby kroki od razu były sprawdzone |
+| 2   | Nowe karty golden setu: parsowanie do katalogu roboczego, indeks obok instancji, porównanie pomiarów i zastąpienie kart. Treść z CLAUDE.md, „Golden set retrievalu” i „Commands”.                                                                                  | krok 2 odchudzania podsekcji „Golden set retrievalu”     |
 
 ## Szablon
 
@@ -98,3 +95,13 @@ Najnowszy wpis na górze.
 
 - RRRR-MM-DD — co przechodzono; wynik; co w runbooku poprawiono.
 ```
+
+## Log
+
+Zmiany zasad, szablonu i układu tego pliku, najnowsza na górze. Nowy wiersz spisu albo „ToDo”
+wpisu nie dostaje, bo widać go w tabeli.
+
+- 2026-11-25 — „ToDo” na runbooki do spisania (tabela: opis i na co czeka) i ten „Log”.
+- 2026-11-25 — „Powiązania” w szablonie to linki względne.
+- 2026-11-25 — README z zasadami, spisem i szablonem: Cel, Kiedy, Wymaga, Koszt, Kroki,
+  Weryfikacja, Sprzątanie, Pułapki, Powiązania, Log.

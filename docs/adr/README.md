@@ -98,3 +98,15 @@ Poprawki niemerytoryczne po przyjęciu, najnowsza na górze.
 
 - RRRR-MM-DD — co poprawiono.
 ```
+
+## Log
+
+Zmiany zasad, obszarów, szablonu i układu tego pliku, najnowsza na górze. Nowy wiersz spisu
+decyzji wpisu nie dostaje, bo widać go w spisie.
+
+- 2026-11-25 — w zasadach i szablonie sekcja „Log” na poprawki niemerytoryczne ADR: przyjętego
+  ADR nie zmienia się merytorycznie, a literówkę, martwy link albo ścieżkę po przeniesieniu
+  wolno poprawić z wpisem w „Logu”; ten „Log” w README.
+- 2026-11-25 — obszar PRD wskazuje sekcje „Produkt” i „Zasady produktu”, bo zasady produktu
+  przeszły w CLAUDE.md do sekcji „Zasady”.
+- 2026-11-20 — README z zasadami, obszarami z prefiksami, spisem decyzji i szablonem.
