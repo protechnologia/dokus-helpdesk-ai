@@ -2653,40 +2653,38 @@ API grafu, oba kształty przebiegu, fabryka, atrapy, strumień kroków i układ 
 odpowiedzi stoją w docstringach `agent_graphs/`, w komentarzach `respond_tool.md` i w teście
 kontraktu grafów (2026-11-25). Tu zostają decyzje z ceną, liczby z sond i otwarte pytania.
 
-- **LangSmith wyłącza import pakietu `app.agent_graphs`** — `langsmith.configure(enabled=False)` w
-  `agent_graphs/__init__.py`. Zmierzone 2026-10-02: przy `LANGSMITH_TRACING=true` LangGraph wysyła
-  stan każdego węzła, także `input_text` sprzed anonimizacji; przełącznik globalny wygrywa z ENV.
-  Pilnuje `test_api_agent_graphs_langsmith.py` (pada bez blokady — sprawdzone).
+- **Import `app.agent_graphs` wyłącza LangSmith (2026-10-02)**, bo przy `LANGSMITH_TRACING=true`
+  LangGraph wysyła do chmury stan każdego węzła, także `input_text` sprzed anonimizacji.
+  Przełącznik globalny (`langsmith.configure(enabled=False)`) wygrywa z ENV; pilnuje go
+  `test_api_agent_graphs_langsmith.py`, który bez blokady pada.
 - **Każda funkcja ma własną pętlę i sama dociąga materiał
-  ([AGT-005](docs/adr/AGT-005_funkcja-sama-dociaga-material.md))** — `/suggest` bierze
-  zgłoszenie, nie identyfikatory trafień. Cena: człowiek nie odznacza trafień przed generacją,
-  więc ginie też etykieta do feedbacku, a każdy guzik szuka od nowa.
+  ([AGT-005](docs/adr/AGT-005_funkcja-sama-dociaga-material.md)):** `/suggest` bierze
+  zgłoszenie, nie identyfikatory trafień. Cena: każdy guzik szuka od nowa (p. 71), a bez
+  odznaczania trafień przez człowieka ginie etykieta do feedbacku (p. 42).
 - **Odpowiedź grafu przychodzi narzędziem `respond_<graf>`, nie tekstem
-  ([AGT-006](docs/adr/AGT-006_odpowiedz-grafu-narzedziem.md)), a opis narzędzia odpowiedzi ma układ
-  opisu narzędzia agenta (2026-10-21):** model dostaje opisy narzędzi wiedzy i odpowiedzi w jednej
-  liście, więc w każdym szuka argumentów i zasad w tym samym miejscu. Układ stoi w komentarzu na
-  górze każdego `respond_tool.md`, a sekcji i zgodności tabelki ze schematem odpowiedzi pilnuje test
-  kontraktu grafów. Cena: długi tekst w argumencie (`suggest_*`, `polish`) — do zmierzenia
-  w p. 25–28.
-- **`search` kończy się `respond_search` z uwagami dla wdrożeniowca, a zgodność przyczyn
-  przeczytanych spraw ocenia w nich agent, nie kod
-  ([AGT-008](docs/adr/AGT-008_zgodnosc-przyczyn-ocenia-agent.md)).** Wynikiem są źródła
-  z `cite()`, zapytania agenta z `messages` i uwagi (`SearchNotes.internal_notes`); lista źródeł
-  nadal powstaje z odczytów (zasada 9).
+  ([AGT-006](docs/adr/AGT-006_odpowiedz-grafu-narzedziem.md)), a opis tego narzędzia ma układ
+  opisu narzędzia agenta (2026-10-21)**, bo model dostaje oba rodzaje opisów w jednej liście
+  i w każdym szuka argumentów i zasad w tym samym miejscu. Układ stoi w komentarzu każdego
+  `respond_tool.md`, a sekcji i zgodności tabelki ze schematem pilnuje test kontraktu grafów.
+  Cena: długi tekst idzie w argumencie (`suggest_*`, `polish`), do zmierzenia w p. 25–28.
+- **`search` kończy się uwagami dla wdrożeniowca, a zgodność przyczyn przeczytanych spraw ocenia
+  w nich agent, nie kod ([AGT-008](docs/adr/AGT-008_zgodnosc-przyczyn-ocenia-agent.md)).** Wynik
+  to źródła z `cite()`, zapytania agenta z `messages` i uwagi (`SearchNotes.internal_notes`);
+  źródła dalej powstają z odczytów, nie z uwag (zasada 9). Otwarte: czy uwagi mówią prawdę
+  o przeczytanych sprawach i ile mają mieć znaków (p. 23.3).
 - **`search` sprawdza kod aplikacji w każdej sprawie o działaniu aplikacji, razem ze zgłoszeniami
-  i instrukcjami (decyzja 2026-10-11).** Pomija go tylko sprawa organizacyjna (konto, szkolenie,
-  termin). Bez komunikatu wejściem są nazwy z ekranu. W `suggest_questions` i `suggest_solution` kod
-  zostaje wyjściem awaryjnym do p. 25–26. Cena: w większości spraw dochodzą wywołania narzędzi kodu.
-  Na żywym `gpt-6.1-sol` rozpoznanie wyszło w siedmiu zmyślonych sprawach (2026-10-11, pojedyncze
-  przebiegi, nie pomiar). Narzędzia kodu prawdziwe, na aplikacji syntetycznej. W sześciu sprawach
-  o działaniu aplikacji model wszedł w kod w pierwszej turze, w sprawie organizacyjnej ani razu.
-  Sprawa to 3–6 tur i 0,01–0,05 USD, bo model woła kilka narzędzi w jednej turze. Przy trzech
-  różnych przyczynach uwagi wymieniały je osobno, przy trzech zgodnych mówiły o zgodności
-  z dopiskiem, że u klienta przyczyna nie jest potwierdzona, a przy wątku z odpowiedziami klienta
-  nazwały przyczynę wykluczoną i te, które zostają. Wszystkie 11 cytowań dotyczyło linii wcześniej
-  odczytanych i żadne uwagi nie podpowiadały, co zrobić ze sprawą. Bez komunikatu model trafiał
-  w kod jednym albo dwoma szukaniami, ale aplikacja syntetyczna ma 34 pliki, więc o kodzie Dokusa to
-  nic nie mówi.
+  i instrukcjami (2026-10-11).** Pomija go tylko sprawa organizacyjna (konto, szkolenie, termin),
+  a bez komunikatu wejściem są nazwy z ekranu. W `suggest_questions` i `suggest_solution` kod
+  zostaje wyjściem awaryjnym do p. 25–26. Sonda na `gpt-6.1-sol` (2026-10-11, siedem zmyślonych
+  spraw na aplikacji syntetycznej z prawdziwymi narzędziami kodu, pojedyncze przebiegi, nie
+  pomiar): model wszedł w kod w pierwszej turze w sześciu sprawach o działaniu aplikacji, a w
+  organizacyjnej ani razu; sprawa to 3–6 tur i 0,01–0,05 USD, bo model woła kilka narzędzi
+  w jednej turze; 11 z 11 cytowań dotyczyło linii wcześniej odczytanych. Uwagi przy trzech
+  różnych przyczynach wymieniały je osobno, przy trzech zgodnych mówiły o zgodności z dopiskiem,
+  że u klienta przyczyna nie jest potwierdzona, a przy wątku z odpowiedziami klienta nazywały
+  przyczynę wykluczoną i pozostałe; żadne nie podpowiadały, co zrobić ze sprawą. Bez komunikatu
+  model trafiał w kod jednym albo dwoma szukaniami, ale przy 34 plikach o kodzie Dokusa to nic
+  nie mówi. Cena: w większości spraw dochodzą wywołania narzędzi kodu.
 
 #### Warianty generacji
 
@@ -2699,43 +2697,43 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
 | `handoff`   | informacja o przekazaniu zgłoszenia do dalszych prac po stronie serwisu | nie |
 
 - **Wariant to kod: osobny graf na wariant
-  ([AGT-007](docs/adr/AGT-007_wariant-generacji-to-kod.md)), który deklaruje, czy potrzebuje źródeł
-  (`requires_hits`), a egzekwuje to kod węzła odpowiedzi, nie posłuszeństwo modelu.** `questions`
-  i `handoff` działają przy pustym indeksie, `solution` bez odczytanych źródeł oddaje same uwagi dla
-  wdrożeniowca, bez treści dla klienta, cokolwiek model napisał (zasada 9). Wariant bez narzędzi
-  wiedzy wraca z pustą listą źródeł, i to jest informacja, nie brak danych. Cena: nowy guzik wymaga
-  deployu.
-- **Uwagi dla wdrożeniowca to osobne pole wyniku, `internal_notes` (2026-10-08).** Bez osobnego
-  pola treść dla klienta niosłaby notatki i analizę z kodu, a nawias w treści model gubi: linia
+  ([AGT-007](docs/adr/AGT-007_wariant-generacji-to-kod.md)), który deklaruje, czy potrzebuje
+  źródeł (`requires_hits`), a egzekwuje to kod węzła odpowiedzi, nie posłuszeństwo modelu.**
+  `questions` i `handoff` działają przy pustym indeksie, a `solution` bez odczytanych źródeł
+  oddaje same uwagi dla wdrożeniowca, bez treści dla klienta, cokolwiek model napisał
+  (zasada 9). Pusta lista źródeł wariantu bez narzędzi wiedzy to informacja, nie brak danych.
+  Cena: nowy guzik wymaga deployu.
+- **Uwagi dla wdrożeniowca to osobne pole wyniku, `internal_notes` (2026-10-08)**, bo inaczej
+  treść dla klienta niosłaby notatki i analizę z kodu, a nawias w treści model gubi: linia
   `[UWAGA: …]` nie padła w żadnym z czterech pomiarów. Ostrzeżenie o kroku nieodwracalnym zostaje
   w treści dla klienta: w `solution` w „Uwagach dla klienta", w `questions` jako linia w nawiasie
   pod pytaniami. Zasada 9 obowiązuje oba pola.
-- **`questions` działa dwutorowo, a od 2026-10-11 może oddać brak pytań:** bez trafień pyta na
-  podstawie samego zgłoszenia, z trafieniami dokłada `questions_summary` z podobnych spraw.
-  Sentinela w przebraniu na kartach importu nie ma, ale pole rzadko niesie treść: ma ją 21% kart
-  w indeksie (2026-11-20), więc pytania z samego zgłoszenia są drogą główną, nie zapasową. Gdy fakty
-  ze zgłoszenia — z opisu albo z odpowiedzi klienta w wątku — zostawiają jedną przyczynę albo nic,
-  o co klient mógłby odpowiedzieć bez diagnozy, model oddaje `text: null` i uwagi zamiast pytań na
-  siłę. Wyjściem jest wartość pola, nie zdanie: zdanie-formułkę o braku pytań słabszy model doklejał
-  po pytaniach w 7 przebiegach na 8. Hamulec w prompcie: zgodny objaw to nie jedna przyczyna, więc
-  gdy przeczytane sprawy podają różne przyczyny, a zgłoszenie ich nie rozróżnia, pytania są. Na
-  żywym `gpt-6.1-sol` (cztery pojedyncze przebiegi, 0,13 USD) model oddał brak pytań w obu sprawach,
-  w których fakty rozstrzygały (raz z wątku, raz z samego opisu), a pytania w obu, w których nie
-  rozstrzygały: jedno nowe po odpowiedziach, które tylko zawężały, i pięć przy samym objawie. Guzik
-  nadal nie pamięta pytań wygenerowanych, ale niewysłanych.
-- **`handoff` to krótka wiadomość bez narzędzi (2026-10-30, p. 27):** „Dzień dobry.”, podsumowanie
-  problemu z tym, co dotąd ustalono, informacja o przekazaniu sprawy, „Pozdrawiam.”. Samo
-  „przekazaliśmy do analizy” nie mówi klientowi, o co chodzi i co już wiadomo; krótkie komentarze
-  z przekazaniem to w korpusie mediana 155 znaków (zgrubne liczenie po słowach, 104 komentarze
-  w 100 zgłoszeniach). Dosłownie powtarza się tam tylko jeden tekst (3×), więc problemem jest brak
-  treści, a nie szablon. Przeszło sprawdzenie, nie pomiar: na `gpt-6.1-sol`
-  scenariusze z `handoff.json` dały 0 błędów na 9 spraw w dwóch przebiegach, wstrzyknięcia
-  0 przebić z 6, a cztery zmyślone sprawy przez `/suggest` z anonimizatorem na Bieliku oczekiwany
-  układ, po około 0,003 USD. Cena: nic już wprost nie mówi, że zapowiedź („sprawdzimy”) nie jest
-  ustaleniem, ani nie każe przekazać ostrzeżenia; pilnują tego tylko scenariusze h03, h04 i h09.
-  Wiadomość nie mówi też klientowi, czy dostanie jeszcze odpowiedź. Pomiaru na prawdziwych
-  przekazaniach nie robimy (decyzja 2026-11-20): to w korpusie krótkie formułki, więc nie ma
-  z czym porównać wyniku, a ocena mówiłaby głównie o stylu.
+- **`questions` pyta dwutorowo, a od 2026-10-11 może oddać brak pytań.** Bez trafień pyta
+  z samego zgłoszenia, z trafieniami dokłada `questions_summary` podobnych spraw. Sentineli
+  w przebraniu na kartach importu nie ma, ale treść ma to pole tylko w 21% kart indeksu
+  (2026-11-20), więc pytania z samego zgłoszenia są drogą główną, nie zapasową. Gdy fakty z opisu
+  albo z odpowiedzi klienta w wątku zostawiają jedną przyczynę albo nic, o co klient mógłby
+  odpowiedzieć bez diagnozy, model oddaje `text: null` z uwagami zamiast pytań na siłę. Wartość
+  pola, a nie zdanie, bo formułkę o braku pytań słabszy model doklejał po pytaniach w 7 przebiegach
+  na 8. Hamulec w prompcie: zgodny objaw to nie jedna przyczyna, więc gdy przeczytane sprawy podają
+  różne przyczyny, a zgłoszenie ich nie rozróżnia, pytania są. Sonda na `gpt-6.1-sol` (cztery
+  pojedyncze przebiegi, 0,13 USD): brak pytań w obu sprawach, w których fakty rozstrzygały (raz
+  z wątku, raz z samego opisu), pytania w obu pozostałych (jedno nowe po odpowiedziach, które
+  tylko zawężały, pięć przy samym objawie). Otwarte: guzik nie pamięta pytań wygenerowanych, ale
+  niewysłanych.
+- **`handoff` to krótka wiadomość bez narzędzi (2026-10-30, p. 27):** „Dzień dobry.”,
+  podsumowanie problemu z tym, co dotąd ustalono, informacja o przekazaniu sprawy,
+  „Pozdrawiam.”, bo samo „przekazaliśmy do analizy” nie mówi klientowi, o co chodzi i co już
+  wiadomo. Krótkie komentarze z przekazaniem mają w korpusie medianę 155 znaków (zgrubne liczenie
+  po słowach, 104 komentarze w 100 zgłoszeniach), a dosłownie powtarza się tylko jeden tekst (3×),
+  więc problemem jest brak treści, a nie szablon. Sprawdzenie, nie pomiar, na `gpt-6.1-sol`:
+  scenariusze z `handoff.json` 0 błędów na 9 spraw w dwóch przebiegach, wstrzyknięcia 0 przebić
+  z 6, a cztery zmyślone sprawy przez `/suggest` z anonimizatorem na Bieliku dały oczekiwany
+  układ, po około 0,003 USD. Pomiaru na prawdziwych przekazaniach nie robimy (2026-11-20): to
+  w korpusie krótkie formułki, więc nie ma z czym porównać wyniku, a ocena mówiłaby głównie
+  o stylu. Cena: nic już wprost nie mówi, że zapowiedź („sprawdzimy”) nie jest ustaleniem, ani
+  nie każe przekazać ostrzeżenia, czego pilnują tylko scenariusze h03, h04 i h09; wiadomość nie
+  mówi też klientowi, czy dostanie jeszcze odpowiedź.
 
 ### Warstwa LLM
 
