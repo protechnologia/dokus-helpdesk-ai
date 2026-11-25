@@ -14,6 +14,7 @@
 - [Dokumentacja](#dokumentacja)
   - [CLAUDE.md](#claudemd)
   - [ADR](#adr)
+  - [Runbook](#runbook)
   - [Raporty i prezentacje](#raporty-i-prezentacje)
   - [README](#readme)
 - [Styl kodu i komentarzy](#styl-kodu-i-komentarzy)
@@ -237,15 +238,10 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
   żeby dało się ją przenieść albo przepisać bez poprawiania pozostałych (2026-10-04). Wyjątkiem są
   numery punktów planu („p. N"), bo są stałe. Starsze odwołania usuwamy przy zmianach w sekcji,
   nie hurtem.
-- **Co jakiś czas odchudzamy jedną podsekcję CLAUDE.md (2026-11-20).** Cztery kroki, każdy
-  z plikiem do przeglądu przed zmianą i osobnym commitem; po każdym skrypt porównuje liczby
-  i odesłania do planu obu wersji:
-  1. **ADR** — wybór dużych decyzji podsekcji do ADR (decyzja, opcje, powód).
-  2. **Czyszczenie** — wypada to, co się nie przyda albo łatwo wyciągnąć z kodu; przy „bo jest
-     w kodzie” sprawdzamy, że to naprawdę stoi w docstringu, modelu albo opisie narzędzia.
-  3. **Łączenie** — punkty o jednej osi w jeden, ułożone tematycznie, bez przepisywania słów.
-  4. **Zwięzłość** — każdy punkt w jednym układzie: pogrubiona decyzja z datą, dlaczego, liczby,
-     na końcu „Cena:” albo otwarte pytanie; fakty bez zmian.
+- **Co jakiś czas odchudzamy jedną podsekcję CLAUDE.md (2026-11-20).** Pięć kroków: ADR,
+  runbook, czyszczenie, łączenie i zwięzłość, każdy z plikiem do przeglądu przed zmianą
+  i osobnym commitem; po każdym skrypt porównuje liczby i odesłania do planu obu wersji.
+  Przebieg: [runbook](docs/runbook/odchudzanie-podsekcji-claude-md.md).
 
 ### ADR
 
@@ -262,6 +258,26 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
   refaktoryzacji podsekcji CLAUDE.md, nie hurtem.
 - **Nowy obszar ADR dopiero po akceptacji użytkownika.** Gdy decyzja nie pasuje do żadnego
   obszaru z README, agent proponuje nowy obszar z prefiksem i dopisuje go dopiero po akceptacji.
+
+### Runbook
+
+- **`docs/runbook/` — procedury pracy nad projektem, których nie zapisuje kod, w repo
+  (2026-11-25).** Runbook mówi, jak przeprowadzić czynność, która wychodzi poza repo albo ma krok
+  płatny, nieodwracalny lub decyzję człowieka: kroki, dostępy, koszt i sprzątanie. Zasady, spis
+  i szablon stoją w `docs/runbook/README.md`.
+- **README i runbooki dzielą procedury po czytelniku, bez dublowania.** To, czego potrzebuje
+  operator instancji, stoi w całości w README; runbook zostaje na nasze konta i maszyny, pomiary
+  i utrzymanie dokumentacji. Pojedyncze polecenie zostaje w „Commands”.
+- **Przy procedurze w CLAUDE.md zostaje reguła, to, co z niej wynika, i link do runbooka.** Link
+  stoi w sekcji tematycznej procedury, bo tam agent trafia na nią przed czynnością; pilnuje tego
+  `test_docs_runbook_links.py`.
+- **Przed procedurą przeczytaj jej runbook, a po przejściu popraw go i dopisz wpis do „Logu”.**
+  Runbook, inaczej niż ADR, jest żywy, a żaden test go nie uruchamia, więc zgadza się z kodem
+  tylko wtedy, gdy poprawia go każde przejście.
+- **Nową procedurę agent od razu proponuje jako runbook, a nie zapisuje w swojej pamięci.**
+  Pamięć jest prywatna dla jednej maszyny, a jej treść nie przechodzi przeglądu w commicie: opis
+  wdrożenia na serwer pokazowy wskazywał w niej jeszcze 2026-11-25 katalog kart przeniesiony
+  2026-11-11.
 
 ### Raporty i prezentacje
 
@@ -293,7 +309,11 @@ Numery ciągną się od zasad technicznych (1–6), bo do numerów odwołuje si�
   7. **Integracje** — zawartość `integrations/` z przykładem użycia.
   8. **Uwagi techniczne.**
   9. **Testy** — jak uruchomić, markery.
-  10. **Typowe procedury** — same kroki instruktażowe (rationale zostaje w CLAUDE.md).
+  10. **Typowe procedury** — procedury operatora instancji, same kroki instruktażowe (rationale
+      zostaje w CLAUDE.md).
+- **README jest kompletny i do niczego nie odsyła (2026-11-25).** Procedura, której potrzebuje
+  jego czytelnik, stoi w nim w całości, bez linku do runbooka, ADR ani CLAUDE.md, bo README
+  będzie podstawą dokumentacji produktu.
 
 ## Styl kodu i komentarzy
 
@@ -310,6 +330,7 @@ dokus-helpdesk-ai/
 ├── CLAUDE.md / README.md
 ├── scripts/                      # skrypty repo: przygotowanie danych i pomiary
 ├── docs/adr/                     # decyzje (ADR): README.md z obszarami, spisem i szablonem — W repo
+├── docs/runbook/                 # procedury pracy nad projektem: README.md z zasadami, spisem i szablonem — W repo
 ├── data/
 │   ├── safe/                     # dane zmyślone — W repo
 │   │   ├── instruction/          # syntetyczna dokumentacja: manifest.json + pliki .md
@@ -3899,6 +3920,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/anonymizer_llm/`      | model anonimizujący usługi `anonymizer`: odpowiedź Chat Completions (`chat_answer()`), klient modelu na atrapie transportu (`model_client_on()`) i odpowiadający węzłom osób i adresów (`scripted_llm()`), konfiguracja z `.env` dla `llm_live` (`live_agent_settings()`), pomiar silnika `agent` na golden secie (`measure_agent()`), przecieki ponad próg i progi |
 | `tests/_helpers/patterns/`            | wzorce usługi `anonymizer`: tekst po zamianie miejscami z jednego wariantu (`replaced_by()`), zamiana wszystkimi wzorcami jako funkcja do pomiaru golden setu (`anonymize_with_patterns()`), rodzaje od wzorców, progi przecieków na zestaw i odczyt pomiaru (`kinds_over_threshold()`, `leaked_fragments()`, `destroyed_fragments()`, `removed_kinds()`) |
 | `tests/_helpers/adr/`                 | ADR-y w repo: pliki w `docs/adr/` (`adr_files()`) i linki do nich w CLAUDE.md (`claude_md_links()`), w spisie README (`readme_links()`) i w dowolnym tekście Markdown (`linked_adr_files()`) |
+| `tests/_helpers/runbook/`             | runbooki w repo: pliki w `docs/runbook/` (`runbook_files()`) i linki do nich w CLAUDE.md (`claude_md_links()`), w spisie README (`readme_links()`) i w dowolnym tekście Markdown (`linked_runbook_files()`) |
 
 - **Każdy helper ma folder w `tests/_helpers/`, także bez modeli — dla spójności (2026-10-15,
   wcześniej pliki `tests/helpers_*.py`).** W folderze `helper.py` z logiką, `models/`
