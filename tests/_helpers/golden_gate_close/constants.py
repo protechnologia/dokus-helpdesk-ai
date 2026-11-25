@@ -50,14 +50,14 @@ CONCURRENCY = 4
 ANONYMIZATION_MEDIAN_SECONDS = 2.0
 ANONYMIZATION_MAX_SECONDS    = 6.5
 
-# Progi pomiaru: gorszy wynik z dwóch przebiegów na `gpt-6.1-sol`, zmierzony 2026-11-25 jeszcze na
-# regułach i etykietach w wersji 1 (fałszywych alarmów 18 i 19 z 61). Fałszywe alarmy liczy się
-# wśród spraw, z których widać problem i rozwiązanie, a przepuszczenia osobno w każdej grupie
-# blokad. Do przeliczenia po pomiarze na regułach w wersji 2 (p. 33.2.3).
-MAX_FALSE_ALARMS = 19
+# Progi pomiaru: gorszy wynik z dwóch przebiegów na `gpt-6.1-sol`, zmierzony 2026-11-25 na regułach
+# i etykietach w wersji 2 (fałszywych alarmów 13 i 14 z 59). Fałszywe alarmy liczy się wśród spraw,
+# z których widać problem i rozwiązanie, a przepuszczenia osobno w każdej grupie blokad. Pilnują,
+# żeby nie było gorzej; grupa „nie widać problemu” jest na tych etykietach pusta.
+MAX_FALSE_ALARMS = 14
 MAX_MISSES = {
-    "no_problem":  1,
-    "no_solution": 0,
+    "no_problem":  0,
+    "no_solution": 2,
     "neither":     0,
     "notice":      1,
 }

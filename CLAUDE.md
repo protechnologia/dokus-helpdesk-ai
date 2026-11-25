@@ -1636,29 +1636,32 @@ merytorycznie").
   wykrywaniu prośby o hasło, czy na potocznym słownictwie.
 - **Dla „Popraw" osobne kryterium: brak nowych faktów.** Porównanie wejścia z wyjściem pod kątem
   dodanych liczb/nazw/kroków — to jedyna oś, na której ta funkcja może zaszkodzić klientowi.
-- **Bramka zamknięcia przeszła sprawdzenie, ale nie pomiar (2026-10-21).** Na `gpt-6.1-sol`
+- **Bramka zamknięcia przeszła sprawdzenie na zmyślonych sprawach (2026-10-21).** Na `gpt-6.1-sol`
   scenariusze bramek dały 0 fałszywych alarmów z 5 i 0 przepuszczeń z 3 w dwóch przebiegach,
   także w parze ze znacznikami anonimizacji, a wstrzyknięcia 0 przebić z 9. Dziesięć zmyślonych
   zamknięć przez trasę `/gate/close`, z anonimizatorem na Bieliku, dało zgodne werdykty bez
   danych osobowych w uzasadnieniach, 2–7,5 s i około 0,003 USD na sprawę; do tego test ręczny
   przez front. Na regułach w wersji 2 (2026-11-25) 24 scenariusze dały 0 fałszywych alarmów
-  z 15 i 0 przepuszczeń z 9 w dwóch przebiegach, a wstrzyknięcia 0 przebić z 9. Liczby na
-  prawdziwych zamknięciach daje pomiar z p. 33.2.
+  z 15 i 0 przepuszczeń z 9 w dwóch przebiegach, a wstrzyknięcia 0 przebić z 9.
 - **Zestaw prawdziwych zamknięć: `data/unsafe/golden/gate-close.json` (2026-11-20, p. 33.2).**
   120 zamknięć z korpusu instancji, warstwami: 10 najdłuższych wątków, 10 z kanału „Automat
-  mailowy”, 40 z kart odrzuconych przez filtr i 60 losowych. Wejście bramki to wątek
+  mailowy”, 40 z kart odrzuconych przez filtr i 60 losowych; ocen z badania jakości
+  z 2026-09-02 nie użyto, bo skasowano je 2026-11-13. Wejście bramki to wątek
   z `corpus/anonymized/` ucięty na zamknięciu: komentarze do `data_zamkniecia` z minutą zapasu,
   a data bez godziny (552 zgłoszenia korpusu) to koniec dnia; ucięcie dotyczy 156 z 1894
-  wątków, a 13 zgłoszeń zamknięto bez komentarza. Przy wpisie liczba komentarzy w chwili
-  zamknięcia, skrót uciętego wątku, rodzaj zgłoszenia i dwie etykiety z powodem, po jednej na
-  regułę. Oznaczali agenci na ślepo; drugi, niezależny oceniający na 40 wpisach zgadza się
+  wątków, a 13 zgłoszeń zamknięto bez komentarza. Graf dostaje go przez anonimizator, który
+  przepuszcza tekst bez zmian, bez poda, bo wątek jest już po anonimizacji. Przy wpisie liczba
+  komentarzy w chwili zamknięcia, skrót uciętego wątku, rodzaj zgłoszenia i dwie etykiety
+  z powodem, po jednej na regułę. Oznaczali agenci na ślepo; drugi, niezależny oceniający na 40 wpisach zgadza się
   w regule 1 w 40 (kappa 1,00), w regule 2 w 37 (kappa 0,85) i w rodzaju w 40, a trzy
   niezgodności rozstrzygnął człowiek. W kanale mailowym rodzaj pochodzi z `tickets-mail.json`:
   kopia naszej korespondencji, która niesie sprawę, to sprawa (decyzja 2026-11-20 przy dwóch
   wpisach, w których oceniający dali „powiadomienie”). Zestaw ma 113 spraw i 7 powiadomień,
   a oczekiwanych blokad 59 i przepuszczeń 61; reguła 1 jest złamana tylko w 3 sprawach, więc jej
-  przepuszczeń zestaw prawie nie mierzy.
-- **Na prawdziwych zamknięciach bramka zamknięcia jest za surowa (2026-11-25, p. 33.2.2).** Na
+  przepuszczeń zestaw prawie nie mierzy. Pod reguły w wersji 2 (2026-11-25) etykiety mówią, czy
+  widać problem i rozwiązanie, a nie odpowiadają już regułom jeden do jednego; człowiek zmienił
+  14 z nich (8 na blokadę, 6 na przepuszczenie), więc blokad jest 61, a przepuszczeń 59.
+- **Na prawdziwych zamknięciach bramka zamknięcia jest za surowa (2026-11-25, p. 33.2).** Na
   `gpt-6.1-sol` i regułach w wersji 1, w dwóch przebiegach: fałszywych alarmów 18 i 19 z 61,
   przepuszczeń 2 z 59 (sprawa z regułą 1 i powiadomienie), odpowiedzi nie do przyjęcia 0
   i znaczników przekręconych 0. Złe werdykty są prawie te same w obu przebiegach (17 alarmów
@@ -1675,9 +1678,38 @@ merytorycznie").
   opisanym tylko w załączniku (sporne), choć krótką, ale jasną czynność bramka gdzie indziej
   blokuje. Czas bramki przy 4 zamknięciach naraz: mediana 3,5 s, p90 5,0–5,1 s, maks. 7,2–8,2 s,
   a z anonimizacją z pomiaru z 2026-10-19 mediana około 5,5 s i maks. do 14,7 s. Koszt zestawu:
-  0,51 USD, a z początkiem żądania z cache 0,17 USD. Progi testu stoją na gorszym przebiegu (19
-  alarmów, przepuszczenia 1 przy regule 1 i 1 przy powiadomieniach) i pilnują, żeby nie było
-  gorzej; co poprawić, rozstrzyga p. 33.2.3.
+  0,51 USD, a z początkiem żądania z cache 0,17 USD. Z przeglądu wyszły reguły w wersji 2.
+- **Reguły w wersji 2 zmniejszają fałszywe alarmy, ale bramka zamknięcia zostaje za surowa
+  (2026-11-25, p. 33.2).** Reguł jest sześć zamiast dwóch: wymóg (z wątku da się wyprowadzić
+  problem, przyczynę i rozwiązanie), czym jest problem (objaw, niedogodność albo prośba klienta),
+  przyczyna (może wynikać z samego rozwiązania, np. wgranej poprawki; niepotrzebna przy prośbie
+  o zmianę i wtedy, gdy ustalić jej się nie udało) i rozwiązanie (czynność obsługi, sprawdzenie
+  z konkretnymi ustaleniami albo wskazanie klientowi konkretnego ustawienia lub czynności, które
+  usuwają przyczynę), odpowiedź na ostatnie pytanie albo reklamację klienta i wyjątek dla
+  duplikatu albo odesłania, który reguły o odpowiedzi nie znosi. Naprawa samych skutków bez
+  przyczyny ma być blokowana. Granicę wyznaczył człowiek na 14 wątkach, z myślą o tym, jak mają
+  wyglądać przyszłe zamknięcia, a nie o pokryciu każdego wzorca starych wątków. Na `gpt-6.1-sol`,
+  w dwóch przebiegach: fałszywych alarmów 13 i 14 z 59, przepuszczeń 3 z 61 (2 z 52 przy
+  niewidocznym rozwiązaniu, 1 z 7 powiadomień), odpowiedzi nie do przyjęcia 0 i znaczników
+  przekręconych 0; alarmów wspólnych 11, przepuszczenia te same, a 8 alarmów stoi przy wpisach
+  wątpliwych. Z 20 alarmów wersji 1 reguły usunęły 7, 5 stało przy wątkach przełożonych przez
+  człowieka na blokadę (bramka blokuje je zgodnie z etykietą), 8 zostało i 8 doszło. 6 z 16
+  alarmów obu przebiegów to wątki, które człowiek rozstrzygnął na przepuszczenie przy ustalaniu
+  reguł; etykiet pod wynik nie zmieniano, więc liczą się jako błąd bramki. Powód alarmu to ręczna
+  klasyfikacja uzasadnień modelu po pierwszym powodzie, bo werdykt nie podaje numeru reguły, a test
+  powodu nie sprawdza: bramka żąda przyczyny, która wynika z wątku albo nie była potrzebna (5),
+  nie uznaje za rozwiązanie sprawdzenia, ogólnego „zmiany wprowadzone”, czynności klienta albo
+  czynności innej niż prośba (5), poboczne pytanie klienta bierze za pytanie bez odpowiedzi (3,
+  a jako drugi powód w 5 kolejnych) i blokuje wątki z wieloma punktami, z których część jest
+  zapowiedziana (3). Oba nowe przepuszczenia to naprawa samych skutków bez przyczyny (poprawiony
+  jeden plik, ręcznie dograna wizualizacja), czyli to, co reguła o przyczynie miała blokować,
+  a trzecie to ta sama rozsyłka co na wersji 1; przy `pass` uzasadnienia nie ma, więc powodu nie
+  widać. Co do przyczyny bramka jest więc niekonsekwentna. Czas przy 4 zamknięciach naraz:
+  mediana 4,2–4,3 s, p90 7,0–7,1 s, maks. 11,0–11,5 s, a z anonimizacją mediana około 6,3 s
+  i maks. do 18,0 s; wejście jest o około 280 tokenów dłuższe na sprawę, a wyjście o połowę (17
+  zamiast 11 tys. tokenów na zestaw). Koszt zestawu: 0,69 USD, a z początkiem żądania z cache
+  0,22 USD. Progi testu stoją na gorszym przebiegu (14 alarmów, przepuszczenia 2 przy
+  niewidocznym rozwiązaniu i 1 przy powiadomieniach) i pilnują, żeby nie było gorzej.
 - **Bramka wysyłki przeszła sprawdzenie, ale nie pomiar (2026-10-22).** Na `gpt-6.1-sol` scenariusze
   na regułach w wersji 2 dały 0 fałszywych alarmów z 13 i 0 przepuszczeń z 9 w dwóch przebiegach, a
   wstrzyknięcia 0 przebić z 9. Przez trasę `/gate/reply` z anonimizatorem na Bieliku 13 z 13
@@ -3477,7 +3509,7 @@ localhost:8010/search`.
   **kosztuje, pytaj przed**; sześć spraw to około 0,04 USD
 - Bramka zamknięcia na 120 prawdziwych zamknięciach z korpusu (p. 33.2):
   `pytest tests/evaluation/test_api_agent_graphs_gate_close_golden_live.py -m llm_live` —
-  **kosztuje, pytaj przed**; 0,51 USD (0,17 USD z początkiem żądania z cache) i około 2 minut
+  **kosztuje, pytaj przed**; 0,69 USD (0,22 USD z początkiem żądania z cache) i około 2 minut
   przy 4 zamknięciach naraz; bez zestawu i korpusu w `data/unsafe/` testy się pomija
 - Silnik `agent` usługi `anonymizer` na golden secie (p. 19.5):
   `pytest tests/evaluation/test_anonymizer_agent_golden_live.py -m llm_live` — woła model
@@ -4324,29 +4356,13 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
     zgłoszenia”, „Domena”, „Reguły parsowania”, „`questions_summary`”, „Ewaluacja bramek”,
     „Embeddingi”, „Warianty generacji”, „Świadomie pominięte”; `RAG_SCORE_MIN` w p. 79,
     porównanie embedderów w p. 40, „Popraw” w p. 80.
-  - [ ] **33.2 `gate_close` na prawdziwych zamknięciach** — decyzje 2026-11-20: wątki
-    z `corpus/anonymized/`, które graf dostaje przez anonimizator przepuszczający tekst bez
-    zmian, bez poda; etykiety na każdą z dwóch reguł od agentów na ślepo, bez wglądu w werdykt,
-    z drugim, niezależnym oceniającym na części zestawu i niezgodnościami do przeglądu
-    człowieka; próg równy gorszemu z dwóch przebiegów, osobno dla fałszywych alarmów
-    i przepuszczeń. Oceny z badania jakości z 2026-09-02 skasowano 2026-11-13.
-    - [x] **33.2.1 Zestaw `gate-close.json`** (2026-11-20) → „Ewaluacja bramek”, „Helpery”.
-    - [x] **33.2.2 Test `llm_live` na zestawie** (2026-11-25) → „Ewaluacja bramek”, „Commands”,
-      „Helpery”.
-    - [ ] **33.2.3 Wnioski** — reguły zamknięcia w wersji 2 zapisane (2026-11-25): sześć reguł —
-      wymóg (z wątku wynika problem, przyczyna i rozwiązanie), definicje problemu, przyczyny
-      i rozwiązania, odpowiedź na ostatnie pytanie albo reklamację klienta i wyjątek dla
-      duplikatu albo odesłania, który reguły o odpowiedzi nie znosi. Przyczyna może wynikać
-      z rozwiązania (wgrana poprawka), a nie jest potrzebna przy prośbie o zmianę albo gdy jej
-      ustalenie się nie udało, więc naprawa samych skutków bez przyczyny jest blokowana. Pod
-      nie: 24 scenariusze bramki (było 8) i 14 etykiet zestawu (8 na blokadę, 6 na
-      przepuszczenie; 59 przepuszczeń i 61 blokad), z granicą od człowieka na 14 wpisach.
-      Reguła 4 uznaje za rozwiązanie także wskazanie klientowi konkretnego ustawienia lub
-      czynności, które usuwają przyczynę. Scenariusze na żywym modelu przeszły (2026-11-25).
-      Zostało: pomiar zestawu w dwóch przebiegach, nowe progi i wnioski do „Ewaluacji bramek”.
+  - [x] **33.2 `gate_close` na prawdziwych zamknięciach** (2026-11-20 – 2026-11-25) → „Ewaluacja
+    bramek”, „Commands”, „Helpery”.
   - [ ] **33.3 `gate_reply` na prawdziwych wiadomościach** — wiadomości konsultantów z tych
     samych wątków (2631 komentarzy z rolą „konsultant” poza kanałem „Automat mailowy”, w którym
-    rola z bazy nie mówi, kto pisał), te same decyzje co w 33.2; fałszywe alarmy na losowych
+    rola z bazy nie mówi, kto pisał), te same decyzje co w 33.2 (wejście z `anonymized/` przez
+    anonimizator bez zmian, etykiety na każdą regułę od agentów na ślepo z drugim oceniającym na
+    części zestawu, próg z gorszego z dwóch przebiegów); fałszywe alarmy na losowych
     wiadomościach, przepuszczenia na każdą z sześciu reguł tam, gdzie korpus ma prawdziwe
     przykłady; osobno zasada, że cytaty reguł nie łamią — bez niej bramka blokowała cytat
     komunikatu z ekranu „Ups! Coś poszło nie tak.” jako potoczny, a czy z nią nie przepuszcza

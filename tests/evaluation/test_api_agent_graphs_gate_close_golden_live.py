@@ -8,7 +8,7 @@ który zamykał zgłoszenie; werdykt porównuje się z etykietami oceniających,
 | test (`test_…`)                          | co liczy                       | próg               |
 |------------------------------------------|--------------------------------|--------------------|
 | `every_closing_gets_an_accepted_verdict` | zamknięcia bez werdyktu        | 0                  |
-| `false_alarms_stay_within_the_threshold` | blokady spraw z obu regułami   | `MAX_FALSE_ALARMS` |
+| `false_alarms_stay_within_the_threshold` | blokady dobrych zamknięć       | `MAX_FALSE_ALARMS` |
 | `misses_stay_within_the_threshold`       | przepuszczenia w grupie blokad | `MAX_MISSES`       |
 | `no_marker_is_malformed`                 | znaczniki przekręcone          | 0                  |
 
@@ -28,17 +28,19 @@ Co się dzieje po drodze:
    wątpliwych i na warstwę, czas bramki z doliczoną anonimizacją i pod każdym złym werdyktem
    etykiety z powodem i uzasadnienie modelu.
 
-Pomiary (reguły w wersji 1, `gpt-6.1-sol`, dwa przebiegi):
+Pomiary (`gpt-6.1-sol`, dwa przebiegi; etykiety zmieniły się razem z regułami, więc wiersze nie
+porównują się wprost):
 
-| data       | fałszywe alarmy | przepuszczenia                        | czas: mediana, maks. |
-|------------|-----------------|---------------------------------------|----------------------|
-| 2026-11-25 | 18 i 19 z 61    | 2 z 59: reguła 1 1 z 1, powiad. 1 z 7 | 3,5 s, 7,2 i 8,2 s   |
+| reguły | fałszywe alarmy | przepuszczenia                                | czas: mediana, maks. |
+|--------|-----------------|-----------------------------------------------|----------------------|
+| v1     | 18 i 19 z 61    | 2 z 59: reguła 1 1 z 1, powiad. 1 z 7         | 3,5 s, 7,2 i 8,2 s   |
+| v2     | 13 i 14 z 59    | 3 z 61: bez rozwiązania 2 z 52, powiad. 1 z 7 | 4,2 i 4,3 s, 11,5 s  |
 
-Złe werdykty są prawie te same w obu przebiegach (17 fałszywych alarmów wspólnych, oba
-przepuszczenia te same), a 10 fałszywych alarmów stoi przy wpisach wątpliwych. Bramka blokuje
-konkretne wyjaśnienie albo przyczynę bez czynności i krótką czynność, której przedmiot wynika
-z wątku, bo reguła 2 pyta tylko, „co zostało zrobione”; przy ostatniej reklamacji klienta bez
-odpowiedzi ma za to rację wbrew etykietom. Przegląd i dalsze kroki: p. 33.2.3.
+Oba pomiary z 2026-11-25. Na regułach w wersji 2 złe werdykty są prawie te same w obu
+przebiegach (11 fałszywych alarmów wspólnych, wszystkie przepuszczenia te same), a 8 fałszywych
+alarmów stoi przy wpisach wątpliwych. Bramka żąda przyczyny, która wynika z wątku albo nie była
+potrzebna, za ogólne uznaje sprawdzenie albo „zmiany wprowadzone” i bierze poboczne pytanie
+klienta za pytanie bez odpowiedzi; przepuszcza za to naprawę samych skutków bez przyczyny.
 
 O czym pamiętać przy zmianach:
 
@@ -48,8 +50,8 @@ O czym pamiętać przy zmianach:
 - Zestaw i korpus to dane klientów, poza repo: bez nich testy się pomija. Raport cytuje
   uzasadnienia modelu, więc zostaje na ekranie, a do CLAUDE.md idą same liczby.
 - KOSZTUJE: sprawa to jedna tura modelu na wątku do kilkunastu tysięcy znaków. Cały zestaw na
-  `gpt-6.1-sol` to 0,51 USD przy pierwszym przebiegu i 0,17 USD przy drugim, z początkiem
-  żądania z cache, oraz około 2 minut.
+  `gpt-6.1-sol` i regułach w wersji 2 to 0,69 USD przy pierwszym przebiegu po zmianie reguł albo
+  promptu i 0,22 USD przy kolejnym, z początkiem żądania z cache, oraz około 2 minut.
 """
 
 import pytest
@@ -113,8 +115,8 @@ def test_every_closing_gets_an_accepted_verdict(outcomes: list[GateCloseOutcome]
 
 
 def test_false_alarms_stay_within_the_threshold(outcomes: list[GateCloseOutcome]) -> None:
-    """Sprawdza, czy bramka blokuje najwyżej `MAX_FALSE_ALARMS` spraw z tych, które spełniają
-    obie reguły: z treści wynika problem i to, co zrobiono.
+    """Sprawdza, czy bramka blokuje najwyżej `MAX_FALSE_ALARMS` spraw z tych, z których według
+    etykiet widać problem i rozwiązanie.
 
     Wyłapuje bramkę, która blokuje poprawne zamknięcia, na przykład za krótkie rozwiązanie albo
     za znaczniki anonimizacji w miejscu danych: fałszywy alarm uczy wdrożeniowców klikać furtkę
@@ -132,7 +134,7 @@ def test_misses_stay_within_the_threshold(
     outcomes: list[GateCloseOutcome],  # wstrzykiwane przez pytest; oceny zamknięć
 ) -> None:
     """Sprawdza, czy w danej grupie blokad bramka przepuszcza najwyżej tyle wpisów, ile pozwala
-    `MAX_MISSES`: osobno sprawy bez widocznego problemu, bez widocznej czynności, bez obu
+    `MAX_MISSES`: osobno sprawy bez widocznego problemu, bez widocznego rozwiązania, bez obu
     i powiadomienia.
 
     Wyłapuje bramkę, która przepuszcza zamknięcie zdaniem „problem rozwiązany” albo „omówione
