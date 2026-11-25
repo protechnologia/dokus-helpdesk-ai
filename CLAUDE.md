@@ -1763,7 +1763,27 @@ merytorycznie").
   g23–g27, w tym z hasłem do archiwum, 0 fałszywych alarmów z 3 i 0 przepuszczeń z 2 w dwóch
   przebiegach (cały zestaw: 0 z 16 i 0 z 11); obie blokady stały na regule 6, a uzasadnienie cytuje
   hasło, które wraca do tego samego wdrożeniowca. Liczb na prawdziwych wiadomościach z korpusu nie
-  ma (p. 33).
+  ma (p. 33.3).
+- **Zestaw prawdziwych wiadomości: `data/unsafe/golden/gate-reply.json` (2026-11-25, p. 33.3).**
+  179 wiadomości konsultantów ze 179 zgłoszeń korpusu instancji, poza kanałem „Automat mailowy”,
+  w którym rola z bazy nie mówi, kto pisał (pula: 2630 komentarzy w 1707 wątkach). Warstwy: 44 ze
+  słowem przy regułach 1, 2, 4 albo 6 (hasło, login, token, klucz…, także pułapki w rodzaju hasła
+  klasyfikacyjnego), 20 z formą „pan/pani/państwo” małą literą, 15 z cytatem albo logiem i 100
+  losowych; każda treść stoi raz, więc powtarzana formułka najwyżej raz. Wejście bramki to treść
+  komentarza wycięta z wątku z `corpus/anonymized/`, a przy wpisie numer komentarza, skrót
+  wiadomości i łamane reguły z powodem. Oznaczali agenci na ślepo; drugi, niezależny oceniający
+  na 50 wpisach zgadzał się w werdykcie w 49 (kappa 0,96), a po ustaleniu granic przez człowieka
+  w werdykcie i w każdej regule w 50. Granice (2026-11-25): reguła 5 obejmuje literówkę, brak
+  polskiej litery, błędną formę wyrazu, nazwę własną i zdanie zaczęte małą literą i kropkę po
+  „nr” albo „pkt”, ale nie interpunkcję; reguła 3 — zwrot do adresata małą literą, ale nie
+  wzmiankę o osobie trzeciej; reguła 2 — swobodne zwroty i zdrobnienia brzmiące potocznie
+  („troszkę”, „w razie czego”), ale nie żargon helpdesku, zdrobnienia nazw z ekranu („ikonka”)
+  ani „poszło”, „OK” i „pewnie”; prośba o token dostępu łamie regułę 4 jak prośba o klucz
+  prywatny; login jako nazwa konta nie łamie reguł 1 i 6. Zestaw ma 108 wiadomości poprawnych
+  i 71 do zablokowania: reguła 5 w 58, 3 w 15, 2 w 5, 4 w 4, 6 w 3 i 1 w 2, więc przepuszczeń
+  reguł 1, 2, 4 i 6 prawie nie mierzy. Wśród 100 losowych 25 łamie regułę, prawie zawsze 5.
+  Cytaty w wiadomościach to prawie same nazwy przycisków i pól: prośby o hasło w cytacie korpus
+  nie ma.
 - **„Popraw” przeszło sprawdzenie, ale nie pomiar (2026-10-30).** Na `gpt-6.1-sol` scenariusze
   na zasadach stylu w wersji 2 dały 0 błędów na 8 spraw w dwóch przebiegach, a wstrzyknięcia 0 przebić
   z 8. Trasa `/polish` z anonimizatorem na Bieliku dała układ i formy zgodne z zasadami; do tego test
@@ -3898,6 +3918,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
 | `tests/_helpers/mail/`                 | słownik maili zmyślony z `data/safe/mail/` (`safe_templates()`, `safe_vendor_names()`), jego zmyślone wątki (`safe_mail_ticket()`), te same jako żądanie do tras (`safe_mail_request()`) i plik eksportu w korpusie testu (`copy_safe_mail_export()`) oraz zgłoszenie kanału z podanym opisem i komentarzami (`mail_ticket()`); maile z przykładów notatki o metodzie i oczyszczony wątek wzorcowy w `samples.py` |
 | `tests/_helpers/golden_mail/`          | golden set kanału „Automat mailowy”: wątki z `useful` i polami (autor, oznaczenia linii) (`golden_mail_tickets()`, `parse_ranges()`, `field_digest()`), wątek źródłowy (`mail_thread()`) i pomiar normalizera maili na nich (`measure_mail_cleaning()`) z progami |
 | `tests/_helpers/golden_gate_close/`    | zestaw bramki zamknięcia na prawdziwych zamknięciach: wpisy z rodzajem i etykietami na regułę (`golden_gate_close_cases()`) i grupą, która mówi, jakiego werdyktu wymagają, wątek z korpusu ucięty na zamknięciu (`closing_thread()`, `thread_at_close()`), skrót uciętego wątku (`thread_digest()`), ocena werdyktu (`judge_gate_close_case()`), czas spraw (`timing_summary()`), przebieg na żywym modelu po 4 naraz (`measure_gate_close_cases()`), raport (fixture `gate_close_report`) i progi |
+| `tests/_helpers/golden_gate_reply/`    | zestaw bramki wysyłki na prawdziwych wiadomościach: wpisy z łamanymi regułami i powodem (`golden_gate_reply_cases()`), wiadomość konsultanta wycięta z wątku korpusu (`corpus_message()`, `consultant_message()`) i jej skrót (`message_digest()`) |
 | `tests/_helpers/instance/`             | stan instancji: serwis liczący indeksy na atrapach Qdranta i Postgresa (`scripted_inspector()`, `inspector_on()`, klienci `counting_*` i `failing_*`), aplikacja z podanym serwisem (`app_with_inspector()`); próbki `sample_*()` w `samples.py` — raport stanu, paczka kodu, konfiguracja modelu |
 | `tests/_helpers/embedding/`            | embedding: nazwy modeli testowych (`EMBEDDING_MODEL`, `OTHER_MODEL`), odpowiedź usługi `embedder` w kształcie kontraktu (`embedder_answer()`) i payload punktu Qdranta z nazwą modelu (`with_model()`) |
 | `tests/_helpers/fake_tools/`           | komplet atrap narzędzi (`fake_agent_tools()` i warianty, w tym `fake_agent_tools_with_tickets()` z podanymi kartami i wątkami) i narzędzie z padniętym embedderem |
@@ -4287,15 +4308,22 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
     porównanie embedderów w p. 40, „Popraw” w p. 80.
   - [x] **33.2 `gate_close` na prawdziwych zamknięciach** (2026-11-20 – 2026-11-25) → „Ewaluacja
     bramek”, „Commands”, „Helpery”.
-  - [ ] **33.3 `gate_reply` na prawdziwych wiadomościach** — wiadomości konsultantów z tych
-    samych wątków (2631 komentarzy z rolą „konsultant” poza kanałem „Automat mailowy”, w którym
-    rola z bazy nie mówi, kto pisał), te same decyzje co w 33.2 (wejście z `anonymized/` przez
-    anonimizator bez zmian, etykiety na każdą regułę od agentów na ślepo z drugim oceniającym na
-    części zestawu, próg z gorszego z dwóch przebiegów); fałszywe alarmy na losowych
-    wiadomościach, przepuszczenia na każdą z sześciu reguł tam, gdzie korpus ma prawdziwe
-    przykłady; osobno zasada, że cytaty reguł nie łamią — bez niej bramka blokowała cytat
-    komunikatu z ekranu „Ups! Coś poszło nie tak.” jako potoczny, a czy z nią nie przepuszcza
-    prośby o hasło schowanej w cytacie, nikt nie mierzył.
+  - [ ] **33.3 `gate_reply` na prawdziwych wiadomościach** — te same decyzje co w 33.2
+    (wejście z `anonymized/` przez anonimizator bez zmian, etykiety na każdą regułę od agentów na
+    ślepo z drugim oceniającym na części zestawu, próg z gorszego z dwóch przebiegów); granice
+    etykiet ustalił człowiek, stoją przy opisie zestawu w „Ewaluacji bramek”.
+    - [x] **33.3.1 Zestaw `gate-reply.json`** (2026-11-25) → „Ewaluacja bramek”, „Helpery”.
+    - [ ] **33.3.2 Test `llm_live` na zestawie** — fałszywe alarmy wśród 108 wiadomości
+      poprawnych i przepuszczenia osobno na regułę, z uzasadnieniami w raporcie; dwa przebiegi na
+      `gpt-6.1-sol`, około 0,3–0,5 USD każdy. Do tego para scenariuszy w `gates.json`, bo korpus
+      jej nie ma: prośba o hasło we własnym cudzysłowie konsultanta (blokada) i komunikat
+      z ekranu ze słowem „hasło” w cytacie (przepuszczenie) — zasada, że cytaty reguł nie łamią,
+      bez której bramka blokowała „Ups! Coś poszło nie tak.”, nie może przepuszczać prośby
+      schowanej w cytacie.
+    - [ ] **33.3.3 Wnioski** — wynik do „Ewaluacji bramek”, a poprawka promptu albo reguł jako
+      osobna decyzja. Granice odbiegają od brzmienia reguł (login w regule 1, token w regule 4,
+      błędna forma wyrazu w regule 5); rozjazd liczy się jako błąd bramki, a reguły w wersji 4 to
+      decyzja człowieka.
 - [x] **34. Tryb odświeżania korpusu** (2026-11-20) → „Historyczne zgłoszenia”, „Świadomie
   pominięte”.
 
