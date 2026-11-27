@@ -1,8 +1,8 @@
 """
 Description:
-Zestaw scenariuszy cytowania kodu (`data/safe/golden/code.json`) i ocena sprawy przeprowadzonej
-na żywym modelu: czy graf z narzędziami kodu (`search`, `suggest_questions`) cytuje jako
-przyczynę plik, w którym stoi komunikat ze zgłoszenia, czy nie cytuje przyczyny, gdy komunikatu
+Zestaw scenariuszy cytowania kodu (`data/safe/golden/graph-code.json`) i ocena sprawy
+przeprowadzonej na żywym modelu: czy graf z narzędziami kodu (`search`, `suggest_questions`) cytuje
+jako przyczynę plik, w którym stoi komunikat ze zgłoszenia, czy nie cytuje przyczyny, gdy komunikatu
 nie ma w kodzie nigdzie, i czy cytuje tylko linie, które wcześniej przeczytał. Narzędzia kodu
 są prawdziwe, na paczce aplikacji syntetycznej, a zgłoszenia i instrukcje to atrapy. Korzysta
 z niego test ewaluacyjny cytowania kodu (p. 59). Modele zestawu i oceny leżą w `models/`,
@@ -74,7 +74,7 @@ from tests._helpers.synthetic_code import synthetic_code_tools
 
 
 def code_cases(
-    path: Path = CODE_FILE,  # np. Path("data/safe/golden/code.json")
+    path: Path = CODE_FILE,  # np. Path("data/safe/golden/graph-code.json")
 ) -> tuple[CodeCase, ...]:
     """
     Description:
@@ -82,7 +82,7 @@ def code_cases(
     bez względu na to, na ilu grafach idzie.
 
     Example args:
-        path=Path("data/safe/golden/code.json")
+        path=Path("data/safe/golden/graph-code.json")
 
     Example result:
         (CodeCase(case_id="k01", graphs=("search", "suggest_questions", …), …), …)
@@ -93,7 +93,7 @@ def code_cases(
 
 
 def code_sections(
-    path: Path = CODE_FILE,  # np. Path("data/safe/golden/code.json")
+    path: Path = CODE_FILE,  # np. Path("data/safe/golden/graph-code.json")
 ) -> dict[str, CodeSection]:
     """
     Description:
@@ -101,7 +101,7 @@ def code_sections(
     wymienia w `graphs`, w kolejności zestawu. Grafy stoją w kolejności pierwszego wystąpienia.
 
     Example args:
-        path=Path("data/safe/golden/code.json")
+        path=Path("data/safe/golden/graph-code.json")
 
     Example result:
         {"search": CodeSection(graph="search", cases=(CodeCase(case_id="k01", …), …)),

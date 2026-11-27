@@ -1,9 +1,9 @@
 """
 Description:
-Spójność golden setu kanału „Automat mailowy” (`tickets-mail.json`) z wątkami, z których powstał,
-bez modelu i bez stacku. Wpis to wątek: etykiety z 32.1 i pola, każde z autorem i oznaczeniami
-linii z 32.3. Na zestawie stoi test ewaluacyjny normalizera maili, a pomyłka w nim nie daje
-błędu, tylko fałszywy wynik pomiaru.
+Spójność golden setu kanału „Automat mailowy” (`service-tickets-mail.json`) z wątkami, z których
+powstał, bez modelu i bez stacku. Wpis to wątek: etykiety z 32.1 i pola, każde z autorem i
+oznaczeniami linii z 32.3. Na zestawie stoi test ewaluacyjny normalizera maili, a pomyłka w nim nie
+daje błędu, tylko fałszywy wynik pomiaru.
 
 | warunek                                                 | czym grozi jego brak                   |
 |---------------------------------------------------------|----------------------------------------|

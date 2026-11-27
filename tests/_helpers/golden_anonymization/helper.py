@@ -4,7 +4,8 @@ Golden set anonimizatora (p. 19.3) i ocena tekstu po anonimizacji: co z danych, 
 zniknąć, zostało w wyniku, i czego z wiedzy, która miała zostać, w wyniku ubyło. Przypadek to
 tekst z dwiema listami fragmentów: `remove` (dane z rodzajem) i `keep` (wiedza z rodzajem);
 czego nie ma na żadnej liście, ocena nie sprawdza. Zestawy są dwa: zmyślony
-(`data/safe/golden/anonymization.json`) i próbka korpusu (`data/unsafe/golden/anonymization.json`).
+(`data/safe/golden/service-anonymizer.json`) i próbka korpusu
+(`data/unsafe/golden/service-anonymizer.json`).
 
 | co                          | do czego                                                       |
 |-----------------------------|----------------------------------------------------------------|
@@ -76,7 +77,7 @@ Span = tuple[int, int]
 
 
 def anonymization_set(
-    path: Path,  # np. Path("data/safe/golden/anonymization.json")
+    path: Path,  # np. Path("data/safe/golden/service-anonymizer.json")
 ) -> AnonymizationSet:
     """
     Description:
@@ -85,7 +86,7 @@ def anonymization_set(
     fragmenty.
 
     Example args:
-        path=Path("data/safe/golden/anonymization.json")
+        path=Path("data/safe/golden/service-anonymizer.json")
 
     Example result:
         AnonymizationSet(name="anonymization-v1", synthetic=True,

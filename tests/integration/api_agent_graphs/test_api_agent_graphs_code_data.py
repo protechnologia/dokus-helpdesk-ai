@@ -1,10 +1,10 @@
 """
 Description:
-Spójność zestawu scenariuszy cytowania kodu (`data/safe/golden/code.json`) bez modelu: czy sprawy
-idą na grafach z narzędziami kodu, czy para „komunikat w kodzie / komunikatu nigdzie” naprawdę
-stoi na paczce syntetycznej i czy narzędzia sprawy to atrapy zgłoszeń i instrukcji z prawdziwym
-kodem. Test na żywym modelu z takim zestawem mierzyłby co innego, niż obiecuje, więc te warunki
-pilnuje się w domyślnym `pytest`.
+Spójność zestawu scenariuszy cytowania kodu (`data/safe/golden/graph-code.json`) bez modelu: czy
+sprawy idą na grafach z narzędziami kodu, czy para „komunikat w kodzie / komunikatu nigdzie”
+naprawdę stoi na paczce syntetycznej i czy narzędzia sprawy to atrapy zgłoszeń i instrukcji z
+prawdziwym kodem. Test na żywym modelu z takim zestawem mierzyłby co innego, niż obiecuje, więc te
+warunki pilnuje się w domyślnym `pytest`.
 
 | warunek                                        | czym grozi jego brak                         |
 |------------------------------------------------|----------------------------------------------|

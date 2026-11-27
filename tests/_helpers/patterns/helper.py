@@ -133,14 +133,14 @@ def destroyed_fragments(
 
 
 def removed_kinds(
-    path: Path,  # np. Path("data/safe/golden/anonymization.json")
+    path: Path,  # np. Path("data/safe/golden/service-anonymizer.json")
 ) -> set[str]:
     """
     Description:
     Rodzaje danych, które stoją w zestawie golden setu.
 
     Example args:
-        path=Path("data/safe/golden/anonymization.json")
+        path=Path("data/safe/golden/service-anonymizer.json")
 
     Example result:
         {"IMIĘ", "NAZWISKO", "PESEL", …}

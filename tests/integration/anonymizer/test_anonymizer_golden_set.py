@@ -1,7 +1,8 @@
 """
 Description:
 Spójność golden setu anonimizatora bez silnika: zestaw zmyślony
-(`data/safe/golden/anonymization.json`) i próbka korpusu (`data/unsafe/golden/anonymization.json`).
+(`data/safe/golden/service-anonymizer.json`) i próbka korpusu
+(`data/unsafe/golden/service-anonymizer.json`).
 Zaznaczenia pisze się ręcznie, a pomyłka w nich nie daje błędu, tylko fałszywy wynik pomiaru,
 więc te warunki pilnuje się w domyślnym `pytest`, zanim zestaw zmierzy wzorce (p. 19.4)
 i silnik (p. 19.5).

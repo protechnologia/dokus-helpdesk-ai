@@ -73,7 +73,7 @@ def measured(request: pytest.FixtureRequest) -> Callable[[str], AnonymizationMea
         request=<żądanie fixture pytest>
 
     Example result:
-        funkcja: measured("data/safe/golden/anonymization.json") -> AnonymizationMeasurement(…)
+        funkcja: measured("data/safe/golden/service-anonymizer.json") -> AnonymizationMeasurement(…)
     """
     settings = live_agent_settings(request.config)
 

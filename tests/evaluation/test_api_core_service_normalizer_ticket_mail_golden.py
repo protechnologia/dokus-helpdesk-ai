@@ -20,11 +20,11 @@ Udział słów, które zostają, sam niczego nie rozstrzyga: dopiero oznaczenia 
 Co się dzieje po drodze (`measure_mail_cleaning()` z `tests/_helpers/golden_mail/`):
 
 1. Dla każdego wątku z `data/unsafe/corpus/raw-db/` uruchamia normalizer ze słownikiem
-   z `data/unsafe/mail/` i porównuje role pól z autorami z `tickets-mail.json`.
+   z `data/unsafe/mail/` i porównuje role pól z autorami z `service-tickets-mail.json`.
 2. Pyta `repeated_lines()`, które linie zniknęły, i sprawdza, że normalizer oddał dokładnie
    słowa linii, które zostały.
-3. Liczy linie i słowa każdej etykiety z oznaczeń linii w `tickets-mail.json`: które zostały,
-   które zniknęły.
+3. Liczy linie i słowa każdej etykiety z oznaczeń linii w `service-tickets-mail.json`: które
+   zostały, które zniknęły.
 
 O czym pamiętać przy zmianach:
 

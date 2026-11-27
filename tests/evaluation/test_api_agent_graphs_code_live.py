@@ -3,7 +3,7 @@ Description:
 Scenariusze ewaluacyjne cytowania kodu na żywym modelu (p. 59): czy graf z narzędziami kodu
 cytuje jako przyczynę plik, w którym stoi komunikat ze zgłoszenia, czy nie cytuje przyczyny, gdy
 komunikatu nie ma w kodzie nigdzie, choć podobny kusi, i czy cytuje tylko linie, które wcześniej
-przeczytał. Zestaw leży w `data/safe/golden/code.json`: jedna lista spraw, a każda wymienia
+przeczytał. Zestaw leży w `data/safe/golden/graph-code.json`: jedna lista spraw, a każda wymienia
 w `graphs` grafy, na których idzie (`search`, `suggest_questions`, `suggest_solution`);
 narzędzia kodu są prawdziwe, na paczce aplikacji syntetycznej, a zgłoszenia i instrukcje to
 atrapy.

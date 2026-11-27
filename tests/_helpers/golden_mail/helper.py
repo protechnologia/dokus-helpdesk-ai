@@ -1,6 +1,6 @@
 """
 Description:
-Golden set kanału „Automat mailowy” (`tickets-mail.json`) i pomiar normalizera maili na nim
+Golden set kanału „Automat mailowy” (`service-tickets-mail.json`) i pomiar normalizera maili na nim
 (p. 32.3). Wpis to jeden ze 136 wątków: `useful` z 32.1 i pola wątku, każde z autorem wiadomości
 i oznaczeniami linii (etykieta na każdą linię ze słowami). Używają go test spójności zestawu
 i test ewaluacyjny normalizera.

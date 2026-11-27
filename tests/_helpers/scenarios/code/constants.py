@@ -9,7 +9,7 @@ from pathlib import Path
 
 # Plik zestawu, który wczytuje się, gdy test nie poda innego. Ścieżka od korzenia repo, bo z niego
 # uruchamia się pytest.
-CODE_FILE = Path("data/safe/golden/code.json")
+CODE_FILE = Path("data/safe/golden/graph-code.json")
 
 # Klucz listy spraw zestawu; obok niego stoi tylko metryczka. Sprawa sama mówi w polu `graphs`,
 # na których grafach idzie, więc zestaw nie ma sekcji na graf.

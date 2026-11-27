@@ -3,7 +3,7 @@
     "name": "anonymization-v1",
     "created": "2026-10-17",
     "synthetic": true,
-    "purpose": "Golden set anonimizatora na zmyślonych tekstach (p. 19.3): co ma zniknąć i co ma zostać. Pilnuje oceny i zjawisk, których w próbce korpusu może zabraknąć. NIE mierzy skuteczności na prawdziwych zgłoszeniach: to robi próbka korpusu w data/unsafe/golden/anonymization.json.",
+    "purpose": "Golden set anonimizatora na zmyślonych tekstach (p. 19.3): co ma zniknąć i co ma zostać. Pilnuje oceny i zjawisk, których w próbce korpusu może zabraknąć. NIE mierzy skuteczności na prawdziwych zgłoszeniach: to robi próbka korpusu w data/unsafe/golden/service-anonymizer.json.",
     "rules": [
       "Przypadek: id, phenomenon (zjawisko, bez cytowania danych), text (wątek w kształcie RawTicket.as_thread() albo sama wiadomość), remove i keep: fragmenty zapisane po rodzaju.",
       "remove: dane, które mają zniknąć, rodzaje z REMOVE_KINDS (tests/_helpers/golden_anonymization/constants.py). Fragment to sama dana, bez etykiety: „600 123 456”, nie „tel. 600 123 456”. Każda forma odmiany osobno („Katarzyna”, „Katarzyno”); wielkość liter i polskie znaki nie mają znaczenia.",

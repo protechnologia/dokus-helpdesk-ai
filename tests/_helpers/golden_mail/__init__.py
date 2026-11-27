@@ -1,8 +1,8 @@
 """
 Description:
-Golden set kanału „Automat mailowy” z `data/unsafe/golden/tickets-mail.json`: etykiety wątków
-z 32.1 i autor oraz oznaczenia linii każdego pola z 32.3, a także pomiar normalizera maili na nich.
-Używają go test spójności zestawu i test ewaluacyjny normalizera.
+Golden set kanału „Automat mailowy” z `data/unsafe/golden/service-tickets-mail.json`: etykiety
+wątków z 32.1 i autor oraz oznaczenia linii każdego pola z 32.3, a także pomiar normalizera maili na
+nich. Używają go test spójności zestawu i test ewaluacyjny normalizera.
 
 Logika leży w `helper.py`, stałe w `constants.py`, modele w `models/`; testy importują je
 z pakietu.

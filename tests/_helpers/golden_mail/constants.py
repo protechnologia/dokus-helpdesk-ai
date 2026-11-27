@@ -10,7 +10,7 @@ from pathlib import Path
 
 # Golden set kanału: etykiety wątków z 32.1 (rodzaj, `useful`) i pola wątku, każde z autorem
 # i oznaczeniami linii z 32.3. Dane klienta, poza repo.
-GOLDEN_FILE = Path("data/unsafe/golden/tickets-mail.json")
+GOLDEN_FILE = Path("data/unsafe/golden/service-tickets-mail.json")
 
 # Wątki źródłowe: pliki eksportu sierpniowego zrzutu, z których powstały obie warstwy etykiet.
 RAW_DB_DIR = Path("data/unsafe/corpus/raw-db")

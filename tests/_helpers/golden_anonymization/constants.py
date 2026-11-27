@@ -9,10 +9,10 @@ from pathlib import Path
 
 # Zestaw zmyślony, w repo: pilnuje oceny i zjawisk, których w próbce korpusu może zabraknąć.
 # Ścieżka od korzenia repo, bo z niego uruchamia się pytest.
-SAFE_FILE = Path("data/safe/golden/anonymization.json")
+SAFE_FILE = Path("data/safe/golden/service-anonymizer.json")
 
 # Próbka korpusu: prawdziwe wątki z danymi klientów, poza repo.
-UNSAFE_FILE = Path("data/unsafe/golden/anonymization.json")
+UNSAFE_FILE = Path("data/unsafe/golden/service-anonymizer.json")
 
 # Rodzaje danych, które mają zniknąć. Nazwy to nazwy znaczników z p. 19, bez nawiasów; znacznika
 # w wyniku ocena nie sprawdza, a rodzaj służy do liczenia przecieków osobno. `DOWÓD` to numer

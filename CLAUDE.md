@@ -795,8 +795,8 @@ zgłoszenia źródłowe → [adapter] → RawTicket → [LLM parser] → ParsedT
   ruszyć nazw, jak przy `rules.json` paczki kodu. Słownik zmyślony, z trzech zmyślonych wątków
   i progiem 2, leży w `data/safe/mail/`, a test pilnuje, że zgadza się ze źródłem. Brak pliku to
   `MailDictionaryConfigError`, a nie pusty słownik, który przepuściłby wątek bez czyszczenia.
-- **Czyszczenie mierzy golden set kanału, `tickets-mail.json` (2026-11-18 – 2026-11-20, p. 32):**
-  wpis na każdy ze 136 wątków z rodzajem i `useful` (79 spraw i 57 powiadomień, 27 z wiedzą,
+- **Czyszczenie mierzy golden set kanału, `service-tickets-mail.json` (2026-11-18 – 2026-11-20,
+  p. 32):** wpis na każdy ze 136 wątków z rodzajem i `useful` (79 spraw i 57 powiadomień, 27 z wiedzą,
   6 par jednej sprawy; ślepy przegląd zgodny w 131 ze 136, kappa 0,89, a sporna klasa to
   poprawka dostawcy bez przyczyny) i z polami wątku, każde z autorem i etykietą na każdą linię
   ze słowami: `tresc`, `podpis`, `naglowek`, `kopia` albo `stopka`,
@@ -1353,8 +1353,9 @@ roboczej gałęzi jednego klienta, a paczka powstała z innej gałęzi.
   których nie da się odpowiedzieć na pytanie ze zgłoszenia; obok zapisane są miejsca pokrewne
   i pułapki. Ze zgłoszeń przypadków się nie bierze: cudzysłów w zgłoszeniu łapie głównie nazwy
   przycisków i pól, a z 602 cytowanych fragmentów 170 stoi dosłownie w paczce, w tym tylko 52
-  w jednym miejscu. Zestaw na kodzie Dokusa ma 9 przypadków (`data/unsafe/golden/code.json`, do
-  2026-10-15 `code-dokus.json`). Opisy zachowania zatwierdza osoba znająca Dokusa; do tego czasu przypadek ma
+  w jednym miejscu. Zestaw na kodzie Dokusa ma 9 przypadków
+  (`data/unsafe/golden/graph-code.json`, do 2026-10-15 `code-dokus.json`, do 2026-11-27
+  `code.json`). Opisy zachowania zatwierdza osoba znająca Dokusa; do tego czasu przypadek ma
   `behaviour_confirmed: false`.
 - **Zestaw do aplikacji syntetycznej ma inny kształt, bo służy testom bez modelu (2026-10-07).**
   `data/safe/golden/tool-code.json` trzyma sekcję na narzędzie: 74 zapytania w kształcie
@@ -1699,12 +1700,12 @@ merytorycznie").
   komentarzy w chwili zamknięcia, skrót uciętego wątku, rodzaj zgłoszenia i dwie etykiety
   z powodem, po jednej na regułę. Oznaczali agenci na ślepo; drugi, niezależny oceniający na 40 wpisach zgadza się
   w regule 1 w 40 (kappa 1,00), w regule 2 w 37 (kappa 0,85) i w rodzaju w 40, a trzy
-  niezgodności rozstrzygnął człowiek. W kanale mailowym rodzaj pochodzi z `tickets-mail.json`:
-  kopia naszej korespondencji, która niesie sprawę, to sprawa (decyzja 2026-11-20 przy dwóch
-  wpisach, w których oceniający dali „powiadomienie”). Zestaw ma 113 spraw i 7 powiadomień,
-  a oczekiwanych blokad 59 i przepuszczeń 61; reguła 1 jest złamana tylko w 3 sprawach, więc jej
-  przepuszczeń zestaw prawie nie mierzy. Pod reguły w wersji 2 (2026-11-25) etykiety mówią, czy
-  widać problem i rozwiązanie, a nie odpowiadają już regułom jeden do jednego; człowiek zmienił
+  niezgodności rozstrzygnął człowiek. W kanale mailowym rodzaj pochodzi z
+  `service-tickets-mail.json`: kopia naszej korespondencji, która niesie sprawę, to sprawa (decyzja
+  2026-11-20 przy dwóch wpisach, w których oceniający dali „powiadomienie”). Zestaw ma 113 spraw i 7
+  powiadomień, a oczekiwanych blokad 59 i przepuszczeń 61; reguła 1 jest złamana tylko w 3 sprawach,
+  więc jej przepuszczeń zestaw prawie nie mierzy. Pod reguły w wersji 2 (2026-11-25) etykiety mówią,
+  czy widać problem i rozwiązanie, a nie odpowiadają już regułom jeden do jednego; człowiek zmienił
   14 z nich (8 na blokadę, 6 na przepuszczenie), więc blokad jest 61, a przepuszczeń 59.
 - **Na prawdziwych zamknięciach bramka zamknięcia jest za surowa (2026-11-25, p. 33.2).** Na
   `gpt-6.1-sol` i regułach w wersji 1, w dwóch przebiegach: fałszywych alarmów 18 i 19 z 61,
@@ -3786,21 +3787,25 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
   tego, że ścieżka się nie zepsuła. Zgodność indeksu syntetycznego z plikami paczki sprawdzają
   fixture'y z `tests/evaluation/conftest.py`; porównanie i pomiary leżą w helperach
   `synthetic_docs` i `golden_tickets`.
-- **Nazwa zestawu mówi, co mierzy: przedrostek `tool-` albo `graph-` (2026-11-27, wcześniej
-  dopisek `-tools` z 2026-10-15).** `tool-` ma zestaw zapytań do narzędzia z oczekiwanym wynikiem,
-  sprawdzany bez modelu: `tool-code.json` i `tool-docs.json` w `safe` (do 2026-11-27
-  `code-tools.json` i `docs-tools.json`, a wcześniej z dopiskiem `-synthetic`) oraz
+- **Nazwa zestawu mówi, co mierzy: przedrostek `tool-`, `graph-` albo `service-` (2026-11-27,
+  wcześniej dopisek `-tools` z 2026-10-15).** `tool-` ma zestaw zapytań do narzędzia
+  z oczekiwanym wynikiem, sprawdzany bez modelu: `tool-code.json` i `tool-docs.json` w `safe` (do
+  2026-11-27 `code-tools.json` i `docs-tools.json`, a wcześniej z dopiskiem `-synthetic`) oraz
   `tool-tickets-vector.json`, `tool-tickets-vector-distractors.json` i `tool-tickets-text.json`
-  w `unsafe`. `graph-` ma zestaw do pomiaru grafu na żywym modelu, na prawdziwych danych:
-  `graph-gate-close.json` i `graph-gate-reply.json` w `unsafe`. Zestawy zgłoszeń mają za
-  przedrostkiem wyszukiwanie, które mierzą (`-vector`, a od p. 31 `-text`; 2026-11-15), bo oba
-  stoją na zgłoszeniach. Bez przedrostka zostają scenariusze ewaluacji modelu z p. 59 w `safe`
-  (`injections`, `gates`, `polish`, `handoff`, `questions`, `code`, `solution`, `reading`,
-  `closed`) oraz `code.json` w `unsafe`, `anonymization.json` i `tickets-mail.json`. Zestawy w `data/unsafe/golden/` nie mają dopisku paczki (do 2026-10-15 `-dokus`):
-  instancja obsługuje jeden produkt, więc dane klienta są zawsze z tej samej paczki. `code.json`
-  w `unsafe` to sprawy dla agenta na prawdziwym kodzie, ten sam rodzaj co `code.json` w `safe` na
-  aplikacji syntetycznej. Tak samo `anonymization.json` (2026-10-17): golden set anonimizatora
-  w jednym kształcie, zmyślony w `safe` i próbka korpusu w `unsafe`.
+  w `unsafe`. `graph-` ma zestaw do pomiaru grafu na żywym modelu: `graph-gate-close.json`
+  i `graph-gate-reply.json` w `unsafe` oraz `graph-code.json` w obu katalogach (do 2026-11-27
+  `code.json`): w `unsafe` sprawy dla agenta na prawdziwym kodzie, w `safe` ten sam rodzaj na
+  aplikacji syntetycznej. `service-` ma zestaw serwisu, czyli kodu, który przetwarza dane poza
+  pętlą agenta, mierzonego w całości, a nie po jednym węźle: `service-anonymizer.json` (usługa
+  `anonymizer`, do 2026-11-27 `anonymization.json`; od 2026-10-17 w jednym kształcie, zmyślony
+  w `safe` i próbka korpusu w `unsafe`), na którym chodzą i same wzorce, i silnik `agent`, oraz
+  `service-tickets-mail.json` (normalizer maili z `core_service/`, do 2026-11-27
+  `tickets-mail.json`). Zestawy zgłoszeń mają za przedrostkiem wyszukiwanie, które mierzą
+  (`-vector`, a od p. 31 `-text`; 2026-11-15), bo oba stoją na zgłoszeniach. Bez przedrostka
+  zostają scenariusze ewaluacji modelu z p. 59 w `safe` (`injections`, `gates`, `polish`,
+  `handoff`, `questions`, `solution`, `reading`, `closed`). Zestawy w `data/unsafe/golden/` nie mają
+  dopisku paczki (do 2026-10-15 `-dokus`): instancja obsługuje jeden produkt, więc dane klienta są
+  zawsze z tej samej paczki.
 - **Golden set anonimizatora (2026-10-17, p. 19.3): przypadek to tekst z danymi, które mają
   zniknąć (`remove`), i wiedzą, która ma zostać (`keep`), obie zapisane po rodzaju.** Zestaw
   zmyślony ma 59 przypadków: cytowaną historię maili z adresami w `<…>`, dane złamane między
@@ -3924,7 +3929,7 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
   | `polish_live.py`                       | `polish.json`     | „Popraw” zmienia formę: bez słów potocznych, zgubionych faktów i dopisków |
   | `handoff_live.py`                      | `handoff.json`    | przekazanie trzyma układ i fakty, niesie ostrzeżenie, nie dopisuje i nie obiecuje |
   | `questions_live.py`                    | `questions.json`  | `suggest_questions` pyta tylko wtedy, gdy przyczyny konkurują |
-  | `code_live.py`                         | `code.json`       | przyczyną jest plik z komunikatem, cytowany po odczycie    |
+  | `code_live.py`                         | `graph-code.json` | przyczyną jest plik z komunikatem, cytowany po odczycie    |
   | `solution_live.py`                     | `solution.json`   | treść dla klienta niesie fakty z karty, w tym krok nieodwracalny |
   | `reading_live.py`                      | `reading.json`    | przy jednym objawie i trzech przyczynach model czyta wszystkie trzy karty |
 
@@ -4379,9 +4384,9 @@ limit, reakcję na flagi wyniku, przepisywanie przykładów z tabelki argumentó
 w stałym początku żądania (osiem narzędzi to było 3,6 tys. tokenów, dziś jest czternaście).
 
 - [ ] **81. Przebieg wyjściowy `search`** — test ewaluacyjny grafu `search` na zapytaniach
-  golden200 z celem w indeksie i na 9 przypadkach `code.json` (paczka Dokusa), z raportem liczb
-  na narzędzie: wspólnych i tych, których potrzebują p. 82–91; dwa przebiegi, a przed nimi próba
-  na 10 sprawach z kosztem. Wymaga poda z anonimizatorem (RB-002). *Dlaczego:* punkty narzędzi
+  golden200 z celem w indeksie i na 9 przypadkach `graph-code.json` (paczka Dokusa), z raportem
+  liczb na narzędzie: wspólnych i tych, których potrzebują p. 82–91; dwa przebiegi, a przed nimi
+  próba na 10 sprawach z kosztem. Wymaga poda z anonimizatorem (RB-002). *Dlaczego:* punkty narzędzi
   biorą liczby z tego samego przebiegu, a jego wynik jest odniesieniem dla każdej zmiany opisu.
 - [ ] **82. `find_tickets_vector`** — trafność zapytań pisanych przez agenta wobec zapytań
   z golden setu (`recall@1` i MRR; odniesieniem są pola `query_problem` i `query_symptoms` —
@@ -4428,8 +4433,8 @@ w stałym początku żądania (osiem narzędzi to było 3,6 tys. tokenów, dziś
   stop przy zgodnym objawie i rozłącznych przyczynach (e-Doręczenia: 6 zgłoszeń, 6 przyczyn).
 - [ ] **25. `suggest_questions`** — prompt z 6.3 przemierzony na modelu docelowym z placeholderami,
   z regułą zgodności przyczyny z objawem i z szerszą regułą sięgania po kod, tą samą co w p. 23
-  (z nią do `code.json` wracają sprawy bez komunikatu na tym grafie); czy wyjątek dla hipotezy,
-  zapisany 2026-10-30 obok zasad ogólnych, nie zmienia pytań;
+  (z nią do `graph-code.json` wracają sprawy bez komunikatu na tym grafie); czy wyjątek dla
+  hipotezy, zapisany 2026-10-30 obok zasad ogólnych, nie zmienia pytań;
   sprawa ze znacznikami anonimizacji w `questions.json` z oceną helpera `markers`, jak w p. 23;
   czy `questions_summary` z kart importu nie podsuwa pytań proceduralnych w przebraniu (w przeglądzie
   importu zdarza się prośba o numer pisma zamiast pytania diagnostycznego);
@@ -4445,8 +4450,8 @@ w stałym początku żądania (osiem narzędzi to było 3,6 tys. tokenów, dziś
   dziura (pytanie o wygasłe konto przy awarii całego urzędu) czeka na regułę.
 - [ ] **26. `suggest_solution`** — prompt z 6.4 przemierzony na modelu docelowym, z regułą
   zgodności trafienia z objawem, osobną regułą ostrzeżenia o kroku nieodwracalnym i szerszą
-  regułą sięgania po kod, tą samą co w p. 23 (z nią do `code.json` wracają sprawy bez komunikatu
-  na tym grafie); sprawa ze znacznikami anonimizacji
+  regułą sięgania po kod, tą samą co w p. 23 (z nią do `graph-code.json` wracają sprawy bez
+  komunikatu na tym grafie); sprawa ze znacznikami anonimizacji
   w `solution.json` z oceną helpera `markers`, jak w p. 23; do rozstrzygnięcia pomiarem: kiedy model ma czytać wątki (w sondzie `gpt-6.1-sol` brał wszystkie,
   także po zaostrzeniu zdania w prompcie), czy „instrukcje zawsze" nie dokłada do źródeł sekcji,
   z których odpowiedź nie korzysta, i jak ważyć instrukcję wobec zgłoszeń (od 2026-10-04 prompt

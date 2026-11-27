@@ -1,7 +1,7 @@
 """
 Description:
 Rozbiór oznaczeń linii golden setu kanału „Automat mailowy” (`tests/_helpers/golden_mail/`):
-zakresy z pól `tickets-mail.json` na etykietę na linię i skrót tekstu pola. Na nich stoi
+zakresy z pól `service-tickets-mail.json` na etykietę na linię i skrót tekstu pola. Na nich stoi
 test spójności zestawu i pomiar normalizera maili, więc błąd tu dałby fałszywy wynik pomiaru.
 """
 
