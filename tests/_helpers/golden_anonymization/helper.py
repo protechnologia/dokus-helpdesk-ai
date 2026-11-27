@@ -89,7 +89,7 @@ def anonymization_set(
         path=Path("data/safe/golden/service-anonymizer.json")
 
     Example result:
-        AnonymizationSet(name="anonymization-v1", synthetic=True,
+        AnonymizationSet(name="service-anonymizer-v1", synthetic=True,
                          cases=(AnonymizationCase(case_id="s01", …), …))
     """
     raw       = json.loads(path.read_text(encoding="utf-8"))

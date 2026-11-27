@@ -1,6 +1,6 @@
 {
   "meta": {
-    "name": "anonymization-v1",
+    "name": "service-anonymizer-v1",
     "created": "2026-10-17",
     "synthetic": true,
     "purpose": "Golden set anonimizatora na zmyślonych tekstach (p. 19.3): co ma zniknąć i co ma zostać. Pilnuje oceny i zjawisk, których w próbce korpusu może zabraknąć. NIE mierzy skuteczności na prawdziwych zgłoszeniach: to robi próbka korpusu w data/unsafe/golden/service-anonymizer.json.",

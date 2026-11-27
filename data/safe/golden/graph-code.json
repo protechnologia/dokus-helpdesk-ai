@@ -1,6 +1,6 @@
 {
   "meta": {
-    "name": "code-v1",
+    "name": "graph-code-v1",
     "created": "2026-10-15",
     "purpose": "Czy graf z narzędziami kodu (search, suggest_questions, suggest_solution) cytuje jako przyczynę plik, w którym stoi komunikat ze zgłoszenia, nie cytuje przyczyny, gdy komunikatu nie ma w kodzie nigdzie, i cytuje tylko linie, które wcześniej przeczytał — na żywym modelu, na prawdziwych narzędziach kodu na paczce aplikacji syntetycznej (p. 59). NIE mierzy trafności rozpoznania na kodzie Dokusa (p. 81): sprawy pisze autor promptów, a aplikacja syntetyczna ma kilkadziesiąt plików.",
     "rules": [
