@@ -37,7 +37,7 @@ wyłącznie to, czego szukać: ile pobrać i gdzie uciąć to strojenie (`RAG_TO
 ### Koszty
 
 - Zapytanie nie powstaje tym samym promptem co korpus, więc jego trafność trzeba zmierzyć
-  (p. 23). Do tego czasu odniesieniem są zapytania w kształcie narzędzia z golden setu: na kartach
+  (p. 82). Do tego czasu odniesieniem są zapytania w kształcie narzędzia z golden setu: na kartach
   `gpt-6.1-sol` cel na pierwszym miejscu w 119 ze 126; na kartach Bielika 93,8% wobec 98,1% dla
   zapytań surowych.
 
@@ -45,4 +45,6 @@ wyłącznie to, czego szukać: ile pobrać i gdzie uciąć to strojenie (`RAG_TO
 
 Poprawki niemerytoryczne po przyjęciu, najnowsza na górze.
 
+- 2026-11-27 — pomiar trafności zapytań agenta to p. 82 zamiast p. 23: plan dzieli pomiary
+  narzędzi na punkt na narzędzie.
 - 2026-11-25 — ID AGT-001 zmienione na ADR-001: ADR-y numerujemy bez przedrostka obszaru.

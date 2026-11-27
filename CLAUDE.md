@@ -1541,7 +1541,7 @@ najmniej 3 pozycje listy w opisie (`<li>` albo linia od punktora lub numeru) ma 
 zgłoszeń (3,5%), z tego 31 przeszło filtr; lipcowej metody liczenia nie zapisano, więc liczb nie
 porównuje się wprost. Wpływu na trafienia nie mierzymy: przy tym udziale wymagałby osobnych
 zapytań pod te karty, a rozbicie — ponownego parsowania. Wraca, gdy pomiary wyszukiwania
-(p. 23) pokażą takie karty za złymi propozycjami.
+(p. 81–85) pokażą takie karty za złymi propozycjami.
 
 #### `questions_summary` — synteza bez konkretów jest bezwartościowa
 
@@ -2384,7 +2384,7 @@ Osoby i adresy idą osobnymi wywołaniami: wspólne kosztowało na próbce korpu
   także teraz, gdy model widzi `score` i czyta karty sam (2026-10-04): to jedyne miejsce, w którym
   KOD mówi „nic nie znaleziono" — bez niego wyszukiwanie zawsze oddaje komplet numerów, źródła
   zawsze są, a `requires_hits` nic nie znaczy. Może za to stać niżej, bo ma odcinać tylko oczywiste
-  śmieci (do przeliczenia w p. 23.2). Trzy pułapki strojenia:
+  śmieci (do przeliczenia w p. 82). Trzy pułapki strojenia:
   - **Nie stroi się go liczbą „ile procent zachowanych"** — krótkie teksty mają niski score mimo
     idealnego dopasowania (0,455 przy niemal tym samym zdaniu), więc z pięciu traconych zapytań
     cztery stały na pierwszym miejscu. Zawsze `eval_threshold.py detail` przed zmianą wartości.
@@ -2394,7 +2394,7 @@ Osoby i adresy idą osobnymi wywołaniami: wspólne kosztowało na próbce korpu
   - **Zmierzony na zapytaniach surowych, a agent pyta w kształcie korpusu.** Taki kształt
     upodabnia do korpusu także zapytania bez odpowiednika: w sondzie z 2026-08-20 przy 0.48
     przechodziło 29 z 80 trafień dystraktorów zamiast 2 z 80, a trafienia poprawne nie cierpiały.
-    Odpowiednik dzisiejszego wyboru to okolice 0.52 — do przeliczenia w p. 23.2.
+    Odpowiednik dzisiejszego wyboru to okolice 0.52 — do przeliczenia w p. 82.
 
 ### Warstwa wyszukiwania tekstowego (Postgres)
 
@@ -2425,7 +2425,7 @@ narzędzia kończą się błędem `DbPostgresMissingTableError`.
 - **Ani podciąg, ani słownik nie zrównują liter z ogonkami i bez nich (zmierzone 2026-11-15
   na golden secie)** — „Wygasly dane logowania” nie znajduje „Wygasły dane logowania” ani frazą,
   ani słowami, więc komunikat przepisany z notatki pisanej bez polskich znaków chybia. Czy to
-  boli, pokaże pomiar narzędzi na prawdziwych zapytaniach agenta (p. 23.2).
+  boli, pokaże pomiar narzędzi na prawdziwych zapytaniach agenta (p. 83).
 - **Dlaczego nie filtr tekstowy Qdranta:** zmierzony na 1.12.5 wymaga wszystkich słów, ale nie
   odmienia („serwer" nie znajduje „serwerem") i nie zna frazy.
 - **Słownik ładuje się w KAŻDEJ sesji: około 0,6 s i 32 MB na połączenie.** Klient musi trzymać
@@ -2470,7 +2470,7 @@ narzędzia kończą się błędem `DbPostgresMissingTableError`.
   karty nie występuje w wątku, z którego powstała, a najczęstsze z nich to formułki parsera —
   „główna aplikacja" w `component` (184 karty), „pytano o…" (181), „brak" (116) — więc zapytanie
   o „aplikacja" trafiałoby w 183 karty z 200. Cena: giną trafienia po parafrazie z `cause`
-  i `solution` (39% i 42% słów spoza wątku); czy to boli, pokaże p. 23. W dokumentacji
+  i `solution` (39% i 42% słów spoza wątku); czy to boli, pokaże p. 83. W dokumentacji
   przeszukiwany jest tytuł i treść sekcji; opis z metryczki nie, bo pisze go model. Samo
   wyszukiwanie po wątku jest potrzebne, bo parser gubi około połowy dosłownych komunikatów
   (14 z 30 na golden200), a `error_codes` wypełnia w 9 kartach z 200.
@@ -2528,7 +2528,7 @@ decyzji i otwarte pytania, także przy nowym narzędziu.
   funkcji, mówi prompt grafu; po zmianie opisu trzeba przemierzyć wszystkie grafy z tym narzędziem.
   Układ opisu (2026-10-05) podaje komentarz w każdym `description.md`, a pilnuje go test kontraktu.
   Przykład w tabelce argumentów to wzór, który model może przepisać (dlatego schemat odpowiedzi
-  przykładów nie niesie); czy przepisuje, pokażą pomiary grafów (p. 23). Decyzje o tabelce
+  przykładów nie niesie); czy przepisuje, pokażą pomiary narzędzi (p. 82–91). Decyzje o tabelce
   argumentów z 2026-10-21:
   - typ to nazwa z JSON-a (`string`, `integer`, `string[]`), bo model wypełnia argumenty JSON-em i
     dostaje obok schemat; „liczba” nie mówiła, czy całkowita;
@@ -2544,7 +2544,7 @@ decyzji i otwarte pytania, także przy nowym narzędziu.
 - **Zapytanie wektorowe pisze agent, w kształcie indeksu
   ([ADR-001](docs/adr/ADR-001_zapytanie-w-ksztalcie-indeksu.md)):** `find_tickets_vector` przyjmuje
   `problem` i `symptoms`, bez parsera; ile pobrać i gdzie uciąć to ENV (`RAG_TOP_K`,
-  `RAG_SCORE_MIN`), nie argument modelu. Trafność zapytań agenta mierzy p. 23.
+  `RAG_SCORE_MIN`), nie argument modelu. Trafność zapytań agenta mierzy p. 82.
 - **`exact` to jedna fraza, nie lista (decyzja 2026-10-05).** Przy liście wynik nie mówił, która
   fraza trafiła, a „którakolwiek z fraz” obok „wszystkie słowa” trzeba było modelowi tłumaczyć. W
   zestawie zapytań żadne nie podawało więcej niż jednej frazy. Cena: kilka tropów (kod z ekranu, kod
@@ -2557,7 +2557,7 @@ decyzji i otwarte pytania, także przy nowym narzędziu.
   (`AGENT_MAX_CALLS_READ_TICKETS_THREAD`) jest wprost liczbą przeczytanych wątków. Przy liście sufit
   wynosił limit razy pięć, a model w sondzie brał naraz wszystkie znalezione wątki. Kilka wątków to
   kilka wywołań, także w jednej turze. Limit to 3 wątki na sprawę zamiast dziesięciu (do
-  przestrojenia w p. 23). Karty zostają listą: są krótkie, a przy jednym objawie i różnych
+  przestrojenia w p. 85). Karty zostają listą: są krótkie, a przy jednym objawie i różnych
   przyczynach model ma je czytać razem.
 - **Źródłem z kodu jest tylko fragment zacytowany narzędziem `quote_code` jako przyczyna
   ([ADR-004](docs/adr/ADR-004_zrodlo-z-kodu-to-cytowana-przyczyna.md)).** Kod liczy się jako źródło
@@ -2752,7 +2752,7 @@ kontraktu grafów (2026-11-25). Tu zostają decyzje z ceną, liczby z sond i otw
   w nich agent, nie kod ([ADR-009](docs/adr/ADR-009_zgodnosc-przyczyn-ocenia-agent.md)).** Wynik
   to źródła z `cite()`, zapytania agenta z `messages` i uwagi (`SearchNotes.internal_notes`);
   źródła dalej powstają z odczytów, nie z uwag (zasada 9). Otwarte: czy uwagi mówią prawdę
-  o przeczytanych sprawach i ile mają mieć znaków (p. 23.3).
+  o przeczytanych sprawach i ile mają mieć znaków (p. 23).
 - **`search` sprawdza kod aplikacji w każdej sprawie o działaniu aplikacji, razem ze zgłoszeniami
   i instrukcjami (2026-10-11).** Pomija go tylko sprawa organizacyjna (konto, szkolenie, termin),
   a bez komunikatu wejściem są nazwy z ekranu. W `suggest_questions` i `suggest_solution` kod
@@ -2920,7 +2920,7 @@ Wdrożeniowiec wybiera rodzaj odpowiedzi. Trzy warianty startowe:
   pojedyncze przebiegi, nie pomiar.** Sprawa to 4–7 tur i około 0,02 USD; cache promptu obniża
   koszt mniej więcej o połowę, a stały początek (prompt i osiem narzędzi) to 3,6 tys. tokenów.
   Model czyta wątki wszystkich znalezionych zgłoszeń, także wbrew promptowi — na prawdziwych
-  wątkach to będzie główny koszt sprawy (p. 23–26). Reguła „instrukcje sprawdzasz zawsze" musi iść
+  wątkach to będzie główny koszt sprawy (p. 85, 25–26). Reguła „instrukcje sprawdzasz zawsze" musi iść
   w parze z regułą, że fakty wolno brać także z instrukcji: inaczej trop z instrukcji ląduje tylko
   w uwagach. Zapisy rozmów skasowane 2026-11-13; liczby zostają. Od 2026-10-05 każdy graf na
   węzłach właściwych jest testem `llm_live`; jeden przebieg na `gpt-6.1-sol` to osiem spraw,
@@ -3175,7 +3175,7 @@ w pliku wektorowym, bo stoją na tych samych 200 zgłoszeniach.
 - **Każde zapytanie ma dwa kształty: `query_raw` i `query_problem` + `query_symptoms`** (dopisane
   2026-10-03, także w dystraktorach). Drugi to kształt narzędzia `find_tickets_vector`, napisany
   **wyłącznie z `query_raw`, bez wglądu w rekord-cel**, według opisu narzędzia dla agenta. Zastępuje
-  zapytanie agenta do czasu pomiaru z p. 23, więc **nie wolno go poprawiać pod wynik**. Przez
+  zapytanie agenta do czasu pomiaru z p. 82, więc **nie wolno go poprawiać pod wynik**. Przez
   narzędzie daje rekord-cel na pierwszym miejscu w 119 ze 126 zapytań, a zwraca go w każdym;
   trafienie dostaje 7 z 16 dystraktorów (2026-10-23, karty `gpt-6.1-sol`). Na kartach Bielika
   było 152 ze 162 (93,8%, wobec 98,1% dla zapytań surowych), 160 zwróconych i 3 z 16
@@ -4071,7 +4071,7 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
 - **Kolejka do akceptacji kart z trasy zamknięcia (p. 30)** — karta idzie do indeksów od razu:
   człowiek zatwierdził już zamknięcie przy werdykcie bramki, kartę bez wiedzy zatrzymuje filtr, a
   złą naprawia ponowne zamknięcie albo przebudowa z plików. Wraca, gdy pomiary wyszukiwania
-  (p. 23) albo przegląd kart pokażą złe karty w indeksie.
+  (p. 81–85) albo przegląd kart pokażą złe karty w indeksie.
 - **Załączniki zgłoszeń** — tabela `zalacznik` w zrzucie trzyma same ścieżki, bez plików; wystarcza
   treść zgłoszenia i wątku.
 - **Sprawy procedury po stronie klienta** (skreślone 2026-11-11, dawny p. 39) — hasła w zrzucie
@@ -4083,7 +4083,7 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
   i wątków importu z etykietami golden200 i zapytaniami o częste komunikaty. P. 23 porównuje
   zapytania agenta z zapytaniami golden setu na jednym indeksie, a to porównanie zostaje uczciwe
   także na 141 kartach golden200; zawyżone są tylko liczby bezwzględne. Wraca, gdy pomiar ma podać
-  skuteczność produktu albo agent przy częstym komunikacie zgubi cel (p. 23.2).
+  skuteczność produktu albo agent przy częstym komunikacie zgubi cel (p. 83).
 - **Odrzucone pola karty.** Siedem wypadło przy przeglądzie z 2026-07-31 (17 pól → 10), bo pasowały
   do tego korpusu, a nie do produktu; dwa ostatnie nie weszły wcale:
   - `system` — stały przy zasadzie „jedna instancja = jeden produkt”;
@@ -4137,14 +4137,14 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
   ze zrzutem, a obraz `api` nie ma Dockera ani dostępu do tego kontenera; zrzuty są przejściowe,
   więc eksport zostaje skryptem (p. 34). Komendy na grafach skreślono 2026-10-16: wołalibyśmy je
   tylko my, trasy oddają koszt i log, a testy na żywym modelu całą rozmowę, więc komenda
-  powtarzałaby to, co trasa robi wokół grafu. Graf na pliku z eksportu wraca, gdy będą go potrzebować pomiary (p. 23); parsowanie korpusu
+  powtarzałaby to, co trasa robi wokół grafu. Graf na pliku z eksportu wraca, gdy będą go potrzebować pomiary (p. 81); parsowanie korpusu
   weszło komendą masowego importu (`helpdesk tickets import`, p. 31).
 - **Reguły bramek jako regexy albo lista słów zamiast modelu** — „potocznego słownictwa” ani „nie
   widać, co zrobiono” nie da się zapisać słownikiem. Mogą wrócić jako tani filtr przed modelem, gdy
   koszt zacznie boleć.
 - **Tryb strict narzędzi u OpenAI** — wymaga schematów, w których każde pole jest wymagane, a
   argumenty i tak sprawdza `run_tools`, który odsyła błąd modelowi. Wraca, gdy pomiar pokaże częste
-  błędne argumenty (p. 23).
+  błędne argumenty (p. 82–91).
 - **Poprawka albo blokada w wariancie wymagającym źródeł.** Gdy źródeł nie ma, wariant nie dostaje
   poprawki: to nie błąd formatu, a w sprawie bez podobnych zgłoszeń dodatkowa tura nic nie zmieni.
   Wraca, gdy pomiar pokaże, że model kończy przed odczytem (p. 26). Źródła `code` wariant nie
@@ -4347,7 +4347,7 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 - [x] **33. Przeliczenia na pełnym korpusie** (2026-11-20 – 2026-11-25) → „Historyczne
   zgłoszenia”, „Domena”, „Reguły parsowania”, „`questions_summary`”, „Ewaluacja bramek”,
   „Embeddingi”, „Warianty generacji”, „Świadomie pominięte”, „Commands”, „Helpery”;
-  `RAG_SCORE_MIN` w p. 23.2, porównanie embedderów w p. 40, „Popraw” w p. 80.
+  `RAG_SCORE_MIN` w p. 82, porównanie embedderów w p. 40, „Popraw” w p. 80.
 - [x] **34. Tryb odświeżania korpusu** (2026-11-20) → „Historyczne zgłoszenia”, „Świadomie
   pominięte”.
 
@@ -4357,51 +4357,71 @@ Po masowym imporcie (p. 31), na zanonimizowanych kartach i wątkach, na prawdziw
 i anonimizatorze. Każdy pomiar ≥2 przebiegi, z czytaniem surowych odpowiedzi i raportem z datą
 i wersją promptu; przy generacji do wyboru golden set odpowiedzi albo przegląd ręczny, a każdy
 wariant mierzy się osobno, bo warianty mają różne kryteria sukcesu. Opis narzędzia
-(`description.md`) jest wspólny dla grafów, więc opisy stroi p. 23 na grafie `search`, który ma
-wszystkie narzędzia, a p. 25–26 mierzą na opisach zamrożonych; zmiana opisu po p. 23 to ponowny
-pomiar p. 23, 25 i 26. Opisy narzędzi dokumentacji mierzy p. 55, na właściwej dokumentacji.
-Punkt grafu zamyka się po pracy nad promptem, scenariuszach z p. 59 na żywym modelu i zgrubnym
-teście ręcznym przez front (decyzja 2026-10-22); to, co w punkcie jest pomiarem na prawdziwym
-korpusie, przechodzi przy zamknięciu do p. 33.
+(`description.md`) jest wspólny dla grafów, więc opisy stroją p. 82–91 na grafie `search`, który
+ma wszystkie narzędzia, a p. 25–26 mierzą na opisach zamrożonych; zmiana opisu po zamknięciu
+jego punktu to ponowny przebieg `search` (przynajmniej na próbie) i pomiar p. 25–26. Opisy
+narzędzi dokumentacji mierzy p. 55, na właściwej dokumentacji. Punkt grafu zamyka się po pracy
+nad promptem, scenariuszach z p. 59 na żywym modelu i zgrubnym teście ręcznym przez front
+(decyzja 2026-10-22); to, co w punkcie jest pomiarem na prawdziwym korpusie, przechodzi przy
+zamknięciu do p. 33.
 
-- [ ] **23. `search` i opisy narzędzi** — prompt pętli i opisy narzędzi, które pętla woła;
-  w każdym materiale te same liczby na narzędzie, brane z rozmowy, nie z deklaracji modelu:
-  błędne argumenty i odmowy, wywołania ponad limit, reakcja na flagi wyniku (`cut_by_limit`,
-  `has_more_depth`), przepisywanie przykładów z tabelki argumentów i koszt opisów w stałym
-  początku żądania (osiem narzędzi to było 3,6 tys. tokenów, dziś jest czternaście); do tego,
-  czy długi tekst w wyniku JSON (wątek, sekcja instrukcji) czyta się modelowi gorzej niż goły.
-  Zestawy scenariuszy tych grafów (`reading`, `code`, a w p. 25–26 `questions` i `solution`)
-  dostają sprawę ze znacznikami anonimizacji z prawdziwego anonimizatora i ocenę z helpera
-  `markers`, jak bramki i „Popraw”: znacznik przekręcony w wyniku i znacznik w argumentach
-  narzędzi wyszukiwania to błędy z wymogiem zera (zasada w „Zasadach szczegółowych” grafów z narzędziami).
-  *Dlaczego:* najgroźniejszy błąd agenta to stop przy zgodnym objawie i rozłącznych przyczynach
-  (e-Doręczenia: 6 zgłoszeń, 6 przyczyn), a zapytanie agenta nie powstaje już promptem korpusu.
-  - [ ] **23.1 Narzędzia kodu** — ile kosztuje kod aplikacji sprawdzany w każdej sprawie
-    o działaniu aplikacji (reguła z p. 70); na kodzie Dokusa: jak często szukanie nazw z ekranu
-    trafia we właściwe miejsce i ile szukań zużywa, czy opis projektu (p. 65) to szukanie skraca
-    i czy odczyt symbolu (p. 73) pomaga w sprawach, w których model dziś nie dochodzi do miejsca.
-    Materiał już jest: paczka Dokusa i 9 przypadków w `code.json`.
-  - [ ] **23.2 Narzędzia zgłoszeń** — trafność zapytań pisanych przez agenta wobec zapytań
-    z parsera korpusu (golden set, `recall@1` i MRR; punkt odniesienia to pola `query_problem`
-    i `query_symptoms` golden setu — 119 ze 126 na pierwszym miejscu); wkład narzędzi `_text`
-    liczony osobno — czy znajdują coś, czego wektor nie znajduje, jest dziś niezmierzone; dwie
-    słabości `find_tickets_text` z zestawu tekstowego (2026-11-15): komunikat bez polskich znaków
-    chybia frazą i słowami, a słowa kontekstu nie zawężają częstego komunikatu, bo trafienia
-    frazą idą pierwsze — czy agent wpada w którąś z nich i czy go to kosztuje; czy
-    model czyta karty WSZYSTKICH znalezionych numerów, czy tylko pierwszego, i ile kosztuje
-    dodatkowa tura odczytu; na prawdziwych wątkach: ile wątków na sprawę (dziś 3), limit
-    długości wątku i czy wątek ma nieść etykiety z `as_thread()` („KOMENTARZ", rola, data);
-    `RAG_SCORE_MIN` przeliczony skryptem `eval_threshold.py` na kolekcji instancji, na
-    zapytaniach w kształcie narzędzia, z dystraktorami sprawdzonymi wobec jej kart (na kartach
-    `gpt-6.1-sol` golden200 przy progu 0.48 trafienie dostaje 7 z 16 dystraktorów, na kartach
-    Bielika 3 z 16).
-  - [ ] **23.3 Prompt `search`** — kiedy materiał wystarcza: pomiar pętli wobec wszystkich
-    narzędzi naraz (tryb bez pętli zostaje jako odniesienie i tryb awaryjny), w zestawie klastry
-    wieloprzyczynowe; czy uwagi dla wdrożeniowca mówią prawdę o przeczytanych sprawach i ile
-    mają mieć znaków; ile tur na sprawę (limit dziś 20, do ustawienia z rozkładu tur
-    w przebiegach); w sprawie organizacyjnej z 59.9 model czytał karty wszystkich pięciu
-    zgłoszeń z wyszukiwań, choć żadna sprawy nie dotyczyła, więc lista źródeł niosła materiał
-    bez związku (trzy przebiegi).
+**Punkty idą po kolei i każdy blokuje następny (decyzja 2026-11-27):** 81, potem narzędzia
+zgłoszeń drogą agenta (82–85: szukanie, potem odczyt), narzędzia kodu (86–91: opis, szukanie,
+spis, odczyt, cytowanie), prompt `search` (23) i warianty (25, 26). Następny zaczyna się po
+zamknięciu poprzedniego, bo zmiana opisu albo promptu zmienia to, jak agent używa pozostałych
+narzędzi, więc każdy punkt mierzy na zamrożonym wyniku poprzednich. Każdy punkt narzędzia liczy
+z rozmowy, nie z deklaracji modelu, te same liczby: błędne argumenty i odmowy, wywołania ponad
+limit, reakcję na flagi wyniku, przepisywanie przykładów z tabelki argumentów i koszt opisu
+w stałym początku żądania (osiem narzędzi to było 3,6 tys. tokenów, dziś jest czternaście).
+
+- [ ] **81. Przebieg wyjściowy `search`** — test ewaluacyjny grafu `search` na zapytaniach
+  golden200 z celem w indeksie i na 9 przypadkach `code.json` (paczka Dokusa), z raportem liczb
+  na narzędzie: wspólnych i tych, których potrzebują p. 82–91; dwa przebiegi, a przed nimi próba
+  na 10 sprawach z kosztem. Wymaga poda z anonimizatorem (RB-002). *Dlaczego:* punkty narzędzi
+  biorą liczby z tego samego przebiegu, a jego wynik jest odniesieniem dla każdej zmiany opisu.
+- [ ] **82. `find_tickets_vector`** — trafność zapytań pisanych przez agenta wobec zapytań
+  z golden setu (`recall@1` i MRR; odniesieniem są pola `query_problem` i `query_symptoms` —
+  119 ze 126 na pierwszym miejscu); `RAG_SCORE_MIN` przeliczony skryptem `eval_threshold.py` na
+  kolekcji instancji, na zapytaniach w kształcie narzędzia, z dystraktorami sprawdzonymi wobec
+  jej kart (na kartach `gpt-6.1-sol` golden200 przy progu 0.48 trafienie dostaje 7 z 16
+  dystraktorów, na kartach Bielika 3 z 16). *Dlaczego:* zapytanie agenta nie powstaje już
+  promptem korpusu, a próg to jedyne miejsce, w którym kod mówi „nic nie znaleziono”.
+- [ ] **83. `find_tickets_text`** — co znajduje, czego wektor nie znajduje (dziś niezmierzone),
+  i czy agent gubi trafienia po parafrazie z `cause` i `solution`, których w wątku nie ma; dwie
+  słabości z zestawu tekstowego (2026-11-15): komunikat bez polskich znaków chybia frazą
+  i słowami, a słowa kontekstu nie zawężają częstego komunikatu, bo trafienia frazą idą
+  pierwsze — czy agent wpada w którąś z nich i czy go to kosztuje.
+- [ ] **84. `read_tickets_card`** — czy model czyta karty WSZYSTKICH znalezionych numerów, czy
+  tylko pierwszego, i ile kosztuje dodatkowa tura odczytu.
+- [ ] **85. `read_tickets_thread`** — na prawdziwych wątkach: ile wątków na sprawę (dziś 3),
+  limit długości wątku, czy wątek ma nieść etykiety z `as_thread()` („KOMENTARZ", rola, data)
+  i czy długi tekst w wyniku JSON czyta się modelowi gorzej niż goły (to samo pytanie wraca
+  przy sekcjach instrukcji w p. 55).
+- [ ] **86. `describe_code`** — czy opis projektu (p. 65) skraca szukanie na kodzie Dokusa.
+- [ ] **87. `find_code_text`** — jak często szukanie nazw z ekranu trafia na kodzie Dokusa we
+  właściwe miejsce i ile szukań zużywa.
+- [ ] **88. `list_code_files`** — czy model czyta flagi spisu, które idą w przeciwnym kierunku
+  niż w odczycie pliku (`has_more_depth` mówi „jest coś głębiej”, `end_of_file` „dalej nic nie
+  ma”).
+- [ ] **89. `read_code_file`** — reakcja na `cut_by_limit`, którego w sondach model nie osiągnął,
+  i czy numer linii oddzielony tabulatorem nie miesza się modelowi z kodem.
+- [ ] **90. `read_code_symbol`** — czy odczyt symbolu (p. 73) pomaga w sprawach, w których model
+  dziś nie dochodzi do miejsca, i ile wywołań bez ścieżki kończy się listą kandydatów.
+- [ ] **91. `quote_code`** — na kodzie Dokusa: czy model cytuje tylko linie wcześniej odczytane
+  i czy wystarczają limity z sondy (fragment do 40 linii, 5 cytowań na sprawę).
+- [ ] **23. Prompt `search`** — kiedy materiał wystarcza: pomiar pętli wobec wszystkich
+  narzędzi naraz (tryb bez pętli zostaje jako odniesienie i tryb awaryjny), w zestawie klastry
+  wieloprzyczynowe; ile kosztuje kod aplikacji sprawdzany w każdej sprawie o działaniu aplikacji
+  (reguła z p. 70); czy uwagi dla wdrożeniowca mówią prawdę o przeczytanych sprawach i ile mają
+  mieć znaków; ile tur na sprawę (limit dziś 20, do ustawienia z rozkładu tur w przebiegach);
+  w sprawie organizacyjnej z 59.9 model czytał karty wszystkich pięciu zgłoszeń z wyszukiwań,
+  choć żadna sprawy nie dotyczyła, więc lista źródeł niosła materiał bez związku (trzy
+  przebiegi). Zestawy scenariuszy grafów z narzędziami (`reading`, `code`, a w p. 25–26
+  `questions` i `solution`) dostają sprawę ze znacznikami anonimizacji z prawdziwego
+  anonimizatora i ocenę z helpera `markers`, jak bramki i „Popraw”: znacznik przekręcony
+  w wyniku i znacznik w argumentach narzędzi wyszukiwania to błędy z wymogiem zera (zasada
+  w „Zasadach szczegółowych” grafów z narzędziami). *Dlaczego:* najgroźniejszy błąd agenta to
+  stop przy zgodnym objawie i rozłącznych przyczynach (e-Doręczenia: 6 zgłoszeń, 6 przyczyn).
 - [ ] **25. `suggest_questions`** — prompt z 6.3 przemierzony na modelu docelowym z placeholderami,
   z regułą zgodności przyczyny z objawem i z szerszą regułą sięgania po kod, tą samą co w p. 23
   (z nią do `code.json` wracają sprawy bez komunikatu na tym grafie); czy wyjątek dla hipotezy,

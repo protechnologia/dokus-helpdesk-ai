@@ -34,7 +34,7 @@ O czym pamiętać przy zmianach:
 - Wątek wraca z kolumny `thread`, czyli dosłowny, ze złamaniami linii i etykietami komentarzy.
   Tekst, w którym szuka `find_tickets_text`, ma białe znaki sprowadzone do spacji i do modelu
   nie idzie.
-- Narzędzie nie skraca wątku: limit długości pojedynczego wątku czeka na prawdziwe wątki (p. 23).
+- Narzędzie nie skraca wątku: limit długości pojedynczego wątku czeka na prawdziwe wątki (p. 85).
 - Numer znaleziony po karcie da się tu odczytać tylko wtedy, gdy tabela zgłoszeń ma to samo
   zgłoszenie — oba indeksy muszą powstawać z tego samego zestawu.
 """

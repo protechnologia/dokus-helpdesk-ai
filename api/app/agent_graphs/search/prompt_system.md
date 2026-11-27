@@ -25,7 +25,7 @@
      projektu (`describe_code`): mówi, w którym katalogu leży kod której części aplikacji, a
      nazw z ekranu model szuka już w tym katalogu. Opis jest ogólny i krótki; nie mówi, która
      funkcja co obsługuje. Zdanie na końcu akapitu o kodzie to przyzwolenie, nie nakaz, to samo
-     w trzech grafach. Czy opis skraca szukanie na kodzie Dokusa, liczy p. 23.
+     w trzech grafach. Czy opis skraca szukanie na kodzie Dokusa, liczy p. 86.
 
      Z kodu człowiek dostaje na liście źródeł tylko fragmenty zacytowane jako przyczyna, bo
      odczyt pliku źródła nie tworzy. Miejsca wykluczone docierają do niego przez uwagi.

@@ -29,7 +29,7 @@ O czym pamiętać przy zmianach:
 
 - `query_problem` i `query_symptoms` napisano z samego `query_raw`, bez wglądu w rekord-cel. Nie
   wolno ich poprawiać pod wynik: zastępują zapytanie agenta do czasu pomiaru na prawdziwym modelu
-  (p. 23).
+  (p. 82).
 - Indeksem jest osobna kolekcja golden setu, `tickets_golden`, a nie kolekcja instancji, bo ta
   trzyma karty pełnego korpusu (2026-11-13). Test jej nie buduje, bo indeks 200 kart liczy się na
   CPU ponad dwie i pół minuty; brakująca albo pusta kolekcja wywala test, a buduje ją razem

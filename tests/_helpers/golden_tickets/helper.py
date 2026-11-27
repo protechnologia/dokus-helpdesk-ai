@@ -27,7 +27,7 @@ O czym pamiętać przy zmianach:
   z indeksu i nie miałby jak wrócić.
 - `query_problem` i `query_symptoms` napisano z samego `query_raw`, bez wglądu w rekord-cel. Nie
   wolno ich poprawiać pod wynik: zastępują zapytanie agenta do czasu pomiaru na prawdziwym modelu
-  (p. 23).
+  (p. 82).
 - Pomiary czytają własną kolekcję i tabelę golden setu (`GOLDEN_COLLECTION`, `GOLDEN_TABLE`),
   a nie indeksy instancji, bo te trzymają pełny korpus (2026-11-13, tabela od 2026-11-15).
   Buduje je raz komenda z `BUILD_HINT`, a nie test, bo indeks 200 kart liczy się na CPU ponad

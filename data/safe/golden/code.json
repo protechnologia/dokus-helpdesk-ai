@@ -2,7 +2,7 @@
   "meta": {
     "name": "code-v1",
     "created": "2026-10-15",
-    "purpose": "Czy graf z narzędziami kodu (search, suggest_questions, suggest_solution) cytuje jako przyczynę plik, w którym stoi komunikat ze zgłoszenia, nie cytuje przyczyny, gdy komunikatu nie ma w kodzie nigdzie, i cytuje tylko linie, które wcześniej przeczytał — na żywym modelu, na prawdziwych narzędziach kodu na paczce aplikacji syntetycznej (p. 59). NIE mierzy trafności rozpoznania na kodzie Dokusa (p. 23): sprawy pisze autor promptów, a aplikacja syntetyczna ma kilkadziesiąt plików.",
+    "purpose": "Czy graf z narzędziami kodu (search, suggest_questions, suggest_solution) cytuje jako przyczynę plik, w którym stoi komunikat ze zgłoszenia, nie cytuje przyczyny, gdy komunikatu nie ma w kodzie nigdzie, i cytuje tylko linie, które wcześniej przeczytał — na żywym modelu, na prawdziwych narzędziach kodu na paczce aplikacji syntetycznej (p. 59). NIE mierzy trafności rozpoznania na kodzie Dokusa (p. 81): sprawy pisze autor promptów, a aplikacja syntetyczna ma kilkadziesiąt plików.",
     "rules": [
       "cases: lista spraw; graphs: grafy, na których sprawa idzie, każdy nazwany jak jego katalog w api/app/agent_graphs/ i z narzędziami kodu. Sprawa na kilku grafach to jeden wpis, a każdy graf przeprowadza ją osobno.",
       "Sprawy bez komunikatu (k03, k04) idą tylko w search: suggest_questions i suggest_solution sięgają po kod wyłącznie przy komunikacie, wpisie z logu albo kodzie błędu, których zgłoszenia i instrukcje nie tłumaczą (szerszą regułę stroją p. 25 i p. 26), więc nie miałyby tam z czego wymagać pliku. W suggest_solution sprawa bez przyczyny i bez innych źródeł kończy się samymi uwagami, bez treści dla klienta.",

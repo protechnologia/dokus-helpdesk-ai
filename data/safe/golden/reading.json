@@ -2,7 +2,7 @@
   "meta": {
     "name": "reading-v1",
     "created": "2026-10-15",
-    "purpose": "Czy graf z narzędziami wiedzy (search, suggest_questions, suggest_solution) czyta to, co znalazł — na żywym modelu, na materiale atrap narzędzi (p. 59.9). Atrapy wyszukiwań oddają zawsze ten sam wynik, więc zestaw mierzy czytanie znalezionego materiału, NIE jakość szukania (p. 23) ani trafność odpowiedzi.",
+    "purpose": "Czy graf z narzędziami wiedzy (search, suggest_questions, suggest_solution) czyta to, co znalazł — na żywym modelu, na materiale atrap narzędzi (p. 59.9). Atrapy wyszukiwań oddają zawsze ten sam wynik, więc zestaw mierzy czytanie znalezionego materiału, NIE jakość szukania (p. 81) ani trafność odpowiedzi.",
     "rules": [
       "cases: jedna lista spraw; każda wymienia w graphs grafy z narzędziami wiedzy, na których idzie, każdy raz.",
       "Materiał to atrapy narzędzi (api/app/agent_tools/tickets/fake_tickets.py, api/app/agent_tools/docs/fake_docs.py): wyszukiwanie po znaczeniu oddaje zgłoszenia 90001–90003, czyli jeden objaw „nie przychodzą przesyłki z e-Doręczeń” i trzy rozłączne przyczyny — zacięta kolejka (90001), plik blokady po aktualizacji (90002), załącznik ponad limit operatora (90003) — a wyszukiwanie w dokumentacji sekcję o uprawnieniu do kancelarii e-Doręczeń i dystraktor o skrzynce ePUAP.",

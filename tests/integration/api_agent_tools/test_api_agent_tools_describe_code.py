@@ -21,7 +21,7 @@ O czym pamiętać przy zmianach:
   zapytania, a model ma dostać błąd w miejscu wyniku.
 - Opis aplikacji syntetycznej ma dwa zdania i pilnuje okablowania: że tekst dociera do modelu
   bez zmian, a jego katalogi istnieją w paczce. Czy opis pomaga w szukaniu, pokaże dopiero kod
-  Dokusa (CLAUDE.md -> p. 23).
+  Dokusa (CLAUDE.md -> p. 86).
 - Nowy przypadek dopisuje się w zestawie, nie tutaj.
 """
 
