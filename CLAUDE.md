@@ -2384,7 +2384,7 @@ Osoby i adresy idą osobnymi wywołaniami: wspólne kosztowało na próbce korpu
   także teraz, gdy model widzi `score` i czyta karty sam (2026-10-04): to jedyne miejsce, w którym
   KOD mówi „nic nie znaleziono" — bez niego wyszukiwanie zawsze oddaje komplet numerów, źródła
   zawsze są, a `requires_hits` nic nie znaczy. Może za to stać niżej, bo ma odcinać tylko oczywiste
-  śmieci (do przeliczenia w p. 79). Trzy pułapki strojenia:
+  śmieci (do przeliczenia w p. 23.2). Trzy pułapki strojenia:
   - **Nie stroi się go liczbą „ile procent zachowanych"** — krótkie teksty mają niski score mimo
     idealnego dopasowania (0,455 przy niemal tym samym zdaniu), więc z pięciu traconych zapytań
     cztery stały na pierwszym miejscu. Zawsze `eval_threshold.py detail` przed zmianą wartości.
@@ -2394,7 +2394,7 @@ Osoby i adresy idą osobnymi wywołaniami: wspólne kosztowało na próbce korpu
   - **Zmierzony na zapytaniach surowych, a agent pyta w kształcie korpusu.** Taki kształt
     upodabnia do korpusu także zapytania bez odpowiednika: w sondzie z 2026-08-20 przy 0.48
     przechodziło 29 z 80 trafień dystraktorów zamiast 2 z 80, a trafienia poprawne nie cierpiały.
-    Odpowiednik dzisiejszego wyboru to okolice 0.52 — do przeliczenia w p. 79.
+    Odpowiednik dzisiejszego wyboru to okolice 0.52 — do przeliczenia w p. 23.2.
 
 ### Warstwa wyszukiwania tekstowego (Postgres)
 
@@ -3148,7 +3148,7 @@ w pliku wektorowym, bo stoją na tych samych 200 zgłoszeniach.
   błędu ma tylko 19 przyjętych zgłoszeń, więc przypadek częstego komunikatu, który przy wynikach
   od najnowszych wypycha cel poza limit, prawie w nim nie występuje. Ręczne etykiety przenoszą
   się na karty importu prawie bez strat (z 135 z wiedzą filtr przyjął 131, z 65 bez wiedzy
-  odrzucił 56). Pełny golden z korpusu importu to p. 79.
+  odrzucił 56).
 - **Zestaw tekstowy to `data/unsafe/golden/tickets-text.json` (2026-11-15, p. 31): 23 zapytania
   w kształcie `find_tickets_text` do wątków golden200 i 6 bez celu, na tabeli
   `tickets_text_golden`.** Cel to zgłoszenie, z którego wątku wzięto komunikat albo kod, i tylko
@@ -4079,6 +4079,11 @@ czegoś z tej listy — zapytaj, zamiast wprowadzać.
   zgłoszeń). Tych spraw nie prowadzimy: naprawia je procedura klienta, nie nasz kod. Po naszej
   stronie eksport nie czyta kolumn z hasłami, wiadomość do klienta z hasłem zatrzymuje bramka
   wysyłki (reguła 6), a sekrety w treści zgłoszeń czekają na detektor (p. 20).
+- **Golden set z korpusu importu** (skreślony 2026-11-27, dawny p. 79) — zamrożona kopia kart
+  i wątków importu z etykietami golden200 i zapytaniami o częste komunikaty. P. 23 porównuje
+  zapytania agenta z zapytaniami golden setu na jednym indeksie, a to porównanie zostaje uczciwe
+  także na 141 kartach golden200; zawyżone są tylko liczby bezwzględne. Wraca, gdy pomiar ma podać
+  skuteczność produktu albo agent przy częstym komunikacie zgubi cel (p. 23.2).
 - **Odrzucone pola karty.** Siedem wypadło przy przeglądzie z 2026-07-31 (17 pól → 10), bo pasowały
   do tego korpusu, a nie do produktu; dwa ostatnie nie weszły wcale:
   - `system` — stały przy zasadzie „jedna instancja = jeden produkt”;
@@ -4342,7 +4347,7 @@ Numeracja dawnej roadmapy zostaje, bo odwołują się do niej sekcje wyżej („
 - [x] **33. Przeliczenia na pełnym korpusie** (2026-11-20 – 2026-11-25) → „Historyczne
   zgłoszenia”, „Domena”, „Reguły parsowania”, „`questions_summary`”, „Ewaluacja bramek”,
   „Embeddingi”, „Warianty generacji”, „Świadomie pominięte”, „Commands”, „Helpery”;
-  `RAG_SCORE_MIN` w p. 79, porównanie embedderów w p. 40, „Popraw” w p. 80.
+  `RAG_SCORE_MIN` w p. 23.2, porównanie embedderów w p. 40, „Popraw” w p. 80.
 - [x] **34. Tryb odświeżania korpusu** (2026-11-20) → „Historyczne zgłoszenia”, „Świadomie
   pominięte”.
 
@@ -4358,20 +4363,6 @@ pomiar p. 23, 25 i 26. Opisy narzędzi dokumentacji mierzy p. 55, na właściwej
 Punkt grafu zamyka się po pracy nad promptem, scenariuszach z p. 59 na żywym modelu i zgrubnym
 teście ręcznym przez front (decyzja 2026-10-22); to, co w punkcie jest pomiarem na prawdziwym
 korpusie, przechodzi przy zamknięciu do p. 33.
-
-- [ ] **79. Golden set z korpusu importu** (przed p. 23, od 2026-11-20 w planie, wcześniej „Na
-  później”) — zamrożona kopia `cards/` i `anonymized/` importu w układzie korpusu: etykiety
-  i zapytania wektorowe golden200 przepięte na jej karty, około 40 zapytań tekstowych
-  z komunikatami z wielu wątków, własna kolekcja i tabela, nowe progi; do tego `RAG_SCORE_MIN`
-  przeliczony na zapytaniach w kształcie narzędzia, z dystraktorami sprawdzonymi wobec kart
-  indeksu (na kartach `gpt-6.1-sol` golden200 trafienie dostaje 7 z 16 dystraktorów, na kartach
-  Bielika 3 z 16, przy tym samym progu 0.48). Wszystkie 200 zgłoszeń golden200 są w korpusie,
-  etykieta zgadza się z oceną karty importu w 191 (9 do przejrzenia: 6 kart przyjętych wbrew
-  etykiecie, 3 odrzucone), a cel ma w indeksie 123 ze 126 zapytań. *Dlaczego:* golden200 jest
-  z lipcowego zrzutu, szuka wśród 141 kart zamiast 1115 i ma za mało powtarzających się
-  komunikatów, żeby zmierzyć największą słabość wyszukiwania tekstowego: częsty komunikat
-  wypycha cel poza limit wyników. Cena: około 25 minut liczenia wektorów na CPU, a stare liczby
-  przestają być porównywalne.
 
 - [ ] **23. `search` i opisy narzędzi** — prompt pętli i opisy narzędzi, które pętla woła;
   w każdym materiale te same liczby na narzędzie, brane z rozmowy, nie z deklaracji modelu:
@@ -4399,7 +4390,11 @@ korpusie, przechodzi przy zamknięciu do p. 33.
     frazą idą pierwsze — czy agent wpada w którąś z nich i czy go to kosztuje; czy
     model czyta karty WSZYSTKICH znalezionych numerów, czy tylko pierwszego, i ile kosztuje
     dodatkowa tura odczytu; na prawdziwych wątkach: ile wątków na sprawę (dziś 3), limit
-    długości wątku i czy wątek ma nieść etykiety z `as_thread()` („KOMENTARZ", rola, data).
+    długości wątku i czy wątek ma nieść etykiety z `as_thread()` („KOMENTARZ", rola, data);
+    `RAG_SCORE_MIN` przeliczony skryptem `eval_threshold.py` na kolekcji instancji, na
+    zapytaniach w kształcie narzędzia, z dystraktorami sprawdzonymi wobec jej kart (na kartach
+    `gpt-6.1-sol` golden200 przy progu 0.48 trafienie dostaje 7 z 16 dystraktorów, na kartach
+    Bielika 3 z 16).
   - [ ] **23.3 Prompt `search`** — kiedy materiał wystarcza: pomiar pętli wobec wszystkich
     narzędzi naraz (tryb bez pętli zostaje jako odniesienie i tryb awaryjny), w zestawie klastry
     wieloprzyczynowe; czy uwagi dla wdrożeniowca mówią prawdę o przeczytanych sprawach i ile
@@ -4483,8 +4478,8 @@ korpusie, przechodzi przy zamknięciu do p. 33.
   hooka bramek nikt nie woła, a o fail-open decyduje tamta strona.
 - [ ] **40. Licencja PolDense (gemma).** *Dlaczego:* licencja idzie od modelu-nauczyciela
   (destylacja z BGE-Multilingual-Gemma2), więc wybór embeddera jest też decyzją licencyjną.
-  Gdy licencja nie przejdzie, wraca porównanie embedderów na pełnym korpusie, na golden secie
-  z p. 79 (`scripts/eval_embeddings.py`). Do sprawdzenia także licencja modelu anonimizującego
+  Gdy licencja nie przejdzie, wraca porównanie embedderów na pełnym korpusie, z zapytaniami
+  golden200 (`scripts/eval_embeddings.py`). Do sprawdzenia także licencja modelu anonimizującego
   (Bielik 11B v3).
 - [ ] **41. Pomiar po stronie użytkownika** — ilu wdrożeniowców, ile czasu tracą na szukanie.
   *Dlaczego:* wszystkie dotychczasowe pomiary dotyczą korpusu, nie ludzi.
@@ -4526,8 +4521,8 @@ Rzeczy odłożone świadomie, bez miejsca w kolejności planu. Każdy punkt: cel
 - [ ] **78. Pomiar anonimizatora na wątkach spoza strojenia** — około 30 wątków korpusu spoza
   golden setu, dobranych warstwami, zaznaczonych przez model i przejrzanych przez człowieka;
   jeden przebieg `llm_live` bez strojenia. *Dlaczego:* silnik stroiliśmy na zestawie, na którym
-  mierzymy, więc „bez przecieku" jest wynikiem optymistycznym. Wraca z p. 79 albo przy
-  podejrzeniu przecieku.
+  mierzymy, więc „bez przecieku" jest wynikiem optymistycznym. Wraca przy podejrzeniu
+  przecieku.
 - [ ] **80. „Popraw” na prawdziwych notatkach** (odłożony 2026-11-20) — brak nowych faktów na
   prawdziwych notatkach wdrożeniowców, bo z promptu wypadły osobne zasady o dopiskach
   i znacznikach, oraz decyzja, czy „Popraw” zostaje w zakresie. *Dlaczego odłożony:* w korpusie
