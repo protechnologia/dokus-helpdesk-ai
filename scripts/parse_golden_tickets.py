@@ -5,7 +5,7 @@ Do czego:
     Pomiary filtra jakości i wyszukiwania stoją na kartach golden setu
     w `data/unsafe/golden/cards/`. Gdy zmienia się prompt parsujący, kontrakt karty albo model,
     te karty trzeba policzyć od nowa.
-    Skrypt bierze numery zgłoszeń z golden setu (`data/unsafe/golden/tickets-vector.json`),
+    Skrypt bierze numery zgłoszeń z golden setu (`data/unsafe/golden/tool-tickets-vector.json`),
     czyta ich wątki z `data/unsafe/golden/raw-db/` i parsuje każdy tą samą drogą co trasa
     `/parse-ticket`: anonimizator, potem model generujący z `.env`. Karty idą do nowego katalogu
     roboczego, a katalog odniesienia zastępują dopiero wtedy, gdy człowiek je przyjmie.
@@ -96,7 +96,7 @@ from app.engine_anonymization import (  # noqa: E402
 from app.engine_llm import LLMConfigError, LLMError, get_llm_client  # noqa: E402
 
 # Golden set zgłoszeń: wpis na każde zgłoszenie i w metryczce katalog kart odniesienia.
-GOLDEN_DEFAULT = REPO_ROOT / "data" / "unsafe" / "golden" / "tickets-vector.json"
+GOLDEN_DEFAULT = REPO_ROOT / "data" / "unsafe" / "golden" / "tool-tickets-vector.json"
 
 # Usługa `anonymizer` z hosta — zgodne z DOCKER_ANONYMIZER_PORT w `.env.example`.
 ANONYMIZER_URL_DEFAULT = "http://localhost:8002"
@@ -126,7 +126,7 @@ def main() -> None:
 
 
 def golden_tickets(
-    golden: pathlib.Path,  # np. Path("data/unsafe/golden/tickets-vector.json")
+    golden: pathlib.Path,  # np. Path("data/unsafe/golden/tool-tickets-vector.json")
 ) -> tuple[list[str], TicketsCorpus]:
     """
     Description:
@@ -135,7 +135,7 @@ def golden_tickets(
     W nim leżą eksport (`raw-db/`), karty (`cards/`) i wątki po anonimizacji (`anonymized/`).
 
     Example args:
-        golden=Path("data/unsafe/golden/tickets-vector.json")
+        golden=Path("data/unsafe/golden/tool-tickets-vector.json")
 
     Example result:
         (["10012", "10170", …], TicketsCorpus(root=Path("/…/data/unsafe/golden")))
@@ -297,7 +297,7 @@ def parse(
 
     Example args:
         out_dir=Path("data/unsafe/golden-gpt-6.1-sol-v3/cards")
-        golden=Path("data/unsafe/golden/tickets-vector.json")
+        golden=Path("data/unsafe/golden/tool-tickets-vector.json")
         anonymizer_url="http://localhost:8002"
         concurrency=4
         limit=None
@@ -462,7 +462,7 @@ def anonymize(
     kodem 1, gdy któreś zgłoszenie się nie udało, a kodem 2 przy błędzie konfiguracji.
 
     Example args:
-        golden=Path("data/unsafe/golden/tickets-vector.json")
+        golden=Path("data/unsafe/golden/tool-tickets-vector.json")
         anonymizer_url="http://localhost:8002"
         concurrency=4
         limit=None

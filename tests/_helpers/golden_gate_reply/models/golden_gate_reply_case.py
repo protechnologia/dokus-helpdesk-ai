@@ -5,7 +5,7 @@ from tests._helpers.golden_gate_reply.models.rule_violation import RuleViolation
 
 @dataclasses.dataclass(frozen=True)
 class GoldenGateReplyCase:
-    """Wiadomość z zestawu bramki wysyłki (`gate-reply.json`): skąd wzięta i które reguły
+    """Wiadomość z zestawu bramki wysyłki (`graph-gate-reply.json`): skąd wzięta i które reguły
     wysyłki łamie według oceniających."""
 
     ticket_id:  str                        # np. "23921"

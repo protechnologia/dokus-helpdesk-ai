@@ -9,7 +9,7 @@ from pathlib import Path
 
 # Zestaw: wiadomości konsultantów z korpusu instancji z etykietami na każdą regułę bramki. Dane
 # klienta, poza repo.
-GOLDEN_FILE = Path("data/unsafe/golden/gate-reply.json")
+GOLDEN_FILE = Path("data/unsafe/golden/graph-gate-reply.json")
 
 # Wątki po anonimizacji, z których test wycina wejście bramki: ten sam tekst, który poszedł do
 # modelu przy masowym imporcie.

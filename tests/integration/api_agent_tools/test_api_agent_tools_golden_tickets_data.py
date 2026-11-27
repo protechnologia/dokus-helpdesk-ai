@@ -1,9 +1,9 @@
 """
 Description:
-Spójność golden setu zgłoszeń (`data/unsafe/golden/tickets-vector.json`) z korpusem odniesienia,
-bez stacku i bez modelu. Na tym pliku stoją dwa pomiary: wyszukiwania po znaczeniu (zapytania,
-`find_tickets_vector`) i filtra jakości (etykiety `useful`). Etykiety i liczniki poprawia się
-ręcznie, a pomyłka w nich nie daje błędu, tylko fałszywy wynik pomiaru.
+Spójność golden setu zgłoszeń (`data/unsafe/golden/tool-tickets-vector.json`) z korpusem
+odniesienia, bez stacku i bez modelu. Na tym pliku stoją dwa pomiary: wyszukiwania po znaczeniu
+(zapytania, `find_tickets_vector`) i filtra jakości (etykiety `useful`). Etykiety i liczniki
+poprawia się ręcznie, a pomyłka w nich nie daje błędu, tylko fałszywy wynik pomiaru.
 
 | warunek                                              | czym grozi jego brak                    |
 |------------------------------------------------------|-----------------------------------------|

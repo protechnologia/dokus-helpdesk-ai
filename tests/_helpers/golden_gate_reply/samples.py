@@ -18,7 +18,8 @@ O czym pamiętać przy zmianach:
 
 - Próbek nie wystawia `__init__.py` pakietu: test helpera importuje je z tego modułu, żeby test
   na żywym modelu nie wziął przez pomyłkę danych testu jednostkowego.
-- Dane są zmyślone i nie mają nic wspólnego z zestawem `gate-reply.json`, który leży poza repo.
+- Dane są zmyślone i nie mają nic wspólnego z zestawem `graph-gate-reply.json`, który leży poza
+  repo.
 """
 
 from collections.abc import Sequence

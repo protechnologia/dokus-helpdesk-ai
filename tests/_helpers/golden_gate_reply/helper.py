@@ -1,6 +1,6 @@
 """
 Description:
-Zestaw bramki wysyłki na prawdziwych wiadomościach (`gate-reply.json`, p. 33.3). Wpis to jedna
+Zestaw bramki wysyłki na prawdziwych wiadomościach (`graph-gate-reply.json`, p. 33.3). Wpis to jedna
 wiadomość konsultanta z korpusu instancji: zgłoszenie, numer komentarza, warstwa doboru, skrót
 wiadomości i reguły, które według oceniających łamie, każda z powodem. Wejście bramki test wycina
 z wątku po anonimizacji, tak jak stoi w korpusie.

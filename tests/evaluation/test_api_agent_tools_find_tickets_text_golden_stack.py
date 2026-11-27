@@ -20,7 +20,7 @@ Co się dzieje po drodze:
 
 1. `measure_tickets_text()` z `tests/_helpers/golden_tickets/` sprawdza, że tabela
    `tickets_text_golden` trzyma dokładnie wątki kart golden setu przyjętych przez filtr jakości.
-2. Każde zapytanie z `data/unsafe/golden/tickets-text.json` (23 z celem, 6 bez celu) idzie do
+2. Każde zapytanie z `data/unsafe/golden/tool-tickets-text.json` (23 z celem, 6 bez celu) idzie do
    `FindTicketsTextTool` polami `exact` i `words`, z `RAG_TOP_K` z konfiguracji.
 3. Liczy, ile razy cel wrócił jako pierwszy, ile razy wrócił w ogóle i ile zapytań bez celu
    dostało choć jedno trafienie.

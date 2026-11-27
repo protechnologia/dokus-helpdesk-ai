@@ -102,8 +102,9 @@ sys.path.insert(0, str(REPO_ROOT / "api"))
 
 from app.db_qdrant.point.tickets import VECTOR_PROBLEM  # noqa: E402  (po sys.path)
 
-DEFAULT_GOLDEN      = REPO_ROOT / "data" / "unsafe" / "golden" / "tickets-vector.json"
-DEFAULT_DISTRACTORS = REPO_ROOT / "data" / "unsafe" / "golden" / "tickets-vector-distractors.json"
+GOLDEN_DIR          = REPO_ROOT / "data" / "unsafe" / "golden"
+DEFAULT_GOLDEN      = GOLDEN_DIR / "tool-tickets-vector.json"
+DEFAULT_DISTRACTORS = GOLDEN_DIR / "tool-tickets-vector-distractors.json"
 
 # Adresy z HOSTA, nie z sieci compose: skrypt chodzi obok stacku.
 DEFAULT_EMBEDDER = "http://localhost:8001"
@@ -143,7 +144,7 @@ HELP_PLOT   = "Wykres obu rozkładów score z zaznaczoną linią progu — zapis
 
 
 def _load_queries(
-    golden_path: pathlib.Path,  # e.g. Path("data/unsafe/golden/tickets-vector.json")
+    golden_path: pathlib.Path,  # e.g. Path("data/unsafe/golden/tool-tickets-vector.json")
 ) -> list[dict]:
     """
     Description:
@@ -151,7 +152,7 @@ def _load_queries(
     z numerem swojego zgłoszenia.
 
     Example args:
-        golden_path=Path("data/unsafe/golden/tickets-vector.json")
+        golden_path=Path("data/unsafe/golden/tool-tickets-vector.json")
 
     Example result:
         [{"ticket_id": "5641", "query_raw": "Dzień dobry, nie mogę…", …}]
@@ -167,14 +168,14 @@ def _load_queries(
 
 
 def _load_distractors(
-    distractors_path: pathlib.Path,  # e.g. Path("data/…/tickets-vector-distractors.json")
+    distractors_path: pathlib.Path,  # e.g. Path("data/…/tool-tickets-vector-distractors.json")
 ) -> list[dict]:
     """
     Description:
     Reads distractor queries — the ones whose correct answer is NO hit at all.
 
     Example args:
-        distractors_path=Path("data/unsafe/golden/tickets-vector-distractors.json")
+        distractors_path=Path("data/unsafe/golden/tool-tickets-vector-distractors.json")
 
     Example result:
         [{"id": "D01", "class": "spoza_modulu", "query_raw": "Dzień dobry, w Kartach…"}]
@@ -406,8 +407,8 @@ def main() -> None:
 
 def _measure(
     collection:  str,           # e.g. "tickets"
-    golden:      pathlib.Path,  # e.g. Path("data/unsafe/golden/tickets-vector.json")
-    distractors: pathlib.Path,  # e.g. Path("data/unsafe/golden/tickets-vector-distractors.json")
+    golden:      pathlib.Path,  # e.g. Path("data/unsafe/golden/tool-tickets-vector.json")
+    distractors: pathlib.Path,  # e.g. Path("data/…/tool-tickets-vector-distractors.json")
     embedder:    str,           # e.g. "http://localhost:8001"
     qdrant:      str,           # e.g. "http://localhost:6333"
     top_k:       int,           # e.g. 5
@@ -422,8 +423,8 @@ def _measure(
 
     Example args:
         collection="tickets"
-        golden=Path("data/unsafe/golden/tickets-vector.json")
-        distractors=Path("data/unsafe/golden/tickets-vector-distractors.json")
+        golden=Path("data/unsafe/golden/tool-tickets-vector.json")
+        distractors=Path("data/unsafe/golden/tool-tickets-vector-distractors.json")
         top_k=5
 
     Example result:

@@ -1123,7 +1123,7 @@ dokumentacji jeszcze nie ma (p. 55) — indeksacja i narzędzia powstają na pac
   paczki syntetycznej trwa na CPU ponad minutę. Słowo „import" zostaje dla masowego importu
   zgłoszeń (p. 31), który jest czymś innym: parsowaniem korpusu modelem.
 - **Paczka syntetyczna (2026-10-04):** dwa zmyślone dokumenty, 27 sekcji, `synthetic: true`,
-  z zestawem 61 zapytań do obu wyszukiwań w `data/safe/golden/docs-tools.json`. Mierzy
+  z zestawem 61 zapytań do obu wyszukiwań w `data/safe/golden/tool-docs.json`. Mierzy
   okablowanie narzędzi, nie skuteczność, i nie może trafić do właściwego indeksu. Ma własny:
   `helpdesk docs index --synthetic` pisze do tabeli `docs_text_synthetic` i kolekcji o nazwie
   z dopiskiem `_synthetic`, a flaga komendy i `synthetic` w manifeście muszą się zgadzać w obie
@@ -1357,7 +1357,7 @@ roboczej gałęzi jednego klienta, a paczka powstała z innej gałęzi.
   2026-10-15 `code-dokus.json`). Opisy zachowania zatwierdza osoba znająca Dokusa; do tego czasu przypadek ma
   `behaviour_confirmed: false`.
 - **Zestaw do aplikacji syntetycznej ma inny kształt, bo służy testom bez modelu (2026-10-07).**
-  `data/safe/golden/code-tools.json` trzyma sekcję na narzędzie: 74 zapytania w kształcie
+  `data/safe/golden/tool-code.json` trzyma sekcję na narzędzie: 74 zapytania w kształcie
   narzędzia z oczekiwanym wynikiem, oraz listę plików, których paczka nie może zawierać.
   Zgłoszeń w nim nie ma: testowi bez modelu nic nie dają, bo zamiana zgłoszenia na wywołania
   narzędzi to praca modelu. Kształty zapytań pochodzą z planu i prototypów, więc sekcję
@@ -1688,7 +1688,7 @@ merytorycznie").
   danych osobowych w uzasadnieniach, 2–7,5 s i około 0,003 USD na sprawę; do tego test ręczny
   przez front. Na regułach w wersji 2 (2026-11-25) 24 scenariusze dały 0 fałszywych alarmów
   z 15 i 0 przepuszczeń z 9 w dwóch przebiegach, a wstrzyknięcia 0 przebić z 9.
-- **Zestaw prawdziwych zamknięć: `data/unsafe/golden/gate-close.json` (2026-11-20, p. 33.2).**
+- **Zestaw prawdziwych zamknięć: `data/unsafe/golden/graph-gate-close.json` (2026-11-20, p. 33.2).**
   120 zamknięć z korpusu instancji, warstwami: 10 najdłuższych wątków, 10 z kanału „Automat
   mailowy”, 40 z kart odrzuconych przez filtr i 60 losowych; ocen z badania jakości
   z 2026-09-02 nie użyto, bo skasowano je 2026-11-13. Wejście bramki to wątek
@@ -1766,7 +1766,7 @@ merytorycznie").
   p. 33.3): prośba o login i hasło we własnym cudzysłowie konsultanta (g28) zablokowana, a cytat
   komunikatu z ekranu ze słowami „login i hasło” (g29) przepuszczony, w obu przebiegach (cały
   zestaw: 0 z 17 i 0 z 12).
-- **Zestaw prawdziwych wiadomości: `data/unsafe/golden/gate-reply.json` (2026-11-25, p. 33.3).**
+- **Zestaw prawdziwych wiadomości: `data/unsafe/golden/graph-gate-reply.json` (2026-11-25, p. 33.3).**
   179 wiadomości konsultantów ze 179 zgłoszeń korpusu instancji, poza kanałem „Automat mailowy”,
   w którym rola z bazy nie mówi, kto pisał (pula: 2630 komentarzy w 1707 wątkach). Warstwy: 44 ze
   słowem przy regułach 1, 2, 4 albo 6 (hasło, login, token, klucz…, także pułapki w rodzaju hasła
@@ -3111,23 +3111,25 @@ dobre rozwiązanie: pierwsze mają trafiać w niewiadome, drugie w sprawdzony kr
 Zestaw to **syntetyczne zapytania**, nie pary historycznych zgłoszeń: produkt bierze nowe
 zgłoszenie i szuka podobnych, więc para `ticket ↔ ticket` mierzyłaby coś, czego produkt nie robi.
 Uboczny zysk: znika problem singletonów (47% rekordów nie ma bliskiego sąsiada), bo **zapytanie
-dostaje każdy rekord**. Pliki: `data/unsafe/golden/tickets-vector.json` (200 wpisów: 135 z wiedzą,
+dostaje każdy rekord**. Pliki: `data/unsafe/golden/tool-tickets-vector.json` (200 wpisów: 135 z wiedzą,
 65 bez i 126 zapytań; do 2026-10-10 `golden200.json`, do 2026-10-15 `tickets-dokus.json`, do
-2026-11-15 `tickets.json`), karty `data/unsafe/golden/cards/` (200 kart `gpt-6.1-sol`
-z 2026-10-23; do 2026-11-11 w `data/unsafe/parsed/gpt-6.1-sol-golden200-v2/`, a wcześniej karty
-Bielika, skasowane) i dystraktory `data/unsafe/golden/tickets-vector-distractors.json` (wcześniej
-`distractors.json`, `tickets-dokus-distractors.json` i `tickets-distractors.json`) — materiał
-wielokrotnego użytku przy każdej zmianie modelu. „Golden200" zostaje nazwą próbki 200 zgłoszeń.
-Dopisek `-vector` od 2026-11-15: obok staje zestaw wyszukiwania tekstowego w wątkach golden setu
-(p. 31), a dwa pliki `tickets*` nie mówiłyby, który mierzy co. Etykiety filtra jakości zostają
-w pliku wektorowym, bo stoją na tych samych 200 zgłoszeniach.
+2026-11-15 `tickets.json`, do 2026-11-27 `tickets-vector.json`), karty `data/unsafe/golden/cards/`
+(200 kart `gpt-6.1-sol` z 2026-10-23; do 2026-11-11 w
+`data/unsafe/parsed/gpt-6.1-sol-golden200-v2/`, a wcześniej karty Bielika, skasowane)
+i dystraktory `data/unsafe/golden/tool-tickets-vector-distractors.json` (wcześniej
+`distractors.json`, `tickets-dokus-distractors.json`, `tickets-distractors.json`
+i `tickets-vector-distractors.json`) — materiał wielokrotnego użytku przy każdej zmianie modelu.
+„Golden200" zostaje nazwą próbki 200 zgłoszeń. Dopisek `-vector` od 2026-11-15: obok staje zestaw
+wyszukiwania tekstowego w wątkach golden setu (p. 31), a dwa pliki `tickets*` nie mówiłyby, który
+mierzy co; przedrostek `tool-` od 2026-11-27. Etykiety filtra jakości zostają w pliku wektorowym,
+bo stoją na tych samych 200 zgłoszeniach.
 
 - **Karty golden setu zastępuje się w całości, po przyjęciu (2026-11-11).** Jest jeden katalog kart,
   bez nazwy modelu w ścieżce: model i datę zapisuje ten opis, bo karty nie mają pola z modelem. Nowe
   parsowanie (`scripts/parse_golden_tickets.py`) idzie do `cards/` w osobnym katalogu roboczym, bo
   komendy `helpdesk tickets` biorą katalog korpusu, a `golden/cards/` zastępuje dopiero po
   porównaniu pomiarów na obu; stare karty nie zostają obok. Numery zgłoszeń skrypt bierze z
-  `tickets-vector.json`, a katalog kart z jego metryczki (`meta.corpus_dir`).
+  `tool-tickets-vector.json`, a katalog kart z jego metryczki (`meta.corpus_dir`).
 - **Wątki golden setu leżą w `golden/raw-db/` (2026-11-11, do 2026-11-15 w `golden/raw/`):**
   200 plików z eksportu lipcowego zrzutu, z których powstały karty i na których przeglądano
   etykiety. Katalog nazywa się jak w korpusie, więc `golden/` ma układ korpusu, a skrypt golden
@@ -3149,7 +3151,7 @@ w pliku wektorowym, bo stoją na tych samych 200 zgłoszeniach.
   od najnowszych wypycha cel poza limit, prawie w nim nie występuje. Ręczne etykiety przenoszą
   się na karty importu prawie bez strat (z 135 z wiedzą filtr przyjął 131, z 65 bez wiedzy
   odrzucił 56).
-- **Zestaw tekstowy to `data/unsafe/golden/tickets-text.json` (2026-11-15, p. 31): 23 zapytania
+- **Zestaw tekstowy to `data/unsafe/golden/tool-tickets-text.json` (2026-11-15, p. 31): 23 zapytania
   w kształcie `find_tickets_text` do wątków golden200 i 6 bez celu, na tabeli
   `tickets_text_golden`.** Cel to zgłoszenie, z którego wątku wzięto komunikat albo kod, i tylko
   takie, którego karta o nim mówi; słowa stoją w innej odmianie niż w wątku, a zapytania bez celu
@@ -3363,7 +3365,7 @@ nogi produktu na jednej sprawie.
   nie ma albo któraś ścieżka nie zgadza się z paczką; budowa paczki robi to samo na końcu)
 - Ponowne parsowanie golden setu grafem `parse_ticket` do katalogu roboczego, z wznawianiem
   i postępem co 10 zgłoszeń: `python scripts/parse_golden_tickets.py parse <nowy katalog>/cards`
-  (numery z `data/unsafe/golden/tickets-vector.json`; do `golden/cards/` nie zapisuje; indeks do
+  (numery z `data/unsafe/golden/tool-tickets-vector.json`; do `golden/cards/` nie zapisuje; indeks do
   pomiaru: `QDRANT_COLLECTION=tickets_golden POSTGRES_TICKETS_TABLE=tickets_text_golden helpdesk
   tickets reindex <nowy katalog>`) — **płatne,
   pytaj przed**; wymaga usługi `anonymizer` z modelem anonimizującym i modelu generującego
@@ -3433,7 +3435,7 @@ nogi produktu na jednej sprawie.
   per kandydat na próg), `... detail --threshold 0.48` (co ten próg robi z każdym dystraktorem
   i które trafienia poprawne kosztuje) oraz `... plot` (wykres obu rozkładów z linią progu do
   `data/unsafe/docs/`). **Wymaga stacku i dwóch zbiorów** — golden setu oraz
-  `data/unsafe/golden/tickets-vector-distractors.json`; sam golden set mierzy tylko połowę
+  `data/unsafe/golden/tool-tickets-vector-distractors.json`; sam golden set mierzy tylko połowę
   rozkładu
 
 **Grafy (bramki, propozycje, „Popraw", wyszukiwanie, karta zgłoszenia) uruchamia się przez API**,
@@ -3784,19 +3786,21 @@ usługi `anonymizer` potrzebują jej silnika `agent` z osiągalnym modelem anoni
   tego, że ścieżka się nie zepsuła. Zgodność indeksu syntetycznego z plikami paczki sprawdzają
   fixture'y z `tests/evaluation/conftest.py`; porównanie i pomiary leżą w helperach
   `synthetic_docs` i `golden_tickets`.
-- **Nazwa zestawu w `data/safe/golden/` mówi, czego dotyczy (2026-10-15).** Dopisek `-tools` ma
-  zestaw zapytań do narzędzi z oczekiwanym wynikiem, sprawdzany bez modelu (`code-tools.json`,
-  `docs-tools.json`, wcześniej z dopiskiem `-synthetic`). Nazwa bez dopisku to scenariusze
-  ewaluacji modelu z p. 59 (`injections`, `gates`, `polish`, `handoff`, `questions`, `code`, `solution`,
-  `reading`). Zestawy
-  w `data/unsafe/golden/` nie mają dopisku paczki (do 2026-10-15 `-dokus`): instancja obsługuje
-  jeden produkt, więc dane klienta są zawsze z tej samej paczki (`tickets-vector.json`,
-  `tickets-vector-distractors.json`, `code.json`). Zestawy zgłoszeń mają za to dopisek
-  wyszukiwania, które mierzą (`-vector`, a od p. 31 `-text`; 2026-11-15), bo oba stoją na
-  zgłoszeniach. `code.json` w `unsafe` to sprawy dla agenta na
-  prawdziwym kodzie, ten sam rodzaj co `code.json` w `safe` na aplikacji syntetycznej. Tak samo
-  `anonymization.json` (2026-10-17): golden set anonimizatora w jednym kształcie, zmyślony
-  w `safe` i próbka korpusu w `unsafe`.
+- **Nazwa zestawu mówi, co mierzy: przedrostek `tool-` albo `graph-` (2026-11-27, wcześniej
+  dopisek `-tools` z 2026-10-15).** `tool-` ma zestaw zapytań do narzędzia z oczekiwanym wynikiem,
+  sprawdzany bez modelu: `tool-code.json` i `tool-docs.json` w `safe` (do 2026-11-27
+  `code-tools.json` i `docs-tools.json`, a wcześniej z dopiskiem `-synthetic`) oraz
+  `tool-tickets-vector.json`, `tool-tickets-vector-distractors.json` i `tool-tickets-text.json`
+  w `unsafe`. `graph-` ma zestaw do pomiaru grafu na żywym modelu, na prawdziwych danych:
+  `graph-gate-close.json` i `graph-gate-reply.json` w `unsafe`. Zestawy zgłoszeń mają za
+  przedrostkiem wyszukiwanie, które mierzą (`-vector`, a od p. 31 `-text`; 2026-11-15), bo oba
+  stoją na zgłoszeniach. Bez przedrostka zostają scenariusze ewaluacji modelu z p. 59 w `safe`
+  (`injections`, `gates`, `polish`, `handoff`, `questions`, `code`, `solution`, `reading`,
+  `closed`) oraz `code.json` w `unsafe`, `anonymization.json` i `tickets-mail.json`. Zestawy w `data/unsafe/golden/` nie mają dopisku paczki (do 2026-10-15 `-dokus`):
+  instancja obsługuje jeden produkt, więc dane klienta są zawsze z tej samej paczki. `code.json`
+  w `unsafe` to sprawy dla agenta na prawdziwym kodzie, ten sam rodzaj co `code.json` w `safe` na
+  aplikacji syntetycznej. Tak samo `anonymization.json` (2026-10-17): golden set anonimizatora
+  w jednym kształcie, zmyślony w `safe` i próbka korpusu w `unsafe`.
 - **Golden set anonimizatora (2026-10-17, p. 19.3): przypadek to tekst z danymi, które mają
   zniknąć (`remove`), i wiedzą, która ma zostać (`keep`), obie zapisane po rodzaju.** Zestaw
   zmyślony ma 59 przypadków: cytowaną historię maili z adresami w `<…>`, dane złamane między

@@ -1,6 +1,6 @@
 """
 Description:
-Spójność zestawu bramki wysyłki na prawdziwych wiadomościach (`gate-reply.json`, p. 33.3)
+Spójność zestawu bramki wysyłki na prawdziwych wiadomościach (`graph-gate-reply.json`, p. 33.3)
 z wątkami korpusu, bez modelu i bez stacku. Wpis to wiadomość konsultanta: zgłoszenie, numer
 komentarza, warstwa doboru, skrót wiadomości i łamane reguły z powodem. Na zestawie stoi test
 bramki na żywym modelu, a pomyłka w nim nie daje błędu, tylko fałszywy wynik pomiaru.

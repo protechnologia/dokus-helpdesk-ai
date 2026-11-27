@@ -11,7 +11,7 @@ commitem — test jej nie buduje (CLAUDE.md -> „Kod aplikacji").
 | `synthetic_code_symbols()` | czytnik jej mapy symboli                                    |
 | `synthetic_code_texts()`   | treść każdego pliku zbudowanej paczki, po ścieżce           |
 | `synthetic_code_tools()`   | sześć prawdziwych narzędzi kodu na tej paczce               |
-| `synthetic_code_cases()`   | sekcję jednego narzędzia z `code-tools.json`            |
+| `synthetic_code_cases()`   | sekcję jednego narzędzia z `tool-code.json`            |
 | `synthetic_absent_paths()` | pliki ze źródła, których paczka nie może zawierać           |
 | `line_of()`                | numer linii, w której stoi fragment zapisany w zestawie     |
 

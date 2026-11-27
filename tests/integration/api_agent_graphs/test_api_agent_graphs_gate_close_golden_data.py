@@ -1,6 +1,6 @@
 """
 Description:
-Spójność zestawu bramki zamknięcia na prawdziwych zamknięciach (`gate-close.json`, p. 33.2)
+Spójność zestawu bramki zamknięcia na prawdziwych zamknięciach (`graph-gate-close.json`, p. 33.2)
 z wątkami korpusu, bez modelu i bez stacku. Wpis to zamknięcie: warstwa doboru, liczba
 komentarzy w chwili zamknięcia, skrót uciętego wątku, rodzaj i dwie etykiety z powodem. Na
 zestawie stoi test bramki na żywym modelu, a pomyłka w nim nie daje błędu, tylko fałszywy wynik

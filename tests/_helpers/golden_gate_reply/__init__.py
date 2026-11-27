@@ -1,6 +1,6 @@
 """
 Description:
-Zestaw bramki wysyłki na prawdziwych wiadomościach z `data/unsafe/golden/gate-reply.json`
+Zestaw bramki wysyłki na prawdziwych wiadomościach z `data/unsafe/golden/graph-gate-reply.json`
 (p. 33.3): wiadomości konsultantów z korpusu z etykietami na każdą regułę wysyłki, wycinanie
 wejścia bramki z wątku po anonimizacji, ocena werdyktu, raport i przebieg na żywym modelu.
 Używają go test spójności zestawu i test bramki na żywym modelu.

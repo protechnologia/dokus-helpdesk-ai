@@ -1,7 +1,7 @@
 """
 Description:
-Zestaw bramki zamknięcia na prawdziwych zamknięciach (`gate-close.json`, p. 33.2). Wpis to jedno
-zamknięcie z korpusu instancji: warstwa doboru, liczba komentarzy w chwili zamknięcia, skrót
+Zestaw bramki zamknięcia na prawdziwych zamknięciach (`graph-gate-close.json`, p. 33.2). Wpis to
+jedno zamknięcie z korpusu instancji: warstwa doboru, liczba komentarzy w chwili zamknięcia, skrót
 uciętego wątku i dwie etykiety, po jednej na regułę zamknięcia. Wejście bramki test składa
 z wątku po anonimizacji, uciętego tak, jak go widział konsultant, który zamykał zgłoszenie.
 

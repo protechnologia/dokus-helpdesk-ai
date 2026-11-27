@@ -9,7 +9,7 @@ from pathlib import Path
 
 # Zestaw: zamknięcia z korpusu instancji z etykietami na każdą regułę bramki. Dane klienta, poza
 # repo.
-GOLDEN_FILE = Path("data/unsafe/golden/gate-close.json")
+GOLDEN_FILE = Path("data/unsafe/golden/graph-gate-close.json")
 
 # Wątki po anonimizacji, z których test składa wejście bramki: ten sam tekst, który poszedł do
 # modelu przy masowym imporcie, ucięty na zamknięciu.

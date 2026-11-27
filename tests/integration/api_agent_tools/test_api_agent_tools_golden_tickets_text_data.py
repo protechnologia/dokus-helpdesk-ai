@@ -1,6 +1,6 @@
 """
 Description:
-Spójność zestawu tekstowego (`data/unsafe/golden/tickets-text.json`) z kartami i wątkami golden
+Spójność zestawu tekstowego (`data/unsafe/golden/tool-tickets-text.json`) z kartami i wątkami golden
 setu, bez stacku. Na zestawie stoi pomiar `find_tickets_text`, a zapytania i cele dobiera się
 ręcznie: pomyłka w nich nie daje błędu, tylko fałszywy wynik pomiaru.
 

@@ -5,7 +5,7 @@ from tests._helpers.golden_gate_close.constants import GROUP_LABELS
 
 @dataclasses.dataclass(frozen=True)
 class GoldenGateCloseCase:
-    """Zamknięcie z zestawu bramki zamknięcia (`gate-close.json`): skąd wzięte, ile komentarzy
+    """Zamknięcie z zestawu bramki zamknięcia (`graph-gate-close.json`): skąd wzięte, ile komentarzy
     widzi bramka i dwie etykiety, po jednej na regułę zamknięcia."""
 
     ticket_id:         str   # np. "33605"

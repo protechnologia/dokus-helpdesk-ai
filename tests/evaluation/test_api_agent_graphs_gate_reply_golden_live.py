@@ -1,10 +1,10 @@
 """
 Description:
 Pomiar bramki wysyłki na prawdziwych wiadomościach z korpusu instancji (p. 33.3): fałszywe alarmy
-i przepuszczenia na 179 wiadomościach konsultantów z zestawu `data/unsafe/golden/gate-reply.json`.
-Wejście bramki to treść komentarza konsultanta wycięta z wątku z `corpus/anonymized/`, czyli to,
-co konsultant wysłał klientowi; werdykt porównuje się z regułami, które według oceniających
-wiadomość łamie.
+i przepuszczenia na 179 wiadomościach konsultantów z zestawu
+`data/unsafe/golden/graph-gate-reply.json`. Wejście bramki to treść komentarza konsultanta
+wycięta z wątku z `corpus/anonymized/`, czyli to, co konsultant wysłał klientowi; werdykt
+porównuje się z regułami, które według oceniających wiadomość łamie.
 
 | test (`test_…`)                          | co liczy                      | próg               |
 |------------------------------------------|-------------------------------|--------------------|

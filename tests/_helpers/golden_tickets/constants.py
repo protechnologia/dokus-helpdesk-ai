@@ -9,7 +9,7 @@ from pathlib import Path
 
 # Golden set: wpis na każde zgłoszenie korpusu odniesienia z etykietą przeglądu (`useful`)
 # i opcjonalnym zapytaniem, którego jest celem. Dane klienta, poza repo.
-GOLDEN_FILE = Path("data/unsafe/golden/tickets-vector.json")
+GOLDEN_FILE = Path("data/unsafe/golden/tool-tickets-vector.json")
 
 # Warstwy zapytań, po których `scripts/eval_embeddings.py` liczy wyniki osobno: rodzaj sprawy
 # i trudność zapytania. Wartość spoza listy dałaby w tabeli pomiaru osobny wiersz.
@@ -18,7 +18,7 @@ QUERY_DIFFICULTIES = ("typowe", "trudne")
 
 # Dystraktory: zapytania bez odpowiednika w indeksie, na które poprawną odpowiedzią jest pusty
 # wynik.
-DISTRACTORS_FILE = Path("data/unsafe/golden/tickets-vector-distractors.json")
+DISTRACTORS_FILE = Path("data/unsafe/golden/tool-tickets-vector-distractors.json")
 
 # Korpus odniesienia: karty 200 zgłoszeń golden setu, z których buduje się indeks do pomiarów.
 # Sparsowane `gpt-6.1-sol` 2026-10-23; nowsze karty zastępują ten katalog dopiero po przyjęciu.
@@ -53,7 +53,7 @@ MAX_DISTRACTORS_WITH_HITS = 8
 
 # Zestaw tekstowy: zapytania w kształcie `find_tickets_text` do wątków golden setu, z celem
 # i bez celu (2026-11-15). Dane klienta, poza repo.
-TEXT_FILE = Path("data/unsafe/golden/tickets-text.json")
+TEXT_FILE = Path("data/unsafe/golden/tool-tickets-text.json")
 
 # Wątki golden setu po anonimizacji, z których `reindex` buduje tabelę `GOLDEN_TABLE`.
 THREADS_DIR = Path("data/unsafe/golden/anonymized")

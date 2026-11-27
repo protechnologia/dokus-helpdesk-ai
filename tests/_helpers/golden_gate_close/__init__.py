@@ -1,6 +1,6 @@
 """
 Description:
-Zestaw bramki zamknięcia na prawdziwych zamknięciach z `data/unsafe/golden/gate-close.json`
+Zestaw bramki zamknięcia na prawdziwych zamknięciach z `data/unsafe/golden/graph-gate-close.json`
 (p. 33.2): wpisy z etykietami na każdą regułę, wejście bramki, czyli wątek z korpusu ucięty na
 zamknięciu, ocena werdyktu, raport i przebieg na żywym modelu. Używają go test spójności zestawu
 i test bramki na żywym modelu.

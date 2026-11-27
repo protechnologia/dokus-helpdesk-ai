@@ -1,9 +1,10 @@
 """
 Description:
 Pomiar bramki zamknięcia na prawdziwych zamknięciach z korpusu instancji (p. 33.2): fałszywe
-alarmy i przepuszczenia na 120 zamknięciach zestawu `data/unsafe/golden/gate-close.json`. Wejście
-bramki to wątek z `corpus/anonymized/` ucięty na zamknięciu, czyli to, co widział konsultant,
-który zamykał zgłoszenie; werdykt porównuje się z etykietami oceniających, po jednej na regułę.
+alarmy i przepuszczenia na 120 zamknięciach zestawu `data/unsafe/golden/graph-gate-close.json`.
+Wejście bramki to wątek z `corpus/anonymized/` ucięty na zamknięciu, czyli to, co widział
+konsultant, który zamykał zgłoszenie; werdykt porównuje się z etykietami oceniających, po jednej
+na regułę.
 
 | test (`test_…`)                          | co liczy                       | próg               |
 |------------------------------------------|--------------------------------|--------------------|
